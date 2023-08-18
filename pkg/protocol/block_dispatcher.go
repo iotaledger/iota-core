@@ -238,7 +238,7 @@ func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Bl
 	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
 
-	return aboveWarpSyncThreshold(block.ID().Index(), latestCommitmentIndex, maxCommittableAge) && slotCommitmentID.Index() > latestCommitmentIndex
+	return block.ID().Index() > latestCommitmentIndex+maxCommittableAge
 }
 
 // warpSyncIfNecessary checks if a warp sync is necessary and starts the process if that is the case.
@@ -251,8 +251,8 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
-	if aboveWarpSyncThreshold(chainCommitment.Commitment().Index(), latestCommitmentIndex, maxCommittableAge) {
-		for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+maxCommittableAge; slotToWarpSync++ {
+	if chainCommitment.Commitment().Index() > latestCommitmentIndex+1 {
+		for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+2*maxCommittableAge; slotToWarpSync++ {
 			if commitmentToSync := chain.Commitment(slotToWarpSync); commitmentToSync != nil && !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
 				b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
 			}
@@ -329,9 +329,6 @@ func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
 	})
 }
 
-func aboveWarpSyncThreshold(slot iotago.SlotIndex, latestCommitmentIndex iotago.SlotIndex, maxCommittableAge iotago.SlotIndex) bool {
-	return slot > latestCommitmentIndex+2*maxCommittableAge
-}
 
 // WarpSyncRetryInterval is the interval in which a warp sync request is retried.
 const WarpSyncRetryInterval = 1 * time.Minute
