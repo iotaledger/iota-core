@@ -1,6 +1,8 @@
 package chainmanagerv1
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ds/reactive"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -18,6 +20,8 @@ type Chain struct {
 	latestCommitmentIndex         reactive.Variable[iotago.SlotIndex]
 	latestVerifiedCommitmentIndex reactive.Variable[iotago.SlotIndex]
 
+	evicted reactive.Event
+
 	// syncThreshold defines an upper bound for the range of slots that are being fed to the engine as part of the sync
 	// process (sync from past to present preventing the engine from running out of memory).
 	syncThreshold reactive.Variable[iotago.SlotIndex]
@@ -29,8 +33,9 @@ type Chain struct {
 
 func NewChain() *Chain {
 	c := &Chain{
-		latestCommitmentIndex:         reactive.NewVariable[*Commitment](),
-		latestVerifiedCommitmentIndex: reactive.NewVariable[*Commitment](),
+		evicted:                       reactive.NewEvent(),
+		latestCommitmentIndex:         reactive.NewVariable[iotago.SlotIndex](),
+		latestVerifiedCommitmentIndex: reactive.NewVariable[iotago.SlotIndex](),
 	}
 
 	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
@@ -42,6 +47,14 @@ func NewChain() *Chain {
 	}, c.latestCommitmentIndex)
 
 	return c
+}
+
+func (c *Chain) RegisterCommitment(commitment *CommitmentMetadata) {
+	fmt.Println("RegisterCommitment", commitment.ID(), "as index", commitment.Index())
+}
+
+func (c *Chain) UnregisterCommitment(commitment *CommitmentMetadata) {
+	fmt.Println("UnregisterCommitment", commitment.ID(), "as index", commitment.Index())
 }
 
 func (c *Chain) LatestVerifiedCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
