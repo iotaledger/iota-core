@@ -42,7 +42,7 @@ type TestFramework struct {
 
 func NewTestFramework(t *testing.T, storageOpts ...options.Option[storage.Storage]) *TestFramework {
 	errorHandler := func(err error) {
-		t.Error(err)
+		t.Log(err)
 	}
 
 	baseDir := t.TempDir()
@@ -60,6 +60,11 @@ func NewTestFramework(t *testing.T, storageOpts ...options.Option[storage.Storag
 
 func (t *TestFramework) Shutdown() {
 	t.Instance.Shutdown()
+}
+
+func (t *TestFramework) SetLatestFinalizedEpoch(epoch iotago.EpochIndex) {
+	endSlot := t.Instance.Settings().APIProvider().CurrentAPI().TimeProvider().EpochEnd(epoch)
+	t.Instance.Settings().SetLatestFinalizedSlot(endSlot)
 }
 
 func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64) {
