@@ -9,7 +9,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (s *Storage) RewardsForEpoch(epoch iotago.EpochIndex) kvstore.KVStore {
+func (s *Storage) RewardsForEpoch(epoch iotago.EpochIndex) (kvstore.KVStore, error) {
 	return s.prunable.RewardsForEpoch(epoch)
 }
 

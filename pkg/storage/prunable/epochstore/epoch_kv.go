@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -29,6 +30,15 @@ func NewEpochKVStore(realm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotag
 	}
 }
 
+func (e *EpochKVStore) isTooOld(epoch iotago.EpochIndex) bool {
+	e.lastPrunedMutex.RLock()
+	defer e.lastPrunedMutex.RUnlock()
+
+	prunedEpoch, hasPruned := e.lastPrunedEpoch.Index()
+
+	return hasPruned && epoch <= prunedEpoch
+}
+
 func (e *EpochKVStore) RestoreLastPrunedEpoch(epoch iotago.EpochIndex) {
 	e.lastPrunedMutex.Lock()
 	defer e.lastPrunedMutex.Unlock()
@@ -43,15 +53,12 @@ func (e *EpochKVStore) LastPrunedEpoch() (iotago.EpochIndex, bool) {
 	return e.lastPrunedEpoch.Index()
 }
 
-func (e *EpochKVStore) GetEpoch(epoch iotago.EpochIndex) kvstore.KVStore {
-	e.lastPrunedMutex.RLock()
-	defer e.lastPrunedMutex.RUnlock()
-
-	if epoch < lo.Return1(e.lastPrunedEpoch.Index()) {
-		return nil
+func (e *EpochKVStore) GetEpoch(epoch iotago.EpochIndex) (kvstore.KVStore, error) {
+	if e.isTooOld(epoch) {
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "epoch %d is too old", epoch)
 	}
 
-	return lo.PanicOnErr(e.kv.WithExtendedRealm(epoch.MustBytes()))
+	return lo.PanicOnErr(e.kv.WithExtendedRealm(epoch.MustBytes())), nil
 }
 
 // GetPrunableEpoch returns the KVStore for the given epoch with pruningDelay if it is prunable.
@@ -64,7 +71,7 @@ func (e *EpochKVStore) GetPrunableEpoch(epoch iotago.EpochIndex) kvstore.KVStore
 		return nil
 	}
 
-	return e.GetEpoch(epoch - e.pruningDelay)
+	return lo.Return1(e.GetEpoch(epoch - e.pruningDelay))
 }
 
 func (e *EpochKVStore) PruneUntilEpoch(epoch iotago.EpochIndex) error {

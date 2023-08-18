@@ -175,7 +175,10 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 		targetRewardsEpoch = currentEpoch
 	}
 
-	rewardsRoot = o.performanceTracker.RewardsRoot(targetRewardsEpoch)
+	rewardsRoot, err = o.performanceTracker.RewardsRoot(targetRewardsEpoch)
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to calculate rewards root for epoch %d", targetRewardsEpoch))
+	}
 
 	o.lastCommittedSlot = slot
 

@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -33,7 +34,9 @@ func (s *Store[V]) isTooOld(epoch iotago.EpochIndex) bool {
 	s.lastPrunedMutex.RLock()
 	defer s.lastPrunedMutex.RUnlock()
 
-	return epoch < lo.Return1(s.lastPrunedEpoch.Index())
+	prunedEpoch, hasPruned := s.lastPrunedEpoch.Index()
+
+	return hasPruned && epoch <= prunedEpoch
 }
 
 func (s *Store[V]) RestoreLastPrunedEpoch(epoch iotago.EpochIndex) {
@@ -50,12 +53,12 @@ func (s *Store[V]) LastPrunedEpoch() (iotago.EpochIndex, bool) {
 	return s.lastPrunedEpoch.Index()
 }
 
-// LoadPrunable loads the value for the given epoch.
+// Load loads the value for the given epoch.
 func (s *Store[V]) Load(epoch iotago.EpochIndex) (V, error) {
 	var zeroValue V
 
 	if s.isTooOld(epoch) {
-		return zeroValue, ierrors.Errorf("epoch %d is too old", epoch)
+		return zeroValue, ierrors.Wrapf(database.ErrEpochPruned, "epoch %d is too old", epoch)
 	}
 
 	value, err := s.kv.Get(epoch)
@@ -88,7 +91,7 @@ func (s *Store[V]) LoadPrunable(epoch iotago.EpochIndex) (bool, V, error) {
 
 func (s *Store[V]) Store(epoch iotago.EpochIndex, value V) error {
 	if s.isTooOld(epoch) {
-		return ierrors.Errorf("epoch %d is too old", epoch)
+		return ierrors.Wrapf(database.ErrEpochPruned, "epoch %d is too old", epoch)
 	}
 
 	return s.kv.Set(epoch, value)

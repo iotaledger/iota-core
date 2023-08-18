@@ -105,13 +105,13 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
 
-	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
-	start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
-	if start < epoch {
-		err := ierrors.Wrapf(prunable.ErrNotEnoughHistory, "pruning epoch %d is larger than the current epoch %d in PruneByEpochIndex", epoch, start)
-		s.errorHandler(err)
-		return err
-	}
+	// latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
+	// start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
+	// if start < epoch {
+	// 	err := ierrors.Wrapf(prunable.ErrNotEnoughHistory, "pruning epoch %d is larger than the current epoch %d in PruneByEpochIndex", epoch, start)
+	// 	s.errorHandler(err)
+	// 	return err
+	// }
 
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
@@ -131,7 +131,7 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) error {
 	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
 	start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
 	if start < depth {
-		err := ierrors.Wrapf(prunable.ErrNotEnoughHistory, "pruning depth %d is greater than the current epoch %d in PruneByDepth", depth, start)
+		err := ierrors.Wrapf(database.ErrNotEnoughHistory, "pruning depth %d is greater than the current epoch %d in PruneByDepth", depth, start)
 		s.errorHandler(err)
 		return err
 	}
@@ -142,7 +142,7 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) error {
 func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
 	if !s.optPruningSizeEnabled && len(targetSizeBytes) == 0 {
 		// pruning by size deactivated
-		return prunable.ErrNoPruningNeeded
+		return database.ErrNoPruningNeeded
 	}
 
 	s.pruningLock.Lock()
@@ -159,7 +159,7 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
 	currentSize := s.Size()
 	// No need to prune. The database is already smaller than the target size.
 	if targetDatabaseSizeBytes < 0 || currentSize < targetDatabaseSizeBytes {
-		return prunable.ErrNoPruningNeeded
+		return database.ErrNoPruningNeeded
 	}
 
 	latestEpoch := s.Settings().APIProvider().CurrentAPI().TimeProvider().EpochFromSlot(s.Settings().LatestFinalizedSlot())
