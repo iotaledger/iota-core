@@ -12,20 +12,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func TestStorage_Pruning(t *testing.T) {
-	tf := NewTestFramework(t, "")
-	defer tf.Shutdown()
-
-	tf.GeneratePermanentData(100 * MB)
-	tf.GeneratePrunableData(1, 100*MB)
-	tf.GeneratePrunableData(2, 100*MB)
-	for i := 0; i < 100; i++ {
-		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
-	}
-}
-
 func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
-	tf := NewTestFramework(t, "", storage.WithPruningDelay(1))
+	tf := NewTestFramework(t, storage.WithPruningDelay(1))
 	defer tf.Shutdown()
 
 	totalEpochs := 10
@@ -59,7 +47,7 @@ func TestStorage_PruneByEpochIndex_SmallerDefault(t *testing.T) {
 }
 
 func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
-	tf := NewTestFramework(t, "", storage.WithPruningDelay(10))
+	tf := NewTestFramework(t, storage.WithPruningDelay(10))
 	defer tf.Shutdown()
 
 	totalEpochs := 14
@@ -88,8 +76,8 @@ func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
 	require.ErrorContains(t, err, database.ErrNoPruningNeeded.Error())
 
 	tf.AssertPrunedUntil(
-		types.NewTuple(0, true),
-		types.NewTuple(0, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),
@@ -107,7 +95,7 @@ func TestStorage_PruneByEpochIndex_BiggerDefault(t *testing.T) {
 }
 
 func TestStorage_PruneBySize(t *testing.T) {
-	tf := NewTestFramework(t, "",
+	tf := NewTestFramework(t,
 		storage.WithPruningDelay(2),
 		storage.WithPruningSizeEnable(true),
 		storage.WithPruningSizeMaxTargetSizeBytes(10*MB))
@@ -142,7 +130,7 @@ func TestStorage_PruneBySize(t *testing.T) {
 }
 
 func TestStorage_RestoreFromDisk(t *testing.T) {
-	tf := NewTestFramework(t, "", storage.WithPruningDelay(1))
+	tf := NewTestFramework(t, storage.WithPruningDelay(1))
 
 	totalEpochs := 370
 	tf.GeneratePermanentData(5 * MB)
@@ -152,6 +140,7 @@ func TestStorage_RestoreFromDisk(t *testing.T) {
 	}
 
 	tf.SetLatestFinalizedEpoch(366)
+
 	tf.Instance.PruneByEpochIndex(366)
 	tf.AssertPrunedUntil(
 		types.NewTuple(365, true),
@@ -161,14 +150,14 @@ func TestStorage_RestoreFromDisk(t *testing.T) {
 		types.NewTuple(1, true),
 	)
 
-	restoreDir := tf.BaseDir()
-	tf.Shutdown()
-
 	// restore from disk
-	tf = NewTestFramework(t, restoreDir, storage.WithPruningDelay(1))
-	tf.Instance.RestoreFromDisk()
+	tf.RestoreFromDisk()
 
-	epoch, pruned := tf.Instance.LastPrunedEpoch()
-	require.Equal(t, iotago.EpochIndex(365), epoch)
-	require.True(t, pruned)
+	tf.AssertPrunedUntil(
+		types.NewTuple(365, true),
+		types.NewTuple(359, true),
+		types.NewTuple(1, true),
+		types.NewTuple(1, true),
+		types.NewTuple(1, true),
+	)
 }

@@ -37,28 +37,32 @@ type TestFramework struct {
 	baseDir         string
 	baseDirPrunable string
 
-	uniqueKeyCounter uint64
+	uniqueKeyCounter   uint64
+	storageFactoryFunc func() *storage.Storage
 }
 
-func NewTestFramework(t *testing.T, base string, storageOpts ...options.Option[storage.Storage]) *TestFramework {
+func NewTestFramework(t *testing.T, storageOpts ...options.Option[storage.Storage]) *TestFramework {
 	errorHandler := func(err error) {
 		t.Log(err)
 	}
 
-	baseDir := base
-	if baseDir == "" {
-		baseDir = t.TempDir()
+	baseDir := t.TempDir()
+	storageFactoryFunc := func() *storage.Storage {
+		instance := storage.New(baseDir, 0, errorHandler, storageOpts...)
+		require.NoError(t, instance.Settings().StoreProtocolParametersForStartEpoch(iotago.NewV3ProtocolParameters(), 0))
+
+		return instance
 	}
 
-	instance := storage.New(baseDir, 0, errorHandler, storageOpts...)
-	require.NoError(t, instance.Settings().StoreProtocolParametersForStartEpoch(iotago.NewV3ProtocolParameters(), 0))
+	instance := storageFactoryFunc()
 
 	return &TestFramework{
-		t:               t,
-		Instance:        instance,
-		apiProvider:     instance.Settings().APIProvider(),
-		baseDir:         baseDir,
-		baseDirPrunable: filepath.Join(baseDir, "prunable"),
+		t:                  t,
+		Instance:           instance,
+		apiProvider:        instance.Settings().APIProvider(),
+		baseDir:            baseDir,
+		baseDirPrunable:    filepath.Join(baseDir, "prunable"),
+		storageFactoryFunc: storageFactoryFunc,
 	}
 }
 
@@ -66,13 +70,16 @@ func (t *TestFramework) Shutdown() {
 	t.Instance.Shutdown()
 }
 
-func (t *TestFramework) BaseDir() string {
-	return t.baseDir
+func (t *TestFramework) RestoreFromDisk() {
+	t.Instance.Shutdown()
+
+	t.Instance = t.storageFactoryFunc()
+	t.Instance.RestoreFromDisk()
 }
 
 func (t *TestFramework) SetLatestFinalizedEpoch(epoch iotago.EpochIndex) {
 	endSlot := t.Instance.Settings().APIProvider().CurrentAPI().TimeProvider().EpochEnd(epoch)
-	t.Instance.Settings().SetLatestFinalizedSlot(endSlot)
+	require.NoError(t.t, t.Instance.Settings().SetLatestFinalizedSlot(endSlot))
 }
 
 func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64) {
@@ -104,7 +111,7 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 	t.Instance.Flush()
 	t.AssertPrunableSizeGreater(initialStorageSize + size)
 
-	fmt.Printf("> created %d MB of bucket prunable data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
+	// fmt.Printf("> created %d MB of bucket prunable data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
 }
 
 func (t *TestFramework) GenerateSemiPermanentData(epoch iotago.EpochIndex) {
@@ -161,7 +168,7 @@ func (t *TestFramework) GeneratePermanentData(size int64) {
 	t.Instance.Flush()
 
 	t.AssertPermanentSizeGreater(initialStorageSize + size)
-	fmt.Printf("> created %d MB of permanent data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
+	// fmt.Printf("> created %d MB of permanent data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
 }
 
 func (t *TestFramework) storeRandomData(kv kvstore.KVStore, size int64) int64 {

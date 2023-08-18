@@ -54,8 +54,9 @@ func (e *EpochKVStore) RestoreLastPrunedEpoch() error {
 		return err
 	}
 
-	if lowestEpoch != nil {
-		e.lastPrunedEpoch.MarkEvicted(*lowestEpoch)
+	if lowestEpoch != nil && *lowestEpoch > 0 {
+		// We need to subtract 1 as lowestEpoch is the last epoch we have stored. Thus, the last pruned is -1.
+		e.lastPrunedEpoch.MarkEvicted(*lowestEpoch - 1)
 	}
 
 	return nil
@@ -75,7 +76,6 @@ func (e *EpochKVStore) GetEpoch(epoch iotago.EpochIndex) (kvstore.KVStore, error
 
 	return lo.PanicOnErr(e.kv.WithExtendedRealm(epoch.MustBytes())), nil
 }
-
 
 func (e *EpochKVStore) streamEpochs(consumer func(epoch iotago.EpochIndex) error) error {
 	var innerErr error
