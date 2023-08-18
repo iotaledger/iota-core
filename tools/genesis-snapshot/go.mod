@@ -10,7 +10,7 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20230803080824-b9183942b168
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230803080824-b9183942b168
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230817100419-87dc40e5a760
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230817132808-c8c002a395f4
 	github.com/mr-tron/base58 v1.2.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.12.0
@@ -35,7 +35,6 @@ require (
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230803080824-b9183942b168 // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230803080824-b9183942b168 // indirect
 	github.com/kr/text v0.2.0 // indirect
-	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
 	github.com/pelletier/go-toml/v2 v2.0.9 // indirect
 	github.com/petermattis/goid v0.0.0-20230518223814-80aa455d8761 // indirect
