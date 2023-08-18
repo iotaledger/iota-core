@@ -24,10 +24,6 @@ func (p *Protocol) runNetworkProtocol() {
 		}
 	}, event.WithWorkerPool(wpBlocks))
 
-	p.Events.Engine.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
-		p.networkProtocol.RequestBlock(blockID)
-	}, event.WithWorkerPool(wpBlocks))
-
 	// Blocks are gossiped when they are scheduled or skipped.
 	p.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
 		p.networkProtocol.SendBlock(block.ModelBlock())
