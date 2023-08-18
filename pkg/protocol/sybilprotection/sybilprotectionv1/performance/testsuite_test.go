@@ -164,7 +164,7 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochInde
 	endSlot := t.API.TimeProvider().EpochEnd(epochIndex)
 	for slot := startSlot; slot <= endSlot; slot++ {
 		for i := uint64(0); i < performanceFactor; i++ {
-			block := tpkg.RandBasicBlockWithIssuerAndBurnedMana(accountID, 10)
+			block := tpkg.RandBasicBlockWithIssuerAndRMC(accountID, 10)
 			block.IssuingTime = t.API.TimeProvider().SlotStartTime(slot)
 			modelBlock, err := model.BlockFromBlock(block, t.API)
 			t.Instance.TrackValidationBlock(blocks.NewBlock(modelBlock))

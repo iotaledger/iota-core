@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"math"
 	"testing"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
@@ -33,7 +32,7 @@ func Test_TransitionAccount(t *testing.T) {
 		// AccountID is derived from this field, so this must be set uniquely for each account.
 		IssuerKey: oldGenesisOutputKey,
 		// Expiry Slot is the slot index at which the account expires.
-		ExpirySlot: math.MaxUint64,
+		ExpirySlot: 1,
 		// BlockIssuanceCredits on this account is custom because it never needs to issue.
 		// On Validator nodes it's unlimited (MaxInt64).
 		BlockIssuanceCredits: iotago.BlockIssuanceCredits(123),
@@ -56,7 +55,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ID:         genesisAccountOutput.AccountID,
 		Credits:    accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
 		OutputID:   genesisAccount.OutputID(),
-		ExpirySlot: math.MaxUint64,
+		ExpirySlot: 1,
 		PubKeys:    ds.NewSet(oldGenesisOutputKey),
 	}, ts.Nodes()...)
 
@@ -64,6 +63,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	newGenesisOutputKey := utils.RandPubKey()
 	newAccountBlockIssuerKey := utils.RandPubKey()
+	latestCommitmentID := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID()
 
 	accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount(
 		"Genesis:1",
@@ -75,6 +75,14 @@ func Test_TransitionAccount(t *testing.T) {
 	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
 		testsuite.WithAccountInput(accountInput, true),
 		testsuite.WithInputs(consumedInputs),
+		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
+			&iotago.BlockIssuanceCreditInput{
+				AccountID: genesisAccountOutput.AccountID,
+			},
+			&iotago.CommitmentInput{
+				CommitmentID: latestCommitmentID,
+			},
+		}),
 		testsuite.WithOutputs(append(accountOutputs, equalOutputs...)),
 		testsuite.WithAllotments(iotago.Allotments{&iotago.Allotment{
 			AccountID: genesisAccountOutput.AccountID,
@@ -92,7 +100,7 @@ func Test_TransitionAccount(t *testing.T) {
 	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock1, &model.AccountDiff{
 		BICChange:           0,
 		PreviousUpdatedTime: 0,
-		PreviousExpirySlot:  math.MaxUint64,
+		PreviousExpirySlot:  1,
 		NewExpirySlot:       1,
 		NewOutputID:         iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 		PreviousOutputID:    genesisAccount.OutputID(),

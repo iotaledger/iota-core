@@ -131,3 +131,19 @@ func (blk *Block) String() string {
 
 	return out.String()
 }
+
+func (blk *Block) WorkScore() iotago.WorkScore {
+	if basicBlock, isBasic := blk.BasicBlock(); isBasic {
+		workScore, err := basicBlock.WorkScore(blk.api.ProtocolParameters().WorkScoreStructure())
+		if err != nil {
+			panic(err)
+		}
+
+		return workScore
+	}
+
+	// else this is a validator block and should have workScore Zero
+	// TODO: deal with validator blocks with issue #236
+	return iotago.WorkScore(0)
+
+}

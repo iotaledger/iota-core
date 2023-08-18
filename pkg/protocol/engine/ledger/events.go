@@ -8,6 +8,8 @@ import (
 
 type Events struct {
 	StateDiffApplied *event.Event3[iotago.SlotIndex, utxoledger.Outputs, utxoledger.Spents]
+	AccountCreated   *event.Event1[iotago.AccountID]
+	AccountDestroyed *event.Event1[iotago.AccountID]
 
 	event.Group[Events, *Events]
 }
@@ -16,5 +18,7 @@ type Events struct {
 var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 	return &Events{
 		StateDiffApplied: event.New3[iotago.SlotIndex, utxoledger.Outputs, utxoledger.Spents](),
+		AccountCreated:   event.New1[iotago.AccountID](),
+		AccountDestroyed: event.New1[iotago.AccountID](),
 	}
 })

@@ -45,12 +45,12 @@ func (q *IssuerQueue) Size() int {
 
 // Work returns the total work of the blocks in the queue.
 // This function is thread-safe.
-func (q *IssuerQueue) Work() int {
+func (q *IssuerQueue) Work() iotago.WorkScore {
 	if q == nil {
 		return 0
 	}
 
-	return int(q.work.Load())
+	return iotago.WorkScore(q.work.Load())
 }
 
 // IssuerID returns the ID of the issuer belonging to the queue.
