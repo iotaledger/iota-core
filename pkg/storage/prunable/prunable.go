@@ -53,6 +53,8 @@ func New(dbConfig database.Config, pruningDelay iotago.EpochIndex, apiProvider a
 func (p *Prunable) RestoreFromDisk() {
 	p.prunableSlotStore.RestoreFromDisk()
 
+	// TODO: revisit AssertPrunedUntil after this is fixed.
+
 	// set lastPrunedEpoch based on latest pruning epoch of buckets
 	// TODO: can't simply mark as evicted even if it's epoch 0. Maybe we need to store the last pruned slot in the settings.
 	//  lastPrunedEpoch := lo.Return1(p.prunableSlotStore.LastPrunedEpoch())
@@ -128,17 +130,13 @@ func (p *Prunable) EpochToPrunedBySize(targetSize int64, latestFinalizedEpoch io
 
 	var sum int64
 	for i := lastPrunedEpoch + 1; i <= latestFinalizedEpoch-p.defaultPruningDelay; i++ {
-		semiSize, err := p.semiPermanentDBSizeByEpoch(i)
-		if err != nil {
-			return 0, ierrors.Wrapf(err, "failed to get semiPermanentDB size in EpochToPrunedBasedOnSize")
-		}
-		sum += semiSize
-
 		bucketSize, err := p.prunableSlotStore.BucketSize(i)
 		if err != nil {
 			return 0, ierrors.Wrapf(err, "failed to get bucket size in EpochToPrunedBasedOnSize")
 		}
-		sum += bucketSize
+		// add 10% for semiPermanentDB size estimation, it would be too heavy to estimate semiPermanentDB.
+		// we can tune this number later
+		sum += int64(float64(bucketSize) * 1.1)
 
 		if sum >= targetSize {
 			return i + p.defaultPruningDelay, nil
@@ -151,36 +149,4 @@ func (p *Prunable) EpochToPrunedBySize(targetSize int64, latestFinalizedEpoch io
 
 	// TODO: do we return error here, or prune as much as we could
 	return 0, database.ErrNotEnoughHistory
-}
-
-func (p *Prunable) semiPermanentDBSizeByEpoch(epoch iotago.EpochIndex) (int64, error) {
-	var sum int64
-
-	if prunable, versionHash, err := p.decidedUpgradeSignals.LoadPrunable(epoch); err != nil {
-		return 0, ierrors.Wrapf(err, "failed to load decidedUpgradeSignals with delay for epoch %d", epoch)
-	} else if prunable {
-		sum += int64(len(lo.Return1(versionHash.Bytes()))) + 8 // epoch key
-	}
-
-	if prunable, stats, err := p.poolStats.LoadPrunable(epoch); err != nil {
-		return 0, ierrors.Wrapf(err, "failed to load poolStats with delay for epoch %d", epoch)
-	} else if prunable {
-		sum += int64(len(lo.Return1(stats.Bytes()))) + 8 // epoch key
-	}
-
-	if prunable, committee, err := p.committee.LoadPrunable(epoch); err != nil {
-		return 0, ierrors.Wrapf(err, "failed to load committee with delay for epoch %d", epoch)
-	} else if prunable {
-		sum += int64(len(lo.Return1(committee.Bytes()))) + 8 // epoch key
-	}
-
-	if rewardsStore := p.poolRewards.GetPrunableEpoch(epoch); rewardsStore != nil {
-		rewardsStore.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
-			sum += int64(len(key) + len(value))
-
-			return true
-		})
-	}
-
-	return sum, nil
 }

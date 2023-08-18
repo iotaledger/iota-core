@@ -73,22 +73,6 @@ func (s *Store[V]) Load(epoch iotago.EpochIndex) (V, error) {
 	return value, nil
 }
 
-// LoadPrunable loads the value for the given epoch with pruningDelay if it is valid to prune.
-func (s *Store[V]) LoadPrunable(epoch iotago.EpochIndex) (bool, V, error) {
-	s.lastPrunedMutex.RLock()
-	defer s.lastPrunedMutex.RUnlock()
-
-	var zeroValue V
-	minStartEpoch := s.lastPrunedEpoch.NextIndex() + s.pruningDelay
-	if epoch < minStartEpoch {
-		return false, zeroValue, nil
-	}
-
-	value, err := s.Load(epoch - s.pruningDelay)
-
-	return true, value, err
-}
-
 func (s *Store[V]) Store(epoch iotago.EpochIndex, value V) error {
 	if s.isTooOld(epoch) {
 		return ierrors.Wrapf(database.ErrEpochPruned, "epoch %d is too old", epoch)

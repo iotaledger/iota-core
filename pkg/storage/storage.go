@@ -184,7 +184,6 @@ func (s *Storage) Shutdown() {
 }
 
 func (s *Storage) Flush() {
-	// TODO: when to trigger flush?
 	s.permanent.Flush()
 	s.prunable.Flush()
 }
