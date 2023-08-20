@@ -41,10 +41,8 @@ func NewChainManager() *ChainManager {
 }
 
 func (c *ChainManager) SetRootCommitment(commitment *model.Commitment) (commitmentMetadata *CommitmentMetadata, err error) {
-	var prevRootToEvict *CommitmentMetadata
-
 	c.rootCommitment.Compute(func(currentRoot *CommitmentMetadata) *CommitmentMetadata {
-		if prevRootToEvict = currentRoot; currentRoot != nil {
+		if currentRoot != nil {
 			if currentRoot.Index() > commitment.Index() {
 				err = ierrors.Errorf("cannot set root commitment with lower index %s than current root commitment index %s", commitment.Index(), currentRoot.Index())
 				return currentRoot
@@ -56,35 +54,20 @@ func (c *ChainManager) SetRootCommitment(commitment *model.Commitment) (commitme
 			}
 		}
 
-		commitmentRequest, requestCreated := c.cachedCommitments.GetOrCreate(commitment.ID(), lo.NoVariadic(promise.New[*CommitmentMetadata]))
-		commitmentRequest.OnSuccess(func(resolvedMetadata *CommitmentMetadata) {
-			commitmentMetadata = resolvedMetadata
-			commitmentMetadata.Chain().Set(c.rootChain)
-			commitmentMetadata.Solid().Trigger()
-			commitmentMetadata.Verified().Trigger()
-			commitmentMetadata.BelowSyncThreshold().Trigger()
-			commitmentMetadata.BelowWarpSyncThreshold().Trigger()
-			commitmentMetadata.BelowLatestVerifiedCommitment().Trigger()
-
-			if requestCreated {
-				c.commitmentCreated.Trigger(commitmentMetadata)
-
-				commitmentMetadata.Evicted().OnTrigger(func() {
-					c.cachedCommitments.Delete(commitment.ID())
-				})
-			}
-		})
-		commitmentRequest.Resolve(NewCommitmentMetadata(commitment))
+		commitmentMetadata = NewCommitmentMetadata(commitment)
+		commitmentMetadata.Chain().Set(c.rootChain)
+		commitmentMetadata.Solid().Trigger()
+		commitmentMetadata.Verified().Trigger()
+		commitmentMetadata.BelowSyncThreshold().Trigger()
+		commitmentMetadata.BelowWarpSyncThreshold().Trigger()
+		commitmentMetadata.BelowLatestVerifiedCommitment().Trigger()
+		commitmentMetadata.Evicted().Trigger()
 
 		return commitmentMetadata
 	})
 
 	if err != nil {
 		return nil, err
-	}
-
-	if prevRootToEvict != nil {
-		prevRootToEvict.Evicted().Trigger()
 	}
 
 	return commitmentMetadata, nil
@@ -104,12 +87,14 @@ func (c *ChainManager) OnCommitmentCreated(callback func(commitment *CommitmentM
 	return c.commitmentCreated.Hook(callback).Unhook
 }
 
-func (c *ChainManager) SlotEvictedEvent(index iotago.SlotIndex) (slotEvictedEvent reactive.Event) {
+func (c *ChainManager) SlotEvictedEvent(index iotago.SlotIndex) reactive.Event {
+	var slotEvictedEvent reactive.Event
+
 	c.lastEvictedSlotIndex.Compute(func(lastEvictedSlotIndex iotago.SlotIndex) iotago.SlotIndex {
 		if index > lastEvictedSlotIndex {
 			slotEvictedEvent, _ = c.slotEvictionEvents.GetOrCreate(index, reactive.NewEvent)
 		} else {
-			slotEvictedEvent = triggeredEvent
+			slotEvictedEvent = defaultTriggeredEvent
 		}
 
 		return lastEvictedSlotIndex
@@ -141,59 +126,52 @@ func (c *ChainManager) Evict(slotIndex iotago.SlotIndex) {
 }
 
 func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvictedEvent reactive.Event) {
-	if rootCommitment := c.rootCommitment.Get(); rootCommitment != nil && commitment.PrevID() == rootCommitment.ID() {
-		commitment.RegisterParent(rootCommitment)
-	} else {
-		c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, commitment.RegisterParent)
-	}
+	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, commitment.RegisterParent)
 
-	slotEvictedEvent.OnTrigger(func() {
-		if c.rootCommitment.Get().ID() != commitment.ID() {
-			commitment.Evicted().Trigger()
-		}
-	})
+	slotEvictedEvent.OnTrigger(func() { commitment.Evicted().Trigger() })
 
 	c.commitmentCreated.Trigger(commitment)
 }
 
 func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.SlotIndex, requestIfMissing bool, optSuccessCallbacks ...func(metadata *CommitmentMetadata)) (commitmentRequest *promise.Promise[*CommitmentMetadata], requestCreated bool) {
-	rootCommitment := c.rootCommitment.Get()
-
-	if slotEvictedEvent := c.SlotEvictedEvent(index); !slotEvictedEvent.WasTriggered() || rootCommitment != nil && rootCommitment.ID() == id {
-		if commitmentRequest, requestCreated = c.cachedCommitments.GetOrCreate(id, lo.NoVariadic(promise.New[*CommitmentMetadata])); requestCreated {
-			if requestIfMissing {
-				c.commitmentRequester.StartTicker(id)
+	slotEvictedEvent := c.SlotEvictedEvent(index)
+	if slotEvictedEvent.WasTriggered() {
+		if rootCommitment := c.rootCommitment.Get(); rootCommitment != nil && id == rootCommitment.ID() {
+			for _, successCallback := range optSuccessCallbacks {
+				successCallback(rootCommitment)
 			}
 
-			commitmentRequest.OnSuccess(func(commitment *CommitmentMetadata) {
-				if requestIfMissing {
-					c.commitmentRequester.StopTicker(commitment.ID())
-				}
-
-				c.setupCommitment(commitment, slotEvictedEvent)
-			})
-
-			slotEvictedEvent.OnTrigger(func() {
-				if rootCommitment == nil || id != c.rootCommitment.Get().ID() {
-					c.cachedCommitments.Delete(id)
-				} else {
-					rootCommitment.Evicted().OnTrigger(func() {
-						c.cachedCommitments.Delete(id)
-					})
-				}
-			})
+			return promise.New[*CommitmentMetadata]().Resolve(rootCommitment), false
 		}
 
-		for _, successCallback := range optSuccessCallbacks {
-			commitmentRequest.OnSuccess(successCallback)
+		return nil, false
+	}
+
+	if commitmentRequest, requestCreated = c.cachedCommitments.GetOrCreate(id, lo.NoVariadic(promise.New[*CommitmentMetadata])); requestCreated {
+		if requestIfMissing {
+			c.commitmentRequester.StartTicker(id)
 		}
+
+		commitmentRequest.OnSuccess(func(commitment *CommitmentMetadata) {
+			if requestIfMissing {
+				c.commitmentRequester.StopTicker(commitment.ID())
+			}
+
+			c.setupCommitment(commitment, slotEvictedEvent)
+		})
+
+		slotEvictedEvent.OnTrigger(func() { c.cachedCommitments.Delete(id) })
+	}
+
+	for _, successCallback := range optSuccessCallbacks {
+		commitmentRequest.OnSuccess(successCallback)
 	}
 
 	return commitmentRequest, requestCreated
 }
 
-var triggeredEvent = reactive.NewEvent()
+var defaultTriggeredEvent = reactive.NewEvent()
 
 func init() {
-	triggeredEvent.Trigger()
+	defaultTriggeredEvent.Trigger()
 }
