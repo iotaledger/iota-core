@@ -1,9 +1,9 @@
 package chainmanagerv1
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ds/reactive"
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -17,7 +17,10 @@ const (
 )
 
 type Chain struct {
-	latestCommitmentIndex         reactive.Variable[iotago.SlotIndex]
+	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *CommitmentMetadata]
+
+	latestCommitmentIndex reactive.Variable[iotago.SlotIndex]
+
 	latestVerifiedCommitmentIndex reactive.Variable[iotago.SlotIndex]
 
 	evicted reactive.Event
@@ -33,6 +36,7 @@ type Chain struct {
 
 func NewChain() *Chain {
 	c := &Chain{
+		commitments:                   shrinkingmap.New[iotago.SlotIndex, *CommitmentMetadata](),
 		evicted:                       reactive.NewEvent(),
 		latestCommitmentIndex:         reactive.NewVariable[iotago.SlotIndex](),
 		latestVerifiedCommitmentIndex: reactive.NewVariable[iotago.SlotIndex](),
@@ -50,11 +54,19 @@ func NewChain() *Chain {
 }
 
 func (c *Chain) RegisterCommitment(commitment *CommitmentMetadata) {
-	fmt.Println("RegisterCommitment", commitment.ID(), "as index", commitment.Index())
+	c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
+		c.commitments.Set(commitment.Index(), commitment)
+
+		return lo.Cond(latestCommitmentIndex > commitment.Index(), latestCommitmentIndex, commitment.Index())
+	})
 }
 
 func (c *Chain) UnregisterCommitment(commitment *CommitmentMetadata) {
-	fmt.Println("UnregisterCommitment", commitment.ID(), "as index", commitment.Index())
+	c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
+		c.commitments.Delete(commitment.Index())
+
+		return lo.Cond(commitment.Index() < latestCommitmentIndex, commitment.Index()-1, latestCommitmentIndex)
+	})
 }
 
 func (c *Chain) LatestVerifiedCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
