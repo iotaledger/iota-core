@@ -42,6 +42,14 @@ func NewCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
 		chainSuccessor:                      reactive.NewVariable[*CommitmentMetadata](),
 	}
 
+	c.chain.OnUpdate(func(oldChain, newChain *Chain) {
+		if oldChain != nil {
+			oldChain.UnregisterCommitment(c)
+		}
+
+		newChain.RegisterCommitment(c)
+	})
+
 	c.directlyAboveLatestVerifiedCommitment = reactive.NewDerivedVariable2(func(parentVerified, verified bool) bool {
 		return parentVerified && !verified
 	}, c.parentVerified, c.verified)
@@ -57,14 +65,6 @@ func NewCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
 	c.requiresWarpSync = reactive.NewDerivedVariable2(func(inSyncWindow, belowWarpSyncThreshold bool) bool {
 		return inSyncWindow && belowWarpSyncThreshold
 	}, c.inSyncWindow, c.belowWarpSyncThreshold)
-
-	c.chain.OnUpdate(func(oldChain, newChain *Chain) {
-		if oldChain != nil {
-			oldChain.UnregisterCommitment(c)
-		}
-
-		newChain.RegisterCommitment(c)
-	})
 
 	return c
 }
