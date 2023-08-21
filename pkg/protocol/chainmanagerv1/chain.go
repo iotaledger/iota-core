@@ -63,9 +63,9 @@ func NewChain(forkingPoint *CommitmentMetadata) *Chain {
 	c.cumulativeWeight = reactive.NewDerivedVariable[uint64](func(latestCommitmentIndex iotago.SlotIndex) uint64 {
 		if latestCommitment, exists := c.commitments.Get(latestCommitmentIndex); exists {
 			return latestCommitment.CumulativeWeight()
-		} else {
-			panic(fmt.Sprintf("latest commitment with index %d does not exist", latestCommitmentIndex))
 		}
+
+		panic(fmt.Sprintf("latest commitment with index %d does not exist", latestCommitmentIndex))
 	}, c.latestCommitmentIndex)
 
 	return c
