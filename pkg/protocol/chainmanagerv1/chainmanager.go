@@ -30,7 +30,6 @@ type ChainManager struct {
 
 func NewChainManager() *ChainManager {
 	return &ChainManager{
-		rootChain:            NewChain(),
 		rootCommitment:       reactive.NewVariable[*CommitmentMetadata](),
 		commitmentCreated:    event.New1[*CommitmentMetadata](),
 		cachedCommitments:    shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
@@ -55,13 +54,17 @@ func (c *ChainManager) SetRootCommitment(commitment *model.Commitment) (commitme
 		}
 
 		commitmentMetadata = NewCommitmentMetadata(commitment)
-		commitmentMetadata.Chain().Set(c.rootChain)
 		commitmentMetadata.Solid().Trigger()
 		commitmentMetadata.Verified().Trigger()
 		commitmentMetadata.BelowSyncThreshold().Trigger()
 		commitmentMetadata.BelowWarpSyncThreshold().Trigger()
 		commitmentMetadata.BelowLatestVerifiedCommitment().Trigger()
 		commitmentMetadata.Evicted().Trigger()
+
+		if c.rootChain == nil {
+			c.rootChain = NewChain(commitmentMetadata)
+		}
+		commitmentMetadata.Chain().Set(c.rootChain)
 
 		return commitmentMetadata
 	})

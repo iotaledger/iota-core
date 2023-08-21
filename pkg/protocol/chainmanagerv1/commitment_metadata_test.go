@@ -13,16 +13,16 @@ import (
 func TestCommitment(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
-	rootChain := NewChain()
-
 	rootCommitment := model.NewEmptyCommitment(testAPI)
 	rootCommitmentMetadata := NewCommitmentMetadata(rootCommitment)
-	rootCommitmentMetadata.Chain().Set(rootChain)
 	rootCommitmentMetadata.Solid().Trigger()
 	rootCommitmentMetadata.Verified().Trigger()
 	rootCommitmentMetadata.BelowSyncThreshold().Trigger()
 	rootCommitmentMetadata.BelowWarpSyncThreshold().Trigger()
 	rootCommitmentMetadata.BelowLatestVerifiedCommitment().Trigger()
+
+	rootChain := NewChain(rootCommitmentMetadata)
+	rootCommitmentMetadata.Chain().Set(rootChain)
 
 	commitment1, err := model.CommitmentFromCommitment(iotago.NewCommitment(1, rootCommitment.Index()+1, rootCommitment.ID(), rootCommitmentMetadata.RootsID(), 1, 1), testAPI)
 	require.NoError(t, err)

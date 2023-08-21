@@ -13,10 +13,12 @@ const (
 
 	// WarpSyncOffset defines how many slots a commitment needs to be behind the latest commitment to be requested by
 	// the warp sync process.
-	WarpSyncOffset = 2
+	WarpSyncOffset = 1
 )
 
 type Chain struct {
+	forkingPoint reactive.Variable[*CommitmentMetadata]
+
 	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *CommitmentMetadata]
 
 	latestCommitmentIndex reactive.Variable[iotago.SlotIndex]
@@ -34,13 +36,16 @@ type Chain struct {
 	warpSyncThreshold reactive.Variable[iotago.SlotIndex]
 }
 
-func NewChain() *Chain {
+func NewChain(forkingPoint *CommitmentMetadata) *Chain {
 	c := &Chain{
+		forkingPoint:                  reactive.NewVariable[*CommitmentMetadata](),
 		commitments:                   shrinkingmap.New[iotago.SlotIndex, *CommitmentMetadata](),
 		evicted:                       reactive.NewEvent(),
 		latestCommitmentIndex:         reactive.NewVariable[iotago.SlotIndex](),
 		latestVerifiedCommitmentIndex: reactive.NewVariable[iotago.SlotIndex](),
 	}
+
+	c.forkingPoint.Set(forkingPoint)
 
 	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
 		return latestVerifiedCommitmentIndex + 1 + SyncWindow
@@ -53,22 +58,6 @@ func NewChain() *Chain {
 	return c
 }
 
-func (c *Chain) RegisterCommitment(commitment *CommitmentMetadata) {
-	c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
-		c.commitments.Set(commitment.Index(), commitment)
-
-		return lo.Cond(latestCommitmentIndex > commitment.Index(), latestCommitmentIndex, commitment.Index())
-	})
-}
-
-func (c *Chain) UnregisterCommitment(commitment *CommitmentMetadata) {
-	c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
-		c.commitments.Delete(commitment.Index())
-
-		return lo.Cond(commitment.Index() < latestCommitmentIndex, commitment.Index()-1, latestCommitmentIndex)
-	})
-}
-
 func (c *Chain) LatestVerifiedCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
 	return c.latestVerifiedCommitmentIndex
 }
@@ -79,4 +68,29 @@ func (c *Chain) SyncThreshold() reactive.Variable[iotago.SlotIndex] {
 
 func (c *Chain) WarpSyncThreshold() reactive.Variable[iotago.SlotIndex] {
 	return c.warpSyncThreshold
+}
+
+func (c *Chain) registerCommitment(commitment *CommitmentMetadata) {
+	c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
+		c.commitments.Set(commitment.Index(), commitment)
+
+		return lo.Cond(latestCommitmentIndex > commitment.Index(), latestCommitmentIndex, commitment.Index())
+	})
+
+	unregisterCommitment := reactive.NewEvent()
+	unsubscribe := commitment.Chain().OnUpdate(func(_, newValue *Chain) {
+		if newValue != c {
+			unregisterCommitment.Trigger()
+		}
+	})
+
+	unregisterCommitment.OnTrigger(func() {
+		go unsubscribe()
+
+		c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
+			c.commitments.Delete(commitment.Index())
+
+			return lo.Cond(commitment.Index() < latestCommitmentIndex, commitment.Index()-1, latestCommitmentIndex)
+		})
+	})
 }

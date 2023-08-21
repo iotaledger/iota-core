@@ -54,4 +54,6 @@ func TestChainManager(t *testing.T) {
 
 	require.True(t, commitment3Metadata.AboveLatestVerifiedCommitment().Get())
 	require.True(t, commitment3Metadata.BelowSyncThreshold().Get())
+
+	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().Get().latestCommitmentIndex.Get())
 }
