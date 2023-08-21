@@ -17,7 +17,7 @@ func TestStorage_PruneByEpochIndex(t *testing.T) {
 
 	totalEpochs := 10
 	tf.GeneratePermanentData(10 * MB)
-	for i := 1; i <= totalEpochs; i++ {
+	for i := 0; i <= totalEpochs; i++ {
 		tf.GeneratePrunableData(iotago.EpochIndex(i), 10*KB)
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
@@ -57,7 +57,7 @@ func TestStorage_PruneByDepth(t *testing.T) {
 
 	totalEpochs := 20
 	tf.GeneratePermanentData(10 * MB)
-	for i := 1; i <= totalEpochs; i++ {
+	for i := 0; i <= totalEpochs; i++ {
 		tf.GeneratePrunableData(iotago.EpochIndex(i), 10*KB)
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
@@ -114,12 +114,12 @@ func TestStorage_PruneBySize(t *testing.T) {
 	tf := NewTestFramework(t,
 		storage.WithPruningDelay(2),
 		storage.WithPruningSizeEnable(true),
-		storage.WithPruningSizeMaxTargetSizeBytes(10*MB))
+		storage.WithPruningSizeMaxTargetSizeBytes(15*MB))
 	defer tf.Shutdown()
 
 	totalEpochs := 14
 	tf.GeneratePermanentData(5 * MB)
-	for i := 1; i <= totalEpochs; i++ {
+	for i := 0; i <= totalEpochs; i++ {
 		tf.GeneratePrunableData(iotago.EpochIndex(i), 120*KB)
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
@@ -130,14 +130,9 @@ func TestStorage_PruneBySize(t *testing.T) {
 	err := tf.Instance.PruneBySize()
 	require.ErrorContains(t, err, database.ErrNoPruningNeeded.Error())
 
-	// prunable can't reached to pruned bytes size, should NOT prune
+	// prunable can't reached to pruned bytes size, should prune but return an insufficient pruning error
 	err = tf.Instance.PruneBySize(4 * MB)
-	// require.ErrorContains(t, err, database.ErrNotEnoughHistory.Error())
-
-	// prunable can reached to pruned bytes size, should prune
-	err = tf.Instance.PruneBySize(7 * MB)
-	require.NoError(t, err)
-	require.LessOrEqual(t, tf.Instance.Size(), 7*MB)
+	require.ErrorContains(t, err, database.ErrDatabaseFull.Error())
 
 	// execute goroutine that monitors the size of the database and prunes if necessary
 

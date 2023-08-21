@@ -126,7 +126,8 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 	}
 
 	// No need to prune. The database is already smaller than the start threshold size.
-	if s.Size() < int64(float64(targetDatabaseSizeMaxBytes)*s.optsPruningSizeStartThresholdPercentage) {
+	targetDatabaseSizeBytes := int64(float64(targetDatabaseSizeMaxBytes) * s.optsPruningSizeTargetThresholdPercentage)
+	if s.Size() < targetDatabaseSizeBytes {
 		return database.ErrNoPruningNeeded
 	}
 
@@ -138,7 +139,7 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 		return ierrors.Wrapf(database.ErrEpochPruned, "can't prune any more data: latest prunable epoch is %d but pruned epoch is already %d", latestPrunableEpoch, lo.Return1(s.lastPrunedEpoch.Index()))
 	}
 
-	targetDatabaseSizeBytes := int64(float64(targetDatabaseSizeMaxBytes) * s.optsPruningSizeTargetThresholdPercentage)
+	totalBytesToPruned := s.Size() - targetDatabaseSizeBytes
 
 	var prunedEpoch iotago.EpochIndex
 	for prunedEpoch = start; prunedEpoch <= latestPrunableEpoch; prunedEpoch++ {
@@ -147,8 +148,8 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 			return ierrors.Wrapf(err, "failed to get bucket size for epoch %d", prunedEpoch)
 		}
 
-		// add 10% as an estimate for semiPermanentDB and 20% for ledger state: calculating the exact size would be too heavy.
-		targetDatabaseSizeBytes -= int64(float64(bucketSize) * 1.2)
+		// add 10% as an estimate for semiPermanentDB and 10% for ledger state: calculating the exact size would be too heavy.
+		totalBytesToPruned -= int64(float64(bucketSize) * 1.2)
 
 		// Actually prune the epoch.
 		if err := s.pruneUntilEpoch(prunedEpoch, prunedEpoch, 0); err != nil {
@@ -156,15 +157,15 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 		}
 
 		// We have pruned sufficiently.
-		if targetDatabaseSizeBytes <= 0 {
+		if totalBytesToPruned <= 0 {
 			return nil
 		}
 	}
 
 	// If the size of the database is still bigger than the target size, after we tried to prune everything possible,
 	// we return an error so that the user can be notified about a potentially full disk.
-	if s.Size() < int64(float64(targetDatabaseSizeMaxBytes)*s.optsPruningSizeStartThresholdPercentage) {
-		return ierrors.Wrapf(database.ErrDatabaseFull, "database size is still bigger than the start threshold size after pruning: %d > %d", s.Size(), int64(float64(targetDatabaseSizeMaxBytes)*s.optsPruningSizeStartThresholdPercentage))
+	if s.Size() > targetDatabaseSizeBytes {
+		return ierrors.Wrapf(database.ErrDatabaseFull, "database size is still bigger than the start threshold size after pruning: %d > %d", s.Size(), targetDatabaseSizeBytes)
 	}
 
 	return nil
