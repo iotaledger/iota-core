@@ -41,18 +41,6 @@ func (s *Storage) TryPrune() error {
 	return nil
 }
 
-func (s *Storage) latestPrunableEpoch() iotago.EpochIndex {
-	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
-	currentFinalizedEpoch := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
-
-	// We can only prune the epoch before the current finalized epoch.
-	if currentFinalizedEpoch < 1 {
-		return 0
-	}
-
-	return currentFinalizedEpoch - 1
-}
-
 // PruneByEpochIndex prunes the database until the given epoch. It returns an error if the epoch is too old or too new.
 // It is to be called by the user e.g. via the WebAPI.
 func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
@@ -77,28 +65,39 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 	}
 
 	if err := s.pruneUntilEpoch(start, epoch, 0); err != nil {
-		return ierrors.Wrapf(err, "failed to prune until epoch %d", epoch)
+		return ierrors.Wrapf(err, "failed to prune from epoch %d to %d", start, epoch)
 	}
 
 	return nil
 }
 
-func (s *Storage) PruneByDepth(depth iotago.EpochIndex) error {
+func (s *Storage) PruneByDepth(depth iotago.EpochIndex) (firstPruned, lastPruned iotago.EpochIndex, err error) {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
 
-	s.setIsPruning(true)
-	defer s.setIsPruning(false)
-
-	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
-	start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
-	if start < depth {
-		err := ierrors.Wrapf(database.ErrNotEnoughHistory, "pruning depth %d is greater than the current epoch %d in PruneByDepth", depth, start)
-		s.errorHandler(err)
-		return err
+	latestPrunableEpoch := s.latestPrunableEpoch()
+	if depth > latestPrunableEpoch {
+		return 0, 0, ierrors.Errorf("depth %d is too big, latest prunable epoch is %d", depth, latestPrunableEpoch)
 	}
 
-	return s.PruneByEpochIndex(start - depth)
+	end := latestPrunableEpoch - depth
+
+	// Make sure epoch is not already pruned.
+	lastPrunedEpoch, hasPruned := s.lastPrunedEpoch.Index()
+	if hasPruned && end <= lastPrunedEpoch {
+		return 0, 0, ierrors.Wrapf(database.ErrEpochPruned, "depth %d is too big, want to prune until %d but pruned epoch is already %d", depth, end, lastPrunedEpoch)
+	}
+
+	start := lastPrunedEpoch + 1
+	if !hasPruned {
+		start = 0
+	}
+
+	if err := s.pruneUntilEpoch(start, end, 0); err != nil {
+		return 0, 0, ierrors.Wrapf(err, "failed to prune from epoch %d to %d", start, end)
+	}
+
+	return start, end, nil
 }
 
 func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
@@ -166,6 +165,18 @@ func (s *Storage) epochToPrunedBySize(targetSize int64, latestFinalizedEpoch iot
 	//
 	// 	// TODO: do we return error here, or prune as much as we could
 	return 0, database.ErrNotEnoughHistory
+}
+
+func (s *Storage) latestPrunableEpoch() iotago.EpochIndex {
+	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
+	currentFinalizedEpoch := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
+
+	// We can only prune the epoch before the current finalized epoch.
+	if currentFinalizedEpoch < 1 {
+		return 0
+	}
+
+	return currentFinalizedEpoch - 1
 }
 
 // PruneUntilEpoch prunes the database until the given epoch.

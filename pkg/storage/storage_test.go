@@ -43,6 +43,56 @@ func TestStorage_PruneByEpochIndex(t *testing.T) {
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),
 	)
+
+	err = tf.Instance.PruneByEpochIndex(10)
+	require.ErrorContains(t, err, "too new")
+
+	err = tf.Instance.PruneByEpochIndex(8)
+	require.ErrorContains(t, err, "too old")
+}
+
+func TestStorage_PruneByDepth(t *testing.T) {
+	tf := NewTestFramework(t)
+	defer tf.Shutdown()
+
+	totalEpochs := 10
+	tf.GeneratePermanentData(10 * MB)
+	for i := 1; i <= totalEpochs; i++ {
+		tf.GeneratePrunableData(iotago.EpochIndex(i), 10*KB)
+		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
+	}
+
+	tf.SetLatestFinalizedEpoch(9)
+
+	_, _, err := tf.Instance.PruneByDepth(10)
+	require.ErrorContains(t, err, "too big")
+
+	start, end, err := tf.Instance.PruneByDepth(5)
+	require.NoError(t, err)
+	require.EqualValues(t, 0, start)
+	require.EqualValues(t, 4, end)
+	tf.AssertPrunedUntil(
+		types.NewTuple(4, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+	)
+
+	_, _, err = tf.Instance.PruneByDepth(6)
+	require.ErrorContains(t, err, "pruned epoch is already")
+
+	start, end, err = tf.Instance.PruneByDepth(2)
+	require.NoError(t, err)
+	require.EqualValues(t, 5, start)
+	require.EqualValues(t, 7, end)
+	tf.AssertPrunedUntil(
+		types.NewTuple(7, true),
+		types.NewTuple(0, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+	)
 }
 
 func TestStorage_PruneBySize(t *testing.T) {
