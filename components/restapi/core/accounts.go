@@ -16,12 +16,6 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-const (
-	DefaultPageSize                = 50
-	RequestsMemoryCacheGranularity = 10
-	MaxRequestedSlotAge            = 10
-)
-
 func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
@@ -78,13 +72,13 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	}
 
 	// do not respond to really old requests
-	if requestedSlotIndex+MaxRequestedSlotAge < latestCommittedSlot {
+	if requestedSlotIndex+iotago.SlotIndex(restapi.ParamsRestAPI.MaxRequestedSlotAge) < latestCommittedSlot {
 		return nil, ierrors.Errorf("request is too old, request started at %d, latest committed slot index is %d", requestedSlotIndex, latestCommittedSlot)
 	}
 
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
-	slotRange := uint32(requestedSlotIndex / RequestsMemoryCacheGranularity)
+	slotRange := uint32(requestedSlotIndex) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 	registeredValidators, exists := deps.Protocol.MainEngineInstance().Retainer.RegisteredValidatorsCache(slotRange)
 	if !exists {
 		registeredValidators, err = deps.Protocol.MainEngineInstance().SybilProtection.OrderedRegisteredCandidateValidatorsList(nextEpoch)
