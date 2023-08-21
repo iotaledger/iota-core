@@ -213,6 +213,10 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*prunable.Val
 
 	var epochPerformanceFactor uint64
 	for _, pf := range slotActivityVector {
+		// no activity in a slot
+		if pf == nil {
+			continue
+		}
 		// each one bit represents at least one block issued in that subslot,
 		// we reward not only total number of blocks issued, but also regularity based on block timestamp
 		slotPerformanceFactor := bits.OnesCount32(pf.SlotActivityVector)
