@@ -23,17 +23,16 @@ type ChainManager struct {
 
 	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 
-	*EvictionState
+	reactive.EvictionState[iotago.SlotIndex]
 }
 
 func NewChainManager() *ChainManager {
 	return &ChainManager{
+		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
 		rootCommitment:      reactive.NewVariable[*CommitmentMetadata](),
 		commitmentCreated:   event.New1[*CommitmentMetadata](),
 		cachedCommitments:   shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
 		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
-
-		EvictionState: NewEvictionState(),
 	}
 }
 
