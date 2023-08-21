@@ -37,7 +37,7 @@ func TestChainManager(t *testing.T) {
 		commitment2.Index()+1,
 		commitment2.ID(),
 		commitment2.RootsID(),
-		2,
+		3,
 		2,
 	), testAPI)))
 
@@ -56,4 +56,5 @@ func TestChainManager(t *testing.T) {
 	require.True(t, commitment3Metadata.BelowSyncThreshold().Get())
 
 	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().Get().latestCommitmentIndex.Get())
+	require.Equal(t, uint64(3), commitment3Metadata.Chain().Get().cumulativeWeight.Get())
 }

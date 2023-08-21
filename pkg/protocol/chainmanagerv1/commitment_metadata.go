@@ -151,10 +151,6 @@ func (c *CommitmentMetadata) registerChild(newChild *CommitmentMetadata, onSucce
 	c.evicted.OnTrigger(c.chainSuccessor.OnUpdate(onSuccessorUpdated))
 }
 
-// inheritChain returns a function that implements the chain inheritance rules.
-//
-// It must be called whenever the successor of the parent changes as we spawn a new chain for each child that is not the
-// direct successor of a parent, and we inherit its chain otherwise.
 func (c *CommitmentMetadata) inheritChain(parent *CommitmentMetadata) func(*CommitmentMetadata, *CommitmentMetadata) {
 	var spawnedChain *Chain
 	spawnChain := func() {

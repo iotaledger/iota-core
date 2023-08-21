@@ -23,20 +23,32 @@ type ChainManager struct {
 
 	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 
-	slotEvictionEvents *shrinkingmap.ShrinkingMap[iotago.SlotIndex, reactive.Event]
-
-	lastEvictedSlotIndex reactive.Variable[iotago.SlotIndex]
+	*SlotEviction
 }
 
 func NewChainManager() *ChainManager {
 	return &ChainManager{
-		rootCommitment:       reactive.NewVariable[*CommitmentMetadata](),
-		commitmentCreated:    event.New1[*CommitmentMetadata](),
-		cachedCommitments:    shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
-		commitmentRequester:  eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
-		slotEvictionEvents:   shrinkingmap.New[iotago.SlotIndex, reactive.Event](),
-		lastEvictedSlotIndex: reactive.NewVariable[iotago.SlotIndex](),
+		rootCommitment:      reactive.NewVariable[*CommitmentMetadata](),
+		commitmentCreated:   event.New1[*CommitmentMetadata](),
+		cachedCommitments:   shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
+		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
+
+		SlotEviction: NewSlotEviction(),
 	}
+}
+
+func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *CommitmentMetadata) {
+	if commitmentRequest, _ := c.requestCommitment(commitment.ID(), commitment.Index(), false, func(resolvedMetadata *CommitmentMetadata) {
+		commitmentMetadata = resolvedMetadata
+	}); commitmentRequest != nil {
+		commitmentRequest.Resolve(NewCommitmentMetadata(commitment))
+	}
+
+	return commitmentMetadata
+}
+
+func (c *ChainManager) OnCommitmentCreated(callback func(commitment *CommitmentMetadata)) (unsubscribe func()) {
+	return c.commitmentCreated.Hook(callback).Unhook
 }
 
 func (c *ChainManager) SetRootCommitment(commitment *model.Commitment) (commitmentMetadata *CommitmentMetadata, err error) {
@@ -74,58 +86,6 @@ func (c *ChainManager) SetRootCommitment(commitment *model.Commitment) (commitme
 	return commitmentMetadata, nil
 }
 
-func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *CommitmentMetadata) {
-	if commitmentRequest, _ := c.requestCommitment(commitment.ID(), commitment.Index(), false, func(resolvedMetadata *CommitmentMetadata) {
-		commitmentMetadata = resolvedMetadata
-	}); commitmentRequest != nil {
-		commitmentRequest.Resolve(NewCommitmentMetadata(commitment))
-	}
-
-	return commitmentMetadata
-}
-
-func (c *ChainManager) OnCommitmentCreated(callback func(commitment *CommitmentMetadata)) (unsubscribe func()) {
-	return c.commitmentCreated.Hook(callback).Unhook
-}
-
-func (c *ChainManager) SlotEvictedEvent(index iotago.SlotIndex) reactive.Event {
-	var slotEvictedEvent reactive.Event
-
-	c.lastEvictedSlotIndex.Compute(func(lastEvictedSlotIndex iotago.SlotIndex) iotago.SlotIndex {
-		if index > lastEvictedSlotIndex {
-			slotEvictedEvent, _ = c.slotEvictionEvents.GetOrCreate(index, reactive.NewEvent)
-		} else {
-			slotEvictedEvent = defaultTriggeredEvent
-		}
-
-		return lastEvictedSlotIndex
-	})
-
-	return slotEvictedEvent
-}
-
-func (c *ChainManager) Evict(slotIndex iotago.SlotIndex) {
-	slotEvictedEventsToTrigger := make([]reactive.Event, 0)
-
-	c.lastEvictedSlotIndex.Compute(func(lastEvictedSlotIndex iotago.SlotIndex) iotago.SlotIndex {
-		if slotIndex <= lastEvictedSlotIndex {
-			return lastEvictedSlotIndex
-		}
-
-		for i := lastEvictedSlotIndex + 1; i <= slotIndex; i++ {
-			if slotEvictedEvent, exists := c.slotEvictionEvents.Get(i); exists {
-				slotEvictedEventsToTrigger = append(slotEvictedEventsToTrigger, slotEvictedEvent)
-			}
-		}
-
-		return slotIndex
-	})
-
-	for _, slotEvictedEvent := range slotEvictedEventsToTrigger {
-		slotEvictedEvent.Trigger()
-	}
-}
-
 func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvictedEvent reactive.Event) {
 	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, commitment.registerParent)
 
@@ -135,8 +95,8 @@ func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvict
 }
 
 func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.SlotIndex, requestIfMissing bool, optSuccessCallbacks ...func(metadata *CommitmentMetadata)) (commitmentRequest *promise.Promise[*CommitmentMetadata], requestCreated bool) {
-	slotEvictedEvent := c.SlotEvictedEvent(index)
-	if slotEvictedEvent.WasTriggered() {
+	slotEvicted := c.EvictedEvent(index)
+	if slotEvicted.WasTriggered() {
 		if rootCommitment := c.rootCommitment.Get(); rootCommitment != nil && id == rootCommitment.ID() {
 			for _, successCallback := range optSuccessCallbacks {
 				successCallback(rootCommitment)
@@ -158,10 +118,10 @@ func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.Sl
 				c.commitmentRequester.StopTicker(commitment.ID())
 			}
 
-			c.setupCommitment(commitment, slotEvictedEvent)
+			c.setupCommitment(commitment, slotEvicted)
 		})
 
-		slotEvictedEvent.OnTrigger(func() { c.cachedCommitments.Delete(id) })
+		slotEvicted.OnTrigger(func() { c.cachedCommitments.Delete(id) })
 	}
 
 	for _, successCallback := range optSuccessCallbacks {
@@ -169,10 +129,4 @@ func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.Sl
 	}
 
 	return commitmentRequest, requestCreated
-}
-
-var defaultTriggeredEvent = reactive.NewEvent()
-
-func init() {
-	defaultTriggeredEvent.Trigger()
 }

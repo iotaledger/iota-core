@@ -1,6 +1,8 @@
 package chainmanagerv1
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -34,6 +36,8 @@ type Chain struct {
 	// warpSyncThreshold defines a lower bound for where the warp sync process starts (to not requests slots that we are
 	// about to commit ourselves once we are in sync).
 	warpSyncThreshold reactive.Variable[iotago.SlotIndex]
+
+	cumulativeWeight reactive.Variable[uint64]
 }
 
 func NewChain(forkingPoint *CommitmentMetadata) *Chain {
@@ -55,7 +59,23 @@ func NewChain(forkingPoint *CommitmentMetadata) *Chain {
 		return latestCommitmentIndex - WarpSyncOffset
 	}, c.latestCommitmentIndex)
 
+	c.cumulativeWeight = reactive.NewDerivedVariable[uint64](func(latestCommitmentIndex iotago.SlotIndex) uint64 {
+		if latestCommitment, exists := c.commitments.Get(latestCommitmentIndex); exists {
+			return latestCommitment.CumulativeWeight()
+		} else {
+			panic(fmt.Sprintf("latest commitment with index %d does not exist", latestCommitmentIndex))
+		}
+	}, c.latestCommitmentIndex)
+
 	return c
+}
+
+func (c *Chain) ForkingPoint() reactive.Variable[*CommitmentMetadata] {
+	return c.forkingPoint
+}
+
+func (c *Chain) LatestCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
+	return c.latestCommitmentIndex
 }
 
 func (c *Chain) LatestVerifiedCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
