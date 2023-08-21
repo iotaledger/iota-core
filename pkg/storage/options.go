@@ -39,12 +39,12 @@ func WithPruningSizeEnable(pruningSizeEnabled bool) options.Option[Storage] {
 
 func WithPruningSizeMaxTargetSizeBytes(pruningSizeTargetSizeBytes int64) options.Option[Storage] {
 	return func(p *Storage) {
-		p.optPruningSizeMaxTargetSizeBytes = pruningSizeTargetSizeBytes
+		p.optsPruningSizeMaxTargetSizeBytes = pruningSizeTargetSizeBytes
 	}
 }
 
 func WithPruningSizeThresholdPercentage(pruningSizeThresholdPercentage float64) options.Option[Storage] {
 	return func(p *Storage) {
-		p.optPruningSizeThresholdPercentage = pruningSizeThresholdPercentage
+		p.optsPruningSizeStartThresholdPercentage = pruningSizeThresholdPercentage
 	}
 }

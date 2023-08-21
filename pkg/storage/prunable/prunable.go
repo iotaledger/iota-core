@@ -90,6 +90,10 @@ func (p *Prunable) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.Epo
 	return nil
 }
 
+func (p *Prunable) BucketSize(epoch iotago.EpochIndex) (int64, error) {
+	return p.prunableSlotStore.BucketSize(epoch)
+}
+
 func (p *Prunable) Size() int64 {
 	semiSize, err := ioutils.FolderSize(p.semiPermanentDBConfig.Directory)
 	if err != nil {

@@ -189,6 +189,9 @@ func (m *PrunableSlotManager) Prune(epoch iotago.EpochIndex) error {
 }
 
 func (m *PrunableSlotManager) BucketSize(epoch iotago.EpochIndex) (int64, error) {
+	m.openDBsMutex.RLock()
+	defer m.openDBsMutex.RUnlock()
+
 	size, exists := m.dbSizes.Get(epoch)
 	if exists {
 		return size, nil

@@ -9,8 +9,9 @@ import (
 
 func (s *Storage) setIsPruning(value bool) {
 	s.statusLock.Lock()
+	defer s.statusLock.Unlock()
+
 	s.isPruning = value
-	s.statusLock.Unlock()
 }
 
 func (s *Storage) IsPruning() bool {
@@ -31,13 +32,13 @@ func (s *Storage) TryPrune() error {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
 
+	s.setIsPruning(true)
+	defer s.setIsPruning(false)
+
+	s.PruneByDepth(s.optsPruningDelay)
+
 	// TODO: This should be called whenever a slot is accepted/finalized.
 	// It should adhere to the default pruningDelay, whereas the others might not need to.
-
-	// No need to prune.
-	// if epoch < s.optsPruningDelay {
-	// 	return database.ErrNoPruningNeeded
-	// }
 
 	return nil
 }
@@ -47,6 +48,9 @@ func (s *Storage) TryPrune() error {
 func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
+
+	s.setIsPruning(true)
+	defer s.setIsPruning(false)
 
 	// Make sure epoch is not too recent or not yet finalized.
 	latestPrunableEpoch := s.latestPrunableEpoch()
@@ -70,6 +74,9 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 func (s *Storage) PruneByDepth(depth iotago.EpochIndex) (firstPruned, lastPruned iotago.EpochIndex, err error) {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
+
+	s.setIsPruning(true)
+	defer s.setIsPruning(false)
 
 	if depth == 0 {
 		return 0, 0, database.ErrNoPruningNeeded
@@ -96,42 +103,66 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) (firstPruned, lastPruned
 	return start, end, nil
 }
 
-func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
-	if !s.optPruningSizeEnabled && len(targetSizeBytes) == 0 {
-		// pruning by size deactivated
-		return database.ErrNoPruningNeeded
-	}
-
+func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
 
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
-	targetDatabaseSizeBytes := s.optPruningSizeMaxTargetSizeBytes
-	if len(targetSizeBytes) > 0 {
-		targetDatabaseSizeBytes = targetSizeBytes[0]
-	}
-
-	currentSize := s.Size()
-	// No need to prune. The database is already smaller than the target size.
-	if targetDatabaseSizeBytes < 0 || currentSize < targetDatabaseSizeBytes {
+	// pruning by size deactivated
+	if !s.optPruningSizeEnabled && len(targetSizeMaxBytes) == 0 {
 		return database.ErrNoPruningNeeded
 	}
 
-	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
-	latestEpoch := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
-	bytesToPrune := currentSize - int64(float64(targetDatabaseSizeBytes)*s.optPruningSizeThresholdPercentage)
-	targetEpoch, err := s.epochToPrunedBySize(bytesToPrune, latestEpoch)
-	if err != nil {
-		s.errorHandler(err)
-		return err
+	targetDatabaseSizeMaxBytes := s.optsPruningSizeMaxTargetSizeBytes
+	if len(targetSizeMaxBytes) > 0 {
+		targetDatabaseSizeMaxBytes = targetSizeMaxBytes[0]
 	}
 
-	s.pruneUntilEpoch(0, targetEpoch, 0)
+	// No need to prune. The database is already smaller than the start threshold size.
+	if s.Size() < int64(float64(targetDatabaseSizeMaxBytes)*s.optsPruningSizeStartThresholdPercentage) {
+		return database.ErrNoPruningNeeded
+	}
+
+	latestPrunableEpoch := s.latestPrunableEpoch()
+
+	// Make sure epoch is not already pruned.
+	start, canPrune := s.getPruningStart(latestPrunableEpoch)
+	if !canPrune {
+		return ierrors.Wrapf(database.ErrEpochPruned, "can't prune any more data: latest prunable epoch is %d but pruned epoch is already %d", latestPrunableEpoch, lo.Return1(s.lastPrunedEpoch.Index()))
+	}
+
+	targetDatabaseSizeBytes := int64(float64(targetDatabaseSizeMaxBytes) * s.optsPruningSizeTargetThresholdPercentage)
+
+	var prunedEpoch iotago.EpochIndex
+	for prunedEpoch = start; prunedEpoch <= latestPrunableEpoch; prunedEpoch++ {
+		bucketSize, err := s.prunable.BucketSize(prunedEpoch)
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to get bucket size for epoch %d", prunedEpoch)
+		}
+
+		// add 10% as an estimate for semiPermanentDB and 10% for ledger state: calculating the exact size would be too heavy.
+		targetDatabaseSizeBytes -= int64(float64(bucketSize) * 1.2)
+
+		// Actually prune the epoch.
+		if err := s.pruneUntilEpoch(prunedEpoch, prunedEpoch, 0); err != nil {
+			return ierrors.Wrapf(err, "failed to prune epoch %d", prunedEpoch)
+		}
+
+		// We have pruned sufficiently.
+		if targetDatabaseSizeBytes <= 0 {
+			return nil
+		}
+	}
+
+	// If the size of the database is still bigger than the target size, after we tried to prune everything possible,
+	// we return an error so that the user can be notified about a potentially full disk.
+	if s.Size() < int64(float64(targetDatabaseSizeMaxBytes)*s.optsPruningSizeStartThresholdPercentage) {
+		return ierrors.Wrapf(database.ErrDatabaseFull, "database size is still bigger than the start threshold size after pruning: %d > %d", s.Size(), int64(float64(targetDatabaseSizeMaxBytes)*s.optsPruningSizeStartThresholdPercentage))
+	}
 
 	return nil
-	// Note: what if permanent is too big -> log error?
 }
 
 func (s *Storage) getPruningStart(epoch iotago.EpochIndex) (iotago.EpochIndex, bool) {
@@ -141,35 +172,6 @@ func (s *Storage) getPruningStart(epoch iotago.EpochIndex) (iotago.EpochIndex, b
 	}
 
 	return s.lastPrunedEpoch.NextIndex(), true
-}
-
-func (s *Storage) epochToPrunedBySize(targetSize int64, latestFinalizedEpoch iotago.EpochIndex) (iotago.EpochIndex, error) {
-	// 	lastPrunedEpoch := lo.Return1(p.prunableSlotStore.LastPrunedEpoch())
-	// 	if latestFinalizedEpoch < p.defaultPruningDelay {
-	// 		return 0, database.ErrNoPruningNeeded
-	// 	}
-	//
-	// 	var sum int64
-	// 	for i := lastPrunedEpoch + 1; i <= latestFinalizedEpoch-p.defaultPruningDelay; i++ {
-	// 		bucketSize, err := p.prunableSlotStore.BucketSize(i)
-	// 		if err != nil {
-	// 			return 0, ierrors.Wrapf(err, "failed to get bucket size in EpochToPrunedBasedOnSize")
-	// 		}
-	// 		// add 10% for semiPermanentDB size estimation, it would be too heavy to estimate semiPermanentDB.
-	// 		// we can tune this number later
-	// 		sum += int64(float64(bucketSize) * 1.1)
-	//
-	// 		if sum >= targetSize {
-	// 			return i + p.defaultPruningDelay, nil
-	// 		}
-	// 	}
-	//
-	// 	if sum >= targetSize {
-	// 		return latestFinalizedEpoch, nil
-	// 	}
-	//
-	// 	// TODO: do we return error here, or prune as much as we could
-	return 0, database.ErrNotEnoughHistory
 }
 
 func (s *Storage) latestPrunableEpoch() iotago.EpochIndex {
@@ -187,9 +189,6 @@ func (s *Storage) latestPrunableEpoch() iotago.EpochIndex {
 // PruneUntilEpoch prunes the database until the given epoch.
 // The caller needs to make sure that the start and target epoch take into account the specified pruning delay.
 func (s *Storage) pruneUntilEpoch(start iotago.EpochIndex, target iotago.EpochIndex, pruningDelay iotago.EpochIndex) error {
-	s.setIsPruning(true)
-	defer s.setIsPruning(false)
-
 	for currentIndex := start; currentIndex <= target; currentIndex++ {
 		if err := s.prunable.Prune(currentIndex, pruningDelay); err != nil {
 			return ierrors.Wrapf(err, "failed to prune epoch in prunable %d", currentIndex)
