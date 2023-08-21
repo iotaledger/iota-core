@@ -97,7 +97,16 @@ func configure() error {
 			return
 		}
 
-		blocksPrunableStorage.PruneUntilEpoch(epoch - iotago.EpochIndex(ParamsDebugAPI.PruningThreshold))
+		lastPruned, hasPruned := blocksPrunableStorage.LastPrunedEpoch()
+		if hasPruned {
+			lastPruned += 1
+		}
+
+		for i := lastPruned; i < epoch-iotago.EpochIndex(ParamsDebugAPI.PruningThreshold); i++ {
+			if err := blocksPrunableStorage.Prune(i); err != nil {
+				fmt.Printf(">> DebugAPI Error: %s\n", err)
+			}
+		}
 
 	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", 1)))
 
