@@ -37,7 +37,7 @@ func NewChainManager() *ChainManager {
 }
 
 func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *CommitmentMetadata) {
-	if commitmentRequest, _ := c.requestCommitment(commitment.ID(), commitment.Index(), false, func(resolvedMetadata *CommitmentMetadata) {
+	if commitmentRequest := c.requestCommitment(commitment.ID(), commitment.Index(), false, func(resolvedMetadata *CommitmentMetadata) {
 		commitmentMetadata = resolvedMetadata
 	}); commitmentRequest != nil {
 		commitmentRequest.Resolve(NewCommitmentMetadata(commitment))
@@ -93,7 +93,7 @@ func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvict
 	c.commitmentCreated.Trigger(commitment)
 }
 
-func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.SlotIndex, requestIfMissing bool, optSuccessCallbacks ...func(metadata *CommitmentMetadata)) (commitmentRequest *promise.Promise[*CommitmentMetadata], requestCreated bool) {
+func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.SlotIndex, requestIfMissing bool, optSuccessCallbacks ...func(metadata *CommitmentMetadata)) (commitmentRequest *promise.Promise[*CommitmentMetadata]) {
 	slotEvicted := c.EvictionEvent(index)
 	if slotEvicted.WasTriggered() {
 		if rootCommitment := c.rootCommitment.Get(); rootCommitment != nil && id == rootCommitment.ID() {
@@ -101,13 +101,14 @@ func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.Sl
 				successCallback(rootCommitment)
 			}
 
-			return promise.New[*CommitmentMetadata]().Resolve(rootCommitment), false
+			return promise.New[*CommitmentMetadata]().Resolve(rootCommitment)
 		}
 
-		return nil, false
+		return nil
 	}
 
-	if commitmentRequest, requestCreated = c.cachedCommitments.GetOrCreate(id, lo.NoVariadic(promise.New[*CommitmentMetadata])); requestCreated {
+	commitmentRequest, requestCreated := c.cachedCommitments.GetOrCreate(id, lo.NoVariadic(promise.New[*CommitmentMetadata]))
+	if requestCreated {
 		if requestIfMissing {
 			c.commitmentRequester.StartTicker(id)
 		}
@@ -127,5 +128,5 @@ func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.Sl
 		commitmentRequest.OnSuccess(successCallback)
 	}
 
-	return commitmentRequest, requestCreated
+	return commitmentRequest
 }
