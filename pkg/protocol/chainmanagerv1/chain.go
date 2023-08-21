@@ -1,8 +1,6 @@
 package chainmanagerv1
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -42,15 +40,12 @@ type Chain struct {
 
 func NewChain(forkingPoint *CommitmentMetadata) *Chain {
 	c := &Chain{
-		forkingPoint:                  reactive.NewVariable[*CommitmentMetadata](),
+		forkingPoint:                  reactive.NewVariable[*CommitmentMetadata]().Init(forkingPoint),
 		commitments:                   shrinkingmap.New[iotago.SlotIndex, *CommitmentMetadata](),
 		evicted:                       reactive.NewEvent(),
 		latestCommitmentIndex:         reactive.NewVariable[iotago.SlotIndex](),
 		latestVerifiedCommitmentIndex: reactive.NewVariable[iotago.SlotIndex](),
 	}
-
-	c.forkingPoint.Set(forkingPoint)
-	c.latestCommitmentIndex.Set(forkingPoint.Index())
 
 	forkingPoint.Chain().Set(c)
 
@@ -63,26 +58,24 @@ func NewChain(forkingPoint *CommitmentMetadata) *Chain {
 	}, c.latestCommitmentIndex)
 
 	c.cumulativeWeight = reactive.NewDerivedVariable[uint64](func(latestCommitmentIndex iotago.SlotIndex) uint64 {
-		if latestCommitment, exists := c.commitments.Get(latestCommitmentIndex); exists {
-			return latestCommitment.CumulativeWeight()
-		}
-
-		panic(fmt.Sprintf("latest commitment with index %d does not exist", latestCommitmentIndex))
+		return lo.Return1(c.commitments.Get(latestCommitmentIndex)).CumulativeWeight()
 	}, c.latestCommitmentIndex)
 
 	return c
 }
 
-func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *CommitmentMetadata, exists bool) {
-	if commitment, exists = c.commitments.Get(index); exists {
-		return commitment, true
-	}
-
-	return nil, false
-}
-
 func (c *Chain) ForkingPoint() reactive.Variable[*CommitmentMetadata] {
 	return c.forkingPoint
+}
+
+func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *CommitmentMetadata, exists bool) {
+	forkingPoint := c.forkingPoint.Get()
+
+	if index < forkingPoint.Index() {
+		return nil, false
+	}
+
+	return c.commitments.Get(index)
 }
 
 func (c *Chain) LatestCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
