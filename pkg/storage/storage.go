@@ -3,10 +3,9 @@ package storage
 import (
 	"sync"
 
-	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -34,9 +33,10 @@ type Storage struct {
 	shutdownOnce sync.Once
 	errorHandler func(error)
 
-	isPruning   bool
-	statusLock  sync.RWMutex
-	pruningLock sync.Mutex
+	isPruning       bool
+	statusLock      sync.RWMutex
+	pruningLock     sync.RWMutex
+	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
 
 	optsDBEngine                      hivedb.Engine
 	optsAllowedDBEngines              []hivedb.Engine
@@ -52,6 +52,7 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 	return options.Apply(&Storage{
 		dir:                               utils.NewDirectory(directory, true),
 		errorHandler:                      errorHandler,
+		lastPrunedEpoch:                   model.NewEvictionIndex[iotago.EpochIndex](),
 		optsDBEngine:                      hivedb.EngineRocksDB,
 		optsPruningDelay:                  2,       // TODO: what's the default now?
 		optPruningSizeMaxTargetSizeBytes:  1 << 30, // 1GB, TODO: what's the default?
@@ -66,21 +67,8 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 			}
 
 			s.permanent = permanent.New(dbConfig, errorHandler)
-			s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.optsPruningDelay, s.Settings().APIProvider(), errorHandler, s.optsPrunableManagerOptions...)
+			s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.Settings().APIProvider(), errorHandler, s.optsPrunableManagerOptions...)
 		})
-}
-
-func (s *Storage) setIsPruning(value bool) {
-	s.statusLock.Lock()
-	s.isPruning = value
-	s.statusLock.Unlock()
-}
-
-func (s *Storage) IsPruning() bool {
-	s.statusLock.RLock()
-	defer s.statusLock.RUnlock()
-
-	return s.isPruning
 }
 
 func (s *Storage) Directory() string {
@@ -99,116 +87,6 @@ func (s *Storage) PermanentDatabaseSize() int64 {
 
 func (s *Storage) Size() int64 {
 	return s.PermanentDatabaseSize() + s.PrunableDatabaseSize()
-}
-
-func (s *Storage) TryPrune() error {
-	s.pruningLock.Lock()
-	defer s.pruningLock.Unlock()
-
-	// This should be called whenever a slot is accepted/finalized.
-	// It should adhere to the default pruningDelay, whereas the others might not need to.
-
-	return nil
-}
-
-func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
-	s.pruningLock.Lock()
-	defer s.pruningLock.Unlock()
-
-	// try to prune epoch from the future
-	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
-	start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
-	if start < epoch {
-		err := ierrors.Wrapf(database.ErrNotEnoughHistory, "pruning epoch %d is larger than the current epoch %d in PruneByEpochIndex", epoch, start)
-		s.errorHandler(err)
-		return err
-	}
-
-	// try to prune old epoch
-	lastPrunedEpoch := lo.Return1(s.prunable.LastPrunedEpoch())
-	if epoch <= lastPrunedEpoch {
-		err := ierrors.Wrapf(database.ErrNoPruningNeeded, "pruning epoch %d is smaller than the last pruned epoch %d in pruneUntilEpoch", epoch, lastPrunedEpoch)
-		s.errorHandler(err)
-		return err
-	}
-
-	if epoch < s.optsPruningDelay {
-		err := ierrors.Wrapf(database.ErrNoPruningNeeded, "pruning epoch %d is smaller than the pruning delay %d in pruneUntilEpoch", epoch, lastPrunedEpoch)
-		s.errorHandler(err)
-		return err
-	}
-
-	s.setIsPruning(true)
-	defer s.setIsPruning(false)
-
-	s.pruneUntilEpoch(epoch)
-
-	return nil
-
-	// TODO: call ledger pruning
-}
-
-func (s *Storage) PruneByDepth(depth iotago.EpochIndex) error {
-	s.pruningLock.Lock()
-	defer s.pruningLock.Unlock()
-
-	s.setIsPruning(true)
-	defer s.setIsPruning(false)
-
-	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
-	start := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
-	if start < depth {
-		err := ierrors.Wrapf(database.ErrNotEnoughHistory, "pruning depth %d is greater than the current epoch %d in PruneByDepth", depth, start)
-		s.errorHandler(err)
-		return err
-	}
-
-	return s.PruneByEpochIndex(start - depth)
-}
-
-func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
-	if !s.optPruningSizeEnabled && len(targetSizeBytes) == 0 {
-		// pruning by size deactivated
-		return database.ErrNoPruningNeeded
-	}
-
-	s.pruningLock.Lock()
-	defer s.pruningLock.Unlock()
-
-	s.setIsPruning(true)
-	defer s.setIsPruning(false)
-
-	targetDatabaseSizeBytes := s.optPruningSizeMaxTargetSizeBytes
-	if len(targetSizeBytes) > 0 {
-		targetDatabaseSizeBytes = targetSizeBytes[0]
-	}
-
-	currentSize := s.Size()
-	// No need to prune. The database is already smaller than the target size.
-	if targetDatabaseSizeBytes < 0 || currentSize < targetDatabaseSizeBytes {
-		return database.ErrNoPruningNeeded
-	}
-
-	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
-	latestEpoch := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
-	bytesToPrune := currentSize - int64(float64(targetDatabaseSizeBytes)*s.optPruningSizeThresholdPercentage)
-	targetEpoch, err := s.prunable.EpochToPrunedBySize(bytesToPrune, latestEpoch)
-	if err != nil {
-		s.errorHandler(err)
-		return err
-	}
-
-	s.pruneUntilEpoch(targetEpoch)
-
-	return nil
-	// Note: what if permanent is too big -> log error?
-}
-
-func (s *Storage) pruneUntilEpoch(epoch iotago.EpochIndex) {
-	lastPrunedEpoch, _ := s.prunable.LastPrunedEpoch()
-	for currentIndex := lastPrunedEpoch; currentIndex <= epoch; currentIndex++ {
-		s.prunable.Prune(currentIndex)
-	}
 }
 
 // Shutdown shuts down the storage.

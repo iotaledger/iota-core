@@ -147,23 +147,24 @@ func (s *Store[V]) streamEpochs(consumer func(epoch iotago.EpochIndex) error) er
 	return nil
 }
 
-func (s *Store[V]) Prune(epoch iotago.EpochIndex) error {
+func (s *Store[V]) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) error {
 	s.lastPrunedMutex.Lock()
 	defer s.lastPrunedMutex.Unlock()
 
-	minStartEpoch := lo.Return1(s.lastPrunedEpoch.Index()) + s.pruningDelay
+	pruningDelay := lo.Max(s.pruningDelay, defaultPruningDelay)
+
 	// No need to prune.
-	if epoch < minStartEpoch {
+	if epoch < lo.Return1(s.lastPrunedEpoch.Index())+pruningDelay {
 		return nil
 	}
 
-	targetIndex := epoch - s.pruningDelay
-	err := s.kv.DeletePrefix(targetIndex.MustBytes())
+	target := epoch - pruningDelay
+	err := s.kv.DeletePrefix(target.MustBytes())
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to prune epoch store for realm %v", s.realm)
+		return ierrors.Wrapf(err, "failed to prune epoch store for realm %v at epoch %d", s.realm, target)
 	}
 
-	s.lastPrunedEpoch.MarkEvicted(targetIndex)
+	s.lastPrunedEpoch.MarkEvicted(target)
 
 	return nil
 }

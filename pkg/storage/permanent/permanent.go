@@ -97,7 +97,7 @@ func (p *Permanent) Flush() {
 	}
 }
 
-func (p *Permanent) PruneUTXOLedger(epoch iotago.EpochIndex) {
+func (p *Permanent) PruneUTXOLedger(epoch iotago.EpochIndex) error {
 	p.utxoLedger.WriteLockLedger()
 	defer p.utxoLedger.WriteUnlockLedger()
 
@@ -106,7 +106,9 @@ func (p *Permanent) PruneUTXOLedger(epoch iotago.EpochIndex) {
 
 	for slot := start; slot <= end; slot++ {
 		if err := p.utxoLedger.PruneSlotIndexWithoutLocking(slot); err != nil {
-			p.errorHandler(ierrors.Wrapf(err, "failed to prune ledger for slot %d", slot))
+			return ierrors.Wrapf(err, "failed to prune ledger for slot %d", slot)
 		}
 	}
+
+	return nil
 }

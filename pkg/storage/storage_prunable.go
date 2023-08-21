@@ -61,10 +61,6 @@ func (s *Storage) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
 	return s.prunable.Retainer(slot)
 }
 
-func (s *Storage) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
-	return s.prunable.LastPrunedEpoch()
-}
-
 func (s *Storage) RestoreFromDisk() {
 	s.prunable.RestoreFromDisk()
 }
