@@ -66,11 +66,11 @@ func (p *Prunable) RestoreFromDisk() {
 
 func (p *Prunable) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) error {
 	// prune prunable_slot
-	if err := p.prunableSlotStore.Prune(epoch - defaultPruningDelay); err != nil {
+	if err := p.prunableSlotStore.Prune(epoch); err != nil {
 		return ierrors.Wrapf(err, "prune prunableSlotStore failed for epoch %d", epoch)
 	}
 
-	// prune prunable_epoch: each component has its own pruning delay based on max(individualPruningDelay, defaultPruningDelay)
+	// prune prunable_epoch: each component has its own pruning delay.
 	if err := p.decidedUpgradeSignals.Prune(epoch, defaultPruningDelay); err != nil {
 		return ierrors.Wrapf(err, "prune decidedUpgradeSignals failed for epoch %d", epoch)
 	}

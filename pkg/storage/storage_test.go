@@ -55,40 +55,55 @@ func TestStorage_PruneByDepth(t *testing.T) {
 	tf := NewTestFramework(t)
 	defer tf.Shutdown()
 
-	totalEpochs := 10
+	totalEpochs := 20
 	tf.GeneratePermanentData(10 * MB)
 	for i := 1; i <= totalEpochs; i++ {
 		tf.GeneratePrunableData(iotago.EpochIndex(i), 10*KB)
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
 
-	tf.SetLatestFinalizedEpoch(9)
+	tf.SetLatestFinalizedEpoch(20)
 
-	_, _, err := tf.Instance.PruneByDepth(10)
+	_, _, err := tf.Instance.PruneByDepth(21)
 	require.ErrorContains(t, err, "too big")
 
-	start, end, err := tf.Instance.PruneByDepth(5)
+	start, end, err := tf.Instance.PruneByDepth(15)
 	require.NoError(t, err)
 	require.EqualValues(t, 0, start)
-	require.EqualValues(t, 4, end)
+	require.EqualValues(t, 5, end)
 	tf.AssertPrunedUntil(
-		types.NewTuple(4, true),
-		types.NewTuple(0, false),
+		types.NewTuple(5, true),
+		types.NewTuple(5, true),
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),
 	)
 
-	_, _, err = tf.Instance.PruneByDepth(6)
-	require.ErrorContains(t, err, "pruned epoch is already")
+	// last pruned: 5
+	start, end, err = tf.Instance.PruneByDepth(5)
+	require.NoError(t, err)
+	require.EqualValues(t, 6, start)
+	require.EqualValues(t, 15, end)
+	tf.AssertPrunedUntil(
+		types.NewTuple(15, true),
+		types.NewTuple(13, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+	)
 
+	// last pruned: 15, should not prune as 20 - 6 = 14 which is < 15
+	_, _, err = tf.Instance.PruneByDepth(6)
+	require.ErrorContains(t, err, "pruned epoch is already 15")
+
+	// last pruned: 15, should prune
 	start, end, err = tf.Instance.PruneByDepth(2)
 	require.NoError(t, err)
-	require.EqualValues(t, 5, start)
-	require.EqualValues(t, 7, end)
+	require.EqualValues(t, 16, start)
+	require.EqualValues(t, 18, end)
 	tf.AssertPrunedUntil(
-		types.NewTuple(7, true),
-		types.NewTuple(0, true),
+		types.NewTuple(18, true),
+		types.NewTuple(13, true),
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),

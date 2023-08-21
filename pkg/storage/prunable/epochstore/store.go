@@ -151,7 +151,14 @@ func (s *Store[V]) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.Epo
 	s.lastPrunedMutex.Lock()
 	defer s.lastPrunedMutex.Unlock()
 
-	pruningDelay := lo.Max(s.pruningDelay, defaultPruningDelay)
+	// The epoch we're trying to prune already takes into account the defaultPruningDelay.
+	// Therefore, we don't need to do anything if it is greater equal s.pruningDelay and take the difference otherwise.
+	var pruningDelay iotago.EpochIndex
+	if defaultPruningDelay >= s.pruningDelay {
+		pruningDelay = 0
+	} else {
+		pruningDelay = s.pruningDelay - defaultPruningDelay
+	}
 
 	// No need to prune.
 	if epoch < lo.Return1(s.lastPrunedEpoch.Index())+pruningDelay {

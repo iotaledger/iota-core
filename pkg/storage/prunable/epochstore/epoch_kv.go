@@ -104,7 +104,14 @@ func (e *EpochKVStore) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago
 	e.lastPrunedMutex.Lock()
 	defer e.lastPrunedMutex.Unlock()
 
-	pruningDelay := lo.Max(e.pruningDelay, defaultPruningDelay)
+	// The epoch we're trying to prune already takes into account the defaultPruningDelay.
+	// Therefore, we don't need to do anything if it is greater equal e.pruningDelay and take the difference otherwise.
+	var pruningDelay iotago.EpochIndex
+	if defaultPruningDelay >= e.pruningDelay {
+		pruningDelay = 0
+	} else {
+		pruningDelay = e.pruningDelay - defaultPruningDelay
+	}
 
 	// No need to prune.
 	if epoch < lo.Return1(e.lastPrunedEpoch.Index())+pruningDelay {

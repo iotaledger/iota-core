@@ -2,6 +2,7 @@ package storage
 
 import (
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -54,14 +55,9 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 	}
 
 	// Make sure epoch is not already pruned.
-	lastPrunedEpoch, hasPruned := s.lastPrunedEpoch.Index()
-	if hasPruned && epoch <= lastPrunedEpoch {
-		return ierrors.Errorf("epoch %d is too old, last pruned epoch is %d", epoch, lastPrunedEpoch)
-	}
-
-	start := lastPrunedEpoch + 1
-	if !hasPruned {
-		start = 0
+	start, canPrune := s.getPruningStart(epoch)
+	if !canPrune {
+		return ierrors.Errorf("epoch %d is too old, last pruned epoch is %d", epoch, lo.Return1(s.lastPrunedEpoch.Index()))
 	}
 
 	if err := s.pruneUntilEpoch(start, epoch, 0); err != nil {
@@ -75,25 +71,25 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) (firstPruned, lastPruned
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
 
+	if depth == 0 {
+		return 0, 0, database.ErrNoPruningNeeded
+	}
+
 	latestPrunableEpoch := s.latestPrunableEpoch()
 	if depth > latestPrunableEpoch {
 		return 0, 0, ierrors.Errorf("depth %d is too big, latest prunable epoch is %d", depth, latestPrunableEpoch)
 	}
 
-	end := latestPrunableEpoch - depth
+	// We need to do (depth-1) because latestPrunableEpoch is already making sure that we keep at least one full epoch.
+	end := latestPrunableEpoch - (depth - 1)
 
 	// Make sure epoch is not already pruned.
-	lastPrunedEpoch, hasPruned := s.lastPrunedEpoch.Index()
-	if hasPruned && end <= lastPrunedEpoch {
-		return 0, 0, ierrors.Wrapf(database.ErrEpochPruned, "depth %d is too big, want to prune until %d but pruned epoch is already %d", depth, end, lastPrunedEpoch)
+	start, canPrune := s.getPruningStart(end)
+	if !canPrune {
+		return 0, 0, ierrors.Wrapf(database.ErrEpochPruned, "depth %d is too big, want to prune until %d but pruned epoch is already %d", depth, end, lo.Return1(s.lastPrunedEpoch.Index()))
 	}
 
-	start := lastPrunedEpoch + 1
-	if !hasPruned {
-		start = 0
-	}
-
-	if err := s.pruneUntilEpoch(start, end, 0); err != nil {
+	if err := s.pruneUntilEpoch(start, end, depth); err != nil {
 		return 0, 0, ierrors.Wrapf(err, "failed to prune from epoch %d to %d", start, end)
 	}
 
@@ -138,6 +134,15 @@ func (s *Storage) PruneBySize(targetSizeBytes ...int64) error {
 	// Note: what if permanent is too big -> log error?
 }
 
+func (s *Storage) getPruningStart(epoch iotago.EpochIndex) (iotago.EpochIndex, bool) {
+	lastPrunedEpoch, hasPruned := s.lastPrunedEpoch.Index()
+	if hasPruned && epoch <= lastPrunedEpoch {
+		return 0, false
+	}
+
+	return s.lastPrunedEpoch.NextIndex(), true
+}
+
 func (s *Storage) epochToPrunedBySize(targetSize int64, latestFinalizedEpoch iotago.EpochIndex) (iotago.EpochIndex, error) {
 	// 	lastPrunedEpoch := lo.Return1(p.prunableSlotStore.LastPrunedEpoch())
 	// 	if latestFinalizedEpoch < p.defaultPruningDelay {
@@ -171,16 +176,16 @@ func (s *Storage) latestPrunableEpoch() iotago.EpochIndex {
 	latestFinalizedSlot := s.Settings().LatestFinalizedSlot()
 	currentFinalizedEpoch := s.Settings().APIProvider().APIForSlot(latestFinalizedSlot).TimeProvider().EpochFromSlot(latestFinalizedSlot)
 
-	// We can only prune the epoch before the current finalized epoch.
-	if currentFinalizedEpoch < 1 {
+	// We always want at least 1 full epoch of history. Thus, the latest prunable epoch is the current finalized epoch - 2.
+	if currentFinalizedEpoch < 2 {
 		return 0
 	}
 
-	return currentFinalizedEpoch - 1
+	return currentFinalizedEpoch - 2
 }
 
 // PruneUntilEpoch prunes the database until the given epoch.
-// The caller needs to make sure that start >= pruningDelay.
+// The caller needs to make sure that the start and target epoch take into account the specified pruning delay.
 func (s *Storage) pruneUntilEpoch(start iotago.EpochIndex, target iotago.EpochIndex, pruningDelay iotago.EpochIndex) error {
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
@@ -190,7 +195,7 @@ func (s *Storage) pruneUntilEpoch(start iotago.EpochIndex, target iotago.EpochIn
 			return ierrors.Wrapf(err, "failed to prune epoch in prunable %d", currentIndex)
 		}
 
-		if err := s.permanent.PruneUTXOLedger(currentIndex - pruningDelay); err != nil {
+		if err := s.permanent.PruneUTXOLedger(currentIndex); err != nil {
 			return ierrors.Wrapf(err, "failed to prune epoch in permanent %d", currentIndex)
 		}
 	}
