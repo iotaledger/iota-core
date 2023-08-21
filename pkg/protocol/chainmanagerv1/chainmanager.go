@@ -73,7 +73,6 @@ func (c *ChainManager) SetRootCommitment(commitment *model.Commitment) (commitme
 		commitmentMetadata.Evicted().Trigger()
 
 		c.rootChain = NewChain(commitmentMetadata)
-		commitmentMetadata.Chain().Set(c.rootChain)
 
 		return commitmentMetadata
 	})

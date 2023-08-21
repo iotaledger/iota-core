@@ -52,6 +52,8 @@ func NewChain(forkingPoint *CommitmentMetadata) *Chain {
 	c.forkingPoint.Set(forkingPoint)
 	c.latestCommitmentIndex.Set(forkingPoint.Index())
 
+	forkingPoint.Chain().Set(c)
+
 	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
 		return latestVerifiedCommitmentIndex + 1 + SyncWindow
 	}, c.latestVerifiedCommitmentIndex)
@@ -69,6 +71,14 @@ func NewChain(forkingPoint *CommitmentMetadata) *Chain {
 	}, c.latestCommitmentIndex)
 
 	return c
+}
+
+func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *CommitmentMetadata, exists bool) {
+	if commitment, exists = c.commitments.Get(index); exists {
+		return commitment, true
+	}
+
+	return nil, false
 }
 
 func (c *Chain) ForkingPoint() reactive.Variable[*CommitmentMetadata] {
