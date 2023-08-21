@@ -29,16 +29,21 @@ func (s *Storage) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
 }
 
 func (s *Storage) TryPrune() error {
-	s.pruningLock.Lock()
-	defer s.pruningLock.Unlock()
+	// prune finalizedEpoch - s.optsPruningDelay if possible
+	if _, _, err := s.PruneByDepth(s.optsPruningDelay); err != nil {
+		if ierrors.As(err, database.ErrNoPruningNeeded) {
+			return nil
+		}
+		return ierrors.Wrap(err, "failed to prune with PruneByDepth in TryPrune")
+	}
 
-	s.setIsPruning(true)
-	defer s.setIsPruning(false)
-
-	s.PruneByDepth(s.optsPruningDelay)
-
-	// TODO: This should be called whenever a slot is accepted/finalized.
-	// It should adhere to the default pruningDelay, whereas the others might not need to.
+	// the disk could still be full after PruneByDepth, thus need to check by size again and prune if needed.
+	if err := s.PruneBySize(); err != nil {
+		if ierrors.As(err, database.ErrNoPruningNeeded) {
+			return nil
+		}
+		return ierrors.Wrap(err, "failed to prune with PruneBySize in TryPrune")
+	}
 
 	return nil
 }
@@ -142,7 +147,7 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 			return ierrors.Wrapf(err, "failed to get bucket size for epoch %d", prunedEpoch)
 		}
 
-		// add 10% as an estimate for semiPermanentDB and 10% for ledger state: calculating the exact size would be too heavy.
+		// add 10% as an estimate for semiPermanentDB and 20% for ledger state: calculating the exact size would be too heavy.
 		targetDatabaseSizeBytes -= int64(float64(bucketSize) * 1.2)
 
 		// Actually prune the epoch.
