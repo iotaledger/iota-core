@@ -10,6 +10,8 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/buffer"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -44,11 +46,14 @@ type BlockDispatcher struct {
 
 	// shutdownEvent is a reactive event that is triggered when the BlockDispatcher instance is stopped.
 	shutdownEvent reactive.Event
+
+	// optWarpSyncWindowSize is the optional warp sync window size.
+	optWarpSyncWindowSize iotago.SlotIndex
 }
 
 // NewBlockDispatcher creates a new BlockDispatcher instance.
-func NewBlockDispatcher(protocol *Protocol) *BlockDispatcher {
-	b := &BlockDispatcher{
+func NewBlockDispatcher(protocol *Protocol, opts ...options.Option[BlockDispatcher]) *BlockDispatcher {
+	return options.Apply(&BlockDispatcher{
 		protocol:                  protocol,
 		dispatchWorkers:           protocol.Workers.CreatePool("BlockDispatcher.Dispatch"),
 		warpSyncWorkers:           protocol.Workers.CreatePool("BlockDispatcher.WarpSync", 1),
@@ -56,13 +61,11 @@ func NewBlockDispatcher(protocol *Protocol) *BlockDispatcher {
 		pendingWarpSyncRequests:   eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
 		processedWarpSyncRequests: ds.NewSet[iotago.CommitmentID](),
 		shutdownEvent:             reactive.NewEvent(),
-	}
-
-	protocol.HookConstructed(b.initEngineMonitoring)
-	protocol.HookInitialized(b.initNetworkConnection)
-	protocol.HookStopped(b.shutdown)
-
-	return b
+	}, opts, func(b *BlockDispatcher) {
+		protocol.HookConstructed(b.initEngineMonitoring)
+		protocol.HookInitialized(b.initNetworkConnection)
+		protocol.HookStopped(b.shutdown)
+	})
 }
 
 // Dispatch dispatches the given block to the correct engine instance.
@@ -107,7 +110,11 @@ func (b *BlockDispatcher) initEngineMonitoring() {
 			}, b.dispatchWorkers)
 
 			b.runTask(func() {
-				b.warpSyncIfNecessary(b.targetEngine(chainCommitment), chainCommitment)
+				// warpsync only if the observed commitment is at least two commitments ahead.
+				targetEngine := b.targetEngine(chainCommitment)
+				if targetEngine != nil && chainCommitment.Commitment().Index() > targetEngine.Storage.Settings().LatestCommitment().Index()+1 {
+					b.warpSync(targetEngine, chainCommitment)
+				}
 			}, b.warpSyncWorkers)
 		})
 	})
@@ -238,24 +245,23 @@ func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Bl
 	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
 
-	return aboveWarpSyncThreshold(block.ID().Index(), latestCommitmentIndex, maxCommittableAge) && slotCommitmentID.Index() > latestCommitmentIndex
+	return block.ID().Index() > latestCommitmentIndex+maxCommittableAge
 }
 
-// warpSyncIfNecessary checks if a warp sync is necessary and starts the process if that is the case.
-func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
+// warpSync triggers warp sync from the latest committed slot up to the warpsync window.
+func (b *BlockDispatcher) warpSync(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
 	if e == nil || chainCommitment == nil {
 		return
 	}
 
 	chain := chainCommitment.Chain()
 	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
+	warpSyncWindowSize := lo.Cond(maxCommittableAge > b.optWarpSyncWindowSize, maxCommittableAge, b.optWarpSyncWindowSize)
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
-	if aboveWarpSyncThreshold(chainCommitment.Commitment().Index(), latestCommitmentIndex, maxCommittableAge) {
-		for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+maxCommittableAge; slotToWarpSync++ {
-			if commitmentToSync := chain.Commitment(slotToWarpSync); commitmentToSync != nil && !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
-				b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
-			}
+	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+warpSyncWindowSize; slotToWarpSync++ {
+		if commitmentToSync := chain.Commitment(slotToWarpSync); commitmentToSync != nil && !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
+			b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
 		}
 	}
 }
@@ -291,8 +297,7 @@ func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.E
 	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		if chainCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID()); exists {
 			b.processedWarpSyncRequests.Delete(commitment.ID())
-
-			b.warpSyncIfNecessary(engineInstance, chainCommitment)
+			b.warpSync(engineInstance, chainCommitment)
 		}
 	}).Unhook)
 }
@@ -329,8 +334,11 @@ func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
 	})
 }
 
-func aboveWarpSyncThreshold(slot iotago.SlotIndex, latestCommitmentIndex iotago.SlotIndex, maxCommittableAge iotago.SlotIndex) bool {
-	return slot > latestCommitmentIndex+2*maxCommittableAge
+// WithWarpSyncWindowSize is an option for the BlockDispatcher that allows to set the warp sync window size.
+func WithWarpSyncWindowSize(size iotago.SlotIndex) options.Option[BlockDispatcher] {
+	return func(b *BlockDispatcher) {
+		b.optWarpSyncWindowSize = size
+	}
 }
 
 // WarpSyncRetryInterval is the interval in which a warp sync request is retried.
