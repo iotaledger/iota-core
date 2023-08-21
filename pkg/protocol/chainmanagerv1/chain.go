@@ -50,6 +50,7 @@ func NewChain(forkingPoint *CommitmentMetadata) *Chain {
 	}
 
 	c.forkingPoint.Set(forkingPoint)
+	c.latestCommitmentIndex.Set(forkingPoint.Index())
 
 	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
 		return latestVerifiedCommitmentIndex + 1 + SyncWindow
@@ -94,17 +95,22 @@ func (c *Chain) registerCommitment(commitment *CommitmentMetadata) {
 	c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
 		c.commitments.Set(commitment.Index(), commitment)
 
-		return lo.Cond(latestCommitmentIndex > commitment.Index(), latestCommitmentIndex, commitment.Index())
+		if latestCommitmentIndex > commitment.Index() {
+			return latestCommitmentIndex
+		}
+
+		return commitment.Index()
 	})
 
-	unregisterCommitment := reactive.NewEvent()
+	unregistered := reactive.NewEvent()
+
 	unsubscribe := commitment.Chain().OnUpdate(func(_, newValue *Chain) {
 		if newValue != c {
-			unregisterCommitment.Trigger()
+			unregistered.Trigger()
 		}
 	})
 
-	unregisterCommitment.OnTrigger(func() {
+	unregistered.OnTrigger(func() {
 		go unsubscribe()
 
 		c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {

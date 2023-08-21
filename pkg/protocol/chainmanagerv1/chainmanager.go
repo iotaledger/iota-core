@@ -23,7 +23,7 @@ type ChainManager struct {
 
 	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 
-	*SlotEviction
+	*EvictionState
 }
 
 func NewChainManager() *ChainManager {
@@ -33,7 +33,7 @@ func NewChainManager() *ChainManager {
 		cachedCommitments:   shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
 		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 
-		SlotEviction: NewSlotEviction(),
+		EvictionState: NewEvictionState(),
 	}
 }
 
@@ -95,7 +95,7 @@ func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvict
 }
 
 func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.SlotIndex, requestIfMissing bool, optSuccessCallbacks ...func(metadata *CommitmentMetadata)) (commitmentRequest *promise.Promise[*CommitmentMetadata], requestCreated bool) {
-	slotEvicted := c.EvictedEvent(index)
+	slotEvicted := c.EvictionEvent(index)
 	if slotEvicted.WasTriggered() {
 		if rootCommitment := c.rootCommitment.Get(); rootCommitment != nil && id == rootCommitment.ID() {
 			for _, successCallback := range optSuccessCallbacks {

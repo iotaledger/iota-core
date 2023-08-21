@@ -3,64 +3,68 @@ package chainmanagerv1
 import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type SlotEviction struct {
-	evictionEvents *shrinkingmap.ShrinkingMap[iotago.SlotIndex, reactive.Event]
+type EvictionState[Type SlotType] struct {
+	evictionEvents *shrinkingmap.ShrinkingMap[Type, reactive.Event]
 
-	lastEvictedSlotIndex reactive.Variable[iotago.SlotIndex]
+	lastEvictedSlotIndex reactive.Variable[Type]
 }
 
-func NewSlotEviction() *SlotEviction {
-	return &SlotEviction{
-		evictionEvents:       shrinkingmap.New[iotago.SlotIndex, reactive.Event](),
-		lastEvictedSlotIndex: reactive.NewVariable[iotago.SlotIndex](),
+func NewEvictionState[Type SlotType]() *EvictionState[Type] {
+	return &EvictionState[Type]{
+		evictionEvents:       shrinkingmap.New[Type, reactive.Event](),
+		lastEvictedSlotIndex: reactive.NewVariable[Type](),
 	}
 }
 
-func (c *SlotEviction) LastEvictedSlotIndex() reactive.Variable[iotago.SlotIndex] {
+func (c *EvictionState[Type]) LastEvictedSlot() reactive.Variable[Type] {
 	return c.lastEvictedSlotIndex
 }
 
-func (c *SlotEviction) EvictedEvent(index iotago.SlotIndex) reactive.Event {
-	slotEvictedEvent := defaultTriggeredEvent
+func (c *EvictionState[Type]) EvictionEvent(slot Type) reactive.Event {
+	evictionEvent := evictedSlotEvent
 
-	c.lastEvictedSlotIndex.Compute(func(lastEvictedSlotIndex iotago.SlotIndex) iotago.SlotIndex {
-		if index > lastEvictedSlotIndex {
-			slotEvictedEvent, _ = c.evictionEvents.GetOrCreate(index, reactive.NewEvent)
+	c.lastEvictedSlotIndex.Compute(func(lastEvictedSlotIndex Type) Type {
+		if slot > lastEvictedSlotIndex {
+			evictionEvent, _ = c.evictionEvents.GetOrCreate(slot, reactive.NewEvent)
 		}
-
 		return lastEvictedSlotIndex
 	})
 
-	return slotEvictedEvent
+	return evictionEvent
 }
 
-func (c *SlotEviction) Evict(slotIndex iotago.SlotIndex) {
-	slotEvictedEventsToTrigger := make([]reactive.Event, 0)
-
-	c.lastEvictedSlotIndex.Compute(func(lastEvictedSlotIndex iotago.SlotIndex) iotago.SlotIndex {
-		if slotIndex <= lastEvictedSlotIndex {
-			return lastEvictedSlotIndex
-		}
-
-		for i := lastEvictedSlotIndex + 1; i <= slotIndex; i++ {
-			if slotEvictedEvent, exists := c.evictionEvents.Get(i); exists {
-				slotEvictedEventsToTrigger = append(slotEvictedEventsToTrigger, slotEvictedEvent)
-			}
-		}
-
-		return slotIndex
-	})
-
-	for _, slotEvictedEvent := range slotEvictedEventsToTrigger {
+func (c *EvictionState[Type]) Evict(slot Type) {
+	for _, slotEvictedEvent := range c.evict(slot) {
 		slotEvictedEvent.Trigger()
 	}
 }
 
-var defaultTriggeredEvent = reactive.NewEvent()
+func (c *EvictionState[Type]) evict(slot Type) (eventsToTrigger []reactive.Event) {
+	c.lastEvictedSlotIndex.Compute(func(lastEvictedSlotIndex Type) Type {
+		if slot <= lastEvictedSlotIndex {
+			return lastEvictedSlotIndex
+		}
+
+		for i := lastEvictedSlotIndex + Type(1); i <= slot; i = i + Type(1) {
+			if slotEvictedEvent, exists := c.evictionEvents.Get(i); exists {
+				eventsToTrigger = append(eventsToTrigger, slotEvictedEvent)
+			}
+		}
+
+		return slot
+	})
+
+	return eventsToTrigger
+}
+
+type SlotType interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr | ~float32 | ~float64 | ~string
+}
+
+var evictedSlotEvent = reactive.NewEvent()
 
 func init() {
-	defaultTriggeredEvent.Trigger()
+	evictedSlotEvent.Trigger()
 }
