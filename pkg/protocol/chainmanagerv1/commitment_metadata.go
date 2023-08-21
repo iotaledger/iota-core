@@ -125,7 +125,7 @@ func (c *CommitmentMetadata) registerParent(parent *CommitmentMetadata) {
 	// triggerEventIfIndexBelowThreshold triggers the given event if the commitment's index is below the given
 	// threshold. We only monitor the threshold after the corresponding parent event was triggered (to minimize
 	// the amount of elements that listen to updates of the same property).
-	triggerEventIfIndexBelowThreshold := func(eventFunc func(*CommitmentMetadata) reactive.Event, thresholdFunc func(*Chain) reactive.Variable[iotago.SlotIndex], id string) {
+	triggerEventIfIndexBelowThreshold := func(eventFunc func(*CommitmentMetadata) reactive.Event, thresholdFunc func(*Chain) reactive.Variable[iotago.SlotIndex]) {
 		eventFunc(parent).OnTrigger(func() {
 			unsubscribe := thresholdFunc(c.chain.Get()).OnUpdate(func(_, latestVerifiedCommitmentIndex iotago.SlotIndex) {
 				if c.Index() < latestVerifiedCommitmentIndex {
@@ -137,9 +137,9 @@ func (c *CommitmentMetadata) registerParent(parent *CommitmentMetadata) {
 		})
 	}
 
-	triggerEventIfIndexBelowThreshold((*CommitmentMetadata).BelowLatestVerifiedCommitment, (*Chain).LatestVerifiedCommitmentIndex, "BelowLatestVerifiedCommitment")
-	triggerEventIfIndexBelowThreshold((*CommitmentMetadata).BelowSyncThreshold, (*Chain).SyncThreshold, "BelowSyncThreshold")
-	triggerEventIfIndexBelowThreshold((*CommitmentMetadata).BelowWarpSyncThreshold, (*Chain).WarpSyncThreshold, "BelowWarpSyncThreshold")
+	triggerEventIfIndexBelowThreshold((*CommitmentMetadata).BelowLatestVerifiedCommitment, (*Chain).LatestVerifiedCommitmentIndex)
+	triggerEventIfIndexBelowThreshold((*CommitmentMetadata).BelowSyncThreshold, (*Chain).SyncThreshold)
+	triggerEventIfIndexBelowThreshold((*CommitmentMetadata).BelowWarpSyncThreshold, (*Chain).WarpSyncThreshold)
 }
 
 func (c *CommitmentMetadata) registerChild(newChild *CommitmentMetadata, onSuccessorUpdated func(*CommitmentMetadata, *CommitmentMetadata)) {
