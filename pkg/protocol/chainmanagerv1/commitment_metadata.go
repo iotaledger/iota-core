@@ -63,8 +63,60 @@ func NewCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
 	return c
 }
 
-func (c *CommitmentMetadata) RegisterParent(parent *CommitmentMetadata) {
-	parent.RegisterChild(c, c.inheritChain(parent))
+func (c *CommitmentMetadata) Chain() reactive.Variable[*Chain] {
+	return c.chain
+}
+
+func (c *CommitmentMetadata) Solid() reactive.Event {
+	return c.solid
+}
+
+func (c *CommitmentMetadata) Verified() reactive.Event {
+	return c.verified
+}
+
+func (c *CommitmentMetadata) ParentVerified() reactive.Event {
+	return c.parentVerified
+}
+
+func (c *CommitmentMetadata) BelowSyncThreshold() reactive.Event {
+	return c.belowSyncThreshold
+}
+
+func (c *CommitmentMetadata) BelowWarpSyncThreshold() reactive.Event {
+	return c.belowWarpSyncThreshold
+}
+
+func (c *CommitmentMetadata) BelowLatestVerifiedCommitment() reactive.Event {
+	return c.belowLatestVerifiedCommitment
+}
+
+func (c *CommitmentMetadata) Evicted() reactive.Event {
+	return c.evicted
+}
+
+func (c *CommitmentMetadata) ParentAboveLatestVerifiedCommitment() reactive.Variable[bool] {
+	return c.parentAboveLatestVerifiedCommitment
+}
+
+func (c *CommitmentMetadata) AboveLatestVerifiedCommitment() reactive.Variable[bool] {
+	return c.aboveLatestVerifiedCommitment
+}
+
+func (c *CommitmentMetadata) InSyncWindow() reactive.Variable[bool] {
+	return c.inSyncWindow
+}
+
+func (c *CommitmentMetadata) RequiresWarpSync() reactive.Variable[bool] {
+	return c.requiresWarpSync
+}
+
+func (c *CommitmentMetadata) ChainSuccessor() reactive.Variable[*CommitmentMetadata] {
+	return c.chainSuccessor
+}
+
+func (c *CommitmentMetadata) registerParent(parent *CommitmentMetadata) {
+	parent.registerChild(c, c.inheritChain(parent))
 
 	c.solid.InheritFrom(parent.solid)
 	c.parentVerified.InheritFrom(parent.verified)
@@ -90,7 +142,7 @@ func (c *CommitmentMetadata) RegisterParent(parent *CommitmentMetadata) {
 	triggerEventIfIndexBelowThreshold((*CommitmentMetadata).BelowWarpSyncThreshold, (*Chain).WarpSyncThreshold, "BelowWarpSyncThreshold")
 }
 
-func (c *CommitmentMetadata) RegisterChild(newChild *CommitmentMetadata, onSuccessorUpdated func(*CommitmentMetadata, *CommitmentMetadata)) {
+func (c *CommitmentMetadata) registerChild(newChild *CommitmentMetadata, onSuccessorUpdated func(*CommitmentMetadata, *CommitmentMetadata)) {
 	c.chainSuccessor.Compute(func(currentSuccessor *CommitmentMetadata) *CommitmentMetadata {
 		return lo.Cond(currentSuccessor != nil, currentSuccessor, newChild)
 	})
@@ -105,15 +157,12 @@ func (c *CommitmentMetadata) RegisterChild(newChild *CommitmentMetadata, onSucce
 // direct successor of a parent, and we inherit its chain otherwise.
 func (c *CommitmentMetadata) inheritChain(parent *CommitmentMetadata) func(*CommitmentMetadata, *CommitmentMetadata) {
 	var spawnedChain *Chain
-
 	spawnChain := func() {
 		if spawnedChain == nil {
 			spawnedChain = NewChain(c)
-
 			c.chain.Set(spawnedChain)
 		}
 	}
-
 	evictSpawnedChain := func() {
 		if spawnedChain != nil {
 			spawnedChain.evicted.Trigger()
@@ -122,13 +171,11 @@ func (c *CommitmentMetadata) inheritChain(parent *CommitmentMetadata) func(*Comm
 	}
 
 	var unsubscribe func()
-
 	subscribeToParentChain := func() {
 		if unsubscribe == nil {
 			unsubscribe = parent.chain.OnUpdate(func(_, chain *Chain) { c.chain.Set(chain) })
 		}
 	}
-
 	unsubscribeFromParentChain := func() {
 		if unsubscribe != nil {
 			unsubscribe()

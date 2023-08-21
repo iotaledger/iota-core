@@ -127,7 +127,7 @@ func (c *ChainManager) Evict(slotIndex iotago.SlotIndex) {
 }
 
 func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvictedEvent reactive.Event) {
-	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, commitment.RegisterParent)
+	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, commitment.registerParent)
 
 	slotEvictedEvent.OnTrigger(func() { commitment.Evicted().Trigger() })
 
