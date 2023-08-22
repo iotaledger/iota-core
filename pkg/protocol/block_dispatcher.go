@@ -63,7 +63,7 @@ func NewBlockDispatcher(protocol *Protocol, opts ...options.Option[BlockDispatch
 	}, opts, func(b *BlockDispatcher) {
 		protocol.HookConstructed(b.initEngineMonitoring)
 		protocol.HookInitialized(b.initNetworkConnection)
-		protocol.HookStopped(b.shutdown)
+		protocol.HookShutdown(b.shutdown)
 	})
 }
 

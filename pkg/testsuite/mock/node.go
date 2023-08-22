@@ -114,7 +114,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 
 	started := make(chan struct{}, 1)
 
-	n.Protocol.Events.Started.Hook(func() {
+	n.Protocol.HookInitialized(func() {
 		close(started)
 	})
 
@@ -432,7 +432,7 @@ func (n *Node) Shutdown() {
 	stopped := make(chan struct{}, 1)
 
 	if n.Protocol != nil {
-		n.Protocol.Events.Stopped.Hook(func() {
+		n.Protocol.HookStopped(func() {
 			close(stopped)
 		})
 	} else {
