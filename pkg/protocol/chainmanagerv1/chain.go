@@ -102,11 +102,11 @@ func (c *Chain) registerCommitment(commitment *CommitmentMetadata) {
 		return lo.Cond(latestCommitmentIndex > commitment.Index(), latestCommitmentIndex, commitment.Index())
 	})
 
-	unregisterCondition := func(_, newValue *Chain) bool {
+	commitment.Chain().OnUpdateOnce(func(_, _ *Chain) {
+		c.unregisterCommitment(commitment)
+	}, func(_, newValue *Chain) bool {
 		return newValue != c
-	}
-
-	commitment.Chain().OnUpdateOnce(func(_, _ *Chain) { c.unregisterCommitment(commitment) }, unregisterCondition)
+	})
 }
 
 func (c *Chain) unregisterCommitment(commitment *CommitmentMetadata) iotago.SlotIndex {
