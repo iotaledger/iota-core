@@ -15,10 +15,9 @@ type Store[V any] struct {
 	pruningDelay iotago.EpochIndex
 
 	lastPrunedEpoch *model.PruningIndex
-	// lastPrunedMutex syncutils.RWMutex
 }
 
-func NewStore[V any](storeRealm kvstore.Realm, pruningRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex, vToBytes kvstore.ObjectToBytes[V], bytesToV kvstore.BytesToObject[V]) *Store[V] {
+func NewStore[V any](storeRealm, pruningRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex, vToBytes kvstore.ObjectToBytes[V], bytesToV kvstore.BytesToObject[V]) *Store[V] {
 	return &Store[V]{
 		realm:           storeRealm,
 		kv:              kvstore.NewTypedStore(lo.PanicOnErr(kv.WithExtendedRealm(storeRealm)), iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, vToBytes, bytesToV),
@@ -28,42 +27,17 @@ func NewStore[V any](storeRealm kvstore.Realm, pruningRealm kvstore.Realm, kv kv
 }
 
 func (s *Store[V]) isTooOld(epoch iotago.EpochIndex) bool {
-	s.lastPrunedMutex.RLock()
-	defer s.lastPrunedMutex.RUnlock()
-
 	prunedEpoch, hasPruned := s.lastPrunedEpoch.Index()
 
 	return hasPruned && epoch <= prunedEpoch
 }
 
 func (s *Store[V]) RestoreLastPrunedEpoch() error {
-	s.lastPrunedMutex.Lock()
-	defer s.lastPrunedMutex.Unlock()
-
-	var lowestEpoch *iotago.EpochIndex
-	if err := s.streamEpochs(func(epoch iotago.EpochIndex) error {
-		if lowestEpoch == nil || epoch < *lowestEpoch {
-			lowestEpoch = &epoch
-		}
-
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	if lowestEpoch != nil && *lowestEpoch > 0 {
-		// We need to subtract 1 as lowestEpoch is the last epoch we have stored. Thus, the last pruned is -1.
-		s.lastPrunedEpoch.MarkEvicted(*lowestEpoch - 1)
-	}
-
-	return nil
+	return s.lastPrunedEpoch.RestoreFromDisk()
 }
 
-func (s *Store[V]) LastPrunedEpoch() (iotago.EpochIndex, bool) {
-	s.lastPrunedMutex.RLock()
-	defer s.lastPrunedMutex.RUnlock()
-
-	return s.lastPrunedEpoch.Index()
+func (e *Store[V]) LastPrunedEpoch() (iotago.EpochIndex, bool) {
+	return e.lastPrunedEpoch.Index()
 }
 
 // Load loads the value for the given epoch.
@@ -127,27 +101,7 @@ func (s *Store[V]) StreamBytes(consumer func([]byte, []byte) error) error {
 	return innerErr
 }
 
-func (s *Store[V]) streamEpochs(consumer func(epoch iotago.EpochIndex) error) error {
-	var innerErr error
-	if storageErr := s.kv.IterateKeys(kvstore.EmptyPrefix, func(epoch iotago.EpochIndex) (advance bool) {
-		innerErr = consumer(epoch)
-
-		return innerErr == nil
-	}); storageErr != nil {
-		return ierrors.Wrap(storageErr, "failed to iterate over epochs")
-	}
-
-	if innerErr != nil {
-		return ierrors.Wrap(innerErr, "failed to stream epochs")
-	}
-
-	return nil
-}
-
 func (s *Store[V]) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) error {
-	s.lastPrunedMutex.Lock()
-	defer s.lastPrunedMutex.Unlock()
-
 	// The epoch we're trying to prune already takes into account the defaultPruningDelay.
 	// Therefore, we don't need to do anything if it is greater equal s.pruningDelay and take the difference otherwise.
 	var pruningDelay iotago.EpochIndex

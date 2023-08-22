@@ -66,6 +66,10 @@ func (s *Storage) RestoreFromDisk() {
 	defer s.pruningLock.Unlock()
 
 	lastPrunedEpoch := s.prunable.RestoreFromDisk()
+	// Return if it's epoch 0, leave the lastPrunedEpoch at the default value, indicating epoch 0 is not pruned yet.
+	if lastPrunedEpoch == 0 {
+		return
+	}
 
 	s.lastPrunedEpoch.MarkEvicted(lastPrunedEpoch)
 }

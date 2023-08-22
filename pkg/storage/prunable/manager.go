@@ -124,11 +124,10 @@ func (m *SlotManager) RestoreFromDisk() (lastPrunedEpoch iotago.EpochIndex) {
 	}
 
 	// Set the maxPruned epoch to the baseIndex-1 of the oldest dbInstance.
+	// Leave the lastPrunedEpoch at the default value if the oldest dbInstance is at baseIndex 0, which is not pruned yet.
 	if dbInfos[0].baseIndex > 0 {
 		lastPrunedEpoch = dbInfos[0].baseIndex - 1
 		m.lastPrunedEpoch.MarkEvicted(lastPrunedEpoch)
-	} else {
-		m.lastPrunedEpoch.MarkEvicted(0)
 	}
 
 	// Open all the dbInstances (perform health checks) and add them to the openDBs cache. Also fills the dbSizes map (when evicted from the cache).
