@@ -4,7 +4,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -15,18 +14,16 @@ type Store[V any] struct {
 	kv           *kvstore.TypedStore[iotago.EpochIndex, V]
 	pruningDelay iotago.EpochIndex
 
-	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
-	lastPrunedMutex syncutils.RWMutex
+	lastPrunedEpoch *model.PruningIndex
+	// lastPrunedMutex syncutils.RWMutex
 }
 
-func NewStore[V any](realm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex, vToBytes kvstore.ObjectToBytes[V], bytesToV kvstore.BytesToObject[V]) *Store[V] {
-	kv = lo.PanicOnErr(kv.WithExtendedRealm(realm))
-
+func NewStore[V any](storeRealm kvstore.Realm, pruningRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex, vToBytes kvstore.ObjectToBytes[V], bytesToV kvstore.BytesToObject[V]) *Store[V] {
 	return &Store[V]{
-		realm:           realm,
-		kv:              kvstore.NewTypedStore(kv, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, vToBytes, bytesToV),
+		realm:           storeRealm,
+		kv:              kvstore.NewTypedStore(lo.PanicOnErr(kv.WithExtendedRealm(storeRealm)), iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, vToBytes, bytesToV),
 		pruningDelay:    pruningDelay,
-		lastPrunedEpoch: model.NewEvictionIndex[iotago.EpochIndex](),
+		lastPrunedEpoch: model.NewPruningIndex(lo.PanicOnErr(kv.WithExtendedRealm(pruningRealm)), storeRealm),
 	}
 }
 
