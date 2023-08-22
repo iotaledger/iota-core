@@ -294,7 +294,7 @@ func (b *BlockDispatcher) targetEngine(commitment *chainmanager.ChainCommitment)
 // monitorLatestEngineCommitment monitors the latest commitment of the given engine instance and triggers a warp sync if
 // necessary.
 func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.Engine) {
-	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+	unsubscribe := engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		if chainCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID()); exists {
 			b.processedWarpSyncRequests.Delete(commitment.ID())
 
@@ -303,7 +303,9 @@ func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.E
 				b.warpSync(engineInstance, chainCommitment)
 			}
 		}
-	}).Unhook)
+	}).Unhook
+
+	engineInstance.HookStopped(unsubscribe)
 }
 
 // evict evicts all elements from the unsolid commitment blocks buffer and the pending warp sync requests that are older
