@@ -18,7 +18,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -82,7 +81,7 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error
 	matchingEngineFound := false
 	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
 		if engine != nil && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
-			if !b.inWarpSyncRange(engine, block) {
+			if b.inSyncWindow(engine, block) {
 				engine.ProcessBlockFromPeer(block, src)
 			}
 
@@ -221,10 +220,6 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 	b.processedWarpSyncRequests.Add(commitmentID)
 
-	targetEngine.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-		block.ID()
-	})
-
 	for _, blockID := range blockIDs {
 		targetEngine.BlockDAG.GetOrRequestBlock(blockID)
 	}
@@ -232,20 +227,20 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 	return nil
 }
 
-// inWarpSyncRange returns whether the given block should be processed by a warp sync process.
+// inSyncWindow returns whether the given block is within the sync window of the given engine instance.
 //
-// This is the case if the block is more than a warp sync threshold ahead of the latest commitment while also committing
-// to a new slot that can be warp synced.
-func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Block) bool {
+// We limit the amount of slots ahead of the latest commitment that we forward to the engine instance to prevent memory
+// exhaustion while syncing.
+func (b *BlockDispatcher) inSyncWindow(engine *engine.Engine, block *model.Block) bool {
 	if engine.BlockRequester.HasTicker(block.ID()) {
-		return false
+		return true
 	}
 
 	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
 	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
 
-	return block.ID().Index() > latestCommitmentIndex+maxCommittableAge
+	return block.ID().Index() <= latestCommitmentIndex+maxCommittableAge
 }
 
 // warpSync triggers warp sync from the latest committed slot up to the warpsync window.
