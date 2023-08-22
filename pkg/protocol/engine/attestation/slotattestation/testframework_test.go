@@ -71,7 +71,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("TestJungle", "tgl"),
 			iotago.WithSupplyOptions(10000, 0, 0, 0, 0, 0),
-			iotago.WithLivenessOptions(1, 1, 2, 8),
+			iotago.WithLivenessOptions(1, 1, 2, 8, 2),
 		),
 	)
 
