@@ -71,6 +71,7 @@ func (e *PruningIndex) RestoreFromDisk() error {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil
 		}
+
 		return err
 	}
 

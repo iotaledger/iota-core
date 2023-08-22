@@ -69,7 +69,10 @@ func (e *EpochKVStore) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to prune epoch store for realm %v at epoch %d", e.realm, i)
 		}
-		e.lastPrunedEpoch.MarkEvicted(i)
+		err = e.lastPrunedEpoch.MarkEvicted(i)
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to store lastPrunedEpoch for epoch %d in Prune", i)
+		}
 	}
 
 	return nil

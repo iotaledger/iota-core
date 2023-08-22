@@ -36,8 +36,8 @@ func (s *Store[V]) RestoreLastPrunedEpoch() error {
 	return s.lastPrunedEpoch.RestoreFromDisk()
 }
 
-func (e *Store[V]) LastPrunedEpoch() (iotago.EpochIndex, bool) {
-	return e.lastPrunedEpoch.Index()
+func (s *Store[V]) LastPrunedEpoch() (iotago.EpochIndex, bool) {
+	return s.lastPrunedEpoch.Index()
 }
 
 // Load loads the value for the given epoch.
@@ -121,7 +121,10 @@ func (s *Store[V]) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.Epo
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to prune epoch store for realm %v at epoch %d", s.realm, i)
 		}
-		s.lastPrunedEpoch.MarkEvicted(i)
+		err = s.lastPrunedEpoch.MarkEvicted(i)
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to store lastPrunedEpoch for epoch %d in Prune", i)
+		}
 	}
 
 	return nil
