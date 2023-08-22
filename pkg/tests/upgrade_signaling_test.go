@@ -2,19 +2,24 @@ package tests
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/crypto/ed25519"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -159,5 +164,31 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.AssertVersionAndProtocolParametersHashes(map[iotago.Version]iotago.Identifier{
 		3: lo.PanicOnErr(ts.API.ProtocolParameters().Hash()),
 		5: hash1,
+	}, ts.Nodes()...)
+
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:                             ts.Node("nodeA").AccountID,
+		Credits:                        &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
+		ExpirySlot:                     math.MaxUint64,
+		OutputID:                       iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
+		PubKeys:                        ds.NewSet[ed25519.PublicKey](ed25519.PublicKey(ts.Node("nodeA").PubKey)),
+		ValidatorStake:                 testsuite.MinValidatorAccountAmount,
+		DelegationStake:                0,
+		FixedCost:                      0,
+		StakeEndEpoch:                  math.MaxUint64,
+		LatestSupportedProtocolVersion: 5,
+	}, ts.Nodes()...)
+
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:                             ts.Node("nodeF").AccountID,
+		Credits:                        &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
+		ExpirySlot:                     math.MaxUint64,
+		OutputID:                       iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 6),
+		PubKeys:                        ds.NewSet[ed25519.PublicKey](ed25519.PublicKey(ts.Node("nodeF").PubKey)),
+		ValidatorStake:                 0,
+		DelegationStake:                0,
+		FixedCost:                      0,
+		StakeEndEpoch:                  0,
+		LatestSupportedProtocolVersion: 5,
 	}, ts.Nodes()...)
 }

@@ -44,6 +44,22 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 			if !cmp.Equal(accountData.PubKeys.ToSlice(), actualAccountData.PubKeys.ToSlice()) {
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.PubKeys, actualAccountData.PubKeys)
 			}
+
+			if accountData.StakeEndEpoch != actualAccountData.StakeEndEpoch {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected stake end epoch %s, got %s", node.Name, accountData.ID, accountData.StakeEndEpoch, actualAccountData.StakeEndEpoch)
+			}
+
+			if accountData.FixedCost != actualAccountData.FixedCost {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected fixed cost %d, got %d", node.Name, accountData.ID, accountData.FixedCost, actualAccountData.FixedCost)
+			}
+
+			if accountData.ValidatorStake != actualAccountData.ValidatorStake {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected validator stake %d, got %d", node.Name, accountData.ID, accountData.ValidatorStake, actualAccountData.ValidatorStake)
+			}
+
+			if accountData.DelegationStake != actualAccountData.DelegationStake {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected delegation stake %d, got %d", node.Name, accountData.ID, accountData.DelegationStake, actualAccountData.DelegationStake)
+			}
 		}
 
 		return nil

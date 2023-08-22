@@ -1,8 +1,6 @@
 package accountsledger
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/core/safemath"
@@ -146,7 +144,9 @@ func (m *Manager) ApplyDiff(
 		return ierrors.Wrap(err, "could not update slot diff with burns")
 	}
 
-	m.updateSlotDiffWithVersionSignals(slotIndex, accountDiffs)
+	if err := m.updateSlotDiffWithVersionSignals(slotIndex, accountDiffs); err != nil {
+		return ierrors.Wrap(err, "could not update slot diff latest version signals")
+	}
 
 	for accountID := range accountDiffs {
 		destroyed := destroyedAccounts.Has(accountID)
@@ -415,15 +415,6 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex, rmc iotag
 	return burns, nil
 }
 
-func (m *Manager) computeLatestSupportedVersionsForSlot(slotIndex iotago.SlotIndex) (latestSupportedVersions map[iotago.AccountID]iotago.Version) {
-	signalsStorage := m.latestSupportedVersionSignals.Get(slotIndex)
-	if signalsStorage == nil {
-		return nil
-	}
-
-	return signalsStorage.AsMap()
-}
-
 func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
@@ -498,13 +489,11 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		}
 		accountData.FixedCost = iotago.Mana(fixedCost)
 
-		fmt.Println("latest", accountData.LatestSupportedProtocolVersion)
 		latestSupportedProtocolVersion, err := safemath.SafeAdd(uint8(accountData.LatestSupportedProtocolVersion), uint8(diffChange.LatestSupportedProtocolVersionChange))
 		if err != nil {
 			return ierrors.Wrapf(err, "can't retrieve account, validator latest supported version overflow for account (%s) in slot (%d): %d + %d", accountData.ID, index, accountData.LatestSupportedProtocolVersion, diffChange.LatestSupportedProtocolVersionChange)
 		}
 		accountData.LatestSupportedProtocolVersion = iotago.Version(latestSupportedProtocolVersion)
-
 		if err := m.accountsTree.Set(accountID, accountData); err != nil {
 			return ierrors.Wrapf(err, "could not set account (%s) in accounts tree", accountID)
 		}
@@ -531,8 +520,8 @@ func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDif
 		accountDiff, exists := accountDiffs[id]
 		if !exists {
 			accountDiff = prunable.NewAccountDiff()
-			accountDiffs[id] = accountDiff
 		}
+
 		accountDiff.BICChange -= iotago.BlockIssuanceCredits(burn)
 		accountDiffs[id] = accountDiff
 	}
@@ -540,15 +529,31 @@ func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDif
 	return nil
 }
 
-func (m *Manager) updateSlotDiffWithVersionSignals(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) {
-	for id, version := range m.computeLatestSupportedVersionsForSlot(slotIndex) {
+func (m *Manager) updateSlotDiffWithVersionSignals(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) error {
+	signalsStorage := m.latestSupportedVersionSignals.Get(slotIndex)
+	if signalsStorage == nil {
+		return nil
+	}
+
+	for id, version := range signalsStorage.AsMap() {
+		accountData, exists, err := m.accountsTree.Get(id)
+		if err != nil {
+			return ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", id)
+		}
+
+		if !exists {
+			accountData = accounts.NewAccountData(id)
+		}
+
 		accountDiff, exists := accountDiffs[id]
 		if !exists {
 			accountDiff = prunable.NewAccountDiff()
+		}
+		if latestSupportedProtocolVersionChange := int8(version) - int8(accountData.LatestSupportedProtocolVersion); latestSupportedProtocolVersionChange != 0 {
+			accountDiff.LatestSupportedProtocolVersionChange = latestSupportedProtocolVersionChange
 			accountDiffs[id] = accountDiff
 		}
-
-		accountDiff.LatestSupportedProtocolVersionChange = int8(version)
-		accountDiffs[id] = accountDiff
 	}
+
+	return nil
 }
