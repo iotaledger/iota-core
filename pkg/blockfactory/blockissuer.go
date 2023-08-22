@@ -188,18 +188,19 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, issuerAccount Account, op
 		blockBuilder.ShallowLikeParents(shallowLikeParents)
 	}
 
-	// TODO: add workscore here with issue #264
+	blockBuilder.Payload(blockParams.Payload)
+
 	rmcSlot, err := safemath.SafeSub(api.TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime), api.ProtocolParameters().MaxCommittableAge())
 	if err != nil {
 		rmcSlot = 0
 	}
-	rmcCommitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(rmcSlot)
+	rmc, err := i.protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
 	}
-	blockBuilder.BurnedMana(rmcCommitment.Commitment().RMC)
 
-	blockBuilder.Payload(blockParams.Payload)
+	// only set the burned Mana as the last step before signing, so workscore calculation is correct.
+	blockBuilder.BurnedMana(rmc)
 
 	blockBuilder.Sign(issuerAccount.ID(), issuerAccount.PrivateKey())
 

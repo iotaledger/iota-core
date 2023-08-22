@@ -115,6 +115,7 @@ func (m *Manager) AccountsTreeRoot() iotago.Identifier {
 // ApplyDiff applies the given accountDiff to the Account tree.
 func (m *Manager) ApplyDiff(
 	slotIndex iotago.SlotIndex,
+	rmc iotago.Mana,
 	accountDiffs map[iotago.AccountID]*prunable.AccountDiff,
 	destroyedAccounts ds.Set[iotago.AccountID],
 ) error {
@@ -127,7 +128,7 @@ func (m *Manager) ApplyDiff(
 	}
 
 	// load blocks burned in this slot
-	if err := m.updateSlotDiffWithBurns(slotIndex, accountDiffs); err != nil {
+	if err := m.updateSlotDiffWithBurns(slotIndex, accountDiffs, rmc); err != nil {
 		return ierrors.Wrap(err, "could not update slot diff with burns")
 	}
 
@@ -372,17 +373,18 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 	return slotDiff, err
 }
 
-func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex) (burns map[iotago.AccountID]iotago.Mana, err error) {
+func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex, rmc iotago.Mana) (burns map[iotago.AccountID]iotago.Mana, err error) {
 	burns = make(map[iotago.AccountID]iotago.Mana)
 	if set, exists := m.blockBurns.Get(slotIndex); exists {
+		// Get RMC for this slot
 		for it := set.Iterator(); it.HasNext(); {
 			blockID := it.Next()
 			block, blockLoaded := m.block(blockID)
 			if !blockLoaded {
 				return nil, ierrors.Errorf("cannot apply the new diff, block %s not found in the block cache", blockID)
 			}
-			if basicBlock, isBasicBlock := block.BasicBlock(); isBasicBlock {
-				burns[block.ProtocolBlock().IssuerID] += basicBlock.BurnedMana
+			if _, isBasicBlock := block.BasicBlock(); isBasicBlock {
+				burns[block.ProtocolBlock().IssuerID] += iotago.Mana(block.WorkScore()) * rmc
 			}
 		}
 	}
@@ -480,8 +482,8 @@ func (m *Manager) evict(index iotago.SlotIndex) {
 	m.blockBurns.Delete(index)
 }
 
-func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) error {
-	burns, err := m.computeBlockBurnsForSlot(slotIndex)
+func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, rmc iotago.Mana) error {
+	burns, err := m.computeBlockBurnsForSlot(slotIndex, rmc)
 	if err != nil {
 		return ierrors.Wrap(err, "could not create block burns for slot")
 	}
