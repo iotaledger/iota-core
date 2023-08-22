@@ -2,7 +2,9 @@ package blockfactory
 
 import (
 	"crypto/ed25519"
+	"fmt"
 
+	"github.com/iotaledger/hive.go/crypto"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -52,4 +54,17 @@ func (e *Ed25519Account) Address() iotago.Address {
 // PrivateKey returns the account private key for signing.
 func (e *Ed25519Account) PrivateKey() ed25519.PrivateKey {
 	return e.privateKey
+}
+
+func AccountFromParams(accountHex, privateKey string) Account {
+	accountID, err := iotago.IdentifierFromHexString(accountHex)
+	if err != nil {
+		panic(fmt.Sprintln("invalid accountID hex string", err))
+	}
+	privKey, err := crypto.ParseEd25519PrivateKeyFromString(privateKey)
+	if err != nil {
+		panic(fmt.Sprintln("invalid ed25519 private key string", err))
+	}
+
+	return NewEd25519Account(accountID, privKey)
 }

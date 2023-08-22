@@ -10,6 +10,10 @@ type ParametersINX struct {
 	Enabled bool `default:"false" usage:"whether the INX plugin is enabled"`
 	// the bind address on which the INX can be accessed from
 	BindAddress string `default:"localhost:9029" usage:"the bind address on which the INX can be accessed from"`
+	// BlockIssuerAccount the accountID of the account that will issue the blocks.
+	BlockIssuerAccount string `default:"" usage:"the accountID of the account that will issue the blocks"`
+	// BlockIssuerPrivateKey the private key of the account that will issue the blocks.
+	BlockIssuerPrivateKey string `default:"" usage:"the private key of the account that will issue the blocks"`
 }
 
 var ParamsINX = &ParametersINX{}
