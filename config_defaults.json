@@ -45,14 +45,19 @@
       "/api/core/v3/transactions*",
       "/api/core/v3/commitments*",
       "/api/core/v3/outputs*",
+      "/api/core/v3/accounts*",
+      "/api/core/v3/validators*",
+      "/api/core/v3/rewards*",
+      "/api/core/v3/committee",
       "/api/debug/v2/*",
-      "/api/indexer/v1/*"
+      "/api/indexer/v2/*"
     ],
     "protectedRoutes": [
       "/api/*"
     ],
     "debugRequestLoggerEnabled": false,
     "allowIncompleteBlock": false,
+    "maxPageSize": 100,
     "jwtAuth": {
       "salt": "IOTA"
     },
@@ -84,7 +89,9 @@
       "depth": 5
     },
     "filter": {
-      "maxAllowedClockDrift": "5s"
+      "maxAllowedClockDrift": "5s",
+      "minCommittableAge": 6,
+      "maxCommittableAge": 12
     },
     "baseToken": {
       "name": "Shimmer",
@@ -103,9 +110,10 @@
     "privateKey": "",
     "rateSetterEnabled": false
   },
-  "activity": {
+  "validator": {
     "enabled": true,
-    "broadcastInterval": "2s",
+    "committeeBroadcastInterval": "2s",
+    "candidateBroadcastInterval": "30m",
     "parentsCount": 8,
     "ignoreBootstrapped": false
   },
@@ -120,6 +128,13 @@
     "conflicts": {
       "maxCount": 100
     }
+  },
+  "metrics": {
+    "enabled": true,
+    "bindAddress": "0.0.0.0:9311",
+    "goMetrics": false,
+    "processMetrics": false,
+    "promhttpMetrics": false
   },
   "inx": {
     "enabled": false,
