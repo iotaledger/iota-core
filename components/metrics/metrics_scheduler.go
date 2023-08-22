@@ -11,7 +11,7 @@ import (
 const (
 	schedulerNamespace = "scheduler"
 
-	queueSizePerNodeWork     = "queue_size_per_node_work" // #nosec G101
+	queueSizePerNodeWork     = "queue_size_per_node_work" //nolint:gosec
 	queueSizePerNodeCount    = "queue_size_per_node_count"
 	schedulerProcessedBlocks = "processed_blocks"
 	manaAmountPerNode        = "mana_per_node"
@@ -19,7 +19,7 @@ const (
 	skippedBlockLabel        = "skipped"
 	droppedBlockLabel        = "dropped"
 	enqueuedBlockLabel       = "enqueued"
-	bufferReadyBlockCount    = "buffer_ready_block_total" // #nosec G101
+	bufferReadyBlockCount    = "buffer_ready_block_total" //nolint:gosec
 	bufferTotalSize          = "buffer_size_block_total"
 	bufferMaxSize            = "buffer_max_size"
 	rate                     = "rate"
