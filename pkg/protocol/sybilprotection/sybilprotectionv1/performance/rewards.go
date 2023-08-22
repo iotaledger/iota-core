@@ -152,6 +152,7 @@ func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotag
 	if err != nil {
 		return nil, false, err
 	}
+
 	return m.Get(accountID)
 }
 

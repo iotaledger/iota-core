@@ -16,7 +16,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type PrunableSlotManager struct {
+type SlotManager struct {
 	openDBs      *cache.Cache[iotago.EpochIndex, *database.DBInstance]
 	openDBsMutex syncutils.RWMutex
 
@@ -31,14 +31,14 @@ type PrunableSlotManager struct {
 	optsMaxOpenDBs int
 }
 
-func NewPrunableSlotManager(dbConfig database.Config, errorHandler func(error), opts ...options.Option[PrunableSlotManager]) *PrunableSlotManager {
-	return options.Apply(&PrunableSlotManager{
+func NewSlotManager(dbConfig database.Config, errorHandler func(error), opts ...options.Option[SlotManager]) *SlotManager {
+	return options.Apply(&SlotManager{
 		optsMaxOpenDBs:  10,
 		dbConfig:        dbConfig,
 		errorHandler:    errorHandler,
 		dbSizes:         shrinkingmap.New[iotago.EpochIndex, int64](),
 		lastPrunedEpoch: model.NewEvictionIndex[iotago.EpochIndex](),
-	}, opts, func(m *PrunableSlotManager) {
+	}, opts, func(m *SlotManager) {
 		m.openDBs = cache.New[iotago.EpochIndex, *database.DBInstance](m.optsMaxOpenDBs)
 		m.openDBs.SetEvictCallback(func(baseIndex iotago.EpochIndex, db *database.DBInstance) {
 			db.Close()
@@ -54,14 +54,14 @@ func NewPrunableSlotManager(dbConfig database.Config, errorHandler func(error), 
 }
 
 // IsTooOld checks if the index is in a pruned epoch.
-func (m *PrunableSlotManager) IsTooOld(index iotago.EpochIndex) (isTooOld bool) {
+func (m *SlotManager) IsTooOld(index iotago.EpochIndex) (isTooOld bool) {
 	m.lastPrunedMutex.RLock()
 	defer m.lastPrunedMutex.RUnlock()
 
 	return index < m.lastPrunedEpoch.NextIndex()
 }
 
-func (m *PrunableSlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) (kvstore.KVStore, error) {
+func (m *SlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) (kvstore.KVStore, error) {
 	if m.IsTooOld(index) {
 		return nil, ierrors.Wrapf(database.ErrEpochPruned, "epoch %d", index)
 	}
@@ -71,7 +71,7 @@ func (m *PrunableSlotManager) Get(index iotago.EpochIndex, realm kvstore.Realm) 
 	return lo.PanicOnErr(kv.WithExtendedRealm(realm)), nil
 }
 
-func (m *PrunableSlotManager) Shutdown() {
+func (m *SlotManager) Shutdown() {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
@@ -81,7 +81,7 @@ func (m *PrunableSlotManager) Shutdown() {
 }
 
 // PrunableSlotStorageSize returns the size of the prunable storage containing all db instances.
-func (m *PrunableSlotManager) PrunableSlotStorageSize() int64 {
+func (m *SlotManager) PrunableSlotStorageSize() int64 {
 	// Sum up all the evicted databases
 	var sum int64
 	m.dbSizes.ForEach(func(index iotago.EpochIndex, i int64) bool {
@@ -105,14 +105,14 @@ func (m *PrunableSlotManager) PrunableSlotStorageSize() int64 {
 	return sum
 }
 
-func (m *PrunableSlotManager) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
+func (m *SlotManager) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
 	m.lastPrunedMutex.RLock()
 	defer m.lastPrunedMutex.RUnlock()
 
 	return m.lastPrunedEpoch.Index()
 }
 
-func (m *PrunableSlotManager) RestoreFromDisk() {
+func (m *SlotManager) RestoreFromDisk() {
 	m.lastPrunedMutex.Lock()
 	defer m.lastPrunedMutex.Unlock()
 
@@ -142,7 +142,7 @@ func (m *PrunableSlotManager) RestoreFromDisk() {
 //	epochIndex 0 -> db 0
 //	epochIndex 1 -> db 1
 //	epochIndex 2 -> db 2
-func (m *PrunableSlotManager) getDBInstance(index iotago.EpochIndex) (db *database.DBInstance) {
+func (m *SlotManager) getDBInstance(index iotago.EpochIndex) (db *database.DBInstance) {
 	m.openDBsMutex.Lock()
 	defer m.openDBsMutex.Unlock()
 
@@ -159,7 +159,7 @@ func (m *PrunableSlotManager) getDBInstance(index iotago.EpochIndex) (db *databa
 	return db
 }
 
-func (m *PrunableSlotManager) Prune(epoch iotago.EpochIndex) error {
+func (m *SlotManager) Prune(epoch iotago.EpochIndex) error {
 	m.lastPrunedMutex.Lock()
 	defer m.lastPrunedMutex.Unlock()
 
@@ -188,7 +188,7 @@ func (m *PrunableSlotManager) Prune(epoch iotago.EpochIndex) error {
 	return nil
 }
 
-func (m *PrunableSlotManager) BucketSize(epoch iotago.EpochIndex) (int64, error) {
+func (m *SlotManager) BucketSize(epoch iotago.EpochIndex) (int64, error) {
 	m.openDBsMutex.RLock()
 	defer m.openDBsMutex.RUnlock()
 
@@ -199,7 +199,9 @@ func (m *PrunableSlotManager) BucketSize(epoch iotago.EpochIndex) (int64, error)
 
 	_, exists = m.openDBs.Get(epoch)
 	if !exists {
-		return 0, ierrors.Errorf("bucket does not exists: %d", epoch)
+		return 0, nil
+		// TODO: this should be fixed by https://github.com/iotaledger/iota.go/pull/480
+		//  return 0, ierrors.Errorf("bucket does not exists: %d", epoch)
 	}
 
 	size, err := dbPrunableDirectorySize(m.dbConfig.Directory, epoch)
@@ -210,7 +212,7 @@ func (m *PrunableSlotManager) BucketSize(epoch iotago.EpochIndex) (int64, error)
 	return size, nil
 }
 
-func (m *PrunableSlotManager) Flush() error {
+func (m *SlotManager) Flush() error {
 	m.openDBsMutex.RLock()
 	defer m.openDBsMutex.RUnlock()
 

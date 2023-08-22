@@ -168,9 +168,9 @@ func (r *Retainer) RetainBlockFailure(blockID iotago.BlockID, failureCode apimod
 }
 
 func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, err error) {
-	store, err := r.store(blockID.Index())
-	if err != nil {
-		r.errorHandler(ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Index()))
+	store, storeErr := r.store(blockID.Index())
+	if storeErr != nil {
+		r.errorHandler(ierrors.Wrapf(storeErr, "could not get retainer store for slot %d", blockID.Index()))
 		return
 	}
 

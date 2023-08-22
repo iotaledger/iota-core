@@ -16,7 +16,7 @@ import (
 
 type Prunable struct {
 	apiProvider       api.Provider
-	prunableSlotStore *PrunableSlotManager
+	prunableSlotStore *SlotManager
 	errorHandler      func(error)
 
 	semiPermanentDBConfig database.Config
@@ -28,7 +28,7 @@ type Prunable struct {
 	committee             *epochstore.Store[*account.Accounts]
 }
 
-func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[PrunableSlotManager]) *Prunable {
+func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[SlotManager]) *Prunable {
 	dir := utils.NewDirectory(dbConfig.Directory, true)
 	semiPermanentDBConfig := dbConfig.WithDirectory(dir.PathWithCreate("semipermanent"))
 	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig)
@@ -36,7 +36,7 @@ func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(e
 	return &Prunable{
 		apiProvider:       apiProvider,
 		errorHandler:      errorHandler,
-		prunableSlotStore: NewPrunableSlotManager(dbConfig, errorHandler, opts...),
+		prunableSlotStore: NewSlotManager(dbConfig, errorHandler, opts...),
 
 		semiPermanentDBConfig: semiPermanentDBConfig,
 		semiPermanentDB:       semiPermanentDB,

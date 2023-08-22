@@ -14,14 +14,14 @@ type Store[K, V any] struct {
 func NewStore[K, V any](
 	slot iotago.SlotIndex,
 	kv kvstore.KVStore,
-	kToBytes kvstore.ObjectToBytes[K],
-	bytesToK kvstore.BytesToObject[K],
+	keyToBytes kvstore.ObjectToBytes[K],
+	bytesToKey kvstore.BytesToObject[K],
 	vToBytes kvstore.ObjectToBytes[V],
 	bytesToV kvstore.BytesToObject[V],
 ) *Store[K, V] {
 	return &Store[K, V]{
 		slot: slot,
-		kv:   kvstore.NewTypedStore(kv, kToBytes, bytesToK, vToBytes, bytesToV),
+		kv:   kvstore.NewTypedStore(kv, keyToBytes, bytesToKey, vToBytes, bytesToV),
 	}
 }
 

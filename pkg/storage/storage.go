@@ -45,7 +45,7 @@ type Storage struct {
 	optsPruningSizeMaxTargetSizeBytes        int64
 	optsPruningSizeStartThresholdPercentage  float64
 	optsPruningSizeTargetThresholdPercentage float64
-	optsPrunableManagerOptions               []options.Option[prunable.PrunableSlotManager]
+	optsPrunableManagerOptions               []options.Option[prunable.SlotManager]
 }
 
 // New creates a new storage instance with the named database version in the given directory.

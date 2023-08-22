@@ -5,8 +5,8 @@ import (
 )
 
 // WithMaxOpenDBs sets the maximum concurrently open DBs.
-func WithMaxOpenDBs(optsMaxOpenDBs int) options.Option[PrunableSlotManager] {
-	return func(m *PrunableSlotManager) {
+func WithMaxOpenDBs(optsMaxOpenDBs int) options.Option[SlotManager] {
+	return func(m *SlotManager) {
 		m.optsMaxOpenDBs = optsMaxOpenDBs
 	}
 }

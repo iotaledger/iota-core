@@ -179,13 +179,14 @@ func New(
 				}
 
 				// Only mark any pruning indexes if we loaded a non-genesis snapshot
-				if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-					// TODO: check whether this is still necessary
-					// e.Storage.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
-					// if index, pruned := e.Storage.LastPrunedEpoch(); pruned {
-					// 	e.Events.StoragePruned.Trigger(index)
-					// }
-				}
+				// TODO: calling TryPrune here should be sufficient
+				// if e.Storage.Settings().LatestFinalizedSlot() > 0 {
+				// TODO: check whether this is still necessary
+				// e.Storage.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
+				// if index, pruned := e.Storage.LastPrunedEpoch(); pruned {
+				// 	e.Events.StoragePruned.Trigger(index)
+				// }
+				// }
 
 				if err := e.Storage.Settings().SetSnapshotImported(); err != nil {
 					panic(ierrors.Wrap(err, "failed to set snapshot imported"))

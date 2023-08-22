@@ -54,7 +54,7 @@ var (
 	deps      dependencies
 
 	blocksPerSlot         *shrinkingmap.ShrinkingMap[iotago.SlotIndex, []*blocks.Block]
-	blocksPrunableStorage *prunable.PrunableSlotManager
+	blocksPrunableStorage *prunable.SlotManager
 )
 
 type dependencies struct {
@@ -72,7 +72,7 @@ func configure() error {
 	}
 
 	blocksPerSlot = shrinkingmap.New[iotago.SlotIndex, []*blocks.Block]()
-	blocksPrunableStorage = prunable.NewPrunableSlotManager(database.Config{
+	blocksPrunableStorage = prunable.NewSlotManager(database.Config{
 		Engine:    hivedb.EngineRocksDB,
 		Directory: ParamsDebugAPI.Path,
 
