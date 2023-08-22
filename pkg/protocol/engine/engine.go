@@ -500,8 +500,8 @@ func (e *Engine) setupBlockRequester() {
 }
 
 func (e *Engine) setupPruning() {
-	e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		if err := e.Storage.TryPrune(); err != nil {
+	e.Events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+		if err := e.Storage.TryPrune(slot); err != nil {
 			e.errorHandler(err)
 		}
 	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))

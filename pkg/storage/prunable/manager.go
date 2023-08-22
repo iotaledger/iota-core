@@ -199,9 +199,7 @@ func (m *PrunableSlotManager) BucketSize(epoch iotago.EpochIndex) (int64, error)
 
 	_, exists = m.openDBs.Get(epoch)
 	if !exists {
-		return 0, nil
-		// TODO: in unit test, we never store stuff to epoch 0, thus it fails here in PruneBySize test
-		// return 0, ierrors.Errorf("bucket does not exists: %d", epoch)
+		return 0, ierrors.Errorf("bucket does not exists: %d", epoch)
 	}
 
 	size, err := dbPrunableDirectorySize(m.dbConfig.Directory, epoch)
