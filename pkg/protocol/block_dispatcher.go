@@ -98,22 +98,19 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error
 
 // initEngineMonitoring initializes the automatic monitoring of the engine instances.
 func (b *BlockDispatcher) initEngineMonitoring() {
-	b.monitorLatestEngineCommitment(b.protocol.mainEngine)
+	b.monitorLatestEngineCommitment(b.protocol.MainEngineInstance())
 
 	b.protocol.engineManager.OnEngineCreated(b.monitorLatestEngineCommitment)
 
 	b.protocol.Events.ChainManager.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
+		// as soon as a commitment is solid, it's chain is known and it can be dispatched
 		chainCommitment.SolidEvent().OnTrigger(func() {
 			b.runTask(func() {
 				b.injectUnsolidCommitmentBlocks(chainCommitment.Commitment().ID())
 			}, b.dispatchWorkers)
 
 			b.runTask(func() {
-				// warpsync only if the observed commitment is at least two commitments ahead.
-				targetEngine := b.targetEngine(chainCommitment)
-				if targetEngine != nil && chainCommitment.Commitment().Index() > targetEngine.Storage.Settings().LatestCommitment().Index()+1 {
-					b.warpSync(targetEngine, chainCommitment)
-				}
+				b.warpSyncIfNecessary(b.targetEngine(chainCommitment), chainCommitment)
 			}, b.warpSyncWorkers)
 		})
 	})
@@ -243,16 +240,21 @@ func (b *BlockDispatcher) inSyncWindow(engine *engine.Engine, block *model.Block
 	return block.ID().Index() <= latestCommitmentIndex+maxCommittableAge
 }
 
-// warpSync triggers warp sync from the latest committed slot up to the warpsync window.
-func (b *BlockDispatcher) warpSync(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
-	if e == nil || chainCommitment == nil {
+// warpSyncIfNecessary triggers a warp sync if necessary.
+func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
+	if e == nil {
 		return
 	}
 
 	chain := chainCommitment.Chain()
-	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
-	warpSyncWindowSize := lo.Cond(maxCommittableAge > b.optWarpSyncWindowSize, maxCommittableAge, b.optWarpSyncWindowSize)
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
+
+	if latestCommitmentIndex+1 >= chain.LatestCommitment().Commitment().Index() {
+		return
+	}
+
+	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
+	warpSyncWindowSize := lo.Max(maxCommittableAge, b.optWarpSyncWindowSize)
 
 	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+warpSyncWindowSize; slotToWarpSync++ {
 		commitmentToSync := chain.Commitment(slotToWarpSync)
@@ -295,13 +297,10 @@ func (b *BlockDispatcher) targetEngine(commitment *chainmanager.ChainCommitment)
 // necessary.
 func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.Engine) {
 	unsubscribe := engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-		if chainCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID()); exists {
+		if latestEngineCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID()); exists {
 			b.processedWarpSyncRequests.Delete(commitment.ID())
 
-			// we only need to warp sync if the processed commitment is not too close to latest commitment of the chain
-			if chainCommitment.ID().Index()+1 <= chainCommitment.Chain().LatestCommitment().Commitment().Index() {
-				b.warpSync(engineInstance, chainCommitment)
-			}
+			b.warpSyncIfNecessary(engineInstance, latestEngineCommitment)
 		}
 	}).Unhook
 
