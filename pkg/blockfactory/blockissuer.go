@@ -2,7 +2,6 @@ package blockfactory
 
 import (
 	"context"
-	"crypto/ed25519"
 	"time"
 
 	"github.com/iotaledger/hive.go/core/safemath"
@@ -38,7 +37,6 @@ type BlockIssuer struct {
 
 	workerPool *workerpool.WorkerPool
 
-	Account  Account
 	protocol *protocol.Protocol
 
 	optsTipSelectionTimeout       time.Duration
@@ -48,16 +46,15 @@ type BlockIssuer struct {
 	optsRateSetterEnabled       bool
 }
 
-func New(p *protocol.Protocol, account Account, opts ...options.Option[BlockIssuer]) *BlockIssuer {
+func New(p *protocol.Protocol, opts ...options.Option[BlockIssuer]) *BlockIssuer {
 	return options.Apply(&BlockIssuer{
-		events:                      NewEvents(),
-		workerPool:                  p.Workers.CreatePool("BlockIssuer"),
-		protocol:                    p,
-		Account:                     account,
-		optsIncompleteBlockAccepted: false,
-		optsRateSetterEnabled:       false,
-		// optsTipSelectionTimeout:       5 * time.Second, // TODO: what should the default be?
-		// optsTipSelectionRetryInterval: 200 * time.Millisecond, // TODO: what should the default be?
+		events:                        NewEvents(),
+		workerPool:                    p.Workers.CreatePool("BlockIssuer"),
+		protocol:                      p,
+		optsIncompleteBlockAccepted:   false,
+		optsRateSetterEnabled:         false,
+		optsTipSelectionTimeout:       5 * time.Second,
+		optsTipSelectionRetryInterval: 200 * time.Millisecond,
 	}, opts)
 }
 
@@ -67,20 +64,20 @@ func (i *BlockIssuer) Shutdown() {
 	i.workerPool.ShutdownComplete.Wait()
 }
 
-func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
-	blockParams := options.Apply(&BlockParams{}, opts)
+func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount Account, opts ...options.Option[ValidatorBlockParams]) (*model.Block, error) {
+	blockParams := options.Apply(&ValidatorBlockParams{}, opts)
 
-	if err := i.setDefaultBlockParams(blockParams); err != nil {
-		return nil, err
-	}
-
-	if blockParams.References == nil {
+	if blockParams.BlockHeader.References == nil {
 		// TODO: change this to get references for validator block
-		references, err := i.getReferences(ctx, blockParams.Payload, blockParams.ParentsCount)
+		references, err := i.getReferences(ctx, nil, blockParams.BlockHeader.ParentsCount)
 		if err != nil {
 			return nil, ierrors.Wrap(err, "error building block")
 		}
-		blockParams.References = references
+		blockParams.BlockHeader.References = references
+	}
+
+	if err := i.setDefaultBlockParams(blockParams.BlockHeader, issuerAccount); err != nil {
+		return nil, err
 	}
 
 	if blockParams.HighestSupportedVersion == nil {
@@ -97,43 +94,35 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 		blockParams.ProtocolParametersHash = &protocolParametersHash
 	}
 
-	if err := i.validateReferences(*blockParams.IssuingTime, blockParams.SlotCommitment.Index, blockParams.References); err != nil {
-		return nil, ierrors.Wrap(err, "block references invalid")
-	}
-
-	var api iotago.API
-	if blockParams.ProtocolVersion != nil {
-		var err error
-		api, err = i.protocol.APIForVersion(*blockParams.ProtocolVersion)
-		if err != nil {
-			return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.ProtocolVersion)
-		}
-	} else {
-		api = i.protocol.CurrentAPI()
+	api, err := i.retrieveAPI(blockParams.BlockHeader)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.BlockHeader.ProtocolVersion)
 	}
 
 	blockBuilder := builder.NewValidationBlockBuilder(api)
-	blockBuilder.SlotCommitmentID(blockParams.SlotCommitment.MustID())
-	blockBuilder.LatestFinalizedSlot(*blockParams.LatestFinalizedSlot)
-	blockBuilder.IssuingTime(*blockParams.IssuingTime)
-	blockBuilder.HighestSupportedVersion(*blockParams.HighestSupportedVersion)
-	blockBuilder.ProtocolParametersHash(*blockParams.ProtocolParametersHash)
 
-	if strongParents, exists := blockParams.References[iotago.StrongParentType]; exists && len(strongParents) > 0 {
+	blockBuilder.SlotCommitmentID(blockParams.BlockHeader.SlotCommitment.MustID())
+	blockBuilder.LatestFinalizedSlot(*blockParams.BlockHeader.LatestFinalizedSlot)
+	blockBuilder.IssuingTime(*blockParams.BlockHeader.IssuingTime)
+
+	if strongParents, exists := blockParams.BlockHeader.References[iotago.StrongParentType]; exists && len(strongParents) > 0 {
 		blockBuilder.StrongParents(strongParents)
 	} else {
 		return nil, ierrors.New("cannot create a block without strong parents")
 	}
 
-	if weakParents, exists := blockParams.References[iotago.WeakParentType]; exists {
+	if weakParents, exists := blockParams.BlockHeader.References[iotago.WeakParentType]; exists {
 		blockBuilder.WeakParents(weakParents)
 	}
 
-	if shallowLikeParents, exists := blockParams.References[iotago.ShallowLikeParentType]; exists {
+	if shallowLikeParents, exists := blockParams.BlockHeader.References[iotago.ShallowLikeParentType]; exists {
 		blockBuilder.ShallowLikeParents(shallowLikeParents)
 	}
 
-	blockBuilder.Sign(i.Account.ID(), i.Account.PrivateKey())
+	blockBuilder.HighestSupportedVersion(*blockParams.HighestSupportedVersion)
+	blockBuilder.ProtocolParametersHash(*blockParams.ProtocolParametersHash)
+
+	blockBuilder.Sign(issuerAccount.ID(), issuerAccount.PrivateKey())
 
 	block, err := blockBuilder.Build()
 	if err != nil {
@@ -151,94 +140,69 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, opts ...options
 	return modelBlock, nil
 }
 
-func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
-	protoParams := i.protocol.CurrentAPI().ProtocolParameters()
-	commitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
-
-	if blockSlot > commitment.Index+protoParams.MaxCommittableAge() {
-		return nil, ierrors.Errorf("can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Index)
+func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams) (iotago.API, error) {
+	if blockParams.ProtocolVersion != nil {
+		return i.protocol.APIForVersion(*blockParams.ProtocolVersion)
 	}
 
-	if blockSlot < commitment.Index+protoParams.MinCommittableAge() {
-		if blockSlot < protoParams.MinCommittableAge() || commitment.Index < protoParams.MinCommittableAge() {
-			return commitment, nil
-		}
-
-		commitmentSlot := commitment.Index - protoParams.MinCommittableAge()
-		loadedCommitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(commitmentSlot)
-		if err != nil {
-			return nil, ierrors.Wrapf(err, "error loading valid commitment of slot %d according to minCommittableAge from storage", commitmentSlot)
-		}
-
-		return loadedCommitment.Commitment(), nil
-	}
-
-	return commitment, nil
+	return i.protocol.CurrentAPI(), nil
 }
 
 // CreateBlock creates a new block with the options.
-func (i *BlockIssuer) CreateBlock(ctx context.Context, opts ...options.Option[BlockParams]) (*model.Block, error) {
-	blockParams := options.Apply(&BlockParams{}, opts)
+func (i *BlockIssuer) CreateBlock(ctx context.Context, issuerAccount Account, opts ...options.Option[BasicBlockParams]) (*model.Block, error) {
+	blockParams := options.Apply(&BasicBlockParams{}, opts)
 
-	if err := i.setDefaultBlockParams(blockParams); err != nil {
-		return nil, err
-	}
-
-	if blockParams.References == nil {
-		references, err := i.getReferences(ctx, blockParams.Payload, blockParams.ParentsCount)
+	if blockParams.BlockHeader.References == nil {
+		references, err := i.getReferences(ctx, blockParams.Payload, blockParams.BlockHeader.ParentsCount)
 		if err != nil {
 			return nil, ierrors.Wrap(err, "error building block")
 		}
-		blockParams.References = references
+		blockParams.BlockHeader.References = references
 	}
 
-	if err := i.validateReferences(*blockParams.IssuingTime, blockParams.SlotCommitment.Index, blockParams.References); err != nil {
-		return nil, ierrors.Wrap(err, "block references invalid")
+	if err := i.setDefaultBlockParams(blockParams.BlockHeader, issuerAccount); err != nil {
+		return nil, err
 	}
 
-	var api iotago.API
-	if blockParams.ProtocolVersion != nil {
-		var err error
-		api, err = i.protocol.APIForVersion(*blockParams.ProtocolVersion)
-		if err != nil {
-			return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.ProtocolVersion)
-		}
-	} else {
-		api = i.protocol.CurrentAPI()
+	api, err := i.retrieveAPI(blockParams.BlockHeader)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "error getting api for version %d", *blockParams.BlockHeader.ProtocolVersion)
 	}
 
 	blockBuilder := builder.NewBasicBlockBuilder(api)
-	blockBuilder.Payload(blockParams.Payload)
-	blockBuilder.SlotCommitmentID(blockParams.SlotCommitment.MustID())
-	blockBuilder.LatestFinalizedSlot(*blockParams.LatestFinalizedSlot)
-	blockBuilder.IssuingTime(*blockParams.IssuingTime)
 
-	if strongParents, exists := blockParams.References[iotago.StrongParentType]; exists && len(strongParents) > 0 {
+	blockBuilder.SlotCommitmentID(blockParams.BlockHeader.SlotCommitment.MustID())
+	blockBuilder.LatestFinalizedSlot(*blockParams.BlockHeader.LatestFinalizedSlot)
+	blockBuilder.IssuingTime(*blockParams.BlockHeader.IssuingTime)
+	if strongParents, exists := blockParams.BlockHeader.References[iotago.StrongParentType]; exists && len(strongParents) > 0 {
 		blockBuilder.StrongParents(strongParents)
 	} else {
 		return nil, ierrors.New("cannot create a block without strong parents")
 	}
 
-	if weakParents, exists := blockParams.References[iotago.WeakParentType]; exists {
+	if weakParents, exists := blockParams.BlockHeader.References[iotago.WeakParentType]; exists {
 		blockBuilder.WeakParents(weakParents)
 	}
 
-	if shallowLikeParents, exists := blockParams.References[iotago.ShallowLikeParentType]; exists {
+	if shallowLikeParents, exists := blockParams.BlockHeader.References[iotago.ShallowLikeParentType]; exists {
 		blockBuilder.ShallowLikeParents(shallowLikeParents)
 	}
 
-	rmcSlot, err := safemath.SafeSub(api.TimeProvider().SlotFromTime(*blockParams.IssuingTime), api.ProtocolParameters().MaxCommittableAge())
+	blockBuilder.Payload(blockParams.Payload)
+
+	rmcSlot, err := safemath.SafeSub(api.TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime), api.ProtocolParameters().MaxCommittableAge())
 	if err != nil {
 		rmcSlot = 0
 	}
-	rmcCommitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(rmcSlot)
+	rmc, err := i.protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
 	}
-	// only set the burned Mana as the last step before signing so workscore calculation is correct.
-	blockBuilder.BurnedMana(rmcCommitment.Commitment().RMC)
 
-	blockBuilder.Sign(i.Account.ID(), i.Account.PrivateKey())
+	// only set the burned Mana as the last step before signing, so workscore calculation is correct.
+	blockBuilder.BurnedMana(rmc)
+
+	blockBuilder.Sign(issuerAccount.ID(), issuerAccount.PrivateKey())
 
 	block, err := blockBuilder.Build()
 	if err != nil {
@@ -303,7 +267,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	}
 }
 
-func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock) (iotago.BlockID, error) {
+func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock, optIssuerAccount ...Account) (iotago.BlockID, error) {
 	// if anything changes, need to make a new signature
 	var resign bool
 
@@ -367,11 +331,11 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	if iotaBlock.IssuerID.Empty() || resign {
-		if i.optsIncompleteBlockAccepted {
-			iotaBlock.IssuerID = i.Account.ID()
+		if i.optsIncompleteBlockAccepted && len(optIssuerAccount) > 0 {
+			issuerAccount := optIssuerAccount[0]
+			iotaBlock.IssuerID = issuerAccount.ID()
 
-			prvKey := i.Account.PrivateKey()
-			signature, signatureErr := iotaBlock.Sign(apiForVesion, iotago.NewAddressKeysForEd25519Address(iotago.Ed25519AddressFromPubKey(prvKey.Public().(ed25519.PublicKey)), prvKey))
+			signature, signatureErr := iotaBlock.Sign(apiForVesion, iotago.NewAddressKeysForEd25519Address(issuerAccount.Address().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
 			if signatureErr != nil {
 				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
 			}
@@ -403,7 +367,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	return modelBlock.ID(), nil
 }
 
-func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockParams) error {
+func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, issuerAccount Account) error {
 	if blockParams.IssuingTime == nil {
 		issuingTime := time.Now().UTC()
 		blockParams.IssuingTime = &issuingTime
@@ -423,10 +387,41 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockParams) error {
 	}
 
 	if blockParams.Issuer == nil {
-		blockParams.Issuer = NewEd25519Account(i.Account.ID(), i.Account.PrivateKey())
+		blockParams.Issuer = NewEd25519Account(issuerAccount.ID(), issuerAccount.PrivateKey())
+	} else if blockParams.Issuer.ID() != issuerAccount.ID() {
+		return ierrors.Errorf("provided issuer account %s, but issuer provided in the block params is different %s", issuerAccount.ID(), blockParams.Issuer.ID())
+	}
+
+	if err := i.validateReferences(*blockParams.IssuingTime, blockParams.SlotCommitment.Index, blockParams.References); err != nil {
+		return ierrors.Wrap(err, "block references invalid")
 	}
 
 	return nil
+}
+
+func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
+	protoParams := i.protocol.CurrentAPI().ProtocolParameters()
+	commitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+
+	if blockSlot > commitment.Index+protoParams.MaxCommittableAge() {
+		return nil, ierrors.Errorf("can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Index)
+	}
+
+	if blockSlot < commitment.Index+protoParams.MinCommittableAge() {
+		if blockSlot < protoParams.MinCommittableAge() || commitment.Index < protoParams.MinCommittableAge() {
+			return commitment, nil
+		}
+
+		commitmentSlot := commitment.Index - protoParams.MinCommittableAge()
+		loadedCommitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(commitmentSlot)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "error loading valid commitment of slot %d according to minCommittableAge from storage", commitmentSlot)
+		}
+
+		return loadedCommitment.Commitment(), nil
+	}
+
+	return commitment, nil
 }
 
 func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, strongParentsCountOpt ...int) (model.ParentReferences, error) {

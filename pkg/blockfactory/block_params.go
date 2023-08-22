@@ -3,31 +3,38 @@ package blockfactory
 import (
 	"time"
 
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type BlockParams struct {
-	ParentsCount            int
-	References              model.ParentReferences
-	SlotCommitment          *iotago.Commitment
-	Payload                 iotago.Payload
-	LatestFinalizedSlot     *iotago.SlotIndex
-	IssuingTime             *time.Time
-	ProtocolVersion         *iotago.Version
-	Issuer                  Account
+type BlockHeaderParams struct {
+	ParentsCount        int
+	References          model.ParentReferences
+	SlotCommitment      *iotago.Commitment
+	LatestFinalizedSlot *iotago.SlotIndex
+	IssuingTime         *time.Time
+	ProtocolVersion     *iotago.Version
+	Issuer              Account
+}
+type BasicBlockParams struct {
+	BlockHeader *BlockHeaderParams
+	Payload     iotago.Payload
+}
+type ValidatorBlockParams struct {
+	BlockHeader             *BlockHeaderParams
 	HighestSupportedVersion *iotago.Version
 	ProtocolParametersHash  *iotago.Identifier
 }
 
-func WithParentsCount(parentsCount int) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithParentsCount(parentsCount int) func(builder *BlockHeaderParams) {
+	return func(builder *BlockHeaderParams) {
 		builder.ParentsCount = parentsCount
 	}
 }
 
-func WithStrongParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithStrongParents(blockIDs ...iotago.BlockID) func(builder *BlockHeaderParams) {
+	return func(builder *BlockHeaderParams) {
 		if builder.References == nil {
 			builder.References = make(model.ParentReferences)
 		}
@@ -35,8 +42,8 @@ func WithStrongParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
 		builder.References[iotago.StrongParentType] = blockIDs
 	}
 }
-func WithWeakParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithWeakParents(blockIDs ...iotago.BlockID) func(builder *BlockHeaderParams) {
+	return func(builder *BlockHeaderParams) {
 		if builder.References == nil {
 			builder.References = make(model.ParentReferences)
 		}
@@ -45,8 +52,8 @@ func WithWeakParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
 	}
 }
 
-func WithShallowLikeParents(blockIDs ...iotago.BlockID) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithShallowLikeParents(blockIDs ...iotago.BlockID) func(builder *BlockHeaderParams) {
+	return func(builder *BlockHeaderParams) {
 		if builder.References == nil {
 			builder.References = make(model.ParentReferences)
 		}
@@ -55,49 +62,61 @@ func WithShallowLikeParents(blockIDs ...iotago.BlockID) func(builder *BlockParam
 	}
 }
 
-func WithSlotCommitment(commitment *iotago.Commitment) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithSlotCommitment(commitment *iotago.Commitment) func(builder *BlockHeaderParams) {
+	return func(builder *BlockHeaderParams) {
 		builder.SlotCommitment = commitment
 	}
 }
 
-func WithLatestFinalizedSlot(commitmentIndex iotago.SlotIndex) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithLatestFinalizedSlot(commitmentIndex iotago.SlotIndex) func(builder *BlockHeaderParams) {
+	return func(builder *BlockHeaderParams) {
 		builder.LatestFinalizedSlot = &commitmentIndex
 	}
 }
 
-func WithPayload(payload iotago.Payload) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
-		builder.Payload = payload
-	}
-}
-
-func WithIssuingTime(issuingTime time.Time) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithIssuingTime(issuingTime time.Time) func(builder *BlockHeaderParams) {
+	return func(builder *BlockHeaderParams) {
 		builder.IssuingTime = &issuingTime
 	}
 }
 
-func WithProtocolVersion(version iotago.Version) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithProtocolVersion(version iotago.Version) func(builder *BlockHeaderParams) {
+	return func(builder *BlockHeaderParams) {
 		builder.ProtocolVersion = &version
 	}
 }
-func WithIssuer(issuer Account) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithIssuer(issuer Account) func(builder *BlockHeaderParams) {
+	return func(builder *BlockHeaderParams) {
 		builder.Issuer = issuer
 	}
 }
 
-func WithHighestSupportedVersion(highestSupportedVersion iotago.Version) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithValidationBlockHeaderOptions(opts ...options.Option[BlockHeaderParams]) func(builder *ValidatorBlockParams) {
+	return func(builder *ValidatorBlockParams) {
+		builder.BlockHeader = options.Apply(&BlockHeaderParams{}, opts)
+	}
+}
+
+func WithBasicBlockHeader(opts ...options.Option[BlockHeaderParams]) func(builder *BasicBlockParams) {
+	return func(builder *BasicBlockParams) {
+		builder.BlockHeader = options.Apply(&BlockHeaderParams{}, opts)
+	}
+}
+
+func WithPayload(payload iotago.Payload) func(builder *BasicBlockParams) {
+	return func(builder *BasicBlockParams) {
+		builder.Payload = payload
+	}
+}
+
+func WithHighestSupportedVersion(highestSupportedVersion iotago.Version) func(builder *ValidatorBlockParams) {
+	return func(builder *ValidatorBlockParams) {
 		builder.HighestSupportedVersion = &highestSupportedVersion
 	}
 }
 
-func WithProtocolParametersHash(protocolParametersHash iotago.Identifier) func(builder *BlockParams) {
-	return func(builder *BlockParams) {
+func WithProtocolParametersHash(protocolParametersHash iotago.Identifier) func(builder *ValidatorBlockParams) {
+	return func(builder *ValidatorBlockParams) {
 		builder.ProtocolParametersHash = &protocolParametersHash
 	}
 }

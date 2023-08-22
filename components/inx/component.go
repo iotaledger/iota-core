@@ -29,8 +29,9 @@ func init() {
 }
 
 var (
-	Component *app.Component
-	deps      dependencies
+	Component          *app.Component
+	deps               dependencies
+	blockIssuerAccount blockfactory.Account
 )
 
 type dependencies struct {
@@ -54,6 +55,7 @@ func provide(c *dig.Container) error {
 }
 
 func configure() error {
+	blockIssuerAccount = blockfactory.AccountFromParams(ParamsINX.BlockIssuerAccount, ParamsINX.BlockIssuerPrivateKey)
 
 	return nil
 }

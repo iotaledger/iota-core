@@ -158,13 +158,13 @@ func (p *Protocol) Run(ctx context.Context) error {
 
 	p.TriggerInitialized()
 
-	p.Events.Started.Trigger()
-
 	<-p.context.Done()
+
+	p.TriggerShutdown()
 
 	p.shutdown()
 
-	p.Events.Stopped.Trigger()
+	p.TriggerStopped()
 
 	return p.context.Err()
 }
@@ -183,8 +183,6 @@ func (p *Protocol) shutdown() {
 	if p.networkProtocol != nil {
 		p.networkProtocol.Shutdown()
 	}
-
-	p.TriggerStopped()
 
 	p.ChainManager.Shutdown()
 	p.Workers.Shutdown()

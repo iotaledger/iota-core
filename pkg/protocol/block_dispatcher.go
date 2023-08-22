@@ -18,7 +18,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -64,7 +63,7 @@ func NewBlockDispatcher(protocol *Protocol, opts ...options.Option[BlockDispatch
 	}, opts, func(b *BlockDispatcher) {
 		protocol.HookConstructed(b.initEngineMonitoring)
 		protocol.HookInitialized(b.initNetworkConnection)
-		protocol.HookStopped(b.shutdown)
+		protocol.HookShutdown(b.shutdown)
 	})
 }
 
@@ -82,7 +81,7 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error
 	matchingEngineFound := false
 	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
 		if engine != nil && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
-			if !b.inWarpSyncRange(engine, block) {
+			if b.inSyncWindow(engine, block) {
 				engine.ProcessBlockFromPeer(block, src)
 			}
 
@@ -99,22 +98,19 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src network.PeerID) error
 
 // initEngineMonitoring initializes the automatic monitoring of the engine instances.
 func (b *BlockDispatcher) initEngineMonitoring() {
-	b.monitorLatestEngineCommitment(b.protocol.mainEngine)
+	b.monitorLatestEngineCommitment(b.protocol.MainEngineInstance())
 
 	b.protocol.engineManager.OnEngineCreated(b.monitorLatestEngineCommitment)
 
 	b.protocol.Events.ChainManager.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
+		// as soon as a commitment is solid, it's chain is known and it can be dispatched
 		chainCommitment.SolidEvent().OnTrigger(func() {
 			b.runTask(func() {
 				b.injectUnsolidCommitmentBlocks(chainCommitment.Commitment().ID())
 			}, b.dispatchWorkers)
 
 			b.runTask(func() {
-				// warpsync only if the observed commitment is at least two commitments ahead.
-				targetEngine := b.targetEngine(chainCommitment)
-				if targetEngine != nil && chainCommitment.Commitment().Index() > targetEngine.Storage.Settings().LatestCommitment().Index()+1 {
-					b.warpSync(targetEngine, chainCommitment)
-				}
+				b.warpSyncIfNecessary(b.targetEngine(chainCommitment), chainCommitment)
 			}, b.warpSyncWorkers)
 		})
 	})
@@ -221,10 +217,6 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 	b.processedWarpSyncRequests.Add(commitmentID)
 
-	targetEngine.Events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-		block.ID()
-	})
-
 	for _, blockID := range blockIDs {
 		targetEngine.BlockDAG.GetOrRequestBlock(blockID)
 	}
@@ -232,35 +224,45 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 	return nil
 }
 
-// inWarpSyncRange returns whether the given block should be processed by a warp sync process.
+// inSyncWindow returns whether the given block is within the sync window of the given engine instance.
 //
-// This is the case if the block is more than a warp sync threshold ahead of the latest commitment while also committing
-// to a new slot that can be warp synced.
-func (b *BlockDispatcher) inWarpSyncRange(engine *engine.Engine, block *model.Block) bool {
+// We limit the amount of slots ahead of the latest commitment that we forward to the engine instance to prevent memory
+// exhaustion while syncing.
+func (b *BlockDispatcher) inSyncWindow(engine *engine.Engine, block *model.Block) bool {
 	if engine.BlockRequester.HasTicker(block.ID()) {
-		return false
+		return true
 	}
 
 	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
 	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
 
-	return block.ID().Index() > latestCommitmentIndex+maxCommittableAge
+	return block.ID().Index() <= latestCommitmentIndex+maxCommittableAge
 }
 
-// warpSync triggers warp sync from the latest committed slot up to the warpsync window.
-func (b *BlockDispatcher) warpSync(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
-	if e == nil || chainCommitment == nil {
+// warpSyncIfNecessary triggers a warp sync if necessary.
+func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
+	if e == nil {
 		return
 	}
 
 	chain := chainCommitment.Chain()
-	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
-	warpSyncWindowSize := lo.Cond(maxCommittableAge > b.optWarpSyncWindowSize, maxCommittableAge, b.optWarpSyncWindowSize)
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
+	if latestCommitmentIndex+1 >= chain.LatestCommitment().Commitment().Index() {
+		return
+	}
+
+	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
+	warpSyncWindowSize := lo.Max(maxCommittableAge, b.optWarpSyncWindowSize)
+
 	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+warpSyncWindowSize; slotToWarpSync++ {
-		if commitmentToSync := chain.Commitment(slotToWarpSync); commitmentToSync != nil && !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
+		commitmentToSync := chain.Commitment(slotToWarpSync)
+		if commitmentToSync == nil {
+			break
+		}
+
+		if !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
 			b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
 		}
 	}
@@ -294,12 +296,15 @@ func (b *BlockDispatcher) targetEngine(commitment *chainmanager.ChainCommitment)
 // monitorLatestEngineCommitment monitors the latest commitment of the given engine instance and triggers a warp sync if
 // necessary.
 func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.Engine) {
-	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-		if chainCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID()); exists {
+	unsubscribe := engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+		if latestEngineCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID()); exists {
 			b.processedWarpSyncRequests.Delete(commitment.ID())
-			b.warpSync(engineInstance, chainCommitment)
+
+			b.warpSyncIfNecessary(engineInstance, latestEngineCommitment)
 		}
-	}).Unhook)
+	}).Unhook
+
+	engineInstance.HookStopped(unsubscribe)
 }
 
 // evict evicts all elements from the unsolid commitment blocks buffer and the pending warp sync requests that are older

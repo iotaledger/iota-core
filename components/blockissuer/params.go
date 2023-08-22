@@ -17,12 +17,6 @@ type ParametersBlockIssuer struct {
 	// TipSelectionRetryInterval the interval for retrying tip selection.
 	TipSelectionRetryInterval time.Duration `default:"200ms" usage:"the interval for retrying tip selection"`
 
-	// IssuerAccount the accountID of the account that will issue the blocks.
-	IssuerAccount string `default:"" usage:"the accountID of the account that will issue the blocks"`
-
-	// PrivateKey the private key of the account that will issue the blocks.
-	PrivateKey string `default:"" usage:"the private key of the account that will issue the blocks"`
-
 	// RateSetterEnabled whether the RateSetter should be taken into account when issuing blocks.
 	RateSetterEnabled bool `default:"false" usage:"whether the RateSetter should be taken into account when issuing blocks"`
 }

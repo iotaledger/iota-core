@@ -93,7 +93,7 @@ func Test_TransitionAccount(t *testing.T) {
 	var slotIndexBlock1 iotago.SlotIndex = 1
 	activeNodes := []*mock.Node{node1}
 
-	block1 := ts.IssueBlockAtSlotWithOptions("block1", slotIndexBlock1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, blockfactory.WithPayload(tx1))
+	block1 := ts.IssueBlockAtSlotWithOptions("block1", slotIndexBlock1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, tx1)
 
 	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Index(), activeNodes, block1)
 
@@ -158,7 +158,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithCreationSlot(slotIndexBlock2),
 	))
 
-	block2 := ts.IssueBlockAtSlotWithOptions("block2", slotIndexBlock2, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, blockfactory.WithStrongParents(latestParent.ID()), blockfactory.WithPayload(tx2))
+	block2 := ts.IssueBlockAtSlotWithOptions("block2", slotIndexBlock2, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx2, blockfactory.WithStrongParents(latestParent.ID()))
 
 	latestParent = ts.CommitUntilSlot(slotIndexBlock2, activeNodes, block2)
 
@@ -229,7 +229,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithCreationSlot(slotIndexBlock3),
 	))
 
-	block3 := ts.IssueBlockAtSlotWithOptions("block3", slotIndexBlock3, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, blockfactory.WithStrongParents(latestParent.ID()), blockfactory.WithPayload(tx3))
+	block3 := ts.IssueBlockAtSlotWithOptions("block3", slotIndexBlock3, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx3, blockfactory.WithStrongParents(latestParent.ID()))
 
 	_ = ts.CommitUntilSlot(slotIndexBlock3, activeNodes, block3)
 
