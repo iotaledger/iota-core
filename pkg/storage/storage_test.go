@@ -62,27 +62,41 @@ func TestStorage_PruneByDepth(t *testing.T) {
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
 
-	tf.SetLatestFinalizedEpoch(20)
+	tf.SetLatestFinalizedEpoch(10)
 
 	_, _, err := tf.Instance.PruneByDepth(21)
 	require.ErrorContains(t, err, "too big")
 
-	start, end, err := tf.Instance.PruneByDepth(15)
+	start, end, err := tf.Instance.PruneByDepth(4)
 	require.NoError(t, err)
 	require.EqualValues(t, 0, start)
-	require.EqualValues(t, 5, end)
+	require.EqualValues(t, 6, end)
 	tf.AssertPrunedUntil(
-		types.NewTuple(5, true),
-		types.NewTuple(5, true),
+		types.NewTuple(6, true),
+		types.NewTuple(3, true),
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),
 	)
 
-	// last pruned: 5
+	tf.SetLatestFinalizedEpoch(20)
+
+	start, end, err = tf.Instance.PruneByDepth(10)
+	require.NoError(t, err)
+	require.EqualValues(t, 7, start)
+	require.EqualValues(t, 10, end)
+	tf.AssertPrunedUntil(
+		types.NewTuple(10, true),
+		types.NewTuple(10, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+	)
+
+	// last pruned: 10, should prune till 15
 	start, end, err = tf.Instance.PruneByDepth(5)
 	require.NoError(t, err)
-	require.EqualValues(t, 6, start)
+	require.EqualValues(t, 11, start)
 	require.EqualValues(t, 15, end)
 	tf.AssertPrunedUntil(
 		types.NewTuple(15, true),
@@ -146,38 +160,51 @@ func TestStorage_PruneBySize(t *testing.T) {
 	// We already pruned the maximum and can't prune any more data right now.
 	err = tf.Instance.PruneBySize(4 * MB)
 	require.ErrorIs(t, err, database.ErrEpochPruned)
+
+	// TODO: assert that storage size is below a certain threshold
 }
 
 func TestStorage_RestoreFromDisk(t *testing.T) {
 	tf := NewTestFramework(t, storage.WithPruningDelay(1))
 
-	totalEpochs := 370
+	totalEpochs := 9
 	tf.GeneratePermanentData(5 * MB)
 	for i := 1; i <= totalEpochs; i++ {
 		tf.GeneratePrunableData(iotago.EpochIndex(i), 1*B)
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
 
-	tf.SetLatestFinalizedEpoch(369)
+	tf.SetLatestFinalizedEpoch(8)
 
-	err := tf.Instance.PruneByEpochIndex(366)
+	// restore from disk
+	tf.RestoreFromDisk()
+
+	tf.AssertPrunedUntil(
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+	)
+
+	err := tf.Instance.PruneByEpochIndex(7)
 	require.NoError(t, err)
 	tf.AssertPrunedUntil(
-		types.NewTuple(366, true),
-		types.NewTuple(359, true),
-		types.NewTuple(1, true),
-		types.NewTuple(1, true),
-		types.NewTuple(1, true),
+		types.NewTuple(7, true),
+		types.NewTuple(0, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
 	)
 
 	// restore from disk
 	tf.RestoreFromDisk()
 
 	tf.AssertPrunedUntil(
-		types.NewTuple(366, true),
-		types.NewTuple(359, true),
-		types.NewTuple(1, true),
-		types.NewTuple(1, true),
-		types.NewTuple(1, true),
+		types.NewTuple(7, true),
+		types.NewTuple(0, true),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
+		types.NewTuple(0, false),
 	)
 }

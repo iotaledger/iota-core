@@ -28,14 +28,14 @@ func (s *Storage) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
 	return s.lastPrunedEpoch.Index()
 }
 
-func (s *Storage) TryPrune(slot iotago.SlotIndex) error {
+func (s *Storage) TryPrune() error {
 	// Prune finalizedEpoch - s.optsPruningDelay if possible.
 	if _, _, err := s.PruneByDepth(s.optsPruningDelay); err != nil {
-		if ierrors.Is(err, database.ErrNoPruningNeeded) {
+		if ierrors.Is(err, database.ErrNoPruningNeeded) || ierrors.Is(err, database.ErrEpochPruned) {
 			return nil
 		}
 
-		return ierrors.Wrapf(err, "failed to prune with PruneByDepth for slot %d", slot)
+		return ierrors.Wrap(err, "failed to prune with PruneByDepth")
 	}
 
 	// Disk could still be full after PruneByDepth, thus need to check by size again and prune if needed.
@@ -44,7 +44,7 @@ func (s *Storage) TryPrune(slot iotago.SlotIndex) error {
 			return nil
 		}
 
-		return ierrors.Wrapf(err, "failed to prune with PruneBySize for slot %d", slot)
+		return ierrors.Wrap(err, "failed to prune with PruneBySize for")
 	}
 
 	return nil
@@ -79,13 +79,14 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 }
 
 func (s *Storage) PruneByDepth(depth iotago.EpochIndex) (firstPruned, lastPruned iotago.EpochIndex, err error) {
+	// Depth of 0 and 1 means we prune to the latestPrunableEpoch.
 	if depth == 0 {
-		return 0, 0, database.ErrNoPruningNeeded
+		depth = 1
 	}
 
 	latestPrunableEpoch := s.latestPrunableEpoch()
 	if depth > latestPrunableEpoch {
-		return 0, 0, ierrors.Errorf("depth %d is too big, latest prunable epoch is %d", depth, latestPrunableEpoch)
+		return 0, 0, ierrors.Wrapf(database.ErrNoPruningNeeded, "depth %d is too big, latest prunable epoch is %d", depth, latestPrunableEpoch)
 	}
 
 	// We need to do (depth-1) because latestPrunableEpoch is already making sure that we keep at least one full epoch.

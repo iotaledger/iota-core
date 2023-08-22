@@ -161,17 +161,17 @@ func (s *Store[V]) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.Epo
 	}
 
 	// No need to prune.
-	if epoch < lo.Return1(s.lastPrunedEpoch.Index())+pruningDelay {
+	if epoch < pruningDelay {
 		return nil
 	}
 
-	target := epoch - pruningDelay
-	err := s.kv.DeletePrefix(target.MustBytes())
-	if err != nil {
-		return ierrors.Wrapf(err, "failed to prune epoch store for realm %v at epoch %d", s.realm, target)
+	for i := s.lastPrunedEpoch.NextIndex(); i <= epoch-pruningDelay; i++ {
+		err := s.kv.DeletePrefix(i.MustBytes())
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to prune epoch store for realm %v at epoch %d", s.realm, i)
+		}
+		s.lastPrunedEpoch.MarkEvicted(i)
 	}
-
-	s.lastPrunedEpoch.MarkEvicted(target)
 
 	return nil
 }

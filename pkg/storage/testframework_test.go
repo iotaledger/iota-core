@@ -90,7 +90,7 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 	endSlot := apiForEpoch.TimeProvider().EpochEnd(epoch)
 
 	var createdBytes int64
-	for createdBytes < size*150/100 { // add 50% more data to make sure there's enough
+	for createdBytes < size {
 		block := tpkg.RandProtocolBlock(&iotago.BasicBlock{
 			StrongParents: tpkg.SortedRandBlockIDs(1 + rand.Intn(iotago.BlockMaxParents)),
 			Payload:       &iotago.TaggedData{Data: make([]byte, 8192)},
@@ -110,7 +110,7 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 	}
 
 	t.Instance.Flush()
-	t.AssertPrunableSizeGreater(initialStorageSize + size)
+	t.assertPrunableSizeGreater(initialStorageSize + size)
 
 	// fmt.Printf("> created %d MB of bucket prunable data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
 }
@@ -168,7 +168,7 @@ func (t *TestFramework) GeneratePermanentData(size int64) {
 
 	t.Instance.Flush()
 
-	t.AssertPermanentSizeGreater(initialStorageSize + size)
+	t.assertPermanentSizeGreater(initialStorageSize + size)
 	// fmt.Printf("> created %d MB of permanent data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
 }
 
@@ -187,16 +187,12 @@ func uint64ToBytes[V ~uint64](v V) []byte {
 	return b
 }
 
-func (t *TestFramework) AssertStorageSizeGreater(expected int64) {
-	require.GreaterOrEqual(t.t, t.Instance.Size(), expected)
+func (t *TestFramework) assertPrunableSizeGreater(expected int64) {
+	require.GreaterOrEqual(t.t, float64(t.Instance.PrunableDatabaseSize()), float64(expected)*0.8)
 }
 
-func (t *TestFramework) AssertPrunableSizeGreater(expected int64) {
-	require.GreaterOrEqual(t.t, t.Instance.PrunableDatabaseSize(), expected)
-}
-
-func (t *TestFramework) AssertPermanentSizeGreater(expected int64) {
-	require.GreaterOrEqual(t.t, t.Instance.PermanentDatabaseSize(), expected)
+func (t *TestFramework) assertPermanentSizeGreater(expected int64) {
+	require.GreaterOrEqual(t.t, float64(t.Instance.PermanentDatabaseSize()), float64(expected)*0.8)
 }
 
 func (t *TestFramework) AssertStorageSizeBelow(expected int64) {

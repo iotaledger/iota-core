@@ -502,8 +502,8 @@ func (e *Engine) setupBlockRequester() {
 
 func (e *Engine) setupPruning() {
 	e.Events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
-		if err := e.Storage.TryPrune(slot); err != nil {
-			e.errorHandler(err)
+		if err := e.Storage.TryPrune(); err != nil {
+			e.errorHandler(ierrors.Wrapf(err, "failed to prune storage at slot %d", slot))
 		}
 	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))
 }

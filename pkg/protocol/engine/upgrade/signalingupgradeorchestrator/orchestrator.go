@@ -297,7 +297,7 @@ func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex)
 	for epoch := o.signalingWindowStart(currentEpoch); epoch <= currentEpoch; epoch++ {
 		version, err := o.decidedUpgradeSignals.Load(epoch)
 		if err != nil {
-			o.errorHandler(ierrors.Wrap(err, "failed to get permanent upgrade signals"))
+			o.errorHandler(ierrors.Wrapf(err, "failed to get permanent upgrade signals for epoch %d in %d", epoch, currentEpoch))
 
 			return model.VersionAndHash{}, false
 		}
