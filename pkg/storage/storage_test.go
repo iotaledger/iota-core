@@ -149,35 +149,35 @@ func TestStorage_PruneBySize(t *testing.T) {
 }
 
 func TestStorage_RestoreFromDisk(t *testing.T) {
-	// TODO: we need to restore the last pruned epoch for storage
-	// tf := NewTestFramework(t, storage.WithPruningDelay(1))
-	//
-	// totalEpochs := 370
-	// tf.GeneratePermanentData(5 * MB)
-	// for i := 1; i <= totalEpochs; i++ {
-	// 	tf.GeneratePrunableData(iotago.EpochIndex(i), 1*B)
-	// 	tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
-	// }
-	//
-	// tf.SetLatestFinalizedEpoch(366)
-	//
-	// tf.Instance.PruneByEpochIndex(366)
-	// tf.AssertPrunedUntil(
-	// 	types.NewTuple(365, true),
-	// 	types.NewTuple(359, true),
-	// 	types.NewTuple(1, true),
-	// 	types.NewTuple(1, true),
-	// 	types.NewTuple(1, true),
-	// )
-	//
-	// // restore from disk
-	// tf.RestoreFromDisk()
-	//
-	// tf.AssertPrunedUntil(
-	// 	types.NewTuple(365, true),
-	// 	types.NewTuple(359, true),
-	// 	types.NewTuple(1, true),
-	// 	types.NewTuple(1, true),
-	// 	types.NewTuple(1, true),
-	// )
+	tf := NewTestFramework(t, storage.WithPruningDelay(1))
+
+	totalEpochs := 370
+	tf.GeneratePermanentData(5 * MB)
+	for i := 1; i <= totalEpochs; i++ {
+		tf.GeneratePrunableData(iotago.EpochIndex(i), 1*B)
+		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
+	}
+
+	tf.SetLatestFinalizedEpoch(369)
+
+	err := tf.Instance.PruneByEpochIndex(366)
+	require.NoError(t, err)
+	tf.AssertPrunedUntil(
+		types.NewTuple(366, true),
+		types.NewTuple(359, true),
+		types.NewTuple(1, true),
+		types.NewTuple(1, true),
+		types.NewTuple(1, true),
+	)
+
+	// restore from disk
+	tf.RestoreFromDisk()
+
+	tf.AssertPrunedUntil(
+		types.NewTuple(366, true),
+		types.NewTuple(359, true),
+		types.NewTuple(1, true),
+		types.NewTuple(1, true),
+		types.NewTuple(1, true),
+	)
 }

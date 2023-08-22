@@ -47,8 +47,8 @@ func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(e
 	}
 }
 
-func (p *Prunable) RestoreFromDisk() {
-	p.prunableSlotStore.RestoreFromDisk()
+func (p *Prunable) RestoreFromDisk() (lastPrunedEpoch iotago.EpochIndex) {
+	lastPrunedEpoch = p.prunableSlotStore.RestoreFromDisk()
 
 	if err := p.decidedUpgradeSignals.RestoreLastPrunedEpoch(); err != nil {
 		p.errorHandler(err)
@@ -62,6 +62,8 @@ func (p *Prunable) RestoreFromDisk() {
 	if err := p.committee.RestoreLastPrunedEpoch(); err != nil {
 		p.errorHandler(err)
 	}
+
+	return
 }
 
 func (p *Prunable) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) error {

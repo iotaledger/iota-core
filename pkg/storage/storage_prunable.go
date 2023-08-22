@@ -62,5 +62,10 @@ func (s *Storage) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
 }
 
 func (s *Storage) RestoreFromDisk() {
-	s.prunable.RestoreFromDisk()
+	s.pruningLock.Lock()
+	defer s.pruningLock.Unlock()
+
+	lastPrunedEpoch := s.prunable.RestoreFromDisk()
+
+	s.lastPrunedEpoch.MarkEvicted(lastPrunedEpoch)
 }

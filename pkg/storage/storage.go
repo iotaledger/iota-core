@@ -69,7 +69,7 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 			}
 
 			s.permanent = permanent.New(dbConfig, errorHandler)
-			s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.Settings().APIProvider(), errorHandler, s.optsPrunableManagerOptions...)
+			s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.Settings().APIProvider(), s.errorHandler, s.optsPrunableManagerOptions...)
 		})
 }
 

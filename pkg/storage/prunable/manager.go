@@ -112,7 +112,7 @@ func (m *SlotManager) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool
 	return m.lastPrunedEpoch.Index()
 }
 
-func (m *SlotManager) RestoreFromDisk() {
+func (m *SlotManager) RestoreFromDisk() (lastPrunedEpoch iotago.EpochIndex) {
 	m.lastPrunedMutex.Lock()
 	defer m.lastPrunedMutex.Unlock()
 
@@ -125,7 +125,8 @@ func (m *SlotManager) RestoreFromDisk() {
 
 	// Set the maxPruned epoch to the baseIndex-1 of the oldest dbInstance.
 	if dbInfos[0].baseIndex > 0 {
-		m.lastPrunedEpoch.MarkEvicted(dbInfos[0].baseIndex - 1)
+		lastPrunedEpoch = dbInfos[0].baseIndex - 1
+		m.lastPrunedEpoch.MarkEvicted(lastPrunedEpoch)
 	} else {
 		m.lastPrunedEpoch.MarkEvicted(0)
 	}
@@ -134,6 +135,8 @@ func (m *SlotManager) RestoreFromDisk() {
 	for _, dbInfo := range dbInfos {
 		m.getDBInstance(dbInfo.baseIndex)
 	}
+
+	return
 }
 
 // getDBInstance returns the DB instance for the given epochIndex or creates a new one if it does not yet exist.
