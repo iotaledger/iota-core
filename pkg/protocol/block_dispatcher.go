@@ -260,7 +260,12 @@ func (b *BlockDispatcher) warpSync(e *engine.Engine, chainCommitment *chainmanag
 	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
 
 	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+warpSyncWindowSize; slotToWarpSync++ {
-		if commitmentToSync := chain.Commitment(slotToWarpSync); commitmentToSync != nil && !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
+		commitmentToSync := chain.Commitment(slotToWarpSync)
+		if commitmentToSync == nil {
+			break
+		}
+
+		if !b.processedWarpSyncRequests.Has(commitmentToSync.ID()) {
 			b.pendingWarpSyncRequests.StartTicker(commitmentToSync.ID())
 		}
 	}
@@ -297,7 +302,11 @@ func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.E
 	engineInstance.HookStopped(engineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		if chainCommitment, exists := b.protocol.ChainManager.Commitment(commitment.ID()); exists {
 			b.processedWarpSyncRequests.Delete(commitment.ID())
-			b.warpSync(engineInstance, chainCommitment)
+
+			// we only need to warp sync if the processed commitment is not too close to latest commitment of the chain
+			if chainCommitment.ID().Index()+1 <= chainCommitment.Chain().LatestCommitment().Commitment().Index() {
+				b.warpSync(engineInstance, chainCommitment)
+			}
 		}
 	}).Unhook)
 }
