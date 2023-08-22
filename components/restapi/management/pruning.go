@@ -57,7 +57,7 @@ func pruneDatabase(c echo.Context) (*apimodels.PruneDatabaseResponse, error) {
 
 	targetIndex, hasPruned := deps.Protocol.MainEngineInstance().Storage.LastPrunedEpoch()
 	if hasPruned {
-		targetIndex += 1
+		targetIndex++
 	}
 
 	return &apimodels.PruneDatabaseResponse{

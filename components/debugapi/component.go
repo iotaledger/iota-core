@@ -99,7 +99,7 @@ func configure() error {
 
 		lastPruned, hasPruned := blocksPrunableStorage.LastPrunedEpoch()
 		if hasPruned {
-			lastPruned += 1
+			lastPruned++
 		}
 
 		for i := lastPruned; i < epoch-iotago.EpochIndex(ParamsDebugAPI.PruningThreshold); i++ {

@@ -1,3 +1,4 @@
+//nolint:gosec // false positive on constants
 package metrics
 
 import (
