@@ -72,6 +72,7 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *CommitmentMetada
 	forkingPoint := c.forkingPoint.Get()
 
 	if index < forkingPoint.Index() {
+		// TODO: GO TO PARENT CHAIN
 		return nil, false
 	}
 
@@ -98,28 +99,20 @@ func (c *Chain) registerCommitment(commitment *CommitmentMetadata) {
 	c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
 		c.commitments.Set(commitment.Index(), commitment)
 
-		if latestCommitmentIndex > commitment.Index() {
-			return latestCommitmentIndex
-		}
-
-		return commitment.Index()
+		return lo.Cond(latestCommitmentIndex > commitment.Index(), latestCommitmentIndex, commitment.Index())
 	})
 
-	unregistered := reactive.NewEvent()
+	unregisterCondition := func(_, newValue *Chain) bool {
+		return newValue != c
+	}
 
-	unsubscribe := commitment.Chain().OnUpdate(func(_, newValue *Chain) {
-		if newValue != c {
-			unregistered.Trigger()
-		}
-	})
+	commitment.Chain().OnUpdateOnce(func(_, _ *Chain) { c.unregisterCommitment(commitment) }, unregisterCondition)
+}
 
-	unregistered.OnTrigger(func() {
-		go unsubscribe()
+func (c *Chain) unregisterCommitment(commitment *CommitmentMetadata) iotago.SlotIndex {
+	return c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
+		c.commitments.Delete(commitment.Index())
 
-		c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
-			c.commitments.Delete(commitment.Index())
-
-			return lo.Cond(commitment.Index() < latestCommitmentIndex, commitment.Index()-1, latestCommitmentIndex)
-		})
+		return lo.Cond(commitment.Index() < latestCommitmentIndex, commitment.Index()-1, latestCommitmentIndex)
 	})
 }
