@@ -57,11 +57,20 @@ func (t *TestSuite) InitRewardManager() {
 
 		return p
 	}
+	RegistrationActivityFunc := func(index iotago.SlotIndex) *prunable.RegisteredValidatorSlotActivity {
+		if _, exists := prunableStores[index]; !exists {
+			prunableStores[index] = mapdb.NewMapDB()
+		}
+
+		p := prunable.NewRegisteredValidatorActivity(index, prunableStores[index], t.apiProvider)
+
+		return p
+	}
 
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
 	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, t.latestCommittedEpoch, t.apiProvider, func(err error) {})
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, RegistrationActivityFunc, perforanceFactorFunc, t.latestCommittedEpoch, t.apiProvider, func(err error) {})
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
