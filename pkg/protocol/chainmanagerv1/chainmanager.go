@@ -47,13 +47,13 @@ func (c *ChainManager) OnCommitmentCreated(callback func(commitment *CommitmentM
 	return c.commitmentCreated.Hook(callback).Unhook
 }
 
-func (c *ChainManager) RootCommitment() *CommitmentMetadata {
+func (c *ChainManager) RootCommitment() reactive.Variable[*CommitmentMetadata] {
 	chain := c.rootChain.Get()
 	if chain == nil {
-		return nil
+		panic("root chain not initialized")
 	}
 
-	return chain.ForkingPoint().Get()
+	return chain.ForkingPoint()
 }
 
 func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvictedEvent reactive.Event) {
@@ -67,7 +67,7 @@ func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvict
 func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.SlotIndex, requestIfMissing bool, optSuccessCallbacks ...func(metadata *CommitmentMetadata)) (commitmentRequest *promise.Promise[*CommitmentMetadata]) {
 	slotEvicted := c.EvictionEvent(index)
 	if slotEvicted.WasTriggered() {
-		if rootCommitment := c.RootCommitment(); rootCommitment != nil && id == rootCommitment.ID() {
+		if rootCommitment := c.RootCommitment().Get(); rootCommitment != nil && id == rootCommitment.ID() {
 			for _, successCallback := range optSuccessCallbacks {
 				successCallback(rootCommitment)
 			}
