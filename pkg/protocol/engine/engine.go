@@ -36,6 +36,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -179,14 +180,15 @@ func New(
 				}
 
 				// Only mark any pruning indexes if we loaded a non-genesis snapshot
-				// TODO: calling TryPrune here should be sufficient
-				// if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-				// TODO: check whether this is still necessary
-				// e.Storage.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
-				// if index, pruned := e.Storage.LastPrunedEpoch(); pruned {
-				// 	e.Events.StoragePruned.Trigger(index)
-				// }
-				// }
+				if e.Storage.Settings().LatestFinalizedSlot() > 0 {
+					fmt.Println("Pruning indexes", e.Storage.Settings().LatestFinalizedSlot())
+					if _, _, err := e.Storage.PruneByDepth(1); err != nil {
+						if !ierrors.Is(err, database.ErrNoPruningNeeded) &&
+							!ierrors.Is(err, database.ErrEpochPruned) {
+							panic(ierrors.Wrap(err, "failed to prune storage"))
+						}
+					}
+				}
 
 				if err := e.Storage.Settings().SetSnapshotImported(); err != nil {
 					panic(ierrors.Wrap(err, "failed to set snapshot imported"))
