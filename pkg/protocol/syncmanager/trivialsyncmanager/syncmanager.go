@@ -33,6 +33,9 @@ type SyncManager struct {
 	lastPrunedSlot     iotago.SlotIndex
 	lastPrunedSlotLock syncutils.RWMutex
 
+	isSynced     bool
+	isSyncedLock syncutils.RWMutex
+
 	isBootstrappedFunc isBootstrappedFunc
 
 	module.Module
@@ -57,7 +60,10 @@ func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 		}, asyncOpt)
 
 		e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-			if s.updateLatestCommitment(commitment) {
+			syncChaged := s.updateSyncStatus()
+			commitmentChanged := s.updateLatestCommitment(commitment)
+
+			if syncChaged || commitmentChanged {
 				s.triggerUpdate()
 			}
 		}, asyncOpt)
@@ -153,6 +159,18 @@ func (s *SyncManager) updateLatestCommitment(commitment *model.Commitment) (chan
 	return false
 }
 
+func (s *SyncManager) updateSyncStatus() (changed bool) {
+	s.isSyncedLock.Lock()
+	defer s.isSyncedLock.Unlock()
+
+	if s.isSynced != s.isBootstrappedFunc() {
+		s.isSynced = !s.isSynced
+		return true
+	}
+
+	return false
+}
+
 func (s *SyncManager) updateFinalizedSlot(index iotago.SlotIndex) (changed bool) {
 	s.latestFinalizedSlotLock.Lock()
 	defer s.latestFinalizedSlotLock.Unlock()
@@ -178,7 +196,10 @@ func (s *SyncManager) updatePrunedSlot(index iotago.SlotIndex) (changed bool) {
 }
 
 func (s *SyncManager) IsNodeSynced() bool {
-	return s.isBootstrappedFunc()
+	s.isSyncedLock.RLock()
+	defer s.isSyncedLock.RUnlock()
+
+	return s.isSynced
 }
 
 func (s *SyncManager) LastAcceptedBlockSlot() iotago.SlotIndex {
