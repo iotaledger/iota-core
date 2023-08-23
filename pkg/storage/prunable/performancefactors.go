@@ -8,8 +8,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-// VlidatorSlotPerformance represent the performance factors of a validator for a given slot.
-type VlidatorSlotPerformance struct {
+// ValidatorSlotPerformance represent the performance factors of a validator for a given slot.
+type ValidatorSlotPerformance struct {
 	slot  iotago.SlotIndex
 	store kvstore.KVStore
 
@@ -33,16 +33,16 @@ func ValidatorPerformanceFromBytes(bytes []byte, slotAPI iotago.API) (*Validator
 	return p, offset, nil
 }
 
-// NewPerformanceFactors is a constructor for the VlidatorSlotPerformance.
-func NewPerformanceFactors(slot iotago.SlotIndex, store kvstore.KVStore, apiProvider api.Provider) *VlidatorSlotPerformance {
-	return &VlidatorSlotPerformance{
+// NewPerformanceFactors is a constructor for the ValidatorSlotPerformance.
+func NewPerformanceFactors(slot iotago.SlotIndex, store kvstore.KVStore, apiProvider api.Provider) *ValidatorSlotPerformance {
+	return &ValidatorSlotPerformance{
 		slot:        slot,
 		store:       store,
 		apiProvider: apiProvider,
 	}
 }
 
-func (p *VlidatorSlotPerformance) Load(accountID iotago.AccountID) (pf *ValidatorPerformance, err error) {
+func (p *ValidatorSlotPerformance) Load(accountID iotago.AccountID) (pf *ValidatorPerformance, err error) {
 	performanceFactorsBytes, err := p.store.Get(accountID[:])
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
@@ -59,7 +59,7 @@ func (p *VlidatorSlotPerformance) Load(accountID iotago.AccountID) (pf *Validato
 	return validatorPerformance, nil
 }
 
-func (p *VlidatorSlotPerformance) Store(accountID iotago.AccountID, pf *ValidatorPerformance) error {
+func (p *ValidatorSlotPerformance) Store(accountID iotago.AccountID, pf *ValidatorPerformance) error {
 	bytes, err := p.apiProvider.APIForSlot(p.slot).Encode(pf)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to serialize performance factor for account %s", accountID)
@@ -70,7 +70,7 @@ func (p *VlidatorSlotPerformance) Store(accountID iotago.AccountID, pf *Validato
 // ForEachPerformanceFactor iterates over all saved validators.
 // Note that this stream function won't call the consumer function for inactive validators,
 // so better to use the load over every member of the committee if needed.
-func (p *VlidatorSlotPerformance) ForEachPerformanceFactor(consumer func(accountID iotago.AccountID, vp *ValidatorPerformance) error) error {
+func (p *ValidatorSlotPerformance) ForEachPerformanceFactor(consumer func(accountID iotago.AccountID, vp *ValidatorPerformance) error) error {
 	var innerErr error
 	if err := p.store.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
 		accountID, _, err := iotago.IdentifierFromBytes(key)

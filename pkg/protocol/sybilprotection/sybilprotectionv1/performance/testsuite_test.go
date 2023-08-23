@@ -3,6 +3,7 @@ package performance
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -30,10 +31,10 @@ type TestSuite struct {
 
 func NewTestSuite(t *testing.T) *TestSuite {
 	apiProvider := api.NewEpochBasedProvider()
-	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 0)
-	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 1)
-	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 2)
-	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(), 3)
+	// setup params for 8 epochs
+	for i := 0; i <= 8; i++ {
+		apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 3)), iotago.EpochIndex(i))
+	}
 
 	ts := &TestSuite{
 		T:           t,
@@ -47,7 +48,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 
 func (t *TestSuite) InitRewardManager() {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
-	perforanceFactorFunc := func(index iotago.SlotIndex) *prunable.VlidatorSlotPerformance {
+	perforanceFactorFunc := func(index iotago.SlotIndex) *prunable.ValidatorSlotPerformance {
 		if _, exists := prunableStores[index]; !exists {
 			prunableStores[index] = mapdb.NewMapDB()
 		}
@@ -129,9 +130,7 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 
 func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochIndex iotago.EpochIndex, performanceFactor uint64) {
 	startSlot := t.apiProvider.APIForEpoch(epochIndex).TimeProvider().EpochStart(epochIndex)
-	// TODO change params instad of hand typing here, also how to make it faster without shortening the epoch length?
-	//endSlot := t.apiProvider.APIForEpoch(epochIndex).TimeProvider().EpochEnd(epochIndex)
-	endSlot := startSlot + 10
+	endSlot := t.apiProvider.APIForEpoch(epochIndex).TimeProvider().EpochEnd(epochIndex)
 	for slot := startSlot; slot <= endSlot; slot++ {
 		for i := uint64(0); i < performanceFactor; i++ {
 			block := tpkg.RandBasicBlockWithIssuerAndRMC(accountID, 10)

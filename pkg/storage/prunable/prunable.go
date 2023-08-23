@@ -14,6 +14,7 @@ const (
 	attestationsPrefix
 	accountDiffsPrefix
 	performanceFactorsPrefix
+	registeredValidatorActivityPrefix
 	upgradeSignalsPrefix
 	rootsPrefix
 	retainerPrefix
@@ -77,13 +78,23 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
 	return NewAccountDiffs(slot, store, p.apiProvider.APIForSlot(slot))
 }
 
-func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *VlidatorSlotPerformance {
+func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *ValidatorSlotPerformance {
 	store := p.manager.Get(slot, kvstore.Realm{performanceFactorsPrefix})
 	if store == nil {
 		return nil
 	}
 
 	return NewPerformanceFactors(slot, store, p.apiProvider)
+}
+
+// TODO: refactor it after pruning PR is merged
+func (p *Prunable) ValidatorActivity(epochStart iotago.SlotIndex) *RegisteredValidatorSlotActivity {
+	store := p.manager.Get(epochStart, kvstore.Realm{registeredValidatorActivityPrefix})
+	if store == nil {
+		return nil
+	}
+
+	return NewRegisteredValidatorActivity(epochStart, store, p.apiProvider)
 }
 
 func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *UpgradeSignals {
