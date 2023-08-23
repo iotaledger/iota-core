@@ -4,7 +4,6 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
@@ -13,9 +12,7 @@ import (
 )
 
 type ChainManager struct {
-	rootChain *Chain
-
-	rootCommitment reactive.Variable[*CommitmentMetadata]
+	rootChain reactive.Variable[*Chain]
 
 	commitmentCreated *event.Event1[*CommitmentMetadata]
 
@@ -26,10 +23,10 @@ type ChainManager struct {
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
-func NewChainManager() *ChainManager {
+func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 	return &ChainManager{
 		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
-		rootCommitment:      reactive.NewVariable[*CommitmentMetadata](),
+		rootChain:           reactive.NewVariable[*Chain]().Init(NewChain(NewRootCommitmentMetadata(rootCommitment))),
 		commitmentCreated:   event.New1[*CommitmentMetadata](),
 		cachedCommitments:   shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
 		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
@@ -50,41 +47,13 @@ func (c *ChainManager) OnCommitmentCreated(callback func(commitment *CommitmentM
 	return c.commitmentCreated.Hook(callback).Unhook
 }
 
-func (c *ChainManager) SetRootCommitment(commitment *model.Commitment) (commitmentMetadata *CommitmentMetadata, err error) {
-	c.rootCommitment.Compute(func(currentRoot *CommitmentMetadata) *CommitmentMetadata {
-		if currentRoot != nil {
-			if currentRoot.Index() > commitment.Index() {
-				err = ierrors.Errorf("cannot set root commitment with lower index %s than current root commitment index %s", commitment.Index(), currentRoot.Index())
-				return currentRoot
-			}
-
-			if currentRoot.Index() == commitment.Index() && currentRoot.ID() != commitment.ID() {
-				err = ierrors.Errorf("cannot set root commitment with same index %s but different id %s than current root commitment id %s", commitment.Index(), commitment.ID(), currentRoot.ID())
-				return currentRoot
-			}
-		}
-
-		commitmentMetadata = NewRootCommitmentMetadata(commitment)
-
-		if c.rootChain == nil {
-			c.rootChain = NewChain(commitmentMetadata)
-		} else {
-			chainCommitment, exists := c.rootChain.Commitment(commitment.Index())
-			if !exists || chainCommitment.ID() != commitment.ID() {
-				panic("can only set root commitment to a commitment of the same chain")
-			}
-
-			c.rootChain.ForkingPoint().Set(chainCommitment)
-		}
-
-		return commitmentMetadata
-	})
-
-	if err != nil {
-		return nil, err
+func (c *ChainManager) RootCommitment() *CommitmentMetadata {
+	chain := c.rootChain.Get()
+	if chain == nil {
+		return nil
 	}
 
-	return commitmentMetadata, nil
+	return chain.ForkingPoint().Get()
 }
 
 func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvictedEvent reactive.Event) {
@@ -98,7 +67,7 @@ func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvict
 func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.SlotIndex, requestIfMissing bool, optSuccessCallbacks ...func(metadata *CommitmentMetadata)) (commitmentRequest *promise.Promise[*CommitmentMetadata]) {
 	slotEvicted := c.EvictionEvent(index)
 	if slotEvicted.WasTriggered() {
-		if rootCommitment := c.rootCommitment.Get(); rootCommitment != nil && id == rootCommitment.ID() {
+		if rootCommitment := c.RootCommitment(); rootCommitment != nil && id == rootCommitment.ID() {
 			for _, successCallback := range optSuccessCallbacks {
 				successCallback(rootCommitment)
 			}

@@ -13,48 +13,48 @@ import (
 
 func TestChainManager(t *testing.T) {
 	testAPI := tpkg.TestAPI
+	rootCommitment := model.NewEmptyCommitment(testAPI)
+	chainManager := NewChainManager(rootCommitment)
 
-	chainManager := NewChainManager()
-
-	rootCommitment := lo.PanicOnErr(chainManager.SetRootCommitment(model.NewEmptyCommitment(testAPI)))
-	commitment1Metadata := chainManager.ProcessCommitment(lo.PanicOnErr(model.CommitmentFromCommitment(iotago.NewCommitment(testAPI.Version(),
+	commitment1 := lo.PanicOnErr(model.CommitmentFromCommitment(iotago.NewCommitment(testAPI.Version(),
 		rootCommitment.Index()+1,
 		rootCommitment.ID(),
 		rootCommitment.RootsID(),
 		1,
 		1,
-	), testAPI)))
+	), testAPI))
 
 	commitment2 := lo.PanicOnErr(model.CommitmentFromCommitment(iotago.NewCommitment(testAPI.Version(),
-		commitment1Metadata.Index()+1,
-		commitment1Metadata.ID(),
-		commitment1Metadata.RootsID(),
+		commitment1.Index()+1,
+		commitment1.ID(),
+		commitment1.RootsID(),
 		2,
 		2,
 	), testAPI))
 
-	commitment3Metadata := chainManager.ProcessCommitment(lo.PanicOnErr(model.CommitmentFromCommitment(iotago.NewCommitment(testAPI.Version(),
+	commitment3 := lo.PanicOnErr(model.CommitmentFromCommitment(iotago.NewCommitment(testAPI.Version(),
 		commitment2.Index()+1,
 		commitment2.ID(),
 		commitment2.RootsID(),
 		3,
 		2,
-	), testAPI)))
+	), testAPI))
 
+	commitment1Metadata := chainManager.ProcessCommitment(commitment1)
+	require.True(t, commitment1Metadata.Solid().Get())
+
+	commitment3Metadata := chainManager.ProcessCommitment(commitment3)
 	require.True(t, commitment1Metadata.Solid().Get())
 	require.False(t, commitment3Metadata.Solid().Get())
 
 	commitment2Metadata := chainManager.ProcessCommitment(commitment2)
-
 	require.True(t, commitment1Metadata.Solid().Get())
 	require.True(t, commitment2Metadata.Solid().Get())
 	require.True(t, commitment3Metadata.Solid().Get())
 
 	commitment2Metadata.Verified().Trigger()
-
 	require.True(t, commitment3Metadata.AboveLatestVerifiedCommitment().Get())
 	require.True(t, commitment3Metadata.BelowSyncThreshold().Get())
-
 	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().Get().latestCommitmentIndex.Get())
 	require.Equal(t, uint64(3), commitment3Metadata.Chain().Get().cumulativeWeight.Get())
 }
