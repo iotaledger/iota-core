@@ -47,11 +47,11 @@ func NewTestFramework(test *testing.T, api iotago.API, opts ...options.Option[Te
 			t.test.Logf("ForkDetected: %s", fork)
 			atomic.AddInt32(&t.forkDetected, 1)
 		})
-		t.Instance.Events.CommitmentMissing.Hook(func(id iotago.CommitmentID) {
+		t.Instance.commitmentRequester.Events.TickerStarted.Hook(func(id iotago.CommitmentID) {
 			t.test.Logf("CommitmentMissing: %s", id)
 			atomic.AddInt32(&t.commitmentMissing, 1)
 		})
-		t.Instance.Events.MissingCommitmentReceived.Hook(func(id iotago.CommitmentID) {
+		t.Instance.commitmentRequester.Events.TickerStopped.Hook(func(id iotago.CommitmentID) {
 			t.test.Logf("MissingCommitmentReceived: %s", id)
 			atomic.AddInt32(&t.missingCommitmentReceived, 1)
 		})

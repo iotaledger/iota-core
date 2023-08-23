@@ -6,11 +6,9 @@ import (
 )
 
 type Events struct {
-	CommitmentPublished       *event.Event1[*ChainCommitment]
-	CommitmentMissing         *event.Event1[iotago.CommitmentID]
-	MissingCommitmentReceived *event.Event1[iotago.CommitmentID]
-	CommitmentBelowRoot       *event.Event1[iotago.CommitmentID]
-	ForkDetected              *event.Event1[*Fork]
+	CommitmentPublished *event.Event1[*ChainCommitment]
+	CommitmentBelowRoot *event.Event1[iotago.CommitmentID]
+	ForkDetected        *event.Event1[*Fork]
 
 	RequestCommitment *event.Event1[iotago.CommitmentID]
 
@@ -19,11 +17,9 @@ type Events struct {
 
 var NewEvents = event.CreateGroupConstructor(func() *Events {
 	return &Events{
-		CommitmentPublished:       event.New1[*ChainCommitment](),
-		CommitmentMissing:         event.New1[iotago.CommitmentID](),
-		MissingCommitmentReceived: event.New1[iotago.CommitmentID](),
-		CommitmentBelowRoot:       event.New1[iotago.CommitmentID](),
-		ForkDetected:              event.New1[*Fork](),
-		RequestCommitment:         event.New1[iotago.CommitmentID](),
+		CommitmentPublished: event.New1[*ChainCommitment](),
+		CommitmentBelowRoot: event.New1[iotago.CommitmentID](),
+		ForkDetected:        event.New1[*Fork](),
+		RequestCommitment:   event.New1[iotago.CommitmentID](),
 	}
 })

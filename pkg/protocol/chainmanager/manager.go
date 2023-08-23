@@ -46,8 +46,6 @@ func NewManager(opts ...options.Option[Manager]) (manager *Manager) {
 		lastEvictedSlot:       model.NewEvictionIndex(),
 	}, opts, func(m *Manager) {
 		m.commitmentRequester = eventticker.New(m.optsCommitmentRequester...)
-		m.Events.CommitmentMissing.Hook(m.commitmentRequester.StartTicker)
-		m.Events.MissingCommitmentReceived.Hook(m.commitmentRequester.StopTicker)
 		m.Events.CommitmentBelowRoot.Hook(m.commitmentRequester.StopTicker)
 
 		m.Events.RequestCommitment.LinkTo(m.commitmentRequester.Events.Tick)
@@ -181,7 +179,7 @@ func (m *Manager) LoadCommitmentOrRequestMissing(id iotago.CommitmentID) *ChainC
 
 	chainCommitment, created := m.getOrCreateCommitment(id)
 	if created {
-		m.Events.CommitmentMissing.Trigger(id)
+		m.commitmentRequester.StartTicker(id)
 	}
 
 	return chainCommitment
@@ -368,7 +366,7 @@ func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*Ch
 func (m *Manager) registerCommitment(commitment *model.Commitment) (isNew bool, isSolid bool, wasForked bool, chainCommitment *ChainCommitment) {
 	parentCommitment, commitmentCreated := m.getOrCreateCommitment(commitment.PrevID())
 	if commitmentCreated {
-		m.Events.CommitmentMissing.Trigger(parentCommitment.ID())
+		m.commitmentRequester.StartTicker(parentCommitment.ID())
 	}
 
 	chainCommitment, created := m.getOrCreateCommitment(commitment.ID())
@@ -380,7 +378,7 @@ func (m *Manager) registerCommitment(commitment *model.Commitment) (isNew bool, 
 	m.Events.CommitmentPublished.Trigger(chainCommitment)
 
 	if !created {
-		m.Events.MissingCommitmentReceived.Trigger(chainCommitment.ID())
+		m.commitmentRequester.StopTicker(chainCommitment.ID())
 	}
 
 	isSolid, _, wasForked = m.registerChild(parentCommitment, chainCommitment)
