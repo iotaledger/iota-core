@@ -6,9 +6,6 @@ import (
 
 	"github.com/multiformats/go-varint"
 	"google.golang.org/protobuf/proto"
-
-	"github.com/iotaledger/hive.go/ierrors"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // UvarintWriter writes protobuf blocks.
@@ -61,9 +58,6 @@ func (ur *UvarintReader) ReadBlk(blk proto.Message) error {
 		return err
 	}
 
-	if length64 > iotago.MaxBlockSize {
-		return ierrors.Errorf("max block size exceeded: %d", length64)
-	}
 	buf := make([]byte, length64)
 	if _, err := io.ReadFull(ur.r, buf); err != nil {
 		return err

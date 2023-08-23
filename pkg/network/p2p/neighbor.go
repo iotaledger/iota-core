@@ -17,7 +17,7 @@ import (
 type NeighborsGroup int8
 
 const (
-	NeighborsSendQueueSize = 1000
+	NeighborsSendQueueSize = 20_000
 )
 
 const (

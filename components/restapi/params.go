@@ -36,6 +36,12 @@ type ParametersRestAPI struct {
 		// the maximum number of results that may be returned by an endpoint
 		MaxResults int `default:"1000" usage:"the maximum number of results that may be returned by an endpoint"`
 	}
+
+	// BlockIssuerAccount the accountID of the account that will issue the blocks.
+	BlockIssuerAccount string `default:"" usage:"the accountID of the account that will issue the blocks"`
+
+	// BlockIssuerPrivateKey the private key of the account that will issue the blocks.
+	BlockIssuerPrivateKey string `default:"" usage:"the private key of the account that will issue the blocks"`
 }
 
 var ParamsRestAPI = &ParametersRestAPI{

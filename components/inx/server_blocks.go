@@ -147,7 +147,7 @@ func (s *Server) SubmitPayload(ctx context.Context, rawPayload *inx.RawPayload) 
 	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
 	defer mergedCtxCancel()
 
-	block, err := deps.BlockIssuer.CreateBlock(mergedCtx, blockfactory.WithPayload(payload))
+	block, err := deps.BlockIssuer.CreateBlock(mergedCtx, blockIssuerAccount, blockfactory.WithPayload(payload))
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to create block: %s", err.Error())
 	}
@@ -159,7 +159,7 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (
 	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
 	defer mergedCtxCancel()
 
-	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, block)
+	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, block, blockIssuerAccount)
 	if err != nil {
 		switch {
 		case ierrors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):

@@ -24,7 +24,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 
 	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "tx1:0"))
 
-	ts.IssueBlock("block1", node1, blockfactory.WithPayload(tx2))
+	ts.IssuePayloadWithOptions("block1", node1, tx2)
 
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx2"), true, node1)
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), false, node1)
@@ -32,7 +32,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx2"), false, node1)
 	// make sure that the block is not booked
 
-	ts.IssueBlock("block2", node1, blockfactory.WithPayload(tx1))
+	ts.IssuePayloadWithOptions("block2", node1, tx1)
 
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)
 	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)
@@ -66,8 +66,8 @@ func Test_DoubleSpend(t *testing.T) {
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "Genesis:0"))
 
-		ts.IssueBlock("block1", node1, blockfactory.WithPayload(tx1), blockfactory.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssueBlock("block2", node1, blockfactory.WithPayload(tx2), blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("block1", node1, tx1, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("block2", node1, tx2, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
@@ -131,9 +131,9 @@ func Test_MultipleAttachments(t *testing.T) {
 	{
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 2, "Genesis:0"))
 
-		ts.IssueBlock("A.1", nodeA, blockfactory.WithPayload(tx1), blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("A.1", nodeA, tx1, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlock("A.1.1", nodeA, blockfactory.WithStrongParents(ts.BlockID("A.1")))
-		ts.IssueBlock("B.1", nodeB, blockfactory.WithPayload(tx1), blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("B.1", nodeB, tx1, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlock("B.1.1", nodeB, blockfactory.WithStrongParents(ts.BlockID("B.1")))
 
 		ts.IssueValidationBlock("A.2", nodeA, blockfactory.WithStrongParents(ts.BlockID("B.1.1")))
@@ -158,7 +158,7 @@ func Test_MultipleAttachments(t *testing.T) {
 	{
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "tx1:1"))
 
-		ts.IssueBlock("A.3", nodeA, blockfactory.WithPayload(tx2), blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("A.3", nodeA, tx2, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlock("B.3", nodeB, blockfactory.WithStrongParents(ts.BlockID("A.3")))
 		ts.IssueValidationBlock("A.4", nodeA, blockfactory.WithStrongParents(ts.BlockID("B.3")))
 

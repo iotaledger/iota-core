@@ -12,12 +12,17 @@ services:
       ${MANUALPEERING_CONFIG}
       --p2p.seed=0x88ce2019dd99fd5a3c46e10ffc192549fc4491eee07552153ff66cf792b6a0af
       --blockIssuer.rateSetterEnabled=true
-      --blockIssuer.issuerAccount=0x907c02e9302e0f0571f10f885594e56d8c54ff0708ab7a39bc1b74d396b93b12
-      --blockIssuer.privateKey=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
+      --validator.enabled=true
       --validator.ignoreBootstrapped=true
+      --validator.account=0x907c02e9302e0f0571f10f885594e56d8c54ff0708ab7a39bc1b74d396b93b12
+      --validator.privateKey=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
       --restAPI.allowIncompleteBlock=true
+      --restAPI.blockIssuerAccount=0x907c02e9302e0f0571f10f885594e56d8c54ff0708ab7a39bc1b74d396b93b12
+      --restAPI.blockIssuerPrivateKey=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
+      --inx.blockIssuerAccount=0x907c02e9302e0f0571f10f885594e56d8c54ff0708ab7a39bc1b74d396b93b12
+      --inx.blockIssuerPrivateKey=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -25,7 +30,7 @@ services:
       - "8080:8080/tcp" # web API
       - "8081:8081/tcp" # dashboard
       - "6081:6061/tcp" # pprof
-      - "9029:9029/tcp" # inx
+      - "9089:9029/tcp" # inx
     networks:
       - iota-core
 
@@ -46,9 +51,16 @@ services:
       ${MANUALPEERING_CONFIG}
       --p2p.seed=0xf739eea09eb0f4820f26504a3135131a075089b4c901c19c2099513ee016f516
       --blockIssuer.rateSetterEnabled=true
-      --blockIssuer.issuerAccount=0x375358f92cc94750669598b0aaa55a6ff73310b90710e1fad524c0f911be0fea
-      --blockIssuer.privateKey=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064
+      --validator.enabled=true
+      --validator.account=0x375358f92cc94750669598b0aaa55a6ff73310b90710e1fad524c0f911be0fea
+      --validator.privateKey=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064
       --restAPI.allowIncompleteBlock=true
+      --restAPI.blockIssuerAccount=0x375358f92cc94750669598b0aaa55a6ff73310b90710e1fad524c0f911be0fea
+      --restAPI.blockIssuerPrivateKey=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064
+      --inx.enabled=true
+      --inx.bindAddress=0.0.0.0:9029
+      --inx.blockIssuerAccount=0x375358f92cc94750669598b0aaa55a6ff73310b90710e1fad524c0f911be0fea
+      --inx.blockIssuerPrivateKey=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -56,6 +68,8 @@ services:
       - "8070:8080/tcp" # web API
       - "8071:8081/tcp" # dashboard
       - "6071:6061/tcp" # pprof
+      - "9029:9029/tcp" # inx
+
     networks:
       - iota-core
 
@@ -67,9 +81,16 @@ services:
       ${MANUALPEERING_CONFIG}
       --p2p.seed=0x2ab2792bba8ab6deb7978165e4072d3f00def97a0138b98ba2d21eba54159705
       --blockIssuer.rateSetterEnabled=true
-      --blockIssuer.issuerAccount=0x6aee704f25558e8aa7630fed0121da53074188abc423b3c5810f80be4936eb6e
-      --blockIssuer.privateKey=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
+      --validator.enabled=true
+      --validator.account=0x6aee704f25558e8aa7630fed0121da53074188abc423b3c5810f80be4936eb6e
+      --validator.privateKey=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
       --restAPI.allowIncompleteBlock=true
+      --restAPI.blockIssuerAccount=0x6aee704f25558e8aa7630fed0121da53074188abc423b3c5810f80be4936eb6e
+      --restAPI.blockIssuerPrivateKey=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
+      --inx.enabled=true
+      --inx.bindAddress=0.0.0.0:9029
+      --inx.blockIssuerAccount=0x6aee704f25558e8aa7630fed0121da53074188abc423b3c5810f80be4936eb6e
+      --inx.blockIssuerPrivateKey=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -77,6 +98,7 @@ services:
       - "8090:8080/tcp" # web API
       - "8091:8081/tcp" # dashboard
       - "6091:6061/tcp" # pprof
+      - "9099:9029/tcp" # inx
     networks:
       - iota-core
 
@@ -87,10 +109,13 @@ services:
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
       --p2p.seed=0x6bd12a0398f9264788bc6481e2665eb90bd58a33b82347fb70f612cc8a91fcce
-      --blockIssuer.issuerAccount=0xd057230f48fdf59ae093e2179857c590e960b05389399399ce69ad169a9c7f37
-      --blockIssuer.privateKey=dcf7adb000f03826f1964a3e5378874b1972c38229fb740a8e47f2c421cddcf9a54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39
       --restAPI.allowIncompleteBlock=true
-
+      --restAPI.blockIssuerAccount=0xd057230f48fdf59ae093e2179857c590e960b05389399399ce69ad169a9c7f37
+      --restAPI.blockIssuerPrivateKey=dcf7adb000f03826f1964a3e5378874b1972c38229fb740a8e47f2c421cddcf9a54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39
+      --inx.enabled=true
+      --inx.bindAddress=0.0.0.0:9029
+      --inx.blockIssuerAccount=0xd057230f48fdf59ae093e2179857c590e960b05389399399ce69ad169a9c7f37
+      --inx.blockIssuerPrivateKey=dcf7adb000f03826f1964a3e5378874b1972c38229fb740a8e47f2c421cddcf9a54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -98,6 +123,7 @@ services:
       - "8040:8080/tcp" # web API
       - "8041:8081/tcp" # dashboard
       - "6041:6061/tcp" # pprof
+      - "9049:9029/tcp" # inx
     networks:
       - iota-core
 
@@ -108,10 +134,13 @@ services:
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
       --p2p.seed=0x4da1119dc9cc3750ebb313c3c7dcb50120465544d256ee3c0d4586ce1772c96b
-      --blockIssuer.issuerAccount=0x7a9ec5d9c0c145bae03b20cbe481cfea306e688c00525b410eb8cb18a169ed7f
-      --blockIssuer.privateKey=0d8ecad4cefe927d2b6c64ee56576c52450f9a7a0113f96683cf8e8cc5c64264cb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b
       --restAPI.allowIncompleteBlock=true
-
+      --restAPI.blockIssuerAccount=0x7a9ec5d9c0c145bae03b20cbe481cfea306e688c00525b410eb8cb18a169ed7f
+      --restAPI.blockIssuerPrivateKey=0d8ecad4cefe927d2b6c64ee56576c52450f9a7a0113f96683cf8e8cc5c64264cb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b
+      --inx.enabled=true
+      --inx.bindAddress=0.0.0.0:9029
+      --inx.blockIssuerAccount=0x7a9ec5d9c0c145bae03b20cbe481cfea306e688c00525b410eb8cb18a169ed7f
+      --inx.blockIssuerPrivateKey=0d8ecad4cefe927d2b6c64ee56576c52450f9a7a0113f96683cf8e8cc5c64264cb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -119,6 +148,8 @@ services:
       - "8030:8080/tcp" # web API
       - "8031:8081/tcp" # dashboard
       - "6031:6061/tcp" # pprof
+      - "9039:9029/tcp" # inx
+
     networks:
       - iota-core
 
