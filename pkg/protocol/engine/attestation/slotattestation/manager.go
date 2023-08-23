@@ -137,12 +137,12 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (ads.Map[iotago.AccountID, *iot
 	if index > m.lastCommittedSlot {
 		return nil, ierrors.Errorf("slot %d is newer than last committed slot %d", index, m.lastCommittedSlot)
 	}
-	cutoffIndex, isValid := m.computeAttestationCommitmentOffset(index)
-	if !isValid {
+
+	if cutoffIndex, isValid := m.computeAttestationCommitmentOffset(index); !isValid {
 		return nil, ierrors.Errorf("slot %d is smaller than attestation cutoffIndex %d thus we don't have attestations", index, cutoffIndex)
 	}
 
-	return m.attestationsForSlot(cutoffIndex)
+	return m.attestationsForSlot(index)
 }
 
 // AddAttestationFromValidationBlock adds an attestation from a block to the future attestations (beyond the attestation window).
@@ -249,7 +249,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	m.pendingAttestations.Evict(cutoffIndex)
 
 	// Store all attestations of cutoffIndex in bucketed storage via ads.Map / sparse merkle tree -> committed attestations.
-	tree, err := m.attestationsForSlot(cutoffIndex)
+	tree, err := m.attestationsForSlot(index)
 	if err != nil {
 		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get attestation storage when committing slot %d", index)
 	}
