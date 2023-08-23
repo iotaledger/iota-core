@@ -154,7 +154,7 @@ func currentNodeStatus() *nodestatus {
 	}
 	// get TangleTime
 	cl := deps.Protocol.MainEngineInstance().Clock
-	syncStatus := deps.Protocol.SyncManager.SyncStatus()
+	syncStatus := deps.Protocol.MainEngineInstance().SyncManager.SyncStatus()
 
 	status.TangleTime = tangleTime{
 		Synced:             syncStatus.NodeSynced,

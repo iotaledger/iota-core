@@ -34,6 +34,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -61,6 +62,7 @@ type Engine struct {
 	TipManager          tipmanager.TipManager
 	TipSelection        tipselection.TipSelection
 	Retainer            retainer.Retainer
+	SyncManager         syncmanager.SyncManager
 	UpgradeOrchestrator upgrade.Orchestrator
 
 	Workers      *workerpool.Group
@@ -105,6 +107,7 @@ func New(
 	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
 	retainerProvider module.Provider[*Engine, retainer.Retainer],
 	upgradeOrchestratorProvider module.Provider[*Engine, upgrade.Orchestrator],
+	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	var needsToImportSnapshot bool
@@ -160,6 +163,7 @@ func New(
 			e.TipSelection = tipSelectionProvider(e)
 			e.Retainer = retainerProvider(e)
 			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
+			e.SyncManager = syncManagerProvider(e)
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
@@ -220,6 +224,7 @@ func (e *Engine) Shutdown() {
 
 		e.BlockRequester.Shutdown()
 		e.Attestations.Shutdown()
+		e.SyncManager.Shutdown()
 		e.Notarization.Shutdown()
 		e.Booker.Shutdown()
 		e.Ledger.Shutdown()

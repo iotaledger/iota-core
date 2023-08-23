@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -43,6 +44,7 @@ type Events struct {
 	ConflictDAG      *conflictdag.Events[iotago.TransactionID, iotago.OutputID]
 	Scheduler        *scheduler.Events
 	SeatManager      *seatmanager.Events
+	SyncManager      *syncmanager.Events
 
 	event.Group[Events, *Events]
 }
@@ -69,5 +71,6 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		ConflictDAG:            conflictdag.NewEvents[iotago.TransactionID, iotago.OutputID](),
 		Scheduler:              scheduler.NewEvents(),
 		SeatManager:            seatmanager.NewEvents(),
+		SyncManager:            syncmanager.NewEvents(),
 	}
 })

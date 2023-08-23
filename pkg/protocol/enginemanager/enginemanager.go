@@ -29,6 +29,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
+	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
@@ -67,6 +68,7 @@ type EngineManager struct {
 	tipSelectionProvider        module.Provider[*engine.Engine, tipselection.TipSelection]
 	retainerProvider            module.Provider[*engine.Engine, retainer.Retainer]
 	upgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
+	syncManagerProvider         module.Provider[*engine.Engine, syncmanager.SyncManager]
 
 	activeInstance *engine.Engine
 }
@@ -94,6 +96,7 @@ func New(
 	tipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection],
 	retainerProvider module.Provider[*engine.Engine, retainer.Retainer],
 	upgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator],
+	syncManagerProvider module.Provider[*engine.Engine, syncmanager.SyncManager],
 ) *EngineManager {
 	return &EngineManager{
 		workers:                     workers,
@@ -118,6 +121,7 @@ func New(
 		tipSelectionProvider:        tipSelectionProvider,
 		retainerProvider:            retainerProvider,
 		upgradeOrchestratorProvider: upgradeOrchestratorProvider,
+		syncManagerProvider:         syncManagerProvider,
 	}
 }
 
@@ -209,6 +213,7 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.tipSelectionProvider,
 		e.retainerProvider,
 		e.upgradeOrchestratorProvider,
+		e.syncManagerProvider,
 		append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))...,
 	)
 }

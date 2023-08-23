@@ -58,9 +58,9 @@ import (
 )
 
 type Protocol struct {
-	context                 context.Context
-	Events                  *Events
-	SyncManager             syncmanager.SyncManager
+	context context.Context
+	Events  *Events
+
 	engineManager           *enginemanager.EngineManager
 	ChainManager            *chainmanager.Manager
 	unsolidCommitmentBlocks *buffer.UnsolidCommitmentBuffer[*types.Tuple[*model.Block, network.PeerID]]
@@ -81,23 +81,24 @@ type Protocol struct {
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
 	optsStorageOptions      []options.Option[storage.Storage]
 
-	optsFilterProvider              module.Provider[*engine.Engine, filter.Filter]
-	optsCommitmentFilterProvider    module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
-	optsBlockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
-	optsTipManagerProvider          module.Provider[*engine.Engine, tipmanager.TipManager]
-	optsTipSelectionProvider        module.Provider[*engine.Engine, tipselection.TipSelection]
-	optsBookerProvider              module.Provider[*engine.Engine, booker.Booker]
-	optsClockProvider               module.Provider[*engine.Engine, clock.Clock]
-	optsBlockGadgetProvider         module.Provider[*engine.Engine, blockgadget.Gadget]
-	optsSlotGadgetProvider          module.Provider[*engine.Engine, slotgadget.Gadget]
-	optsSybilProtectionProvider     module.Provider[*engine.Engine, sybilprotection.SybilProtection]
-	optsNotarizationProvider        module.Provider[*engine.Engine, notarization.Notarization]
-	optsAttestationProvider         module.Provider[*engine.Engine, attestation.Attestations]
-	optsSyncManagerProvider         module.Provider[*engine.Engine, syncmanager.SyncManager]
+	optsFilterProvider           module.Provider[*engine.Engine, filter.Filter]
+	optsCommitmentFilterProvider module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
+	optsBlockDAGProvider         module.Provider[*engine.Engine, blockdag.BlockDAG]
+	optsTipManagerProvider       module.Provider[*engine.Engine, tipmanager.TipManager]
+	optsTipSelectionProvider     module.Provider[*engine.Engine, tipselection.TipSelection]
+	optsBookerProvider           module.Provider[*engine.Engine, booker.Booker]
+	optsClockProvider            module.Provider[*engine.Engine, clock.Clock]
+	optsBlockGadgetProvider      module.Provider[*engine.Engine, blockgadget.Gadget]
+	optsSlotGadgetProvider       module.Provider[*engine.Engine, slotgadget.Gadget]
+	optsSybilProtectionProvider  module.Provider[*engine.Engine, sybilprotection.SybilProtection]
+	optsNotarizationProvider     module.Provider[*engine.Engine, notarization.Notarization]
+	optsAttestationProvider      module.Provider[*engine.Engine, attestation.Attestations]
+
 	optsLedgerProvider              module.Provider[*engine.Engine, ledger.Ledger]
 	optsRetainerProvider            module.Provider[*engine.Engine, retainer.Retainer]
 	optsSchedulerProvider           module.Provider[*engine.Engine, scheduler.Scheduler]
 	optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
+	optsSyncManagerProvider         module.Provider[*engine.Engine, syncmanager.SyncManager]
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -171,12 +172,6 @@ func (p *Protocol) Run(ctx context.Context) error {
 }
 
 func (p *Protocol) linkToEngine(engineInstance *engine.Engine) {
-	if p.SyncManager != nil {
-		p.SyncManager.Shutdown()
-		p.SyncManager = nil
-	}
-	p.SyncManager = p.optsSyncManagerProvider(engineInstance)
-
 	p.Events.Engine.LinkTo(engineInstance.Events)
 }
 
@@ -194,8 +189,6 @@ func (p *Protocol) shutdown() {
 		p.candidateEngine.engine.Shutdown()
 	}
 	p.activeEngineMutex.RUnlock()
-
-	p.SyncManager.Shutdown()
 }
 
 func (p *Protocol) initEngineManager() {
@@ -222,6 +215,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsTipSelectionProvider,
 		p.optsRetainerProvider,
 		p.optsUpgradeOrchestratorProvider,
+		p.optsSyncManagerProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine(p.optsSnapshotPath)

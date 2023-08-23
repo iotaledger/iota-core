@@ -80,6 +80,7 @@ func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 			}
 		}, asyncOpt)
 
+		e.Events.SyncManager.LinkTo(s.events)
 		s.TriggerInitialized()
 
 		return s
