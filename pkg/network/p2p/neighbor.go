@@ -8,9 +8,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/iota-core/pkg/network"
 )
 
 // NeighborsGroup is an enum type for various neighbors groups like auto/manual.
@@ -39,7 +39,7 @@ type (
 
 // Neighbor describes the established p2p connection to another peer.
 type Neighbor struct {
-	*peer.Peer
+	*network.Peer
 	Group NeighborsGroup
 
 	packetReceivedFunc PacketReceivedFunc
@@ -60,7 +60,7 @@ type Neighbor struct {
 }
 
 // NewNeighbor creates a new neighbor from the provided peer and connection.
-func NewNeighbor(p *peer.Peer, group NeighborsGroup, protocols map[protocol.ID]*PacketsStream, log *logger.Logger, packetReceivedCallback PacketReceivedFunc, disconnectedCallback NeighborDisconnectedFunc) *Neighbor {
+func NewNeighbor(p *network.Peer, group NeighborsGroup, protocols map[protocol.ID]*PacketsStream, log *logger.Logger, packetReceivedCallback PacketReceivedFunc, disconnectedCallback NeighborDisconnectedFunc) *Neighbor {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	neighbor := &Neighbor{
@@ -80,7 +80,7 @@ func NewNeighbor(p *peer.Peer, group NeighborsGroup, protocols map[protocol.ID]*
 	conn := neighbor.getAnyStream().Conn()
 
 	neighbor.Log = log.With(
-		"id", p.ID(),
+		"id", p.Identity.ID(),
 		"localAddr", conn.LocalMultiaddr(),
 		"remoteAddr", conn.RemoteMultiaddr(),
 	)
@@ -177,7 +177,7 @@ func (n *Neighbor) writeLoop() {
 			case sendPacket := <-n.sendQueue:
 				stream := n.GetStream(sendPacket.protocolID)
 				if stream == nil {
-					n.Log.Warnw("send error, no stream for protocol", "peer-id", n.ID(), "protocol", sendPacket.protocolID)
+					n.Log.Warnw("send error, no stream for protocol", "peer-id", n.Identity.ID(), "protocol", sendPacket.protocolID)
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
 						n.Log.Warnw("Failed to disconnect", "err", disconnectErr)
 					}
@@ -185,7 +185,7 @@ func (n *Neighbor) writeLoop() {
 					return
 				}
 				if err := stream.WritePacket(sendPacket.packet); err != nil {
-					n.Log.Warnw("send error", "peer-id", n.ID(), "err", err)
+					n.Log.Warnw("send error", "peer-id", n.Identity.ID(), "err", err)
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
 						n.Log.Warnw("Failed to disconnect", "err", disconnectErr)
 					}

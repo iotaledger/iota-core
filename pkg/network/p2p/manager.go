@@ -137,18 +137,18 @@ func (m *Manager) LocalPeer() *peer.Local {
 }
 
 // AddOutbound tries to add a neighbor by connecting to that peer.
-func (m *Manager) AddOutbound(ctx context.Context, p *peer.Peer, group NeighborsGroup,
+func (m *Manager) AddOutbound(ctx context.Context, p *network.Peer, group NeighborsGroup,
 	connectOpts ...ConnectPeerOption,
 ) error {
-	m.log.Debugw("adding outbound neighbor", "peer", p.ID())
+	m.log.Debugw("adding outbound neighbor", "peer", p.Identity.ID())
 	return m.addNeighbor(ctx, p, group, m.dialPeer, connectOpts)
 }
 
 // AddInbound tries to add a neighbor by accepting an incoming connection from that peer.
-func (m *Manager) AddInbound(ctx context.Context, p *peer.Peer, group NeighborsGroup,
+func (m *Manager) AddInbound(ctx context.Context, p *network.Peer, group NeighborsGroup,
 	connectOpts ...ConnectPeerOption,
 ) error {
-	m.log.Debugw("adding inbound neighbor", "peer", p.ID())
+	m.log.Debugw("adding inbound neighbor", "peer", p.Identity.ID())
 	return m.addNeighbor(ctx, p, group, m.acceptPeer, connectOpts)
 }
 
@@ -206,7 +206,7 @@ func (m *Manager) AllNeighborsIDs() (ids []network.PeerID) {
 	ids = make([]network.PeerID, 0)
 	neighbors := m.AllNeighbors()
 	for _, nbr := range neighbors {
-		ids = append(ids, nbr.ID())
+		ids = append(ids, nbr.Identity.ID())
 	}
 
 	return
@@ -242,11 +242,11 @@ func (m *Manager) neighborWithGroup(id network.PeerID, group NeighborsGroup) (*N
 	return nbr, nil
 }
 
-func (m *Manager) addNeighbor(ctx context.Context, p *peer.Peer, group NeighborsGroup,
-	connectorFunc func(context.Context, *peer.Peer, []ConnectPeerOption) (map[protocol.ID]*PacketsStream, error),
+func (m *Manager) addNeighbor(ctx context.Context, p *network.Peer, group NeighborsGroup,
+	connectorFunc func(context.Context, *network.Peer, []ConnectPeerOption) (map[protocol.ID]*PacketsStream, error),
 	connectOpts []ConnectPeerOption,
 ) error {
-	if p.ID() == m.local.ID() {
+	if p.Identity.ID() == m.local.ID() {
 		return ierrors.WithStack(ErrLoopbackNeighbor)
 	}
 	m.stopMutex.RLock()
@@ -254,7 +254,7 @@ func (m *Manager) addNeighbor(ctx context.Context, p *peer.Peer, group Neighbors
 	if m.isStopped {
 		return ErrNotRunning
 	}
-	if m.neighborExists(p.ID()) {
+	if m.neighborExists(p.Identity.ID()) {
 		return ierrors.WithStack(ErrDuplicateNeighbor)
 	}
 
@@ -272,7 +272,7 @@ func (m *Manager) addNeighbor(ctx context.Context, p *peer.Peer, group Neighbors
 		if !isRegistered {
 			nbr.Log.Errorw("Can't handle packet as the protocol is not registered", "protocol", protocol, "err", err)
 		}
-		if err := protocolHandler.PacketHandler(nbr.ID(), packet); err != nil {
+		if err := protocolHandler.PacketHandler(nbr.Identity.ID(), packet); err != nil {
 			nbr.Log.Debugw("Can't handle packet", "err", err)
 		}
 	}, func(nbr *Neighbor) {
@@ -307,16 +307,16 @@ func (m *Manager) neighborExists(id network.PeerID) bool {
 func (m *Manager) deleteNeighbor(nbr *Neighbor) {
 	m.neighborsMutex.Lock()
 	defer m.neighborsMutex.Unlock()
-	delete(m.neighbors, nbr.ID())
+	delete(m.neighbors, nbr.Identity.ID())
 }
 
 func (m *Manager) setNeighbor(nbr *Neighbor) error {
 	m.neighborsMutex.Lock()
 	defer m.neighborsMutex.Unlock()
-	if _, exists := m.neighbors[nbr.ID()]; exists {
+	if _, exists := m.neighbors[nbr.Identity.ID()]; exists {
 		return ierrors.WithStack(ErrDuplicateNeighbor)
 	}
-	m.neighbors[nbr.ID()] = nbr
+	m.neighbors[nbr.Identity.ID()] = nbr
 
 	return nil
 }

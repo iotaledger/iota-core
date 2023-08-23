@@ -19,8 +19,11 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/libp2putil"
+	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/network/autopeering"
 	"github.com/iotaledger/iota-core/pkg/network/manualpeering"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
+	"github.com/iotaledger/iota-core/pkg/protocol"
 )
 
 func init() {
@@ -46,8 +49,10 @@ type dependencies struct {
 
 	LocalPeer        *peer.Local
 	ManualPeeringMgr *manualpeering.Manager
+	AutoPeeringMgr   *autopeering.Manager
 	P2PManager       *p2p.Manager
 	PeerDB           *peer.DB
+	Protocol         *protocol.Protocol
 	PeerDBKVSTore    kvstore.KVStore `name:"peerDBKVStore"`
 }
 
@@ -59,8 +64,23 @@ func provide(c *dig.Container) error {
 		P2PManager *p2p.Manager
 	}
 
+	type autoPeeringDeps struct {
+		dig.In
+
+		Protocol         *protocol.Protocol
+		ManualPeeringMgr *manualpeering.Manager
+		Host             host.Host
+		PeerDB           *peer.DB
+	}
+
 	if err := c.Provide(func(deps manualPeeringDeps) *manualpeering.Manager {
 		return manualpeering.NewManager(deps.P2PManager, deps.LocalPeer, Component.WorkerPool, Component.Logger())
+	}); err != nil {
+		return err
+	}
+
+	if err := c.Provide(func(deps autoPeeringDeps) *autopeering.Manager {
+		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.ManualPeeringMgr, deps.Host, deps.PeerDB, Component.Logger())
 	}); err != nil {
 		return err
 	}
@@ -177,12 +197,12 @@ func configure() error {
 	// log the p2p events
 	deps.P2PManager.NeighborGroupEvents(p2p.NeighborsGroupAuto).NeighborAdded.Hook(func(event *p2p.NeighborAddedEvent) {
 		n := event.Neighbor
-		Component.LogInfof("Neighbor added: %s / %s", p2p.GetAddress(n.Peer), n.ID())
+		Component.LogInfof("Neighbor added: %s / %s", n.PeerAddresses, n.Identity.ID())
 	}, event.WithWorkerPool(Component.WorkerPool))
 
 	deps.P2PManager.NeighborGroupEvents(p2p.NeighborsGroupAuto).NeighborRemoved.Hook(func(event *p2p.NeighborRemovedEvent) {
 		n := event.Neighbor
-		Component.LogInfof("Neighbor removed: %s / %s", p2p.GetAddress(n.Peer), n.ID())
+		Component.LogInfof("Neighbor removed: %s / %s", n.PeerAddresses, n.Identity.ID())
 	}, event.WithWorkerPool(Component.WorkerPool))
 
 	return nil
@@ -191,6 +211,7 @@ func configure() error {
 func run() error {
 	if err := Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		deps.ManualPeeringMgr.Start()
+		deps.AutoPeeringMgr.Start(ctx)
 		defer func() {
 			if err := deps.ManualPeeringMgr.Stop(); err != nil {
 				Component.LogErrorf("Failed to stop the manager", "err", err)
@@ -199,7 +220,6 @@ func run() error {
 		//nolint:contextcheck // false positive
 		addPeersFromConfigToManager(deps.ManualPeeringMgr)
 		<-ctx.Done()
-
 	}, daemon.PriorityManualPeering); err != nil {
 		Component.LogErrorfAndExit("Failed to start as daemon: %s", err)
 	}
@@ -235,6 +255,7 @@ func run() error {
 }
 
 func addPeersFromConfigToManager(mgr *manualpeering.Manager) {
+	TODO: peers address format now changed!
 	peers, err := getKnownPeersFromConfig()
 	if err != nil {
 		Component.LogErrorf("Failed to get known peers from the config file, continuing without them...", "err", err)
@@ -247,11 +268,11 @@ func addPeersFromConfigToManager(mgr *manualpeering.Manager) {
 	}
 }
 
-func getKnownPeersFromConfig() ([]*manualpeering.KnownPeerToAdd, error) {
+func getKnownPeersFromConfig() ([]*network.PeerDescriptor, error) {
 	if ParamsPeers.KnownPeers == "" {
-		return []*manualpeering.KnownPeerToAdd{}, nil
+		return []*network.PeerDescriptor{}, nil
 	}
-	var peers []*manualpeering.KnownPeerToAdd
+	var peers []*network.PeerDescriptor
 	if err := json.Unmarshal([]byte(ParamsPeers.KnownPeers), &peers); err != nil {
 		return nil, ierrors.Wrap(err, "can't parse peers from json")
 	}

@@ -2,10 +2,10 @@ package dashboard
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -14,7 +14,6 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
-	"github.com/iotaledger/hive.go/autopeering/peer/service"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/pkg/daemon"
@@ -35,9 +34,7 @@ func init() {
 	}
 }
 
-var (
-	NodeStartupTimestamp = time.Now()
-)
+var NodeStartupTimestamp = time.Now()
 
 var (
 	Component *app.Component
@@ -193,11 +190,9 @@ func neighborMetrics() []neighbormetric {
 		//	}
 		// }
 
-		host := neighbor.Peer.IP().String()
-		port := neighbor.Peer.Services().Get(service.P2PKey).Port()
 		stats = append(stats, neighbormetric{
-			ID:               neighbor.Peer.ID().String(),
-			Address:          net.JoinHostPort(host, strconv.Itoa(port)),
+			ID:               neighbor.Peer.Identity.ID().String(),
+			Addresses:        fmt.Sprintf("%s", neighbor.Peer.PeerAddresses),
 			PacketsRead:      neighbor.PacketsRead(),
 			PacketsWritten:   neighbor.PacketsWritten(),
 			ConnectionOrigin: "Inbound", // origin

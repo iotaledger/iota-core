@@ -3,13 +3,11 @@ package manualpeering
 import (
 	"bytes"
 	"context"
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/iotaledger/hive.go/autopeering/peer"
-	"github.com/iotaledger/hive.go/autopeering/peer/service"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -20,42 +18,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 )
-
-const defaultReconnectInterval = 5 * time.Second
-
-// ConnectionDirection is an enum for the type of connection between local peer and the other peer in the gossip layer.
-type ConnectionDirection string
-
-const (
-	// ConnDirectionOutbound means that the local peer dials for the connection in the gossip layer.
-	ConnDirectionOutbound ConnectionDirection = "outbound"
-	// ConnDirectionInbound means that the local peer accepts for the connection in the gossip layer.
-	ConnDirectionInbound ConnectionDirection = "inbound"
-)
-
-// ConnectionStatus is an enum for the peer connection status in the gossip layer.
-type ConnectionStatus string
-
-const (
-	// ConnStatusDisconnected means that there is no real connection established in the gossip layer for that peer.
-	ConnStatusDisconnected ConnectionStatus = "disconnected"
-	// ConnStatusConnected means that there is a real connection established in the gossip layer for that peer.
-	ConnStatusConnected ConnectionStatus = "connected"
-)
-
-// KnownPeerToAdd defines a type that is used in .AddPeer() method.
-type KnownPeerToAdd struct {
-	PublicKey ed25519.PublicKey `json:"publicKey"`
-	Address   string            `json:"address"`
-}
-
-// KnownPeer defines a peer record in the manual peering layer.
-type KnownPeer struct {
-	PublicKey     ed25519.PublicKey   `json:"publicKey"`
-	Address       string              `json:"address"`
-	ConnDirection ConnectionDirection `json:"connectionDirection"`
-	ConnStatus    ConnectionStatus    `json:"connectionStatus"`
-}
 
 // Manager is the core entity in the manual peering package.
 // It holds a list of known peers and constantly provisions it to the gossip layer.
@@ -76,7 +38,7 @@ type Manager struct {
 	isStopped         bool
 	reconnectInterval time.Duration
 	knownPeersMutex   syncutils.RWMutex
-	knownPeers        map[network.PeerID]*knownPeer
+	knownPeers        map[network.PeerID]*network.Peer
 	workerPool        *workerpool.WorkerPool
 
 	onGossipNeighborRemovedHook *event.Hook[func(*p2p.NeighborRemovedEvent)]
@@ -89,8 +51,8 @@ func NewManager(p2pm *p2p.Manager, local *peer.Local, workerPool *workerpool.Wor
 		p2pm:              p2pm,
 		local:             local,
 		log:               log,
-		reconnectInterval: defaultReconnectInterval,
-		knownPeers:        map[network.PeerID]*knownPeer{},
+		reconnectInterval: network.DefaultReconnectInterval,
+		knownPeers:        map[network.PeerID]*network.Peer{},
 		workerPool:        workerPool,
 	}
 
@@ -98,7 +60,7 @@ func NewManager(p2pm *p2p.Manager, local *peer.Local, workerPool *workerpool.Wor
 }
 
 // AddPeer adds multiple peers to the list of known peers.
-func (m *Manager) AddPeer(peers ...*KnownPeerToAdd) error {
+func (m *Manager) AddPeer(peers ...*network.PeerDescriptor) error {
 	var resultErr error
 	for _, p := range peers {
 		if err := m.addPeer(p); err != nil {
@@ -157,19 +119,19 @@ func WithOnlyConnectedPeers() GetPeersOption {
 }
 
 // GetPeers returns the list of known peers.
-func (m *Manager) GetPeers(opts ...GetPeersOption) []*KnownPeer {
+func (m *Manager) GetPeers(opts ...GetPeersOption) []*network.KnownPeer {
 	conf := BuildGetPeersConfig(opts)
 	m.knownPeersMutex.RLock()
 	defer m.knownPeersMutex.RUnlock()
 
-	peers := make([]*KnownPeer, 0, len(m.knownPeers))
+	peers := make([]*network.KnownPeer, 0, len(m.knownPeers))
 	for _, kp := range m.knownPeers {
-		connStatus := kp.getConnStatus()
-		if !conf.OnlyConnected || connStatus == ConnStatusConnected {
-			peers = append(peers, &KnownPeer{
-				PublicKey:     kp.peer.PublicKey(),
-				Address:       kp.peerAddress,
-				ConnDirection: kp.connDirection,
+		connStatus := kp.GetConnStatus()
+		if !conf.OnlyConnected || connStatus == network.ConnStatusConnected {
+			peers = append(peers, &network.KnownPeer{
+				PublicKey:     kp.Identity.PublicKey(),
+				Addresses:     kp.PeerAddresses,
+				ConnDirection: kp.ConnDirection,
 				ConnStatus:    connStatus,
 			})
 		}
@@ -211,48 +173,7 @@ func (m *Manager) Stop() (err error) {
 	return err
 }
 
-type knownPeer struct {
-	peer          *peer.Peer
-	peerAddress   string
-	connDirection ConnectionDirection
-	connStatus    *atomic.Value
-	removeCh      chan struct{}
-	doneCh        chan struct{}
-}
-
-func newKnownPeer(p *KnownPeerToAdd, connDirection ConnectionDirection) (*knownPeer, error) {
-	tcpAddress, err := net.ResolveTCPAddr("tcp", p.Address)
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to parse peer address")
-	}
-	services := service.New()
-	// Peering key is required in order to initialize a peer,
-	// but it's not used in both manual peering and gossip layers so we just specify the default one.
-	services.Update(service.PeeringKey, "tcp", 14626)
-	services.Update(service.P2PKey, tcpAddress.Network(), tcpAddress.Port)
-	kp := &knownPeer{
-		peer:          peer.NewPeer(identity.New(p.PublicKey), tcpAddress.IP, services),
-		peerAddress:   p.Address,
-		connDirection: connDirection,
-		connStatus:    &atomic.Value{},
-		removeCh:      make(chan struct{}),
-		doneCh:        make(chan struct{}),
-	}
-	kp.setConnStatus(ConnStatusDisconnected)
-
-	return kp, nil
-}
-
-func (kp *knownPeer) getConnStatus() ConnectionStatus {
-	//nolint:forcetypeassert // we do not care
-	return kp.connStatus.Load().(ConnectionStatus)
-}
-
-func (kp *knownPeer) setConnStatus(cs ConnectionStatus) {
-	kp.connStatus.Store(cs)
-}
-
-func (m *Manager) addPeer(p *KnownPeerToAdd) error {
+func (m *Manager) addPeer(p *network.PeerDescriptor) error {
 	if !m.isStarted.Load() {
 		return ierrors.New("manual peering manager hasn't been started yet")
 	}
@@ -271,17 +192,17 @@ func (m *Manager) addPeer(p *KnownPeerToAdd) error {
 	if err != nil {
 		return ierrors.WithStack(err)
 	}
-	kp, err := newKnownPeer(p, connDirection)
+	kp, err := network.NewPeer(p, connDirection)
 	if err != nil {
 		return ierrors.WithStack(err)
 	}
-	if _, exists := m.knownPeers[kp.peer.ID()]; exists {
+	if _, exists := m.knownPeers[kp.Identity.ID()]; exists {
 		return nil
 	}
 	m.log.Infow("Adding new peer to the list of known peers in manual peering", "peer", p)
-	m.knownPeers[kp.peer.ID()] = kp
+	m.knownPeers[kp.Identity.ID()] = kp
 	go func() {
-		defer close(kp.doneCh)
+		defer close(kp.DoneCh)
 		m.keepPeerConnected(kp)
 	}()
 
@@ -320,8 +241,8 @@ func (m *Manager) removePeerByID(peerID network.PeerID) error {
 		return nil
 	}
 	delete(m.knownPeers, peerID)
-	close(kp.removeCh)
-	<-kp.doneCh
+	close(kp.RemoveCh)
+	<-kp.DoneCh
 	if err := m.p2pm.DropNeighbor(peerID, p2p.NeighborsGroupManual); err != nil && !ierrors.Is(err, p2p.ErrUnknownNeighbor) {
 		return ierrors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID)
 	}
@@ -329,10 +250,10 @@ func (m *Manager) removePeerByID(peerID network.PeerID) error {
 	return nil
 }
 
-func (m *Manager) keepPeerConnected(kp *knownPeer) {
+func (m *Manager) keepPeerConnected(p *network.Peer) {
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	cancelContextOnRemove := func() {
-		<-kp.removeCh
+		<-p.RemoveCh
 		ctxCancel()
 	}
 	go cancelContextOnRemove()
@@ -340,29 +261,32 @@ func (m *Manager) keepPeerConnected(kp *knownPeer) {
 	ticker := time.NewTicker(m.reconnectInterval)
 	defer ticker.Stop()
 
-	peerID := kp.peer.ID()
+	peerID := p.Identity.ID()
 	for {
-		if kp.getConnStatus() == ConnStatusDisconnected {
+		if p.GetConnStatus() == network.ConnStatusDisconnected {
 			m.log.Infow(
 				"Peer is disconnected, calling gossip layer to establish the connection",
-				"peer", kp.peer, "connectionDirection", kp.connDirection,
+				"peer", p.Identity.ID(), "connectionDirection", p.ConnDirection,
 			)
+
 			var err error
-			if kp.connDirection == ConnDirectionOutbound {
-				err = m.p2pm.AddOutbound(ctx, kp.peer, p2p.NeighborsGroupManual)
-			} else if kp.connDirection == ConnDirectionInbound {
-				err = m.p2pm.AddInbound(ctx, kp.peer, p2p.NeighborsGroupManual, p2p.WithNoDefaultTimeout())
+			switch p.ConnDirection {
+			case network.ConnDirectionOutbound:
+				err = m.p2pm.AddOutbound(ctx, p, p2p.NeighborsGroupManual)
+			case network.ConnDirectionInbound:
+				err = m.p2pm.AddInbound(ctx, p, p2p.NeighborsGroupManual, p2p.WithNoDefaultTimeout())
 			}
+
 			if err != nil && !ierrors.Is(err, p2p.ErrDuplicateNeighbor) && !ierrors.Is(err, context.Canceled) {
 				m.log.Errorw(
 					"Failed to connect a neighbor in the gossip layer",
-					"peerID", peerID, "connectionDirection", kp.connDirection, "err", err,
+					"peerID", peerID, "connectionDirection", p.ConnDirection, "err", err,
 				)
 			}
 		}
 		select {
 		case <-ticker.C:
-		case <-kp.removeCh:
+		case <-p.RemoveCh:
 			<-ctx.Done()
 			return
 		}
@@ -370,29 +294,29 @@ func (m *Manager) keepPeerConnected(kp *knownPeer) {
 }
 
 func (m *Manager) onGossipNeighborRemoved(neighbor *p2p.Neighbor) {
-	m.changeNeighborStatus(neighbor, ConnStatusDisconnected)
+	m.changeNeighborStatus(neighbor, network.ConnStatusDisconnected)
 }
 
 func (m *Manager) onGossipNeighborAdded(neighbor *p2p.Neighbor) {
-	m.changeNeighborStatus(neighbor, ConnStatusConnected)
+	m.changeNeighborStatus(neighbor, network.ConnStatusConnected)
 	m.log.Infow(
 		"Gossip layer successfully connected with the peer",
 		"peer", neighbor.Peer,
 	)
 }
 
-func (m *Manager) changeNeighborStatus(neighbor *p2p.Neighbor, connStatus ConnectionStatus) {
+func (m *Manager) changeNeighborStatus(neighbor *p2p.Neighbor, connStatus network.ConnectionStatus) {
 	m.knownPeersMutex.RLock()
 	defer m.knownPeersMutex.RUnlock()
 
-	kp, exists := m.knownPeers[neighbor.ID()]
+	kp, exists := m.knownPeers[neighbor.Identity.ID()]
 	if !exists {
 		return
 	}
-	kp.setConnStatus(connStatus)
+	kp.SetConnStatus(connStatus)
 }
 
-func (m *Manager) connectionDirection(peerPK ed25519.PublicKey) (ConnectionDirection, error) {
+func (m *Manager) connectionDirection(peerPK ed25519.PublicKey) (network.ConnectionDirection, error) {
 	pkBytes, err := m.local.PublicKey().Bytes()
 	if err != nil {
 		return "", err
@@ -405,9 +329,9 @@ func (m *Manager) connectionDirection(peerPK ed25519.PublicKey) (ConnectionDirec
 
 	result := bytes.Compare(pkBytes, peerPKBytes)
 	if result < 0 {
-		return ConnDirectionOutbound, nil
+		return network.ConnDirectionOutbound, nil
 	} else if result > 0 {
-		return ConnDirectionInbound, nil
+		return network.ConnDirectionInbound, nil
 	} else {
 		return "", ierrors.Errorf(
 			"manual peering: provided neighbor public key %s is the same as the local %s: can't compare lexicographically",

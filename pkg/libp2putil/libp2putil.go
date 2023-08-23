@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/iota-core/pkg/network"
 )
 
 // GetLibp2pIdentity returns libp2p Host option for Identity from local peer object.
@@ -41,8 +42,8 @@ func ToLibp2pPrivateKey(ourPrivateKey ed25519.PrivateKey) (libp2pcrypto.PrivKey,
 }
 
 // ToLibp2pPeerID computes libp2p peer ID from our peer object.
-func ToLibp2pPeerID(p *peer.Peer) (libp2ppeer.ID, error) {
-	pubKeyBytes, err := p.PublicKey().Bytes()
+func ToLibp2pPeerID(p *network.Peer) (libp2ppeer.ID, error) {
+	pubKeyBytes, err := p.Identity.PublicKey().Bytes()
 	if err != nil {
 		return "", ierrors.WithStack(err)
 	}

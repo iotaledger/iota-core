@@ -2,25 +2,20 @@ package p2p
 
 import (
 	"context"
-	"fmt"
-	"net"
-	"strconv"
 	"sync"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/network"
+	p2pnetwork "github.com/libp2p/go-libp2p/core/network"
 	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/atomic"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/iotaledger/hive.go/autopeering/peer"
-	"github.com/iotaledger/hive.go/autopeering/peer/service"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/libp2putil"
+	"github.com/iotaledger/iota-core/pkg/network"
 	pp "github.com/iotaledger/iota-core/pkg/network/p2p/proto"
 )
 
@@ -38,26 +33,17 @@ var (
 	ErrNoP2P = ierrors.New("peer does not have a p2p service")
 )
 
-func (m *Manager) dialPeer(ctx context.Context, p *peer.Peer, opts []ConnectPeerOption) (map[protocol.ID]*PacketsStream, error) {
+func (m *Manager) dialPeer(ctx context.Context, p *network.Peer, opts []ConnectPeerOption) (map[protocol.ID]*PacketsStream, error) {
 	m.registeredProtocolsMutex.RLock()
 	defer m.registeredProtocolsMutex.RUnlock()
 
 	conf := buildConnectPeerConfig(opts)
-	p2pEndpoint := p.Services().Get(service.P2PKey)
-	if p2pEndpoint == nil {
-		return nil, ErrNoP2P
-	}
 	libp2pID, err := libp2putil.ToLibp2pPeerID(p)
 	if err != nil {
 		return nil, ierrors.WithStack(err)
 	}
 
-	addressStr := fmt.Sprintf("/ip4/%s/tcp/%d", p.IP(), p2pEndpoint.Port())
-	address, err := multiaddr.NewMultiaddr(addressStr)
-	if err != nil {
-		return nil, err
-	}
-	m.libp2pHost.Peerstore().AddAddr(libp2pID, address, peerstore.ConnectedAddrTTL)
+	m.libp2pHost.Peerstore().AddAddrs(libp2pID, p.PeerAddresses, peerstore.ConnectedAddrTTL)
 
 	if conf.useDefaultTimeout {
 		var cancel context.CancelFunc
@@ -69,11 +55,11 @@ func (m *Manager) dialPeer(ctx context.Context, p *peer.Peer, opts []ConnectPeer
 	for protocolID := range m.registeredProtocols {
 		stream, err := m.initiateStream(ctx, libp2pID, protocolID)
 		if err != nil {
-			m.log.Errorf("dial %s / %s failed for proto %s: %w", address, p.ID(), protocolID, err)
+			m.log.Errorf("dial %s / %s failed for proto %s: %w", p.PeerAddresses, p.Identity.ID(), protocolID, err)
 			continue
 		}
 		m.log.Debugw("outgoing stream negotiated",
-			"id", p.ID(),
+			"id", p.Identity.ID(),
 			"addr", stream.Conn().RemoteMultiaddr(),
 			"proto", protocolID,
 		)
@@ -81,20 +67,15 @@ func (m *Manager) dialPeer(ctx context.Context, p *peer.Peer, opts []ConnectPeer
 	}
 
 	if len(streams) == 0 {
-		return nil, ierrors.Errorf("no streams initiated with peer %s / %s", address, p.ID())
+		return nil, ierrors.Errorf("no streams initiated with peer %s / %s", p.PeerAddresses, p.Identity.ID())
 	}
 
 	return streams, nil
 }
 
-func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPeerOption) (map[protocol.ID]*PacketsStream, error) {
+func (m *Manager) acceptPeer(ctx context.Context, p *network.Peer, opts []ConnectPeerOption) (map[protocol.ID]*PacketsStream, error) {
 	m.registeredProtocolsMutex.RLock()
 	defer m.registeredProtocolsMutex.RUnlock()
-
-	p2pEndpoint := p.Services().Get(service.P2PKey)
-	if p2pEndpoint == nil {
-		return nil, ErrNoP2P
-	}
 
 	handleInboundStream := func(ctx context.Context, protocolID protocol.ID) (*PacketsStream, error) {
 		if buildConnectPeerConfig(opts).useDefaultTimeout {
@@ -111,7 +92,7 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 		}
 		defer m.removeAcceptMatcher(am, protocolID)
 
-		m.log.Debugw("waiting for incoming stream", "id", am.Peer.ID(), "proto", protocolID)
+		m.log.Debugw("waiting for incoming stream", "id", am.Peer.Identity.ID(), "proto", protocolID)
 		am.StreamChMutex.RLock()
 		streamCh := am.StreamCh[protocolID]
 		am.StreamChMutex.RUnlock()
@@ -125,10 +106,10 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 		case <-amCtx.Done():
 			err := amCtx.Err()
 			if ierrors.Is(err, context.DeadlineExceeded) {
-				m.log.Debugw("accept timeout", "id", am.Peer.ID(), "proto", protocolID)
+				m.log.Debugw("accept timeout", "id", am.Peer.Identity.ID(), "proto", protocolID)
 				return nil, ierrors.WithStack(ErrTimeout)
 			}
-			m.log.Debugw("context error", "id", am.Peer.ID(), "err", err)
+			m.log.Debugw("context error", "id", am.Peer.Identity.ID(), "err", err)
 
 			return nil, ierrors.WithStack(err)
 		}
@@ -144,8 +125,8 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 			if err != nil {
 				m.log.Errorf(
 					"accept %s / %s proto %s failed: %s",
-					net.JoinHostPort(p.IP().String(), strconv.Itoa(p2pEndpoint.Port())),
-					p.ID(),
+					p.PeerAddresses,
+					p.Identity.ID(),
 					protocolID,
 					err,
 				)
@@ -153,7 +134,7 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 				return
 			}
 			m.log.Debugw("incoming stream negotiated",
-				"id", p.ID(),
+				"id", p.Identity.ID(),
 				"addr", stream.Conn().RemoteMultiaddr(),
 				"proto", protocolID,
 			)
@@ -169,7 +150,7 @@ func (m *Manager) acceptPeer(ctx context.Context, p *peer.Peer, opts []ConnectPe
 	}
 
 	if len(streams) == 0 {
-		return nil, ierrors.Errorf("no streams accepted from peer %s", p.ID())
+		return nil, ierrors.Errorf("no streams accepted from peer %s", p.Identity.ID())
 	}
 
 	return streams, nil
@@ -195,7 +176,7 @@ func (m *Manager) initiateStream(ctx context.Context, libp2pID libp2ppeer.ID, pr
 	return ps, nil
 }
 
-func (m *Manager) handleStream(stream network.Stream) {
+func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 	m.registeredProtocolsMutex.RLock()
 	defer m.registeredProtocolsMutex.RUnlock()
 
@@ -223,7 +204,7 @@ func (m *Manager) handleStream(stream network.Stream) {
 		select {
 		case <-am.Ctx.Done():
 		case streamCh <- ps:
-			m.log.Debugw("incoming stream matched", "id", am.Peer.ID(), "proto", protocolID)
+			m.log.Debugw("incoming stream matched", "id", am.Peer.Identity.ID(), "proto", protocolID)
 		}
 	} else {
 		// close the connection if not matched
@@ -236,7 +217,7 @@ func (m *Manager) handleStream(stream network.Stream) {
 
 // AcceptMatcher holds data to match an existing connection with a peer.
 type AcceptMatcher struct {
-	Peer          *peer.Peer // connecting peer
+	Peer          *network.Peer // connecting peer
 	Libp2pID      libp2ppeer.ID
 	StreamChMutex syncutils.RWMutex
 	StreamCh      map[protocol.ID]chan *PacketsStream
@@ -244,7 +225,7 @@ type AcceptMatcher struct {
 	CtxCancel     context.CancelFunc
 }
 
-func (m *Manager) newAcceptMatcher(ctx context.Context, p *peer.Peer, protocolID protocol.ID) (context.Context, *AcceptMatcher, error) {
+func (m *Manager) newAcceptMatcher(ctx context.Context, p *network.Peer, protocolID protocol.ID) (context.Context, *AcceptMatcher, error) {
 	m.acceptMutex.Lock()
 	defer m.acceptMutex.Unlock()
 
@@ -299,7 +280,7 @@ func (m *Manager) removeAcceptMatcher(am *AcceptMatcher, protocolID protocol.ID)
 	}
 }
 
-func (m *Manager) matchNewStream(stream network.Stream) *AcceptMatcher {
+func (m *Manager) matchNewStream(stream p2pnetwork.Stream) *AcceptMatcher {
 	m.acceptMutex.RLock()
 	defer m.acceptMutex.RUnlock()
 	am := m.acceptMap[stream.Conn().RemotePeer()]
@@ -307,7 +288,7 @@ func (m *Manager) matchNewStream(stream network.Stream) *AcceptMatcher {
 	return am
 }
 
-func (m *Manager) closeStream(s network.Stream) {
+func (m *Manager) closeStream(s p2pnetwork.Stream) {
 	if err := s.Close(); err != nil {
 		m.log.Warnw("close error", "err", err)
 	}
@@ -315,7 +296,7 @@ func (m *Manager) closeStream(s network.Stream) {
 
 // PacketsStream represents a stream of packets.
 type PacketsStream struct {
-	network.Stream
+	p2pnetwork.Stream
 	packetFactory func() proto.Message
 
 	readerLock     syncutils.Mutex
@@ -327,7 +308,7 @@ type PacketsStream struct {
 }
 
 // NewPacketsStream creates a new PacketsStream.
-func NewPacketsStream(stream network.Stream, packetFactory func() proto.Message) *PacketsStream {
+func NewPacketsStream(stream p2pnetwork.Stream, packetFactory func() proto.Message) *PacketsStream {
 	return &PacketsStream{
 		Stream:         stream,
 		packetFactory:  packetFactory,
