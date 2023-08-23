@@ -174,14 +174,6 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
 	})
 
-	events.ChainManager.CommitmentMissing.Hook(func(commitmentID iotago.CommitmentID) {
-		fmt.Printf("%s > ChainManager.CommitmentMissing: %s\n", n.Name, commitmentID)
-	})
-
-	events.ChainManager.MissingCommitmentReceived.Hook(func(commitmentID iotago.CommitmentID) {
-		fmt.Printf("%s > ChainManager.MissingCommitmentReceived: %s\n", n.Name, commitmentID)
-	})
-
 	events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
 		fmt.Printf("%s > ChainManager.CommitmentBelowRoot: %s\n", n.Name, commitmentID)
 	})
