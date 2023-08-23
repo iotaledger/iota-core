@@ -43,13 +43,17 @@ type Scheduler struct {
 
 	blockCache *blocks.Blocks
 
+	errorHandler func(error)
+
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engine, scheduler.Scheduler] {
 	return module.Provide(func(e *engine.Engine) scheduler.Scheduler {
 		s := New(e, opts...)
+		s.errorHandler = e.ErrorHandler("scheduler")
 		s.buffer = NewBufferQueue(int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize))
+
 		e.HookConstructed(func() {
 			s.blockCache = e.BlockCache
 			e.Events.Scheduler.LinkTo(s.events)
@@ -210,12 +214,24 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	if err != nil {
 		// this should only ever happen if the issuer has been removed due to insufficient Mana.
 		// if Mana is now sufficient again, we can add the issuer again.
-		if _, err := s.quantumFunc(issuerID, slotIndex); err == nil {
-			issuerQueue = s.createIssuer(issuerID)
+		_, quantumErr := s.quantumFunc(issuerID, slotIndex)
+		if quantumErr != nil {
+			s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve quantum for issuerID %s in slot %d when adding a block", issuerID, slotIndex))
 		}
+
+		issuerQueue = s.createIssuer(issuerID)
 	}
 
-	droppedBlocks, err := s.buffer.Submit(block, issuerQueue, func(issuerID iotago.AccountID) (Deficit, error) { return s.quantumFunc(issuerID, slotIndex) })
+	droppedBlocks, err := s.buffer.Submit(block, issuerQueue, func(issuerID iotago.AccountID) Deficit {
+		quantum, quantumErr := s.quantumFunc(issuerID, slotIndex)
+		if quantumErr != nil {
+			s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve deficit for issuerID %d in slot %d when submitting a block", issuerID, slotIndex))
+
+			return 0
+		}
+
+		return quantum
+	})
 	// error submitting indicates that the block was already submitted so we do nothing else.
 	if err != nil {
 		return
@@ -299,7 +315,9 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 		for q := start; ; {
 			issuerID := q.IssuerID()
 			if err := s.incrementDeficit(issuerID, rounds, slotIndex); err != nil {
+				s.errorHandler(ierrors.Wrapf(err, "failed to increment deficit for issuerID %s in slot %d", issuerID, slotIndex))
 				s.removeIssuer(issuerID, err)
+
 				q = s.buffer.Current()
 			} else {
 				q = s.buffer.Next()
@@ -316,6 +334,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	for q := start; q != schedulingIssuer; q = s.buffer.Next() {
 		issuerID := q.IssuerID()
 		if err := s.incrementDeficit(issuerID, 1, slotIndex); err != nil {
+			s.errorHandler(ierrors.Wrapf(err, "failed to increment deficit for issuerID %s in slot %d", issuerID, slotIndex))
 			s.removeIssuer(issuerID, err)
 
 			return
@@ -326,6 +345,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	block := s.buffer.PopFront()
 	issuerID := block.ProtocolBlock().IssuerID
 	err := s.updateDeficit(issuerID, -s.deficitFromWork(block.WorkScore()))
+
 	if err != nil {
 		// if something goes wrong with deficit update, drop the block instead of scheduling it.
 		block.SetDropped()
@@ -371,6 +391,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex)
 			// calculate how many rounds we need to skip to accumulate enough deficit.
 			quantum, err := s.quantumFunc(issuerID, slotIndex)
 			if err != nil {
+				s.errorHandler(ierrors.Wrapf(err, "failed to retrieve quantum for issuerID %s in slot %d during issuer selection", issuerID, slotIndex))
 				// if quantum, can't be retrieved, we need to remove this issuer.
 				s.removeIssuer(issuerID, err)
 				issuerRemoved = true
@@ -380,8 +401,9 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex)
 
 			denom, err := safemath.SafeAdd(remainingDeficit, quantum-1)
 			if err != nil {
-				denom = s.maxDeficit()
+				denom = math.MaxInt64
 			}
+
 			r, err := safemath.SafeDiv(denom, quantum)
 			if err != nil {
 				panic(err)
@@ -443,16 +465,16 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) err
 			updateErr = ierrors.Errorf("could not get deficit for issuer %s", accountID)
 			return 0
 		}
-
 		newDeficit, err := safemath.SafeAdd(currentValue, delta)
 		if err != nil {
-			// if underflow, update error
-			if delta < 0 {
-				updateErr = ierrors.Errorf("deficit for issuer %s decreased below zero", accountID)
-				return 0
-			}
-			// overflow, set to max deficit
+			// It can only overflow. We never allow the value to go below 0, so underflow is impossible.
 			return s.maxDeficit()
+		}
+
+		// If the new deficit is negative, it could only be a result of subtraction and an error should be returned.
+		if newDeficit < 0 {
+			updateErr = ierrors.Errorf("deficit for issuer %s decreased below zero", accountID)
+			return 0
 		}
 
 		return lo.Min(newDeficit, s.maxDeficit())
