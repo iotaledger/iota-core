@@ -15,8 +15,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) assertParentsCommitmentExistFromBlockOptions(blockOpts []options.Option[blockfactory.BlockParams], node *mock.Node) {
-	params := options.Apply(&blockfactory.BlockParams{}, blockOpts)
+func (t *TestSuite) assertParentsCommitmentExistFromBlockOptions(blockOpts []options.Option[blockfactory.BlockHeaderParams], node *mock.Node) {
+	params := options.Apply(&blockfactory.BlockHeaderParams{}, blockOpts)
 	parents := params.References[iotago.StrongParentType]
 	parents = append(parents, params.References[iotago.WeakParentType]...)
 	parents = append(parents, params.References[iotago.ShallowLikeParentType]...)
@@ -26,8 +26,8 @@ func (t *TestSuite) assertParentsCommitmentExistFromBlockOptions(blockOpts []opt
 	}
 }
 
-func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Option[blockfactory.BlockParams], node *mock.Node) {
-	params := options.Apply(&blockfactory.BlockParams{}, blockOpts)
+func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Option[blockfactory.BlockHeaderParams], node *mock.Node) {
+	params := options.Apply(&blockfactory.BlockHeaderParams{}, blockOpts)
 	parents := params.References[iotago.StrongParentType]
 	parents = append(parents, params.References[iotago.WeakParentType]...)
 	parents = append(parents, params.References[iotago.ShallowLikeParentType]...)
@@ -35,8 +35,8 @@ func (t *TestSuite) assertParentsExistFromBlockOptions(blockOpts []options.Optio
 	t.AssertBlocksExist(t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...), true, node)
 }
 
-func (t *TestSuite) limitParentsCountInBlockOptions(blockOpts []options.Option[blockfactory.BlockParams], maxCount int) []options.Option[blockfactory.BlockParams] {
-	params := options.Apply(&blockfactory.BlockParams{}, blockOpts)
+func (t *TestSuite) limitParentsCountInBlockOptions(blockOpts []options.Option[blockfactory.BlockHeaderParams], maxCount int) []options.Option[blockfactory.BlockHeaderParams] {
+	params := options.Apply(&blockfactory.BlockHeaderParams{}, blockOpts)
 	if len(params.References[iotago.StrongParentType]) > maxCount {
 		blockOpts = append(blockOpts, blockfactory.WithStrongParents(params.References[iotago.StrongParentType][:maxCount]...))
 	}
@@ -62,7 +62,7 @@ func (t *TestSuite) registerBlock(alias string, block *blocks.Block) {
 	block.ID().RegisterAlias(alias)
 }
 
-func (t *TestSuite) CreateBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) {
+func (t *TestSuite) CreateBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.BasicBlockParams]) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -84,9 +84,9 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 
 	var block *blocks.Block
 	if node.Validator {
-		block = node.IssueValidationBlock(context.Background(), alias, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...))
+		block = node.IssueValidationBlock(context.Background(), alias, blockfactory.WithValidationBlockHeaderOptions(blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...)))
 	} else {
-		block = node.IssueBlock(context.Background(), alias, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...))
+		block = node.IssueBlock(context.Background(), alias, blockfactory.WithBasicBlockHeader(blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment), blockfactory.WithStrongParents(parents...)))
 	}
 
 	t.registerBlock(alias, block)
@@ -94,82 +94,7 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	return block
 }
 
-func (t *TestSuite) IssueValidationBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
-	t.assertParentsExistFromBlockOptions(blockOpts, node)
-	t.assertParentsCommitmentExistFromBlockOptions(blockOpts, node)
-
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	timeProvider := t.API.TimeProvider()
-
-	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
-
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
-
-	block := node.IssueValidationBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime))...)
-
-	t.registerBlock(alias, block)
-
-	return block
-}
-
-func (t *TestSuite) IssueBasicBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
-	t.assertParentsExistFromBlockOptions(blockOpts, node)
-	t.assertParentsCommitmentExistFromBlockOptions(blockOpts, node)
-
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	timeProvider := t.API.TimeProvider()
-
-	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
-
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
-
-	block := node.IssueBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime))...)
-
-	t.registerBlock(alias, block)
-
-	return block
-}
-
-func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
-	t.assertParentsExistFromBlockOptions(blockOpts, node)
-
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	timeProvider := t.API.TimeProvider()
-	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
-
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
-
-	block := node.IssueBlock(context.Background(), alias, append(blockOpts, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment))...)
-
-	t.registerBlock(alias, block)
-
-	return block
-}
-
-func (t *TestSuite) IssueBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
-	t.assertParentsExistFromBlockOptions(blockOpts, node)
-
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	block := node.IssueBlock(context.Background(), alias, blockOpts...)
-
-	t.registerBlock(alias, block)
-
-	return block
-}
-
-func (t *TestSuite) IssueValidationBlock(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.BlockParams]) *blocks.Block {
-	t.assertParentsExistFromBlockOptions(blockOpts, node)
-
-	require.Truef(t.Testing, node.Validator, "node: %s: is not a validator node", node.Name)
-
+func (t *TestSuite) IssueValidationBlockWithOptions(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -180,19 +105,84 @@ func (t *TestSuite) IssueValidationBlock(alias string, node *mock.Node, blockOpt
 	return block
 }
 
-func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, row int, parentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) []*blocks.Block {
+func (t *TestSuite) IssueBasicBlockWithOptions(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.BasicBlockParams]) *blocks.Block {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	block := node.IssueBlock(context.Background(), alias, blockOpts...)
+
+	t.registerBlock(alias, block)
+
+	return block
+}
+
+func (t *TestSuite) IssueBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, node *mock.Node, payload iotago.Payload, blockOpts ...options.Option[blockfactory.BlockHeaderParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockOpts, node)
+
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	timeProvider := t.API.TimeProvider()
+	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
+
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
+
+	block := node.IssueBlock(context.Background(), alias, blockfactory.WithBasicBlockHeader(append(blockOpts, blockfactory.WithIssuingTime(issuingTime), blockfactory.WithSlotCommitment(slotCommitment))...), blockfactory.WithPayload(payload))
+
+	t.registerBlock(alias, block)
+
+	return block
+}
+
+func (t *TestSuite) IssuePayloadWithOptions(alias string, node *mock.Node, payload iotago.Payload, blockHeaderOpts ...options.Option[blockfactory.BlockHeaderParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockHeaderOpts, node)
+
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	block := node.IssueBlock(context.Background(), alias, blockfactory.WithPayload(payload), blockfactory.WithBasicBlockHeader(blockHeaderOpts...))
+
+	t.registerBlock(alias, block)
+
+	return block
+}
+
+func (t *TestSuite) IssueValidationBlock(alias string, node *mock.Node, blockHeaderOpts ...options.Option[blockfactory.BlockHeaderParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockHeaderOpts, node)
+
+	require.Truef(t.Testing, node.Validator, "node: %s: is not a validator node", node.Name)
+
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	block := node.IssueValidationBlock(context.Background(), alias, blockfactory.WithValidationBlockHeaderOptions(blockHeaderOpts...))
+
+	t.registerBlock(alias, block)
+
+	return block
+}
+
+func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, row int, parentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[blockfactory.BlockHeaderParams]) []*blocks.Block {
 	blocksIssued := make([]*blocks.Block, 0, len(nodes))
 
 	strongParents := t.BlockIDsWithPrefix(parentsPrefixAlias)
-	issuingOptionsCopy := lo.MergeMaps(make(map[string][]options.Option[blockfactory.BlockParams]), issuingOptions)
+	issuingOptionsCopy := lo.MergeMaps(make(map[string][]options.Option[blockfactory.BlockHeaderParams]), issuingOptions)
 
 	for _, node := range nodes {
 		blockAlias := fmt.Sprintf("%s%d.%d-%s", prefix, slot, row, node.Name)
 		issuingOptionsCopy[node.Name] = append(issuingOptionsCopy[node.Name], blockfactory.WithStrongParents(strongParents...))
 
+		timeProvider := t.API.TimeProvider()
+		issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
+		require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
+
 		var b *blocks.Block
 		if node.Validator {
-			b = t.IssueValidationBlockAtSlotWithOptions(blockAlias, slot, node, issuingOptionsCopy[node.Name]...)
+			blockHeaderOptions := append(issuingOptionsCopy[node.Name], blockfactory.WithIssuingTime(issuingTime))
+			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)
+			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node)
+
+			b = t.IssueValidationBlockWithOptions(blockAlias, node, blockfactory.WithValidationBlockHeaderOptions(blockHeaderOptions...), blockfactory.WithHighestSupportedVersion(node.HighestSupportedVersion()), blockfactory.WithProtocolParametersHash(node.ProtocolParametersHash()))
 		} else {
 			txCount := t.automaticTransactionIssuingCounters.Compute(node.Partition, func(currentValue int, exists bool) int {
 				return currentValue + 1
@@ -205,10 +195,13 @@ func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, ro
 			tx, err := t.TransactionFramework.CreateSimpleTransaction(txAlias, 1, inputAlias)
 			require.NoError(t.Testing, err)
 
-			issuingOptionsCopy[node.Name] = append(issuingOptionsCopy[node.Name], blockfactory.WithPayload(tx))
 			issuingOptionsCopy[node.Name] = t.limitParentsCountInBlockOptions(issuingOptionsCopy[node.Name], iotago.BlockMaxParents)
 
-			b = t.IssueBasicBlockAtSlotWithOptions(blockAlias, slot, node, issuingOptionsCopy[node.Name]...)
+			blockHeaderOptions := append(issuingOptionsCopy[node.Name], blockfactory.WithIssuingTime(issuingTime))
+			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)
+			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node)
+
+			b = t.IssueBasicBlockWithOptions(blockAlias, node, blockfactory.WithPayload(tx), blockfactory.WithBasicBlockHeader(blockHeaderOptions...))
 		}
 		blocksIssued = append(blocksIssued, b)
 	}
@@ -216,7 +209,7 @@ func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, ro
 	return blocksIssued
 }
 
-func (t *TestSuite) IssueBlockRowsInSlot(prefix string, slot iotago.SlotIndex, rows int, initialParentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+func (t *TestSuite) IssueBlockRowsInSlot(prefix string, slot iotago.SlotIndex, rows int, initialParentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[blockfactory.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
 	var blocksIssued, lastBlockRowIssued []*blocks.Block
 	parentsPrefixAlias := initialParentsPrefixAlias
 
@@ -232,7 +225,7 @@ func (t *TestSuite) IssueBlockRowsInSlot(prefix string, slot iotago.SlotIndex, r
 	return blocksIssued, lastBlockRowIssued
 }
 
-func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[blockfactory.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
 	var blocksIssued, lastBlockRowIssued []*blocks.Block
 	parentsPrefixAlias := initialParentsPrefixAlias
 
@@ -257,7 +250,7 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 	return blocksIssued, lastBlockRowIssued
 }
 
-func (t *TestSuite) IssueBlocksAtEpoch(prefix string, epoch iotago.EpochIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[blockfactory.BlockParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+func (t *TestSuite) IssueBlocksAtEpoch(prefix string, epoch iotago.EpochIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[blockfactory.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
 	return t.IssueBlocksAtSlots(prefix, t.SlotsForEpoch(epoch), rowsPerSlot, initialParentsPrefixAlias, nodes, waitForSlotsCommitted, issuingOptions)
 }
 

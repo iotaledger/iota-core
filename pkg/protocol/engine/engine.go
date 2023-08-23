@@ -210,7 +210,6 @@ func New(
 				// on disk. We store this information that we can load blocks instead of requesting them again.
 				e.startupAvailableBlocksWindow = e.Storage.Settings().LatestCommitment().Index() + e.CurrentAPI().ProtocolParameters().MaxCommittableAge()
 			}
-
 		},
 		func(e *Engine) {
 			fmt.Println("Engine Settings", e.Storage.Settings().String())
@@ -448,8 +447,6 @@ func (e *Engine) setupEvictionState() {
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		block.ForEachParent(func(parent iotago.Parent) {
-			// TODO: ONLY ADD STRONG PARENTS AFTER NOT DOWNLOADING PAST WEAK ARROWS
-			// TODO: is this correct? could this lock acceptance in some extreme corner case? something like this happened, that confirmation is correctly advancing per block, but acceptance does not. I think it might have something to do with root blocks
 			if parent.ID.Index() < block.ID().Index() && !e.EvictionState.IsRootBlock(parent.ID) {
 				parentBlock, exists := e.Block(parent.ID)
 				if !exists {

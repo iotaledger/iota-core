@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func issueValidatorBlock(ctx context.Context) {
@@ -20,7 +19,7 @@ func issueValidatorBlock(ctx context.Context) {
 
 	// Use 'defer' because nextBroadcast is updated during function execution, and the value at the end needs to be used.
 	defer func() {
-		executor.ExecuteAt(accountID, func() { issueValidatorBlock(ctx) }, nextBroadcast)
+		executor.ExecuteAt(validatorAccount.ID(), func() { issueValidatorBlock(ctx) }, nextBroadcast)
 	}()
 
 	if !ParamsValidator.IgnoreBootstrapped && !engineInstance.IsBootstrapped() {
@@ -29,12 +28,21 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
+	protocolParametersHash, err := deps.Protocol.CurrentAPI().ProtocolParameters().Hash()
+	if err != nil {
+		Component.LogWarnf("failed to get protocol parameters hash: %s", err.Error())
+
+		return
+	}
+
 	modelBlock, err := deps.BlockIssuer.CreateValidationBlock(ctx,
-		blockfactory.WithIssuingTime(blockIssuingTime),
-		blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
-		blockfactory.WithPayload(&iotago.TaggedData{
-			Tag: []byte("VALIDATOR BLOCK"),
-		}),
+		validatorAccount,
+		blockfactory.WithValidationBlockHeaderOptions(
+			blockfactory.WithIssuingTime(blockIssuingTime),
+			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
+		),
+		blockfactory.WithProtocolParametersHash(protocolParametersHash),
+		blockfactory.WithHighestSupportedVersion(deps.Protocol.LatestAPI().Version()),
 	)
 	if err != nil {
 		Component.LogWarnf("error creating validator block: %s", err.Error())
@@ -42,7 +50,7 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	if !engineInstance.SybilProtection.SeatManager().Committee(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(accountID) {
+	if !engineInstance.SybilProtection.SeatManager().Committee(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(validatorAccount.ID()) {
 		// update nextBroadcast value here, so that this updated value is used in the `defer`
 		// callback to schedule issuing of the next block at a different interval than for committee members
 		nextBroadcast = blockIssuingTime.Add(ParamsValidator.CandidateBroadcastInterval)

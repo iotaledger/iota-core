@@ -34,9 +34,9 @@ var (
 	Component *app.Component
 	deps      dependencies
 
-	isValidator atomic.Bool
-	executor    *timed.TaskExecutor[iotago.AccountID]
-	accountID   iotago.AccountID
+	isValidator      atomic.Bool
+	executor         *timed.TaskExecutor[iotago.AccountID]
+	validatorAccount blockfactory.Account
 )
 
 type dependencies struct {
@@ -47,15 +47,12 @@ type dependencies struct {
 }
 
 func run() error {
-	accountID = deps.BlockIssuer.Account.ID()
-	// If issuer is part of the current committee, and current time is in the epoch, issue validator blocks.
-
-	// If issuer is not part of the committee and current time is in the time range for registering candidates, issue candidate blocks.
+	validatorAccount = blockfactory.AccountFromParams(ParamsValidator.Account, ParamsValidator.PrivateKey)
 
 	executor = timed.NewTaskExecutor[iotago.AccountID](1)
 
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
-		Component.LogInfof("Starting Validator with IssuerID: %s", accountID)
+		Component.LogInfof("Starting Validator with IssuerID: %s", validatorAccount.ID())
 
 		checkValidatorStatus(ctx)
 
@@ -72,9 +69,9 @@ func run() error {
 }
 
 func checkValidatorStatus(ctx context.Context) {
-	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index())
+	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(validatorAccount.ID(), deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index())
 	if err != nil {
-		Component.LogErrorf("error when retrieving BlockIssuer account %s: %w", accountID, err)
+		Component.LogErrorf("error when retrieving BlockIssuer account %s: %w", validatorAccount.ID(), err)
 
 		return
 	}
@@ -82,16 +79,16 @@ func checkValidatorStatus(ctx context.Context) {
 	if !exists || account.StakeEndEpoch <= deps.Protocol.CurrentAPI().TimeProvider().EpochFromSlot(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time.Now())) {
 		if prevValue := isValidator.Swap(false); prevValue {
 			// If the account stops being a validator, don't issue any blocks.
-			Component.LogInfof("BlockIssuer account %s stopped being a validator", accountID)
-			executor.Cancel(accountID)
+			Component.LogInfof("BlockIssuer account %s stopped being a validator", validatorAccount.ID())
+			executor.Cancel(validatorAccount.ID())
 		}
 
 		return
 	}
 
 	if prevValue := isValidator.Swap(true); !prevValue {
-		Component.LogInfof("BlockIssuer account %s became a validator", accountID)
+		Component.LogInfof("BlockIssuer account %s became a validator", validatorAccount.ID())
 		// If the account becomes a validator, start issue validator blocks.
-		executor.ExecuteAfter(accountID, func() { issueValidatorBlock(ctx) }, ParamsValidator.CommitteeBroadcastInterval)
+		executor.ExecuteAfter(validatorAccount.ID(), func() { issueValidatorBlock(ctx) }, ParamsValidator.CommitteeBroadcastInterval)
 	}
 }
