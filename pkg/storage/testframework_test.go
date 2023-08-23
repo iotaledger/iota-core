@@ -243,8 +243,6 @@ func (t *TestFramework) AssertPrunedUntil(
 			require.ErrorIsf(t.t, err, database.ErrEpochPruned, "expected epoch %d to be pruned when calling RewardsForEpoch", epoch)
 		}
 	}
-
-	// TODO:  -> for permanent storage we need to make sure that everything from the ledger is deleted for the given epoch/slots
 }
 
 func assertPrunableEpochStoragesPruned[V any](t *TestFramework, store *epochstore.Store[V], epoch iotago.EpochIndex) {

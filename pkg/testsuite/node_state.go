@@ -78,8 +78,6 @@ type NodeState struct {
 	activeRootBlocks  *[]*blocks.Block
 
 	evictedSlot *iotago.SlotIndex
-	prunedEpoch *iotago.EpochIndex
-	hasPruned   bool
 
 	chainManagerSolid *bool
 }

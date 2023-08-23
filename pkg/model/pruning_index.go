@@ -3,7 +3,6 @@ package model
 import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -24,22 +23,13 @@ func NewPruningIndex(kv kvstore.KVStore, key kvstore.Realm) *PruningIndex {
 	}
 }
 
-func (e *PruningIndex) ShouldPrune(newIndex iotago.EpochIndex) bool {
-	e.lastPrunedMutex.RLock()
-	defer e.lastPrunedMutex.RUnlock()
-
-	prunedEpoch, _ := e.memLastPrunedEpoch.Index()
-
-	return newIndex > prunedEpoch
-}
-
 func (e *PruningIndex) MarkEvicted(index iotago.EpochIndex) error {
 	e.lastPrunedMutex.Lock()
 	defer e.lastPrunedMutex.Unlock()
 
 	e.memLastPrunedEpoch.MarkEvicted(index)
 
-	return e.kv.Set(e.key, lo.Return1(index.Bytes()))
+	return e.kv.Set(e.key, index.MustBytes())
 }
 
 func (e *PruningIndex) Index() (current iotago.EpochIndex, valid bool) {
@@ -56,16 +46,10 @@ func (e *PruningIndex) NextIndex() iotago.EpochIndex {
 	return e.memLastPrunedEpoch.NextIndex()
 }
 
-func (e *PruningIndex) IsEvicted(index iotago.EpochIndex) bool {
-	e.lastPrunedMutex.RLock()
-	defer e.lastPrunedMutex.RUnlock()
-
-	lastPruned, _ := e.memLastPrunedEpoch.Index()
-
-	return index <= lastPruned
-}
-
 func (e *PruningIndex) RestoreFromDisk() error {
+	e.lastPrunedMutex.Lock()
+	defer e.lastPrunedMutex.Unlock()
+
 	lastPrunedBytes, err := e.kv.Get(e.key)
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {

@@ -19,8 +19,6 @@ type ParametersProtocol struct {
 	Filter struct {
 		// MaxAllowedClockDrift defines the maximum drift our wall clock can have to future blocks being received from the network.
 		MaxAllowedClockDrift time.Duration `default:"5s" usage:"the maximum drift our wall clock can have to future blocks being received from the network"`
-		MinCommittableAge    uint64        `default:"6" usage:"the minimum age of a commitment or commitment input, relative to block issuance time"`
-		MaxCommittableAge    uint64        `default:"12" usage:"the maximum age of a commitment or commitment input, relative to block issuance time"`
 	}
 
 	BaseToken BaseToken
@@ -45,17 +43,16 @@ type BaseToken struct {
 type ParametersDatabase struct {
 	Engine           string `default:"rocksdb" usage:"the used database engine (rocksdb/mapdb)"`
 	Path             string `default:"testnet/database" usage:"the path to the database folder"`
-	MaxOpenDBs       int    `default:"10" usage:"maximum number of open database instances"`
-	PruningThreshold uint64 `default:"16384" usage:"how many confirmed slots should be retained"`
-	DBGranularity    int64  `default:"8192" usage:"how many slots should be contained in a single DB instance"`
+	MaxOpenDBs       int    `default:"5" usage:"maximum number of open database instances"`
+	PruningThreshold uint64 `default:"30" usage:"how many finalized epochs should be retained"`
 
 	Size struct {
 		// Enabled defines whether to delete old block data from the database based on maximum database size
 		Enabled bool `default:"true" usage:"whether to delete old block data from the database based on maximum database size"`
 		// TargetSize defines the target size of the database
 		TargetSize string `default:"30GB" usage:"target size of the database"`
-		// ThresholdPercentage defines the percentage the database size gets reduced if the target size is reached
-		ThresholdPercentage float64 `default:"10.0" usage:"the percentage the database size gets reduced if the target size is reached"`
+		// ReductionPercentage defines the percentage the database size gets reduced if the target size is reached
+		ReductionPercentage float64 `default:"10.0" usage:"the percentage the database size gets reduced if the target size is reached"`
 		// CooldownTime defines the cooldown time between two pruning by database size events
 		CooldownTime time.Duration `default:"5m" usage:"cooldown time between two pruning by database size events"`
 	}

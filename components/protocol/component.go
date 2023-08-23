@@ -111,7 +111,8 @@ func provide(c *dig.Container) error {
 				storage.WithPruningDelay(iotago.EpochIndex(ParamsDatabase.PruningThreshold)),
 				storage.WithPruningSizeEnable(ParamsDatabase.Size.Enabled),
 				storage.WithPruningSizeMaxTargetSizeBytes(pruningTargetDatabaseSizeBytes),
-				storage.WithPruningSizeStartThresholdPercentage(ParamsDatabase.Size.ThresholdPercentage),
+				storage.WithPruningSizeReductionPercentage(ParamsDatabase.Size.ReductionPercentage),
+				storage.WithPruningSizeCooldownTime(ParamsDatabase.Size.CooldownTime),
 				storage.WithPrunableManagerOptions(
 					prunable.WithMaxOpenDBs(ParamsDatabase.MaxOpenDBs),
 				),

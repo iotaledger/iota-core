@@ -136,6 +136,7 @@ func assertPrunableEpochStoragesPruned[V any](t *TestSuite, store *epochstore.St
 			return ierrors.Wrapf(err, "failed to parse epoch from bytes")
 		}
 		seenEpochs = append(seenEpochs, epochFromBytes)
+
 		return nil
 	})
 	if err != nil {

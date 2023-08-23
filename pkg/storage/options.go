@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"time"
+
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -43,14 +45,14 @@ func WithPruningSizeMaxTargetSizeBytes(pruningSizeTargetSizeBytes int64) options
 	}
 }
 
-func WithPruningSizeStartThresholdPercentage(pruningSizeThresholdPercentage float64) options.Option[Storage] {
+func WithPruningSizeReductionPercentage(pruningSizeReductionPercentage float64) options.Option[Storage] {
 	return func(p *Storage) {
-		p.optsPruningSizeStartThresholdPercentage = pruningSizeThresholdPercentage
+		p.optsPruningSizeReductionPercentage = pruningSizeReductionPercentage
 	}
 }
 
-func WithPruningSizeTargetThresholdPercentage(pruningSizeTargetThresholdPercentage float64) options.Option[Storage] {
+func WithPruningSizeCooldownTime(cooldown time.Duration) options.Option[Storage] {
 	return func(p *Storage) {
-		p.optsPruningSizeTargetThresholdPercentage = pruningSizeTargetThresholdPercentage
+		p.optsPruningSizeCooldownTime = cooldown
 	}
 }

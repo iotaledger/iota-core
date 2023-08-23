@@ -129,7 +129,8 @@ func TestStorage_PruneBySize(t *testing.T) {
 		storage.WithPruningDelay(2),
 		storage.WithPruningSizeEnable(true),
 		storage.WithPruningSizeMaxTargetSizeBytes(15*MB),
-		storage.WithPruningSizeStartThresholdPercentage(0.9),
+		storage.WithPruningSizeReductionPercentage(0.2),
+		storage.WithPruningSizeCooldownTime(0),
 	)
 	defer tf.Shutdown()
 
@@ -142,7 +143,7 @@ func TestStorage_PruneBySize(t *testing.T) {
 
 	tf.SetLatestFinalizedEpoch(13)
 
-	// db size < target size 13.5 MB, should NOT prune
+	// db size < max size=15 MB, should NOT prune
 	err := tf.Instance.PruneBySize()
 	require.ErrorIs(t, err, database.ErrNoPruningNeeded)
 
@@ -157,11 +158,11 @@ func TestStorage_PruneBySize(t *testing.T) {
 		types.NewTuple(0, false),
 	)
 
+	tf.AssertStorageSizeBelow(6 * MB)
+
 	// We already pruned the maximum and can't prune any more data right now.
 	err = tf.Instance.PruneBySize(4 * MB)
 	require.ErrorIs(t, err, database.ErrEpochPruned)
-
-	// TODO: assert that storage size is below a certain threshold
 }
 
 func TestStorage_RestoreFromDisk(t *testing.T) {
@@ -169,7 +170,7 @@ func TestStorage_RestoreFromDisk(t *testing.T) {
 
 	totalEpochs := 9
 	tf.GeneratePermanentData(5 * MB)
-	for i := 1; i <= totalEpochs; i++ {
+	for i := 0; i <= totalEpochs; i++ {
 		tf.GeneratePrunableData(iotago.EpochIndex(i), 1*B)
 		tf.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}

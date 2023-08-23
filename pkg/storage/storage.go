@@ -2,6 +2,7 @@ package storage
 
 import (
 	"sync"
+	"time"
 
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -33,32 +34,34 @@ type Storage struct {
 	shutdownOnce sync.Once
 	errorHandler func(error)
 
-	isPruning       bool
-	statusLock      sync.RWMutex
-	pruningLock     sync.RWMutex
-	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
+	isPruning          bool
+	statusLock         sync.RWMutex
+	pruningLock        sync.RWMutex
+	lastPrunedEpoch    *model.EvictionIndex[iotago.EpochIndex]
+	lastPrunedSizeTime time.Time
 
-	optsDBEngine                             hivedb.Engine
-	optsAllowedDBEngines                     []hivedb.Engine
-	optsPruningDelay                         iotago.EpochIndex
-	optPruningSizeEnabled                    bool
-	optsPruningSizeMaxTargetSizeBytes        int64
-	optsPruningSizeStartThresholdPercentage  float64
-	optsPruningSizeTargetThresholdPercentage float64
-	optsPrunableManagerOptions               []options.Option[prunable.SlotManager]
+	optsDBEngine                       hivedb.Engine
+	optsAllowedDBEngines               []hivedb.Engine
+	optsPruningDelay                   iotago.EpochIndex
+	optPruningSizeEnabled              bool
+	optsPruningSizeMaxTargetSizeBytes  int64
+	optsPruningSizeReductionPercentage float64
+	optsPrunableManagerOptions         []options.Option[prunable.SlotManager]
+	optsPruningSizeCooldownTime        time.Duration
 }
 
 // New creates a new storage instance with the named database version in the given directory.
 func New(directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
 	return options.Apply(&Storage{
-		dir:                                      utils.NewDirectory(directory, true),
-		errorHandler:                             errorHandler,
-		lastPrunedEpoch:                          model.NewEvictionIndex[iotago.EpochIndex](),
-		optsDBEngine:                             hivedb.EngineRocksDB,
-		optsPruningDelay:                         30,      // TODO: what's the default now?
-		optsPruningSizeMaxTargetSizeBytes:        1 << 30, // 1GB, TODO: what's the default?
-		optsPruningSizeStartThresholdPercentage:  0.9,     // TODO: what's the default?
-		optsPruningSizeTargetThresholdPercentage: 0.7,     // TODO: what's the default?
+		dir:                                utils.NewDirectory(directory, true),
+		errorHandler:                       errorHandler,
+		lastPrunedEpoch:                    model.NewEvictionIndex[iotago.EpochIndex](),
+		optsDBEngine:                       hivedb.EngineRocksDB,
+		optsPruningDelay:                   30,
+		optPruningSizeEnabled:              false,
+		optsPruningSizeMaxTargetSizeBytes:  30 * 1024 * 1024 * 1024, // 30GB
+		optsPruningSizeReductionPercentage: 0.1,
+		optsPruningSizeCooldownTime:        5 * time.Minute,
 	}, opts,
 		func(s *Storage) {
 			dbConfig := database.Config{

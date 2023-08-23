@@ -33,7 +33,7 @@ type SlotManager struct {
 
 func NewSlotManager(dbConfig database.Config, errorHandler func(error), opts ...options.Option[SlotManager]) *SlotManager {
 	return options.Apply(&SlotManager{
-		optsMaxOpenDBs:  10,
+		optsMaxOpenDBs:  5,
 		dbConfig:        dbConfig,
 		errorHandler:    errorHandler,
 		dbSizes:         shrinkingmap.New[iotago.EpochIndex, int64](),

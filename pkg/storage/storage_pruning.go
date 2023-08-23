@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"time"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -117,22 +119,30 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 		return database.ErrNoPruningNeeded
 	}
 
-	targetDatabaseSizeMaxBytes := s.optsPruningSizeMaxTargetSizeBytes
+	s.pruningLock.Lock()
+	defer s.pruningLock.Unlock()
+
+	if time.Since(s.lastPrunedSizeTime) < s.optsPruningSizeCooldownTime {
+		return ierrors.Wrapf(database.ErrNoPruningNeeded, "last pruning by size was %s ago, cooldown time is %s", time.Since(s.lastPrunedSizeTime), s.optsPruningSizeCooldownTime)
+	}
+
+	// The target size is the maximum size of the database after pruning.
+	dbMaxSize := s.optsPruningSizeMaxTargetSizeBytes
+	dbTargetSizeAfterPruning := int64(float64(s.optsPruningSizeMaxTargetSizeBytes) * (1 - s.optsPruningSizeReductionPercentage))
+
+	// The function has been called by the user explicitly with a target size.
 	if len(targetSizeMaxBytes) > 0 {
-		targetDatabaseSizeMaxBytes = targetSizeMaxBytes[0]
+		dbMaxSize = targetSizeMaxBytes[0]
+		dbTargetSizeAfterPruning = targetSizeMaxBytes[0]
 	}
 
 	// No need to prune. The database is already smaller than the start threshold size.
-	targetDatabaseSizeBytes := int64(float64(targetDatabaseSizeMaxBytes) * s.optsPruningSizeTargetThresholdPercentage)
 	currentDBSize := s.Size()
-	if currentDBSize < targetDatabaseSizeBytes {
+	if currentDBSize < dbMaxSize {
 		return database.ErrNoPruningNeeded
 	}
 
 	latestPrunableEpoch := s.latestPrunableEpoch()
-
-	s.pruningLock.Lock()
-	defer s.pruningLock.Unlock()
 
 	// Make sure epoch is not already pruned.
 	start, canPrune := s.getPruningStart(latestPrunableEpoch)
@@ -141,9 +151,12 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 	}
 
 	s.setIsPruning(true)
-	defer s.setIsPruning(false)
+	defer func() {
+		s.setIsPruning(false)
+		s.lastPrunedSizeTime = time.Now()
+	}()
 
-	totalBytesToPrune := currentDBSize - targetDatabaseSizeBytes
+	totalBytesToPrune := currentDBSize - dbTargetSizeAfterPruning
 
 	for prunedEpoch := start; prunedEpoch <= latestPrunableEpoch; prunedEpoch++ {
 		bucketSize, err := s.prunable.BucketSize(prunedEpoch)
@@ -165,10 +178,10 @@ func (s *Storage) PruneBySize(targetSizeMaxBytes ...int64) error {
 		}
 	}
 
-	// If the size of the database is still bigger than the target size, after we tried to prune everything possible,
+	// If the size of the database is still bigger than the max size, after we tried to prune everything possible,
 	// we return an error so that the user can be notified about a potentially full disk.
-	if currentDBSize = s.Size(); currentDBSize > targetDatabaseSizeBytes {
-		return ierrors.Wrapf(database.ErrDatabaseFull, "database size is still bigger than the start threshold size after pruning: %d > %d", currentDBSize, targetDatabaseSizeBytes)
+	if currentDBSize = s.Size(); currentDBSize > dbMaxSize {
+		return ierrors.Wrapf(database.ErrDatabaseFull, "database size is still bigger than the start threshold size after pruning: %d > %d", currentDBSize, dbMaxSize)
 	}
 
 	return nil
