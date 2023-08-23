@@ -63,6 +63,18 @@ func NewCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
 	return c
 }
 
+func NewRootCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
+	commitmentMetadata := NewCommitmentMetadata(commitment)
+	commitmentMetadata.Solid().Trigger()
+	commitmentMetadata.Verified().Trigger()
+	commitmentMetadata.BelowSyncThreshold().Trigger()
+	commitmentMetadata.BelowWarpSyncThreshold().Trigger()
+	commitmentMetadata.BelowLatestVerifiedCommitment().Trigger()
+	commitmentMetadata.Evicted().Trigger()
+
+	return commitmentMetadata
+}
+
 func (c *CommitmentMetadata) Chain() reactive.Variable[*Chain] {
 	return c.chain
 }

@@ -64,15 +64,18 @@ func (c *ChainManager) SetRootCommitment(commitment *model.Commitment) (commitme
 			}
 		}
 
-		commitmentMetadata = NewCommitmentMetadata(commitment)
-		commitmentMetadata.Solid().Trigger()
-		commitmentMetadata.Verified().Trigger()
-		commitmentMetadata.BelowSyncThreshold().Trigger()
-		commitmentMetadata.BelowWarpSyncThreshold().Trigger()
-		commitmentMetadata.BelowLatestVerifiedCommitment().Trigger()
-		commitmentMetadata.Evicted().Trigger()
+		commitmentMetadata = NewRootCommitmentMetadata(commitment)
 
-		c.rootChain = NewChain(commitmentMetadata)
+		if c.rootChain == nil {
+			c.rootChain = NewChain(commitmentMetadata)
+		} else {
+			chainCommitment, exists := c.rootChain.Commitment(commitment.Index())
+			if !exists || chainCommitment.ID() != commitment.ID() {
+				panic("can only set root commitment to a commitment of the same chain")
+			}
+
+			c.rootChain.ForkingPoint().Set(chainCommitment)
+		}
 
 		return commitmentMetadata
 	})
