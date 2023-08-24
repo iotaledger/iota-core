@@ -275,7 +275,7 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	return modelBlock, modelBlock != nil
 }
 
-// IsBootstrapped returns true if the node is bootstrapped. Always get bootsrapped status from SyncManager. This method is needed and exported to access component inside the engine, so we could test it with different bootstrapped conditions.
+// IsBootstrapped returns true if the node is bootstrapped. Do not get bootstrapped status with this method, but always get it from SyncManager. This method is needed and exported to access component inside the engine, so we could test it with different bootstrapped conditions.
 func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 	return e.optsIsBootstrappedFunc(e)
 }
