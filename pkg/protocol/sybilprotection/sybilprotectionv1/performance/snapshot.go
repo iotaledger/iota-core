@@ -266,13 +266,13 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 	}
 	// TODO: make sure to adjust this loop if we add pruning later.
 	for epoch := targetEpoch; epoch > iotago.EpochIndex(0); epoch-- {
-		rewardsTree, err := t.rewardsMap(epoch)
+		rewardsMap, err := t.rewardsMap(epoch)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to get rewards tree for epoch index %d", epoch)
 		}
 
 		// if the tree was not present in storage we can skip this epoch and the previous ones, as we never stored any rewards
-		if !rewardsTree.WasRestoredFromStorage() {
+		if !rewardsMap.WasRestoredFromStorage() {
 			break
 		}
 
@@ -285,7 +285,7 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 			return ierrors.Wrapf(err, "unable to write account count for epoch index %d", epoch)
 		}
 
-		if err := rewardsTree.Stream(func(key iotago.AccountID, value *model.PoolRewards) error {
+		if err := rewardsMap.Stream(func(key iotago.AccountID, value *model.PoolRewards) error {
 			if err := pWriter.WriteValue("account id", key); err != nil {
 				return ierrors.Wrapf(err, "unable to write account id for epoch index %d and accountID %s", epoch, key)
 			}

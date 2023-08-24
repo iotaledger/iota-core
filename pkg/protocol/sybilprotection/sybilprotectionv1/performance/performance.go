@@ -104,7 +104,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		panic(ierrors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
-	rewardsTree, err := t.rewardsMap(epoch)
+	rewardsMap, err := t.rewardsMap(epoch)
 	if err != nil {
 		panic(ierrors.Wrapf(err, "failed to create rewards tree for epoch %d", epoch))
 	}
@@ -126,7 +126,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			intermediateFactors = append(intermediateFactors, pf)
 		}
 
-		if err := rewardsTree.Set(accountID, &model.PoolRewards{
+		if err := rewardsMap.Set(accountID, &model.PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(intermediateFactors)),
 			FixedCost:   pool.FixedCost,
@@ -137,7 +137,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		return true
 	})
 
-	if err := rewardsTree.Commit(); err != nil {
+	if err := rewardsMap.Commit(); err != nil {
 		panic(ierrors.Wrapf(err, "failed to commit rewards for epoch %d", epoch))
 	}
 
