@@ -46,8 +46,6 @@ func NewManager(opts ...options.Option[Manager]) (manager *Manager) {
 		lastEvictedSlot:       model.NewEvictionIndex(),
 	}, opts, func(m *Manager) {
 		m.commitmentRequester = eventticker.New(m.optsCommitmentRequester...)
-		m.Events.CommitmentMissing.Hook(m.commitmentRequester.StartTicker)
-		m.Events.MissingCommitmentReceived.Hook(m.commitmentRequester.StopTicker)
 		m.Events.CommitmentBelowRoot.Hook(m.commitmentRequester.StopTicker)
 
 		m.Events.RequestCommitment.LinkTo(m.commitmentRequester.Events.Tick)
@@ -60,7 +58,7 @@ func (m *Manager) Initialize(c *model.Commitment) {
 
 	m.rootCommitment, _ = m.getOrCreateCommitment(c.ID())
 	m.rootCommitment.PublishCommitment(c)
-	m.rootCommitment.SetSolid(true)
+	m.rootCommitment.SolidEvent().Trigger()
 	m.rootCommitment.publishChain(NewChain(m.rootCommitment))
 }
 
@@ -159,11 +157,20 @@ func (m *Manager) Chain(ec iotago.CommitmentID) (chain *Chain) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	if commitment, exists := m.commitment(ec); exists {
+	if commitment, exists := m.Commitment(ec); exists {
 		return commitment.Chain()
 	}
 
 	return nil
+}
+
+func (m *Manager) Commitment(id iotago.CommitmentID) (commitment *ChainCommitment, exists bool) {
+	storage := m.commitmentsByID.Get(id.Index())
+	if storage == nil {
+		return nil, false
+	}
+
+	return storage.Get(id)
 }
 
 func (m *Manager) LoadCommitmentOrRequestMissing(id iotago.CommitmentID) *ChainCommitment {
@@ -172,7 +179,7 @@ func (m *Manager) LoadCommitmentOrRequestMissing(id iotago.CommitmentID) *ChainC
 
 	chainCommitment, created := m.getOrCreateCommitment(id)
 	if created {
-		m.Events.CommitmentMissing.Trigger(id)
+		m.commitmentRequester.StartTicker(id)
 	}
 
 	return chainCommitment
@@ -185,7 +192,7 @@ func (m *Manager) Commitments(id iotago.CommitmentID, amount int) (commitments [
 	commitments = make([]*ChainCommitment, amount)
 
 	for i := 0; i < amount; i++ {
-		currentCommitment, _ := m.commitment(id)
+		currentCommitment, _ := m.Commitment(id)
 		if currentCommitment == nil {
 			return nil, ierrors.Wrap(ErrCommitmentUnknown, "not all commitments in the given range are known")
 		}
@@ -218,7 +225,7 @@ func (m *Manager) SwitchMainChain(head iotago.CommitmentID) error {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	commitment, _ := m.commitment(head)
+	commitment, _ := m.Commitment(head)
 	if commitment == nil {
 		return ierrors.Wrapf(ErrCommitmentUnknown, "unknown commitment %s", head)
 	}
@@ -277,15 +284,6 @@ func (m *Manager) getOrCreateCommitment(id iotago.CommitmentID) (commitment *Cha
 	return m.commitmentsByID.Get(id.Index(), true).GetOrCreate(id, func() *ChainCommitment {
 		return NewChainCommitment(id)
 	})
-}
-
-func (m *Manager) commitment(id iotago.CommitmentID) (commitment *ChainCommitment, exists bool) {
-	storage := m.commitmentsByID.Get(id.Index())
-	if storage == nil {
-		return nil, false
-	}
-
-	return storage.Get(id)
 }
 
 func (m *Manager) evaluateAgainstRootCommitment(commitment *iotago.Commitment) (isBelow, isRootCommitment bool) {
@@ -348,7 +346,7 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID
 }
 
 func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*ChainCommitment, error) {
-	if !commitment.IsSolid() || commitment.Chain() == nil {
+	if !commitment.SolidEvent().WasTriggered() || commitment.Chain() == nil {
 		return nil, ierrors.Wrapf(ErrCommitmentNotSolid, "commitment %s is not solid", commitment)
 	}
 
@@ -357,7 +355,7 @@ func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*Ch
 	for chain := commitment.Chain(); chain != m.rootCommitment.Chain(); chain = commitment.Chain() {
 		forkingCommitment = chain.ForkingPoint
 
-		if commitment, _ = m.commitment(forkingCommitment.Commitment().PrevID()); commitment == nil {
+		if commitment, _ = m.Commitment(forkingCommitment.Commitment().PrevID()); commitment == nil {
 			return nil, ierrors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingCommitment.Commitment().ID())
 		}
 	}
@@ -368,17 +366,19 @@ func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*Ch
 func (m *Manager) registerCommitment(commitment *model.Commitment) (isNew bool, isSolid bool, wasForked bool, chainCommitment *ChainCommitment) {
 	parentCommitment, commitmentCreated := m.getOrCreateCommitment(commitment.PrevID())
 	if commitmentCreated {
-		m.Events.CommitmentMissing.Trigger(parentCommitment.ID())
+		m.commitmentRequester.StartTicker(parentCommitment.ID())
 	}
 
 	chainCommitment, created := m.getOrCreateCommitment(commitment.ID())
 
 	if !chainCommitment.PublishCommitment(commitment) {
-		return false, chainCommitment.IsSolid(), false, chainCommitment
+		return false, chainCommitment.SolidEvent().WasTriggered(), false, chainCommitment
 	}
 
+	m.Events.CommitmentPublished.Trigger(chainCommitment)
+
 	if !created {
-		m.Events.MissingCommitmentReceived.Trigger(chainCommitment.ID())
+		m.commitmentRequester.StopTicker(chainCommitment.ID())
 	}
 
 	isSolid, _, wasForked = m.registerChild(parentCommitment, chainCommitment)
@@ -397,7 +397,7 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 		return nil
 	}
 
-	parentCommitment, _ := m.commitment(forkingPoint.Commitment().PrevID())
+	parentCommitment, _ := m.Commitment(forkingPoint.Commitment().PrevID())
 	if parentCommitment == nil {
 		return ierrors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingPoint.ID())
 	}
@@ -407,7 +407,7 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 
 	// For each forking point coming out of the main chain we need to reorg the children
 	for fp := commitment.Chain().ForkingPoint; ; {
-		fpParent, _ := m.commitment(fp.Commitment().PrevID())
+		fpParent, _ := m.Commitment(fp.Commitment().PrevID())
 
 		mainChild := fpParent.mainChild()
 		newChildChain := NewChain(mainChild)
@@ -441,7 +441,10 @@ func (m *Manager) registerChild(parent *ChainCommitment, child *ChainCommitment)
 	if isSolid, chain, wasForked = parent.registerChild(child); chain != nil {
 		chain.addCommitment(child)
 		child.publishChain(chain)
-		child.SetSolid(isSolid)
+
+		if isSolid {
+			child.SolidEvent().Trigger()
+		}
 	}
 
 	return
@@ -484,7 +487,7 @@ func (m *Manager) propagateSolidity(child *ChainCommitment) (childrenToUpdate []
 	m.commitmentEntityMutex.Lock(child.ID())
 	defer m.commitmentEntityMutex.Unlock(child.ID())
 
-	if child.SetSolid(true) {
+	if child.SolidEvent().Trigger() {
 		childrenToUpdate = child.Children()
 	}
 

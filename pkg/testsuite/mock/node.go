@@ -114,7 +114,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 
 	started := make(chan struct{}, 1)
 
-	n.Protocol.Events.Started.Hook(func() {
+	n.Protocol.HookInitialized(func() {
 		close(started)
 	})
 
@@ -172,14 +172,6 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 
 	events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
 		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
-	})
-
-	events.ChainManager.CommitmentMissing.Hook(func(commitmentID iotago.CommitmentID) {
-		fmt.Printf("%s > ChainManager.CommitmentMissing: %s\n", n.Name, commitmentID)
-	})
-
-	events.ChainManager.MissingCommitmentReceived.Hook(func(commitmentID iotago.CommitmentID) {
-		fmt.Printf("%s > ChainManager.MissingCommitmentReceived: %s\n", n.Name, commitmentID)
 	})
 
 	events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
@@ -432,7 +424,7 @@ func (n *Node) Shutdown() {
 	stopped := make(chan struct{}, 1)
 
 	if n.Protocol != nil {
-		n.Protocol.Events.Stopped.Hook(func() {
+		n.Protocol.HookStopped(func() {
 			close(stopped)
 		})
 	} else {
