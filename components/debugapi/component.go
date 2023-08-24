@@ -2,7 +2,6 @@ package debugapi
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -79,7 +78,7 @@ func configure() error {
 		Version:      1,
 		PrefixHealth: []byte{0},
 	}, func(err error) {
-		fmt.Printf(">> DebugAPI Error: %s\n", err)
+		Component.LogWarnf(">> DebugAPI Error: %s\n", err)
 	}, prunable.WithMaxOpenDBs(ParamsDebugAPI.MaxOpenDBs),
 	)
 
@@ -104,7 +103,7 @@ func configure() error {
 
 		for i := lastPruned; i < epoch-iotago.EpochIndex(ParamsDebugAPI.PruningThreshold); i++ {
 			if err := blocksPrunableStorage.Prune(i); err != nil {
-				fmt.Printf(">> DebugAPI Error: %s\n", err)
+				Component.LogWarnf(">> DebugAPI Error: %s\n", err)
 			}
 		}
 
@@ -112,7 +111,7 @@ func configure() error {
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
 		if err := storeTransactionsPerSlot(scd); err != nil {
-			fmt.Printf(">> DebugAPI Error: %s\n", err)
+			Component.LogWarnf(">> DebugAPI Error: %s\n", err)
 		}
 	})
 
@@ -124,7 +123,7 @@ func configure() error {
 
 		for _, block := range blocksInSlot {
 			if block.ProtocolBlock() == nil {
-				fmt.Println("block is a root block", block.ID())
+				Component.LogInfof("block is a root block", block.ID())
 				continue
 			}
 
