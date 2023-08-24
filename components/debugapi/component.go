@@ -36,6 +36,11 @@ const (
 	RouteCommitmentByIndexTransactionIDs = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/transactions"
 )
 
+const (
+	debugPrefixHealth byte = iota
+	debugPrefixBlocks
+)
+
 func init() {
 	Component = &app.Component{
 		Name:      "DebugAPIV3",
@@ -76,7 +81,7 @@ func configure() error {
 		Directory: ParamsDebugAPI.Path,
 
 		Version:      1,
-		PrefixHealth: []byte{0},
+		PrefixHealth: []byte{debugPrefixHealth},
 	}, func(err error) {
 		Component.LogWarnf(">> DebugAPI Error: %s\n", err)
 	}, prunable.WithMaxOpenDBs(ParamsDebugAPI.MaxOpenDBs),
@@ -128,7 +133,7 @@ func configure() error {
 			}
 
 			epoch := deps.Protocol.APIForSlot(block.ID().Index()).TimeProvider().EpochFromSlot(block.ID().Index())
-			blockStore, err := blocksPrunableStorage.Get(epoch, []byte{1})
+			blockStore, err := blocksPrunableStorage.Get(epoch, []byte{debugPrefixBlocks})
 			if err != nil {
 				panic(err)
 			}
@@ -156,7 +161,7 @@ func configure() error {
 		}
 
 		epoch := deps.Protocol.APIForSlot(blockID.Index()).TimeProvider().EpochFromSlot(blockID.Index())
-		blockStore, err := blocksPrunableStorage.Get(epoch, []byte{1})
+		blockStore, err := blocksPrunableStorage.Get(epoch, []byte{debugPrefixBlocks})
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
