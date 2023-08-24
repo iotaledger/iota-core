@@ -94,7 +94,7 @@ func New(workers *workerpool.Group, apiProvider api.Provider, evictionState *evi
 		workers:               workers,
 		workerPool:            workers.CreatePool("Solidifier", 2),
 		errorHandler:          errorHandler,
-		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](10, 1000),
+		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](int(apiProvider.CurrentAPI().ProtocolParameters().MaxCommittableAge()) * 2),
 	}, opts,
 		func(b *BlockDAG) {
 			b.solidifier = causalorder.New(
@@ -142,6 +142,18 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 	}
 
 	return
+}
+
+// GetOrRequestBlock returns the Block with the given BlockID from the BlockDAG (and requests it from the network if it
+// is missing). If the requested Block is below the eviction threshold, then this method will return a nil block without
+// creating it.
+func (b *BlockDAG) GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Block, requested bool) {
+	return b.blockCache.GetOrCreate(blockID, func() (newBlock *blocks.Block) {
+		newBlock = blocks.NewMissingBlock(blockID)
+		b.events.BlockMissing.Trigger(newBlock)
+
+		return newBlock
+	})
 }
 
 // SetInvalid marks a Block as invalid.
@@ -250,14 +262,9 @@ func (b *BlockDAG) registerChild(child *blocks.Block, parent iotago.Parent) {
 		return
 	}
 
-	parentBlock, _ := b.blockCache.GetOrCreate(parent.ID, func() (newBlock *blocks.Block) {
-		newBlock = blocks.NewMissingBlock(parent.ID)
-		b.events.BlockMissing.Trigger(newBlock)
-
-		return newBlock
-	})
-
-	parentBlock.AppendChild(child, parent.Type)
+	if parentBlock, _ := b.GetOrRequestBlock(parent.ID); parentBlock != nil {
+		parentBlock.AppendChild(child, parent.Type)
+	}
 }
 
 // checkReference checks if the reference between the child and its parent is valid.

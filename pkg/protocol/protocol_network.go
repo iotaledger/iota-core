@@ -10,28 +10,15 @@ import (
 )
 
 func (p *Protocol) runNetworkProtocol() {
-	p.networkProtocol = core.NewProtocol(p.dispatcher, p.Workers.CreatePool("NetworkProtocol"), p) // Use max amount of workers for networking
+	p.networkProtocol = core.NewProtocol(p.networkDispatcher, p.Workers.CreatePool("NetworkProtocol"), p) // Use max amount of workers for networking
 	p.Events.Network.LinkTo(p.networkProtocol.Events)
 
-	// TODO: the distinction between different worker pools as it is right now does not make much sense:
-	//  instead we should distinguish between wp for handling requested/requesting and wp for handling received stuff
-
 	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks
-
-	p.Events.Network.BlockReceived.Hook(func(block *model.Block, id network.PeerID) {
-		if err := p.ProcessBlock(block, id); err != nil {
-			p.ErrorHandler()(err)
-		}
-	}, event.WithWorkerPool(wpBlocks))
 
 	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id network.PeerID) {
 		if block, exists := p.MainEngineInstance().Block(blockID); exists {
 			p.networkProtocol.SendBlock(block, id)
 		}
-	}, event.WithWorkerPool(wpBlocks))
-
-	p.Events.Engine.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
-		p.networkProtocol.RequestBlock(blockID)
 	}, event.WithWorkerPool(wpBlocks))
 
 	// Blocks are gossiped when they are scheduled or skipped.

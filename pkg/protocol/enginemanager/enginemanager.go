@@ -9,6 +9,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -47,10 +48,12 @@ type engineInfo struct {
 type EngineManager struct {
 	directory      *utils.Directory
 	dbVersion      byte
-	storageOptions []options.Option[storage.Storage]
 	workers        *workerpool.Group
 	errorHandler   func(error)
+	engineCreated  *event.Event1[*engine.Engine]
+	activeInstance *engine.Engine
 
+	storageOptions              []options.Option[storage.Storage]
 	engineOptions               []options.Option[engine.Engine]
 	filterProvider              module.Provider[*engine.Engine, filter.Filter]
 	commitmentFilterProvider    module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
@@ -69,8 +72,6 @@ type EngineManager struct {
 	retainerProvider            module.Provider[*engine.Engine, retainer.Retainer]
 	upgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
 	syncManagerProvider         module.Provider[*engine.Engine, syncmanager.SyncManager]
-
-	activeInstance *engine.Engine
 }
 
 func New(
@@ -99,10 +100,11 @@ func New(
 	syncManagerProvider module.Provider[*engine.Engine, syncmanager.SyncManager],
 ) *EngineManager {
 	return &EngineManager{
-		workers:                     workers,
-		errorHandler:                errorHandler,
 		directory:                   utils.NewDirectory(dir),
 		dbVersion:                   dbVersion,
+		workers:                     workers,
+		errorHandler:                errorHandler,
+		engineCreated:               event.New1[*engine.Engine](),
 		storageOptions:              storageOptions,
 		engineOptions:               engineOptions,
 		filterProvider:              filterProvider,
@@ -194,7 +196,7 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", dirName[0:8]))
 	}
 
-	return engine.New(e.workers.CreateGroup(dirName),
+	newEngine := engine.New(e.workers.CreateGroup(dirName),
 		errorHandler,
 		storage.New(e.directory.Path(dirName), e.dbVersion, errorHandler, e.storageOptions...),
 		e.filterProvider,
@@ -216,6 +218,10 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.syncManagerProvider,
 		append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))...,
 	)
+
+	e.engineCreated.Trigger(newEngine)
+
+	return newEngine
 }
 
 func (e *EngineManager) newEngineInstance(snapshotPath string) *engine.Engine {
@@ -231,6 +237,10 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	}
 
 	return e.newEngineInstance(snapshotPath), nil
+}
+
+func (e *EngineManager) OnEngineCreated(handler func(*engine.Engine)) (unsubscribe func()) {
+	return e.engineCreated.Hook(handler).Unhook
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

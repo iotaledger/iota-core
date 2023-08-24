@@ -4,14 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/iotaledger/hive.go/ds/types"
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/core/buffer"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -58,15 +55,15 @@ import (
 )
 
 type Protocol struct {
-	context                 context.Context
-	Events                  *Events
-	engineManager           *enginemanager.EngineManager
-	ChainManager            *chainmanager.Manager
-	unsolidCommitmentBlocks *buffer.UnsolidCommitmentBuffer[*types.Tuple[*model.Block, network.PeerID]]
+	context         context.Context
+	Events          *Events
+	BlockDispatcher *BlockDispatcher
+	engineManager   *enginemanager.EngineManager
+	ChainManager    *chainmanager.Manager
 
-	Workers         *workerpool.Group
-	dispatcher      network.Endpoint
-	networkProtocol *core.Protocol
+	Workers           *workerpool.Group
+	networkDispatcher network.Endpoint
+	networkProtocol   *core.Protocol
 
 	activeEngineMutex syncutils.RWMutex
 	mainEngine        *engine.Engine
@@ -96,14 +93,15 @@ type Protocol struct {
 	optsRetainerProvider            module.Provider[*engine.Engine, retainer.Retainer]
 	optsSchedulerProvider           module.Provider[*engine.Engine, scheduler.Scheduler]
 	optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
+
+	module.Module
 }
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
 		Events:                          NewEvents(),
 		Workers:                         workers,
-		unsolidCommitmentBlocks:         buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, network.PeerID]](20, 100),
-		dispatcher:                      dispatcher,
+		networkDispatcher:               dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
 		optsCommitmentFilterProvider:    accountsfilter.NewProvider(),
 		optsBlockDAGProvider:            inmemoryblockdag.NewProvider(),
@@ -124,10 +122,9 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 
 		optsBaseDirectory:           "",
 		optsChainSwitchingThreshold: 3,
-	}, opts,
-		(*Protocol).initEngineManager,
-		(*Protocol).initChainManager,
-	)
+	}, opts, func(p *Protocol) {
+		p.BlockDispatcher = NewBlockDispatcher(p)
+	}, (*Protocol).initEngineManager, (*Protocol).initChainManager, (*Protocol).TriggerConstructed)
 }
 
 // Run runs the protocol.
@@ -157,13 +154,15 @@ func (p *Protocol) Run(ctx context.Context) error {
 
 	p.runNetworkProtocol()
 
-	p.Events.Started.Trigger()
+	p.TriggerInitialized()
 
 	<-p.context.Done()
 
+	p.TriggerShutdown()
+
 	p.shutdown()
 
-	p.Events.Stopped.Trigger()
+	p.TriggerStopped()
 
 	return p.context.Err()
 }
@@ -191,7 +190,7 @@ func (p *Protocol) shutdown() {
 func (p *Protocol) initEngineManager() {
 	p.engineManager = enginemanager.New(
 		p.Workers.CreateGroup("EngineManager"),
-		p.ErrorHandler(),
+		p.HandleError,
 		p.optsBaseDirectory,
 		DatabaseVersion,
 		p.optsStorageOptions,
@@ -232,21 +231,6 @@ func (p *Protocol) initChainManager() {
 		p.ChainManager.ProcessCommitment(details.Commitment)
 	})
 
-	wp := p.Workers.CreatePool("Protocol.MissingCommitmentReceived", 1)
-	processUnsolidCommitmentBlocksFunc := func(id iotago.CommitmentID) {
-		for _, tuple := range p.unsolidCommitmentBlocks.GetValues(id) {
-			err := p.ProcessBlock(tuple.A, tuple.B)
-			if err != nil {
-				p.ErrorHandler()(err)
-			}
-		}
-	}
-
-	p.Events.ChainManager.MissingCommitmentReceived.Hook(processUnsolidCommitmentBlocksFunc, event.WithWorkerPool(wp))
-	p.Events.Engine.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-		processUnsolidCommitmentBlocksFunc(commitment.ID())
-	}, event.WithWorkerPool(wp))
-
 	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		rootCommitment := p.MainEngineInstance().EarliestRootCommitment(index)
 
@@ -260,7 +244,6 @@ func (p *Protocol) initChainManager() {
 		// stays in memory storage and with it the root commitment itself as well).
 		if rootCommitment.ID().Index() > 0 {
 			p.ChainManager.EvictUntil(rootCommitment.ID().Index() - 1)
-			p.unsolidCommitmentBlocks.EvictUntil(index)
 		}
 	})
 
@@ -268,47 +251,8 @@ func (p *Protocol) initChainManager() {
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wpForking))
 }
 
-func (p *Protocol) ProcessOwnBlock(block *model.Block) error {
-	return p.ProcessBlock(block, p.dispatcher.LocalPeerID())
-}
-
-func (p *Protocol) ProcessBlock(block *model.Block, src network.PeerID) error {
-	mainEngine := p.MainEngineInstance()
-
-	if !mainEngine.WasInitialized() {
-		return ierrors.New("protocol engine not yet initialized")
-	}
-
-	chainCommitment := p.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
-	// If the commitment is not solid (its chain not known), we store the block in a small buffer and process it once we
-	// receive the commitment (or commit the slot ourselves).
-	if !chainCommitment.IsSolid() {
-		if !p.unsolidCommitmentBlocks.Add(block.ProtocolBlock().SlotCommitmentID, types.NewTuple(block, src)) {
-			return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid and could not add to unsolid commitment buffer: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
-		}
-
-		return ierrors.Errorf("protocol ProcessBlock failed. chain is not solid: slotcommitment: %s, latest commitment: %s, block ID: %s", block.ProtocolBlock().SlotCommitmentID, mainEngine.Storage.Settings().LatestCommitment().ID(), block.ID())
-	}
-
-	processed := false
-
-	if mainChain := mainEngine.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == mainChain || mainEngine.BlockRequester.HasTicker(block.ID()) {
-		mainEngine.ProcessBlockFromPeer(block, src)
-		processed = true
-	}
-
-	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil {
-		if candidateChain := candidateEngineInstance.ChainID(); chainCommitment.Chain().ForkingPoint.ID() == candidateChain || candidateEngineInstance.BlockRequester.HasTicker(block.ID()) {
-			candidateEngineInstance.ProcessBlockFromPeer(block, src)
-			processed = true
-		}
-	}
-
-	if !processed {
-		return ierrors.Errorf("block from source %s was not processed: %s; commits to: %s", src, block.ID(), block.ProtocolBlock().SlotCommitmentID)
-	}
-
-	return nil
+func (p *Protocol) IssueBlock(block *model.Block) error {
+	return p.BlockDispatcher.Dispatch(block, p.networkDispatcher.LocalPeerID())
 }
 
 func (p *Protocol) MainEngineInstance() *engine.Engine {
@@ -353,8 +297,8 @@ func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return p.MainEngineInstance().APIForEpoch(epoch)
 }
 
-func (p *Protocol) ErrorHandler() func(error) {
-	return func(err error) {
+func (p *Protocol) HandleError(err error) {
+	if err != nil {
 		p.Events.Error.Trigger(err)
 	}
 }
