@@ -73,9 +73,10 @@ type Protocol struct {
 	optsSnapshotPath            string
 	optsChainSwitchingThreshold int
 
-	optsEngineOptions               []options.Option[engine.Engine]
-	optsChainManagerOptions         []options.Option[chainmanager.Manager]
-	optsStorageOptions              []options.Option[storage.Storage]
+	optsEngineOptions       []options.Option[engine.Engine]
+	optsChainManagerOptions []options.Option[chainmanager.Manager]
+	optsStorageOptions      []options.Option[storage.Storage]
+
 	optsFilterProvider              module.Provider[*engine.Engine, filter.Filter]
 	optsCommitmentFilterProvider    module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
 	optsBlockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
