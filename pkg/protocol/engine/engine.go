@@ -319,12 +319,12 @@ func (e *Engine) CurrentAPI() iotago.API {
 }
 
 // CommittedSlot returns the committed slot for the given slot index.
-func (e *Engine) CommittedSlot(slotIndex iotago.SlotIndex) (*CommittedSlotAPI, error) {
-	if e.Storage.Settings().LatestCommitment().Index() < slotIndex {
-		return nil, ierrors.Errorf("slot %d is not committed yet", slotIndex)
+func (e *Engine) CommittedSlot(commitmentID iotago.CommitmentID) (*CommittedSlotAPI, error) {
+	if e.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
+		return nil, ierrors.Errorf("slot %d is not committed yet", commitmentID.Index())
 	}
 
-	return NewCommittedSlotAPI(e, slotIndex), nil
+	return NewCommittedSlotAPI(e, commitmentID), nil
 }
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
