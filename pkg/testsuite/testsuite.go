@@ -127,7 +127,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsMinCommittableAge,
 					t.optsMaxCommittableAge,
 					t.optsEpochNearingThreshold,
-					t.optsEpochNearingThreshold,
+					t.optsActivityWindowDuration,
 				),
 				iotago.WithCongestionControlOptions(
 					t.optsRMCMin,
@@ -139,6 +139,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsMinMana,
 					t.optsMaxBufferSize,
 				),
+				iotago.WithRewardsOptions(10, 8, 8, 31, 1154, 2, 1),
 				iotago.WithStakingOptions(1),
 			),
 		)

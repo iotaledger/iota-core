@@ -118,7 +118,12 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
+	// key not found
+	if validatorPerformance == nil {
+		validatorPerformance = &prunable.ValidatorPerformance{}
+	}
 	updatedPerformance := t.updateSlotPerformanceBitMap(validatorPerformance, block.ID().Index(), block.ProtocolBlock().IssuingTime)
+
 	if updatedPerformance.BlockIssuedCount == t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot {
 		// no need to store larger number and we can fit into uint8
 		updatedPerformance.BlockIssuedCount = t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot + 1
@@ -149,6 +154,9 @@ func (t *Tracker) ValidatorPerformance(slot iotago.SlotIndex, accountID iotago.A
 }
 
 func (t *Tracker) updateSlotPerformanceBitMap(pf *prunable.ValidatorPerformance, slotIndex iotago.SlotIndex, issuingTime time.Time) *prunable.ValidatorPerformance {
+	if pf == nil {
+		return pf
+	}
 	subslotIndex := t.subslotIndex(slotIndex, issuingTime)
 	// set bit at subslotIndex to 1 to indicate activity in that subslot
 	pf.SlotActivityVector = pf.SlotActivityVector | (1 << subslotIndex)
@@ -209,9 +217,13 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			validatorPerformances = append(validatorPerformances, validatorPerformance)
 		}
 
-		if err := rewardsTree.Set(accountID, &PoolRewards{
+		poolReward, err := t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(validatorPerformances, epoch))
+		if err != nil {
+			panic(ierrors.Wrapf(err, "failed to calculate pool rewards for account %s", accountID))
+		}
+		if err = rewardsTree.Set(accountID, &PoolRewards{
 			PoolStake:   pool.PoolStake,
-			PoolRewards: t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, t.aggregatePerformanceFactors(validatorPerformances, epoch)),
+			PoolRewards: poolReward,
 			FixedCost:   pool.FixedCost,
 		}); err != nil {
 			panic(ierrors.Wrapf(err, "failed to set rewards for account %s", accountID))
