@@ -6,27 +6,36 @@ import (
 	"github.com/zyedidia/generic/cache"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
 	"github.com/iotaledger/hive.go/ds/types"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type UnsolidCommitmentBuffer[V any] struct {
+type optionalSizedBuffer[V comparable] interface {
+	ToSlice() []V
+	Add(value V) bool
+}
+
+type UnsolidCommitmentBuffer[V comparable] struct {
 	blockBufferMaxSize int
 
 	mutex           sync.RWMutex
 	lastEvictedSlot iotago.SlotIndex
-	blockBuffers    *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ringbuffer.RingBuffer[V]]
+	blockBuffers    *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, optionalSizedBuffer[V]]
 
 	commitmentBuffer      *cache.Cache[iotago.CommitmentID, types.Empty]
 	commitmentBufferMutex sync.Mutex
 }
 
-func NewUnsolidCommitmentBuffer[V any](commitmentBufferMaxSize int, blockBufferMaxSize int) *UnsolidCommitmentBuffer[V] {
+func NewUnsolidCommitmentBuffer[V comparable](commitmentBufferMaxSize int, blockBufferMaxSize ...int) *UnsolidCommitmentBuffer[V] {
 	u := &UnsolidCommitmentBuffer[V]{
-		blockBufferMaxSize: blockBufferMaxSize,
-		blockBuffers:       memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ringbuffer.RingBuffer[V]](),
-		commitmentBuffer:   cache.New[iotago.CommitmentID, types.Empty](commitmentBufferMaxSize),
+		blockBuffers:     memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, optionalSizedBuffer[V]](),
+		commitmentBuffer: cache.New[iotago.CommitmentID, types.Empty](commitmentBufferMaxSize),
+	}
+
+	if len(blockBufferMaxSize) > 0 {
+		u.blockBufferMaxSize = blockBufferMaxSize[0]
 	}
 
 	u.commitmentBuffer.SetEvictCallback(func(commitmentID iotago.CommitmentID, _ types.Empty) {
@@ -52,8 +61,12 @@ func (u *UnsolidCommitmentBuffer[V]) Add(commitmentID iotago.CommitmentID, value
 }
 
 func (u *UnsolidCommitmentBuffer[V]) add(commitmentID iotago.CommitmentID, value V) {
-	buffer, _ := u.blockBuffers.Get(commitmentID.Index(), true).GetOrCreate(commitmentID, func() *ringbuffer.RingBuffer[V] {
-		return ringbuffer.NewRingBuffer[V](u.blockBufferMaxSize)
+	buffer, _ := u.blockBuffers.Get(commitmentID.Index(), true).GetOrCreate(commitmentID, func() optionalSizedBuffer[V] {
+		if u.blockBufferMaxSize > 0 {
+			return ringbuffer.NewRingBuffer[V](u.blockBufferMaxSize)
+		}
+
+		return ds.NewSet[V]()
 	})
 	buffer.Add(value)
 
@@ -101,7 +114,7 @@ func (u *UnsolidCommitmentBuffer[V]) GetValues(commitmentID iotago.CommitmentID)
 
 	if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Index()); blockBufferForCommitments != nil {
 		if buffer, exists := blockBufferForCommitments.Get(commitmentID); exists {
-			return buffer.Elements()
+			return buffer.ToSlice()
 		}
 	}
 
@@ -115,7 +128,7 @@ func (u *UnsolidCommitmentBuffer[V]) GetValuesAndEvict(commitmentID iotago.Commi
 	var values []V
 	if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Index()); blockBufferForCommitments != nil {
 		if buffer, exists := blockBufferForCommitments.Get(commitmentID); exists {
-			values = buffer.Elements()
+			values = buffer.ToSlice()
 		}
 	}
 

@@ -17,8 +17,6 @@ const (
 	latestCommitment    = "latest"
 	finalizedCommitment = "finalized"
 	forksCount          = "forks_total"
-	missingRequested    = "missing_requested_total"
-	missingReceived     = "missing_received_total"
 	acceptedBlocks      = "accepted_blocks"
 	transactions        = "accepted_transactions"
 	validators          = "active_validators"
@@ -51,24 +49,6 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.ChainManager.ForkDetected.Hook(func(_ *chainmanager.Fork) {
 				deps.Collector.Increment(commitmentsNamespace, forksCount)
-			}, event.WithWorkerPool(Component.WorkerPool))
-		}),
-	)),
-	collector.WithMetric(collector.NewMetric(missingRequested,
-		collector.WithType(collector.Counter),
-		collector.WithHelp("Number of missing commitments requested by the node."),
-		collector.WithInitFunc(func() {
-			deps.Protocol.Events.ChainManager.CommitmentMissing.Hook(func(commitment iotago.CommitmentID) {
-				deps.Collector.Increment(commitmentsNamespace, missingRequested)
-			}, event.WithWorkerPool(Component.WorkerPool))
-		}),
-	)),
-	collector.WithMetric(collector.NewMetric(missingReceived,
-		collector.WithType(collector.Counter),
-		collector.WithHelp("Number of missing commitments received by the node."),
-		collector.WithInitFunc(func() {
-			deps.Protocol.Events.ChainManager.MissingCommitmentReceived.Hook(func(commitment iotago.CommitmentID) {
-				deps.Collector.Increment(commitmentsNamespace, missingReceived)
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
