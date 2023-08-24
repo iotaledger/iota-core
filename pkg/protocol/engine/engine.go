@@ -181,7 +181,6 @@ func New(
 
 				// Only mark any pruning indexes if we loaded a non-genesis snapshot
 				if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-					fmt.Println("Pruning indexes", e.Storage.Settings().LatestFinalizedSlot())
 					if _, _, err := e.Storage.PruneByDepth(1); err != nil {
 						if !ierrors.Is(err, database.ErrNoPruningNeeded) &&
 							!ierrors.Is(err, database.ErrEpochPruned) {
