@@ -40,5 +40,5 @@ type SyncStatus struct {
 	LastConfirmedBlockSlot iotago.SlotIndex
 	LatestCommitment       *model.Commitment
 	LatestFinalizedSlot    iotago.SlotIndex
-	LatestPrunedEpoch      iotago.EpochIndex
+	LastPrunedEpoch        iotago.EpochIndex
 }

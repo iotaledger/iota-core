@@ -109,7 +109,7 @@ func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
 		LastConfirmedBlockSlot: s.lastConfirmedBlockSlot,
 		LatestCommitment:       s.latestCommitment,
 		LatestFinalizedSlot:    s.latestFinalizedSlot,
-		LatestPrunedEpoch:      s.lastPrunedEpoch,
+		LastPrunedEpoch:        s.lastPrunedEpoch,
 	}
 }
 
