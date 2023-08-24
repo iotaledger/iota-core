@@ -1,6 +1,7 @@
 package chainmanagerv1
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -40,6 +41,14 @@ func TestChainManager(t *testing.T) {
 		2,
 	), testAPI))
 
+	commitment3a := lo.PanicOnErr(model.CommitmentFromCommitment(iotago.NewCommitment(testAPI.Version(),
+		commitment2.Index()+1,
+		commitment2.ID(),
+		commitment2.RootsID(),
+		40,
+		2,
+	), testAPI))
+
 	commitment1Metadata := chainManager.ProcessCommitment(commitment1)
 	require.True(t, commitment1Metadata.Solid().Get())
 
@@ -57,4 +66,7 @@ func TestChainManager(t *testing.T) {
 	require.True(t, commitment3Metadata.BelowSyncThreshold().Get())
 	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().Get().latestCommitmentIndex.Get())
 	require.Equal(t, uint64(3), commitment3Metadata.Chain().Get().cumulativeWeight.Get())
+
+	commitment3aMetadata := chainManager.ProcessCommitment(commitment3a)
+	fmt.Println(commitment3aMetadata.Chain().Get().Root().Get())
 }

@@ -12,32 +12,36 @@ import (
 )
 
 type ChainManager struct {
-	rootChain reactive.Variable[*Chain]
+	mainChain reactive.Variable[*Chain]
 
-	commitmentCreated *event.Event1[*CommitmentMetadata]
-
-	cachedCommitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]]
+	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]]
 
 	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+
+	commitmentCreated *event.Event1[*CommitmentMetadata]
 
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
 func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
-	return &ChainManager{
-		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
-		rootChain:           reactive.NewVariable[*Chain]().Init(NewChain(NewRootCommitmentMetadata(rootCommitment))),
-		commitmentCreated:   event.New1[*CommitmentMetadata](),
-		cachedCommitments:   shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
+	c := &ChainManager{
+		mainChain:           reactive.NewVariable[*Chain](),
+		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
 		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
+		commitmentCreated:   event.New1[*CommitmentMetadata](),
+		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
 	}
+
+	c.mainChain.Set(NewChain(NewRootCommitmentMetadata(rootCommitment, c), c))
+
+	return c
 }
 
 func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *CommitmentMetadata) {
 	if commitmentRequest := c.requestCommitment(commitment.ID(), commitment.Index(), false, func(resolvedMetadata *CommitmentMetadata) {
 		commitmentMetadata = resolvedMetadata
 	}); commitmentRequest != nil {
-		commitmentRequest.Resolve(NewCommitmentMetadata(commitment))
+		commitmentRequest.Resolve(NewCommitmentMetadata(commitment, c))
 	}
 
 	return commitmentMetadata
@@ -47,52 +51,62 @@ func (c *ChainManager) OnCommitmentCreated(callback func(commitment *CommitmentM
 	return c.commitmentCreated.Hook(callback).Unhook
 }
 
+func (c *ChainManager) MainChain() reactive.Variable[*Chain] {
+	return c.mainChain
+}
+
 func (c *ChainManager) RootCommitment() reactive.Variable[*CommitmentMetadata] {
-	chain := c.rootChain.Get()
+	chain := c.mainChain.Get()
 	if chain == nil {
 		panic("root chain not initialized")
 	}
 
-	return chain.ForkingPoint()
+	return chain.Root()
 }
 
 func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvictedEvent reactive.Event) {
-	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, commitment.registerParent)
+	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, func(metadata *CommitmentMetadata) {
+		commitment.Parent().Set(metadata)
+	})
 
-	slotEvictedEvent.OnTrigger(func() { commitment.Evicted().Trigger() })
+	slotEvictedEvent.OnTrigger(func() {
+		commitment.Evicted().Trigger()
+	})
 
 	c.commitmentCreated.Trigger(commitment)
 }
 
-func (c *ChainManager) requestCommitment(id iotago.CommitmentID, index iotago.SlotIndex, requestIfMissing bool, optSuccessCallbacks ...func(metadata *CommitmentMetadata)) (commitmentRequest *promise.Promise[*CommitmentMetadata]) {
+func (c *ChainManager) requestCommitment(commitmentID iotago.CommitmentID, index iotago.SlotIndex, requestFromPeers bool, optSuccessCallbacks ...func(metadata *CommitmentMetadata)) (commitmentRequest *promise.Promise[*CommitmentMetadata]) {
 	slotEvicted := c.EvictionEvent(index)
 	if slotEvicted.WasTriggered() {
-		if rootCommitment := c.RootCommitment().Get(); rootCommitment != nil && id == rootCommitment.ID() {
-			for _, successCallback := range optSuccessCallbacks {
-				successCallback(rootCommitment)
-			}
+		rootCommitment := c.mainChain.Get().root.Get()
 
-			return promise.New[*CommitmentMetadata]().Resolve(rootCommitment)
+		if rootCommitment == nil || commitmentID != rootCommitment.ID() {
+			return nil
 		}
 
-		return nil
+		for _, successCallback := range optSuccessCallbacks {
+			successCallback(rootCommitment)
+		}
+
+		return promise.New[*CommitmentMetadata]().Resolve(rootCommitment)
 	}
 
-	commitmentRequest, requestCreated := c.cachedCommitments.GetOrCreate(id, lo.NoVariadic(promise.New[*CommitmentMetadata]))
+	commitmentRequest, requestCreated := c.commitments.GetOrCreate(commitmentID, lo.NoVariadic(promise.New[*CommitmentMetadata]))
 	if requestCreated {
-		if requestIfMissing {
-			c.commitmentRequester.StartTicker(id)
+		if requestFromPeers {
+			c.commitmentRequester.StartTicker(commitmentID)
+
+			commitmentRequest.OnComplete(func() {
+				c.commitmentRequester.StopTicker(commitmentID)
+			})
 		}
 
 		commitmentRequest.OnSuccess(func(commitment *CommitmentMetadata) {
-			if requestIfMissing {
-				c.commitmentRequester.StopTicker(commitment.ID())
-			}
-
 			c.setupCommitment(commitment, slotEvicted)
 		})
 
-		slotEvicted.OnTrigger(func() { c.cachedCommitments.Delete(id) })
+		slotEvicted.OnTrigger(func() { c.commitments.Delete(commitmentID) })
 	}
 
 	for _, successCallback := range optSuccessCallbacks {

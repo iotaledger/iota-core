@@ -17,15 +17,15 @@ const (
 )
 
 type Chain struct {
-	forkingPoint reactive.Variable[*CommitmentMetadata]
+	manager *ChainManager
+
+	root reactive.Variable[*CommitmentMetadata]
 
 	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *CommitmentMetadata]
 
 	latestCommitmentIndex reactive.Variable[iotago.SlotIndex]
 
 	latestVerifiedCommitmentIndex reactive.Variable[iotago.SlotIndex]
-
-	evicted reactive.Event
 
 	// syncThreshold defines an upper bound for the range of slots that are being fed to the engine as part of the sync
 	// process (sync from past to present preventing the engine from running out of memory).
@@ -36,18 +36,21 @@ type Chain struct {
 	warpSyncThreshold reactive.Variable[iotago.SlotIndex]
 
 	cumulativeWeight reactive.Variable[uint64]
+
+	evicted reactive.Event
 }
 
-func NewChain(forkingPoint *CommitmentMetadata) *Chain {
+func NewChain(root *CommitmentMetadata, manager *ChainManager) *Chain {
 	c := &Chain{
-		forkingPoint:                  reactive.NewVariable[*CommitmentMetadata]().Init(forkingPoint),
+		manager:                       manager,
 		commitments:                   shrinkingmap.New[iotago.SlotIndex, *CommitmentMetadata](),
-		evicted:                       reactive.NewEvent(),
+		root:                          reactive.NewVariable[*CommitmentMetadata]().Init(root),
 		latestCommitmentIndex:         reactive.NewVariable[iotago.SlotIndex](),
 		latestVerifiedCommitmentIndex: reactive.NewVariable[iotago.SlotIndex](),
+		evicted:                       reactive.NewEvent(),
 	}
 
-	forkingPoint.Chain().Set(c)
+	root.Chain().Set(c)
 
 	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
 		return latestVerifiedCommitmentIndex + 1 + SyncWindow
@@ -64,19 +67,28 @@ func NewChain(forkingPoint *CommitmentMetadata) *Chain {
 	return c
 }
 
-func (c *Chain) ForkingPoint() reactive.Variable[*CommitmentMetadata] {
-	return c.forkingPoint
+func (c *Chain) Root() reactive.Variable[*CommitmentMetadata] {
+	return c.root
+}
+
+func (c *Chain) ParentChain() *Chain {
+	if root := c.root.Get(); root != nil {
+		if parent := root.Parent().Get(); parent != nil {
+			return parent.Chain().Get()
+		}
+	}
+
+	return nil
 }
 
 func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *CommitmentMetadata, exists bool) {
-	forkingPoint := c.forkingPoint.Get()
-
-	if index < forkingPoint.Index() {
-		// TODO: GO TO PARENT CHAIN
-		return nil, false
+	for currentChain := c; currentChain != nil; currentChain = currentChain.ParentChain() {
+		if root := currentChain.Root().Get(); root != nil && index >= root.Index() {
+			return currentChain.commitments.Get(index)
+		}
 	}
 
-	return c.commitments.Get(index)
+	return nil, false
 }
 
 func (c *Chain) LatestCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
