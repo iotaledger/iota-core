@@ -25,7 +25,7 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 
 	commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Index())
 	if err != nil {
-		p.ErrorHandler()(ierrors.Wrapf(err, "failed to load commitment %s", commitmentID))
+		p.HandleError(ierrors.Wrapf(err, "failed to load commitment %s", commitmentID))
 		return
 	}
 
@@ -35,18 +35,18 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 
 	attestations, err := mainEngine.Attestations.Get(commitmentID.Index())
 	if err != nil {
-		p.ErrorHandler()(ierrors.Wrapf(err, "failed to load attestations for commitment %s", commitmentID))
+		p.HandleError(ierrors.Wrapf(err, "failed to load attestations for commitment %s", commitmentID))
 		return
 	}
 
 	rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Index())
 	if err != nil {
-		p.ErrorHandler()(ierrors.Errorf("failed to get roots storage for commitment %s", commitmentID))
+		p.HandleError(ierrors.Errorf("failed to get roots storage for commitment %s", commitmentID))
 		return
 	}
 	roots, err := rootsStorage.Load(commitmentID)
 	if err != nil {
-		p.ErrorHandler()(ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID))
+		p.HandleError(ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID))
 		return
 	}
 
@@ -55,18 +55,18 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 
 func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	if candidateEngineInstance := p.CandidateEngineInstance(); candidateEngineInstance != nil && candidateEngineInstance.ChainID() == fork.ForkingPoint.ID() {
-		p.ErrorHandler()(ierrors.Errorf("we are already processing the fork at forkingPoint %s", fork.ForkingPoint.ID()))
+		p.HandleError(ierrors.Errorf("we are already processing the fork at forkingPoint %s", fork.ForkingPoint.ID()))
 		return
 	}
 
 	if p.MainEngineInstance().ChainID() == fork.ForkingPoint.ID() {
-		p.ErrorHandler()(ierrors.Errorf("we already switched our main engine to the fork at forkingPoint %s", fork.ForkingPoint.ID()))
+		p.HandleError(ierrors.Errorf("we already switched our main engine to the fork at forkingPoint %s", fork.ForkingPoint.ID()))
 		return
 	}
 
 	blockIDs, shouldSwitch, banSrc, err := p.processFork(fork)
 	if err != nil {
-		p.ErrorHandler()(ierrors.Wrapf(err, "failed to handle fork %s at forking point %s from source %s", fork.ForkedChain.LatestCommitment().ID(), fork.ForkingPoint.ID(), fork.Source))
+		p.HandleError(ierrors.Wrapf(err, "failed to handle fork %s at forking point %s from source %s", fork.ForkedChain.LatestCommitment().ID(), fork.ForkingPoint.ID(), fork.Source))
 		return
 	}
 
@@ -86,7 +86,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	snapshotTargetIndex := fork.ForkingPoint.Index() - 1
 	candidateEngineInstance, err := p.engineManager.ForkEngineAtSlot(snapshotTargetIndex)
 	if err != nil {
-		p.ErrorHandler()(ierrors.Wrap(err, "error creating new candidate engine"))
+		p.HandleError(ierrors.Wrap(err, "error creating new candidate engine"))
 		return
 	}
 
@@ -112,7 +112,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 
 		candidateEngineInstance.Shutdown()
 		if err := candidateEngineInstance.RemoveFromFilesystem(); err != nil {
-			p.ErrorHandler()(ierrors.Wrapf(err, "error cleaning up candidate engine %s from file system", candidateEngineInstance.Name()))
+			p.HandleError(ierrors.Wrapf(err, "error cleaning up candidate engine %s from file system", candidateEngineInstance.Name()))
 		}
 	}
 
@@ -122,7 +122,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 		if fork.ForkedChain.LatestCommitment().ID().Index() >= commitment.Index() {
 			forkedChainCommitmentID := fork.ForkedChain.Commitment(commitment.Index()).ID()
 			if forkedChainCommitmentID != commitment.ID() {
-				p.ErrorHandler()(ierrors.Errorf("candidate engine %s produced a commitment %s that is not part of the forked chain %s", candidateEngineInstance.Name(), commitment.ID(), forkedChainCommitmentID))
+				p.HandleError(ierrors.Errorf("candidate engine %s produced a commitment %s that is not part of the forked chain %s", candidateEngineInstance.Name(), commitment.ID(), forkedChainCommitmentID))
 				cleanupFunc()
 
 				return
@@ -150,7 +150,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 
 		select {
 		case <-candidateEngineTimeoutTimer.C:
-			p.ErrorHandler()(ierrors.Errorf("timeout waiting for candidate engine %s to sync", candidateEngineInstance.Name()))
+			p.HandleError(ierrors.Errorf("timeout waiting for candidate engine %s to sync", candidateEngineInstance.Name()))
 			cleanupFunc()
 		case <-p.context.Done():
 			// Nothing to do here. The candidate engine will be shutdown on protocol shutdown and cleaned up when starting the node again.
@@ -293,13 +293,13 @@ func (p *Protocol) switchEngines() {
 		candidateEngineInstance := p.candidateEngine.engine
 		// Try to re-org the chain manager
 		if err := p.ChainManager.SwitchMainChain(candidateEngineInstance.Storage.Settings().LatestCommitment().ID()); err != nil {
-			p.ErrorHandler()(ierrors.Wrap(err, "switching main chain failed"))
+			p.HandleError(ierrors.Wrap(err, "switching main chain failed"))
 
 			return false
 		}
 
 		if err := p.engineManager.SetActiveInstance(candidateEngineInstance); err != nil {
-			p.ErrorHandler()(ierrors.Wrap(err, "error switching engines"))
+			p.HandleError(ierrors.Wrap(err, "error switching engines"))
 
 			return false
 		}
@@ -323,7 +323,7 @@ func (p *Protocol) switchEngines() {
 
 		// Cleanup filesystem
 		if err := oldEngine.RemoveFromFilesystem(); err != nil {
-			p.ErrorHandler()(ierrors.Wrap(err, "error removing storage directory after switching engines"))
+			p.HandleError(ierrors.Wrap(err, "error removing storage directory after switching engines"))
 		}
 	}
 }

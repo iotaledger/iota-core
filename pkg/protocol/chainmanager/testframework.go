@@ -47,11 +47,11 @@ func NewTestFramework(test *testing.T, api iotago.API, opts ...options.Option[Te
 			t.test.Logf("ForkDetected: %s", fork)
 			atomic.AddInt32(&t.forkDetected, 1)
 		})
-		t.Instance.Events.CommitmentMissing.Hook(func(id iotago.CommitmentID) {
+		t.Instance.commitmentRequester.Events.TickerStarted.Hook(func(id iotago.CommitmentID) {
 			t.test.Logf("CommitmentMissing: %s", id)
 			atomic.AddInt32(&t.commitmentMissing, 1)
 		})
-		t.Instance.Events.MissingCommitmentReceived.Hook(func(id iotago.CommitmentID) {
+		t.Instance.commitmentRequester.Events.TickerStopped.Hook(func(id iotago.CommitmentID) {
 			t.test.Logf("MissingCommitmentReceived: %s", id)
 			atomic.AddInt32(&t.missingCommitmentReceived, 1)
 		})
@@ -100,7 +100,7 @@ func (t *TestFramework) commitment(alias string) *model.Commitment {
 }
 
 func (t *TestFramework) ChainCommitment(alias string) *ChainCommitment {
-	cm, exists := t.Instance.commitment(t.SlotCommitment(alias))
+	cm, exists := t.Instance.Commitment(t.SlotCommitment(alias))
 	require.True(t.test, exists)
 
 	return cm
@@ -165,7 +165,7 @@ func (t *TestFramework) AssertChainState(chains map[string]string) {
 			continue
 		}
 		if chainAlias == "evicted" {
-			_, exists := t.Instance.commitment(t.SlotCommitment(commitmentAlias))
+			_, exists := t.Instance.Commitment(t.SlotCommitment(commitmentAlias))
 			require.False(t.test, exists, "commitment %s should be evicted", commitmentAlias)
 			continue
 		}
