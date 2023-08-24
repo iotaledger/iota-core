@@ -26,7 +26,6 @@ import (
 var (
 	testPacket1             = &p2pproto.Negotiation{}
 	log                     = logger.NewExampleLogger("p2p_test")
-	protocolID  protocol.ID = "testgossip/0.0.1"
 )
 
 func TestNeighborClose(t *testing.T) {
@@ -68,9 +67,9 @@ func TestNeighborWrite(t *testing.T) {
 	defer neighborB.disconnect()
 	neighborB.readLoop()
 
-	err := neighborA.protocols[protocolID].WritePacket(testPacket1)
+	err := neighborA.stream[protocolID].WritePacket(testPacket1)
 	require.NoError(t, err)
-	err = neighborB.protocols[protocolID].WritePacket(testPacket1)
+	err = neighborB.stream[protocolID].WritePacket(testPacket1)
 	require.NoError(t, err)
 
 	assert.Eventually(t, func() bool { return atomic.LoadUint32(&countA) == 1 }, time.Second, 10*time.Millisecond)

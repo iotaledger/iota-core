@@ -48,15 +48,13 @@ func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, ap
 		apiProvider:               apiProvider,
 		duplicateBlockBytesFilter: bytesfilter.New(10000),
 		requestedBlockHashes:      shrinkingmap.New[types.Identifier, types.Empty](shrinkingmap.WithShrinkingThresholdCount(1000)),
-	}, opts, func(p *Protocol) {
-		network.RegisterProtocol(protocolID, newPacket, p.handlePacket)
-	})
+	}, opts)
 }
 
 func (p *Protocol) SendBlock(block *model.Block, to ...network.PeerID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Block{Block: &nwmodels.Block{
 		Bytes: block.Data(),
-	}}}, protocolID, to...)
+	}}}, to...)
 }
 
 func (p *Protocol) RequestBlock(id iotago.BlockID, to ...network.PeerID) {
@@ -66,13 +64,13 @@ func (p *Protocol) RequestBlock(id iotago.BlockID, to ...network.PeerID) {
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_BlockRequest{BlockRequest: &nwmodels.BlockRequest{
 		BlockId: id[:],
-	}}}, protocolID, to...)
+	}}}, to...)
 }
 
 func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...network.PeerID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitment{SlotCommitment: &nwmodels.SlotCommitment{
 		Bytes: cm.Data(),
-	}}}, protocolID, to...)
+	}}}, to...)
 }
 
 func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
@@ -87,23 +85,23 @@ func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago
 		Commitment:   cm.Data(),
 		Attestations: lo.PanicOnErr(iotagoAPI.Encode(attestations)),
 		MerkleProof:  lo.PanicOnErr(json.Marshal(merkleProof)),
-	}}}, protocolID, to...)
+	}}}, to...)
 }
 
 func (p *Protocol) RequestSlotCommitment(id iotago.CommitmentID, to ...network.PeerID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitmentRequest{SlotCommitmentRequest: &nwmodels.SlotCommitmentRequest{
 		CommitmentId: id[:],
-	}}}, protocolID, to...)
+	}}}, to...)
 }
 
 func (p *Protocol) RequestAttestations(id iotago.CommitmentID, to ...network.PeerID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_AttestationsRequest{AttestationsRequest: &nwmodels.AttestationsRequest{
 		CommitmentId: lo.PanicOnErr(id.Bytes()),
-	}}}, protocolID, to...)
+	}}}, to...)
 }
 
 func (p *Protocol) Shutdown() {
-	p.network.UnregisterProtocol(protocolID)
+	p.network.Shutdown()
 
 	p.workerPool.Shutdown()
 	p.workerPool.ShutdownComplete.Wait()

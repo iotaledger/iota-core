@@ -3,7 +3,7 @@ package libp2putil
 import (
 	golibp2p "github.com/libp2p/go-libp2p"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
@@ -42,7 +42,7 @@ func ToLibp2pPrivateKey(ourPrivateKey ed25519.PrivateKey) (libp2pcrypto.PrivKey,
 }
 
 // ToLibp2pPeerID computes libp2p peer ID from our peer object.
-func ToLibp2pPeerID(p *network.Peer) (libp2ppeer.ID, error) {
+func ToLibp2pPeerID(p *network.Peer) (p2ppeer.ID, error) {
 	pubKeyBytes, err := p.Identity.PublicKey().Bytes()
 	if err != nil {
 		return "", ierrors.WithStack(err)
@@ -53,7 +53,7 @@ func ToLibp2pPeerID(p *network.Peer) (libp2ppeer.ID, error) {
 		return "", ierrors.WithStack(err)
 	}
 
-	libp2pID, err := libp2ppeer.IDFromPublicKey(pubKeyLibp2p)
+	libp2pID, err := p2ppeer.IDFromPublicKey(pubKeyLibp2p)
 	if err != nil {
 		return "", ierrors.WithStack(err)
 	}

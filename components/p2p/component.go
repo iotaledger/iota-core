@@ -11,6 +11,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"go.uber.org/dig"
 
+	ma "github.com/multiformats/go-multiaddr"
+
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/autopeering/peer/service"
@@ -19,7 +21,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/libp2putil"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/autopeering"
 	"github.com/iotaledger/iota-core/pkg/network/manualpeering"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
@@ -195,14 +196,12 @@ func provide(c *dig.Container) error {
 
 func configure() error {
 	// log the p2p events
-	deps.P2PManager.NeighborGroupEvents(p2p.NeighborsGroupAuto).NeighborAdded.Hook(func(event *p2p.NeighborAddedEvent) {
-		n := event.Neighbor
-		Component.LogInfof("Neighbor added: %s / %s", n.PeerAddresses, n.Identity.ID())
+	deps.P2PManager.Events.NeighborAdded.Hook(func(neighbor *p2p.Neighbor) {
+		Component.LogInfof("Neighbor added: %s / %s", neighbor.PeerAddresses, neighbor.Identity.ID())
 	}, event.WithWorkerPool(Component.WorkerPool))
 
-	deps.P2PManager.NeighborGroupEvents(p2p.NeighborsGroupAuto).NeighborRemoved.Hook(func(event *p2p.NeighborRemovedEvent) {
-		n := event.Neighbor
-		Component.LogInfof("Neighbor removed: %s / %s", n.PeerAddresses, n.Identity.ID())
+	deps.P2PManager.Events.NeighborRemoved.Hook(func(neighbor *p2p.Neighbor) {
+		Component.LogInfof("Neighbor removed: %s / %s", neighbor.PeerAddresses, neighbor.Identity.ID())
 	}, event.WithWorkerPool(Component.WorkerPool))
 
 	return nil
@@ -255,24 +254,24 @@ func run() error {
 }
 
 func addPeersFromConfigToManager(mgr *manualpeering.Manager) {
-	TODO: peers address format now changed!
+	// TODO: peers address format now changed!
 	peers, err := getKnownPeersFromConfig()
 	if err != nil {
 		Component.LogErrorf("Failed to get known peers from the config file, continuing without them...", "err", err)
 	} else if len(peers) != 0 {
 		Component.LogInfof("Pass known peers list from the config file to the manager", "peers", peers)
-		if err := mgr.AddPeer(peers...); err != nil {
+		if err := mgr.AddPeers(peers...); err != nil {
 			Component.LogInfof("Failed to pass known peers list from the config file to the manager",
 				"peers", peers, "err", err)
 		}
 	}
 }
 
-func getKnownPeersFromConfig() ([]*network.PeerDescriptor, error) {
+func getKnownPeersFromConfig() ([]ma.Multiaddr, error) {
 	if ParamsPeers.KnownPeers == "" {
-		return []*network.PeerDescriptor{}, nil
+		return nil, nil
 	}
-	var peers []*network.PeerDescriptor
+	var peers []ma.Multiaddr
 	if err := json.Unmarshal([]byte(ParamsPeers.KnownPeers), &peers); err != nil {
 		return nil, ierrors.Wrap(err, "can't parse peers from json")
 	}

@@ -17,7 +17,7 @@ func (p *Protocol) SendWarpSyncRequest(id iotago.CommitmentID, to ...network.Pee
 		WarpSyncRequest: &nwmodels.WarpSyncRequest{
 			CommitmentId: lo.PanicOnErr(id.Bytes()),
 		},
-	}}, protocolID, to...)
+	}}, to...)
 }
 
 func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
@@ -29,7 +29,7 @@ func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.
 			BlockIds:     lo.PanicOnErr(serializer.Encode(blockIDs)),
 			MerkleProof:  lo.PanicOnErr(json.Marshal(merkleProof)),
 		},
-	}}, protocolID, to...)
+	}}, to...)
 }
 
 func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id network.PeerID) {

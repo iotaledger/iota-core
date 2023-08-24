@@ -2,13 +2,10 @@ package p2p
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	p2pnetwork "github.com/libp2p/go-libp2p/core/network"
-	libp2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	"go.uber.org/atomic"
 	"google.golang.org/protobuf/proto"
 
@@ -33,17 +30,19 @@ var (
 	ErrNoP2P = ierrors.New("peer does not have a p2p service")
 )
 
-func (m *Manager) dialPeer(ctx context.Context, p *network.Peer, opts []ConnectPeerOption) (map[protocol.ID]*PacketsStream, error) {
-	m.registeredProtocolsMutex.RLock()
-	defer m.registeredProtocolsMutex.RUnlock()
-
-	conf := buildConnectPeerConfig(opts)
-	libp2pID, err := libp2putil.ToLibp2pPeerID(p)
-	if err != nil {
-		return nil, ierrors.WithStack(err)
+func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...ConnectPeerOption) error {
+	if m.neighborExists(peer.Identity.ID()) {
+		return ierrors.Wrapf(ErrDuplicateNeighbor, "peer %s already exists", peer.Identity.ID())
 	}
 
-	m.libp2pHost.Peerstore().AddAddrs(libp2pID, p.PeerAddresses, peerstore.ConnectedAddrTTL)
+	conf := buildConnectPeerConfig(opts)
+	libp2pID, err := libp2putil.ToLibp2pPeerID(peer)
+	if err != nil {
+		return ierrors.WithStack(err)
+	}
+
+	// Adds the peer's multiaddresses to the peerstore, so that they can be used for dialing.
+	m.libp2pHost.Peerstore().AddAddrs(libp2pID, peer.PeerAddresses, peerstore.ConnectedAddrTTL)
 
 	if conf.useDefaultTimeout {
 		var cancel context.CancelFunc
@@ -51,241 +50,57 @@ func (m *Manager) dialPeer(ctx context.Context, p *network.Peer, opts []ConnectP
 		defer cancel()
 	}
 
-	streams := make(map[protocol.ID]*PacketsStream)
-	for protocolID := range m.registeredProtocols {
-		stream, err := m.initiateStream(ctx, libp2pID, protocolID)
-		if err != nil {
-			m.log.Errorf("dial %s / %s failed for proto %s: %w", p.PeerAddresses, p.Identity.ID(), protocolID, err)
-			continue
-		}
-		m.log.Debugw("outgoing stream negotiated",
-			"id", p.Identity.ID(),
-			"addr", stream.Conn().RemoteMultiaddr(),
-			"proto", protocolID,
-		)
-		streams[protocolID] = stream
-	}
-
-	if len(streams) == 0 {
-		return nil, ierrors.Errorf("no streams initiated with peer %s / %s", p.PeerAddresses, p.Identity.ID())
-	}
-
-	return streams, nil
-}
-
-func (m *Manager) acceptPeer(ctx context.Context, p *network.Peer, opts []ConnectPeerOption) (map[protocol.ID]*PacketsStream, error) {
-	m.registeredProtocolsMutex.RLock()
-	defer m.registeredProtocolsMutex.RUnlock()
-
-	handleInboundStream := func(ctx context.Context, protocolID protocol.ID) (*PacketsStream, error) {
-		if buildConnectPeerConfig(opts).useDefaultTimeout {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, defaultConnectionTimeout)
-			defer cancel()
-		}
-		amCtx, am, err := m.newAcceptMatcher(ctx, p, protocolID)
-		if err != nil {
-			return nil, ierrors.WithStack(err)
-		}
-		if am == nil {
-			return nil, ierrors.WithStack(ErrDuplicateAccept)
-		}
-		defer m.removeAcceptMatcher(am, protocolID)
-
-		m.log.Debugw("waiting for incoming stream", "id", am.Peer.Identity.ID(), "proto", protocolID)
-		am.StreamChMutex.RLock()
-		streamCh := am.StreamCh[protocolID]
-		am.StreamChMutex.RUnlock()
-		select {
-		case ps := <-streamCh:
-			if ps.Protocol() != protocolID {
-				return nil, ierrors.Errorf("accepted stream has wrong protocol: %s != %s", ps.Protocol(), protocolID)
-			}
-
-			return ps, nil
-		case <-amCtx.Done():
-			err := amCtx.Err()
-			if ierrors.Is(err, context.DeadlineExceeded) {
-				m.log.Debugw("accept timeout", "id", am.Peer.Identity.ID(), "proto", protocolID)
-				return nil, ierrors.WithStack(ErrTimeout)
-			}
-			m.log.Debugw("context error", "id", am.Peer.Identity.ID(), "err", err)
-
-			return nil, ierrors.WithStack(err)
-		}
-	}
-
-	var acceptWG sync.WaitGroup
-	streamsChan := make(chan *PacketsStream, len(m.registeredProtocols))
-	for protocolID := range m.registeredProtocols {
-		acceptWG.Add(1)
-		go func(protocolID protocol.ID) {
-			defer acceptWG.Done()
-			stream, err := handleInboundStream(ctx, protocolID)
-			if err != nil {
-				m.log.Errorf(
-					"accept %s / %s proto %s failed: %s",
-					p.PeerAddresses,
-					p.Identity.ID(),
-					protocolID,
-					err,
-				)
-
-				return
-			}
-			m.log.Debugw("incoming stream negotiated",
-				"id", p.Identity.ID(),
-				"addr", stream.Conn().RemoteMultiaddr(),
-				"proto", protocolID,
-			)
-			streamsChan <- stream
-		}(protocolID)
-	}
-	acceptWG.Wait()
-	close(streamsChan)
-
-	streams := make(map[protocol.ID]*PacketsStream)
-	for stream := range streamsChan {
-		streams[stream.Protocol()] = stream
-	}
-
-	if len(streams) == 0 {
-		return nil, ierrors.Errorf("no streams accepted from peer %s", p.Identity.ID())
-	}
-
-	return streams, nil
-}
-
-func (m *Manager) initiateStream(ctx context.Context, libp2pID libp2ppeer.ID, protocolID protocol.ID) (*PacketsStream, error) {
-	protocolHandler, registered := m.registeredProtocols[protocolID]
-	if !registered {
-		return nil, ierrors.Errorf("cannot initiate stream protocol %s is not registered", protocolID)
-	}
 	stream, err := m.P2PHost().NewStream(ctx, libp2pID, protocolID)
 	if err != nil {
-		return nil, err
+		return ierrors.Wrapf(err, "dial %s / %s failed to open stream for proto %s", peer.PeerAddresses, peer.Identity.ID(), protocolID)
 	}
-	ps := NewPacketsStream(stream, protocolHandler.PacketFactory)
+
+	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
 	if err := ps.sendNegotiation(); err != nil {
-		err = ierrors.Wrap(err, "failed to send negotiation block")
-		stream.Close()
+		m.closeStream(stream)
 
-		return nil, err
+		return ierrors.Wrapf(err, "dial %s / %s failed to send negotiation for proto %s", peer.PeerAddresses, peer.Identity.ID(), protocolID)
 	}
 
-	return ps, nil
+	m.log.Debugw("outgoing stream negotiated",
+		"id", peer.Identity.ID(),
+		"addr", ps.Conn().RemoteMultiaddr(),
+		"proto", protocolID,
+	)
+
+	if err := m.addNeighbor(peer, ps); err != nil {
+		m.closeStream(stream)
+
+		return ierrors.Errorf("failed to add neighbor %s: %s", peer.Identity.ID(), err)
+	}
+
+	return nil
 }
 
 func (m *Manager) handleStream(stream p2pnetwork.Stream) {
-	m.registeredProtocolsMutex.RLock()
-	defer m.registeredProtocolsMutex.RUnlock()
-
-	protocolID := stream.Protocol()
-	protocolHandler, registered := m.registeredProtocols[protocolID]
-	if !registered {
-		m.log.Errorf("cannot accept stream: protocol %s is not registered", protocolID)
-		m.closeStream(stream)
-
-		return
-	}
-	ps := NewPacketsStream(stream, protocolHandler.PacketFactory)
+	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
 	if err := ps.receiveNegotiation(); err != nil {
-		m.log.Errorw("failed to receive negotiation message", "proto", protocolID, "err", err)
+		m.log.Errorw("failed to receive negotiation message")
 		m.closeStream(stream)
 
 		return
 	}
-	am := m.matchNewStream(stream)
-	if am != nil {
-		am.StreamChMutex.RLock()
-		defer am.StreamChMutex.RUnlock()
-		streamCh := am.StreamCh[protocolID]
 
-		select {
-		case <-am.Ctx.Done():
-		case streamCh <- ps:
-			m.log.Debugw("incoming stream matched", "id", am.Peer.Identity.ID(), "proto", protocolID)
-		}
-	} else {
-		// close the connection if not matched
-		m.log.Debugw("unexpected connection", "addr", stream.Conn().RemoteMultiaddr(),
-			"id", stream.Conn().RemotePeer(), "proto", protocolID)
-		m.closeStream(stream)
-		stream.Conn().Close()
-	}
-}
-
-// AcceptMatcher holds data to match an existing connection with a peer.
-type AcceptMatcher struct {
-	Peer          *network.Peer // connecting peer
-	Libp2pID      libp2ppeer.ID
-	StreamChMutex syncutils.RWMutex
-	StreamCh      map[protocol.ID]chan *PacketsStream
-	Ctx           context.Context
-	CtxCancel     context.CancelFunc
-}
-
-func (m *Manager) newAcceptMatcher(ctx context.Context, p *network.Peer, protocolID protocol.ID) (context.Context, *AcceptMatcher, error) {
-	m.acceptMutex.Lock()
-	defer m.acceptMutex.Unlock()
-
-	libp2pID, err := libp2putil.ToLibp2pPeerID(p)
+	peerMultiAddr := stream.Conn().RemoteMultiaddr()
+	peer, err := network.NewPeer(peerMultiAddr)
 	if err != nil {
-		return nil, nil, ierrors.WithStack(err)
+		m.log.Errorf("failed to create peer from multiaddr %s: %s", peerMultiAddr, err)
+		m.closeStream(stream)
+
+		return
 	}
 
-	acceptMatcher, acceptExists := m.acceptMap[libp2pID]
-	if acceptExists {
-		acceptMatcher.StreamChMutex.Lock()
-		defer acceptMatcher.StreamChMutex.Unlock()
-		if _, streamChanExists := acceptMatcher.StreamCh[protocolID]; streamChanExists {
-			return nil, nil, nil
-		}
-		acceptMatcher.StreamCh[protocolID] = make(chan *PacketsStream)
+	if err := m.addNeighbor(peer, ps); err != nil {
+		m.log.Errorf("failed to add neighbor %s: %s", peer.Identity.ID(), err)
+		m.closeStream(stream)
 
-		return acceptMatcher.Ctx, acceptMatcher, nil
+		return
 	}
-
-	cancelCtx, cancelCtxFunc := context.WithCancel(ctx)
-
-	am := &AcceptMatcher{
-		Peer:      p,
-		Libp2pID:  libp2pID,
-		StreamCh:  make(map[protocol.ID]chan *PacketsStream),
-		Ctx:       cancelCtx,
-		CtxCancel: cancelCtxFunc,
-	}
-
-	am.StreamCh[protocolID] = make(chan *PacketsStream)
-
-	m.acceptMap[libp2pID] = am
-
-	return cancelCtx, am, nil
-}
-
-func (m *Manager) removeAcceptMatcher(am *AcceptMatcher, protocolID protocol.ID) {
-	m.acceptMutex.Lock()
-	defer m.acceptMutex.Unlock()
-
-	existingAm := m.acceptMap[am.Libp2pID]
-
-	existingAm.StreamChMutex.Lock()
-	defer existingAm.StreamChMutex.Unlock()
-
-	delete(existingAm.StreamCh, protocolID)
-
-	if len(existingAm.StreamCh) == 0 {
-		delete(m.acceptMap, am.Libp2pID)
-		existingAm.CtxCancel()
-	}
-}
-
-func (m *Manager) matchNewStream(stream p2pnetwork.Stream) *AcceptMatcher {
-	m.acceptMutex.RLock()
-	defer m.acceptMutex.RUnlock()
-	am := m.acceptMap[stream.Conn().RemotePeer()]
-
-	return am
 }
 
 func (m *Manager) closeStream(s p2pnetwork.Stream) {

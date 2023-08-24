@@ -10,10 +10,6 @@ type PeerID = identity.ID
 
 type Endpoint interface {
 	LocalPeerID() PeerID
-
-	RegisterProtocol(protocolID string, newMessage func() proto.Message, handler func(PeerID, proto.Message) error)
-
-	UnregisterProtocol(protocolID string)
-
-	Send(packet proto.Message, protocolID string, to ...PeerID)
+	Send(packet proto.Message, to ...PeerID)
+	Shutdown()
 }
