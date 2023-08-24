@@ -9,7 +9,6 @@ import (
 	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -30,7 +29,6 @@ import (
 type Manager struct {
 	p2pm              *p2p.Manager
 	log               *logger.Logger
-	local             *peer.Local
 	startOnce         sync.Once
 	isStarted         atomic.Bool
 	stopOnce          sync.Once
@@ -46,10 +44,9 @@ type Manager struct {
 }
 
 // NewManager initializes a new Manager instance.
-func NewManager(p2pm *p2p.Manager, local *peer.Local, workerPool *workerpool.WorkerPool, log *logger.Logger) *Manager {
+func NewManager(p2pm *p2p.Manager, workerPool *workerpool.WorkerPool, log *logger.Logger) *Manager {
 	m := &Manager{
 		p2pm:              p2pm,
-		local:             local,
 		log:               log,
 		reconnectInterval: network.DefaultReconnectInterval,
 		knownPeers:        make(map[p2ppeer.ID]*network.Peer),

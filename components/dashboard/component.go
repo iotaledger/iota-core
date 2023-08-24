@@ -10,10 +10,10 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/libp2p/go-libp2p/core/host"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/pkg/daemon"
@@ -46,8 +46,8 @@ var (
 type dependencies struct {
 	dig.In
 
+	Host           host.Host
 	Protocol       *protocol.Protocol
-	LocalPeer      *peer.Local
 	AppInfo        *app.Info
 	P2PManager     *p2p.Manager
 	MetricsTracker *metricstracker.MetricsTracker
@@ -133,7 +133,7 @@ func currentNodeStatus() *nodestatus {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	status := &nodestatus{}
-	status.ID = deps.LocalPeer.ID().String()
+	status.ID = deps.Host.ID().String()
 
 	// node status
 	status.Version = deps.AppInfo.Version

@@ -47,7 +47,7 @@ type dependencies struct {
 	Echo               *echo.Echo
 	Host               host.Host
 	RestAPIBindAddress string         `name:"restAPIBindAddress"`
-	NodePrivateKey     crypto.PrivKey `name:"nodePrivateKey"`
+	NodePrivateKey     crypto.PrivKey
 	RestRouteManager   *restapi.RestRouteManager
 
 	Protocol *protocolpkg.Protocol

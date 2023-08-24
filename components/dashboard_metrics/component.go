@@ -8,8 +8,10 @@ import (
 	"github.com/labstack/echo/v4"
 	"go.uber.org/dig"
 
+	"github.com/libp2p/go-libp2p/core/host"
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
@@ -18,7 +20,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 const (
@@ -55,10 +56,10 @@ var (
 type dependencies struct {
 	dig.In
 
+	Host             host.Host
 	Protocol         *protocol.Protocol
 	RestRouteManager *restapipkg.RestRouteManager
 	AppInfo          *app.Info
-	LocalPeer        *peer.Local
 }
 
 func configure() error {

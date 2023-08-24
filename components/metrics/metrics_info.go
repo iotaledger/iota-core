@@ -25,8 +25,8 @@ var InfoMetrics = collector.NewCollection(infoNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitValueFunc(func() (metricValue float64, labelValues []string) {
 			var nodeID string
-			if deps.Local != nil {
-				nodeID = deps.Local.ID().String()
+			if deps.Host != nil {
+				nodeID = deps.Host.ID().String()
 			}
 
 			return 0, []string{nodeID, runtime.GOOS, runtime.GOARCH, strconv.Itoa(runtime.NumCPU())}

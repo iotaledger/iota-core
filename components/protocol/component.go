@@ -9,7 +9,6 @@ import (
 	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -55,7 +54,6 @@ var (
 type dependencies struct {
 	dig.In
 
-	Peer     *peer.Local
 	Protocol *protocol.Protocol
 }
 
