@@ -10,6 +10,9 @@ type SyncManager interface {
 	// SyncStatus returns the sync status of a node.
 	SyncStatus() *SyncStatus
 
+	// IsBootstrapped returns bool indicating if a node is synced.
+	IsBootstrapped() bool
+
 	// IsNodeSynced returns bool indicating if a node is synced.
 	IsNodeSynced() bool
 

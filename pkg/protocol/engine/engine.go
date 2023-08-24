@@ -70,9 +70,6 @@ type Engine struct {
 
 	BlockCache *blocks.Blocks
 
-	isBootstrapped      bool
-	isBootstrappedMutex syncutils.Mutex
-
 	startupAvailableBlocksWindow iotago.SlotIndex
 	chainID                      iotago.CommitmentID
 	mutex                        syncutils.RWMutex
@@ -278,23 +275,9 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	return modelBlock, modelBlock != nil
 }
 
+// IsBootstrapped returns true if the node is bootstrapped. Always get bootsrapped status from SyncManager. This method is needed and exported to access component inside the engine, so we could test it with different bootstrapped conditions.
 func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
-	e.isBootstrappedMutex.Lock()
-	defer e.isBootstrappedMutex.Unlock()
-
-	if e.isBootstrapped {
-		return true
-	}
-
-	if e.optsIsBootstrappedFunc(e) {
-		e.isBootstrapped = true
-	}
-
-	return isBootstrapped
-}
-
-func (e *Engine) IsSynced() (isBootstrapped bool) {
-	return e.IsBootstrapped() // && time.Since(e.Clock.PreAccepted().Time()) < e.optsBootstrappedThreshold
+	return e.optsIsBootstrappedFunc(e)
 }
 
 func (e *Engine) APIForSlot(slot iotago.SlotIndex) iotago.API {

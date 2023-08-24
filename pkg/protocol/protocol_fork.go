@@ -136,7 +136,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 
 		p.ChainManager.ProcessCandidateCommitment(commitment)
 
-		if candidateEngineInstance.IsBootstrapped() &&
+		if candidateEngineInstance.SyncManager.IsBootstrapped() &&
 			commitment.CumulativeWeight() > p.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
 			p.switchEngines()
 		}
