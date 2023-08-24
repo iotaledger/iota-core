@@ -119,7 +119,7 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(host host.Host, lPeer *peer.Local) *p2p.Manager {
-		return p2p.NewManager(host, lPeer, Component.Logger())
+		return p2p.NewManager(host, Component.Logger())
 	}); err != nil {
 		return err
 	}
@@ -197,11 +197,11 @@ func provide(c *dig.Container) error {
 func configure() error {
 	// log the p2p events
 	deps.P2PManager.Events.NeighborAdded.Hook(func(neighbor *p2p.Neighbor) {
-		Component.LogInfof("Neighbor added: %s / %s", neighbor.PeerAddresses, neighbor.Identity.ID())
+		Component.LogInfof("Neighbor added: %s / %s", neighbor.PeerAddresses, neighbor.ID)
 	}, event.WithWorkerPool(Component.WorkerPool))
 
 	deps.P2PManager.Events.NeighborRemoved.Hook(func(neighbor *p2p.Neighbor) {
-		Component.LogInfof("Neighbor removed: %s / %s", neighbor.PeerAddresses, neighbor.Identity.ID())
+		Component.LogInfof("Neighbor removed: %s / %s", neighbor.PeerAddresses, neighbor.ID)
 	}, event.WithWorkerPool(Component.WorkerPool))
 
 	return nil
@@ -256,14 +256,14 @@ func run() error {
 func addPeersFromConfigToManager(manualPeeringMgr *manualpeering.Manager) {
 	peerAddrs, err := getPeerMultiAddrsFromConfig()
 	if err != nil {
-		Component.LogErrorf("Failed to get known peers from the config file, continuing without them...", "err", err)
+		Component.LogError("Failed to get known peers from the config file, continuing without them...", "err", err)
 
 		return
 	}
 
-	Component.LogInfof("Pass known peers list from the config file to the manager", "peers", peerAddrs)
+	Component.LogInfo("Pass known peers list from the config file to the manager", "peers", peerAddrs)
 	if err := manualPeeringMgr.AddPeers(peerAddrs...); err != nil {
-		Component.LogInfof("Failed to pass known peers list from the config file to the manager", "peers", peerAddrs, "err", err)
+		Component.LogInfo("Failed to pass known peers list from the config file to the manager", "peers", peerAddrs, "err", err)
 	}
 }
 

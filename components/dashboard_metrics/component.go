@@ -10,7 +10,6 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
@@ -19,6 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 const (
@@ -105,7 +105,7 @@ func run() error {
 }
 
 func configureComponentCountersEvents() {
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ identity.ID) {
+	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ p2ppeer.ID) {
 		incComponentCounter(Received)
 	})
 

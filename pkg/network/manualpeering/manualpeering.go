@@ -6,11 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/iotaledger/hive.go/autopeering/peer"
-	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -39,7 +38,7 @@ type Manager struct {
 	isStopped         bool
 	reconnectInterval time.Duration
 	knownPeersMutex   syncutils.RWMutex
-	knownPeers        map[network.PeerID]*network.Peer
+	knownPeers        map[p2ppeer.ID]*network.Peer
 	workerPool        *workerpool.WorkerPool
 
 	onGossipNeighborRemovedHook *event.Hook[func(*p2p.Neighbor)]
@@ -53,7 +52,7 @@ func NewManager(p2pm *p2p.Manager, local *peer.Local, workerPool *workerpool.Wor
 		local:             local,
 		log:               log,
 		reconnectInterval: network.DefaultReconnectInterval,
-		knownPeers:        map[network.PeerID]*network.Peer{},
+		knownPeers:        make(map[p2ppeer.ID]*network.Peer),
 		workerPool:        workerPool,
 	}
 
@@ -65,18 +64,6 @@ func (m *Manager) AddPeers(peerAddrs ...ma.Multiaddr) error {
 	var resultErr error
 	for _, peerAddr := range peerAddrs {
 		if err := m.addPeer(peerAddr); err != nil {
-			resultErr = err
-		}
-	}
-
-	return resultErr
-}
-
-// RemovePeer removes multiple peers from the list of known peers.
-func (m *Manager) RemovePeer(keys ...ed25519.PublicKey) error {
-	var resultErr error
-	for _, key := range keys {
-		if err := m.removePeer(key); err != nil {
 			resultErr = err
 		}
 	}
@@ -130,7 +117,6 @@ func (m *Manager) GetPeers(opts ...GetPeersOption) []*network.KnownPeer {
 		connStatus := kp.GetConnStatus()
 		if !conf.OnlyConnected || connStatus == network.ConnStatusConnected {
 			peers = append(peers, &network.KnownPeer{
-				PublicKey:  kp.Identity.PublicKey(),
 				Addresses:  kp.PeerAddresses,
 				ConnStatus: connStatus,
 			})
@@ -185,33 +171,21 @@ func (m *Manager) addPeer(peerAddr ma.Multiaddr) error {
 	m.knownPeersMutex.Lock()
 	defer m.knownPeersMutex.Unlock()
 
-	p, err := network.NewPeer(peerAddr)
+	p, err := network.NewPeerFromMultiAddr(peerAddr)
 	if err != nil {
 		return ierrors.WithStack(err)
 	}
-	if _, exists := m.knownPeers[p.Identity.ID()]; exists {
+	if _, exists := m.knownPeers[p.ID]; exists {
 		return nil
 	}
 	m.log.Infow("Adding new peer to the list of known peers in manual peering", "peer", p)
-	m.knownPeers[p.Identity.ID()] = p
+	m.knownPeers[p.ID] = p
 	go func() {
 		defer close(p.DoneCh)
 		m.keepPeerConnected(p)
 	}()
 
 	return nil
-}
-
-func (m *Manager) removePeer(key ed25519.PublicKey) error {
-	m.knownPeersMutex.Lock()
-	defer m.knownPeersMutex.Unlock()
-
-	m.log.Infow("Removing peer from from the list of known peers in manual peering",
-		"publicKey", key)
-	peerID := identity.NewID(key)
-	err := m.removePeerByID(peerID)
-
-	return ierrors.WithStack(err)
 }
 
 func (m *Manager) removeAllKnownPeers() error {
@@ -228,7 +202,7 @@ func (m *Manager) removeAllKnownPeers() error {
 	return resultErr
 }
 
-func (m *Manager) removePeerByID(peerID network.PeerID) error {
+func (m *Manager) removePeerByID(peerID p2ppeer.ID) error {
 	kp, exists := m.knownPeers[peerID]
 	if !exists {
 		return nil
@@ -254,10 +228,10 @@ func (m *Manager) keepPeerConnected(p *network.Peer) {
 	ticker := time.NewTicker(m.reconnectInterval)
 	defer ticker.Stop()
 
-	peerID := p.Identity.ID()
+	peerID := p.ID
 	for {
 		if p.GetConnStatus() == network.ConnStatusDisconnected {
-			m.log.Infow("Peer is disconnected, calling gossip layer to establish the connection", "peer", p.Identity.ID())
+			m.log.Infow("Peer is disconnected, calling gossip layer to establish the connection", "peer", p.ID)
 
 			var err error
 			if err = m.p2pm.DialPeer(ctx, p); err != nil && !ierrors.Is(err, p2p.ErrDuplicateNeighbor) && !ierrors.Is(err, context.Canceled) {
@@ -286,7 +260,7 @@ func (m *Manager) changeNeighborStatus(neighbor *p2p.Neighbor, connStatus networ
 	m.knownPeersMutex.RLock()
 	defer m.knownPeersMutex.RUnlock()
 
-	kp, exists := m.knownPeers[neighbor.Identity.ID()]
+	kp, exists := m.knownPeers[neighbor.ID]
 	if !exists {
 		return
 	}

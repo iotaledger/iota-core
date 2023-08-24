@@ -3,7 +3,7 @@ package filter
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 type Events struct {
@@ -23,5 +23,5 @@ var NewEvents = event.CreateGroupConstructor(func() *Events {
 type BlockPreFilteredEvent struct {
 	Block  *model.Block
 	Reason error
-	Source network.PeerID
+	Source p2ppeer.ID
 }

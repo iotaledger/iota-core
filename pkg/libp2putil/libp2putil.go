@@ -3,12 +3,10 @@ package libp2putil
 import (
 	golibp2p "github.com/libp2p/go-libp2p"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/iota-core/pkg/network"
 )
 
 // GetLibp2pIdentity returns libp2p Host option for Identity from local peer object.
@@ -39,24 +37,4 @@ func ToLibp2pPrivateKey(ourPrivateKey ed25519.PrivateKey) (libp2pcrypto.PrivKey,
 	}
 
 	return libp2pPrivateKey, nil
-}
-
-// ToLibp2pPeerID computes libp2p peer ID from our peer object.
-func ToLibp2pPeerID(p *network.Peer) (p2ppeer.ID, error) {
-	pubKeyBytes, err := p.Identity.PublicKey().Bytes()
-	if err != nil {
-		return "", ierrors.WithStack(err)
-	}
-
-	pubKeyLibp2p, err := libp2pcrypto.UnmarshalEd25519PublicKey(pubKeyBytes)
-	if err != nil {
-		return "", ierrors.WithStack(err)
-	}
-
-	libp2pID, err := p2ppeer.IDFromPublicKey(pubKeyLibp2p)
-	if err != nil {
-		return "", ierrors.WithStack(err)
-	}
-
-	return libp2pID, nil
 }

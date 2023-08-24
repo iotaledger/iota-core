@@ -130,9 +130,10 @@ func (m *Manager) discoverAndDialPeers() {
 	for peerAddrInfo := range peerChan {
 		m.log.Debugf("Found peer: %s", peerAddrInfo)
 
-		peer, err := network.NewPeer(peerAddrInfo.Addrs...)
+		peer, err := network.NewPeerFromAddrInfo(&peerAddrInfo)
 		if err != nil {
 			m.log.Warnf("Failed to create peer from address %s: %w", peerAddrInfo.Addrs, err)
+			continue
 		}
 
 		m.p2pManager.DialPeer(m.ctx, peer)

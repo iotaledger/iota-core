@@ -5,6 +5,8 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/ds/bytesfilter"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
@@ -51,13 +53,13 @@ func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, ap
 	}, opts)
 }
 
-func (p *Protocol) SendBlock(block *model.Block, to ...network.PeerID) {
+func (p *Protocol) SendBlock(block *model.Block, to ...p2ppeer.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Block{Block: &nwmodels.Block{
 		Bytes: block.Data(),
 	}}}, to...)
 }
 
-func (p *Protocol) RequestBlock(id iotago.BlockID, to ...network.PeerID) {
+func (p *Protocol) RequestBlock(id iotago.BlockID, to ...p2ppeer.ID) {
 	p.requestedBlockHashesMutex.Lock()
 	p.requestedBlockHashes.Set(types.Identifier(id.Identifier()), types.Void)
 	p.requestedBlockHashesMutex.Unlock()
@@ -67,13 +69,13 @@ func (p *Protocol) RequestBlock(id iotago.BlockID, to ...network.PeerID) {
 	}}}, to...)
 }
 
-func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...network.PeerID) {
+func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...p2ppeer.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitment{SlotCommitment: &nwmodels.SlotCommitment{
 		Bytes: cm.Data(),
 	}}}, to...)
 }
 
-func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
+func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...p2ppeer.ID) {
 	var iotagoAPI iotago.API
 	if len(attestations) > 0 {
 		// TODO: there are multiple attestations potentially spanning multiple epochs/versions, we need to use the correct API for each one
@@ -88,13 +90,13 @@ func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago
 	}}}, to...)
 }
 
-func (p *Protocol) RequestSlotCommitment(id iotago.CommitmentID, to ...network.PeerID) {
+func (p *Protocol) RequestSlotCommitment(id iotago.CommitmentID, to ...p2ppeer.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_SlotCommitmentRequest{SlotCommitmentRequest: &nwmodels.SlotCommitmentRequest{
 		CommitmentId: id[:],
 	}}}, to...)
 }
 
-func (p *Protocol) RequestAttestations(id iotago.CommitmentID, to ...network.PeerID) {
+func (p *Protocol) RequestAttestations(id iotago.CommitmentID, to ...p2ppeer.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_AttestationsRequest{AttestationsRequest: &nwmodels.AttestationsRequest{
 		CommitmentId: lo.PanicOnErr(id.Bytes()),
 	}}}, to...)
@@ -107,7 +109,7 @@ func (p *Protocol) Shutdown() {
 	p.workerPool.ShutdownComplete.Wait()
 }
 
-func (p *Protocol) handlePacket(nbr network.PeerID, packet proto.Message) (err error) {
+func (p *Protocol) handlePacket(nbr p2ppeer.ID, packet proto.Message) (err error) {
 	switch packetBody := packet.(*nwmodels.Packet).GetBody().(type) {
 	case *nwmodels.Packet_Block:
 		p.workerPool.Submit(func() { p.onBlock(packetBody.Block.GetBytes(), nbr) })
@@ -136,7 +138,7 @@ func (p *Protocol) handlePacket(nbr network.PeerID, packet proto.Message) (err e
 	return
 }
 
-func (p *Protocol) onBlock(blockData []byte, id network.PeerID) {
+func (p *Protocol) onBlock(blockData []byte, id p2ppeer.ID) {
 	blockIdentifier, err := iotago.BlockIdentifierFromBlockBytes(blockData)
 	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize block"), id)
@@ -162,7 +164,7 @@ func (p *Protocol) onBlock(blockData []byte, id network.PeerID) {
 	p.Events.BlockReceived.Trigger(block, id)
 }
 
-func (p *Protocol) onBlockRequest(idBytes []byte, id network.PeerID) {
+func (p *Protocol) onBlockRequest(idBytes []byte, id p2ppeer.ID) {
 	if len(idBytes) != iotago.BlockIDLength {
 		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize block request"), id)
 
@@ -172,7 +174,7 @@ func (p *Protocol) onBlockRequest(idBytes []byte, id network.PeerID) {
 	p.Events.BlockRequestReceived.Trigger(iotago.BlockID(idBytes), id)
 }
 
-func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id network.PeerID) {
+func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id p2ppeer.ID) {
 	receivedCommitment, err := model.CommitmentFromBytes(commitmentBytes, p.apiProvider, serix.WithValidation())
 	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize slot commitment"), id)
@@ -183,7 +185,7 @@ func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id network.PeerID) {
 	p.Events.SlotCommitmentReceived.Trigger(receivedCommitment, id)
 }
 
-func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id network.PeerID) {
+func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id p2ppeer.ID) {
 	if len(idBytes) != iotago.CommitmentIDLength {
 		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize slot commitment request"), id)
 
@@ -193,7 +195,7 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id network.PeerID) {
 	p.Events.SlotCommitmentRequestReceived.Trigger(iotago.CommitmentID(idBytes), id)
 }
 
-func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []byte, merkleProof []byte, id network.PeerID) {
+func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []byte, merkleProof []byte, id p2ppeer.ID) {
 	cm, err := model.CommitmentFromBytes(commitmentBytes, p.apiProvider, serix.WithValidation())
 	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize commitment"), id)
@@ -219,7 +221,7 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 	p.Events.AttestationsReceived.Trigger(cm, attestations, proof, id)
 }
 
-func (p *Protocol) onAttestationsRequest(commitmentIDBytes []byte, id network.PeerID) {
+func (p *Protocol) onAttestationsRequest(commitmentIDBytes []byte, id p2ppeer.ID) {
 	if len(commitmentIDBytes) != iotago.CommitmentIDLength {
 		p.Events.Error.Trigger(ierrors.Wrap(iotago.ErrInvalidIdentifierLength, "failed to deserialize commitmentID in attestations request"), id)
 

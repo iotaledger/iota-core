@@ -66,7 +66,7 @@ func NewNeighbor(p *network.Peer, stream *PacketsStream, log *logger.Logger, pac
 	conn := neighbor.stream.Conn()
 
 	neighbor.Log = log.With(
-		"id", p.Identity.ID(),
+		"id", p.ID,
 		"localAddr", conn.LocalMultiaddr(),
 		"remoteAddr", conn.RemoteMultiaddr(),
 	)
@@ -139,7 +139,7 @@ func (n *Neighbor) writeLoop() {
 				return
 			case sendPacket := <-n.sendQueue:
 				if n.stream == nil {
-					n.Log.Warnw("send error, no stream for protocol", "peer-id", n.Identity.ID(), "protocol", sendPacket.protocolID)
+					n.Log.Warnw("send error, no stream for protocol", "peer-id", n.ID, "protocol", sendPacket.protocolID)
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
 						n.Log.Warnw("Failed to disconnect", "err", disconnectErr)
 					}
@@ -147,7 +147,7 @@ func (n *Neighbor) writeLoop() {
 					return
 				}
 				if err := n.stream.WritePacket(sendPacket.packet); err != nil {
-					n.Log.Warnw("send error", "peer-id", n.Identity.ID(), "err", err)
+					n.Log.Warnw("send error", "peer-id", n.ID, "err", err)
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
 						n.Log.Warnw("Failed to disconnect", "err", disconnectErr)
 					}

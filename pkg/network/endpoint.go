@@ -1,15 +1,12 @@
 package network
 
 import (
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/protobuf/proto"
-
-	"github.com/iotaledger/hive.go/crypto/identity"
 )
 
-type PeerID = identity.ID
-
 type Endpoint interface {
-	LocalPeerID() PeerID
-	Send(packet proto.Message, to ...PeerID)
+	LocalPeerID() p2ppeer.ID
+	Send(packet proto.Message, to ...p2ppeer.ID)
 	Shutdown()
 }

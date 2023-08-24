@@ -3,16 +3,17 @@ package core
 import (
 	"encoding/json"
 
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
-	"github.com/iotaledger/iota-core/pkg/network"
 	nwmodels "github.com/iotaledger/iota-core/pkg/network/protocols/core/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-func (p *Protocol) SendWarpSyncRequest(id iotago.CommitmentID, to ...network.PeerID) {
+func (p *Protocol) SendWarpSyncRequest(id iotago.CommitmentID, to ...p2ppeer.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_WarpSyncRequest{
 		WarpSyncRequest: &nwmodels.WarpSyncRequest{
 			CommitmentId: lo.PanicOnErr(id.Bytes()),
@@ -20,7 +21,7 @@ func (p *Protocol) SendWarpSyncRequest(id iotago.CommitmentID, to ...network.Pee
 	}}, to...)
 }
 
-func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], to ...network.PeerID) {
+func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], to ...p2ppeer.ID) {
 	serializer := p.apiProvider.APIForSlot(id.Index())
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_WarpSyncResponse{
@@ -32,7 +33,7 @@ func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.
 	}}, to...)
 }
 
-func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id network.PeerID) {
+func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id p2ppeer.ID) {
 	p.workerPool.Submit(func() {
 		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
 		if err != nil {
@@ -45,7 +46,7 @@ func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id network.Pe
 	})
 }
 
-func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, merkleProofBytes []byte, id network.PeerID) {
+func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, merkleProofBytes []byte, id p2ppeer.ID) {
 	p.workerPool.Submit(func() {
 		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
 		if err != nil {

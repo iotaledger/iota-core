@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -19,7 +20,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
+func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, src p2ppeer.ID) {
 	mainEngine := p.MainEngineInstance()
 
 	if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
@@ -198,7 +199,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	defer close(ch)
 
 	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.MainChain.Commitment(fork.ForkingPoint.Index()-1).Commitment())
-	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
+	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ p2ppeer.ID) {
 		blockIDs, actualCumulativeWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 
 		result := &commitmentVerificationResult{

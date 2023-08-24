@@ -4,12 +4,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/libp2p/go-libp2p/core/crypto"
 	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ierrors"
 )
 
@@ -27,13 +25,12 @@ const (
 
 // KnownPeer defines a peer record in the manual peering layer.
 type KnownPeer struct {
-	PublicKey  ed25519.PublicKey `json:"publicKey"`
-	Addresses  []ma.Multiaddr    `json:"addresses"`
-	ConnStatus ConnectionStatus  `json:"connectionStatus"`
+	Addresses  []ma.Multiaddr   `json:"addresses"`
+	ConnStatus ConnectionStatus `json:"connectionStatus"`
 }
 
 type Peer struct {
-	Identity      *identity.Identity
+	ID            p2ppeer.ID
 	PublicKey     ed25519.PublicKey
 	PeerAddresses []ma.Multiaddr
 	ConnStatus    *atomic.Value
@@ -41,39 +38,10 @@ type Peer struct {
 	DoneCh        chan struct{}
 }
 
-func NewPeer(peerAddrs ...ma.Multiaddr) (*Peer, error) {
-	if len(peerAddrs) == 0 {
-		return nil, ierrors.New("no peer addresses provided")
-	}
-
-	addrInfo, err := p2ppeer.AddrInfoFromP2pAddr(peerAddrs[0])
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to parse p2p multiaddress")
-	}
-
-	icPubKey, err := addrInfo.ID.ExtractPublicKey()
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to extract public key from peer ID")
-	}
-
-	ed25519PubKey, ok := icPubKey.(*crypto.Ed25519PublicKey)
-	if !ok {
-		return nil, ierrors.New("failed to cast public key to Ed25519")
-	}
-
-	ed25519PubKeyBytes, err := ed25519PubKey.Raw()
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to get raw public key bytes")
-	}
-
-	ed25519PubKeyNative, _, err := ed25519.PublicKeyFromBytes(ed25519PubKeyBytes)
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to get native public key")
-	}
-
+func NewPeerFromAddrInfo(addrInfo *p2ppeer.AddrInfo) (*Peer, error) {
 	kp := &Peer{
-		Identity:      identity.New(ed25519PubKeyNative),
-		PeerAddresses: peerAddrs,
+		ID:            addrInfo.ID,
+		PeerAddresses: addrInfo.Addrs,
 		ConnStatus:    &atomic.Value{},
 		RemoveCh:      make(chan struct{}),
 		DoneCh:        make(chan struct{}),
@@ -81,6 +49,15 @@ func NewPeer(peerAddrs ...ma.Multiaddr) (*Peer, error) {
 	kp.SetConnStatus(ConnStatusDisconnected)
 
 	return kp, nil
+}
+
+func NewPeerFromMultiAddr(peerAddrs ma.Multiaddr) (*Peer, error) {
+	addrInfo, err := p2ppeer.AddrInfoFromP2pAddr(peerAddrs)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to parse p2p multiaddress")
+	}
+
+	return NewPeerFromAddrInfo(addrInfo)
 }
 
 func (kp *Peer) GetConnStatus() ConnectionStatus {
