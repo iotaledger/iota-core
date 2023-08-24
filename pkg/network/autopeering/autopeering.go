@@ -128,6 +128,11 @@ func (m *Manager) discoverAndDialPeers() {
 	}
 
 	for peerAddrInfo := range peerChan {
+		// Do not self-dial.
+		if peerAddrInfo.ID == m.host.ID() {
+			continue
+		}
+
 		m.log.Debugf("Found peer: %s", peerAddrInfo)
 
 		peer, err := network.NewPeerFromAddrInfo(&peerAddrInfo)
@@ -136,6 +141,8 @@ func (m *Manager) discoverAndDialPeers() {
 			continue
 		}
 
-		m.p2pManager.DialPeer(m.ctx, peer)
+		if err := m.p2pManager.DialPeer(m.ctx, peer); err != nil {
+			m.log.Warnf("Failed to dial peer %s: %w", peer, err)
+		}
 	}
 }
