@@ -41,9 +41,12 @@ type Peer struct {
 	DoneCh        chan struct{}
 }
 
-func NewPeer(peerAddr ma.Multiaddr) (*Peer, error) {
-	// TODO: remove hive.go Peer
-	addrInfo, err := p2ppeer.AddrInfoFromP2pAddr(peerAddr)
+func NewPeer(peerAddrs ...ma.Multiaddr) (*Peer, error) {
+	if len(peerAddrs) == 0 {
+		return nil, ierrors.New("no peer addresses provided")
+	}
+
+	addrInfo, err := p2ppeer.AddrInfoFromP2pAddr(peerAddrs[0])
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to parse p2p multiaddress")
 	}
@@ -70,7 +73,7 @@ func NewPeer(peerAddr ma.Multiaddr) (*Peer, error) {
 
 	kp := &Peer{
 		Identity:      identity.New(ed25519PubKeyNative),
-		PeerAddresses: []ma.Multiaddr{peerAddr},
+		PeerAddresses: peerAddrs,
 		ConnStatus:    &atomic.Value{},
 		RemoveCh:      make(chan struct{}),
 		DoneCh:        make(chan struct{}),

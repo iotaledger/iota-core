@@ -1,7 +1,12 @@
 package p2p
 
 import (
+	"context"
+	"time"
+
 	"github.com/libp2p/go-libp2p/core/host"
+	p2pnetwork "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"google.golang.org/protobuf/proto"
 
@@ -9,11 +14,23 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/pkg/libp2putil"
 	"github.com/iotaledger/iota-core/pkg/network"
 )
 
 const (
-	protocolID = "iota-core/0.0.1"
+	protocolID               = "iota-core/0.0.1"
+	defaultConnectionTimeout = 5 * time.Second // timeout after which the connection must be established.
+	ioTimeout                = 4 * time.Second
+)
+
+var (
+	// ErrTimeout is returned when an expected incoming connection was not received in time.
+	ErrTimeout = ierrors.New("accept timeout")
+	// ErrDuplicateAccept is returned when the server already registered an accept request for that peer ID.
+	ErrDuplicateAccept = ierrors.New("accept request for that peer already exists")
+	// ErrNoP2P means that the given peer does not support the p2p service.
+	ErrNoP2P = ierrors.New("peer does not have a p2p service")
 )
 
 // ConnectPeerOption defines an option for the DialPeer and AcceptPeer methods.
@@ -56,8 +73,8 @@ type Manager struct {
 
 	log *logger.Logger
 
-	stopMutex syncutils.RWMutex
-	isStopped bool
+	shutdownMutex syncutils.RWMutex
+	isShutdown    bool
 
 	neighbors      map[network.PeerID]*Neighbor
 	neighborsMutex syncutils.RWMutex
@@ -80,27 +97,73 @@ func NewManager(libp2pHost host.Host, local *peer.Local, log *logger.Logger) *Ma
 	return m
 }
 
-// Stop stops the manager and closes all established connections.
-func (m *Manager) Stop() {
-	m.stopMutex.Lock()
-	defer m.stopMutex.Unlock()
+// DialPeer connects to a peer.
+func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...ConnectPeerOption) error {
+	if m.neighborExists(peer.Identity.ID()) {
+		return ierrors.Wrapf(ErrDuplicateNeighbor, "peer %s already exists", peer.Identity.ID())
+	}
 
-	if m.isStopped {
+	conf := buildConnectPeerConfig(opts)
+	libp2pID, err := libp2putil.ToLibp2pPeerID(peer)
+	if err != nil {
+		return ierrors.WithStack(err)
+	}
+
+	// Adds the peer's multiaddresses to the peerstore, so that they can be used for dialing.
+	m.libp2pHost.Peerstore().AddAddrs(libp2pID, peer.PeerAddresses, peerstore.ConnectedAddrTTL)
+
+	cancelCtx := ctx
+	if conf.useDefaultTimeout {
+		var cancel context.CancelFunc
+		cancelCtx, cancel = context.WithTimeout(ctx, defaultConnectionTimeout)
+		defer cancel()
+	}
+
+	stream, err := m.P2PHost().NewStream(cancelCtx, libp2pID, protocolID)
+	if err != nil {
+		return ierrors.Wrapf(err, "dial %s / %s failed to open stream for proto %s", peer.PeerAddresses, peer.Identity.ID(), protocolID)
+	}
+
+	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
+	if err := ps.sendNegotiation(); err != nil {
+		m.closeStream(stream)
+
+		return ierrors.Wrapf(err, "dial %s / %s failed to send negotiation for proto %s", peer.PeerAddresses, peer.Identity.ID(), protocolID)
+	}
+
+	m.log.Debugw("outgoing stream negotiated",
+		"id", peer.Identity.ID(),
+		"addr", ps.Conn().RemoteMultiaddr(),
+		"proto", protocolID,
+	)
+
+	if err := m.addNeighbor(peer, ps); err != nil {
+		m.closeStream(stream)
+
+		return ierrors.Errorf("failed to add neighbor %s: %s", peer.Identity.ID(), err)
+	}
+
+	return nil
+}
+
+// Shutdown stops the manager and closes all established connections.
+func (m *Manager) Shutdown() {
+	m.shutdownMutex.Lock()
+	defer m.shutdownMutex.Unlock()
+
+	if m.isShutdown {
 		return
 	}
-	m.isStopped = true
+	m.isShutdown = true
 	m.dropAllNeighbors()
+
+	m.libp2pHost.RemoveStreamHandler(protocol.ID(protocolID))
+	m.protocolHandler = nil
 }
 
 // LocalPeerID returns the local peer ID.
 func (m *Manager) LocalPeerID() network.PeerID {
 	return m.local.Identity.ID()
-}
-
-// Shutdown unregisters the core protocol.
-func (m *Manager) Shutdown() {
-	m.libp2pHost.RemoveStreamHandler(protocol.ID(protocolID))
-	m.protocolHandler = nil
 }
 
 // P2PHost returns the lib-p2p host.
@@ -191,6 +254,38 @@ func (m *Manager) NeighborsByID(ids []network.PeerID) []*Neighbor {
 	return result
 }
 
+func (m *Manager) handleStream(stream p2pnetwork.Stream) {
+	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
+	if err := ps.receiveNegotiation(); err != nil {
+		m.log.Errorw("failed to receive negotiation message")
+		m.closeStream(stream)
+
+		return
+	}
+
+	peerMultiAddr := stream.Conn().RemoteMultiaddr()
+	peer, err := network.NewPeer(peerMultiAddr)
+	if err != nil {
+		m.log.Errorf("failed to create peer from multiaddr %s: %s", peerMultiAddr, err)
+		m.closeStream(stream)
+
+		return
+	}
+
+	if err := m.addNeighbor(peer, ps); err != nil {
+		m.log.Errorf("failed to add neighbor %s: %s", peer.Identity.ID(), err)
+		m.closeStream(stream)
+
+		return
+	}
+}
+
+func (m *Manager) closeStream(s p2pnetwork.Stream) {
+	if err := s.Close(); err != nil {
+		m.log.Warnw("close error", "err", err)
+	}
+}
+
 // neighborWithGroup returns neighbor by ID and group.
 func (m *Manager) neighbor(id network.PeerID) (*Neighbor, error) {
 	m.neighborsMutex.RLock()
@@ -208,9 +303,9 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 	if peer.Identity.ID() == m.local.Identity.ID() {
 		return ierrors.WithStack(ErrLoopbackNeighbor)
 	}
-	m.stopMutex.RLock()
-	defer m.stopMutex.RUnlock()
-	if m.isStopped {
+	m.shutdownMutex.RLock()
+	defer m.shutdownMutex.RUnlock()
+	if m.isShutdown {
 		return ErrNotRunning
 	}
 	if m.neighborExists(peer.Identity.ID()) {

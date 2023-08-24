@@ -19,12 +19,13 @@ import (
 	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
-	"github.com/iotaledger/iota-core/pkg/network/manualpeering"
+	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/network/p2p"
 )
 
 type Manager struct {
 	networkID        string
-	peeringMgr       *manualpeering.Manager
+	p2pManager       *p2p.Manager
 	log              *logger.Logger
 	host             host.Host
 	peerDB           *peer.DB
@@ -37,10 +38,10 @@ type Manager struct {
 	routingDiscovery *routing.RoutingDiscovery
 }
 
-func NewManager(networkID string, peeringManager *manualpeering.Manager, host host.Host, peerDB *peer.DB, log *logger.Logger) *Manager {
+func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *peer.DB, log *logger.Logger) *Manager {
 	return &Manager{
 		networkID:  networkID,
-		peeringMgr: peeringManager,
+		p2pManager: p2pManager,
 		host:       host,
 		peerDB:     peerDB,
 		log:        log,
@@ -105,56 +106,35 @@ func (m *Manager) discoveryLoop() {
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
-	m.discoverPeers()
+	m.discoverAndDialPeers()
 
 	for {
 		select {
 		case <-ticker.C:
-			m.discoverPeers()
+			m.discoverAndDialPeers()
 		case <-m.ctx.Done():
 			return
 		}
 	}
 }
 
-func (m *Manager) discoverPeers() {
-	/*
-		tctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
-		defer cancel()
+func (m *Manager) discoverAndDialPeers() {
+	tctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+	defer cancel()
 
+	peerChan, err := m.routingDiscovery.FindPeers(tctx, m.networkID)
+	if err != nil {
+		m.log.Warnf("Failed to find peers: %s", err)
+	}
 
-			peerChan, err := m.routingDiscovery.FindPeers(tctx, m.networkID)
-			if err != nil {
-				m.log.Warnf("Failed to find peers: %s", err)
-			}
+	for peerAddrInfo := range peerChan {
+		m.log.Debugf("Found peer: %s", peerAddrInfo)
 
-			for peer := range peerChan {
-				m.log.Debugf("Found peer: %s", peer)
-				peerPubKey, err := peer.ID.ExtractPublicKey()
-				if err != nil {
-					m.log.Warnf("Failed to extract public key from peer ID %s: %w", peer.ID, err)
-					continue
-				}
-				ed225519PubKey, ok := peerPubKey.(crypto.Ed25519PublicKey)
-				if !ok {
-					m.log.Warnf("Found peer with unsupported public key type: %s", peer.ID)
-					continue
-				}
+		peer, err := network.NewPeer(peerAddrInfo.Addrs...)
+		if err != nil {
+			m.log.Warnf("Failed to create peer from address %s: %w", peerAddrInfo.Addrs, err)
+		}
 
-				pubKeyBytes, _ := ed225519PubKey.Raw()
-				nativePubKey, _, err := ed25519.PublicKeyFromBytes(bytes)
-				if err != nil {
-					m.log.Warnf("Failed to convert public key to native type: %s", peer.ID)
-					continue
-				}
-
-				peerToAdd := &manualpeering.PeerDescriptor{
-					PublicKey: nativePubKey,
-					Addresses: peer.Addrs,
-				}
-				m.peeringMgr.AddPeer(peerToAdd)
-				// m.peerDB.UpdatePeer()
-				// m.peerDB.UpdatePeer(peer)
-			}
-	*/
+		m.p2pManager.DialPeer(m.ctx, peer)
+	}
 }

@@ -68,10 +68,10 @@ func provide(c *dig.Container) error {
 	type autoPeeringDeps struct {
 		dig.In
 
-		Protocol         *protocol.Protocol
-		ManualPeeringMgr *manualpeering.Manager
-		Host             host.Host
-		PeerDB           *peer.DB
+		Protocol   *protocol.Protocol
+		P2PManager *p2p.Manager
+		Host       host.Host
+		PeerDB     *peer.DB
 	}
 
 	if err := c.Provide(func(deps manualPeeringDeps) *manualpeering.Manager {
@@ -81,7 +81,7 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps autoPeeringDeps) *autopeering.Manager {
-		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.ManualPeeringMgr, deps.Host, deps.PeerDB, Component.Logger())
+		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger())
 	}); err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func run() error {
 	}
 
 	if err := Component.Daemon().BackgroundWorker(fmt.Sprintf("%s-P2PManager", Component.Name), func(ctx context.Context) {
-		defer deps.P2PManager.Stop()
+		defer deps.P2PManager.Shutdown()
 		defer func() {
 			if err := deps.P2PManager.P2PHost().Close(); err != nil {
 				Component.LogWarn("Failed to close libp2p host: %+v", err)
@@ -253,28 +253,37 @@ func run() error {
 	return nil
 }
 
-func addPeersFromConfigToManager(mgr *manualpeering.Manager) {
-	// TODO: peers address format now changed!
-	peers, err := getKnownPeersFromConfig()
+func addPeersFromConfigToManager(manualPeeringMgr *manualpeering.Manager) {
+	peerAddrs, err := getPeerMultiAddrsFromConfig()
 	if err != nil {
 		Component.LogErrorf("Failed to get known peers from the config file, continuing without them...", "err", err)
-	} else if len(peers) != 0 {
-		Component.LogInfof("Pass known peers list from the config file to the manager", "peers", peers)
-		if err := mgr.AddPeers(peers...); err != nil {
-			Component.LogInfof("Failed to pass known peers list from the config file to the manager",
-				"peers", peers, "err", err)
-		}
+
+		return
+	}
+
+	Component.LogInfof("Pass known peers list from the config file to the manager", "peers", peerAddrs)
+	if err := manualPeeringMgr.AddPeers(peerAddrs...); err != nil {
+		Component.LogInfof("Failed to pass known peers list from the config file to the manager", "peers", peerAddrs, "err", err)
 	}
 }
 
-func getKnownPeersFromConfig() ([]ma.Multiaddr, error) {
+func getPeerMultiAddrsFromConfig() ([]ma.Multiaddr, error) {
 	if ParamsPeers.KnownPeers == "" {
 		return nil, nil
 	}
-	var peers []ma.Multiaddr
-	if err := json.Unmarshal([]byte(ParamsPeers.KnownPeers), &peers); err != nil {
+	var peersMultiAddrStrings []string
+	if err := json.Unmarshal([]byte(ParamsPeers.KnownPeers), &peersMultiAddrStrings); err != nil {
 		return nil, ierrors.Wrap(err, "can't parse peers from json")
 	}
 
-	return peers, nil
+	peersMultiAddr := make([]ma.Multiaddr, 0, len(peersMultiAddrStrings))
+	for _, peerMultiAddrString := range peersMultiAddrStrings {
+		peerMultiAddr, err := ma.NewMultiaddr(peerMultiAddrString)
+		if err != nil {
+			return nil, ierrors.Wrap(err, "can't parse peer multiaddr")
+		}
+		peersMultiAddr = append(peersMultiAddr, peerMultiAddr)
+	}
+
+	return peersMultiAddr, nil
 }

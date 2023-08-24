@@ -61,10 +61,10 @@ func NewManager(p2pm *p2p.Manager, local *peer.Local, workerPool *workerpool.Wor
 }
 
 // AddPeers adds multiple peers to the list of known peers.
-func (m *Manager) AddPeers(peers ...ma.Multiaddr) error {
+func (m *Manager) AddPeers(peerAddrs ...ma.Multiaddr) error {
 	var resultErr error
-	for _, peer := range peers {
-		if err := m.addPeer(peer); err != nil {
+	for _, peerAddr := range peerAddrs {
+		if err := m.addPeer(peerAddr); err != nil {
 			resultErr = err
 		}
 	}
@@ -279,10 +279,7 @@ func (m *Manager) onGossipNeighborRemoved(neighbor *p2p.Neighbor) {
 
 func (m *Manager) onGossipNeighborAdded(neighbor *p2p.Neighbor) {
 	m.changeNeighborStatus(neighbor, network.ConnStatusConnected)
-	m.log.Infow(
-		"Gossip layer successfully connected with the peer",
-		"peer", neighbor.Peer,
-	)
+	m.log.Infow("Gossip layer successfully connected with the peer", "peer", neighbor.Peer)
 }
 
 func (m *Manager) changeNeighborStatus(neighbor *p2p.Neighbor, connStatus network.ConnectionStatus) {
