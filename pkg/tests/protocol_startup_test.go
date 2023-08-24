@@ -69,13 +69,15 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 
 	// Verify that nodes have the expected states.
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+	genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),
 		testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-		testsuite.WithLatestCommitment(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())),
+		testsuite.WithLatestCommitment(genesisCommitment),
 		testsuite.WithLatestFinalizedSlot(0),
-		testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
-		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())}),
+		testsuite.WithChainID(genesisCommitment.MustID()),
+		testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 		testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 		testsuite.WithEvictedSlot(0),
@@ -111,7 +113,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
+			testsuite.WithChainID(genesisCommitment.MustID()),
 			testsuite.WithLatestFinalizedSlot(4),
 			testsuite.WithLatestCommitmentSlotIndex(5),
 			testsuite.WithEqualStoredCommitmentAtIndex(5),
@@ -159,7 +161,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
+			testsuite.WithChainID(genesisCommitment.MustID()),
 			testsuite.WithLatestFinalizedSlot(11),
 			testsuite.WithLatestCommitmentSlotIndex(11),
 			testsuite.WithEqualStoredCommitmentAtIndex(11),
