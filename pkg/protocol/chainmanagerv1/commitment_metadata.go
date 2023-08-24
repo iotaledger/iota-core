@@ -202,7 +202,10 @@ func (c *CommitmentMetadata) inheritChain(parent *CommitmentMetadata) func(*Comm
 
 			if spawnedChain == nil {
 				spawnedChain = NewChain(c, c.manager)
+
 				c.chain.Set(spawnedChain)
+
+				c.manager.chainCreated.Trigger(spawnedChain)
 			}
 		}
 	}

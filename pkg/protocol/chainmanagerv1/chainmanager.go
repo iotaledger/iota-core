@@ -20,6 +20,8 @@ type ChainManager struct {
 
 	commitmentCreated *event.Event1[*CommitmentMetadata]
 
+	chainCreated *event.Event1[*Chain]
+
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
@@ -29,6 +31,7 @@ func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
 		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 		commitmentCreated:   event.New1[*CommitmentMetadata](),
+		chainCreated:        event.New1[*Chain](),
 		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
 	}
 
@@ -49,6 +52,10 @@ func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitme
 
 func (c *ChainManager) OnCommitmentCreated(callback func(commitment *CommitmentMetadata)) (unsubscribe func()) {
 	return c.commitmentCreated.Hook(callback).Unhook
+}
+
+func (c *ChainManager) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
+	return c.chainCreated.Hook(callback).Unhook
 }
 
 func (c *ChainManager) MainChain() reactive.Variable[*Chain] {

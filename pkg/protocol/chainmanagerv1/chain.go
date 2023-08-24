@@ -37,20 +37,22 @@ type Chain struct {
 
 	cumulativeWeight reactive.Variable[uint64]
 
+	heavierThanMainChain reactive.Variable[bool]
+
 	evicted reactive.Event
 }
 
-func NewChain(root *CommitmentMetadata, manager *ChainManager) *Chain {
+func NewChain(rootCommitment *CommitmentMetadata, manager *ChainManager) *Chain {
 	c := &Chain{
 		manager:                       manager,
 		commitments:                   shrinkingmap.New[iotago.SlotIndex, *CommitmentMetadata](),
-		root:                          reactive.NewVariable[*CommitmentMetadata]().Init(root),
+		root:                          reactive.NewVariable[*CommitmentMetadata]().Init(rootCommitment),
 		latestCommitmentIndex:         reactive.NewVariable[iotago.SlotIndex](),
 		latestVerifiedCommitmentIndex: reactive.NewVariable[iotago.SlotIndex](),
 		evicted:                       reactive.NewEvent(),
 	}
 
-	root.Chain().Set(c)
+	rootCommitment.Chain().Set(c)
 
 	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
 		return latestVerifiedCommitmentIndex + 1 + SyncWindow
@@ -63,6 +65,12 @@ func NewChain(root *CommitmentMetadata, manager *ChainManager) *Chain {
 	c.cumulativeWeight = reactive.NewDerivedVariable[uint64](func(latestCommitmentIndex iotago.SlotIndex) uint64 {
 		return lo.Return1(c.commitments.Get(latestCommitmentIndex)).CumulativeWeight()
 	}, c.latestCommitmentIndex)
+
+	c.heavierThanMainChain = reactive.NewDerivedVariable[bool](func(cumulativeWeight uint64) bool {
+		mainChain := c.manager.MainChain().Get()
+
+		return mainChain != nil && mainChain != c && cumulativeWeight > mainChain.CumulativeWeight().Get()
+	}, c.cumulativeWeight)
 
 	return c
 }
@@ -105,6 +113,10 @@ func (c *Chain) SyncThreshold() reactive.Variable[iotago.SlotIndex] {
 
 func (c *Chain) WarpSyncThreshold() reactive.Variable[iotago.SlotIndex] {
 	return c.warpSyncThreshold
+}
+
+func (c *Chain) CumulativeWeight() reactive.Variable[uint64] {
+	return c.cumulativeWeight
 }
 
 func (c *Chain) registerCommitment(commitment *CommitmentMetadata) {
