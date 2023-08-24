@@ -62,10 +62,12 @@ func (c *CommittedSlotAPI) BlockIDs() (blockIDs iotago.BlockIDs, err error) {
 		return nil, ierrors.Errorf("failed to get block store of slot index %d", c.CommitmentID.Index())
 	}
 
-	store.ForEachBlockInSlot(func(block *model.Block) error {
+	if err := store.ForEachBlockInSlot(func(block *model.Block) error {
 		blockIDs = append(blockIDs, block.ID())
 		return nil
-	})
+	}); err != nil {
+		return nil, ierrors.Wrapf(err, "failed to iterate over blocks of slot %d", c.CommitmentID.Index())
+	}
 
 	return blockIDs, nil
 }
