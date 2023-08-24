@@ -1,7 +1,6 @@
 package trivialsyncmanager
 
 import (
-	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -43,7 +42,7 @@ type SyncManager struct {
 	isSyncedLock syncutils.RWMutex
 
 	isBootstrapped     bool
-	isBootstrappedLock sync.Once
+	isBootstrappedLock syncutils.RWMutex
 
 	isBootstrappedFunc       isBootstrappedFunc
 	relativeAcceptedTimeFunc relativeAcceptedTimeFunc
@@ -70,7 +69,10 @@ func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 		}, asyncOpt)
 
 		e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-			s.updateBootstrappedStatus()
+			if !s.IsBootstrapped() {
+				s.updateBootstrappedStatus()
+			}
+
 			syncChaged := s.updateSyncStatus()
 			commitmentChanged := s.updateLatestCommitment(commitment)
 
@@ -174,10 +176,11 @@ func (s *SyncManager) updateLatestCommitment(commitment *model.Commitment) (chan
 }
 
 func (s *SyncManager) updateBootstrappedStatus() {
+	s.isBootstrappedLock.Lock()
+	defer s.isBootstrappedLock.Unlock()
+
 	if !s.isBootstrapped && s.isBootstrappedFunc() {
-		s.isBootstrappedLock.Do(func() {
-			s.isBootstrapped = true
-		})
+		s.isBootstrapped = true
 	}
 }
 
@@ -218,6 +221,9 @@ func (s *SyncManager) updatePrunedSlot(index iotago.SlotIndex) (changed bool) {
 }
 
 func (s *SyncManager) IsBootstrapped() bool {
+	s.isBootstrappedLock.RLock()
+	defer s.isBootstrappedLock.RUnlock()
+
 	return s.isBootstrapped
 }
 
