@@ -11,6 +11,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"google.golang.org/protobuf/proto"
 
+	ma "github.com/multiformats/go-multiaddr"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -252,10 +254,13 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 		return
 	}
 
-	peerMultiAddr := stream.Conn().RemoteMultiaddr()
-	peer, err := network.NewPeerFromMultiAddr(peerMultiAddr)
+	peerAddrInfo := &p2ppeer.AddrInfo{
+		ID:    stream.Conn().RemotePeer(),
+		Addrs: []ma.Multiaddr{stream.Conn().RemoteMultiaddr()},
+	}
+	peer, err := network.NewPeerFromAddrInfo(peerAddrInfo)
 	if err != nil {
-		m.log.Errorf("failed to create peer from multiaddr %s: %s", peerMultiAddr, err)
+		m.log.Errorf("failed to create peer from peer addr info %s : %s", peerAddrInfo, err)
 		m.closeStream(stream)
 
 		return
