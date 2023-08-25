@@ -63,7 +63,7 @@ func (m *Manager) Start(ctx context.Context) {
 		}
 
 		for _, seedPeer := range m.peerDB.SeedPeers() {
-			addrInfo, err := p2ppeer.AddrInfoFromString(fmt.Sprintf("/ip4/%s/udp/%d/p2p/%s", seedPeer.IP(), seedPeer.Address().Port, seedPeer.Identity.PublicKey()))
+			addrInfo, err := p2ppeer.AddrInfoFromString(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", seedPeer.IP(), seedPeer.Address().Port, seedPeer.Identity.PublicKey()))
 			if err != nil {
 				m.log.Warnln("Failed to parse bootstrap node address from PeerDB:", err)
 				continue

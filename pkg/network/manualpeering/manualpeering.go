@@ -175,7 +175,7 @@ func (m *Manager) addPeer(peerAddr ma.Multiaddr) error {
 	if _, exists := m.knownPeers[p.ID]; exists {
 		return nil
 	}
-	m.log.Infow("Adding new peer to the list of known peers in manual peering", "peer", p)
+	m.log.Infof("Adding new peer to the list of known peers in manual peering %s", p)
 	m.knownPeers[p.ID] = p
 	go func() {
 		defer close(p.DoneCh)
@@ -214,10 +214,10 @@ func (m *Manager) removePeerByID(peerID p2ppeer.ID) error {
 	return nil
 }
 
-func (m *Manager) keepPeerConnected(p *network.Peer) {
+func (m *Manager) keepPeerConnected(peer *network.Peer) {
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	cancelContextOnRemove := func() {
-		<-p.RemoveCh
+		<-peer.RemoveCh
 		ctxCancel()
 	}
 	go cancelContextOnRemove()
@@ -225,19 +225,19 @@ func (m *Manager) keepPeerConnected(p *network.Peer) {
 	ticker := time.NewTicker(m.reconnectInterval)
 	defer ticker.Stop()
 
-	peerID := p.ID
+	peerID := peer.ID
 	for {
-		if p.GetConnStatus() == network.ConnStatusDisconnected {
-			m.log.Infow("Peer is disconnected, calling gossip layer to establish the connection", "peer", p.ID)
+		if peer.GetConnStatus() == network.ConnStatusDisconnected {
+			m.log.Infow("Peer is disconnected, calling gossip layer to establish the connection", "peer", peer.ID)
 
 			var err error
-			if err = m.p2pm.DialPeer(ctx, p); err != nil && !ierrors.Is(err, p2p.ErrDuplicateNeighbor) && !ierrors.Is(err, context.Canceled) {
+			if err = m.p2pm.DialPeer(ctx, peer); err != nil && !ierrors.Is(err, p2p.ErrDuplicateNeighbor) && !ierrors.Is(err, context.Canceled) {
 				m.log.Errorw("Failed to connect a neighbor in the gossip layer", "peerID", peerID, "err", err)
 			}
 		}
 		select {
 		case <-ticker.C:
-		case <-p.RemoveCh:
+		case <-peer.RemoveCh:
 			<-ctx.Done()
 			return
 		}

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -67,4 +68,8 @@ func (kp *Peer) GetConnStatus() ConnectionStatus {
 
 func (kp *Peer) SetConnStatus(cs ConnectionStatus) {
 	kp.ConnStatus.Store(cs)
+}
+
+func (kp *Peer) String() string {
+	return fmt.Sprintf("Peer{ID: %s, Addrs: %v, ConnStatus: %s}", kp.ID, kp.PeerAddresses, kp.GetConnStatus())
 }
