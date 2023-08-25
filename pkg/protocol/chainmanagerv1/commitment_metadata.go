@@ -14,6 +14,7 @@ type CommitmentMetadata struct {
 	parent                                reactive.Variable[*CommitmentMetadata]
 	successor                             reactive.Variable[*CommitmentMetadata]
 	solid                                 reactive.Event
+	attested                              reactive.Event
 	verified                              reactive.Event
 	parentVerified                        reactive.Event
 	belowSyncThreshold                    reactive.Event
@@ -36,6 +37,7 @@ func NewCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
 		parent:                              reactive.NewVariable[*CommitmentMetadata](),
 		successor:                           reactive.NewVariable[*CommitmentMetadata](),
 		solid:                               reactive.NewEvent(),
+		attested:                            reactive.NewEvent(),
 		verified:                            reactive.NewEvent(),
 		parentVerified:                      reactive.NewEvent(),
 		belowSyncThreshold:                  reactive.NewEvent(),
@@ -97,6 +99,10 @@ func (c *CommitmentMetadata) Parent() reactive.Variable[*CommitmentMetadata] {
 
 func (c *CommitmentMetadata) Solid() reactive.Event {
 	return c.solid
+}
+
+func (c *CommitmentMetadata) Attested() reactive.Event {
+	return c.attested
 }
 
 func (c *CommitmentMetadata) Verified() reactive.Event {

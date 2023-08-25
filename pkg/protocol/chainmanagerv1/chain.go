@@ -14,6 +14,8 @@ type Chain struct {
 
 	latestCommitmentIndex reactive.Variable[iotago.SlotIndex]
 
+	latestAttestedCommitmentIndex reactive.Variable[iotago.SlotIndex]
+
 	latestVerifiedCommitmentIndex reactive.Variable[iotago.SlotIndex]
 
 	// syncThreshold defines an upper bound for the range of slots that are being fed to the engine as part of the sync
@@ -26,6 +28,8 @@ type Chain struct {
 
 	cumulativeWeight reactive.Variable[uint64]
 
+	attestedCumulativeWeight reactive.Variable[uint64]
+
 	verifiedCumulativeWeight reactive.Variable[uint64]
 
 	evicted reactive.Event
@@ -36,6 +40,7 @@ func NewChain(rootCommitment *CommitmentMetadata) *Chain {
 		commitments:                   shrinkingmap.New[iotago.SlotIndex, *CommitmentMetadata](),
 		root:                          reactive.NewVariable[*CommitmentMetadata]().Init(rootCommitment),
 		latestCommitmentIndex:         reactive.NewVariable[iotago.SlotIndex](),
+		latestAttestedCommitmentIndex: reactive.NewVariable[iotago.SlotIndex](),
 		latestVerifiedCommitmentIndex: reactive.NewVariable[iotago.SlotIndex](),
 		evicted:                       reactive.NewEvent(),
 	}
@@ -45,6 +50,7 @@ func NewChain(rootCommitment *CommitmentMetadata) *Chain {
 	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](ComputeSyncThreshold, c.latestVerifiedCommitmentIndex)
 	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](ComputeWarpSyncThreshold, c.latestCommitmentIndex)
 	c.cumulativeWeight = reactive.NewDerivedVariable[uint64](c.computeCumulativeWeightOfSlot, c.latestCommitmentIndex)
+	c.attestedCumulativeWeight = reactive.NewDerivedVariable[uint64](c.computeCumulativeWeightOfSlot, c.latestAttestedCommitmentIndex)
 	c.verifiedCumulativeWeight = reactive.NewDerivedVariable[uint64](c.computeCumulativeWeightOfSlot, c.latestVerifiedCommitmentIndex)
 
 	return c
@@ -94,6 +100,14 @@ func (c *Chain) CumulativeWeight() reactive.Variable[uint64] {
 	return c.cumulativeWeight
 }
 
+func (c *Chain) AttestedCumulativeWeight() reactive.Variable[uint64] {
+	return c.attestedCumulativeWeight
+}
+
+func (c *Chain) VerifiedCumulativeWeight() reactive.Variable[uint64] {
+	return c.verifiedCumulativeWeight
+}
+
 func (c *Chain) registerCommitment(commitment *CommitmentMetadata) {
 	c.commitments.Set(commitment.Index(), commitment)
 
@@ -101,11 +115,19 @@ func (c *Chain) registerCommitment(commitment *CommitmentMetadata) {
 		return lo.Cond(latestCommitmentIndex > commitment.Index(), latestCommitmentIndex, commitment.Index())
 	})
 
-	unsubscribe := commitment.verified.OnTrigger(func() {
-		c.latestVerifiedCommitmentIndex.Compute(func(latestVerifiedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
-			return lo.Cond(latestVerifiedCommitmentIndex > commitment.Index(), latestVerifiedCommitmentIndex, commitment.Index())
-		})
-	})
+	unsubscribe := lo.Batch(
+		commitment.attested.OnTrigger(func() {
+			c.latestAttestedCommitmentIndex.Compute(func(latestAttestedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
+				return lo.Cond(latestAttestedCommitmentIndex > commitment.Index(), latestAttestedCommitmentIndex, commitment.Index())
+			})
+		}),
+
+		commitment.verified.OnTrigger(func() {
+			c.latestVerifiedCommitmentIndex.Compute(func(latestVerifiedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
+				return lo.Cond(latestVerifiedCommitmentIndex > commitment.Index(), latestVerifiedCommitmentIndex, commitment.Index())
+			})
+		}),
+	)
 
 	triggerIfSwitchedChains := func(_, newChain *Chain) bool { return newChain != c }
 
@@ -121,6 +143,10 @@ func (c *Chain) unregisterCommitment(commitment *CommitmentMetadata) {
 
 	c.latestCommitmentIndex.Compute(func(latestCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
 		return lo.Cond(commitment.Index() < latestCommitmentIndex, commitment.Index()-1, latestCommitmentIndex)
+	})
+
+	c.latestAttestedCommitmentIndex.Compute(func(latestAttestedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
+		return lo.Cond(commitment.Index() < latestAttestedCommitmentIndex, commitment.Index()-1, latestAttestedCommitmentIndex)
 	})
 
 	c.latestVerifiedCommitmentIndex.Compute(func(latestVerifiedCommitmentIndex iotago.SlotIndex) iotago.SlotIndex {
