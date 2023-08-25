@@ -150,16 +150,14 @@ func (c *CommitmentMetadata) registerParent(parent *CommitmentMetadata) {
 
 	// triggerIfBelowThreshold triggers the given event if the commitment's index is below the given
 	// threshold. We only monitor the threshold after the corresponding parent event was triggered (to minimize
-	// the amount of elements that listen to updates of the same property).
-	triggerIfBelowThreshold := func(eventFunc func(*CommitmentMetadata) reactive.Event, thresholdFunc func(*Chain) reactive.Variable[iotago.SlotIndex]) {
-		eventFunc(parent).OnTrigger(func() {
-			unsubscribe := thresholdFunc(c.chain.Get()).OnUpdate(func(_, latestVerifiedCommitmentIndex iotago.SlotIndex) {
-				if c.Index() < latestVerifiedCommitmentIndex {
-					eventFunc(c).Trigger()
-				}
+	// the amount of elements that listen to updates of the same chain threshold - it spreads monotonically).
+	triggerIfBelowThreshold := func(event func(*CommitmentMetadata) reactive.Event, chainThreshold func(*Chain) reactive.Variable[iotago.SlotIndex]) {
+		event(parent).OnTrigger(func() {
+			chainThreshold(c.chain.Get()).OnUpdateOnce(func(_, _ iotago.SlotIndex) {
+				event(c).Trigger()
+			}, func(_ iotago.SlotIndex, slotIndex iotago.SlotIndex) bool {
+				return c.Index() < slotIndex
 			})
-
-			eventFunc(c).OnTrigger(func() { go unsubscribe() })
 		})
 	}
 
