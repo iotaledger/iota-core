@@ -15,6 +15,7 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/autopeering/peer"
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -111,6 +112,15 @@ func provide(c *dig.Container) error {
 			seedCheckErr := checkCfgSeedAgainstDB(seed[0], peerDB)
 			if seedCheckErr != nil {
 				Component.LogFatalAndExit(seedCheckErr)
+			}
+		}
+
+		if len(seed) > 0 {
+			key := ed25519.PrivateKeyFromSeed(seed[0])
+			if peerDB != nil {
+				if updatePrivKeyErr := peerDB.UpdateLocalPrivateKey(key); updatePrivKeyErr != nil {
+					Component.LogFatalAndExit(ierrors.Wrap(updatePrivKeyErr, "unable to update local private key"))
+				}
 			}
 		}
 
