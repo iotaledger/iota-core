@@ -28,7 +28,7 @@ type Manager struct {
 	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.BlockID]]
 
 	// latestSupportedVersionSignals keep tracks of the latest supported protocol versions supported by validators.
-	latestSupportedVersionSignals *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, iotago.Version]
+	latestSupportedVersionSignals *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, iotago.VersionAndHash]
 
 	// latestCommittedSlot is where the Account tree is kept at.
 	latestCommittedSlot iotago.SlotIndex
@@ -58,7 +58,7 @@ func New(
 	return &Manager{
 		apiProvider:                   apiProvider,
 		blockBurns:                    shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
-		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, iotago.Version](),
+		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, iotago.VersionAndHash](),
 		accountsTree: ads.NewMap(accountsStore,
 			iotago.Identifier.Bytes,
 			iotago.IdentifierFromBytes,
@@ -96,8 +96,11 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 	set.Add(block.ID())
 
 	if validationBlock, isValidationBlock := block.ValidationBlock(); isValidationBlock {
-		m.latestSupportedVersionSignals.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue iotago.Version, exists bool) iotago.Version {
-			return lo.Max(currentValue, validationBlock.HighestSupportedVersion)
+		m.latestSupportedVersionSignals.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue iotago.VersionAndHash, exists bool) iotago.VersionAndHash {
+			return lo.Cond(
+				currentValue.Version < validationBlock.HighestSupportedVersion,
+				iotago.VersionAndHash{Version: validationBlock.HighestSupportedVersion, Hash: validationBlock.ProtocolParametersHash},
+				currentValue)
 		})
 	}
 }
@@ -190,6 +193,7 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	if m.latestCommittedSlot >= maxCommittableAge && targetIndex+maxCommittableAge < m.latestCommittedSlot {
 		return nil, false, ierrors.Errorf("can't calculate account, target slot index older than allowed (%d<%d)", targetIndex, m.latestCommittedSlot-maxCommittableAge)
 	}
+
 	if targetIndex > m.latestCommittedSlot {
 		return nil, false, ierrors.Errorf("can't retrieve account, slot %d is not committed yet, latest committed slot: %d", targetIndex, m.latestCommittedSlot)
 	}
@@ -351,12 +355,9 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 			return false, ierrors.Wrapf(err, "can't retrieve account, fixed cost underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffIndex, accountData.FixedCost, diffChange.FixedCostChange)
 		}
 		accountData.FixedCost = iotago.Mana(fixedCost)
-
-		latestSupportedProtocolVersion, err := safemath.SafeSub(int8(accountData.LatestSupportedProtocolVersion), diffChange.LatestSupportedProtocolVersionChange)
-		if err != nil {
-			return false, ierrors.Wrapf(err, "can't retrieve account, latest supported protocol version underflow for account (%s) in slot (%d): %d - %d", accountData.ID, diffIndex, accountData.LatestSupportedProtocolVersion, diffChange.LatestSupportedProtocolVersionChange)
+		if diffChange.PrevLatestSupportedVersionAndHash != diffChange.NewLatestSupportedVersionAndHash {
+			accountData.LatestSupportedProtocolVersionAndHash = diffChange.PrevLatestSupportedVersionAndHash
 		}
-		accountData.LatestSupportedProtocolVersion = iotago.Version(latestSupportedProtocolVersion)
 
 		// collected to see if an account was destroyed between slotIndex and b.latestCommittedSlot index.
 		wasDestroyed = wasDestroyed || destroyed
@@ -391,7 +392,8 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 	slotDiff.DelegationStakeChange = -int64(accountData.DelegationStake)
 	slotDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
 	slotDiff.FixedCostChange = -int64(accountData.FixedCost)
-	slotDiff.LatestSupportedProtocolVersionChange = -int8(accountData.LatestSupportedProtocolVersion)
+	slotDiff.NewLatestSupportedVersionAndHash = iotago.VersionAndHash{}
+	slotDiff.PrevLatestSupportedVersionAndHash = accountData.LatestSupportedProtocolVersionAndHash
 
 	return slotDiff, err
 }
@@ -489,11 +491,10 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 		}
 		accountData.FixedCost = iotago.Mana(fixedCost)
 
-		latestSupportedProtocolVersion, err := safemath.SafeAdd(uint8(accountData.LatestSupportedProtocolVersion), uint8(diffChange.LatestSupportedProtocolVersionChange))
-		if err != nil {
-			return ierrors.Wrapf(err, "can't retrieve account, validator latest supported version overflow for account (%s) in slot (%d): %d + %d", accountData.ID, index, accountData.LatestSupportedProtocolVersion, diffChange.LatestSupportedProtocolVersionChange)
+		if diffChange.PrevLatestSupportedVersionAndHash != diffChange.NewLatestSupportedVersionAndHash && accountData.LatestSupportedProtocolVersionAndHash.Version < diffChange.NewLatestSupportedVersionAndHash.Version {
+			accountData.LatestSupportedProtocolVersionAndHash = diffChange.NewLatestSupportedVersionAndHash
 		}
-		accountData.LatestSupportedProtocolVersion = iotago.Version(latestSupportedProtocolVersion)
+
 		if err := m.accountsTree.Set(accountID, accountData); err != nil {
 			return ierrors.Wrapf(err, "could not set account (%s) in accounts tree", accountID)
 		}
@@ -535,7 +536,7 @@ func (m *Manager) updateSlotDiffWithVersionSignals(slotIndex iotago.SlotIndex, a
 		return nil
 	}
 
-	for id, version := range signalsStorage.AsMap() {
+	for id, versionAndHash := range signalsStorage.AsMap() {
 		accountData, exists, err := m.accountsTree.Get(id)
 		if err != nil {
 			return ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", id)
@@ -549,8 +550,9 @@ func (m *Manager) updateSlotDiffWithVersionSignals(slotIndex iotago.SlotIndex, a
 		if !exists {
 			accountDiff = prunable.NewAccountDiff()
 		}
-		if latestSupportedProtocolVersionChange := int8(version) - int8(accountData.LatestSupportedProtocolVersion); latestSupportedProtocolVersionChange != 0 {
-			accountDiff.LatestSupportedProtocolVersionChange = latestSupportedProtocolVersionChange
+		if accountData.LatestSupportedProtocolVersionAndHash != versionAndHash && accountData.LatestSupportedProtocolVersionAndHash.Version < versionAndHash.Version {
+			accountDiff.NewLatestSupportedVersionAndHash = versionAndHash
+			accountDiff.PrevLatestSupportedVersionAndHash = accountData.LatestSupportedProtocolVersionAndHash
 			accountDiffs[id] = accountDiff
 		}
 	}

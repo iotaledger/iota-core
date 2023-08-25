@@ -117,10 +117,11 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 		prevAccountFields, exists := t.latestFieldsPerAccount.Get(accountID)
 		if !exists {
 			prevAccountFields = &latestAccountFields{
-				OutputID:       iotago.EmptyOutputID,
-				BICUpdatedAt:   0,
-				UpdatedInSlots: ds.NewSet[iotago.SlotIndex](),
-				ExpirySlot:     0,
+				OutputID:                      iotago.EmptyOutputID,
+				BICUpdatedAt:                  0,
+				UpdatedInSlots:                ds.NewSet[iotago.SlotIndex](),
+				ExpirySlot:                    0,
+				LatestSupportedVersionAndHash: iotago.VersionAndHash{},
 			}
 			t.latestFieldsPerAccount.Set(accountID, prevAccountFields)
 		}
@@ -134,11 +135,10 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 			PreviousUpdatedTime: prevAccountFields.BICUpdatedAt,
 			NewExpirySlot:       prevAccountFields.ExpirySlot,
 
-			DelegationStakeChange:                action.DelegationStakeChange,
-			ValidatorStakeChange:                 action.ValidatorStakeChange,
-			StakeEndEpochChange:                  action.StakeEndEpochChange,
-			FixedCostChange:                      action.FixedCostChange,
-			LatestSupportedProtocolVersionChange: action.LatestSupportedProtocolVersionChange,
+			DelegationStakeChange: action.DelegationStakeChange,
+			ValidatorStakeChange:  action.ValidatorStakeChange,
+			StakeEndEpochChange:   action.StakeEndEpochChange,
+			FixedCostChange:       action.FixedCostChange,
 		}
 
 		if action.TotalAllotments+iotago.Mana(action.NumBlocks)*rmc != 0 || !exists { // this line assumes that workscore of all blocks is 1
@@ -170,7 +170,13 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 			panic("previous account OutputID in the local map and NewOutputID in slot diff cannot be empty")
 		}
 
-		fmt.Printf("prepared state diffs %+v\nprevAccountdata %+v\n", slotDetails.SlotDiff[accountID], prevAccountFields)
+		if prevAccountFields.LatestSupportedVersionAndHash != action.LatestSupportedProtocolVersionAndHash {
+			slotDetails.SlotDiff[accountID].PrevLatestSupportedVersionAndHash = prevAccountFields.LatestSupportedVersionAndHash
+			slotDetails.SlotDiff[accountID].NewLatestSupportedVersionAndHash = action.LatestSupportedProtocolVersionAndHash
+
+			prevAccountFields.LatestSupportedVersionAndHash = action.LatestSupportedProtocolVersionAndHash
+
+		}
 	}
 
 	// Clone the diffs to prevent the manager from modifying it.
@@ -239,12 +245,11 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 	require.Truef(t.T, expectedPubKeys.Equals(actualState.PubKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedPubKeys, actualState.PubKeys)
 
 	require.Equal(t.T, t.OutputID(expectedState.OutputID, false), actualState.OutputID)
-
 	require.Equal(t.T, expectedState.StakeEndEpoch, actualState.StakeEndEpoch, "slotIndex: %d, accountID %s: expected StakeEndEpoch: %d, actual: %d", slotIndex, accountID, expectedState.StakeEndEpoch, actualState.StakeEndEpoch)
 	require.Equal(t.T, expectedState.ValidatorStake, actualState.ValidatorStake, "slotIndex: %d, accountID %s: expected ValidatorStake: %d, actual: %d", slotIndex, accountID, expectedState.ValidatorStake, actualState.ValidatorStake)
 	require.Equal(t.T, expectedState.FixedCost, actualState.FixedCost, "slotIndex: %d, accountID %s: expected FixedCost: %d, actual: %d", slotIndex, accountID, expectedState.FixedCost, actualState.FixedCost)
 	require.Equal(t.T, expectedState.DelegationStake, actualState.DelegationStake, "slotIndex: %d, accountID %s: expected DelegationStake: %d, actual: %d", slotIndex, accountID, expectedState.DelegationStake, actualState.DelegationStake)
-	require.Equal(t.T, expectedState.LatestSupportedProtocolVersion, actualState.LatestSupportedProtocolVersion, "slotIndex: %d, accountID %s: expected LatestSupportedProtocolVersion: %d, actual: %d", slotIndex, accountID, expectedState.LatestSupportedProtocolVersion, actualState.LatestSupportedProtocolVersion)
+	require.Equal(t.T, expectedState.LatestSupportedProtocolVersionAndHash, actualState.LatestSupportedProtocolVersionAndHash, "slotIndex: %d, accountID %s: expected LatestSupportedProtocolVersionAndHash: %d, actual: %d", slotIndex, accountID, expectedState.LatestSupportedProtocolVersionAndHash, actualState.LatestSupportedProtocolVersionAndHash)
 
 }
 
@@ -287,6 +292,9 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 	require.Equal(t.T, expectedAccountDiff.BICChange-iotago.BlockIssuanceCredits(accountsSlotBuildData.Burns[accountID]), actualDiff.BICChange)
 	require.Equal(t.T, expectedAccountDiff.PubKeysAdded, actualDiff.PubKeysAdded)
 	require.Equal(t.T, expectedAccountDiff.PubKeysRemoved, actualDiff.PubKeysRemoved)
+	require.Equal(t.T, expectedAccountDiff.PrevLatestSupportedVersionAndHash, actualDiff.PrevLatestSupportedVersionAndHash)
+	require.Equal(t.T, expectedAccountDiff.NewLatestSupportedVersionAndHash, actualDiff.NewLatestSupportedVersionAndHash)
+
 }
 
 func (t *TestSuite) AccountID(alias string, createIfNotExists bool) iotago.AccountID {
@@ -341,10 +349,10 @@ type AccountActions struct {
 	AddedKeys       []string
 	RemovedKeys     []string
 
-	ValidatorStakeChange                 int64
-	StakeEndEpochChange                  int64
-	FixedCostChange                      int64
-	LatestSupportedProtocolVersionChange int8
+	ValidatorStakeChange                  int64
+	StakeEndEpochChange                   int64
+	FixedCostChange                       int64
+	LatestSupportedProtocolVersionAndHash iotago.VersionAndHash
 
 	DelegationStakeChange int64
 
@@ -358,20 +366,21 @@ type AccountState struct {
 	OutputID string
 	PubKeys  []string
 
-	ValidatorStake                 iotago.BaseToken
-	DelegationStake                iotago.BaseToken
-	FixedCost                      iotago.Mana
-	StakeEndEpoch                  iotago.EpochIndex
-	LatestSupportedProtocolVersion iotago.Version
+	ValidatorStake                        iotago.BaseToken
+	DelegationStake                       iotago.BaseToken
+	FixedCost                             iotago.Mana
+	StakeEndEpoch                         iotago.EpochIndex
+	LatestSupportedProtocolVersionAndHash iotago.VersionAndHash
 
 	Destroyed bool
 }
 
 type latestAccountFields struct {
-	OutputID       iotago.OutputID
-	BICUpdatedAt   iotago.SlotIndex
-	UpdatedInSlots ds.Set[iotago.SlotIndex]
-	ExpirySlot     iotago.SlotIndex
+	OutputID                      iotago.OutputID
+	BICUpdatedAt                  iotago.SlotIndex
+	UpdatedInSlots                ds.Set[iotago.SlotIndex]
+	ExpirySlot                    iotago.SlotIndex
+	LatestSupportedVersionAndHash iotago.VersionAndHash
 }
 
 type slotData struct {

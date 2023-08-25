@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -59,7 +58,7 @@ type Orchestrator struct {
 
 	latestSignals           *memstorage.IndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignaledBlock]
 	upgradeSignalsFunc      func(slot iotago.SlotIndex) *prunable.UpgradeSignals
-	permanentUpgradeSignals *kvstore.TypedStore[iotago.EpochIndex, VersionAndHash]
+	permanentUpgradeSignals *kvstore.TypedStore[iotago.EpochIndex, iotago.VersionAndHash]
 
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error
 	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error)
@@ -119,7 +118,7 @@ func NewOrchestrator(errorHandler func(error),
 	return options.Apply(&Orchestrator{
 		errorHandler:            errorHandler,
 		latestSignals:           memstorage.NewIndexedStorage[iotago.SlotIndex, account.SeatIndex, *prunable.SignaledBlock](),
-		permanentUpgradeSignals: kvstore.NewTypedStore(permanentUpgradeSignal, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, VersionAndHash.Bytes, VersionAndHashFromBytes),
+		permanentUpgradeSignals: kvstore.NewTypedStore(permanentUpgradeSignal, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, iotago.VersionAndHash.Bytes, iotago.VersionAndHashFromBytes),
 		upgradeSignalsFunc:      upgradeSignalsFunc,
 
 		setProtocolParametersEpochMappingFunc: setProtocolParametersEpochMappingFunc,
@@ -228,9 +227,9 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 		return
 	}
 
-	versionAndHashSupporters := make(map[VersionAndHash]int)
+	versionAndHashSupporters := make(map[iotago.VersionAndHash]int)
 	for _, signaledBlock := range signaledBlockPerSeat {
-		versionAndHash := VersionAndHash{
+		versionAndHash := iotago.VersionAndHash{
 			Version: signaledBlock.HighestSupportedVersion,
 			Hash:    signaledBlock.ProtocolParametersHash,
 		}
@@ -272,8 +271,8 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 	}
 }
 
-func (o *Orchestrator) maxVersionByCount(versionSupporters map[VersionAndHash]int) (VersionAndHash, int) {
-	var versionWithMostSupporters VersionAndHash
+func (o *Orchestrator) maxVersionByCount(versionSupporters map[iotago.VersionAndHash]int) (iotago.VersionAndHash, int) {
+	var versionWithMostSupporters iotago.VersionAndHash
 	var mostSupporters int
 	for versionAndHash, supportersCount := range versionSupporters {
 		if supportersCount > mostSupporters {
@@ -285,8 +284,8 @@ func (o *Orchestrator) maxVersionByCount(versionSupporters map[VersionAndHash]in
 	return versionWithMostSupporters, mostSupporters
 }
 
-func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex) (VersionAndHash, bool) {
-	epochVersions := make(map[VersionAndHash]int)
+func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex) (iotago.VersionAndHash, bool) {
+	epochVersions := make(map[iotago.VersionAndHash]int)
 
 	for epoch := o.signalingWindowStart(currentEpoch); epoch <= currentEpoch; epoch++ {
 		version, err := o.permanentUpgradeSignals.Get(epoch)
@@ -297,7 +296,7 @@ func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex)
 
 			o.errorHandler(ierrors.Wrap(err, "failed to get permanent upgrade signals"))
 
-			return VersionAndHash{}, false
+			return iotago.VersionAndHash{}, false
 		}
 
 		epochVersions[version]++
@@ -309,7 +308,7 @@ func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex)
 
 	// Check whether the signaling window threshold is reached.
 	if signaledCount < int(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().WindowTargetRatio) {
-		return VersionAndHash{}, false
+		return iotago.VersionAndHash{}, false
 	}
 
 	return versionMostSignaled, true
@@ -323,28 +322,4 @@ func (o *Orchestrator) signalingWindowStart(epoch iotago.EpochIndex) iotago.Epoc
 	}
 
 	return epoch - windowSize
-}
-
-type VersionAndHash struct {
-	Version iotago.Version
-	Hash    iotago.Identifier
-}
-
-func (v VersionAndHash) Bytes() ([]byte, error) {
-	// iotago.Version and iotago.Identifier can't panic on .Bytes() call.
-	return byteutils.ConcatBytes(lo.PanicOnErr(v.Version.Bytes()), lo.PanicOnErr(v.Hash.Bytes())), nil
-}
-
-func VersionAndHashFromBytes(bytes []byte) (VersionAndHash, int, error) {
-	version, versionBytesConsumed, err := iotago.VersionFromBytes(bytes)
-	if err != nil {
-		return VersionAndHash{}, 0, ierrors.Wrap(err, "failed to parse version")
-	}
-
-	hash, hashBytesConsumed, err := iotago.IdentifierFromBytes(bytes[versionBytesConsumed:])
-	if err != nil {
-		return VersionAndHash{}, 0, ierrors.Wrap(err, "failed to parse hash")
-	}
-
-	return VersionAndHash{version, hash}, versionBytesConsumed + hashBytesConsumed, nil
 }

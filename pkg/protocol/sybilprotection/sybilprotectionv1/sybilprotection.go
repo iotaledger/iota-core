@@ -307,7 +307,7 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 			ValidatorStake:                 accountData.ValidatorStake,
 			FixedCost:                      accountData.FixedCost,
 			Active:                         active,
-			LatestSupportedProtocolVersion: accountData.LatestSupportedProtocolVersion,
+			LatestSupportedProtocolVersion: accountData.LatestSupportedProtocolVersionAndHash.Version,
 		})
 
 		return nil

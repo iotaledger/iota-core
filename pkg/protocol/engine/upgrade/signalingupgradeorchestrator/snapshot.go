@@ -56,7 +56,7 @@ func (o *Orchestrator) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "failed to read epoch")
 		}
 
-		versionAndHash, err := stream.ReadFunc(reader, VersionAndHashFromBytes)
+		versionAndHash, err := stream.ReadFunc(reader, iotago.VersionAndHashFromBytes)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to read versionAndHash")
 		}

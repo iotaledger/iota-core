@@ -60,6 +60,10 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 			if accountData.DelegationStake != actualAccountData.DelegationStake {
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected delegation stake %d, got %d", node.Name, accountData.ID, accountData.DelegationStake, actualAccountData.DelegationStake)
 			}
+
+			if accountData.LatestSupportedProtocolVersionAndHash != actualAccountData.LatestSupportedProtocolVersionAndHash {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected latest supported protocol version and hash %d, got %d", node.Name, accountData.ID, accountData.LatestSupportedProtocolVersionAndHash, actualAccountData.LatestSupportedProtocolVersionAndHash)
+			}
 		}
 
 		return nil
@@ -135,8 +139,12 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 				return ierrors.Errorf("AssertAccountDiff: %s: expected delegation stake change epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.LatestSupportedProtocolVersionChange, actualAccountDiff.LatestSupportedProtocolVersionChange) {
-				return ierrors.Errorf("AssertAccountDiff: %s: expected latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange, accountID, index)
+			if !cmp.Equal(accountDiff.PrevLatestSupportedVersionAndHash, actualAccountDiff.PrevLatestSupportedVersionAndHash) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected previous latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.PreviousExpirySlot, actualAccountDiff.PrevLatestSupportedVersionAndHash, accountID, index)
+			}
+
+			if !cmp.Equal(accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected new latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash, accountID, index)
 			}
 		}
 
