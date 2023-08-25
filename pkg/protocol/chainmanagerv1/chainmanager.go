@@ -38,25 +38,9 @@ func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
 	}
 
-	c.initChainSwitching()
+	c.OnChainCreated(c.setupChain)
 
 	return c
-}
-
-func (c *ChainManager) initChainSwitching() {
-	c.OnChainCreated(func(chain *Chain) {
-		unsubscribe := chain.cumulativeWeight.OnUpdate(func(_, chainWeight uint64) {
-			c.candidateChain.Compute(func(candidateChain *Chain) *Chain {
-				if candidateChain == nil || candidateChain.evicted.WasTriggered() || chainWeight > candidateChain.CumulativeWeight().Get() {
-					return chain
-				}
-
-				return candidateChain
-			})
-		})
-
-		chain.evicted.OnTrigger(unsubscribe)
-	})
 }
 
 func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *CommitmentMetadata) {
@@ -93,10 +77,24 @@ func (c *ChainManager) RootCommitment() reactive.Variable[*CommitmentMetadata] {
 	panic("root chain not initialized")
 }
 
-func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvictedEvent reactive.Event) {
-	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, func(metadata *CommitmentMetadata) {
-		commitment.Parent().Set(metadata)
+func (c *ChainManager) setupChain(newCandidate *Chain) {
+	newCandidate.cumulativeWeight.OnUpdate(func(_, newChainWeight uint64) {
+		if newChainWeight < c.MainChain().Get().CumulativeWeight().Get() {
+			return
+		}
+
+		c.candidateChain.Compute(func(currentCandidate *Chain) *Chain {
+			if currentCandidate == nil || currentCandidate.evicted.WasTriggered() || newChainWeight > currentCandidate.CumulativeWeight().Get() {
+				return newCandidate
+			}
+
+			return currentCandidate
+		})
 	})
+}
+
+func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvictedEvent reactive.Event) {
+	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, lo.Void(commitment.Parent().Set))
 
 	slotEvictedEvent.OnTrigger(func() {
 		commitment.Evicted().Trigger()
