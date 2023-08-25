@@ -89,7 +89,7 @@ func (c *ChainManager) RootCommitment() reactive.Variable[*CommitmentMetadata] {
 
 func (c *ChainManager) selectHeaviestChain(variable reactive.Variable[*Chain], chainWeight func(*Chain) reactive.Variable[uint64], newCandidate *Chain) {
 	chainWeight(newCandidate).OnUpdate(func(_, newChainWeight uint64) {
-		if newChainWeight < c.MainChain().Get().verifiedCumulativeWeight.Get() {
+		if newChainWeight <= c.MainChain().Get().verifiedCumulativeWeight.Get() {
 			return
 		}
 
