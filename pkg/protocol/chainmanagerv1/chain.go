@@ -17,8 +17,6 @@ const (
 )
 
 type Chain struct {
-	manager *ChainManager
-
 	root reactive.Variable[*CommitmentMetadata]
 
 	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *CommitmentMetadata]

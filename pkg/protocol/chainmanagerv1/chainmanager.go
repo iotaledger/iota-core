@@ -29,7 +29,7 @@ type ChainManager struct {
 
 func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 	c := &ChainManager{
-		mainChain:           reactive.NewVariable[*Chain](),
+		mainChain:           reactive.NewVariable[*Chain]().Init(NewChain(NewRootCommitmentMetadata(rootCommitment))),
 		candidateChain:      reactive.NewVariable[*Chain](),
 		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
 		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
@@ -37,8 +37,6 @@ func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 		chainCreated:        event.New1[*Chain](),
 		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
 	}
-
-	c.mainChain.Set(NewChain(NewRootCommitmentMetadata(rootCommitment, c)))
 
 	c.initChainSwitching()
 
@@ -65,7 +63,7 @@ func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitme
 	if commitmentRequest := c.requestCommitment(commitment.ID(), commitment.Index(), false, func(resolvedMetadata *CommitmentMetadata) {
 		commitmentMetadata = resolvedMetadata
 	}); commitmentRequest != nil {
-		commitmentRequest.Resolve(NewCommitmentMetadata(commitment, c))
+		commitmentRequest.Resolve(NewCommitmentMetadata(commitment))
 	}
 
 	return commitmentMetadata
@@ -103,6 +101,12 @@ func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvict
 
 	slotEvictedEvent.OnTrigger(func() {
 		commitment.Evicted().Trigger()
+	})
+
+	commitment.spawnedChain.OnUpdate(func(oldChain, newChain *Chain) {
+		if newChain != nil {
+			c.chainCreated.Trigger(newChain)
+		}
 	})
 
 	c.commitmentCreated.Trigger(commitment)

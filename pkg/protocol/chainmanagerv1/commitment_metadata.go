@@ -10,7 +10,6 @@ import (
 type CommitmentMetadata struct {
 	*model.Commitment
 
-	manager                               *ChainManager
 	chain                                 reactive.Variable[*Chain]
 	parent                                reactive.Variable[*CommitmentMetadata]
 	successor                             reactive.Variable[*CommitmentMetadata]
@@ -26,13 +25,13 @@ type CommitmentMetadata struct {
 	aboveLatestVerifiedCommitment         reactive.Variable[bool]
 	inSyncWindow                          reactive.Variable[bool]
 	requiresWarpSync                      reactive.Variable[bool]
+	spawnedChain                          reactive.Variable[*Chain]
 }
 
-func NewCommitmentMetadata(commitment *model.Commitment, manager *ChainManager) *CommitmentMetadata {
+func NewCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
 	c := &CommitmentMetadata{
 		Commitment: commitment,
 
-		manager:                             manager,
 		chain:                               reactive.NewVariable[*Chain](),
 		parent:                              reactive.NewVariable[*CommitmentMetadata](),
 		successor:                           reactive.NewVariable[*CommitmentMetadata](),
@@ -44,6 +43,7 @@ func NewCommitmentMetadata(commitment *model.Commitment, manager *ChainManager) 
 		belowLatestVerifiedCommitment:       reactive.NewEvent(),
 		evicted:                             reactive.NewEvent(),
 		parentAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
+		spawnedChain:                        reactive.NewVariable[*Chain](),
 	}
 
 	c.chain.OnUpdate(func(_, chain *Chain) {
@@ -75,8 +75,8 @@ func NewCommitmentMetadata(commitment *model.Commitment, manager *ChainManager) 
 	return c
 }
 
-func NewRootCommitmentMetadata(commitment *model.Commitment, manager *ChainManager) *CommitmentMetadata {
-	commitmentMetadata := NewCommitmentMetadata(commitment, manager)
+func NewRootCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
+	commitmentMetadata := NewCommitmentMetadata(commitment)
 	commitmentMetadata.Solid().Trigger()
 	commitmentMetadata.Verified().Trigger()
 	commitmentMetadata.BelowSyncThreshold().Trigger()
@@ -178,35 +178,34 @@ func (c *CommitmentMetadata) registerChild(newChild *CommitmentMetadata, onSucce
 }
 
 func (c *CommitmentMetadata) inheritChain(parent *CommitmentMetadata) func(*CommitmentMetadata, *CommitmentMetadata) {
-	var spawnedChain *Chain
 	var unsubscribeFromParent func()
 
 	return func(_, successor *CommitmentMetadata) {
-		switch successor {
-		case nil:
-			panic("successor must never be changed back to nil")
-		case c:
-			if spawnedChain != nil {
-				spawnedChain.evicted.Trigger()
-				spawnedChain = nil
-			}
+		c.spawnedChain.Compute(func(spawnedChain *Chain) (newSpawnedChain *Chain) {
+			switch successor {
+			case nil:
+				panic("successor may not be changed back to nil")
+			case c:
+				if spawnedChain != nil {
+					spawnedChain.evicted.Trigger()
+				}
 
-			if unsubscribeFromParent == nil {
 				unsubscribeFromParent = parent.chain.OnUpdate(func(_, chain *Chain) { c.chain.Set(chain) })
-			}
-		default:
-			if unsubscribeFromParent != nil {
-				unsubscribeFromParent()
-				unsubscribeFromParent = nil
+			default:
+				if spawnedChain != nil {
+					return spawnedChain
+				}
+
+				if unsubscribeFromParent != nil {
+					unsubscribeFromParent()
+				}
+
+				newSpawnedChain = NewChain(c)
+
+				c.chain.Set(newSpawnedChain)
 			}
 
-			if spawnedChain == nil {
-				spawnedChain = NewChain(c)
-
-				c.chain.Set(spawnedChain)
-
-				c.manager.chainCreated.Trigger(spawnedChain)
-			}
-		}
+			return newSpawnedChain
+		})
 	}
 }
