@@ -14,16 +14,18 @@ func TestManager_Import_Export(t *testing.T) {
 	epochsCount := 3
 	epochActions := map[string]*EpochActions{
 		"A": {
-			PoolStake:            10,
-			ValidatorStake:       4,
-			FixedCost:            1,
-			ValidationBlocksSent: 10,
+			PoolStake:                   10,
+			ValidatorStake:              4,
+			FixedCost:                   1,
+			ValidationBlocksSentPerSlot: 10,
+			SlotPerformance:             7,
 		},
 		"B": {
-			PoolStake:            20,
-			ValidatorStake:       8,
-			FixedCost:            100,
-			ValidationBlocksSent: 3,
+			PoolStake:                   20,
+			ValidatorStake:              8,
+			FixedCost:                   100,
+			ValidationBlocksSentPerSlot: 3,
+			SlotPerformance:             3,
 		},
 	}
 	for i := 1; i <= epochsCount; i++ {
@@ -39,7 +41,7 @@ func TestManager_Import_Export(t *testing.T) {
 		err := ts.Instance.Export(writer, targetSlot)
 		require.NoError(t, err)
 
-		ts.InitRewardManager()
+		ts.InitPerformanceTracker()
 
 		err = ts.Instance.Import(writer.BytesReader())
 		require.NoError(t, err)
@@ -56,7 +58,7 @@ func TestManager_Import_Export(t *testing.T) {
 		err := ts.Instance.Export(writer, targetSlot)
 		require.NoError(t, err)
 
-		ts.InitRewardManager()
+		ts.InitPerformanceTracker()
 
 		err = ts.Instance.Import(writer.BytesReader())
 		require.NoError(t, err)

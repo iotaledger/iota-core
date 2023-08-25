@@ -26,7 +26,8 @@ type TestSuite struct {
 
 	apiProvider api.Provider
 
-	Instance *Tracker
+	Instance             *Tracker
+	perforanceFactorFunc func(iotago.SlotIndex) *prunable.ValidatorSlotPerformance
 }
 
 func NewTestSuite(t *testing.T) *TestSuite {
@@ -41,12 +42,12 @@ func NewTestSuite(t *testing.T) *TestSuite {
 		accounts:    make(map[string]iotago.AccountID),
 		apiProvider: apiProvider,
 	}
-	ts.InitRewardManager()
+	ts.InitPerformanceTracker()
 
 	return ts
 }
 
-func (t *TestSuite) InitRewardManager() {
+func (t *TestSuite) InitPerformanceTracker() {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
 	perforanceFactorFunc := func(index iotago.SlotIndex) *prunable.ValidatorSlotPerformance {
 		if _, exists := prunableStores[index]; !exists {
@@ -57,6 +58,8 @@ func (t *TestSuite) InitRewardManager() {
 
 		return p
 	}
+	t.perforanceFactorFunc = perforanceFactorFunc
+
 	RegistrationActivityFunc := func(index iotago.SlotIndex) *prunable.RegisteredValidatorSlotActivity {
 		if _, exists := prunableStores[index]; !exists {
 			prunableStores[index] = mapdb.NewMapDB()
@@ -101,7 +104,7 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 	require.NoError(t.T, err)
 	for accIDAlias, action := range actions {
 		accID := t.Account(accIDAlias, true)
-		t.applyPerformanceFactor(accID, epochIndex, action.ValidationBlocksSent)
+		t.applyPerformanceFactor(accID, epochIndex, action.ActiveSlotsCount, action.ValidationBlocksSentPerSlot, action.SlotPerformance)
 	}
 
 	t.Instance.ApplyEpoch(epochIndex, committee)
@@ -115,40 +118,115 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 		totalStake += action.PoolStake
 		totalValidatorsStake += action.ValidatorStake
 	}
-	// TODO: finish and assert profit margin
-	// profitMarging := (1 << 8) * totalValidatorsStake / (totalValidatorsStake + totalStake)
-	// require.Equal(t.T, profitMarging, expectedStats.ProfitMargin)
-	for alias, action := range actions {
-		accountID := t.Account(alias, false)
-		performanceFactor := action.ValidationBlocksSent
+	profitMarging := t.calculateProfitMargin(totalValidatorsStake, totalStake, epochIndex)
 
-		epochsInSlot := 1 << 13
-		targetRewardPerEpoch := uint64(233373068869021000 * epochsInSlot)
-		aux := (((1 << 31) * action.PoolStake) / totalStake) + ((2 << 31) * action.ValidatorStake / totalValidatorsStake)
-		aux2 := uint64(aux) * targetRewardPerEpoch * performanceFactor
-		expectedRewardWithFixedCost := iotago.Mana(aux2 >> 40)
+	for alias, action := range actions {
+		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount
+		poolRewards := t.calculatePoolReward(epochIndex, totalValidatorsStake, totalStake, action.PoolStake, action.ValidatorStake, uint64(action.FixedCost), epochPerformanceFactor)
+		fmt.Println("pool: ", alias, "rewards: ", poolRewards)
+		expectedValidatorReward := t.validatorReward(epochIndex, profitMarging, poolRewards, uint64(action.ValidatorStake), uint64(action.PoolStake), uint64(action.FixedCost))
+		accountID := t.Account(alias, true)
 		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID, actions[alias].ValidatorStake, epochIndex, epochIndex)
+		fmt.Println("actual validator reward: ", actualValidatorReward, "expected validator reward: ", expectedValidatorReward)
 		require.NoError(t.T, err)
-		delegatorStake := actions[alias].PoolStake - actions[alias].ValidatorStake
-		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, delegatorStake, epochIndex, epochIndex)
-		require.NoError(t.T, err)
-		fmt.Printf("expected: %d, actual: %d\n", expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
-		// TODO: require.EqualValues(t.T, expectedRewardWithFixedCost, actualValidatorReward+actualDelegatorReward)
+		require.Equal(t.T, expectedValidatorReward, actualValidatorReward)
+
+		for delegatedAmount := range action.Delegators {
+			expectedDelegatorReward := t.delegatorReward(epochIndex, profitMarging, poolRewards, uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost))
+			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epochIndex, epochIndex)
+			fmt.Println("actual delegator reward: ", actualDelegatorReward, "expected delegator reward: ", expectedDelegatorReward)
+			require.NoError(t.T, err)
+			require.Equal(t.T, expectedDelegatorReward, actualDelegatorReward)
+		}
+
 	}
 }
 
-func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochIndex iotago.EpochIndex, performanceFactor uint64) {
+func (t *TestSuite) validatorReward(epochIndex iotago.EpochIndex, profitMargin, poolRewards, stakeAmount, poolStake, fixedCost uint64) iotago.Mana {
+	profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
+	profitMarginComplement := (1 << profitMarginExponent) - profitMargin
+	profitMarginFactor := (profitMargin * poolRewards) >> profitMarginExponent
+	residualValidatorFactor := ((profitMarginComplement * poolRewards) >> profitMarginExponent) * stakeAmount / poolStake
+
+	unDecayedEpochRewards := fixedCost + profitMarginFactor + residualValidatorFactor
+	decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
+	decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochIndex)
+	require.NoError(t.T, err)
+
+	return decayedEpochRewards
+}
+
+func (t *TestSuite) delegatorReward(epochIndex iotago.EpochIndex, profitMargin, poolRewards, delegatedAmount, poolStake, fixedCost uint64) iotago.Mana {
+	profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
+	profitMarginComplement := (1 << profitMarginExponent) - profitMargin
+
+	unDecayedEpochRewards := (((profitMarginComplement * poolRewards) >> profitMarginExponent) * delegatedAmount) / poolStake
+
+	decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
+	decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochIndex)
+	require.NoError(t.T, err)
+
+	return decayedEpochRewards
+}
+
+func (t *TestSuite) calculatePoolReward(epoch iotago.EpochIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, fixedCost, performanceFactor uint64) uint64 {
+	params := t.apiProvider.APIForEpoch(epoch).ProtocolParameters()
+	targetReward := params.RewardsParameters().TargetReward(epoch, uint64(params.TokenSupply()), params.ManaParameters().ManaGenerationRate, params.ManaParameters().ManaGenerationRateExponent, params.SlotsPerEpochExponent())
+
+	poolCoefficient := t.calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorsStake, epoch)
+	scaledPoolReward := poolCoefficient * targetReward * performanceFactor
+	poolRewardNoFixedCost := scaledPoolReward / uint64(params.RewardsParameters().ValidatorBlocksPerSlot) >> (params.RewardsParameters().PoolCoefficientExponent + 1)
+	if poolRewardNoFixedCost < fixedCost {
+		fmt.Println("less than fixed cost ", poolRewardNoFixedCost, fixedCost)
+		return 0
+	}
+
+	return poolRewardNoFixedCost - fixedCost
+}
+
+func (t *TestSuite) calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorStake iotago.BaseToken, epoch iotago.EpochIndex) uint64 {
+	poolCoeffExponent := t.apiProvider.APIForEpoch(epoch).ProtocolParameters().RewardsParameters().PoolCoefficientExponent
+	poolCoeff := (poolStake<<poolCoeffExponent)/totalStake +
+		(validatorStake<<poolCoeffExponent)/totalValidatorStake
+
+	return uint64(poolCoeff)
+}
+
+// calculateProfitMargin calculates the profit margin of the pool by firstly increasing the accuracy of the given value, so the profit margin is moved to the power of 2^accuracyShift.
+func (t *TestSuite) calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken, epoch iotago.EpochIndex) uint64 {
+	return uint64((totalValidatorsStake << t.apiProvider.APIForEpoch(epoch).ProtocolParameters().RewardsParameters().ProfitMarginExponent) / (totalValidatorsStake + totalPoolStake))
+}
+
+func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochIndex iotago.EpochIndex, activeSlotsCount, validationBlocksSentPerSlot, slotPerformanceFactor uint64) {
 	startSlot := t.apiProvider.APIForEpoch(epochIndex).TimeProvider().EpochStart(epochIndex)
 	endSlot := t.apiProvider.APIForEpoch(epochIndex).TimeProvider().EpochEnd(epochIndex)
+	valBlocksNum := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
+	subslotDur := time.Duration(t.apiProvider.APIForEpoch(epochIndex).TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
+
+	fmt.Println("Start slot: ", startSlot, "\nEnd slot: ", endSlot, "\nSubslot duration: ", subslotDur, "\nTarget validation blocks: ", validationBlocksSentPerSlot)
+
+	slotCount := uint64(0)
 	for slot := startSlot; slot <= endSlot; slot++ {
-		for i := uint64(0); i < performanceFactor; i++ {
+		if slotCount > activeSlotsCount {
+			// no more blocks issued by this validator in this epoch
+			return
+		}
+		fmt.Println("New slot: ", slot)
+		for i := uint64(0); i < validationBlocksSentPerSlot; i++ {
 			block := tpkg.RandBasicBlockWithIssuerAndRMC(accountID, 10)
-			block.IssuingTime = t.apiProvider.APIForEpoch(epochIndex).TimeProvider().SlotStartTime(slot)
+			subslotIndex := i
+			// issued more than one block in the same slot to reduce performance factor
+			if i >= slotPerformanceFactor {
+				subslotIndex = 0
+			}
+			block.IssuingTime = t.apiProvider.APIForEpoch(epochIndex).TimeProvider().SlotStartTime(slot).Add(time.Duration(subslotIndex)*subslotDur + 1*time.Nanosecond)
+			fmt.Println("Issue block at: ", block.IssuingTime)
 			modelBlock, err := model.BlockFromBlock(block, t.apiProvider.APIForEpoch(epochIndex))
 			t.Instance.TrackValidationBlock(blocks.NewBlock(modelBlock))
 
 			require.NoError(t.T, err)
 		}
+		slotCount++
 	}
 }
 
@@ -173,8 +251,14 @@ func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[s
 }
 
 type EpochActions struct {
-	PoolStake            iotago.BaseToken
-	ValidatorStake       iotago.BaseToken
-	FixedCost            iotago.Mana
-	ValidationBlocksSent uint64
+	PoolStake      iotago.BaseToken
+	ValidatorStake iotago.BaseToken
+	Delegators     []iotago.BaseToken
+	FixedCost      iotago.Mana
+	// ActiveSlotsCount is the number of firsts slots the validator was active in the epoch.
+	ActiveSlotsCount uint64
+	// ValidationBlocksSentPerSlot is the number of validation blocks validator sent per slot.
+	ValidationBlocksSentPerSlot uint64
+	// SlotPerformance is the target slot performance factor, how many subslots were covered by validator blocks.
+	SlotPerformance uint64
 }

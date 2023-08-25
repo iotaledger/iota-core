@@ -1,22 +1,30 @@
 package performance
 
-import "testing"
+import (
+	"testing"
+
+	iotago "github.com/iotaledger/iota.go/v4"
+)
 
 func TestManager_Rewards(t *testing.T) {
 	ts := NewTestSuite(t)
 
 	epochActions := map[string]*EpochActions{
 		"A": {
-			PoolStake:            10,
-			ValidatorStake:       4,
-			FixedCost:            1,
-			ValidationBlocksSent: 10,
+			PoolStake:                   10,
+			ValidatorStake:              4,
+			Delegators:                  []iotago.BaseToken{2, 4},
+			FixedCost:                   1,
+			ValidationBlocksSentPerSlot: 10,
+			SlotPerformance:             8,
 		},
 		"B": {
-			PoolStake:            20,
-			ValidatorStake:       8,
-			FixedCost:            100,
-			ValidationBlocksSent: 3,
+			PoolStake:                   20,
+			ValidatorStake:              8,
+			Delegators:                  []iotago.BaseToken{1, 2, 4, 5},
+			FixedCost:                   100,
+			ValidationBlocksSentPerSlot: 3,
+			SlotPerformance:             10,
 		},
 	}
 	ts.ApplyEpochActions(2, epochActions)

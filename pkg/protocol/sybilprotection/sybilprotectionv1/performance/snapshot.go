@@ -2,6 +2,7 @@ package performance
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -75,7 +76,7 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 	if err := binary.Read(reader, binary.LittleEndian, &slotCount); err != nil {
 		return ierrors.Wrap(err, "unable to read slot count")
 	}
-
+	fmt.Println("importing slot count", slotCount)
 	for i := uint64(0); i < slotCount; i++ {
 		var slotIndex iotago.SlotIndex
 		if err := binary.Read(reader, binary.LittleEndian, &slotIndex); err != nil {
@@ -87,6 +88,7 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
 			return ierrors.Wrapf(err, "unable to read accounts count for slot index %d", slotIndex)
 		}
+		fmt.Println("importing account count", accountsCount, "for slot index", slotIndex)
 
 		performanceFactors := t.validatorSlotPerformanceFunc(slotIndex)
 		for j := uint64(0); j < accountsCount; j++ {
@@ -99,6 +101,7 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 			if err := binary.Read(reader, binary.LittleEndian, &performanceFactor); err != nil {
 				return ierrors.Wrapf(err, "unable to read performance factor for account %s and slot index %d", accountID, slotIndex)
 			}
+			fmt.Println("importing performance factor for account", accountID, "and slot index", slotIndex, "with value", performanceFactor)
 			err := performanceFactors.Store(accountID, &performanceFactor)
 			if err != nil {
 				return ierrors.Wrapf(err, "unable to store performance factor for account %s and slot index %d", accountID, slotIndex)
@@ -220,6 +223,7 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 		}
 		// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
 		if err := t.validatorSlotPerformanceFunc(currentSlot).ForEachPerformanceFactor(func(accountID iotago.AccountID, pf *prunable.ValidatorPerformance) error {
+			fmt.Println("writing pf for slot", currentSlot, "account", accountID, "pf", pf)
 			if err := pWriter.WriteValue("account id", accountID); err != nil {
 				return ierrors.Wrapf(err, "unable to write account id %s for slot %d", accountID, currentSlot)
 			}
@@ -236,7 +240,7 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 		}); err != nil {
 			return ierrors.Wrapf(err, "unable to write performance factors for slot index %d", currentSlot)
 		}
-
+		fmt.Println("writing pf account count", accountsCount)
 		if err := pWriter.WriteValueAtBookmark("pf account count", accountsCount); err != nil {
 			return ierrors.Wrap(err, "unable to write pf accounts count")
 		}
