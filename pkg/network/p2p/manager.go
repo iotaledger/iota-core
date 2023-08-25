@@ -89,9 +89,23 @@ func NewManager(libp2pHost host.Host, log *logger.Logger) *Manager {
 		neighbors:  make(map[p2ppeer.ID]*Neighbor),
 	}
 
-	m.libp2pHost.SetStreamHandler(protocol.ID(protocolID), m.handleStream)
-
 	return m
+}
+
+// RegisterProtocol registers the handlers for the protocol within the manager.
+func (m *Manager) RegisterProtocol(factory func() proto.Message, handler func(p2ppeer.ID, proto.Message) error) {
+	m.protocolHandler = &ProtocolHandler{
+		PacketFactory: factory,
+		PacketHandler: handler,
+	}
+
+	m.libp2pHost.SetStreamHandler(protocol.ID(protocolID), m.handleStream)
+}
+
+// UnregisterProtocol unregisters the handlers for the protocol.
+func (m *Manager) UnregisterProtocol() {
+	m.libp2pHost.RemoveStreamHandler(protocol.ID(protocolID))
+	m.protocolHandler = nil
 }
 
 // DialPeer connects to a peer.
@@ -150,8 +164,7 @@ func (m *Manager) Shutdown() {
 	m.isShutdown = true
 	m.dropAllNeighbors()
 
-	m.libp2pHost.RemoveStreamHandler(protocol.ID(protocolID))
-	m.protocolHandler = nil
+	m.UnregisterProtocol()
 }
 
 // LocalPeerID returns the local peer ID.

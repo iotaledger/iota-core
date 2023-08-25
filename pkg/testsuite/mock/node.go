@@ -13,7 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
+	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -22,7 +24,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -36,6 +37,20 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
+
+// idAliases contains a list of aliases registered for a set of IDs.
+var idAliases = make(map[p2ppeer.ID]string)
+
+// RegisterIDAlias registers an alias that will modify the String() output of the ID to show a human
+// readable string instead of the base58 encoded version of itself.
+func RegisterIDAlias(id p2ppeer.ID, alias string) {
+	idAliases[id] = alias
+}
+
+// UnregisterIDAliases removes all aliases registered through the RegisterIDAlias function.
+func UnregisterIDAliases() {
+	idAliases = make(map[p2ppeer.ID]string)
+}
 
 type Node struct {
 	Testing *testing.T
@@ -51,7 +66,7 @@ type Node struct {
 	privateKey              ed25519.PrivateKey
 	PubKey                  ed25519.PublicKey
 	AccountID               iotago.AccountID
-	PeerID                  network.PeerID
+	PeerID                  p2ppeer.ID
 	protocolParametersHash  iotago.Identifier
 	highestSupportedVersion iotago.Version
 
@@ -78,8 +93,8 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 	accountID := iotago.AccountID(blake2b.Sum256(pub))
 	accountID.RegisterAlias(name)
 
-	peerID := network.PeerID(pub)
-	identity.RegisterIDAlias(peerID, name)
+	peerID := lo.PanicOnErr(p2ppeer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
+	RegisterIDAlias(peerID, name)
 
 	return &Node{
 		Testing: t,
@@ -144,29 +159,29 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 
 	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngineInstance())
 
-	events.Network.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
+	events.Network.BlockReceived.Hook(func(block *model.Block, source p2ppeer.ID) {
 		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
 	})
 
-	events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source identity.ID) {
+	events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source p2ppeer.ID) {
 		fmt.Printf("%s > Network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
 	})
 
-	events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source identity.ID) {
+	events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source p2ppeer.ID) {
 		fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
 	})
 
-	events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
+	events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source p2ppeer.ID) {
 		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 
-	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
+	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source p2ppeer.ID) {
 		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
 			return lo.PanicOnErr(a.BlockID(lo.PanicOnErr(n.Protocol.APIForVersion(a.ProtocolVersion))))
 		}))
 	})
 
-	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source network.PeerID) {
+	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source p2ppeer.ID) {
 		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
@@ -196,7 +211,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
 	})
 
-	events.Network.Error.Hook(func(err error, id identity.ID) {
+	events.Network.Error.Hook(func(err error, id p2ppeer.ID) {
 		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
 	})
 

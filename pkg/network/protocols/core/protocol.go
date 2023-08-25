@@ -50,7 +50,9 @@ func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, ap
 		apiProvider:               apiProvider,
 		duplicateBlockBytesFilter: bytesfilter.New(10000),
 		requestedBlockHashes:      shrinkingmap.New[types.Identifier, types.Empty](shrinkingmap.WithShrinkingThresholdCount(1000)),
-	}, opts)
+	}, opts, func(p *Protocol) {
+		network.RegisterProtocol(newPacket, p.handlePacket)
+	})
 }
 
 func (p *Protocol) SendBlock(block *model.Block, to ...p2ppeer.ID) {
