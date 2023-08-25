@@ -86,12 +86,11 @@ func (c *ChainManager) CandidateChain() reactive.Variable[*Chain] {
 }
 
 func (c *ChainManager) RootCommitment() reactive.Variable[*CommitmentMetadata] {
-	chain := c.mainChain.Get()
-	if chain == nil {
-		panic("root chain not initialized")
+	if chain := c.mainChain.Get(); chain != nil {
+		return chain.Root()
 	}
 
-	return chain.Root()
+	panic("root chain not initialized")
 }
 
 func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvictedEvent reactive.Event) {
@@ -103,13 +102,13 @@ func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvict
 		commitment.Evicted().Trigger()
 	})
 
-	commitment.spawnedChain.OnUpdate(func(oldChain, newChain *Chain) {
+	c.commitmentCreated.Trigger(commitment)
+
+	commitment.spawnedChain.OnUpdate(func(_, newChain *Chain) {
 		if newChain != nil {
 			c.chainCreated.Trigger(newChain)
 		}
 	})
-
-	c.commitmentCreated.Trigger(commitment)
 }
 
 func (c *ChainManager) requestCommitment(commitmentID iotago.CommitmentID, index iotago.SlotIndex, requestFromPeers bool, optSuccessCallbacks ...func(metadata *CommitmentMetadata)) (commitmentRequest *promise.Promise[*CommitmentMetadata]) {
