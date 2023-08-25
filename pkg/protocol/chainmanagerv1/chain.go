@@ -37,14 +37,11 @@ type Chain struct {
 
 	cumulativeWeight reactive.Variable[uint64]
 
-	heavierThanMainChain reactive.Variable[bool]
-
 	evicted reactive.Event
 }
 
-func NewChain(rootCommitment *CommitmentMetadata, manager *ChainManager) *Chain {
+func NewChain(rootCommitment *CommitmentMetadata) *Chain {
 	c := &Chain{
-		manager:                       manager,
 		commitments:                   shrinkingmap.New[iotago.SlotIndex, *CommitmentMetadata](),
 		root:                          reactive.NewVariable[*CommitmentMetadata]().Init(rootCommitment),
 		latestCommitmentIndex:         reactive.NewVariable[iotago.SlotIndex](),
@@ -66,12 +63,6 @@ func NewChain(rootCommitment *CommitmentMetadata, manager *ChainManager) *Chain 
 		return lo.Return1(c.commitments.Get(latestCommitmentIndex)).CumulativeWeight()
 	}, c.latestCommitmentIndex)
 
-	c.heavierThanMainChain = reactive.NewDerivedVariable[bool](func(cumulativeWeight uint64) bool {
-		mainChain := c.manager.MainChain().Get()
-
-		return mainChain != nil && mainChain != c && cumulativeWeight > mainChain.CumulativeWeight().Get()
-	}, c.cumulativeWeight)
-
 	return c
 }
 
@@ -79,18 +70,18 @@ func (c *Chain) Root() reactive.Variable[*CommitmentMetadata] {
 	return c.root
 }
 
-func (c *Chain) ParentChain() *Chain {
-	if root := c.root.Get(); root != nil {
-		if parent := root.Parent().Get(); parent != nil {
-			return parent.Chain().Get()
+func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *CommitmentMetadata, exists bool) {
+	parentChain := func(c *Chain) *Chain {
+		if root := c.root.Get(); root != nil {
+			if parent := root.Parent().Get(); parent != nil {
+				return parent.Chain().Get()
+			}
 		}
+
+		return nil
 	}
 
-	return nil
-}
-
-func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *CommitmentMetadata, exists bool) {
-	for currentChain := c; currentChain != nil; currentChain = currentChain.ParentChain() {
+	for currentChain := c; currentChain != nil; currentChain = parentChain(currentChain) {
 		if root := currentChain.Root().Get(); root != nil && index >= root.Index() {
 			return currentChain.commitments.Get(index)
 		}
@@ -126,11 +117,11 @@ func (c *Chain) registerCommitment(commitment *CommitmentMetadata) {
 		return lo.Cond(latestCommitmentIndex > commitment.Index(), latestCommitmentIndex, commitment.Index())
 	})
 
+	triggerIfSwitchedChains := func(_, newChain *Chain) bool { return newChain != c }
+
 	commitment.Chain().OnUpdateOnce(func(_, _ *Chain) {
 		c.unregisterCommitment(commitment)
-	}, func(_, newValue *Chain) bool {
-		return newValue != c
-	})
+	}, triggerIfSwitchedChains)
 }
 
 func (c *Chain) unregisterCommitment(commitment *CommitmentMetadata) iotago.SlotIndex {

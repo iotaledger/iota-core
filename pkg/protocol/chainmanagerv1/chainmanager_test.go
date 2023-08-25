@@ -17,12 +17,8 @@ func TestChainManager(t *testing.T) {
 	rootCommitment := model.NewEmptyCommitment(testAPI)
 	chainManager := NewChainManager(rootCommitment)
 
-	chainManager.OnChainCreated(func(chain *Chain) {
-		unsubscribe := chain.heavierThanMainChain.OnUpdate(func(oldValue, newValue bool) {
-			fmt.Println("heavierThanMainChain", oldValue, newValue, chain.Root().Get())
-		})
-
-		chain.evicted.OnTrigger(unsubscribe)
+	chainManager.CandidateChain().OnUpdate(func(oldValue, newValue *Chain) {
+		fmt.Println("CandidateChain", oldValue, newValue)
 	})
 
 	commitment1 := lo.PanicOnErr(model.CommitmentFromCommitment(iotago.NewCommitment(testAPI.Version(),
@@ -76,5 +72,5 @@ func TestChainManager(t *testing.T) {
 	require.Equal(t, uint64(3), commitment3Metadata.Chain().Get().cumulativeWeight.Get())
 
 	commitment3aMetadata := chainManager.ProcessCommitment(commitment3a)
-	fmt.Println(commitment3aMetadata.Chain().Get().heavierThanMainChain.Get())
+	fmt.Println(commitment3aMetadata.Chain().Get())
 }

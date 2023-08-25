@@ -14,6 +14,8 @@ import (
 type ChainManager struct {
 	mainChain reactive.Variable[*Chain]
 
+	candidateChain reactive.Variable[*Chain]
+
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]]
 
 	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
@@ -28,6 +30,7 @@ type ChainManager struct {
 func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 	c := &ChainManager{
 		mainChain:           reactive.NewVariable[*Chain](),
+		candidateChain:      reactive.NewVariable[*Chain](),
 		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
 		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 		commitmentCreated:   event.New1[*CommitmentMetadata](),
@@ -35,9 +38,27 @@ func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
 	}
 
-	c.mainChain.Set(NewChain(NewRootCommitmentMetadata(rootCommitment, c), c))
+	c.mainChain.Set(NewChain(NewRootCommitmentMetadata(rootCommitment, c)))
+
+	c.initChainSwitching()
 
 	return c
+}
+
+func (c *ChainManager) initChainSwitching() {
+	c.OnChainCreated(func(chain *Chain) {
+		unsubscribe := chain.cumulativeWeight.OnUpdate(func(_, chainWeight uint64) {
+			c.candidateChain.Compute(func(candidateChain *Chain) *Chain {
+				if candidateChain == nil || candidateChain.evicted.WasTriggered() || chainWeight > candidateChain.CumulativeWeight().Get() {
+					return chain
+				}
+
+				return candidateChain
+			})
+		})
+
+		chain.evicted.OnTrigger(unsubscribe)
+	})
 }
 
 func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *CommitmentMetadata) {
@@ -60,6 +81,10 @@ func (c *ChainManager) OnChainCreated(callback func(chain *Chain)) (unsubscribe 
 
 func (c *ChainManager) MainChain() reactive.Variable[*Chain] {
 	return c.mainChain
+}
+
+func (c *ChainManager) CandidateChain() reactive.Variable[*Chain] {
+	return c.candidateChain
 }
 
 func (c *ChainManager) RootCommitment() reactive.Variable[*CommitmentMetadata] {
