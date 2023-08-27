@@ -14,7 +14,7 @@ import (
 type ChainManager struct {
 	mainChain reactive.Variable[*Chain]
 
-	heaviestCandidate reactive.Variable[*Chain]
+	heaviestClaimedCandidate reactive.Variable[*Chain]
 
 	heaviestAttestedCandidate reactive.Variable[*Chain]
 
@@ -34,7 +34,7 @@ type ChainManager struct {
 func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 	c := &ChainManager{
 		mainChain:                 reactive.NewVariable[*Chain]().Init(NewChain(NewRootCommitmentMetadata(rootCommitment))),
-		heaviestCandidate:         reactive.NewVariable[*Chain](),
+		heaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
 		heaviestAttestedCandidate: reactive.NewVariable[*Chain](),
 		heaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
 		commitments:               shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*CommitmentMetadata]](),
@@ -45,9 +45,9 @@ func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 	}
 
 	c.OnChainCreated(func(chain *Chain) {
-		c.selectHeaviestChain(c.heaviestCandidate, (*Chain).CumulativeWeight, chain)
-		c.selectHeaviestChain(c.heaviestAttestedCandidate, (*Chain).AttestedCumulativeWeight, chain)
-		c.selectHeaviestChain(c.heaviestVerifiedCandidate, (*Chain).VerifiedCumulativeWeight, chain)
+		c.selectHeaviestCandidate(c.heaviestClaimedCandidate, chain, (*ChainWeight).ReactiveClaimed)
+		c.selectHeaviestCandidate(c.heaviestAttestedCandidate, chain, (*ChainWeight).ReactiveAttested)
+		c.selectHeaviestCandidate(c.heaviestVerifiedCandidate, chain, (*ChainWeight).ReactiveVerified)
 	})
 
 	return c
@@ -71,30 +71,42 @@ func (c *ChainManager) OnChainCreated(callback func(chain *Chain)) (unsubscribe 
 	return c.chainCreated.Hook(callback).Unhook
 }
 
-func (c *ChainManager) MainChain() reactive.Variable[*Chain] {
+func (c *ChainManager) MainChain() *Chain {
+	return c.mainChain.Get()
+}
+
+func (c *ChainManager) MainChainVar() reactive.Variable[*Chain] {
 	return c.mainChain
 }
 
-func (c *ChainManager) CandidateChain() reactive.Variable[*Chain] {
-	return c.heaviestCandidate
+func (c *ChainManager) HeaviestCandidateChain() reactive.Variable[*Chain] {
+	return c.heaviestClaimedCandidate
+}
+
+func (c *ChainManager) HeaviestAttestedCandidateChain() reactive.Variable[*Chain] {
+	return c.heaviestAttestedCandidate
+}
+
+func (c *ChainManager) HeaviestVerifiedCandidateChain() reactive.Variable[*Chain] {
+	return c.heaviestVerifiedCandidate
 }
 
 func (c *ChainManager) RootCommitment() reactive.Variable[*CommitmentMetadata] {
 	if chain := c.mainChain.Get(); chain != nil {
-		return chain.Root()
+		return chain.ReactiveRoot()
 	}
 
 	panic("root chain not initialized")
 }
 
-func (c *ChainManager) selectHeaviestChain(variable reactive.Variable[*Chain], chainWeight func(*Chain) reactive.Variable[uint64], newCandidate *Chain) {
-	chainWeight(newCandidate).OnUpdate(func(_, newChainWeight uint64) {
-		if newChainWeight <= c.MainChain().Get().verifiedCumulativeWeight.Get() {
+func (c *ChainManager) selectHeaviestCandidate(variable reactive.Variable[*Chain], newCandidate *Chain, chainWeight func(*ChainWeight) reactive.Variable[uint64]) {
+	chainWeight(newCandidate.Weight()).OnUpdate(func(_, newChainWeight uint64) {
+		if newChainWeight <= c.MainChain().Weight().Verified() {
 			return
 		}
 
 		variable.Compute(func(currentCandidate *Chain) *Chain {
-			if currentCandidate == nil || currentCandidate.evicted.WasTriggered() || newChainWeight > chainWeight(currentCandidate).Get() {
+			if currentCandidate == nil || currentCandidate.evicted.WasTriggered() || newChainWeight > chainWeight(currentCandidate.Weight()).Get() {
 				return newCandidate
 			}
 
@@ -104,7 +116,7 @@ func (c *ChainManager) selectHeaviestChain(variable reactive.Variable[*Chain], c
 }
 
 func (c *ChainManager) setupCommitment(commitment *CommitmentMetadata, slotEvictedEvent reactive.Event) {
-	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, lo.Void(commitment.Parent().Set))
+	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, lo.Void(commitment.ReactiveParent().Set))
 
 	slotEvictedEvent.OnTrigger(func() {
 		commitment.Evicted().Trigger()

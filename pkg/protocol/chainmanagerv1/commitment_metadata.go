@@ -48,9 +48,7 @@ func NewCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
 		spawnedChain:                        reactive.NewVariable[*Chain](),
 	}
 
-	c.chain.OnUpdate(func(_, chain *Chain) {
-		chain.registerCommitment(c)
-	})
+	c.chain.OnUpdate(func(_, chain *Chain) { chain.Commitments().Register(c) })
 
 	c.parent.OnUpdate(func(_, parent *CommitmentMetadata) {
 		parent.registerChild(c, c.inheritChain(parent))
@@ -93,7 +91,11 @@ func (c *CommitmentMetadata) Chain() reactive.Variable[*Chain] {
 	return c.chain
 }
 
-func (c *CommitmentMetadata) Parent() reactive.Variable[*CommitmentMetadata] {
+func (c *CommitmentMetadata) Parent() *CommitmentMetadata {
+	return c.parent.Get()
+}
+
+func (c *CommitmentMetadata) ReactiveParent() reactive.Variable[*CommitmentMetadata] {
 	return c.parent
 }
 
@@ -149,6 +151,15 @@ func (c *CommitmentMetadata) ChainSuccessor() reactive.Variable[*CommitmentMetad
 	return c.successor
 }
 
+// Max compares the given commitment with the current one and returns the one with the higher index.
+func (c *CommitmentMetadata) Max(latestCommitment *CommitmentMetadata) *CommitmentMetadata {
+	if c == nil || latestCommitment != nil && latestCommitment.Index() >= c.Index() {
+		return latestCommitment
+	}
+
+	return c
+}
+
 func (c *CommitmentMetadata) registerParent(parent *CommitmentMetadata) {
 	c.solid.InheritFrom(parent.solid)
 	c.parentVerified.InheritFrom(parent.verified)
@@ -157,9 +168,9 @@ func (c *CommitmentMetadata) registerParent(parent *CommitmentMetadata) {
 	// triggerIfBelowThreshold triggers the given event if the commitment's index is below the given
 	// threshold. We only monitor the threshold after the corresponding parent event was triggered (to minimize
 	// the amount of elements that listen to updates of the same chain threshold - it spreads monotonically).
-	triggerIfBelowThreshold := func(event func(*CommitmentMetadata) reactive.Event, chainThreshold func(*Chain) reactive.Variable[iotago.SlotIndex]) {
+	triggerIfBelowThreshold := func(event func(*CommitmentMetadata) reactive.Event, chainThreshold func(*ChainThresholds) reactive.Variable[iotago.SlotIndex]) {
 		event(parent).OnTrigger(func() {
-			chainThreshold(c.chain.Get()).OnUpdateOnce(func(_, _ iotago.SlotIndex) {
+			chainThreshold(c.chain.Get().Thresholds()).OnUpdateOnce(func(_, _ iotago.SlotIndex) {
 				event(c).Trigger()
 			}, func(_ iotago.SlotIndex, slotIndex iotago.SlotIndex) bool {
 				return c.Index() < slotIndex
@@ -167,9 +178,9 @@ func (c *CommitmentMetadata) registerParent(parent *CommitmentMetadata) {
 		})
 	}
 
-	triggerIfBelowThreshold((*CommitmentMetadata).BelowLatestVerifiedCommitment, (*Chain).LatestVerifiedCommitmentIndex)
-	triggerIfBelowThreshold((*CommitmentMetadata).BelowSyncThreshold, (*Chain).SyncThreshold)
-	triggerIfBelowThreshold((*CommitmentMetadata).BelowWarpSyncThreshold, (*Chain).WarpSyncThreshold)
+	triggerIfBelowThreshold((*CommitmentMetadata).BelowLatestVerifiedCommitment, (*ChainThresholds).ReactiveLatestVerifiedIndex)
+	triggerIfBelowThreshold((*CommitmentMetadata).BelowSyncThreshold, (*ChainThresholds).ReactiveSyncThreshold)
+	triggerIfBelowThreshold((*CommitmentMetadata).BelowWarpSyncThreshold, (*ChainThresholds).ReactiveWarpSyncThreshold)
 }
 
 func (c *CommitmentMetadata) registerChild(newChild *CommitmentMetadata, onSuccessorUpdated func(*CommitmentMetadata, *CommitmentMetadata)) {

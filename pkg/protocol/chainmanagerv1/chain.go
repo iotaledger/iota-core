@@ -2,149 +2,51 @@ package chainmanagerv1
 
 import (
 	"github.com/iotaledger/hive.go/ds/reactive"
-	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/lo"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Chain struct {
 	root reactive.Variable[*CommitmentMetadata]
 
-	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *CommitmentMetadata]
+	commitments *ChainCommitments
 
-	latestCommitmentIndex reactive.Variable[iotago.SlotIndex]
+	weight *ChainWeight
 
-	latestAttestedCommitmentIndex reactive.Variable[iotago.SlotIndex]
-
-	latestVerifiedCommitmentIndex reactive.Variable[iotago.SlotIndex]
-
-	// syncThreshold defines an upper bound for the range of slots that are being fed to the engine as part of the sync
-	// process (sync from past to present preventing the engine from running out of memory).
-	syncThreshold reactive.Variable[iotago.SlotIndex]
-
-	// warpSyncThreshold defines a lower bound for where the warp sync process starts (to not requests slots that we are
-	// about to commit ourselves once we are in sync).
-	warpSyncThreshold reactive.Variable[iotago.SlotIndex]
-
-	cumulativeWeight reactive.Variable[uint64]
-
-	attestedCumulativeWeight reactive.Variable[uint64]
-
-	verifiedCumulativeWeight reactive.Variable[uint64]
+	thresholds *ChainThresholds
 
 	evicted reactive.Event
 }
 
 func NewChain(rootCommitment *CommitmentMetadata) *Chain {
 	c := &Chain{
-		commitments:                   shrinkingmap.New[iotago.SlotIndex, *CommitmentMetadata](),
-		root:                          reactive.NewVariable[*CommitmentMetadata]().Init(rootCommitment),
-		latestCommitmentIndex:         reactive.NewVariable[iotago.SlotIndex](),
-		latestAttestedCommitmentIndex: reactive.NewVariable[iotago.SlotIndex](),
-		latestVerifiedCommitmentIndex: reactive.NewVariable[iotago.SlotIndex](),
-		evicted:                       reactive.NewEvent(),
+		root:    reactive.NewVariable[*CommitmentMetadata]().Init(rootCommitment),
+		evicted: reactive.NewEvent(),
 	}
 
-	rootCommitment.Chain().Set(c)
+	c.commitments = NewChainCommitments(c)
+	c.weight = NewChainWeight(c)
+	c.thresholds = NewChainThresholds(c)
 
-	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](ComputeSyncThreshold, c.latestVerifiedCommitmentIndex)
-	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](ComputeWarpSyncThreshold, c.latestCommitmentIndex)
-	c.cumulativeWeight = reactive.NewDerivedVariable[uint64](c.computeCumulativeWeightOfSlot, c.latestCommitmentIndex)
-	c.attestedCumulativeWeight = reactive.NewDerivedVariable[uint64](c.computeCumulativeWeightOfSlot, c.latestAttestedCommitmentIndex)
-	c.verifiedCumulativeWeight = reactive.NewDerivedVariable[uint64](c.computeCumulativeWeightOfSlot, c.latestVerifiedCommitmentIndex)
+	rootCommitment.Chain().Set(c)
 
 	return c
 }
 
-func (c *Chain) Root() reactive.Variable[*CommitmentMetadata] {
+func (c *Chain) Root() *CommitmentMetadata {
+	return c.root.Get()
+}
+
+func (c *Chain) Weight() *ChainWeight {
+	return c.weight
+}
+
+func (c *Chain) Commitments() *ChainCommitments {
+	return c.commitments
+}
+
+func (c *Chain) Thresholds() *ChainThresholds {
+	return c.thresholds
+}
+
+func (c *Chain) ReactiveRoot() reactive.Variable[*CommitmentMetadata] {
 	return c.root
-}
-
-func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *CommitmentMetadata, exists bool) {
-	parentChain := func(c *Chain) *Chain {
-		if root := c.root.Get(); root != nil {
-			if parent := root.Parent().Get(); parent != nil {
-				return parent.Chain().Get()
-			}
-		}
-
-		return nil
-	}
-
-	for currentChain := c; currentChain != nil; currentChain = parentChain(currentChain) {
-		if root := currentChain.Root().Get(); root != nil && index >= root.Index() {
-			return currentChain.commitments.Get(index)
-		}
-	}
-
-	return nil, false
-}
-
-func (c *Chain) LatestCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
-	return c.latestCommitmentIndex
-}
-
-func (c *Chain) LatestVerifiedCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
-	return c.latestVerifiedCommitmentIndex
-}
-
-func (c *Chain) SyncThreshold() reactive.Variable[iotago.SlotIndex] {
-	return c.syncThreshold
-}
-
-func (c *Chain) WarpSyncThreshold() reactive.Variable[iotago.SlotIndex] {
-	return c.warpSyncThreshold
-}
-
-func (c *Chain) CumulativeWeight() reactive.Variable[uint64] {
-	return c.cumulativeWeight
-}
-
-func (c *Chain) AttestedCumulativeWeight() reactive.Variable[uint64] {
-	return c.attestedCumulativeWeight
-}
-
-func (c *Chain) VerifiedCumulativeWeight() reactive.Variable[uint64] {
-	return c.verifiedCumulativeWeight
-}
-
-func (c *Chain) registerCommitment(commitment *CommitmentMetadata) {
-	c.commitments.Set(commitment.Index(), commitment)
-
-	updateLatestIndex := func(latestIndex iotago.SlotIndex) iotago.SlotIndex {
-		return lo.Cond(latestIndex > commitment.Index(), latestIndex, commitment.Index())
-	}
-
-	c.latestCommitmentIndex.Compute(updateLatestIndex)
-
-	unsubscribe := lo.Batch(
-		commitment.attested.OnTrigger(func() { c.latestAttestedCommitmentIndex.Compute(updateLatestIndex) }),
-		commitment.verified.OnTrigger(func() { c.latestVerifiedCommitmentIndex.Compute(updateLatestIndex) }),
-	)
-
-	commitment.Chain().OnUpdateOnce(func(_, _ *Chain) {
-		unsubscribe()
-
-		c.unregisterCommitment(commitment)
-	}, func(_, newChain *Chain) bool { return newChain != c })
-}
-
-func (c *Chain) unregisterCommitment(commitment *CommitmentMetadata) {
-	c.commitments.Delete(commitment.Index())
-
-	updateLatestIndex := func(currentIndex iotago.SlotIndex) iotago.SlotIndex {
-		return lo.Cond(commitment.Index() < currentIndex, commitment.Index()-1, currentIndex)
-	}
-
-	c.latestCommitmentIndex.Compute(updateLatestIndex)
-	c.latestAttestedCommitmentIndex.Compute(updateLatestIndex)
-	c.latestVerifiedCommitmentIndex.Compute(updateLatestIndex)
-}
-
-func (c *Chain) computeCumulativeWeightOfSlot(slotIndex iotago.SlotIndex) uint64 {
-	if commitment, exists := c.commitments.Get(slotIndex); exists {
-		return commitment.CumulativeWeight()
-	}
-
-	return 0
 }

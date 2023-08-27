@@ -17,8 +17,16 @@ func TestChainManager(t *testing.T) {
 	rootCommitment := model.NewEmptyCommitment(testAPI)
 	chainManager := NewChainManager(rootCommitment)
 
-	chainManager.CandidateChain().OnUpdate(func(oldValue, newValue *Chain) {
-		fmt.Println("CandidateChain", oldValue, newValue)
+	chainManager.HeaviestCandidateChain().OnUpdate(func(oldValue, newValue *Chain) {
+		fmt.Println("HeaviestCandidateChain", oldValue, newValue)
+	})
+
+	chainManager.HeaviestAttestedCandidateChain().OnUpdate(func(oldValue, newValue *Chain) {
+		fmt.Println("HeaviestAttestedCandidateChain", oldValue, newValue)
+	})
+
+	chainManager.HeaviestVerifiedCandidateChain().OnUpdate(func(oldValue, newValue *Chain) {
+		fmt.Println("HeaviestVerifiedCandidateChain", oldValue, newValue)
 	})
 
 	commitment1 := lo.PanicOnErr(model.CommitmentFromCommitment(iotago.NewCommitment(testAPI.Version(),
@@ -68,9 +76,11 @@ func TestChainManager(t *testing.T) {
 	commitment2Metadata.Verified().Trigger()
 	require.True(t, commitment3Metadata.AboveLatestVerifiedCommitment().Get())
 	require.True(t, commitment3Metadata.BelowSyncThreshold().Get())
-	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().Get().latestCommitmentIndex.Get())
-	require.Equal(t, uint64(3), commitment3Metadata.Chain().Get().cumulativeWeight.Get())
+	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().Get().Commitments().Latest().Index())
+	require.Equal(t, uint64(3), commitment3Metadata.Chain().Get().Weight().Claimed())
 
 	commitment3aMetadata := chainManager.ProcessCommitment(commitment3a)
+	commitment3aMetadata.Attested().Trigger()
+	commitment3aMetadata.Verified().Trigger()
 	fmt.Println(commitment3aMetadata.Chain().Get())
 }
