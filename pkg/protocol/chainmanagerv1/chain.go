@@ -4,37 +4,48 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 )
 
+// Chain is a reactive component that manages the state of a chain.
 type Chain struct {
-	root reactive.Variable[*CommitmentMetadata]
+	// root contains the Commitment object that spawned this chain.
+	root *Commitment
 
-	commitments *ChainCommitments
-
-	weight *ChainWeight
-
-	thresholds *ChainThresholds
-
+	// evicted is an event that gets triggered when the chain gets evicted.
 	evicted reactive.Event
+
+	// chainCommitments is a reactive collection of Commitment objects that belong to the same chain.
+	*chainCommitments
+
+	// weight is a reactive component that tracks the cumulative weight of the chain.
+	*chainWeights
+
+	// thresholds is a reactive component that tracks the thresholds of the chain.
+	*chainThresholds
 }
 
-func NewChain(rootCommitment *CommitmentMetadata) *Chain {
+// NewChain creates a new Chain instance.
+func NewChain(root *Commitment) *Chain {
 	c := &Chain{
-		root:    reactive.NewVariable[*CommitmentMetadata]().Init(rootCommitment),
+		root:    root,
 		evicted: reactive.NewEvent(),
 	}
 
-	c.commitments = NewChainCommitments(c)
-	c.weight = NewChainWeight(c)
-	c.thresholds = NewChainThresholds(c)
+	// embed reactive subcomponents
+	c.chainCommitments = newChainCommitments(c)
+	c.chainWeights = newChainWeights(c)
+	c.chainThresholds = newChainThresholds(c)
 
-	rootCommitment.SetChain(c)
+	// associate the root commitment with its chain
+	root.setChain(c)
 
 	return c
 }
 
-func (c *Chain) Root() *CommitmentMetadata {
-	return c.root.Get()
+// Root returns the Commitment object that spawned this chain.
+func (c *Chain) Root() *Commitment {
+	return c.root
 }
 
+// ParentChain returns the parent chain of this chain (if it exists and is solid).
 func (c *Chain) ParentChain() *Chain {
 	root := c.Root()
 	if root == nil {
@@ -47,20 +58,4 @@ func (c *Chain) ParentChain() *Chain {
 	}
 
 	return parent.Chain()
-}
-
-func (c *Chain) Weight() *ChainWeight {
-	return c.weight
-}
-
-func (c *Chain) Commitments() *ChainCommitments {
-	return c.commitments
-}
-
-func (c *Chain) Thresholds() *ChainThresholds {
-	return c.thresholds
-}
-
-func (c *Chain) ReactiveRoot() reactive.Variable[*CommitmentMetadata] {
-	return c.root
 }

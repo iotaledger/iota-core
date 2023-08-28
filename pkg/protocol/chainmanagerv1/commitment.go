@@ -7,20 +7,20 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type CommitmentMetadata struct {
+type Commitment struct {
 	*model.Commitment
 
 	chain        reactive.Variable[*Chain]
-	parent       reactive.Variable[*CommitmentMetadata]
-	successor    reactive.Variable[*CommitmentMetadata]
+	parent       reactive.Variable[*Commitment]
+	successor    reactive.Variable[*Commitment]
 	spawnedChain reactive.Variable[*Chain]
 
-	solid          reactive.Event
-	attested       reactive.Event
-	verified       reactive.Event
-	parentVerified reactive.Event
-	evicted        reactive.Event
+	solid    reactive.Event
+	attested reactive.Event
+	verified reactive.Event
+	evicted  reactive.Event
 
+	parentVerified                        reactive.Event
 	directlyAboveLatestVerifiedCommitment reactive.Variable[bool]
 	parentAboveLatestVerifiedCommitment   reactive.Variable[bool]
 	aboveLatestVerifiedCommitment         reactive.Variable[bool]
@@ -32,34 +32,29 @@ type CommitmentMetadata struct {
 	requiresWarpSync              reactive.Variable[bool]
 }
 
-func NewCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
-	c := &CommitmentMetadata{
+func NewCommitment(commitment *model.Commitment) *Commitment {
+	c := &Commitment{
 		Commitment: commitment,
 
 		chain:        reactive.NewVariable[*Chain](),
-		parent:       reactive.NewVariable[*CommitmentMetadata](),
-		successor:    reactive.NewVariable[*CommitmentMetadata](),
+		parent:       reactive.NewVariable[*Commitment](),
+		successor:    reactive.NewVariable[*Commitment](),
 		spawnedChain: reactive.NewVariable[*Chain](),
 
 		solid:    reactive.NewEvent(),
 		attested: reactive.NewEvent(),
 		verified: reactive.NewEvent(),
+		evicted:  reactive.NewEvent(),
 
 		parentVerified:                      reactive.NewEvent(),
-		belowSyncThreshold:                  reactive.NewEvent(),
-		belowWarpSyncThreshold:              reactive.NewEvent(),
-		belowLatestVerifiedCommitment:       reactive.NewEvent(),
-		evicted:                             reactive.NewEvent(),
 		parentAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
+
+		belowSyncThreshold:            reactive.NewEvent(),
+		belowWarpSyncThreshold:        reactive.NewEvent(),
+		belowLatestVerifiedCommitment: reactive.NewEvent(),
 	}
 
-	c.chain.OnUpdate(func(_, chain *Chain) { chain.Commitments().Register(c) })
-
-	c.parent.OnUpdate(func(_, parent *CommitmentMetadata) {
-		parent.registerChild(c, c.inheritChain(parent))
-
-		c.registerParent(parent)
-	})
+	c.chain.OnUpdate(func(_, chain *Chain) { chain.RegisterCommitment(c) })
 
 	c.directlyAboveLatestVerifiedCommitment = reactive.NewDerivedVariable2(func(parentVerified, verified bool) bool {
 		return parentVerified && !verified
@@ -80,9 +75,9 @@ func NewCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
 	return c
 }
 
-func NewRootCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
-	commitmentMetadata := NewCommitmentMetadata(commitment)
-	commitmentMetadata.Solid().Trigger()
+func NewRootCommitment(commitment *model.Commitment) *Commitment {
+	commitmentMetadata := NewCommitment(commitment)
+	commitmentMetadata.SolidEvent().Trigger()
 	commitmentMetadata.Verified().Trigger()
 	commitmentMetadata.BelowSyncThreshold().Trigger()
 	commitmentMetadata.BelowWarpSyncThreshold().Trigger()
@@ -92,81 +87,98 @@ func NewRootCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata
 	return commitmentMetadata
 }
 
-func (c *CommitmentMetadata) Chain() *Chain {
+func (c *Commitment) Chain() *Chain {
 	return c.chain.Get()
-
 }
 
-func (c *CommitmentMetadata) SetChain(chain *Chain) {
-	c.chain.Set(chain)
-}
-
-func (c *CommitmentMetadata) Parent() *CommitmentMetadata {
-	return c.parent.Get()
-}
-
-func (c *CommitmentMetadata) ReactiveChain() reactive.Variable[*Chain] {
+func (c *Commitment) ChainVariable() reactive.Variable[*Chain] {
 	return c.chain
 }
 
-func (c *CommitmentMetadata) ReactiveParent() reactive.Variable[*CommitmentMetadata] {
+func (c *Commitment) setChain(chain *Chain) {
+	c.chain.Set(chain)
+}
+
+func (c *Commitment) Parent() *Commitment {
+	return c.parent.Get()
+}
+
+func (c *Commitment) ParentVariable() reactive.Variable[*Commitment] {
 	return c.parent
 }
 
-func (c *CommitmentMetadata) Solid() reactive.Event {
+func (c *Commitment) setParent(parent *Commitment) {
+	c.parent.Compute(func(currentParent *Commitment) *Commitment {
+		if currentParent != nil {
+			panic("parent may not be changed once it was set")
+		}
+
+		parent.registerChild(c, c.inheritChain(parent))
+
+		c.registerParent(parent)
+
+		return parent
+	})
+}
+
+func (c *Commitment) IsSolid() bool {
+	return c.solid.WasTriggered()
+}
+
+func (c *Commitment) SolidEvent() reactive.Event {
 	return c.solid
 }
 
-func (c *CommitmentMetadata) Attested() reactive.Event {
+func (c *Commitment) Attested() reactive.Event {
 	return c.attested
 }
 
-func (c *CommitmentMetadata) Verified() reactive.Event {
+func (c *Commitment) Verified() reactive.Event {
 	return c.verified
 }
 
-func (c *CommitmentMetadata) ParentVerified() reactive.Event {
+func (c *Commitment) ParentVerified() reactive.Event {
 	return c.parentVerified
 }
 
-func (c *CommitmentMetadata) BelowSyncThreshold() reactive.Event {
+func (c *Commitment) BelowSyncThreshold() reactive.Event {
 	return c.belowSyncThreshold
 }
 
-func (c *CommitmentMetadata) BelowWarpSyncThreshold() reactive.Event {
+func (c *Commitment) BelowWarpSyncThreshold() reactive.Event {
 	return c.belowWarpSyncThreshold
 }
 
-func (c *CommitmentMetadata) BelowLatestVerifiedCommitment() reactive.Event {
+func (c *Commitment) BelowLatestVerifiedCommitment() reactive.Event {
 	return c.belowLatestVerifiedCommitment
 }
 
-func (c *CommitmentMetadata) Evicted() reactive.Event {
+func (c *Commitment) Evicted() reactive.Event {
 	return c.evicted
 }
 
-func (c *CommitmentMetadata) ParentAboveLatestVerifiedCommitment() reactive.Variable[bool] {
+func (c *Commitment) ParentAboveLatestVerifiedCommitment() reactive.Variable[bool] {
 	return c.parentAboveLatestVerifiedCommitment
 }
 
-func (c *CommitmentMetadata) AboveLatestVerifiedCommitment() reactive.Variable[bool] {
+func (c *Commitment) AboveLatestVerifiedCommitment() reactive.Variable[bool] {
 	return c.aboveLatestVerifiedCommitment
 }
 
-func (c *CommitmentMetadata) InSyncWindow() reactive.Variable[bool] {
+func (c *Commitment) InSyncWindow() reactive.Variable[bool] {
 	return c.inSyncWindow
 }
 
-func (c *CommitmentMetadata) RequiresWarpSync() reactive.Variable[bool] {
+func (c *Commitment) RequiresWarpSync() reactive.Variable[bool] {
 	return c.requiresWarpSync
 }
 
-func (c *CommitmentMetadata) ChainSuccessor() reactive.Variable[*CommitmentMetadata] {
+func (c *Commitment) ChainSuccessor() reactive.Variable[*Commitment] {
 	return c.successor
 }
 
 // Max compares the given commitment with the current one and returns the one with the higher index.
-func (c *CommitmentMetadata) Max(latestCommitment *CommitmentMetadata) *CommitmentMetadata {
+func (c *Commitment) Max(latestCommitment *Commitment) *Commitment {
 	if c == nil || latestCommitment != nil && latestCommitment.Index() >= c.Index() {
 		return latestCommitment
 	}
@@ -174,7 +186,7 @@ func (c *CommitmentMetadata) Max(latestCommitment *CommitmentMetadata) *Commitme
 	return c
 }
 
-func (c *CommitmentMetadata) registerParent(parent *CommitmentMetadata) {
+func (c *Commitment) registerParent(parent *Commitment) {
 	c.solid.InheritFrom(parent.solid)
 	c.parentVerified.InheritFrom(parent.verified)
 	c.parentAboveLatestVerifiedCommitment.InheritFrom(parent.aboveLatestVerifiedCommitment)
@@ -182,9 +194,9 @@ func (c *CommitmentMetadata) registerParent(parent *CommitmentMetadata) {
 	// triggerIfBelowThreshold triggers the given event if the commitment's index is below the given
 	// threshold. We only monitor the threshold after the corresponding parent event was triggered (to minimize
 	// the amount of elements that listen to updates of the same chain threshold - it spreads monotonically).
-	triggerIfBelowThreshold := func(event func(*CommitmentMetadata) reactive.Event, chainThreshold func(*ChainThresholds) reactive.Variable[iotago.SlotIndex]) {
+	triggerIfBelowThreshold := func(event func(*Commitment) reactive.Event, chainThreshold func(*Chain) reactive.Variable[iotago.SlotIndex]) {
 		event(parent).OnTrigger(func() {
-			chainThreshold(c.chain.Get().Thresholds()).OnUpdateOnce(func(_, _ iotago.SlotIndex) {
+			chainThreshold(c.Chain()).OnUpdateOnce(func(_, _ iotago.SlotIndex) {
 				event(c).Trigger()
 			}, func(_ iotago.SlotIndex, slotIndex iotago.SlotIndex) bool {
 				return c.Index() < slotIndex
@@ -192,13 +204,13 @@ func (c *CommitmentMetadata) registerParent(parent *CommitmentMetadata) {
 		})
 	}
 
-	triggerIfBelowThreshold((*CommitmentMetadata).BelowLatestVerifiedCommitment, (*ChainThresholds).ReactiveLatestVerifiedIndex)
-	triggerIfBelowThreshold((*CommitmentMetadata).BelowSyncThreshold, (*ChainThresholds).ReactiveSyncThreshold)
-	triggerIfBelowThreshold((*CommitmentMetadata).BelowWarpSyncThreshold, (*ChainThresholds).ReactiveWarpSyncThreshold)
+	triggerIfBelowThreshold((*Commitment).BelowLatestVerifiedCommitment, (*Chain).LatestVerifiedIndexVariable)
+	triggerIfBelowThreshold((*Commitment).BelowSyncThreshold, (*Chain).SyncThresholdVariable)
+	triggerIfBelowThreshold((*Commitment).BelowWarpSyncThreshold, (*Chain).WarpSyncThresholdVariable)
 }
 
-func (c *CommitmentMetadata) registerChild(newChild *CommitmentMetadata, onSuccessorUpdated func(*CommitmentMetadata, *CommitmentMetadata)) {
-	c.successor.Compute(func(currentSuccessor *CommitmentMetadata) *CommitmentMetadata {
+func (c *Commitment) registerChild(newChild *Commitment, onSuccessorUpdated func(*Commitment, *Commitment)) {
+	c.successor.Compute(func(currentSuccessor *Commitment) *Commitment {
 		return lo.Cond(currentSuccessor != nil, currentSuccessor, newChild)
 	})
 
@@ -206,10 +218,10 @@ func (c *CommitmentMetadata) registerChild(newChild *CommitmentMetadata, onSucce
 	c.evicted.OnTrigger(c.successor.OnUpdate(onSuccessorUpdated))
 }
 
-func (c *CommitmentMetadata) inheritChain(parent *CommitmentMetadata) func(*CommitmentMetadata, *CommitmentMetadata) {
+func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitment) {
 	var unsubscribeFromParent func()
 
-	return func(_, successor *CommitmentMetadata) {
+	return func(_, successor *Commitment) {
 		c.spawnedChain.Compute(func(spawnedChain *Chain) (newSpawnedChain *Chain) {
 			switch successor {
 			case nil:
@@ -219,7 +231,7 @@ func (c *CommitmentMetadata) inheritChain(parent *CommitmentMetadata) func(*Comm
 					spawnedChain.evicted.Trigger()
 				}
 
-				unsubscribeFromParent = parent.chain.OnUpdate(func(_, chain *Chain) { c.chain.Set(chain) })
+				unsubscribeFromParent = parent.chain.OnUpdate(func(_, chain *Chain) { c.setChain(chain) })
 			default:
 				if spawnedChain != nil {
 					return spawnedChain
@@ -231,7 +243,7 @@ func (c *CommitmentMetadata) inheritChain(parent *CommitmentMetadata) func(*Comm
 
 				newSpawnedChain = NewChain(c)
 
-				c.chain.Set(newSpawnedChain)
+				c.setChain(newSpawnedChain)
 			}
 
 			return newSpawnedChain

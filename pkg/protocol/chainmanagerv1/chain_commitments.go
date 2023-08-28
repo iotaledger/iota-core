@@ -7,53 +7,48 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// ChainCommitments is a reactive collection of CommitmentMetadata objects that belong to the same chain.
-type ChainCommitments struct {
+// chainCommitments is a reactive collection of Commitment objects that belong to the same chain.
+type chainCommitments struct {
 	// chain is the chain that this collection belongs to.
 	chain *Chain
 
-	// commitments is a map of CommitmentMetadata objects that belong to the same chain.
-	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *CommitmentMetadata]
+	// commitments is a map of Commitment objects that belong to the same chain.
+	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
 
-	// latest is the latest CommitmentMetadata object in this collection.
-	latest reactive.Variable[*CommitmentMetadata]
+	// latestCommitment is the latest Commitment object in this collection.
+	latestCommitment reactive.Variable[*Commitment]
 
-	// latestAttested is the latest attested CommitmentMetadata object in this collection.
-	latestAttested reactive.Variable[*CommitmentMetadata]
+	// latestAttestedCommitment is the latest attested Commitment object in this collection.
+	latestAttestedCommitment reactive.Variable[*Commitment]
 
-	// latestVerified is the latest verified CommitmentMetadata object in this collection.
-	latestVerified reactive.Variable[*CommitmentMetadata]
+	// latestVerifiedCommitment is the latest verified Commitment object in this collection.
+	latestVerifiedCommitment reactive.Variable[*Commitment]
 }
 
-// NewChainCommitments creates a new ChainCommitments instance.
-func NewChainCommitments(chain *Chain) *ChainCommitments {
-	return &ChainCommitments{
-		chain:          chain,
-		commitments:    shrinkingmap.New[iotago.SlotIndex, *CommitmentMetadata](),
-		latest:         reactive.NewVariable[*CommitmentMetadata](),
-		latestAttested: reactive.NewVariable[*CommitmentMetadata](),
-		latestVerified: reactive.NewVariable[*CommitmentMetadata](),
+// newChainCommitments creates a new chainCommitments instance.
+func newChainCommitments(chain *Chain) *chainCommitments {
+	return &chainCommitments{
+		chain:                    chain,
+		commitments:              shrinkingmap.New[iotago.SlotIndex, *Commitment](),
+		latestCommitment:         reactive.NewVariable[*Commitment](),
+		latestAttestedCommitment: reactive.NewVariable[*Commitment](),
+		latestVerifiedCommitment: reactive.NewVariable[*Commitment](),
 	}
 }
 
-// Chain returns the chain that this collection belongs to.
-func (c *ChainCommitments) Chain() *Chain {
-	return c.chain
-}
-
-// Register adds a CommitmentMetadata object to this collection.
-func (c *ChainCommitments) Register(commitment *CommitmentMetadata) {
+// RegisterCommitment adds a Commitment object to this collection.
+func (c *chainCommitments) RegisterCommitment(commitment *Commitment) {
 	unsubscribe := c.register(commitment)
 
-	commitment.ReactiveChain().OnUpdateOnce(func(_, _ *Chain) {
+	commitment.ChainVariable().OnUpdateOnce(func(_, _ *Chain) {
 		unsubscribe()
 
 		c.unregister(commitment)
 	}, func(_, newChain *Chain) bool { return newChain != c.chain })
 }
 
-// Get returns the CommitmentMetadata object with the given index, if it exists.
-func (c *ChainCommitments) Get(index iotago.SlotIndex) (commitment *CommitmentMetadata, exists bool) {
+// Commitment returns the Commitment object with the given index, if it exists.
+func (c *chainCommitments) Commitment(index iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c.chain; currentChain != nil; currentChain = currentChain.ParentChain() {
 		if root := currentChain.Root(); root != nil && index >= root.Index() {
 			return currentChain.commitments.Get(index)
@@ -63,56 +58,56 @@ func (c *ChainCommitments) Get(index iotago.SlotIndex) (commitment *CommitmentMe
 	return nil, false
 }
 
-// Latest returns the latest CommitmentMetadata object in this collection.
-func (c *ChainCommitments) Latest() *CommitmentMetadata {
-	return c.latest.Get()
+// LatestCommitment returns the latest Commitment object in this collection.
+func (c *chainCommitments) LatestCommitment() *Commitment {
+	return c.latestCommitment.Get()
 }
 
-// LatestAttested returns the latest attested CommitmentMetadata object in this collection.
-func (c *ChainCommitments) LatestAttested() *CommitmentMetadata {
-	return c.latestAttested.Get()
-}
-
-// LatestVerified returns the latest verified CommitmentMetadata object in this collection.
-func (c *ChainCommitments) LatestVerified() *CommitmentMetadata {
-	return c.latestVerified.Get()
-}
-
-// ReactiveLatest returns a reactive variable that always contains the latest CommitmentMetadata object in this
+// LatestCommitmentVariable returns a reactive variable that always contains the latest Commitment object in this
 // collection.
-func (c *ChainCommitments) ReactiveLatest() reactive.Variable[*CommitmentMetadata] {
-	return c.latest
+func (c *chainCommitments) LatestCommitmentVariable() reactive.Variable[*Commitment] {
+	return c.latestCommitment
 }
 
-// ReactiveLatestVerified returns a reactive variable that always contains the latest verified CommitmentMetadata object
+// LatestAttestedCommitment returns the latest attested Commitment object in this collection.
+func (c *chainCommitments) LatestAttestedCommitment() *Commitment {
+	return c.latestAttestedCommitment.Get()
+}
+
+// LatestAttestedCommitmentVariable returns a reactive variable that always contains the latest attested Commitment object
 // in this collection.
-func (c *ChainCommitments) ReactiveLatestVerified() reactive.Variable[*CommitmentMetadata] {
-	return c.latestVerified
+func (c *chainCommitments) LatestAttestedCommitmentVariable() reactive.Variable[*Commitment] {
+	return c.latestAttestedCommitment
 }
 
-// ReactiveLatestAttested returns a reactive variable that always contains the latest attested CommitmentMetadata object
+// LatestVerified returns the latest verified Commitment object in this collection.
+func (c *chainCommitments) LatestVerified() *Commitment {
+	return c.latestVerifiedCommitment.Get()
+}
+
+// LatestVerifiedCommitmentVariable returns a reactive variable that always contains the latest verified Commitment object
 // in this collection.
-func (c *ChainCommitments) ReactiveLatestAttested() reactive.Variable[*CommitmentMetadata] {
-	return c.latestAttested
+func (c *chainCommitments) LatestVerifiedCommitmentVariable() reactive.Variable[*Commitment] {
+	return c.latestVerifiedCommitment
 }
 
-// register adds a CommitmentMetadata object to this collection.
-func (c *ChainCommitments) register(commitment *CommitmentMetadata) (unsubscribe func()) {
+// register adds a Commitment object to this collection.
+func (c *chainCommitments) register(commitment *Commitment) (unsubscribe func()) {
 	c.commitments.Set(commitment.Index(), commitment)
 
-	c.latest.Compute(commitment.Max)
+	c.latestCommitment.Compute(commitment.Max)
 
 	return lo.Batch(
-		commitment.attested.OnTrigger(func() { c.latestAttested.Compute(commitment.Max) }),
-		commitment.verified.OnTrigger(func() { c.latestVerified.Compute(commitment.Max) }),
+		commitment.attested.OnTrigger(func() { c.latestAttestedCommitment.Compute(commitment.Max) }),
+		commitment.verified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(commitment.Max) }),
 	)
 }
 
-// unregister removes a CommitmentMetadata object from this collection.
-func (c *ChainCommitments) unregister(commitment *CommitmentMetadata) {
+// unregister removes a Commitment object from this collection.
+func (c *chainCommitments) unregister(commitment *Commitment) {
 	c.commitments.Delete(commitment.Index())
 
-	resetToParent := func(latestCommitment *CommitmentMetadata) *CommitmentMetadata {
+	resetToParent := func(latestCommitment *Commitment) *Commitment {
 		if commitment.Index() > latestCommitment.Index() {
 			return latestCommitment
 		}
@@ -120,7 +115,7 @@ func (c *ChainCommitments) unregister(commitment *CommitmentMetadata) {
 		return commitment.Parent()
 	}
 
-	c.latest.Compute(resetToParent)
-	c.latestAttested.Compute(resetToParent)
-	c.latestVerified.Compute(resetToParent)
+	c.latestCommitment.Compute(resetToParent)
+	c.latestAttestedCommitment.Compute(resetToParent)
+	c.latestVerifiedCommitment.Compute(resetToParent)
 }
