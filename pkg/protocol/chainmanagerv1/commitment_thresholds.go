@@ -63,11 +63,11 @@ func isAboveLatestVerifiedIndex(commitment *Commitment) reactive.Variable[bool] 
 
 		directlyAboveLatestVerifiedCommitment = reactive.NewDerivedVariable2(func(parentVerified, verified bool) bool {
 			return parentVerified && !verified
-		}, parentVerified, commitment.verified)
+		}, parentVerified, commitment.isVerified)
 	)
 
-	commitment.parent.OnUpdateOnce(func(_, parent *Commitment) {
-		parentVerified.InheritFrom(parent.verified)
+	commitment.ParentVariable().OnUpdateOnce(func(_, parent *Commitment) {
+		parentVerified.InheritFrom(parent.isVerified)
 		parentAboveLatestVerifiedCommitment.InheritFrom(parent.isAboveLatestVerifiedIndex)
 	})
 
@@ -77,7 +77,7 @@ func isAboveLatestVerifiedIndex(commitment *Commitment) reactive.Variable[bool] 
 }
 
 func triggerBelowThresholdEventsIfNecessary(commitment *Commitment) func() {
-	return commitment.parent.OnUpdate(func(_, parent *Commitment) {
+	return commitment.ParentVariable().OnUpdate(func(_, parent *Commitment) {
 		// we only monitor the threshold after the corresponding parent event was triggered (to minimize the amount of
 		// elements that listen to updates of the same threshold - it spreads monotonically).
 		triggerIfBelowThreshold := func(event func(*Commitment) reactive.Event, chainThreshold func(*Chain) reactive.Variable[iotago.SlotIndex]) {

@@ -5,7 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 )
 
-type commitmentChainProperties struct {
+type commitmentDAG struct {
 	commitment   *Commitment
 	parent       reactive.Variable[*Commitment]
 	successor    reactive.Variable[*Commitment]
@@ -13,8 +13,8 @@ type commitmentChainProperties struct {
 	chain        reactive.Variable[*Chain]
 }
 
-func newCommitmentChainProperties(commitment *Commitment) *commitmentChainProperties {
-	c := &commitmentChainProperties{
+func newCommitmentDAG(commitment *Commitment) *commitmentDAG {
+	c := &commitmentDAG{
 		commitment:   commitment,
 		parent:       reactive.NewVariable[*Commitment](),
 		successor:    reactive.NewVariable[*Commitment](),
@@ -27,39 +27,39 @@ func newCommitmentChainProperties(commitment *Commitment) *commitmentChainProper
 	return c
 }
 
-func (c *commitmentChainProperties) Parent() *Commitment {
+func (c *commitmentDAG) Parent() *Commitment {
 	return c.parent.Get()
 }
 
-func (c *commitmentChainProperties) ParentVariable() reactive.Variable[*Commitment] {
-	return c.parent
-}
-
-func (c *commitmentChainProperties) Successor() *Commitment {
+func (c *commitmentDAG) Successor() *Commitment {
 	return c.successor.Get()
 }
 
-func (c *commitmentChainProperties) SuccessorVariable() reactive.Variable[*Commitment] {
-	return c.successor
-}
-
-func (c *commitmentChainProperties) SpawnedChain() *Chain {
+func (c *commitmentDAG) SpawnedChain() *Chain {
 	return c.spawnedChain.Get()
 }
 
-func (c *commitmentChainProperties) SpawnedChainVariable() reactive.Variable[*Chain] {
-	return c.spawnedChain
-}
-
-func (c *commitmentChainProperties) Chain() *Chain {
+func (c *commitmentDAG) Chain() *Chain {
 	return c.chain.Get()
 }
 
-func (c *commitmentChainProperties) ChainVariable() reactive.Variable[*Chain] {
+func (c *commitmentDAG) ParentVariable() reactive.Variable[*Commitment] {
+	return c.parent
+}
+
+func (c *commitmentDAG) SuccessorVariable() reactive.Variable[*Commitment] {
+	return c.successor
+}
+
+func (c *commitmentDAG) SpawnedChainVariable() reactive.Variable[*Chain] {
+	return c.spawnedChain
+}
+
+func (c *commitmentDAG) ChainVariable() reactive.Variable[*Chain] {
 	return c.chain
 }
 
-func (c *commitmentChainProperties) setParent(parent *Commitment) {
+func (c *commitmentDAG) setParent(parent *Commitment) {
 	c.parent.Compute(func(currentParent *Commitment) *Commitment {
 		if currentParent != nil {
 			panic("parent may not be changed once it was set")
@@ -67,28 +67,25 @@ func (c *commitmentChainProperties) setParent(parent *Commitment) {
 
 		parent.registerChild(c.commitment, c.inheritChain(parent))
 
-		// TODO: MOVE TO FLAGS INITIALIZATION
-		c.commitment.isSolid.InheritFrom(parent.isSolid)
-
 		return parent
 	})
 }
 
-func (c *commitmentChainProperties) setChain(chain *Chain) {
+func (c *commitmentDAG) setChain(chain *Chain) {
 	c.chain.Set(chain)
 }
 
-func (c *commitmentChainProperties) registerChild(newChild *Commitment, onSuccessorUpdated func(*Commitment, *Commitment)) {
+func (c *commitmentDAG) registerChild(newChild *Commitment, onSuccessorUpdated func(*Commitment, *Commitment)) {
 	c.successor.Compute(func(currentSuccessor *Commitment) *Commitment {
 		return lo.Cond(currentSuccessor != nil, currentSuccessor, newChild)
 	})
 
 	unsubscribe := c.successor.OnUpdate(onSuccessorUpdated)
 
-	c.commitment.evicted.OnTrigger(unsubscribe)
+	c.commitment.isEvicted.OnTrigger(unsubscribe)
 }
 
-func (c *commitmentChainProperties) inheritChain(parent *Commitment) func(*Commitment, *Commitment) {
+func (c *commitmentDAG) inheritChain(parent *Commitment) func(*Commitment, *Commitment) {
 	var unsubscribeFromParent func()
 
 	return func(_, successor *Commitment) {

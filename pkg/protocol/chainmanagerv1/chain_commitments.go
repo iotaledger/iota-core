@@ -95,11 +95,11 @@ func (c *chainCommitments) LatestVerifiedCommitmentVariable() reactive.Variable[
 func (c *chainCommitments) register(commitment *Commitment) (unsubscribe func()) {
 	c.commitments.Set(commitment.Index(), commitment)
 
-	c.latestCommitment.Compute(commitment.Max)
+	c.latestCommitment.Compute(commitment.max)
 
 	return lo.Batch(
-		commitment.attested.OnTrigger(func() { c.latestAttestedCommitment.Compute(commitment.Max) }),
-		commitment.verified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(commitment.Max) }),
+		commitment.isAttested.OnTrigger(func() { c.latestAttestedCommitment.Compute(commitment.max) }),
+		commitment.isVerified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(commitment.max) }),
 	)
 }
 
