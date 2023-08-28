@@ -65,14 +65,10 @@ func (c *commitmentDAG) setParent(parent *Commitment) {
 			panic("parent may not be changed once it was set")
 		}
 
-		parent.registerChild(c.commitment, c.inheritChain(parent))
+		parent.registerChild(c.commitment, c.createChainUpdater(parent))
 
 		return parent
 	})
-}
-
-func (c *commitmentDAG) setChain(chain *Chain) {
-	c.chain.Set(chain)
 }
 
 func (c *commitmentDAG) registerChild(newChild *Commitment, onSuccessorUpdated func(*Commitment, *Commitment)) {
@@ -85,7 +81,7 @@ func (c *commitmentDAG) registerChild(newChild *Commitment, onSuccessorUpdated f
 	c.commitment.isEvicted.OnTrigger(unsubscribe)
 }
 
-func (c *commitmentDAG) inheritChain(parent *Commitment) func(*Commitment, *Commitment) {
+func (c *commitmentDAG) createChainUpdater(parent *Commitment) func(*Commitment, *Commitment) {
 	var unsubscribeFromParent func()
 
 	return func(_, successor *Commitment) {
@@ -99,7 +95,7 @@ func (c *commitmentDAG) inheritChain(parent *Commitment) func(*Commitment, *Comm
 					spawnedChain.evicted.Trigger()
 				}
 
-				unsubscribeFromParent = parent.chain.OnUpdate(func(_, chain *Chain) { c.setChain(chain) })
+				unsubscribeFromParent = parent.chain.OnUpdate(func(_, chain *Chain) { c.chain.Set(chain) })
 
 				return nil
 			}

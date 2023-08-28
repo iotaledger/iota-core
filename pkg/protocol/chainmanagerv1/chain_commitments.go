@@ -80,8 +80,8 @@ func (c *chainCommitments) LatestAttestedCommitmentVariable() reactive.Variable[
 	return c.latestAttestedCommitment
 }
 
-// LatestVerified returns the latest verified Commitment object in this collection.
-func (c *chainCommitments) LatestVerified() *Commitment {
+// LatestVerifiedCommitment returns the latest verified Commitment object in this collection.
+func (c *chainCommitments) LatestVerifiedCommitment() *Commitment {
 	return c.latestVerifiedCommitment.Get()
 }
 

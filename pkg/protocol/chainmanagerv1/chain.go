@@ -35,7 +35,7 @@ func NewChain(root *Commitment) *Chain {
 	c.chainThresholds = newChainThresholds(c)
 
 	// associate the root commitment with its chain
-	root.setChain(c)
+	root.chain.Set(c)
 
 	return c
 }
