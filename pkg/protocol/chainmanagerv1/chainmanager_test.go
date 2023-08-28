@@ -62,20 +62,20 @@ func TestChainManager(t *testing.T) {
 	), testAPI))
 
 	commitment1Metadata := chainManager.ProcessCommitment(commitment1)
-	require.True(t, commitment1Metadata.SolidEvent().Get())
+	require.True(t, commitment1Metadata.IsSolid())
 
 	commitment3Metadata := chainManager.ProcessCommitment(commitment3)
-	require.True(t, commitment1Metadata.SolidEvent().Get())
-	require.False(t, commitment3Metadata.SolidEvent().Get())
+	require.True(t, commitment1Metadata.IsSolid())
+	require.False(t, commitment3Metadata.IsSolid())
 
 	commitment2Metadata := chainManager.ProcessCommitment(commitment2)
-	require.True(t, commitment1Metadata.SolidEvent().Get())
-	require.True(t, commitment2Metadata.SolidEvent().Get())
-	require.True(t, commitment3Metadata.SolidEvent().Get())
+	require.True(t, commitment1Metadata.IsSolid())
+	require.True(t, commitment2Metadata.IsSolid())
+	require.True(t, commitment3Metadata.IsSolid())
 
 	commitment2Metadata.Verified().Trigger()
-	require.True(t, commitment3Metadata.AboveLatestVerifiedCommitment().Get())
-	require.True(t, commitment3Metadata.BelowSyncThreshold().Get())
+	require.True(t, commitment3Metadata.IsAboveLatestVerifiedIndex())
+	require.True(t, commitment3Metadata.IsBelowSyncThreshold())
 	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().LatestIndex())
 	require.Equal(t, uint64(3), commitment3Metadata.Chain().ClaimedWeight())
 

@@ -59,3 +59,13 @@ func (c *Chain) ParentChain() *Chain {
 
 	return parent.Chain()
 }
+
+// Evicted returns whether the chain got evicted.
+func (c *Chain) Evicted() bool {
+	return c.evicted.WasTriggered()
+}
+
+// EvictedEvent returns a reactive event that gets triggered when the chain is evicted.
+func (c *Chain) EvictedEvent() reactive.Event {
+	return c.evicted
+}

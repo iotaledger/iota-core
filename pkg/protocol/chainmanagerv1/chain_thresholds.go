@@ -7,9 +7,6 @@ import (
 
 // chainThresholds is a reactive component that provides a set of thresholds that are derived from the chain.
 type chainThresholds struct {
-	// chain is the chain that this component belongs to.
-	chain *Chain
-
 	// latestIndex is the index of the latest Commitment object in the chain.
 	latestIndex reactive.Variable[iotago.SlotIndex]
 
@@ -30,7 +27,6 @@ type chainThresholds struct {
 // newChainThresholds creates a new chainThresholds instance.
 func newChainThresholds(chain *Chain) *chainThresholds {
 	c := &chainThresholds{
-		chain:               chain,
 		latestIndex:         reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.LatestCommitmentVariable()),
 		latestAttestedIndex: reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.LatestAttestedCommitmentVariable()),
 		latestVerifiedIndex: reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.LatestVerifiedCommitmentVariable()),
