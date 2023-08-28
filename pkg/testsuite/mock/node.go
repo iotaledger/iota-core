@@ -241,6 +241,9 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
 	})
 
+	events.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+		fmt.Printf("%s > [%s] Booker.BlockInvalid: %s\n", n.Name, engineName, block.ID())
+	})
 	events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Scheduler.BlockScheduled: %s\n", n.Name, engineName, block.ID())
 	})
