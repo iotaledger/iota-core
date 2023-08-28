@@ -23,9 +23,9 @@ type ChainWeight struct {
 func NewChainWeight(chain *Chain) *ChainWeight {
 	return &ChainWeight{
 		chain:    chain,
-		claimed:  reactive.NewDerivedVariable[uint64](ignoreNil((*CommitmentMetadata).CumulativeWeight), chain.Commitments().ReactiveLatest()),
-		attested: reactive.NewDerivedVariable[uint64](ignoreNil((*CommitmentMetadata).CumulativeWeight), chain.Commitments().ReactiveLatestAttested()),
-		verified: reactive.NewDerivedVariable[uint64](ignoreNil((*CommitmentMetadata).CumulativeWeight), chain.Commitments().ReactiveLatestVerified()),
+		claimed:  reactive.NewDerivedVariable[uint64](zeroValueIfNil((*CommitmentMetadata).CumulativeWeight), chain.Commitments().ReactiveLatest()),
+		attested: reactive.NewDerivedVariable[uint64](zeroValueIfNil((*CommitmentMetadata).CumulativeWeight), chain.Commitments().ReactiveLatestAttested()),
+		verified: reactive.NewDerivedVariable[uint64](zeroValueIfNil((*CommitmentMetadata).CumulativeWeight), chain.Commitments().ReactiveLatestVerified()),
 	}
 }
 
@@ -60,14 +60,4 @@ func (c *ChainWeight) ReactiveAttested() reactive.Variable[uint64] {
 // ourselves.
 func (c *ChainWeight) ReactiveVerified() reactive.Variable[uint64] {
 	return c.verified
-}
-
-func ignoreNil[A, B any](getter func(*A) B) func(*A) B {
-	return func(a *A) (b B) {
-		if a == nil {
-			return b
-		}
-
-		return getter(a)
-	}
 }

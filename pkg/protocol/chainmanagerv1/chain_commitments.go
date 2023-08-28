@@ -45,7 +45,7 @@ func (c *ChainCommitments) Chain() *Chain {
 func (c *ChainCommitments) Register(commitment *CommitmentMetadata) {
 	unsubscribe := c.register(commitment)
 
-	commitment.Chain().OnUpdateOnce(func(_, _ *Chain) {
+	commitment.ReactiveChain().OnUpdateOnce(func(_, _ *Chain) {
 		unsubscribe()
 
 		c.unregister(commitment)
@@ -54,18 +54,8 @@ func (c *ChainCommitments) Register(commitment *CommitmentMetadata) {
 
 // Get returns the CommitmentMetadata object with the given index, if it exists.
 func (c *ChainCommitments) Get(index iotago.SlotIndex) (commitment *CommitmentMetadata, exists bool) {
-	parentChain := func(c *Chain) *Chain {
-		if root := c.root.Get(); root != nil {
-			if parent := root.Parent(); parent != nil {
-				return parent.Chain().Get()
-			}
-		}
-
-		return nil
-	}
-
-	for currentChain := c.chain; currentChain != nil; currentChain = parentChain(currentChain) {
-		if root := currentChain.ReactiveRoot().Get(); root != nil && index >= root.Index() {
+	for currentChain := c.chain; currentChain != nil; currentChain = currentChain.ParentChain() {
+		if root := currentChain.Root(); root != nil && index >= root.Index() {
 			return currentChain.commitments.Get(index)
 		}
 	}

@@ -26,13 +26,27 @@ func NewChain(rootCommitment *CommitmentMetadata) *Chain {
 	c.weight = NewChainWeight(c)
 	c.thresholds = NewChainThresholds(c)
 
-	rootCommitment.Chain().Set(c)
+	rootCommitment.SetChain(c)
 
 	return c
 }
 
 func (c *Chain) Root() *CommitmentMetadata {
 	return c.root.Get()
+}
+
+func (c *Chain) ParentChain() *Chain {
+	root := c.Root()
+	if root == nil {
+		return nil
+	}
+
+	parent := root.Parent()
+	if parent == nil {
+		return nil
+	}
+
+	return parent.Chain()
 }
 
 func (c *Chain) Weight() *ChainWeight {

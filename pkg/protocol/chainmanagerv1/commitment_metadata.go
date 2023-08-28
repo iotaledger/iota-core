@@ -10,42 +10,47 @@ import (
 type CommitmentMetadata struct {
 	*model.Commitment
 
-	chain                                 reactive.Variable[*Chain]
-	parent                                reactive.Variable[*CommitmentMetadata]
-	successor                             reactive.Variable[*CommitmentMetadata]
-	solid                                 reactive.Event
-	attested                              reactive.Event
-	verified                              reactive.Event
-	parentVerified                        reactive.Event
-	belowSyncThreshold                    reactive.Event
-	belowWarpSyncThreshold                reactive.Event
-	belowLatestVerifiedCommitment         reactive.Event
-	evicted                               reactive.Event
-	parentAboveLatestVerifiedCommitment   reactive.Variable[bool]
+	chain        reactive.Variable[*Chain]
+	parent       reactive.Variable[*CommitmentMetadata]
+	successor    reactive.Variable[*CommitmentMetadata]
+	spawnedChain reactive.Variable[*Chain]
+
+	solid          reactive.Event
+	attested       reactive.Event
+	verified       reactive.Event
+	parentVerified reactive.Event
+	evicted        reactive.Event
+
 	directlyAboveLatestVerifiedCommitment reactive.Variable[bool]
+	parentAboveLatestVerifiedCommitment   reactive.Variable[bool]
 	aboveLatestVerifiedCommitment         reactive.Variable[bool]
-	inSyncWindow                          reactive.Variable[bool]
-	requiresWarpSync                      reactive.Variable[bool]
-	spawnedChain                          reactive.Variable[*Chain]
+
+	belowSyncThreshold            reactive.Event
+	belowWarpSyncThreshold        reactive.Event
+	belowLatestVerifiedCommitment reactive.Event
+	inSyncWindow                  reactive.Variable[bool]
+	requiresWarpSync              reactive.Variable[bool]
 }
 
 func NewCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata {
 	c := &CommitmentMetadata{
 		Commitment: commitment,
 
-		chain:                               reactive.NewVariable[*Chain](),
-		parent:                              reactive.NewVariable[*CommitmentMetadata](),
-		successor:                           reactive.NewVariable[*CommitmentMetadata](),
-		solid:                               reactive.NewEvent(),
-		attested:                            reactive.NewEvent(),
-		verified:                            reactive.NewEvent(),
+		chain:        reactive.NewVariable[*Chain](),
+		parent:       reactive.NewVariable[*CommitmentMetadata](),
+		successor:    reactive.NewVariable[*CommitmentMetadata](),
+		spawnedChain: reactive.NewVariable[*Chain](),
+
+		solid:    reactive.NewEvent(),
+		attested: reactive.NewEvent(),
+		verified: reactive.NewEvent(),
+
 		parentVerified:                      reactive.NewEvent(),
 		belowSyncThreshold:                  reactive.NewEvent(),
 		belowWarpSyncThreshold:              reactive.NewEvent(),
 		belowLatestVerifiedCommitment:       reactive.NewEvent(),
 		evicted:                             reactive.NewEvent(),
 		parentAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
-		spawnedChain:                        reactive.NewVariable[*Chain](),
 	}
 
 	c.chain.OnUpdate(func(_, chain *Chain) { chain.Commitments().Register(c) })
@@ -87,12 +92,21 @@ func NewRootCommitmentMetadata(commitment *model.Commitment) *CommitmentMetadata
 	return commitmentMetadata
 }
 
-func (c *CommitmentMetadata) Chain() reactive.Variable[*Chain] {
-	return c.chain
+func (c *CommitmentMetadata) Chain() *Chain {
+	return c.chain.Get()
+
+}
+
+func (c *CommitmentMetadata) SetChain(chain *Chain) {
+	c.chain.Set(chain)
 }
 
 func (c *CommitmentMetadata) Parent() *CommitmentMetadata {
 	return c.parent.Get()
+}
+
+func (c *CommitmentMetadata) ReactiveChain() reactive.Variable[*Chain] {
+	return c.chain
 }
 
 func (c *CommitmentMetadata) ReactiveParent() reactive.Variable[*CommitmentMetadata] {
