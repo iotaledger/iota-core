@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -362,7 +361,7 @@ func WithBlockIssuerFeature(blockIssuerFeature *iotago.BlockIssuerFeature) optio
 	}
 }
 
-func AddBlockIssuerKey(key ed25519.PublicKey) options.Option[iotago.AccountOutput] {
+func AddBlockIssuerKey(key iotago.BlockIssuerKey) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		blockIssuer := accountOutput.FeatureSet().BlockIssuer()
 		if blockIssuer == nil {

@@ -350,7 +350,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			Address:              iotago.Ed25519AddressFromPubKey(node.PubKey),
 			Amount:               amount,
 			Mana:                 iotago.Mana(amount),
-			IssuerKey:            ed25519.PublicKey(node.PubKey),
+			IssuerKey:            iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(node.PubKey)),
 			ExpirySlot:           math.MaxUint64,
 			BlockIssuanceCredits: iotago.BlockIssuanceCredits(math.MaxInt64),
 		}
@@ -400,7 +400,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 			}
 
 			if accountDetails.AccountID.Empty() {
-				accountDetails.AccountID = blake2b.Sum256(accountDetails.IssuerKey[:])
+				accountDetails.AccountID = blake2b.Sum256(accountDetails.IssuerKey.BlockIssuerKeyBytes())
 			}
 
 			return accountDetails

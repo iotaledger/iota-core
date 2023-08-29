@@ -129,7 +129,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		}
 
 		// We found the accountData, but we don't know the public key used to sign this block/attestation. Ignore.
-		if !accountData.PubKeys.Has(edSig.PublicKey) {
+		if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(edSig.PublicKey)) {
 			continue
 		}
 

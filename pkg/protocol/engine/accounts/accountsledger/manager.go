@@ -266,7 +266,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iot
 			stakingOpts,
 			accounts.WithCredits(accounts.NewBlockIssuanceCredits(blockIssuanceCredits, m.latestCommittedSlot)),
 			accounts.WithOutputID(output.OutputID()),
-			accounts.WithPubKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys...),
+			accounts.WithBlockIssuerKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys...),
 			accounts.WithExpirySlot(accountOutput.FeatureSet().BlockIssuer().ExpirySlot),
 		)...,
 	)
@@ -315,8 +315,8 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 		if diffChange.PreviousOutputID != iotago.EmptyOutputID {
 			accountData.OutputID = diffChange.PreviousOutputID
 		}
-		accountData.AddPublicKeys(diffChange.PubKeysRemoved...)
-		accountData.RemovePublicKeys(diffChange.PubKeysAdded...)
+		accountData.AddBlockIssuerKeys(diffChange.BlockIssuerKeysRemoved...)
+		accountData.RemoveBlockIssuerKey(diffChange.BlockIssuerKeysAdded...)
 
 		validatorStake, err := safemath.SafeSub(int64(accountData.ValidatorStake), diffChange.ValidatorStakeChange)
 		if err != nil {
@@ -369,7 +369,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 	slotDiff.NewOutputID = iotago.EmptyOutputID
 	slotDiff.PreviousOutputID = accountData.OutputID
 	slotDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
-	slotDiff.PubKeysRemoved = accountData.PubKeys.ToSlice()
+	slotDiff.BlockIssuerKeysRemoved = accountData.BlockIssuerKeys.ToSlice()
 
 	slotDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
 	slotDiff.DelegationStakeChange = -int64(accountData.DelegationStake)
@@ -445,8 +445,8 @@ func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges m
 			accountData.OutputID = diffChange.NewOutputID
 		}
 
-		accountData.AddPublicKeys(diffChange.PubKeysAdded...)
-		accountData.RemovePublicKeys(diffChange.PubKeysRemoved...)
+		accountData.AddBlockIssuerKeys(diffChange.BlockIssuerKeysAdded...)
+		accountData.RemoveBlockIssuerKey(diffChange.BlockIssuerKeysRemoved...)
 
 		validatorStake, err := safemath.SafeAdd(int64(accountData.ValidatorStake), diffChange.ValidatorStakeChange)
 		if err != nil {

@@ -4,7 +4,6 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/core/safemath"
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
@@ -396,19 +395,19 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 		accountDiff.PreviousExpirySlot = consumedOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 
-		oldPubKeysSet := accountData.PubKeys
-		newPubKeysSet := ds.NewSet[ed25519.PublicKey]()
+		oldPubKeysSet := accountData.BlockIssuerKeys
+		newPubKeysSet := ds.NewSet[iotago.BlockIssuerKey]()
 		for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
 			newPubKeysSet.Add(pubKey)
 		}
 
 		// Add public keys that are not in the old set
-		accountDiff.PubKeysAdded = newPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
+		accountDiff.BlockIssuerKeysAdded = newPubKeysSet.Filter(func(key iotago.BlockIssuerKey) bool {
 			return !oldPubKeysSet.Has(key)
 		}).ToSlice()
 
 		// Remove the keys that are not in the new set
-		accountDiff.PubKeysRemoved = oldPubKeysSet.Filter(func(key ed25519.PublicKey) bool {
+		accountDiff.BlockIssuerKeysRemoved = oldPubKeysSet.Filter(func(key iotago.BlockIssuerKey) bool {
 			return !newPubKeysSet.Has(key)
 		}).ToSlice()
 
@@ -441,7 +440,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		accountDiff.PreviousOutputID = iotago.EmptyOutputID
 		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 		accountDiff.PreviousExpirySlot = 0
-		accountDiff.PubKeysAdded = createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
+		accountDiff.BlockIssuerKeysAdded = createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
 
 		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
 			accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
