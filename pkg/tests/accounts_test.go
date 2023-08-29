@@ -18,7 +18,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// TODO: implement tests for staking and delegation transitions
+// TODO: implement tests for staking and delegation transitions that cover edge cases - part of hardening phase.
 func Test_TransitionAccount(t *testing.T) {
 	oldGenesisOutputKey := utils.RandPubKey()
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
@@ -143,7 +143,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	destroyedAccountInput, destructionOutputs, destroyWallets := ts.TransactionFramework.DestroyAccount("TX1:0")
 
-	var slotIndexBlock2 iotago.SlotIndex = latestParent.ID().Index()
+	slotIndexBlock2 := latestParent.ID().Index()
 
 	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX2", append(newAccountWallets, destroyWallets...),
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
@@ -210,9 +210,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
-	// TODO: fix this test (merged from develop)
 	// create a delegation output delegating to the newly created account
-
 	inputForNewDelegation, newDelegationOutputs, newDelegationWallets := ts.TransactionFramework.CreateDelegationFromInput("TX1:2",
 		testsuite.WithDelegatedValidatorID(newAccountOutput.AccountID),
 		testsuite.WithDelegationStartEpoch(1),
@@ -233,7 +231,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	block3 := ts.IssueBlockAtSlotWithOptions("block3", slotIndexBlock3, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx3, blockfactory.WithStrongParents(latestParent.ID()))
 
-	_ = ts.CommitUntilSlot(slotIndexBlock3, activeNodes, block3)
+	latestParent = ts.CommitUntilSlot(slotIndexBlock3, activeNodes, block3)
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock3, &model.AccountDiff{
 		BICChange:             0,
@@ -246,6 +244,51 @@ func Test_TransitionAccount(t *testing.T) {
 		StakeEndEpochChange:   0,
 		FixedCostChange:       0,
 		DelegationStakeChange: 973040,
+	}, false, ts.Nodes()...)
+
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:              newAccountOutput.AccountID,
+		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock2),
+		ExpirySlot:      newAccountExpirySlot,
+		OutputID:        newAccount.OutputID(),
+		PubKeys:         ds.NewSet(newAccountBlockIssuerKey),
+		StakeEndEpoch:   10,
+		FixedCost:       421,
+		DelegationStake: 973040,
+		ValidatorStake:  10000,
+	}, ts.Nodes()...)
+
+	// transition a delegation output to a delayed claiming state
+	inputForDelegationTransition, delegationTransitionOutputs, delegationTransitionWallets := ts.TransactionFramework.DelayedClaimingTransition("TX3:0", 0)
+
+	tx4 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX4", delegationTransitionWallets,
+		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
+			&iotago.CommitmentInput{
+				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			},
+		}),
+		testsuite.WithInputs(inputForDelegationTransition),
+		testsuite.WithOutputs(delegationTransitionOutputs),
+		testsuite.WithCreationSlot(slotIndexBlock3),
+	))
+
+	slotIndexBlock4 := latestParent.ID().Index()
+
+	block4 := ts.IssueBlockAtSlotWithOptions("block4", slotIndexBlock4, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx4, blockfactory.WithStrongParents(latestParent.ID()))
+
+	latestParent = ts.CommitUntilSlot(slotIndexBlock4, activeNodes, block4)
+
+	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock4, &model.AccountDiff{
+		BICChange:             0,
+		PreviousUpdatedTime:   0,
+		NewOutputID:           iotago.EmptyOutputID,
+		PreviousOutputID:      iotago.EmptyOutputID,
+		PubKeysAdded:          []ed25519.PublicKey{},
+		PubKeysRemoved:        []ed25519.PublicKey{},
+		ValidatorStakeChange:  0,
+		StakeEndEpochChange:   0,
+		FixedCostChange:       0,
+		DelegationStakeChange: 0,
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
