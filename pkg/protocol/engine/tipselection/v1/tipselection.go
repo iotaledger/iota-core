@@ -74,7 +74,10 @@ func New(e *engine.Engine, tipManager tipmanager.TipManager, conflictDAG conflic
 		optMaxStrongParents:          8,
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,
-		optDynamicLivenessThreshold:  func(tip tipmanager.TipMetadata) time.Time { return tip.Block().IssuingTime() },
+		optDynamicLivenessThreshold: func(tip tipmanager.TipMetadata) time.Time {
+			// TODO: replace with correct version (issuingTime + approvalModifier * graceDuration)
+			return tip.Block().IssuingTime()
+		},
 	}, opts, func(t *TipSelection) {
 		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
 
