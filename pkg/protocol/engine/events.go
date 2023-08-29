@@ -26,7 +26,7 @@ import (
 type Events struct {
 	BlockProcessed         *event.Event1[iotago.BlockID]
 	AcceptedBlockProcessed *event.Event1[*blocks.Block]
-	StoragePruned          *event.Event1[iotago.SlotIndex]
+	StoragePruned          *event.Event1[iotago.EpochIndex]
 
 	EvictionState    *eviction.Events
 	Filter           *filter.Events
@@ -54,7 +54,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 	return &Events{
 		BlockProcessed:         event.New1[iotago.BlockID](),
 		AcceptedBlockProcessed: event.New1[*blocks.Block](),
-		StoragePruned:          event.New1[iotago.SlotIndex](),
+		StoragePruned:          event.New1[iotago.EpochIndex](),
 		EvictionState:          eviction.NewEvents(),
 		Filter:                 filter.NewEvents(),
 		CommitmentFilter:       commitmentfilter.NewEvents(),

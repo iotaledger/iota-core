@@ -63,11 +63,11 @@ func (m *Manager) writeToDisk() error {
 }
 
 func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[iotago.AccountID, *iotago.Attestation], error) {
-	trackerStorage := m.bucketedStorage(index)
-	if trackerStorage == nil {
+	trackerStorage, err := m.bucketedStorage(index)
+	if err != nil {
 		return nil, ierrors.Errorf("failed to access storage for tracker of slot %d", index)
 	}
-	trackerStorage, err := trackerStorage.WithExtendedRealm(kvstore.Realm{prefixAttestationsTracker})
+	trackerStorage, err = trackerStorage.WithExtendedRealm(kvstore.Realm{prefixAttestationsTracker})
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get extended realm for tracker of slot %d", index)
 	}
@@ -90,11 +90,11 @@ func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[io
 }
 
 func (m *Manager) attestationsForSlot(index iotago.SlotIndex) (ads.Map[iotago.AccountID, *iotago.Attestation], error) {
-	attestationsStorage := m.bucketedStorage(index)
-	if attestationsStorage == nil {
+	attestationsStorage, err := m.bucketedStorage(index)
+	if err != nil {
 		return nil, ierrors.Errorf("failed to access storage for attestors of slot %d", index)
 	}
-	attestationsStorage, err := attestationsStorage.WithExtendedRealm(kvstore.Realm{prefixAttestationsADSMap})
+	attestationsStorage, err = attestationsStorage.WithExtendedRealm(kvstore.Realm{prefixAttestationsADSMap})
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get extended realm for attestations of slot %d", index)
 	}

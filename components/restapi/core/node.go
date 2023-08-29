@@ -40,7 +40,7 @@ func info() *apimodels.InfoResponse {
 			LatestFinalizedSlot:         syncStatus.LatestFinalizedSlot,
 			LatestAcceptedBlockSlot:     syncStatus.LastAcceptedBlockSlot,
 			LatestConfirmedBlockSlot:    syncStatus.LastConfirmedBlockSlot,
-			PruningSlot:                 syncStatus.LatestPrunedSlot,
+			PruningEpoch:                syncStatus.LastPrunedEpoch,
 		},
 		Metrics: &apimodels.InfoResNodeMetrics{
 			BlocksPerSecond:          metrics.BlocksPerSecond,

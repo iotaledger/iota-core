@@ -28,8 +28,8 @@ type SyncManager interface {
 	// LatestFinalizedSlot returns the latest finalized slot index.
 	LatestFinalizedSlot() iotago.SlotIndex
 
-	// LastPrunedSlot returns the last pruned slot index.
-	LastPrunedSlot() iotago.SlotIndex
+	// LastPrunedEpoch returns the last pruned epoch index.
+	LastPrunedEpoch() iotago.EpochIndex
 
 	// Shutdown shuts down the SyncManager.
 	Shutdown()
@@ -43,5 +43,5 @@ type SyncStatus struct {
 	LastConfirmedBlockSlot iotago.SlotIndex
 	LatestCommitment       *model.Commitment
 	LatestFinalizedSlot    iotago.SlotIndex
-	LatestPrunedSlot       iotago.SlotIndex
+	LastPrunedEpoch        iotago.EpochIndex
 }

@@ -35,8 +35,8 @@ type SyncManager struct {
 	latestFinalizedSlot     iotago.SlotIndex
 	latestFinalizedSlotLock syncutils.RWMutex
 
-	lastPrunedSlot     iotago.SlotIndex
-	lastPrunedSlotLock syncutils.RWMutex
+	lastPrunedEpoch     iotago.EpochIndex
+	lastPrunedEpochLock syncutils.RWMutex
 
 	isSynced     bool
 	isSyncedLock syncutils.RWMutex
@@ -87,8 +87,8 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 			}
 		}, asyncOpt)
 
-		e.Events.StoragePruned.Hook(func(index iotago.SlotIndex) {
-			if s.updatePrunedSlot(index) {
+		e.Events.StoragePruned.Hook(func(index iotago.EpochIndex) {
+			if s.updatePrunedEpoch(index) {
 				s.triggerUpdate()
 			}
 		}, asyncOpt)
@@ -126,12 +126,12 @@ func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
 	s.lastConfirmedBlockSlotLock.RLock()
 	s.latestCommitmentLock.RLock()
 	s.latestFinalizedSlotLock.RLock()
-	s.lastPrunedSlotLock.RLock()
+	s.lastPrunedEpochLock.RLock()
 	defer s.lastAcceptedBlockSlotLock.RUnlock()
 	defer s.lastConfirmedBlockSlotLock.RUnlock()
 	defer s.latestCommitmentLock.RUnlock()
 	defer s.latestFinalizedSlotLock.RUnlock()
-	defer s.lastPrunedSlotLock.RUnlock()
+	defer s.lastPrunedEpochLock.RUnlock()
 
 	return &syncmanager.SyncStatus{
 		NodeSynced:             s.IsNodeSynced(),
@@ -139,7 +139,7 @@ func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
 		LastConfirmedBlockSlot: s.lastConfirmedBlockSlot,
 		LatestCommitment:       s.latestCommitment,
 		LatestFinalizedSlot:    s.latestFinalizedSlot,
-		LatestPrunedSlot:       s.lastPrunedSlot,
+		LastPrunedEpoch:        s.lastPrunedEpoch,
 	}
 }
 
@@ -216,12 +216,12 @@ func (s *SyncManager) updateFinalizedSlot(index iotago.SlotIndex) (changed bool)
 	return false
 }
 
-func (s *SyncManager) updatePrunedSlot(index iotago.SlotIndex) (changed bool) {
-	s.lastPrunedSlotLock.Lock()
-	defer s.lastPrunedSlotLock.Unlock()
+func (s *SyncManager) updatePrunedEpoch(index iotago.EpochIndex) (changed bool) {
+	s.lastPrunedEpochLock.Lock()
+	defer s.lastPrunedEpochLock.Unlock()
 
-	if s.lastPrunedSlot != index {
-		s.lastPrunedSlot = index
+	if s.lastPrunedEpoch != index {
+		s.lastPrunedEpoch = index
 		return true
 	}
 
@@ -270,11 +270,11 @@ func (s *SyncManager) LatestFinalizedSlot() iotago.SlotIndex {
 	return s.latestFinalizedSlot
 }
 
-func (s *SyncManager) LastPrunedSlot() iotago.SlotIndex {
-	s.lastPrunedSlotLock.RLock()
-	defer s.lastPrunedSlotLock.RUnlock()
+func (s *SyncManager) LastPrunedEpoch() iotago.EpochIndex {
+	s.lastPrunedEpochLock.RLock()
+	defer s.lastPrunedEpochLock.RUnlock()
 
-	return s.lastPrunedSlot
+	return s.lastPrunedEpoch
 }
 
 func (s *SyncManager) triggerUpdate() {

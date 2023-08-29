@@ -11,7 +11,7 @@ type ParametersDebugAPI struct {
 
 	Path             string `default:"testnet/debug" usage:"the path to the database folder"`
 	MaxOpenDBs       int    `default:"2" usage:"maximum number of open database instances"`
-	PruningThreshold uint64 `default:"8640" usage:"how many confirmed slots should be retained"`
+	PruningThreshold uint64 `default:"1" usage:"how many epochs should be retained"`
 	DBGranularity    int64  `default:"100" usage:"how many slots should be contained in a single DB instance"`
 }
 
