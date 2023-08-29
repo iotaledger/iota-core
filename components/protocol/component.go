@@ -113,7 +113,7 @@ func provide(c *dig.Container) error {
 				storage.WithPruningSizeMaxTargetSizeBytes(pruningTargetDatabaseSizeBytes),
 				storage.WithPruningSizeReductionPercentage(ParamsDatabase.Size.ReductionPercentage),
 				storage.WithPruningSizeCooldownTime(ParamsDatabase.Size.CooldownTime),
-				storage.WithPrunableManagerOptions(
+				storage.WithBucketManagerOptions(
 					prunable.WithMaxOpenDBs(ParamsDatabase.MaxOpenDBs),
 				),
 			),

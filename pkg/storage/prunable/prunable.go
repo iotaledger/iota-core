@@ -16,7 +16,7 @@ import (
 
 type Prunable struct {
 	apiProvider       api.Provider
-	prunableSlotStore *SlotManager
+	prunableSlotStore *BucketManager
 	errorHandler      func(error)
 
 	semiPermanentDBConfig database.Config
@@ -28,7 +28,7 @@ type Prunable struct {
 	committee             *epochstore.Store[*account.Accounts]
 }
 
-func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[SlotManager]) *Prunable {
+func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[BucketManager]) *Prunable {
 	dir := utils.NewDirectory(dbConfig.Directory, true)
 	semiPermanentDBConfig := dbConfig.WithDirectory(dir.PathWithCreate("semipermanent"))
 	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig)
@@ -36,7 +36,7 @@ func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(e
 	return &Prunable{
 		apiProvider:       apiProvider,
 		errorHandler:      errorHandler,
-		prunableSlotStore: NewSlotManager(dbConfig, errorHandler, opts...),
+		prunableSlotStore: NewBucketManager(dbConfig, errorHandler, opts...),
 
 		semiPermanentDBConfig: semiPermanentDBConfig,
 		semiPermanentDB:       semiPermanentDB,
@@ -102,7 +102,7 @@ func (p *Prunable) Size() int64 {
 		p.errorHandler(ierrors.Wrapf(err, "get semiPermanentDB failed for %s", p.semiPermanentDBConfig.Directory))
 	}
 
-	return p.prunableSlotStore.PrunableSlotStorageSize() + semiSize
+	return p.prunableSlotStore.TotalSize() + semiSize
 }
 
 func (p *Prunable) Shutdown() {
