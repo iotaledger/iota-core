@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -94,7 +95,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 		deps.Protocol.MainEngineInstance().Retainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
 	}
 
-	page := registeredValidators[cursorIndex : cursorIndex+pageSize]
+	page := registeredValidators[cursorIndex:lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))]
 	resp := &apimodels.ValidatorsResponse{
 		Validators: page,
 		PageSize:   pageSize,
@@ -133,7 +134,8 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 		StakingEpochEnd:                accountData.StakeEndEpoch,
 		FixedCost:                      accountData.FixedCost,
 		Active:                         active,
-		LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
+		LatestSupportedProtocolVersion: accountData.LatestSupportedProtocolVersionAndHash.Version,
+		LatestSupportedProtocolHash:    accountData.LatestSupportedProtocolVersionAndHash.Hash,
 	}, nil
 }
 

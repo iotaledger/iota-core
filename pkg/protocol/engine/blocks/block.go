@@ -352,6 +352,7 @@ func (b *Block) Update(data *model.Block) (wasPublished bool) {
 	}
 
 	b.modelBlock = data
+	b.workScore = data.WorkScore()
 	b.missing = false
 
 	return true

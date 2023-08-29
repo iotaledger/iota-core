@@ -127,14 +127,17 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}
 
 	// Verify that nodes have the expected states.
+
 	{
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithLatestCommitment(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())),
+			testsuite.WithLatestCommitment(genesisCommitment),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
-			testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())}),
+			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
 			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
