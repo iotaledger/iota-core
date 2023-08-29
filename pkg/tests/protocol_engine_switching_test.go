@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	mock2 "github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
+	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -90,6 +91,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				engine.WithIsBootstrappedFunc(func(e *engine.Engine) bool {
 					return e.Storage.Settings().LatestCommitment().Index() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
 				}),
+			),
+			protocol.WithStorageOptions(
+				storage.WithPruningDelay(20),
 			),
 		}
 	}

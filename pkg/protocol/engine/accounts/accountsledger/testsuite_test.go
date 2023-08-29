@@ -17,7 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -63,14 +63,14 @@ func NewTestSuite(test *testing.T) *TestSuite {
 
 func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
-	slotDiffFunc := func(index iotago.SlotIndex) *prunable.AccountDiffs {
+	slotDiffFunc := func(index iotago.SlotIndex) (*slotstore.AccountDiffs, error) {
 		if _, exists := prunableStores[index]; !exists {
 			prunableStores[index] = mapdb.NewMapDB()
 		}
 
-		p := prunable.NewAccountDiffs(index, prunableStores[index], tpkg.TestAPI)
+		p := slotstore.NewAccountDiffs(index, prunableStores[index], tpkg.TestAPI)
 
-		return p
+		return p, nil
 	}
 
 	blockFunc := func(id iotago.BlockID) (*blocks.Block, bool) {
@@ -93,7 +93,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 
 	// Commit an empty diff if no actions specified.
 	if len(actions) == 0 {
-		err := t.Instance.ApplyDiff(slotIndex, rmc, make(map[iotago.AccountID]*prunable.AccountDiff), ds.NewSet[iotago.AccountID]())
+		err := t.Instance.ApplyDiff(slotIndex, rmc, make(map[iotago.AccountID]*model.AccountDiff), ds.NewSet[iotago.AccountID]())
 		require.NoError(t.T, err)
 		return
 	}
@@ -127,7 +127,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 		prevAccountFields.UpdatedInSlots.Add(slotIndex)
 
 		// Put everything together in the format that the manager expects.
-		slotDetails.SlotDiff[accountID] = &prunable.AccountDiff{
+		slotDetails.SlotDiff[accountID] = &model.AccountDiff{
 			BICChange:           iotago.BlockIssuanceCredits(action.TotalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
 			PubKeysAdded:        t.PublicKeys(action.AddedKeys, true),
 			PubKeysRemoved:      t.PublicKeys(action.RemovedKeys, true),
@@ -173,7 +173,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 	}
 
 	// Clone the diffs to prevent the manager from modifying it.
-	diffs := make(map[iotago.AccountID]*prunable.AccountDiff)
+	diffs := make(map[iotago.AccountID]*model.AccountDiff)
 	for accountID, diff := range slotDetails.SlotDiff {
 		diffs[accountID] = diff.Clone()
 	}
@@ -371,7 +371,7 @@ type latestAccountFields struct {
 
 type slotData struct {
 	Burns             map[iotago.AccountID]iotago.Mana
-	SlotDiff          map[iotago.AccountID]*prunable.AccountDiff
+	SlotDiff          map[iotago.AccountID]*model.AccountDiff
 	DestroyedAccounts ds.Set[iotago.AccountID]
 }
 
@@ -379,6 +379,6 @@ func newSlotData() *slotData {
 	return &slotData{
 		DestroyedAccounts: ds.NewSet[iotago.AccountID](),
 		Burns:             make(map[iotago.AccountID]iotago.Mana),
-		SlotDiff:          make(map[iotago.AccountID]*prunable.AccountDiff),
+		SlotDiff:          make(map[iotago.AccountID]*model.AccountDiff),
 	}
 }
