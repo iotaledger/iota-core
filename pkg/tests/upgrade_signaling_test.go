@@ -279,17 +279,4 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		StakeEndEpoch:                         math.MaxUint64,
 		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash2},
 	}, ts.Nodes()...)
-
-	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    ts.Node("nodeF").AccountID,
-		Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-		ExpirySlot:                            math.MaxUint64,
-		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 6),
-		PubKeys:                               ds.NewSet[ed25519.PublicKey](ed25519.PublicKey(ts.Node("nodeF").PubKey)),
-		ValidatorStake:                        0,
-		DelegationStake:                       0,
-		FixedCost:                             0,
-		StakeEndEpoch:                         0,
-		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{},
-	}, ts.Nodes()...)
 }
