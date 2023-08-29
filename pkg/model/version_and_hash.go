@@ -7,6 +7,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+const VersionAndHashSize = iotago.IdentifierLength + iotago.VersionLength
+
 type VersionAndHash struct {
 	Version iotago.Version
 	Hash    iotago.Identifier

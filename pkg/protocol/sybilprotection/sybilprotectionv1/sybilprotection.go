@@ -61,10 +61,10 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 					o.ledger = e.Ledger
 					o.errHandler = e.ErrorHandler("SybilProtection")
 
-					latestCommitedSlot := e.Storage.Settings().LatestCommitment().Index()
-					latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommitedSlot).TimeProvider().EpochFromSlot(latestCommitedSlot)
+					latestCommittedSlot := e.Storage.Settings().LatestCommitment().Index()
+					latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 					o.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, latestCommittedEpoch, e, o.errHandler)
-					o.lastCommittedSlot = latestCommitedSlot
+					o.lastCommittedSlot = latestCommittedSlot
 
 					if o.optsInitialCommittee != nil {
 						if err := o.performanceTracker.RegisterCommittee(0, o.optsInitialCommittee); err != nil {
@@ -80,7 +80,6 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 						// (according to the latest committed slot), and potentially the next selected
 						// committee if we have one.
 
-						// TODO: how do we handle changing API here?
 						currentEpoch := e.CurrentAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
 
 						committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
@@ -271,7 +270,6 @@ func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.
 		if !exists {
 			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
 		}
-		// TODO: not needed if EligibleValidatorsCandidates will take care of it
 		// if `End Epoch` is the current one or has passed, validator is no longer considered for validator selection
 		if accountData.StakeEndEpoch <= epoch {
 			return nil
@@ -312,7 +310,8 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 			ValidatorStake:                 accountData.ValidatorStake,
 			FixedCost:                      accountData.FixedCost,
 			Active:                         active,
-			LatestSupportedProtocolVersion: 0, // TODO  add lates supported protocol version to account data
+			LatestSupportedProtocolVersion: accountData.LatestSupportedProtocolVersionAndHash.Version,
+			LatestSupportedProtocolHash:    accountData.LatestSupportedProtocolVersionAndHash.Hash,
 		})
 
 		return nil
@@ -357,7 +356,6 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 	newCommittee := o.seatManager.RotateCommittee(nextEpoch, weightedCandidates)
 	weightedCommittee := newCommittee.Accounts()
 
-	// FIXME: weightedCommittee returned by the PoA sybil protection does not have stake specified, which will cause problems during rewards calculation.
 	err := o.performanceTracker.RegisterCommittee(nextEpoch, weightedCommittee)
 	if err != nil {
 		o.errHandler(ierrors.Wrap(err, "failed to register committee for epoch"))
