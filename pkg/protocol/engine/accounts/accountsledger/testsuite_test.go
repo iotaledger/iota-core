@@ -121,7 +121,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 				BICUpdatedAt:                  0,
 				UpdatedInSlots:                ds.NewSet[iotago.SlotIndex](),
 				ExpirySlot:                    0,
-				LatestSupportedVersionAndHash: iotago.VersionAndHash{},
+				LatestSupportedVersionAndHash: model.VersionAndHash{},
 			}
 			t.latestFieldsPerAccount.Set(accountID, prevAccountFields)
 		}
@@ -352,7 +352,7 @@ type AccountActions struct {
 	ValidatorStakeChange                  int64
 	StakeEndEpochChange                   int64
 	FixedCostChange                       int64
-	LatestSupportedProtocolVersionAndHash iotago.VersionAndHash
+	LatestSupportedProtocolVersionAndHash model.VersionAndHash
 
 	DelegationStakeChange int64
 
@@ -370,7 +370,7 @@ type AccountState struct {
 	DelegationStake                       iotago.BaseToken
 	FixedCost                             iotago.Mana
 	StakeEndEpoch                         iotago.EpochIndex
-	LatestSupportedProtocolVersionAndHash iotago.VersionAndHash
+	LatestSupportedProtocolVersionAndHash model.VersionAndHash
 
 	Destroyed bool
 }
@@ -380,7 +380,7 @@ type latestAccountFields struct {
 	BICUpdatedAt                  iotago.SlotIndex
 	UpdatedInSlots                ds.Set[iotago.SlotIndex]
 	ExpirySlot                    iotago.SlotIndex
-	LatestSupportedVersionAndHash iotago.VersionAndHash
+	LatestSupportedVersionAndHash model.VersionAndHash
 }
 
 type slotData struct {

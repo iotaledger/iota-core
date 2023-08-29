@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -84,7 +85,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         math.MaxUint64,
-		LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{},
+		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{},
 	}, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -97,7 +98,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         0,
-		LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{},
+		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{},
 	}, ts.Nodes()...)
 
 	ts.Node("nodeA").SetHighestSupportedVersion(4)
@@ -121,7 +122,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         math.MaxUint64,
-		LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 4, Hash: hash2},
+		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 4, Hash: hash2},
 	}, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -134,7 +135,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         math.MaxUint64,
-		LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 3, Hash: hash2},
+		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 3, Hash: hash2},
 	}, ts.Nodes()...)
 
 	// update the latest supported version for the remaining nodes
@@ -155,14 +156,14 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         math.MaxUint64,
-		LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 5, Hash: hash1},
+		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash1},
 	}, ts.Nodes()...)
 
 	// check that rollback is correct
 	account, exists, err := ts.Node("nodeA").Protocol.MainEngineInstance().Ledger.Account(ts.Node("nodeA").AccountID, 7)
 	require.NoError(t, err)
 	require.True(t, exists)
-	require.Equal(t, iotago.VersionAndHash{Version: 4, Hash: hash2}, account.LatestSupportedProtocolVersionAndHash)
+	require.Equal(t, model.VersionAndHash{Version: 4, Hash: hash2}, account.LatestSupportedProtocolVersionAndHash)
 
 	ts.IssueBlocksAtEpoch("", 2, 4, "15.3", ts.Nodes(), true, nil)
 	ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, nil)
@@ -263,7 +264,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         math.MaxUint64,
-		LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 5, Hash: hash1},
+		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash1},
 	}, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -276,7 +277,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         math.MaxUint64,
-		LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 5, Hash: hash2},
+		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash2},
 	}, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -289,6 +290,6 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         0,
-		LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{},
+		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{},
 	}, ts.Nodes()...)
 }

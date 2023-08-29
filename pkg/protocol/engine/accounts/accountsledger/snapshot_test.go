@@ -6,6 +6,7 @@ import (
 	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -37,7 +38,7 @@ func TestManager_Import_Export(t *testing.T) {
 			DelegationStakeChange:                 20,
 			FixedCostChange:                       10,
 			StakeEndEpochChange:                   10,
-			LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 1, Hash: latestSupportedVersionHash1},
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 1, Hash: latestSupportedVersionHash1},
 
 			NewOutputID: "D1",
 		},
@@ -65,7 +66,7 @@ func TestManager_Import_Export(t *testing.T) {
 			DelegationStake:                       20,
 			FixedCost:                             10,
 			StakeEndEpoch:                         10,
-			LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 1, Hash: latestSupportedVersionHash1},
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 1, Hash: latestSupportedVersionHash1},
 		},
 	})
 
@@ -85,7 +86,7 @@ func TestManager_Import_Export(t *testing.T) {
 		},
 		"D": { // update only delegation stake
 			DelegationStakeChange:                 -5,
-			LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
 		},
 	})
 
@@ -111,7 +112,7 @@ func TestManager_Import_Export(t *testing.T) {
 			DelegationStake:                       15,
 			FixedCost:                             10,
 			StakeEndEpoch:                         10,
-			LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
 		},
 	})
 
@@ -138,7 +139,7 @@ func TestManager_Import_Export(t *testing.T) {
 			DelegationStakeChange:                 -10,
 			StakeEndEpochChange:                   8,
 			FixedCostChange:                       -2,
-			LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
 
 			NewOutputID: "D2",
 		},
@@ -171,7 +172,7 @@ func TestManager_Import_Export(t *testing.T) {
 			DelegationStake:                       5,
 			FixedCost:                             8,
 			StakeEndEpoch:                         18,
-			LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
 		},
 	})
 
