@@ -65,7 +65,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 		)
 
 		e.HookConstructed(func() {
-			// TODO: create an Init method that is called with all additional dependencies on e.HookInitialized()
 			e.Events.Ledger.LinkTo(l.events)
 			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
@@ -185,11 +184,11 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	// first, get the RMC corresponding to this slot
 	maxCommittableAge := l.apiProvider.APIForSlot(index).ProtocolParameters().MaxCommittableAge()
 	rmcIndex, _ := safemath.SafeSub(index, maxCommittableAge)
-	rmc, err := l.rmcManager.RMC(rmcIndex)
+	rmcForSlot, err := l.rmcManager.RMC(rmcIndex)
 	if err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to get RMC for index %d: %w", index, err)
 	}
-	if err = l.accountsLedger.ApplyDiff(index, rmc, accountDiffs, destroyedAccounts); err != nil {
+	if err = l.accountsLedger.ApplyDiff(index, rmcForSlot, accountDiffs, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for index %d: %w", index, err)
 	}
 
@@ -471,7 +470,6 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 
 			// if we create an account that doesn't have a block issuer feature or staking, we don't need to track the changes.
 			// the VM needs to make sure that no staking feature is created, if there was no block issuer feature.
-			// TODO: do we even need to check for staking feature here if we require BlockIssuer with staking?
 			if createdAccount.FeatureSet().BlockIssuer() == nil && createdAccount.FeatureSet().Staking() == nil {
 				return true
 			}
@@ -509,7 +507,6 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 		case iotago.OutputAccount:
 			consumedAccount, _ := spentOutput.Output().(*iotago.AccountOutput)
 			// if we transition / destroy an account that doesn't have a block issuer feature or staking, we don't need to track the changes.
-			// TODO: do we even need to check for staking feature here if we require BlockIssuer with staking?
 			if consumedAccount.FeatureSet().BlockIssuer() == nil && consumedAccount.FeatureSet().Staking() == nil {
 				return true
 			}
@@ -704,8 +701,6 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 	}
 
 	if err := l.conflictDAG.CastVotes(vote.NewVote(seat, voteRank), block.ConflictIDs()); err != nil {
-		// TODO: here we need to check what kind of error and potentially mark the block as invalid.
-		//  Do we track witness weight of invalid blocks?
 		l.errorHandler(ierrors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
 }
