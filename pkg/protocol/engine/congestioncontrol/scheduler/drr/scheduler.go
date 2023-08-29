@@ -399,12 +399,12 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex)
 				break
 			}
 
-			denom, err := safemath.SafeAdd(remainingDeficit, quantum-1)
+			numerator, err := safemath.SafeAdd(remainingDeficit, quantum-1)
 			if err != nil {
-				denom = math.MaxInt64
+				numerator = math.MaxInt64
 			}
 
-			r, err := safemath.SafeDiv(denom, quantum)
+			r, err := safemath.SafeDiv(numerator, quantum)
 			if err != nil {
 				panic(err)
 			}
