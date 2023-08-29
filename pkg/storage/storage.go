@@ -46,7 +46,7 @@ type Storage struct {
 	optPruningSizeEnabled              bool
 	optsPruningSizeMaxTargetSizeBytes  int64
 	optsPruningSizeReductionPercentage float64
-	optsPrunableManagerOptions         []options.Option[prunable.SlotManager]
+	optsBucketManagerOptions           []options.Option[prunable.BucketManager]
 	optsPruningSizeCooldownTime        time.Duration
 }
 
@@ -72,7 +72,7 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 			}
 
 			s.permanent = permanent.New(dbConfig, errorHandler)
-			s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.Settings().APIProvider(), s.errorHandler, s.optsPrunableManagerOptions...)
+			s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.Settings().APIProvider(), s.errorHandler, s.optsBucketManagerOptions...)
 		})
 }
 
