@@ -134,7 +134,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithStakingFeature(&iotago.StakingFeature{
 			StakedAmount: 10000,
 			FixedCost:    421,
-			StartEpoch:   1,
+			StartEpoch:   0,
 			EndEpoch:     10,
 		}),
 	)
@@ -213,7 +213,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	inputForNewDelegation, newDelegationOutputs, newDelegationWallets := ts.TransactionFramework.CreateDelegationFromInput("TX1:2",
 		testsuite.WithDelegatedValidatorID(newAccountOutput.AccountID),
-		testsuite.WithDelegationStartEpoch(2),
+		testsuite.WithDelegationStartEpoch(1),
 	)
 
 	slotIndexBlock3 := latestParent.ID().Index()
