@@ -90,8 +90,8 @@ func triggerBelowThresholdEventsIfNecessary(commitment *Commitment) func() {
 			})
 		}
 
-		triggerIfBelowThreshold((*Commitment).IsBelowLatestVerifiedIndexEvent, (*Chain).LatestVerifiedIndexVariable)
-		triggerIfBelowThreshold((*Commitment).IsBelowSyncThresholdEvent, (*Chain).SyncThresholdVariable)
-		triggerIfBelowThreshold((*Commitment).IsBelowWarpSyncThresholdEvent, (*Chain).WarpSyncThresholdVariable)
+		triggerIfBelowThreshold((*Commitment).IsBelowLatestVerifiedIndexEvent, (*Chain).LatestVerifiedIndex)
+		triggerIfBelowThreshold((*Commitment).IsBelowSyncThresholdEvent, (*Chain).SyncThreshold)
+		triggerIfBelowThreshold((*Commitment).IsBelowWarpSyncThresholdEvent, (*Chain).WarpSyncThreshold)
 	})
 }
