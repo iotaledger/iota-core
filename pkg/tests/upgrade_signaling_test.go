@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
+	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -46,6 +47,9 @@ func Test_Upgrade_Signaling(t *testing.T) {
 				eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
 				eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
 			),
+		),
+		protocol.WithStorageOptions(
+			storage.WithPruningDelay(20),
 		),
 	}
 
@@ -104,7 +108,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.Node("nodeC").SetProtocolParametersHash(hash1)
 	ts.Node("nodeD").SetHighestSupportedVersion(3)
 	ts.Node("nodeD").SetProtocolParametersHash(hash2)
-	ts.IssueBlocksAtEpoch("", 1, 4, "Genesis", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, nil)
 
 	// check account data before all nodes set the current version
 	ts.AssertAccountData(&accounts.AccountData{
@@ -139,7 +143,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.Node("nodeD").SetHighestSupportedVersion(5)
 	ts.Node("nodeD").SetProtocolParametersHash(hash2)
 
-	ts.IssueBlocksAtEpoch("", 2, 4, "7.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtEpoch("", 1, 4, "7.3", ts.Nodes(), true, nil)
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeA").AccountID,
@@ -160,11 +164,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	require.True(t, exists)
 	require.Equal(t, iotago.VersionAndHash{Version: 4, Hash: hash2}, account.LatestSupportedProtocolVersionAndHash)
 
-	ts.IssueBlocksAtEpoch("", 3, 4, "15.3", ts.Nodes(), true, nil)
-	ts.IssueBlocksAtEpoch("", 4, 4, "23.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtEpoch("", 2, 4, "15.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, nil)
 
 	// Epoch 5: revoke vote of nodeA in last slot of epoch.
-	ts.IssueBlocksAtSlots("", ts.SlotsForEpoch(5)[:ts.API.TimeProvider().EpochDurationSlots()-1], 4, "31.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtSlots("", ts.SlotsForEpoch(4)[:ts.API.TimeProvider().EpochDurationSlots()-1], 4, "31.3", ts.Nodes(), true, nil)
 
 	ts.Node("nodeA").SetProtocolParametersHash(iotago.Identifier{})
 
@@ -230,12 +234,12 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	// Can't issue on nodeG as its account is not known.
 	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
 
-	ts.IssueBlocksAtEpoch("", 7, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
-	ts.IssueBlocksAtEpoch("", 8, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
+	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
+	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
 
 	ts.AssertEpochVersions(map[iotago.Version]iotago.EpochIndex{
 		3: 0,
-		5: 14,
+		5: 13,
 	}, ts.Nodes()...)
 
 	ts.AssertVersionAndProtocolParameters(map[iotago.Version]iotago.ProtocolParameters{

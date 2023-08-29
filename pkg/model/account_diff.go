@@ -1,4 +1,4 @@
-package prunable
+package model
 
 import (
 	"bytes"
@@ -6,17 +6,10 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
-)
-
-const (
-	diffChangePrefix byte = iota
-	destroyedAccountsPrefix
 )
 
 // AccountDiff represent the storable changes for a single account within a slot.
@@ -41,8 +34,8 @@ type AccountDiff struct {
 	DelegationStakeChange             int64
 	StakeEndEpochChange               int64
 	FixedCostChange                   int64
-	PrevLatestSupportedVersionAndHash iotago.VersionAndHash
-	NewLatestSupportedVersionAndHash  iotago.VersionAndHash
+	PrevLatestSupportedVersionAndHash VersionAndHash
+	NewLatestSupportedVersionAndHash  VersionAndHash
 }
 
 // NewAccountDiff creates a new AccountDiff instance.
@@ -60,8 +53,8 @@ func NewAccountDiff() *AccountDiff {
 		DelegationStakeChange:             0,
 		StakeEndEpochChange:               0,
 		FixedCostChange:                   0,
-		PrevLatestSupportedVersionAndHash: iotago.VersionAndHash{},
-		NewLatestSupportedVersionAndHash:  iotago.VersionAndHash{},
+		PrevLatestSupportedVersionAndHash: VersionAndHash{},
+		NewLatestSupportedVersionAndHash:  VersionAndHash{},
 	}
 }
 
@@ -185,21 +178,21 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 	}
 	offset += 8
 
-	newVersionAndHashBytes := make([]byte, iotago.VersionAndHashSize)
+	newVersionAndHashBytes := make([]byte, VersionAndHashSize)
 	if err = binary.Read(reader, binary.LittleEndian, newVersionAndHashBytes); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read new version and hash bytes in the diff")
 	}
-	d.NewLatestSupportedVersionAndHash, _, err = iotago.VersionAndHashFromBytes(newVersionAndHashBytes)
+	d.NewLatestSupportedVersionAndHash, _, err = VersionAndHashFromBytes(newVersionAndHashBytes)
 	if err != nil {
 		return offset, ierrors.Wrap(err, "unable to parse new version and hash bytes in the diff")
 	}
 	offset += len(newVersionAndHashBytes)
 
-	prevVersionAndHashBytes := make([]byte, iotago.VersionAndHashSize)
+	prevVersionAndHashBytes := make([]byte, VersionAndHashSize)
 	if err = binary.Read(reader, binary.LittleEndian, prevVersionAndHashBytes); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read prev version and hash bytes in the diff")
 	}
-	d.PrevLatestSupportedVersionAndHash, _, err = iotago.VersionAndHashFromBytes(prevVersionAndHashBytes)
+	d.PrevLatestSupportedVersionAndHash, _, err = VersionAndHashFromBytes(prevVersionAndHashBytes)
 	if err != nil {
 		return offset, ierrors.Wrap(err, "unable to parse prev version and hash bytes in the diff")
 	}
@@ -237,99 +230,4 @@ func readPubKey(reader io.ReadSeeker) (pubKey ed25519.PublicKey, offset int, err
 	}
 
 	return pubKey, offset, nil
-}
-
-// AccountDiffs is the storable unit of Account changes for all account in a slot.
-type AccountDiffs struct {
-	api               iotago.API
-	slot              iotago.SlotIndex
-	diffChangeStore   *kvstore.TypedStore[iotago.AccountID, *AccountDiff]
-	destroyedAccounts *kvstore.TypedStore[iotago.AccountID, types.Empty] // TODO is there any store for set of keys only?
-}
-
-// NewAccountDiffs creates a new AccountDiffs instance.
-func NewAccountDiffs(slot iotago.SlotIndex, store kvstore.KVStore, api iotago.API) *AccountDiffs {
-	return &AccountDiffs{
-		api:  api,
-		slot: slot,
-		diffChangeStore: kvstore.NewTypedStore[iotago.AccountID, *AccountDiff](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{diffChangePrefix})),
-			iotago.Identifier.Bytes,
-			iotago.IdentifierFromBytes,
-			(*AccountDiff).Bytes,
-			func(bytes []byte) (object *AccountDiff, consumed int, err error) {
-				diff := new(AccountDiff)
-				n, err := diff.FromBytes(bytes)
-
-				return diff, n, err
-			}),
-		destroyedAccounts: kvstore.NewTypedStore[iotago.AccountID, types.Empty](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{destroyedAccountsPrefix})),
-			iotago.Identifier.Bytes,
-			iotago.IdentifierFromBytes,
-			types.Empty.Bytes,
-			func(bytes []byte) (object types.Empty, consumed int, err error) {
-				return types.Void, 0, nil
-			}),
-	}
-}
-
-// Store stores the given accountID as a root block.
-func (b *AccountDiffs) Store(accountID iotago.AccountID, accountDiff *AccountDiff, destroyed bool) (err error) {
-	if destroyed {
-		if err := b.destroyedAccounts.Set(accountID, types.Void); err != nil {
-			return ierrors.Wrap(err, "failed to set destroyed account")
-		}
-	}
-
-	return b.diffChangeStore.Set(accountID, accountDiff)
-}
-
-// Load loads accountID and commitmentID for the given blockID.
-func (b *AccountDiffs) Load(accountID iotago.AccountID) (accountDiff *AccountDiff, destroyed bool, err error) {
-	destroyed, err = b.destroyedAccounts.Has(accountID)
-	if err != nil {
-		return accountDiff, false, ierrors.Wrap(err, "failed to get destroyed account")
-	} // load diff for a destroyed account to recreate the state
-
-	accountDiff, err = b.diffChangeStore.Get(accountID)
-	if err != nil {
-		return accountDiff, false, ierrors.Wrapf(err, "failed to get account diff for account %s", accountID)
-	}
-
-	return accountDiff, destroyed, err
-}
-
-// Has returns true if the given accountID is a root block.
-func (b *AccountDiffs) Has(accountID iotago.AccountID) (has bool, err error) {
-	return b.diffChangeStore.Has(accountID)
-}
-
-// Delete deletes the given accountID from the root blocks.
-func (b *AccountDiffs) Delete(accountID iotago.AccountID) (err error) {
-	return b.diffChangeStore.Delete(accountID)
-}
-
-// Stream streams all accountIDs changes for a slot index.
-func (b *AccountDiffs) Stream(consumer func(accountID iotago.AccountID, accountDiff *AccountDiff, destroyed bool) bool) error {
-	// We firstly iterate over the destroyed accounts, as they won't have a corresponding accountDiff.
-	if storageErr := b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, empty types.Empty) bool {
-		return consumer(accountID, nil, true)
-	}); storageErr != nil {
-		return ierrors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)
-	}
-
-	// For those accounts that still exist, we might have an accountDiff.
-	if storageErr := b.diffChangeStore.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, accountDiff *AccountDiff) bool {
-		return consumer(accountID, accountDiff, false)
-	}); storageErr != nil {
-		return ierrors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)
-	}
-
-	return nil
-}
-
-// StreamDestroyed streams all destroyed accountIDs for a slot index.
-func (b *AccountDiffs) StreamDestroyed(consumer func(accountID iotago.AccountID) bool) error {
-	return b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, empty types.Empty) bool {
-		return consumer(accountID)
-	})
 }

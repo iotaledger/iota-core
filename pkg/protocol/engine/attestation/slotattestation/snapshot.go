@@ -63,8 +63,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 		return ierrors.Errorf("slot %d is newer than last committed slot %d", targetSlot, m.lastCommittedSlot)
 	}
 
-	attestationSlotIndex, isValid := m.computeAttestationCommitmentOffset(targetSlot)
-	if !isValid {
+	if _, isValid := m.computeAttestationCommitmentOffset(targetSlot); !isValid {
 		if err := stream.Write(writer, uint64(0)); err != nil {
 			return ierrors.Wrap(err, "failed to write 0 attestation count")
 		}
@@ -75,9 +74,9 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 	// We only need to export the committed attestations at targetSlot as these contain all the attestations for the
 	// slots of targetSlot - attestationCommitmentOffset to targetSlot. This is sufficient to reconstruct the pending attestations
 	// for targetSlot+1.
-	attestationsStorage, err := m.attestationsForSlot(attestationSlotIndex)
+	attestationsStorage, err := m.attestationsForSlot(targetSlot)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get attestations of slot %d", attestationSlotIndex)
+		return ierrors.Wrapf(err, "failed to get attestations of slot %d", targetSlot)
 	}
 
 	var attestations []*iotago.Attestation
@@ -86,7 +85,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 
 		return nil
 	}); err != nil {
-		return ierrors.Wrapf(err, "failed to stream attestations of slot %d", attestationSlotIndex)
+		return ierrors.Wrapf(err, "failed to stream attestations of slot %d", targetSlot)
 	}
 
 	if err = stream.WriteCollection(writer, func() (uint64, error) {
@@ -107,7 +106,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 
 		return uint64(len(attestations)), nil
 	}); err != nil {
-		return ierrors.Wrapf(err, "failed to write attestations of slot %d", attestationSlotIndex)
+		return ierrors.Wrapf(err, "failed to write attestations of slot %d", targetSlot)
 	}
 
 	return nil

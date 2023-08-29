@@ -4,8 +4,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -70,11 +70,14 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 	})
 }
 
-func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.SlotIndex, accountDiff *prunable.AccountDiff, destroyed bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.SlotIndex, accountDiff *model.AccountDiff, destroyed bool, nodes ...*mock.Node) {
 	t.Eventually(func() error {
 		for _, node := range nodes {
 
-			accountsDiffStorage := node.Protocol.MainEngineInstance().Storage.AccountDiffs(index)
+			accountsDiffStorage, err := node.Protocol.MainEngineInstance().Storage.AccountDiffs(index)
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertAccountDiff: %s: failed to load accounts diff for slot %d", node.Name, index)
+			}
 
 			if has, err := accountsDiffStorage.Has(accountID); err != nil {
 				return ierrors.Wrapf(err, "AssertAccountDiff: %s: failed to load accounts diff for slot %d", node.Name, index)

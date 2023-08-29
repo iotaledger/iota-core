@@ -11,10 +11,11 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -27,7 +28,7 @@ type Manager struct {
 	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.BlockID]]
 
 	// latestSupportedVersionSignals keep tracks of the latest supported protocol versions supported by validators.
-	latestSupportedVersionSignals *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *prunable.SignaledBlock]
+	latestSupportedVersionSignals *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *model.SignaledBlock]
 
 	// latestCommittedSlot is where the Account tree is kept at.
 	latestCommittedSlot iotago.SlotIndex
@@ -38,7 +39,7 @@ type Manager struct {
 
 	// TODO: add in memory shrink version of the slot diffs
 	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
-	slotDiff func(iotago.SlotIndex) *prunable.AccountDiffs
+	slotDiff func(iotago.SlotIndex) (*slotstore.AccountDiffs, error)
 
 	// block is a function that returns a block from the cache or from the database.
 	block func(id iotago.BlockID) (*blocks.Block, bool)
@@ -51,13 +52,13 @@ type Manager struct {
 func New(
 	apiProvider api.Provider,
 	blockFunc func(id iotago.BlockID) (*blocks.Block, bool),
-	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
+	slotDiffFunc func(iotago.SlotIndex) (*slotstore.AccountDiffs, error),
 	accountsStore kvstore.KVStore,
 ) *Manager {
 	return &Manager{
 		apiProvider:                   apiProvider,
 		blockBurns:                    shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
-		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *prunable.SignaledBlock](),
+		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *model.SignaledBlock](),
 		accountsTree: ads.NewMap(accountsStore,
 			iotago.Identifier.Bytes,
 			iotago.IdentifierFromBytes,
@@ -95,9 +96,9 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 	set.Add(block.ID())
 
 	if validationBlock, isValidationBlock := block.ValidationBlock(); isValidationBlock {
-		newSignaledBlock := prunable.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
+		newSignaledBlock := model.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
 
-		m.latestSupportedVersionSignals.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *prunable.SignaledBlock, exists bool) *prunable.SignaledBlock {
+		m.latestSupportedVersionSignals.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *model.SignaledBlock, exists bool) *model.SignaledBlock {
 			if !exists {
 				return newSignaledBlock
 			}
@@ -111,9 +112,9 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 	}
 }
 
-func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountID) (*prunable.AccountDiff, bool, error) {
-	s := m.slotDiff(index)
-	if s == nil {
+func (m *Manager) LoadSlotDiff(index iotago.SlotIndex, accountID iotago.AccountID) (*model.AccountDiff, bool, error) {
+	s, err := m.slotDiff(index)
+	if err != nil {
 		return nil, false, ierrors.Errorf("slot %d already pruned", index)
 	}
 
@@ -137,7 +138,7 @@ func (m *Manager) AccountsTreeRoot() iotago.Identifier {
 func (m *Manager) ApplyDiff(
 	slotIndex iotago.SlotIndex,
 	rmc iotago.Mana,
-	accountDiffs map[iotago.AccountID]*prunable.AccountDiff,
+	accountDiffs map[iotago.AccountID]*model.AccountDiff,
 	destroyedAccounts ds.Set[iotago.AccountID],
 ) error {
 	m.mutex.Lock()
@@ -175,7 +176,12 @@ func (m *Manager) ApplyDiff(
 	}
 
 	for accountID, accountDiff := range accountDiffs {
-		err := m.slotDiff(slotIndex).Store(accountID, accountDiff, destroyedAccounts.Has(accountID))
+		s, err := m.slotDiff(slotIndex)
+		if err != nil {
+			return ierrors.Wrapf(err, "could not load slot diff for slot %d", slotIndex)
+		}
+
+		err = s.Store(accountID, accountDiff, destroyedAccounts.Has(accountID))
 		if err != nil {
 			return ierrors.Wrapf(err, "could not store diff to slot %d", slotIndex)
 		}
@@ -305,8 +311,8 @@ func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iot
 func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetIndex iotago.SlotIndex) (wasDestroyed bool, err error) {
 	// to reach targetIndex, we need to rollback diffs from the current latestCommittedSlot down to targetIndex + 1
 	for diffIndex := m.latestCommittedSlot; diffIndex > targetIndex; diffIndex-- {
-		diffStore := m.slotDiff(diffIndex)
-		if diffStore == nil {
+		diffStore, err := m.slotDiff(diffIndex)
+		if err != nil {
 			return false, ierrors.Errorf("can't retrieve account, could not find diff store for slot (%d)", diffIndex)
 		}
 
@@ -372,7 +378,7 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetInd
 	return wasDestroyed, nil
 }
 
-func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (accountDiff *prunable.AccountDiff, err error) {
+func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (accountDiff *model.AccountDiff, err error) {
 	// if any data is left on the account, we need to store in the diff, to be able to rollback
 	accountData, exists, err := m.accountsTree.Get(accountID)
 	if err != nil {
@@ -385,7 +391,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 
 	// it does not matter if there are any changes in this slot, as the account was destroyed anyway and the data was lost
 	// we store the accountState in the form of a diff, so we can roll back to the previous state
-	slotDiff := prunable.NewAccountDiff()
+	slotDiff := model.NewAccountDiff()
 	slotDiff.BICChange = -accountData.Credits.Value
 	slotDiff.NewExpirySlot = iotago.SlotIndex(0)
 	slotDiff.PreviousExpirySlot = accountData.ExpirySlot
@@ -398,7 +404,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 	slotDiff.DelegationStakeChange = -int64(accountData.DelegationStake)
 	slotDiff.StakeEndEpochChange = -int64(accountData.StakeEndEpoch)
 	slotDiff.FixedCostChange = -int64(accountData.FixedCost)
-	slotDiff.NewLatestSupportedVersionAndHash = iotago.VersionAndHash{}
+	slotDiff.NewLatestSupportedVersionAndHash = model.VersionAndHash{}
 	slotDiff.PrevLatestSupportedVersionAndHash = accountData.LatestSupportedProtocolVersionAndHash
 
 	return slotDiff, err
@@ -423,7 +429,7 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex, rmc iotag
 	return burns, nil
 }
 
-func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*prunable.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
+func (m *Manager) commitAccountTree(index iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*model.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
 	// update the account tree to latestCommitted slot index
 	for accountID, diffChange := range accountDiffChanges {
 		// remove a destroyed account, no need to update with diffs
@@ -518,7 +524,7 @@ func (m *Manager) evict(index iotago.SlotIndex) {
 	m.latestSupportedVersionSignals.Evict(index)
 }
 
-func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, rmc iotago.Mana) error {
+func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*model.AccountDiff, rmc iotago.Mana) error {
 	burns, err := m.computeBlockBurnsForSlot(slotIndex, rmc)
 	if err != nil {
 		return ierrors.Wrap(err, "could not create block burns for slot")
@@ -526,7 +532,7 @@ func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDif
 	for id, burn := range burns {
 		accountDiff, exists := accountDiffs[id]
 		if !exists {
-			accountDiff = prunable.NewAccountDiff()
+			accountDiff = model.NewAccountDiff()
 		}
 
 		accountDiff.BICChange -= iotago.BlockIssuanceCredits(burn)
@@ -536,7 +542,7 @@ func (m *Manager) updateSlotDiffWithBurns(slotIndex iotago.SlotIndex, accountDif
 	return nil
 }
 
-func (m *Manager) updateSlotDiffWithVersionSignals(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) error {
+func (m *Manager) updateSlotDiffWithVersionSignals(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*model.AccountDiff) error {
 	signalsStorage := m.latestSupportedVersionSignals.Get(slotIndex)
 	if signalsStorage == nil {
 		return nil
@@ -554,9 +560,9 @@ func (m *Manager) updateSlotDiffWithVersionSignals(slotIndex iotago.SlotIndex, a
 
 		accountDiff, exists := accountDiffs[id]
 		if !exists {
-			accountDiff = prunable.NewAccountDiff()
+			accountDiff = model.NewAccountDiff()
 		}
-		newVersionAndHash := iotago.VersionAndHash{
+		newVersionAndHash := model.VersionAndHash{
 			Version: signaledBlock.HighestSupportedVersion,
 			Hash:    signaledBlock.ProtocolParametersHash,
 		}

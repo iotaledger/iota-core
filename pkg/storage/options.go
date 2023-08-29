@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"time"
+
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -19,14 +21,38 @@ func WithAllowedDBEngines(optsAllowedDBEngines []hivedb.Engine) options.Option[S
 	}
 }
 
-func WithPrunableManagerOptions(opts ...options.Option[prunable.Manager]) options.Option[Storage] {
+func WithBucketManagerOptions(opts ...options.Option[prunable.BucketManager]) options.Option[Storage] {
 	return func(s *Storage) {
-		s.optsPrunableManagerOptions = append(s.optsPrunableManagerOptions, opts...)
+		s.optsBucketManagerOptions = append(s.optsBucketManagerOptions, opts...)
 	}
 }
 
-func WithPruningDelay(optsPruningDelay iotago.SlotIndex) options.Option[Storage] {
+func WithPruningDelay(optsPruningDelay iotago.EpochIndex) options.Option[Storage] {
 	return func(s *Storage) {
 		s.optsPruningDelay = optsPruningDelay
+	}
+}
+
+func WithPruningSizeEnable(pruningSizeEnabled bool) options.Option[Storage] {
+	return func(p *Storage) {
+		p.optPruningSizeEnabled = pruningSizeEnabled
+	}
+}
+
+func WithPruningSizeMaxTargetSizeBytes(pruningSizeTargetSizeBytes int64) options.Option[Storage] {
+	return func(p *Storage) {
+		p.optsPruningSizeMaxTargetSizeBytes = pruningSizeTargetSizeBytes
+	}
+}
+
+func WithPruningSizeReductionPercentage(pruningSizeReductionPercentage float64) options.Option[Storage] {
+	return func(p *Storage) {
+		p.optsPruningSizeReductionPercentage = pruningSizeReductionPercentage
+	}
+}
+
+func WithPruningSizeCooldownTime(cooldown time.Duration) options.Option[Storage] {
+	return func(p *Storage) {
+		p.optsPruningSizeCooldownTime = cooldown
 	}
 }

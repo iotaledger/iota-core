@@ -1,4 +1,4 @@
-package performance
+package model
 
 import (
 	"github.com/iotaledger/hive.go/ierrors"

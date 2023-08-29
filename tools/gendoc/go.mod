@@ -45,7 +45,7 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20230821062121-407c9e7a662f // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.3.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
@@ -68,7 +68,7 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230822231018-a16a2b406096 // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230811070302-53cce5ce9e7c // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230801163327-a72de1469de7 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230828125545-47576682361c // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230829065239-6f712462d09f // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-log/v2 v2.5.1 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
@@ -112,7 +112,6 @@ require (
 	github.com/multiformats/go-multihash v0.2.3 // indirect
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
-	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/onsi/ginkgo/v2 v2.11.0 // indirect
 	github.com/opencontainers/runtime-spec v1.1.0 // indirect
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect

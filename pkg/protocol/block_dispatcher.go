@@ -161,7 +161,7 @@ func (b *BlockDispatcher) initNetworkConnection() {
 func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentID, src network.PeerID) error {
 	// TODO: check if the peer is allowed to request the warp sync
 
-	committedSlot, err := b.protocol.MainEngineInstance().CommittedSlot(commitmentID.Index())
+	committedSlot, err := b.protocol.MainEngineInstance().CommittedSlot(commitmentID)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to get slot %d (not committed yet)", commitmentID.Index())
 	}

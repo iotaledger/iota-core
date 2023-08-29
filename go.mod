@@ -6,7 +6,7 @@ require (
 	github.com/goccy/go-graphviz v0.1.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/go-cmp v0.5.9
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/iotaledger/hive.go/ads v0.0.0-20230822231018-a16a2b406096
@@ -25,8 +25,9 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230822231018-a16a2b406096
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230811070302-53cce5ce9e7c
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230801163327-a72de1469de7
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230828125545-47576682361c
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230829065239-6f712462d09f
 	github.com/labstack/echo/v4 v4.11.1
+	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.30.0
 	github.com/multiformats/go-multiaddr v0.11.0
 	github.com/multiformats/go-varint v0.0.7
@@ -89,7 +90,6 @@ require (
 	github.com/knadh/koanf v1.5.0 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
 	github.com/kr/text v0.2.0 // indirect
-	github.com/labstack/gommon v0.4.0 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
@@ -119,7 +119,6 @@ require (
 	github.com/multiformats/go-multicodec v0.9.0 // indirect
 	github.com/multiformats/go-multihash v0.2.3 // indirect
 	github.com/multiformats/go-multistream v0.4.1 // indirect
-	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/onsi/ginkgo/v2 v2.11.0 // indirect
 	github.com/opencontainers/runtime-spec v1.1.0 // indirect
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect

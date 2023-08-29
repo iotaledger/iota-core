@@ -2,9 +2,7 @@ package engine
 
 import (
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -13,22 +11,22 @@ type CommittedSlotAPI struct {
 	// engine is the Engine that is used to access the data.
 	engine *Engine
 
-	// slotIndex is the index of the slot that is accessed.
-	slotIndex iotago.SlotIndex
+	// CommitmentID is the index of the slot that is accessed.
+	CommitmentID iotago.CommitmentID
 }
 
 // NewCommittedSlotAPI creates a new CommittedSlotAPI.
-func NewCommittedSlotAPI(engine *Engine, slotIndex iotago.SlotIndex) *CommittedSlotAPI {
+func NewCommittedSlotAPI(engine *Engine, commitmentID iotago.CommitmentID) *CommittedSlotAPI {
 	return &CommittedSlotAPI{
-		engine:    engine,
-		slotIndex: slotIndex,
+		engine:       engine,
+		CommitmentID: commitmentID,
 	}
 }
 
 // Commitment returns the commitment of the slot.
 func (c *CommittedSlotAPI) Commitment() (commitment *model.Commitment, err error) {
-	if commitment, err = c.engine.Storage.Commitments().Load(c.slotIndex); err != nil {
-		return nil, ierrors.Wrapf(err, "failed to load commitment for slot %d", c.slotIndex)
+	if commitment, err = c.engine.Storage.Commitments().Load(c.CommitmentID.Index()); err != nil {
+		return nil, ierrors.Wrapf(err, "failed to load commitment for slot %d", c.CommitmentID)
 	}
 
 	return commitment, nil
@@ -36,40 +34,39 @@ func (c *CommittedSlotAPI) Commitment() (commitment *model.Commitment, err error
 
 // Roots returns the roots of the slot.
 func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
-	if c.engine.Storage.Settings().LatestCommitment().Index() < c.slotIndex {
-		return nil, ierrors.Errorf("slot %d is not committed yet", c.slotIndex)
+	if c.engine.Storage.Settings().LatestCommitment().Index() < c.CommitmentID.Index() {
+		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
 
-	rootsStorage := c.engine.Storage.Roots(c.slotIndex)
-	if rootsStorage == nil {
-		return nil, ierrors.Errorf("no roots storage for slot %d", c.slotIndex)
-	}
-
-	rootsBytes, err := rootsStorage.Get(kvstore.Key{prunable.RootsKey})
+	rootsStorage, err := c.engine.Storage.Roots(c.CommitmentID.Index())
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to load roots for slot %d", c.slotIndex)
+		return nil, ierrors.Errorf("no roots storage for slot %d", c.CommitmentID)
 	}
 
-	var roots iotago.Roots
-	_, err = c.engine.APIForSlot(c.slotIndex).Decode(rootsBytes, &roots)
+	roots, err := rootsStorage.Load(c.CommitmentID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to decode roots for slot %d", c.slotIndex)
+		return nil, ierrors.Wrapf(err, "failed to load roots for slot %d", c.CommitmentID)
 	}
 
-	return &roots, nil
+	return roots, nil
 }
 
 // BlockIDs returns the accepted block IDs of the slot.
 func (c *CommittedSlotAPI) BlockIDs() (blockIDs iotago.BlockIDs, err error) {
-	if c.engine.Storage.Settings().LatestCommitment().Index() < c.slotIndex {
-		return blockIDs, ierrors.Errorf("slot %d is not committed yet", c.slotIndex)
+	if c.engine.Storage.Settings().LatestCommitment().Index() < c.CommitmentID.Index() {
+		return blockIDs, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
 
-	if err = c.engine.Storage.Blocks(c.slotIndex).ForEachBlockIDInSlot(func(blockID iotago.BlockID) error {
-		blockIDs = append(blockIDs, blockID)
+	store, err := c.engine.Storage.Blocks(c.CommitmentID.Index())
+	if err != nil {
+		return nil, ierrors.Errorf("failed to get block store of slot index %d", c.CommitmentID.Index())
+	}
+
+	if err := store.ForEachBlockInSlot(func(block *model.Block) error {
+		blockIDs = append(blockIDs, block.ID())
 		return nil
 	}); err != nil {
-		return nil, ierrors.Wrapf(err, "failed to iterate over blocks in slot %d", c.slotIndex)
+		return nil, ierrors.Wrapf(err, "failed to iterate over blocks of slot %d", c.CommitmentID.Index())
 	}
 
 	return blockIDs, nil

@@ -1,25 +1,24 @@
-package prunable
+package slotstore
 
 import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Blocks struct {
 	slot  iotago.SlotIndex
 	store kvstore.KVStore
 
-	apiProvider api.Provider
+	apiForSlot iotago.API
 }
 
-func NewBlocks(slot iotago.SlotIndex, store kvstore.KVStore, apiProvider api.Provider) (newBlocks *Blocks) {
+func NewBlocks(slot iotago.SlotIndex, store kvstore.KVStore, apiForSlot iotago.API) (newBlocks *Blocks) {
 	return &Blocks{
-		slot:        slot,
-		store:       store,
-		apiProvider: apiProvider,
+		slot:       slot,
+		store:      store,
+		apiForSlot: apiForSlot,
 	}
 }
 
@@ -34,7 +33,7 @@ func (b *Blocks) Load(id iotago.BlockID) (*model.Block, error) {
 		return nil, ierrors.Wrapf(err, "failed to get block %s", id)
 	}
 
-	return model.BlockFromIDAndBytes(id, blockBytes, b.apiProvider.APIForSlot(id.Index()))
+	return model.BlockFromIDAndBytes(id, blockBytes, b.apiForSlot)
 }
 
 func (b *Blocks) Store(block *model.Block) error {
@@ -46,7 +45,7 @@ func (b *Blocks) Delete(id iotago.BlockID) (err error) {
 	return b.store.Delete(id[:])
 }
 
-func (b *Blocks) ForEachBlockIDInSlot(consumer func(blockID iotago.BlockID) error) error {
+func (b *Blocks) StreamKeys(consumer func(blockID iotago.BlockID) error) error {
 	var innerErr error
 	if err := b.store.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
 		var blockID iotago.BlockID
@@ -73,7 +72,7 @@ func (b *Blocks) ForEachBlockInSlot(consumer func(block *model.Block) error) err
 		var id iotago.BlockID
 		id, _, innerErr = iotago.SlotIdentifierFromBytes(key)
 		var block *model.Block
-		block, innerErr = model.BlockFromIDAndBytes(id, value, b.apiProvider.APIForSlot(b.slot))
+		block, innerErr = model.BlockFromIDAndBytes(id, value, b.apiForSlot)
 
 		if innerErr != nil {
 			return false

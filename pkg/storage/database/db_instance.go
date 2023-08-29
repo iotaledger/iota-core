@@ -1,20 +1,17 @@
-package prunable
+package database
 
 import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/iota-core/pkg/storage/database"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type dbInstance struct {
-	index         iotago.SlotIndex
+type DBInstance struct {
 	store         kvstore.KVStore // KVStore that is used to access the DB instance
 	healthTracker *kvstore.StoreHealthTracker
 }
 
-func newDBInstance(index iotago.SlotIndex, dbConfig database.Config) *dbInstance {
-	db, err := database.StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
+func NewDBInstance(dbConfig Config) *DBInstance {
+	db, err := StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
 	if err != nil {
 		panic(err)
 	}
@@ -26,18 +23,21 @@ func newDBInstance(index iotago.SlotIndex, dbConfig database.Config) *dbInstance
 		panic(err)
 	}
 
-	return &dbInstance{
-		index:         index,
+	return &DBInstance{
 		store:         db,
 		healthTracker: storeHealthTracker,
 	}
 }
 
-func (db *dbInstance) Close() {
-	if err := db.healthTracker.MarkHealthy(); err != nil {
+func (d *DBInstance) Close() {
+	if err := d.healthTracker.MarkHealthy(); err != nil {
 		panic(err)
 	}
-	if err := database.FlushAndClose(db.store); err != nil {
+	if err := FlushAndClose(d.store); err != nil {
 		panic(err)
 	}
+}
+
+func (d *DBInstance) KVStore() kvstore.KVStore {
+	return d.store
 }

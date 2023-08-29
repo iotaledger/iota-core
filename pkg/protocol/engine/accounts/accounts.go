@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -28,7 +29,7 @@ type AccountData struct {
 	DelegationStake                       iotago.BaseToken
 	FixedCost                             iotago.Mana
 	StakeEndEpoch                         iotago.EpochIndex
-	LatestSupportedProtocolVersionAndHash iotago.VersionAndHash
+	LatestSupportedProtocolVersionAndHash model.VersionAndHash
 }
 
 func NewAccountData(id iotago.AccountID, opts ...options.Option[AccountData]) *AccountData {
@@ -42,7 +43,7 @@ func NewAccountData(id iotago.AccountID, opts ...options.Option[AccountData]) *A
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         0,
-		LatestSupportedProtocolVersionAndHash: iotago.VersionAndHash{},
+		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{},
 	}, opts)
 }
 
@@ -165,12 +166,12 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	}
 	bytesConsumed += 8
 
-	versionAndHashBytes := make([]byte, iotago.VersionAndHashSize)
+	versionAndHashBytes := make([]byte, model.VersionAndHashSize)
 	if err := binary.Read(reader, binary.LittleEndian, versionAndHashBytes); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read latest supported protocol version for accountID %s", a.ID)
 	}
 
-	if a.LatestSupportedProtocolVersionAndHash, _, err = iotago.VersionAndHashFromBytes(versionAndHashBytes[:]); err != nil {
+	if a.LatestSupportedProtocolVersionAndHash, _, err = model.VersionAndHashFromBytes(versionAndHashBytes[:]); err != nil {
 		return 0, err
 	}
 
@@ -253,7 +254,7 @@ func WithStakeEndEpoch(stakeEndEpoch iotago.EpochIndex) options.Option[AccountDa
 	}
 }
 
-func WithLatestSupportedProtocolVersion(versionAndHash iotago.VersionAndHash) options.Option[AccountData] {
+func WithLatestSupportedProtocolVersion(versionAndHash model.VersionAndHash) options.Option[AccountData] {
 	return func(a *AccountData) {
 		a.LatestSupportedProtocolVersionAndHash = versionAndHash
 	}

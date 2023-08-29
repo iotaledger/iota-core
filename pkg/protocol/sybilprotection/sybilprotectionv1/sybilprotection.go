@@ -63,12 +63,12 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 
 					latestCommittedSlot := e.Storage.Settings().LatestCommitment().Index()
 					latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
-					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, latestCommittedEpoch, e, o.errHandler)
+					o.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, latestCommittedEpoch, e, o.errHandler)
 					o.lastCommittedSlot = latestCommittedSlot
 
 					if o.optsInitialCommittee != nil {
-						if err := o.performanceTracker.RegisterCommittee(1, o.optsInitialCommittee); err != nil {
-							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 1"))
+						if err := o.performanceTracker.RegisterCommittee(0, o.optsInitialCommittee); err != nil {
+							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
 						}
 					}
 					o.TriggerConstructed()
@@ -174,7 +174,10 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 		targetRewardsEpoch = currentEpoch
 	}
 
-	rewardsRoot = o.performanceTracker.RewardsRoot(targetRewardsEpoch)
+	rewardsRoot, err = o.performanceTracker.RewardsRoot(targetRewardsEpoch)
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to calculate rewards root for epoch %d", targetRewardsEpoch))
+	}
 
 	o.lastCommittedSlot = slot
 
