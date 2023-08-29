@@ -10,54 +10,39 @@ type chainWeights struct {
 	chain *Chain
 
 	// claimed contains the total cumulative weight of the chain that is claimed by the latest commitments.
-	claimed reactive.Variable[uint64]
+	claimedWeight reactive.Variable[uint64]
 
-	// attested contains the total cumulative weight of the chain that we received attestations for.
-	attested reactive.Variable[uint64]
+	// attestedWeight contains the total cumulative weight of the chain that we received attestations for.
+	attestedWeight reactive.Variable[uint64]
 
-	// verified contains the total cumulative weight of the chain that we verified ourselves.
-	verified reactive.Variable[uint64]
+	// verifiedWeight contains the total cumulative weight of the chain that we verified ourselves.
+	verifiedWeight reactive.Variable[uint64]
 }
 
 // newChainWeights creates a new chainWeights for the given chain.
 func newChainWeights(chain *Chain) *chainWeights {
 	return &chainWeights{
-		chain:    chain,
-		claimed:  reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestCommitment),
-		attested: reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestAttestedCommitment),
-		verified: reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestVerifiedCommitment),
+		chain:          chain,
+		claimedWeight:  reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestCommitment),
+		attestedWeight: reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestAttestedCommitment),
+		verifiedWeight: reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestVerifiedCommitment),
 	}
 }
 
-// ClaimedWeight returns the total cumulative weight of the chain that is claimed by the latest commitments.
-func (c *chainWeights) ClaimedWeight() uint64 {
-	return c.claimed.Get()
-}
-
-// ClaimedWeightVariable returns a reactive variable that tracks the total cumulative weight of the chain that is claimed by
+// ClaimedWeight returns a reactive variable that tracks the total cumulative weight of the chain that is claimed by
 // the latest commitments.
-func (c *chainWeights) ClaimedWeightVariable() reactive.Variable[uint64] {
-	return c.claimed
+func (c *chainWeights) ClaimedWeight() reactive.Variable[uint64] {
+	return c.claimedWeight
 }
 
-// AttestedWeight returns the total cumulative weight of the chain that we received attestations for.
-func (c *chainWeights) AttestedWeight() uint64 {
-	return c.attested.Get()
-}
-
-// AttestedWeightVariable returns a reactive variable that tracks the total cumulative weight of the chain that we received
+// AttestedWeight returns a reactive variable that tracks the total cumulative weight of the chain that we received
 // attestations for.
-func (c *chainWeights) AttestedWeightVariable() reactive.Variable[uint64] {
-	return c.attested
+func (c *chainWeights) AttestedWeight() reactive.Variable[uint64] {
+	return c.attestedWeight
 }
 
-// VerifiedWeight returns the total cumulative weight of the chain that we verified ourselves.
-func (c *chainWeights) VerifiedWeight() uint64 {
-	return c.verified.Get()
-}
-
-// VerifiedWeightVariable returns a reactive variable that tracks the total cumulative weight of the chain that we verified
+// VerifiedWeight returns a reactive variable that tracks the total cumulative weight of the chain that we verified
 // ourselves.
-func (c *chainWeights) VerifiedWeightVariable() reactive.Variable[uint64] {
-	return c.verified
+func (c *chainWeights) VerifiedWeight() reactive.Variable[uint64] {
+	return c.verifiedWeight
 }

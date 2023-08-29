@@ -45,9 +45,9 @@ func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 	}
 
 	c.OnChainCreated(func(chain *Chain) {
-		c.selectHeaviestCandidate(c.heaviestClaimedCandidate, chain, (*Chain).ClaimedWeightVariable)
-		c.selectHeaviestCandidate(c.heaviestAttestedCandidate, chain, (*Chain).AttestedWeightVariable)
-		c.selectHeaviestCandidate(c.heaviestVerifiedCandidate, chain, (*Chain).VerifiedWeightVariable)
+		c.selectHeaviestCandidate(c.heaviestClaimedCandidate, chain, (*Chain).ClaimedWeight)
+		c.selectHeaviestCandidate(c.heaviestAttestedCandidate, chain, (*Chain).AttestedWeight)
+		c.selectHeaviestCandidate(c.heaviestVerifiedCandidate, chain, (*Chain).VerifiedWeight)
 	})
 
 	return c
@@ -93,7 +93,7 @@ func (c *ChainManager) HeaviestVerifiedCandidateChain() reactive.Variable[*Chain
 
 func (c *ChainManager) selectHeaviestCandidate(variable reactive.Variable[*Chain], newCandidate *Chain, chainWeight func(*Chain) reactive.Variable[uint64]) {
 	chainWeight(newCandidate).OnUpdate(func(_, newChainWeight uint64) {
-		if newChainWeight <= c.MainChain().VerifiedWeight() {
+		if newChainWeight <= c.MainChain().verifiedWeight.Get() {
 			return
 		}
 
