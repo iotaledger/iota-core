@@ -58,36 +58,21 @@ func (c *chainCommitments) Commitment(index iotago.SlotIndex) (commitment *Commi
 	return nil, false
 }
 
-// LatestCommitment returns the latest Commitment object in this collection.
-func (c *chainCommitments) LatestCommitment() *Commitment {
-	return c.latestCommitment.Get()
-}
-
-// LatestCommitmentVariable returns a reactive variable that always contains the latest Commitment object in this
+// LatestCommitment returns a reactive variable that always contains the latest Commitment object in this
 // collection.
-func (c *chainCommitments) LatestCommitmentVariable() reactive.Variable[*Commitment] {
+func (c *chainCommitments) LatestCommitment() reactive.Variable[*Commitment] {
 	return c.latestCommitment
 }
 
-// LatestAttestedCommitment returns the latest attested Commitment object in this collection.
-func (c *chainCommitments) LatestAttestedCommitment() *Commitment {
-	return c.latestAttestedCommitment.Get()
-}
-
-// LatestAttestedCommitmentVariable returns a reactive variable that always contains the latest attested Commitment object
+// LatestAttestedCommitment returns a reactive variable that always contains the latest attested Commitment object
 // in this collection.
-func (c *chainCommitments) LatestAttestedCommitmentVariable() reactive.Variable[*Commitment] {
+func (c *chainCommitments) LatestAttestedCommitment() reactive.Variable[*Commitment] {
 	return c.latestAttestedCommitment
 }
 
-// LatestVerifiedCommitment returns the latest verified Commitment object in this collection.
-func (c *chainCommitments) LatestVerifiedCommitment() *Commitment {
-	return c.latestVerifiedCommitment.Get()
-}
-
-// LatestVerifiedCommitmentVariable returns a reactive variable that always contains the latest verified Commitment object
+// LatestVerifiedCommitment returns a reactive variable that always contains the latest verified Commitment object
 // in this collection.
-func (c *chainCommitments) LatestVerifiedCommitmentVariable() reactive.Variable[*Commitment] {
+func (c *chainCommitments) LatestVerifiedCommitment() reactive.Variable[*Commitment] {
 	return c.latestVerifiedCommitment
 }
 
