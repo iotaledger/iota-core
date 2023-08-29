@@ -64,13 +64,15 @@
     "limits": {
       "maxBodyLength": "1M",
       "maxResults": 1000
-    }
+    },
+    "blockIssuerAccount": "",
+    "blockIssuerPrivateKey": ""
   },
   "debugAPI": {
     "enabled": true,
     "path": "testnet/debug",
     "maxOpenDBs": 2,
-    "pruningThreshold": 8640,
+    "pruningThreshold": 1,
     "dbGranularity": 100
   },
   "metricstracker": {
@@ -79,9 +81,14 @@
   "database": {
     "engine": "rocksdb",
     "path": "testnet/database",
-    "maxOpenDBs": 10,
-    "pruningThreshold": 16384,
-    "dbGranularity": 8192
+    "maxOpenDBs": 5,
+    "pruningThreshold": 30,
+    "size": {
+      "enabled": true,
+      "targetSize": "30GB",
+      "reductionPercentage": 10,
+      "cooldownTime": "5m"
+    }
   },
   "protocol": {
     "snapshot": {
@@ -89,9 +96,7 @@
       "depth": 5
     },
     "filter": {
-      "maxAllowedClockDrift": "5s",
-      "minCommittableAge": 6,
-      "maxCommittableAge": 12
+      "maxAllowedClockDrift": "5s"
     },
     "baseToken": {
       "name": "Shimmer",
@@ -106,16 +111,16 @@
     "enabled": true,
     "tipSelectionTimeout": "10s",
     "tipSelectionRetryInterval": "200ms",
-    "issuerAccount": "",
-    "privateKey": "",
     "rateSetterEnabled": false
   },
   "validator": {
-    "enabled": true,
-    "committeeBroadcastInterval": "2s",
+    "enabled": false,
+    "committeeBroadcastInterval": "500ms",
     "candidateBroadcastInterval": "30m",
     "parentsCount": 8,
-    "ignoreBootstrapped": false
+    "ignoreBootstrapped": false,
+    "account": "",
+    "privateKey": ""
   },
   "dashboard": {
     "enabled": true,
@@ -138,6 +143,8 @@
   },
   "inx": {
     "enabled": false,
-    "bindAddress": "localhost:9029"
+    "bindAddress": "localhost:9029",
+    "blockIssuerAccount": "",
+    "blockIssuerPrivateKey": ""
   }
 }
