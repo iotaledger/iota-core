@@ -98,8 +98,8 @@ func (c *chainCommitments) register(commitment *Commitment) (unsubscribe func())
 	c.latestCommitment.Compute(commitment.max)
 
 	return lo.Batch(
-		commitment.isAttested.OnTrigger(func() { c.latestAttestedCommitment.Compute(commitment.max) }),
-		commitment.isVerified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(commitment.max) }),
+		commitment.attested.OnTrigger(func() { c.latestAttestedCommitment.Compute(commitment.max) }),
+		commitment.verified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(commitment.max) }),
 	)
 }
 

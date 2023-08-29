@@ -27,12 +27,12 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 func NewRootCommitment(commitment *model.Commitment) *Commitment {
 	commitmentMetadata := NewCommitment(commitment)
 
-	commitmentMetadata.isSolid.Set(true)
-	commitmentMetadata.isVerified.Set(true)
+	commitmentMetadata.solid.Set(true)
+	commitmentMetadata.verified.Set(true)
 	commitmentMetadata.isBelowSyncThreshold.Set(true)
 	commitmentMetadata.isBelowWarpSyncThreshold.Set(true)
 	commitmentMetadata.isBelowLatestVerifiedIndex.Set(true)
-	commitmentMetadata.isEvicted.Set(false)
+	commitmentMetadata.evicted.Set(false)
 
 	return commitmentMetadata
 }

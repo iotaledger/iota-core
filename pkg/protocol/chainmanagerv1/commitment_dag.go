@@ -78,7 +78,7 @@ func (c *commitmentDAG) registerChild(newChild *Commitment, onSuccessorUpdated f
 
 	unsubscribe := c.successor.OnUpdate(onSuccessorUpdated)
 
-	c.commitment.isEvicted.OnTrigger(unsubscribe)
+	c.commitment.evicted.OnTrigger(unsubscribe)
 }
 
 func (c *commitmentDAG) createChainUpdater(parent *Commitment) func(*Commitment, *Commitment) {

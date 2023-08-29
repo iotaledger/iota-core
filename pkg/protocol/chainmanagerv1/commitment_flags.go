@@ -3,55 +3,39 @@ package chainmanagerv1
 import "github.com/iotaledger/hive.go/ds/reactive"
 
 type commitmentFlags struct {
-	isSolid    reactive.Event
-	isAttested reactive.Event
-	isVerified reactive.Event
-	isEvicted  reactive.Event
+	solid    reactive.Event
+	attested reactive.Event
+	verified reactive.Event
+	evicted  reactive.Event
 }
 
 func newCommitmentFlags(commitment *Commitment) *commitmentFlags {
 	c := &commitmentFlags{
-		isSolid:    reactive.NewEvent(),
-		isAttested: reactive.NewEvent(),
-		isVerified: reactive.NewEvent(),
-		isEvicted:  reactive.NewEvent(),
+		solid:    reactive.NewEvent(),
+		attested: reactive.NewEvent(),
+		verified: reactive.NewEvent(),
+		evicted:  reactive.NewEvent(),
 	}
 
 	commitment.ParentVariable().OnUpdate(func(_, parent *Commitment) {
-		c.isSolid.InheritFrom(parent.isSolid)
+		c.solid.InheritFrom(parent.solid)
 	})
 
 	return c
 }
 
-func (c *commitmentFlags) IsSolid() bool {
-	return c.isSolid.WasTriggered()
+func (c *commitmentFlags) Solid() reactive.Event {
+	return c.solid
 }
 
-func (c *commitmentFlags) IsSolidEvent() reactive.Event {
-	return c.isSolid
+func (c *commitmentFlags) Attested() reactive.Event {
+	return c.attested
 }
 
-func (c *commitmentFlags) IsAttested() bool {
-	return c.isAttested.WasTriggered()
+func (c *commitmentFlags) Verified() reactive.Event {
+	return c.verified
 }
 
-func (c *commitmentFlags) IsAttestedEvent() reactive.Event {
-	return c.isAttested
-}
-
-func (c *commitmentFlags) IsVerified() bool {
-	return c.isVerified.WasTriggered()
-}
-
-func (c *commitmentFlags) IsVerifiedEvent() reactive.Event {
-	return c.isVerified
-}
-
-func (c *commitmentFlags) IsEvicted() bool {
-	return c.isEvicted.WasTriggered()
-}
-
-func (c *commitmentFlags) IsEvictedEvent() reactive.Event {
-	return c.isEvicted
+func (c *commitmentFlags) Evicted() reactive.Event {
+	return c.evicted
 }

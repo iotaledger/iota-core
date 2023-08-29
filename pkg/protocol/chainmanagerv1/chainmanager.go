@@ -111,7 +111,7 @@ func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent 
 	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, commitment.setParent)
 
 	slotEvictedEvent.OnTrigger(func() {
-		commitment.IsEvictedEvent().Trigger()
+		commitment.evicted.Trigger()
 	})
 
 	c.commitmentCreated.Trigger(commitment)

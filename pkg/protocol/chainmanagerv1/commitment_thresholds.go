@@ -63,11 +63,11 @@ func isAboveLatestVerifiedIndex(commitment *Commitment) reactive.Variable[bool] 
 
 		directlyAboveLatestVerifiedCommitment = reactive.NewDerivedVariable2(func(parentVerified, verified bool) bool {
 			return parentVerified && !verified
-		}, parentVerified, commitment.isVerified)
+		}, parentVerified, commitment.verified)
 	)
 
 	commitment.ParentVariable().OnUpdateOnce(func(_, parent *Commitment) {
-		parentVerified.InheritFrom(parent.isVerified)
+		parentVerified.InheritFrom(parent.verified)
 		parentAboveLatestVerifiedCommitment.InheritFrom(parent.isAboveLatestVerifiedIndex)
 	})
 
