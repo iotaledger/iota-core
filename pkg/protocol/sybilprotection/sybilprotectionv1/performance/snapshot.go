@@ -6,6 +6,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -87,7 +88,10 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "unable to read accounts count for slot index %d", slotIndex)
 		}
 
-		performanceFactors := t.performanceFactorsFunc(slotIndex)
+		performanceFactors, err := t.performanceFactorsFunc(slotIndex)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to get performance factors for slot index %d", slotIndex)
+		}
 		for j := uint64(0); j < accountsCount; j++ {
 			var accountID iotago.AccountID
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
@@ -120,7 +124,10 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "unable to read epoch index")
 		}
 
-		rewardsTree := t.rewardsMap(epochIndex)
+		rewardsTree, err := t.rewardsMap(epochIndex)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to get rewards tree for epoch index %d", epochIndex)
+		}
 
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
@@ -133,7 +140,7 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 				return ierrors.Wrapf(err, "unable to read account id for the epoch index %d", epochIndex)
 			}
 
-			var reward PoolRewards
+			var reward model.PoolRewards
 			if err := binary.Read(reader, binary.LittleEndian, &reward); err != nil {
 				return ierrors.Wrapf(err, "unable to read reward for account %s and epoch index %d", accountID, epochIndex)
 			}
@@ -162,12 +169,12 @@ func (t *Tracker) importPoolsStats(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "unable to read epoch index")
 		}
 
-		var poolStats PoolsStats
+		var poolStats model.PoolsStats
 		if err := binary.Read(reader, binary.LittleEndian, &poolStats); err != nil {
 			return ierrors.Wrapf(err, "unable to read pool stats for epoch index %d", epochIndex)
 		}
 
-		if err := t.poolStatsStore.Set(epochIndex, &poolStats); err != nil {
+		if err := t.poolStatsStore.Store(epochIndex, &poolStats); err != nil {
 			return ierrors.Wrapf(err, "unable to store pool stats for the epoch index %d", epochIndex)
 		}
 	}
@@ -191,7 +198,7 @@ func (t *Tracker) importCommittees(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "unable to read committee for the epoch index %d", epoch)
 		}
 
-		if err := t.committeeStore.Set(epoch, committee); err != nil {
+		if err := t.committeeStore.Store(epoch, committee); err != nil {
 			return ierrors.Wrap(err, "unable to store committee")
 		}
 	}
@@ -218,7 +225,11 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 			return ierrors.Wrapf(err, "unable to write pf accounts count for slot index %d", currentSlot)
 		}
 		// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
-		if err := t.performanceFactorsFunc(currentSlot).ForEachPerformanceFactor(func(accountID iotago.AccountID, pf uint64) error {
+		performanceFactors, err := t.performanceFactorsFunc(currentSlot)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to get performance factors for slot index %d", currentSlot)
+		}
+		if err := performanceFactors.Stream(func(accountID iotago.AccountID, pf uint64) error {
 			if err := pWriter.WriteValue("account id", accountID); err != nil {
 				return ierrors.Wrapf(err, "unable to write account id %s for slot %d", accountID, currentSlot)
 			}
@@ -255,10 +266,13 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 	}
 	// TODO: make sure to adjust this loop if we add pruning later.
 	for epoch := targetEpoch; epoch > iotago.EpochIndex(0); epoch-- {
-		rewardsTree := t.rewardsMap(epoch)
+		rewardsMap, err := t.rewardsMap(epoch)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to get rewards tree for epoch index %d", epoch)
+		}
 
 		// if the tree was not present in storage we can skip this epoch and the previous ones, as we never stored any rewards
-		if !rewardsTree.WasRestoredFromStorage() {
+		if !rewardsMap.WasRestoredFromStorage() {
 			break
 		}
 
@@ -271,7 +285,7 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 			return ierrors.Wrapf(err, "unable to write account count for epoch index %d", epoch)
 		}
 
-		if err := rewardsTree.Stream(func(key iotago.AccountID, value *PoolRewards) error {
+		if err := rewardsMap.Stream(func(key iotago.AccountID, value *model.PoolRewards) error {
 			if err := pWriter.WriteValue("account id", key); err != nil {
 				return ierrors.Wrapf(err, "unable to write account id for epoch index %d and accountID %s", epoch, key)
 			}
@@ -306,23 +320,23 @@ func (t *Tracker) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 	}
 	// export all stored pools
 	var innerErr error
-	if err := t.poolStatsStore.KVStore().Iterate([]byte{}, func(key []byte, value []byte) bool {
+	if err := t.poolStatsStore.StreamBytes(func(key []byte, value []byte) error {
 		epochIndex := iotago.EpochIndex(binary.LittleEndian.Uint64(key))
 		if epochIndex > targetEpoch {
 			// continue
-			return true
+			return nil
 		}
 		if err := pWriter.WriteBytes(key); err != nil {
 			innerErr = ierrors.Wrapf(err, "unable to write epoch index %d", epochIndex)
-			return false
+			return innerErr
 		}
 		if err := pWriter.WriteBytes(value); err != nil {
 			innerErr = ierrors.Wrapf(err, "unable to write pools stats for epoch %d", epochIndex)
-			return false
+			return innerErr
 		}
 		epochCount++
 
-		return true
+		return nil
 	}); err != nil {
 		return ierrors.Wrap(err, "unable to iterate over pools stats")
 	} else if innerErr != nil {
@@ -346,7 +360,7 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 	pointOfNoReturn := apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) - apiForSlot.ProtocolParameters().MaxCommittableAge()
 
 	var innerErr error
-	err := t.committeeStore.KVStore().Iterate([]byte{}, func(epochBytes []byte, committeeBytes []byte) bool {
+	err := t.committeeStore.StreamBytes(func(epochBytes []byte, committeeBytes []byte) error {
 		epoch := iotago.EpochIndex(binary.LittleEndian.Uint64(epochBytes))
 
 		// We have a committee for an epoch higher than the targetSlot
@@ -358,24 +372,24 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 			committee, _, err := account.AccountsFromBytes(committeeBytes)
 			if err != nil {
 				innerErr = ierrors.Wrapf(err, "failed to parse committee bytes for epoch %d", epoch)
-				return false
+				return innerErr
 			}
 			if committee.IsReused() {
-				return true
+				return nil
 			}
 		}
 
 		if err := pWriter.WriteBytes(epochBytes); err != nil {
 			innerErr = ierrors.Wrap(err, "unable to write epoch index")
-			return false
+			return innerErr
 		}
 		if err := pWriter.WriteBytes(committeeBytes); err != nil {
 			innerErr = ierrors.Wrap(err, "unable to write epoch committee")
-			return false
+			return innerErr
 		}
 		epochCount++
 
-		return true
+		return nil
 	})
 	if err != nil {
 		return ierrors.Wrapf(err, "unable to iterate over committee base store: %w", innerErr)

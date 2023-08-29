@@ -20,7 +20,7 @@ func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
 }
 
 func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(index)
+	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to load commitment: %d", index)
 	}

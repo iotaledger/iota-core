@@ -36,6 +36,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -180,9 +181,11 @@ func New(
 
 				// Only mark any pruning indexes if we loaded a non-genesis snapshot
 				if e.Storage.Settings().LatestFinalizedSlot() > 0 {
-					e.Storage.Prunable.PruneUntilSlot(e.Storage.Settings().LatestFinalizedSlot())
-					if index, pruned := e.Storage.LastPrunedSlot(); pruned {
-						e.Events.StoragePruned.Trigger(index)
+					if _, _, err := e.Storage.PruneByDepth(1); err != nil {
+						if !ierrors.Is(err, database.ErrNoPruningNeeded) &&
+							!ierrors.Is(err, database.ErrEpochPruned) {
+							panic(ierrors.Wrap(err, "failed to prune storage"))
+						}
 					}
 				}
 
@@ -192,7 +195,7 @@ func New(
 
 			} else {
 				// Restore from Disk
-				e.Storage.Prunable.RestoreFromDisk()
+				e.Storage.RestoreFromDisk()
 				e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
 
 				if err := e.Attestations.RestoreFromDisk(); err != nil {
@@ -259,10 +262,13 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 		return nil, false
 	}
 
-	s := e.Storage.Blocks(id.Index())
-	if s == nil {
+	s, err := e.Storage.Blocks(id.Index())
+	if err != nil {
+		e.errorHandler(ierrors.Wrap(err, "failed to get block storage"))
+
 		return nil, false
 	}
+
 	modelBlock, err := s.Load(id)
 	if err != nil {
 		e.errorHandler(ierrors.Wrap(err, "failed to load block from storage"))
@@ -313,19 +319,19 @@ func (e *Engine) CurrentAPI() iotago.API {
 }
 
 // CommittedSlot returns the committed slot for the given slot index.
-func (e *Engine) CommittedSlot(slotIndex iotago.SlotIndex) (*CommittedSlotAPI, error) {
-	if e.Storage.Settings().LatestCommitment().Index() < slotIndex {
-		return nil, ierrors.Errorf("slot %d is not committed yet", slotIndex)
+func (e *Engine) CommittedSlot(commitmentID iotago.CommitmentID) (*CommittedSlotAPI, error) {
+	if e.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
+		return nil, ierrors.Errorf("slot %d is not committed yet", commitmentID.Index())
 	}
 
-	return NewCommittedSlotAPI(e, slotIndex), nil
+	return NewCommittedSlotAPI(e, commitmentID), nil
 }
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
 	if len(targetSlot) == 0 {
 		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index())
-	} else if lastPrunedSlot, hasPruned := e.Storage.LastPrunedSlot(); hasPruned && targetSlot[0] <= lastPrunedSlot {
-		return ierrors.Errorf("impossible to create a snapshot for slot %d because it is pruned (last pruned slot %d)", targetSlot[0], lo.Return1(e.Storage.LastPrunedSlot()))
+	} else if lastPrunedEpoch, hasPruned := e.Storage.LastPrunedEpoch(); hasPruned && e.CurrentAPI().TimeProvider().EpochFromSlot(targetSlot[0]) <= lastPrunedEpoch {
+		return ierrors.Errorf("impossible to create a snapshot for slot %d because it is pruned (last pruned slot %d)", targetSlot[0], lo.Return1(e.Storage.LastPrunedEpoch()))
 	}
 
 	if fileHandle, err := os.Create(filePath); err != nil {
@@ -430,9 +436,10 @@ func (e *Engine) setupBlockStorage() {
 	wp := e.Workers.CreatePool("BlockStorage", 1) // Using just 1 worker to avoid contention
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		store := e.Storage.Blocks(block.ID().Index())
-		if store == nil {
+		store, err := e.Storage.Blocks(block.ID().Index())
+		if err != nil {
 			e.errorHandler(ierrors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
+			return
 		}
 
 		if err := store.Store(block.ModelBlock()); err != nil {
@@ -480,7 +487,7 @@ func (e *Engine) setupBlockRequester() {
 		if block.ID().Index() < e.startupAvailableBlocksWindow {
 			// We shortcut requesting blocks that are in the storage in case we did shut down and restart.
 			// We can safely ignore all errors.
-			if blockStorage := e.Storage.Blocks(block.ID().Index()); blockStorage != nil {
+			if blockStorage, err := e.Storage.Blocks(block.ID().Index()); err == nil {
 				if storedBlock, _ := blockStorage.Load(block.ID()); storedBlock != nil {
 					// We need to attach the block to the DAG in a separate worker pool to avoid a deadlock with the block cache
 					// as the BlockMissing event is triggered within a GetOrCreate call.
@@ -500,8 +507,10 @@ func (e *Engine) setupBlockRequester() {
 }
 
 func (e *Engine) setupPruning() {
-	e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		e.Storage.PruneUntilSlot(index)
+	e.Events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+		if err := e.Storage.TryPrune(); err != nil {
+			e.errorHandler(ierrors.Wrapf(err, "failed to prune storage at slot %d", slot))
+		}
 	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))
 }
 

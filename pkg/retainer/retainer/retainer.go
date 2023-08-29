@@ -10,14 +10,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/retainer"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type (
 	//nolint:revive
-	RetainerFunc            func(iotago.SlotIndex) *prunable.Retainer
+	RetainerFunc            func(iotago.SlotIndex) (*slotstore.Retainer, error)
 	LatestCommittedSlotFunc func() iotago.SlotIndex
 	FinalizedSlotFunc       func() iotago.SlotIndex
 )
@@ -156,13 +156,25 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 }
 
 func (r *Retainer) RetainBlockFailure(blockID iotago.BlockID, failureCode apimodels.BlockFailureReason) {
-	if err := r.store(blockID.Index()).StoreBlockFailure(blockID, failureCode); err != nil {
+	store, err := r.store(blockID.Index())
+	if err != nil {
+		r.errorHandler(ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Index()))
+		return
+	}
+
+	if err := store.StoreBlockFailure(blockID, failureCode); err != nil {
 		r.errorHandler(ierrors.Wrap(err, "failed to store block failure in retainer"))
 	}
 }
 
 func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, err error) {
-	if err := r.store(blockID.Index()).StoreTransactionFailure(blockID, determineTxFailureReason(err)); err != nil {
+	store, storeErr := r.store(blockID.Index())
+	if storeErr != nil {
+		r.errorHandler(ierrors.Wrapf(storeErr, "could not get retainer store for slot %d", blockID.Index()))
+		return
+	}
+
+	if err := store.StoreTransactionFailure(blockID, determineTxFailureReason(err)); err != nil {
 		r.errorHandler(ierrors.Wrap(err, "failed to store transaction failure in retainer"))
 	}
 }
@@ -186,7 +198,13 @@ func (r *Retainer) RetainRegisteredValidatorsCache(index uint32, resp []*apimode
 }
 
 func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, apimodels.BlockFailureReason) {
-	blockData, exists := r.store(blockID.Index()).GetBlock(blockID)
+	store, err := r.store(blockID.Index())
+	if err != nil {
+		r.errorHandler(ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Index()))
+		return apimodels.BlockStateUnknown, apimodels.BlockFailureNone
+	}
+
+	blockData, exists := store.GetBlock(blockID)
 	if !exists {
 		return apimodels.BlockStateUnknown, apimodels.BlockFailureNone
 	}
@@ -205,7 +223,13 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (apimodels.BlockState, ap
 }
 
 func (r *Retainer) transactionStatus(blockID iotago.BlockID) (apimodels.TransactionState, apimodels.TransactionFailureReason) {
-	txData, exists := r.store(blockID.Index()).GetTransaction(blockID)
+	store, err := r.store(blockID.Index())
+	if err != nil {
+		r.errorHandler(ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Index()))
+		return apimodels.TransactionStateNoTransaction, apimodels.TxFailureNone
+	}
+
+	txData, exists := store.GetTransaction(blockID)
 	if !exists {
 		return apimodels.TransactionStateNoTransaction, apimodels.TxFailureNone
 	}
@@ -226,33 +250,68 @@ func (r *Retainer) transactionStatus(blockID iotago.BlockID) (apimodels.Transact
 }
 
 func (r *Retainer) onBlockAttached(blockID iotago.BlockID) error {
-	return r.store(blockID.Index()).StoreBlockAttached(blockID)
+	store, err := r.store(blockID.Index())
+	if err != nil {
+		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Index())
+	}
+
+	return store.StoreBlockAttached(blockID)
 }
 
 func (r *Retainer) onBlockAccepted(blockID iotago.BlockID) error {
-	return r.store(blockID.Index()).StoreBlockAccepted(blockID)
+	store, err := r.store(blockID.Index())
+	if err != nil {
+		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Index())
+	}
+
+	return store.StoreBlockAccepted(blockID)
 }
 
 func (r *Retainer) onBlockConfirmed(blockID iotago.BlockID) error {
-	return r.store(blockID.Index()).StoreBlockConfirmed(blockID)
+	store, err := r.store(blockID.Index())
+	if err != nil {
+		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Index())
+	}
+
+	return store.StoreBlockConfirmed(blockID)
 }
 
 func (r *Retainer) onTransactionAttached(blockID iotago.BlockID) error {
-	return r.store(blockID.Index()).StoreTransactionNoFailureStatus(blockID, apimodels.TransactionStatePending)
+	store, err := r.store(blockID.Index())
+	if err != nil {
+		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Index())
+	}
+
+	return store.StoreTransactionNoFailureStatus(blockID, apimodels.TransactionStatePending)
 }
 
 func (r *Retainer) onTransactionAccepted(blockID iotago.BlockID) error {
-	return r.store(blockID.Index()).StoreTransactionNoFailureStatus(blockID, apimodels.TransactionStateAccepted)
+	store, err := r.store(blockID.Index())
+	if err != nil {
+		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Index())
+	}
+
+	return store.StoreTransactionNoFailureStatus(blockID, apimodels.TransactionStateAccepted)
 }
 
 func (r *Retainer) onAttachmentUpdated(prevID, newID iotago.BlockID, accepted bool) error {
-	if err := r.store(prevID.Index()).DeleteTransactionData(prevID); err != nil {
+	store, err := r.store(prevID.Index())
+	if err != nil {
+		return ierrors.Wrapf(err, "could not get retainer store for slot %d", prevID.Index())
+	}
+
+	if err := store.DeleteTransactionData(prevID); err != nil {
 		return err
 	}
 
-	if accepted {
-		return r.store(newID.Index()).StoreTransactionNoFailureStatus(newID, apimodels.TransactionStateAccepted)
+	store, err = r.store(newID.Index())
+	if err != nil {
+		return ierrors.Wrapf(err, "could not get retainer store for slot %d", newID.Index())
 	}
 
-	return r.store(newID.Index()).StoreTransactionNoFailureStatus(newID, apimodels.TransactionStatePending)
+	if accepted {
+		return store.StoreTransactionNoFailureStatus(newID, apimodels.TransactionStateAccepted)
+	}
+
+	return store.StoreTransactionNoFailureStatus(newID, apimodels.TransactionStatePending)
 }

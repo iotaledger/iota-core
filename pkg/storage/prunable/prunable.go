@@ -1,130 +1,120 @@
 package prunable
 
 import (
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
+	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-const (
-	blocksPrefix byte = iota
-	rootBlocksPrefix
-	attestationsPrefix
-	accountDiffsPrefix
-	performanceFactorsPrefix
-	upgradeSignalsPrefix
-	rootsPrefix
-	retainerPrefix
-)
-
-const (
-	RootsKey byte = iota
-)
-
 type Prunable struct {
-	pruningDelay iotago.SlotIndex
-	apiProvider  api.Provider
-	manager      *Manager
-	errorHandler func(error)
+	apiProvider       api.Provider
+	prunableSlotStore *BucketManager
+	errorHandler      func(error)
+
+	semiPermanentDBConfig database.Config
+	semiPermanentDB       *database.DBInstance
+
+	decidedUpgradeSignals *epochstore.Store[model.VersionAndHash]
+	poolRewards           *epochstore.EpochKVStore
+	poolStats             *epochstore.Store[*model.PoolsStats]
+	committee             *epochstore.Store[*account.Accounts]
 }
 
-func New(dbConfig database.Config, pruningDelay iotago.SlotIndex, errorHandler func(error), opts ...options.Option[Manager]) *Prunable {
+func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[BucketManager]) *Prunable {
+	dir := utils.NewDirectory(dbConfig.Directory, true)
+	semiPermanentDBConfig := dbConfig.WithDirectory(dir.PathWithCreate("semipermanent"))
+	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig)
+
 	return &Prunable{
-		pruningDelay: pruningDelay,
-		errorHandler: errorHandler,
-		manager:      NewManager(dbConfig, errorHandler, opts...),
+		apiProvider:       apiProvider,
+		errorHandler:      errorHandler,
+		prunableSlotStore: NewBucketManager(dbConfig, errorHandler, opts...),
+
+		semiPermanentDBConfig: semiPermanentDBConfig,
+		semiPermanentDB:       semiPermanentDB,
+		decidedUpgradeSignals: epochstore.NewStore(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, kvstore.Realm{lastPrunedEpochKey}, semiPermanentDB.KVStore(), pruningDelayDecidedUpgradeSignals, model.VersionAndHash.Bytes, model.VersionAndHashFromBytes),
+		poolRewards:           epochstore.NewEpochKVStore(kvstore.Realm{epochPrefixPoolRewards}, kvstore.Realm{lastPrunedEpochKey}, semiPermanentDB.KVStore(), pruningDelayPoolRewards),
+		poolStats:             epochstore.NewStore(kvstore.Realm{epochPrefixPoolStats}, kvstore.Realm{lastPrunedEpochKey}, semiPermanentDB.KVStore(), pruningDelayPoolStats, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes),
+		committee:             epochstore.NewStore(kvstore.Realm{epochPrefixCommittee}, kvstore.Realm{lastPrunedEpochKey}, semiPermanentDB.KVStore(), pruningDelayCommittee, (*account.Accounts).Bytes, account.AccountsFromBytes),
 	}
 }
 
-func (p *Prunable) Initialize(apiProvider api.Provider) {
-	p.apiProvider = apiProvider
-}
+func (p *Prunable) RestoreFromDisk() (lastPrunedEpoch iotago.EpochIndex) {
+	lastPrunedEpoch = p.prunableSlotStore.RestoreFromDisk()
 
-func (p *Prunable) RestoreFromDisk() {
-	p.manager.RestoreFromDisk()
-}
-
-func (p *Prunable) Blocks(slot iotago.SlotIndex) *Blocks {
-	store := p.manager.Get(slot, kvstore.Realm{blocksPrefix})
-	if store == nil {
-		return nil
+	if err := p.decidedUpgradeSignals.RestoreLastPrunedEpoch(); err != nil {
+		p.errorHandler(err)
+	}
+	if err := p.poolRewards.RestoreLastPrunedEpoch(); err != nil {
+		p.errorHandler(err)
+	}
+	if err := p.poolStats.RestoreLastPrunedEpoch(); err != nil {
+		p.errorHandler(err)
+	}
+	if err := p.committee.RestoreLastPrunedEpoch(); err != nil {
+		p.errorHandler(err)
 	}
 
-	return NewBlocks(slot, store, p.apiProvider)
+	return
 }
 
-func (p *Prunable) RootBlocks(slot iotago.SlotIndex) *RootBlocks {
-	store := p.manager.Get(slot, kvstore.Realm{rootBlocksPrefix})
-	if store == nil {
-		return nil
+func (p *Prunable) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) error {
+	// prune prunable_slot
+	if err := p.prunableSlotStore.Prune(epoch); err != nil {
+		return ierrors.Wrapf(err, "prune prunableSlotStore failed for epoch %d", epoch)
 	}
 
-	return NewRootBlocks(slot, store)
-}
-
-func (p *Prunable) Attestations(slot iotago.SlotIndex) kvstore.KVStore {
-	return p.manager.Get(slot, kvstore.Realm{attestationsPrefix})
-}
-
-func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) *AccountDiffs {
-	store := p.manager.Get(slot, kvstore.Realm{accountDiffsPrefix})
-	if store == nil {
-		return nil
+	// prune prunable_epoch: each component has its own pruning delay.
+	if err := p.decidedUpgradeSignals.Prune(epoch, defaultPruningDelay); err != nil {
+		return ierrors.Wrapf(err, "prune decidedUpgradeSignals failed for epoch %d", epoch)
 	}
 
-	return NewAccountDiffs(slot, store, p.apiProvider.APIForSlot(slot))
-}
-
-func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) *PerformanceFactors {
-	store := p.manager.Get(slot, kvstore.Realm{performanceFactorsPrefix})
-	if store == nil {
-		return nil
+	if err := p.poolRewards.Prune(epoch, defaultPruningDelay); err != nil {
+		return ierrors.Wrapf(err, "prune poolRewards failed for epoch %d", epoch)
 	}
 
-	return NewPerformanceFactors(slot, store)
-}
-
-func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) *UpgradeSignals {
-	store := p.manager.Get(slot, kvstore.Realm{upgradeSignalsPrefix})
-	if store == nil {
-		return nil
+	if err := p.poolStats.Prune(epoch, defaultPruningDelay); err != nil {
+		return ierrors.Wrapf(err, "prune poolStats failed for epoch %d", epoch)
 	}
 
-	return NewUpgradeSignals(slot, store, p.apiProvider)
-}
-
-func (p *Prunable) Roots(slot iotago.SlotIndex) kvstore.KVStore {
-	return p.manager.Get(slot, kvstore.Realm{rootsPrefix})
-}
-
-func (p *Prunable) Retainer(slot iotago.SlotIndex) *Retainer {
-	store := p.manager.Get(slot, kvstore.Realm{retainerPrefix})
-	if store == nil {
-		return nil
+	if err := p.committee.Prune(epoch, defaultPruningDelay); err != nil {
+		return ierrors.Wrapf(err, "prune committee failed for epoch %d", epoch)
 	}
 
-	return NewRetainer(slot, store)
+	return nil
 }
 
-// PruneUntilSlot prunes storage slots less than and equal to the given index.
-func (p *Prunable) PruneUntilSlot(index iotago.SlotIndex) {
-	if index < p.pruningDelay {
-		return
-	}
-
-	p.manager.PruneUntilSlot(index - p.pruningDelay)
+func (p *Prunable) BucketSize(epoch iotago.EpochIndex) (int64, error) {
+	return p.prunableSlotStore.BucketSize(epoch)
 }
 
 func (p *Prunable) Size() int64 {
-	return p.manager.PrunableStorageSize()
+	semiSize, err := ioutils.FolderSize(p.semiPermanentDBConfig.Directory)
+	if err != nil {
+		p.errorHandler(ierrors.Wrapf(err, "get semiPermanentDB failed for %s", p.semiPermanentDBConfig.Directory))
+	}
+
+	return p.prunableSlotStore.TotalSize() + semiSize
 }
 
 func (p *Prunable) Shutdown() {
-	p.manager.Shutdown()
+	p.prunableSlotStore.Shutdown()
+	p.semiPermanentDB.Close()
 }
 
-func (p *Prunable) LastPrunedSlot() (index iotago.SlotIndex, hasPruned bool) {
-	return p.manager.LastPrunedSlot()
+func (p *Prunable) Flush() {
+	if err := p.prunableSlotStore.Flush(); err != nil {
+		p.errorHandler(err)
+	}
+	if err := p.semiPermanentDB.KVStore().Flush(); err != nil {
+		p.errorHandler(err)
+	}
 }

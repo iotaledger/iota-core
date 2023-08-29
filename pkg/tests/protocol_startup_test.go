@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -15,7 +16,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -35,25 +35,21 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	nodeB := ts.AddValidatorNode("nodeB")
 	ts.AddNode("nodeC")
 
+	nodeOptions := []options.Option[protocol.Protocol]{
+		protocol.WithStorageOptions(
+			storage.WithPruningDelay(20),
+		),
+	}
+	nodeOptionsPruningDelay1 := []options.Option[protocol.Protocol]{
+		protocol.WithStorageOptions(
+			storage.WithPruningDelay(1),
+		),
+	}
+
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
-		"nodeA": {
-			protocol.WithStorageOptions(
-				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
-				storage.WithPruningDelay(1000),
-			),
-		},
-		"nodeB": {
-			protocol.WithStorageOptions(
-				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
-				storage.WithPruningDelay(1000),
-			),
-		},
-		"nodeC": {
-			protocol.WithStorageOptions(
-				storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
-				storage.WithPruningDelay(1000),
-			),
-		},
+		"nodeA": nodeOptions,
+		"nodeB": nodeOptionsPruningDelay1,
+		"nodeC": nodeOptions,
 	})
 
 	ts.Wait()
@@ -191,7 +187,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				nodeC1.Initialize(true,
 					protocol.WithBaseDirectory(ts.Directory.Path(nodeC.Name)),
 					protocol.WithStorageOptions(
-						storage.WithPrunableManagerOptions(prunable.WithGranularity(1)),
 						storage.WithPruningDelay(1000),
 					),
 					protocol.WithEngineOptions(
@@ -224,7 +219,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 				nodeD := ts.AddNode("nodeD")
 				nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.
-				nodeD.Initialize(true,
+				nodeD.Initialize(true, append(nodeOptions,
 					protocol.WithSnapshotPath(snapshotPath),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
 					protocol.WithEngineOptions(
@@ -233,6 +228,9 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 							eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
 						),
 					),
+					protocol.WithStorageOptions(
+						storage.WithPruningDelay(1),
+					))...,
 				)
 				ts.Wait()
 
@@ -254,6 +252,15 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				testsuite.WithEvictedSlot(11),
 				testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
 				testsuite.WithChainManagerIsSolid(),
+			)
+
+			ts.AssertPrunedUntil(
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				ts.Nodes()...,
 			)
 		}
 
@@ -302,6 +309,44 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
 		)
 
+		// nodeB, nodeD have pruned until epoch 3.
+		{
+			ts.AssertPrunedUntil(
+				types.NewTuple(3, true),
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				ts.Nodes("nodeB", "nodeD")...,
+			)
+
+			var expectedStorageRootBlocksFromEpoch4 []*blocks.Block
+			acceptedSlots := ts.SlotsForEpoch(4)
+			acceptedSlots = append(acceptedSlots, 32, 33, 34, 35, 36, 37)
+			for _, slot := range acceptedSlots {
+				aliases := lo.Map([]string{"nodeA", "nodeB"}, func(s string) string {
+					return fmt.Sprintf("%d.3-%s", slot, s)
+				})
+				ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes("nodeB", "nodeD")...)
+
+				expectedActiveRootBlocks = append(expectedStorageRootBlocksFromEpoch4, ts.BlocksWithPrefix(fmt.Sprintf("%d.3", slot))...)
+			}
+
+			ts.AssertStorageRootBlocks(expectedStorageRootBlocksFromEpoch4, ts.Nodes("nodeB", "nodeD")...)
+		}
+
+		// nodeA, nodeC-restarted have not pruned.
+		{
+			ts.AssertPrunedUntil(
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				types.NewTuple(0, false),
+				ts.Nodes("nodeA", "nodeC-restarted")...,
+			)
+		}
+
 		acceptedSlots := ts.SlotsForEpoch(3)
 		acceptedSlots = append(acceptedSlots, ts.SlotsForEpoch(4)...)
 		acceptedSlots = append(acceptedSlots, 32, 33, 34, 35, 36, 37)
@@ -309,14 +354,46 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			aliases := lo.Map([]string{"nodeA", "nodeB"}, func(s string) string {
 				return fmt.Sprintf("%d.3-%s", slot, s)
 			})
-			ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes()...)
+			ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes("nodeA", "nodeC-restarted")...)
 
-			rootBlocks := ts.BlocksWithPrefix(fmt.Sprintf("%d.3", slot))
-			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, rootBlocks...)
-			expectedStorageRootBlocksFrom9 = append(expectedStorageRootBlocksFrom9, rootBlocks...)
+			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, ts.BlocksWithPrefix(fmt.Sprintf("%d.3", slot))...)
 		}
 
-		ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom0, ts.Nodes("nodeA", "nodeB", "nodeC-restarted")...)
-		ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
+		ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom0, ts.Nodes("nodeA", "nodeC-restarted")...)
+	}
+
+	// Start a new node (nodeE) from a snapshot. Verify pruned state.
+	{
+		// Create snapshot.
+		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
+		require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+
+		nodeD := ts.AddNode("nodeE")
+		nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.
+		nodeD.Initialize(true, append(nodeOptions,
+			protocol.WithSnapshotPath(snapshotPath),
+			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
+			protocol.WithEngineOptions(
+				engine.WithBlockRequesterOptions(
+					eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](300*time.Millisecond),
+					eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](100*time.Millisecond),
+				),
+			),
+			protocol.WithStorageOptions(
+				storage.WithPruningDelay(20),
+			))...,
+		)
+		ts.Wait()
+
+		// Even though we have configured a default pruningDelay=20 epochs, we pruned because the last finalized slot is 36 (epoch 5).
+		// Since it's enforced that we keep at least 1 full epoch, we pruned until epoch 3.
+		ts.AssertPrunedUntil(
+			types.NewTuple(3, true),
+			types.NewTuple(0, false),
+			types.NewTuple(0, false),
+			types.NewTuple(0, false),
+			types.NewTuple(0, false),
+			ts.Nodes("nodeE")...,
+		)
 	}
 }
