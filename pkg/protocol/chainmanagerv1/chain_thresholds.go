@@ -27,9 +27,9 @@ type chainThresholds struct {
 // newChainThresholds creates a new chainThresholds instance.
 func newChainThresholds(chain *Chain) *chainThresholds {
 	c := &chainThresholds{
-		latestIndex:         reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.LatestCommitmentVariable()),
-		latestAttestedIndex: reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.LatestAttestedCommitmentVariable()),
-		latestVerifiedIndex: reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.LatestVerifiedCommitmentVariable()),
+		latestIndex:         reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.latestCommitment),
+		latestAttestedIndex: reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.latestAttestedCommitment),
+		latestVerifiedIndex: reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.latestVerifiedCommitment),
 	}
 
 	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestIndex iotago.SlotIndex) iotago.SlotIndex {
