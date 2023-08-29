@@ -92,8 +92,10 @@ func Test_TransitionAccount(t *testing.T) {
 
 	var slotIndexBlock1 iotago.SlotIndex = 1
 	activeNodes := []*mock.Node{node1}
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+	genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
 
-	block1 := ts.IssueBlockAtSlotWithOptions("block1", slotIndexBlock1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, tx1)
+	block1 := ts.IssueBlockAtSlotWithOptions("block1", slotIndexBlock1, genesisCommitment, node1, tx1)
 
 	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Index(), activeNodes, block1)
 
