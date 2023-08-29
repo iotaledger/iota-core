@@ -7,7 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
-	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 )
 
 func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
