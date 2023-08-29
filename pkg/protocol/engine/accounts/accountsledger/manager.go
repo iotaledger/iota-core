@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -28,7 +27,7 @@ type Manager struct {
 	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.BlockID]]
 
 	// latestSupportedVersionSignals keep tracks of the latest supported protocol versions supported by validators.
-	latestSupportedVersionSignals *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, iotago.VersionAndHash]
+	latestSupportedVersionSignals *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *prunable.SignaledBlock]
 
 	// latestCommittedSlot is where the Account tree is kept at.
 	latestCommittedSlot iotago.SlotIndex
@@ -58,7 +57,7 @@ func New(
 	return &Manager{
 		apiProvider:                   apiProvider,
 		blockBurns:                    shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
-		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, iotago.VersionAndHash](),
+		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *prunable.SignaledBlock](),
 		accountsTree: ads.NewMap(accountsStore,
 			iotago.Identifier.Bytes,
 			iotago.IdentifierFromBytes,
@@ -96,11 +95,18 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 	set.Add(block.ID())
 
 	if validationBlock, isValidationBlock := block.ValidationBlock(); isValidationBlock {
-		m.latestSupportedVersionSignals.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue iotago.VersionAndHash, exists bool) iotago.VersionAndHash {
-			return lo.Cond(
-				currentValue.Version < validationBlock.HighestSupportedVersion,
-				iotago.VersionAndHash{Version: validationBlock.HighestSupportedVersion, Hash: validationBlock.ProtocolParametersHash},
-				currentValue)
+		newSignaledBlock := prunable.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
+
+		m.latestSupportedVersionSignals.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *prunable.SignaledBlock, exists bool) *prunable.SignaledBlock {
+			if !exists {
+				return newSignaledBlock
+			}
+
+			if newSignaledBlock.Compare(currentValue) == 1 {
+				return newSignaledBlock
+			}
+
+			return currentValue
 		})
 	}
 }
@@ -536,7 +542,7 @@ func (m *Manager) updateSlotDiffWithVersionSignals(slotIndex iotago.SlotIndex, a
 		return nil
 	}
 
-	for id, versionAndHash := range signalsStorage.AsMap() {
+	for id, signaledBlock := range signalsStorage.AsMap() {
 		accountData, exists, err := m.accountsTree.Get(id)
 		if err != nil {
 			return ierrors.Wrapf(err, "can't retrieve account, could not load account (%s) from accounts tree", id)
@@ -550,8 +556,13 @@ func (m *Manager) updateSlotDiffWithVersionSignals(slotIndex iotago.SlotIndex, a
 		if !exists {
 			accountDiff = prunable.NewAccountDiff()
 		}
-		if accountData.LatestSupportedProtocolVersionAndHash != versionAndHash && accountData.LatestSupportedProtocolVersionAndHash.Version < versionAndHash.Version {
-			accountDiff.NewLatestSupportedVersionAndHash = versionAndHash
+		newVersionAndHash := iotago.VersionAndHash{
+			Version: signaledBlock.HighestSupportedVersion,
+			Hash:    signaledBlock.ProtocolParametersHash,
+		}
+		if accountData.LatestSupportedProtocolVersionAndHash != newVersionAndHash &&
+			accountData.LatestSupportedProtocolVersionAndHash.Version < newVersionAndHash.Version {
+			accountDiff.NewLatestSupportedVersionAndHash = newVersionAndHash
 			accountDiff.PrevLatestSupportedVersionAndHash = accountData.LatestSupportedProtocolVersionAndHash
 			accountDiffs[id] = accountDiff
 		}

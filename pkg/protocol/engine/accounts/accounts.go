@@ -165,7 +165,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	}
 	bytesConsumed += 8
 
-	versionAndHashBytes := make([]byte, iotago.IdentifierLength+1)
+	versionAndHashBytes := make([]byte, iotago.VersionAndHashSize)
 	if err := binary.Read(reader, binary.LittleEndian, versionAndHashBytes); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read latest supported protocol version for accountID %s", a.ID)
 	}

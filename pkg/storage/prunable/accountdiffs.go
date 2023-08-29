@@ -185,7 +185,7 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 	}
 	offset += 8
 
-	newVersionAndHashBytes := make([]byte, iotago.IdentifierLength+1)
+	newVersionAndHashBytes := make([]byte, iotago.VersionAndHashSize)
 	if err = binary.Read(reader, binary.LittleEndian, newVersionAndHashBytes); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read new version and hash bytes in the diff")
 	}
@@ -195,7 +195,7 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 	}
 	offset += len(newVersionAndHashBytes)
 
-	prevVersionAndHashBytes := make([]byte, iotago.IdentifierLength+1)
+	prevVersionAndHashBytes := make([]byte, iotago.VersionAndHashSize)
 	if err = binary.Read(reader, binary.LittleEndian, prevVersionAndHashBytes); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read prev version and hash bytes in the diff")
 	}
