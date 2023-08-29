@@ -53,6 +53,9 @@ type TipSelection struct {
 	// optMaxWeakReferences contains the maximum number of weak references that are allowed.
 	optMaxWeakReferences int
 
+	// optDynamicLivenessThreshold is a function that is used to dynamically determine the liveness threshold for a tip.
+	optDynamicLivenessThreshold func(tip tipmanager.TipMetadata) time.Time
+
 	// Module embeds the required methods of the module.Interface.
 	module.Module
 	engine *engine.Engine
@@ -71,12 +74,17 @@ func New(e *engine.Engine, tipManager tipmanager.TipManager, conflictDAG conflic
 		optMaxStrongParents:          8,
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,
+		optDynamicLivenessThreshold:  func(tip tipmanager.TipMetadata) time.Time { return tip.Block().IssuingTime() },
 	}, opts, func(t *TipSelection) {
 		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
 
 		t.livenessThreshold.OnUpdate(func(_, threshold time.Time) {
 			for _, tip := range t.livenessThresholdQueue.PopUntil(threshold) {
-				tip.LivenessThresholdReached().Trigger()
+				if dynamicLivenessThreshold := t.optDynamicLivenessThreshold(tip); dynamicLivenessThreshold.After(threshold) {
+					t.livenessThresholdQueue.Push(tip, dynamicLivenessThreshold)
+				} else {
+					tip.LivenessThresholdReached().Trigger()
+				}
 			}
 		})
 
@@ -145,7 +153,7 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 		tipMetadata.TipPool().Set(tipmanager.DroppedTipPool)
 	}
 
-	t.livenessThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime())
+	t.livenessThresholdQueue.Push(tipMetadata, t.optDynamicLivenessThreshold(tipMetadata))
 }
 
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
