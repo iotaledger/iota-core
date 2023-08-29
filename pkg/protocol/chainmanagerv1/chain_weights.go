@@ -9,7 +9,7 @@ type chainWeights struct {
 	// chain is the chain that this chainWeights is tracking the cumulative weight of.
 	chain *Chain
 
-	// claimed contains the total cumulative weight of the chain that is claimed by the latest commitments.
+	// claimedWeight contains the total cumulative weight of the chain that is claimed by the latest commitments.
 	claimedWeight reactive.Variable[uint64]
 
 	// attestedWeight contains the total cumulative weight of the chain that we received attestations for.

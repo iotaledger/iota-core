@@ -17,7 +17,7 @@ func newCommitmentFlags(commitment *Commitment) *commitmentFlags {
 		evicted:  reactive.NewEvent(),
 	}
 
-	commitment.ParentVariable().OnUpdate(func(_, parent *Commitment) {
+	commitment.parent.OnUpdate(func(_, parent *Commitment) {
 		c.solid.InheritFrom(parent.solid)
 	})
 

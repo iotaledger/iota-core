@@ -12,8 +12,8 @@ type Chain struct {
 	// evicted is an event that gets triggered when the chain gets evicted.
 	evicted reactive.Event
 
-	// chainCommitments is a reactive collection of Commitment objects that belong to the same chain.
-	*chainCommitments
+	// chainDAG is a reactive collection of Commitment objects that belong to the same chain.
+	*chainDAG
 
 	// weight is a reactive component that tracks the cumulative weight of the chain.
 	*chainWeights
@@ -30,7 +30,7 @@ func NewChain(root *Commitment) *Chain {
 	}
 
 	// embed reactive subcomponents
-	c.chainCommitments = newChainCommitments(c)
+	c.chainDAG = newChainDAG(c)
 	c.chainWeights = newChainWeights(c)
 	c.chainThresholds = newChainThresholds(c)
 
@@ -52,12 +52,12 @@ func (c *Chain) ParentChain() *Chain {
 		return nil
 	}
 
-	parent := root.Parent()
+	parent := root.parent.Get()
 	if parent == nil {
 		return nil
 	}
 
-	return parent.Chain()
+	return parent.chain.Get()
 }
 
 // Evicted returns whether the chain got evicted.

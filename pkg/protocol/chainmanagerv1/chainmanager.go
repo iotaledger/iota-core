@@ -116,7 +116,7 @@ func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent 
 
 	c.commitmentCreated.Trigger(commitment)
 
-	commitment.SpawnedChainVariable().OnUpdate(func(_, newChain *Chain) {
+	commitment.spawnedChain.OnUpdate(func(_, newChain *Chain) {
 		if newChain != nil {
 			c.chainCreated.Trigger(newChain)
 		}

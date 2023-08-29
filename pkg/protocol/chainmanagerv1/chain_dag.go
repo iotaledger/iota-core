@@ -7,8 +7,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// chainCommitments is a reactive collection of Commitment objects that belong to the same chain.
-type chainCommitments struct {
+// chainDAG is a reactive collection of Commitment objects that belong to the same chain.
+type chainDAG struct {
 	// chain is the chain that this collection belongs to.
 	chain *Chain
 
@@ -25,9 +25,9 @@ type chainCommitments struct {
 	latestVerifiedCommitment reactive.Variable[*Commitment]
 }
 
-// newChainCommitments creates a new chainCommitments instance.
-func newChainCommitments(chain *Chain) *chainCommitments {
-	return &chainCommitments{
+// newChainDAG creates a new chainDAG instance.
+func newChainDAG(chain *Chain) *chainDAG {
+	return &chainDAG{
 		chain:                    chain,
 		commitments:              shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 		latestCommitment:         reactive.NewVariable[*Commitment](),
@@ -36,19 +36,8 @@ func newChainCommitments(chain *Chain) *chainCommitments {
 	}
 }
 
-// RegisterCommitment adds a Commitment object to this collection.
-func (c *chainCommitments) RegisterCommitment(commitment *Commitment) {
-	unsubscribe := c.register(commitment)
-
-	commitment.ChainVariable().OnUpdateOnce(func(_, _ *Chain) {
-		unsubscribe()
-
-		c.unregister(commitment)
-	}, func(_, newChain *Chain) bool { return newChain != c.chain })
-}
-
 // Commitment returns the Commitment object with the given index, if it exists.
-func (c *chainCommitments) Commitment(index iotago.SlotIndex) (commitment *Commitment, exists bool) {
+func (c *chainDAG) Commitment(index iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c.chain; currentChain != nil; currentChain = currentChain.ParentChain() {
 		if root := currentChain.Root(); root != nil && index >= root.Index() {
 			return currentChain.commitments.Get(index)
@@ -60,36 +49,42 @@ func (c *chainCommitments) Commitment(index iotago.SlotIndex) (commitment *Commi
 
 // LatestCommitment returns a reactive variable that always contains the latest Commitment object in this
 // collection.
-func (c *chainCommitments) LatestCommitment() reactive.Variable[*Commitment] {
+func (c *chainDAG) LatestCommitment() reactive.Variable[*Commitment] {
 	return c.latestCommitment
 }
 
 // LatestAttestedCommitment returns a reactive variable that always contains the latest attested Commitment object
 // in this collection.
-func (c *chainCommitments) LatestAttestedCommitment() reactive.Variable[*Commitment] {
+func (c *chainDAG) LatestAttestedCommitment() reactive.Variable[*Commitment] {
 	return c.latestAttestedCommitment
 }
 
 // LatestVerifiedCommitment returns a reactive variable that always contains the latest verified Commitment object
 // in this collection.
-func (c *chainCommitments) LatestVerifiedCommitment() reactive.Variable[*Commitment] {
+func (c *chainDAG) LatestVerifiedCommitment() reactive.Variable[*Commitment] {
 	return c.latestVerifiedCommitment
 }
 
-// register adds a Commitment object to this collection.
-func (c *chainCommitments) register(commitment *Commitment) (unsubscribe func()) {
+// registerCommitment adds a Commitment object to this collection.
+func (c *chainDAG) registerCommitment(commitment *Commitment) {
 	c.commitments.Set(commitment.Index(), commitment)
 
 	c.latestCommitment.Compute(commitment.max)
 
-	return lo.Batch(
+	unsubscribe := lo.Batch(
 		commitment.attested.OnTrigger(func() { c.latestAttestedCommitment.Compute(commitment.max) }),
 		commitment.verified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(commitment.max) }),
 	)
+
+	commitment.chain.OnUpdateOnce(func(_, _ *Chain) {
+		unsubscribe()
+
+		c.unregisterCommitment(commitment)
+	}, func(_, newChain *Chain) bool { return newChain != c.chain })
 }
 
-// unregister removes a Commitment object from this collection.
-func (c *chainCommitments) unregister(commitment *Commitment) {
+// unregisterCommitment removes a Commitment object from this collection.
+func (c *chainDAG) unregisterCommitment(commitment *Commitment) {
 	c.commitments.Delete(commitment.Index())
 
 	resetToParent := func(latestCommitment *Commitment) *Commitment {
@@ -97,7 +92,7 @@ func (c *chainCommitments) unregister(commitment *Commitment) {
 			return latestCommitment
 		}
 
-		return commitment.Parent()
+		return commitment.parent.Get()
 	}
 
 	c.latestCommitment.Compute(resetToParent)

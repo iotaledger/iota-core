@@ -22,40 +22,24 @@ func newCommitmentDAG(commitment *Commitment) *commitmentDAG {
 		chain:        reactive.NewVariable[*Chain](),
 	}
 
-	c.chain.OnUpdate(func(_, chain *Chain) { chain.RegisterCommitment(commitment) })
+	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(commitment) })
 
 	return c
 }
 
-func (c *commitmentDAG) Parent() *Commitment {
-	return c.parent.Get()
-}
-
-func (c *commitmentDAG) Successor() *Commitment {
-	return c.successor.Get()
-}
-
-func (c *commitmentDAG) SpawnedChain() *Chain {
-	return c.spawnedChain.Get()
-}
-
-func (c *commitmentDAG) Chain() *Chain {
-	return c.chain.Get()
-}
-
-func (c *commitmentDAG) ParentVariable() reactive.Variable[*Commitment] {
+func (c *commitmentDAG) Parent() reactive.Variable[*Commitment] {
 	return c.parent
 }
 
-func (c *commitmentDAG) SuccessorVariable() reactive.Variable[*Commitment] {
+func (c *commitmentDAG) Successor() reactive.Variable[*Commitment] {
 	return c.successor
 }
 
-func (c *commitmentDAG) SpawnedChainVariable() reactive.Variable[*Chain] {
+func (c *commitmentDAG) SpawnedChain() reactive.Variable[*Chain] {
 	return c.spawnedChain
 }
 
-func (c *commitmentDAG) ChainVariable() reactive.Variable[*Chain] {
+func (c *commitmentDAG) Chain() reactive.Variable[*Chain] {
 	return c.chain
 }
 
