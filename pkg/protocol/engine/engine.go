@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -74,12 +73,10 @@ type Engine struct {
 	chainID                      iotago.CommitmentID
 	mutex                        syncutils.RWMutex
 
-	optsBootstrappedThreshold time.Duration
-	optsIsBootstrappedFunc    func(*Engine) bool
-	optsSnapshotPath          string
-	optsEntryPointsDepth      int
-	optsSnapshotDepth         int
-	optsBlockRequester        []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
+	optsSnapshotPath     string
+	optsEntryPointsDepth int
+	optsSnapshotDepth    int
+	optsBlockRequester   []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
 
 	module.Module
 }
@@ -119,12 +116,8 @@ func New(
 			Workers:       workers,
 			errorHandler:  errorHandler,
 
-			optsSnapshotPath: "snapshot.bin",
-			optsIsBootstrappedFunc: func(e *Engine) bool {
-				return time.Since(e.Clock.Accepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsBootstrapped()
-			},
-			optsBootstrappedThreshold: 10 * time.Second,
-			optsSnapshotDepth:         5,
+			optsSnapshotPath:  "snapshot.bin",
+			optsSnapshotDepth: 5,
 		}, opts, func(e *Engine) {
 			needsToImportSnapshot = !e.Storage.Settings().IsSnapshotImported() && e.optsSnapshotPath != ""
 
@@ -273,11 +266,6 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	}
 
 	return modelBlock, modelBlock != nil
-}
-
-// IsBootstrapped returns true if the node is bootstrapped. Do not get bootstrapped status with this method, but always get it from SyncManager. This method is needed and exported to access component inside the engine, so we could test it with different bootstrapped conditions.
-func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
-	return e.optsIsBootstrappedFunc(e)
 }
 
 func (e *Engine) APIForSlot(slot iotago.SlotIndex) iotago.API {
@@ -531,18 +519,6 @@ func (e *Engine) ErrorHandler(componentName string) func(error) {
 func WithSnapshotPath(snapshotPath string) options.Option[Engine] {
 	return func(e *Engine) {
 		e.optsSnapshotPath = snapshotPath
-	}
-}
-
-func WithBootstrapThreshold(threshold time.Duration) options.Option[Engine] {
-	return func(e *Engine) {
-		e.optsBootstrappedThreshold = threshold
-	}
-}
-
-func WithIsBootstrappedFunc(isBootstrappedFunc func(*Engine) bool) options.Option[Engine] {
-	return func(e *Engine) {
-		e.optsIsBootstrappedFunc = isBootstrappedFunc
 	}
 }
 

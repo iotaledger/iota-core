@@ -5,22 +5,22 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type (
-	isBootstrappedFunc       func() bool
-	relativeAcceptedTimeFunc func() clock.RelativeTime
+	isBootstrappedFunc func(e *engine.Engine) bool
 )
 
 type SyncManager struct {
 	events        *syncmanager.Events
+	engine        *engine.Engine
 	syncThreshold time.Duration
 
 	lastAcceptedBlockSlot     iotago.SlotIndex
@@ -44,16 +44,16 @@ type SyncManager struct {
 	isBootstrapped     bool
 	isBootstrappedLock syncutils.RWMutex
 
-	isBootstrappedFunc       isBootstrappedFunc
-	relativeAcceptedTimeFunc relativeAcceptedTimeFunc
+	optsIsBootstrappedFunc    isBootstrappedFunc
+	optsBootstrappedThreshold time.Duration
 
 	module.Module
 }
 
 // NewProvider creates a new SyncManager provider.
-func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
+func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.Engine, syncmanager.SyncManager] {
 	return module.Provide(func(e *engine.Engine) syncmanager.SyncManager {
-		s := New(e.IsBootstrapped, e.Clock.Accepted, e.Storage.Settings().LatestCommitment(), e.Storage.Settings().LatestFinalizedSlot())
+		s := New(e, e.Storage.Settings().LatestCommitment(), e.Storage.Settings().LatestFinalizedSlot(), opts...)
 		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("SyncManager", 1))
 
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
@@ -100,17 +100,25 @@ func NewProvider() module.Provider[*engine.Engine, syncmanager.SyncManager] {
 	})
 }
 
-func New(bootstrappedFunc isBootstrappedFunc, acceptedTimeFunc relativeAcceptedTimeFunc, latestCommitment *model.Commitment, finalizedSlot iotago.SlotIndex) *SyncManager {
-	return &SyncManager{
-		events:                   syncmanager.NewEvents(),
-		syncThreshold:            10 * time.Second,
-		isBootstrappedFunc:       bootstrappedFunc,
-		relativeAcceptedTimeFunc: acceptedTimeFunc,
-		lastAcceptedBlockSlot:    latestCommitment.Index(),
-		lastConfirmedBlockSlot:   latestCommitment.Index(),
-		latestCommitment:         latestCommitment,
-		latestFinalizedSlot:      finalizedSlot,
-	}
+func New(e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iotago.SlotIndex, opts ...options.Option[SyncManager]) *SyncManager {
+	return options.Apply(&SyncManager{
+		events:                 syncmanager.NewEvents(),
+		engine:                 e,
+		syncThreshold:          10 * time.Second,
+		lastAcceptedBlockSlot:  latestCommitment.Index(),
+		lastConfirmedBlockSlot: latestCommitment.Index(),
+		latestCommitment:       latestCommitment,
+		latestFinalizedSlot:    finalizedSlot,
+
+		optsBootstrappedThreshold: 10 * time.Second,
+	}, opts, func(s *SyncManager) {
+		// set the default bootstrapped function
+		if s.optsIsBootstrappedFunc == nil {
+			s.optsIsBootstrappedFunc = func(e *engine.Engine) bool {
+				return time.Since(e.Clock.Accepted().RelativeTime()) < s.optsBootstrappedThreshold && e.Notarization.IsBootstrapped()
+			}
+		}
+	})
 }
 
 func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
@@ -179,7 +187,7 @@ func (s *SyncManager) updateBootstrappedStatus() {
 	s.isBootstrappedLock.Lock()
 	defer s.isBootstrappedLock.Unlock()
 
-	if !s.isBootstrapped && s.isBootstrappedFunc() {
+	if !s.isBootstrapped && s.optsIsBootstrappedFunc(s.engine) {
 		s.isBootstrapped = true
 	}
 }
@@ -188,7 +196,7 @@ func (s *SyncManager) updateSyncStatus() (changed bool) {
 	s.isSyncedLock.Lock()
 	defer s.isSyncedLock.Unlock()
 
-	if s.isSynced != (s.isBootstrapped && time.Since(s.relativeAcceptedTimeFunc().RelativeTime()) < s.syncThreshold) {
+	if s.isSynced != (s.isBootstrapped && time.Since(s.engine.Clock.Accepted().RelativeTime()) < s.syncThreshold) {
 		s.isSynced = !s.isSynced
 		return true
 	}
@@ -271,4 +279,16 @@ func (s *SyncManager) LastPrunedSlot() iotago.SlotIndex {
 
 func (s *SyncManager) triggerUpdate() {
 	s.events.UpdatedStatus.Trigger(s.SyncStatus())
+}
+
+func WithBootstrappedThreshold(threshold time.Duration) options.Option[SyncManager] {
+	return func(s *SyncManager) {
+		s.optsBootstrappedThreshold = threshold
+	}
+}
+
+func WithBootstrappedFunc(isBootstrapped func(*engine.Engine) bool) options.Option[SyncManager] {
+	return func(s *SyncManager) {
+		s.optsIsBootstrappedFunc = isBootstrapped
+	}
 }
