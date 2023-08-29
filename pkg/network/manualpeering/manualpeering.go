@@ -172,6 +172,12 @@ func (m *Manager) addPeer(peerAddr ma.Multiaddr) error {
 	if err != nil {
 		return ierrors.WithStack(err)
 	}
+
+	// Do not add self
+	if p.ID == m.p2pm.P2PHost().ID() {
+		return ierrors.New("not adding self to the list of known peers")
+	}
+
 	if _, exists := m.knownPeers[p.ID]; exists {
 		return nil
 	}
@@ -225,14 +231,13 @@ func (m *Manager) keepPeerConnected(peer *network.Peer) {
 	ticker := time.NewTicker(m.reconnectInterval)
 	defer ticker.Stop()
 
-	peerID := peer.ID
 	for {
 		if peer.GetConnStatus() == network.ConnStatusDisconnected {
 			m.log.Infow("Peer is disconnected, calling gossip layer to establish the connection", "peer", peer.ID)
 
 			var err error
 			if err = m.p2pm.DialPeer(ctx, peer); err != nil && !ierrors.Is(err, p2p.ErrDuplicateNeighbor) && !ierrors.Is(err, context.Canceled) {
-				m.log.Errorw("Failed to connect a neighbor in the gossip layer", "peerID", peerID, "err", err)
+				m.log.Errorw("Failed to connect a neighbor in the gossip layer", "peerID", peer.ID, "err", err)
 			}
 		}
 		select {

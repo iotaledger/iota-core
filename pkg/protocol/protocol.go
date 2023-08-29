@@ -126,7 +126,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		optsChainSwitchingThreshold: 3,
 	}, opts, func(p *Protocol) {
 		p.BlockDispatcher = NewBlockDispatcher(p)
-	}, (*Protocol).initEngineManager, (*Protocol).initChainManager, (*Protocol).TriggerConstructed)
+	}, (*Protocol).initEngineManager, (*Protocol).initChainManager, (*Protocol).initNetworkProtocol, (*Protocol).TriggerConstructed)
 }
 
 // Run runs the protocol.

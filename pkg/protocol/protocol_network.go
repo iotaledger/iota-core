@@ -10,8 +10,11 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (p *Protocol) runNetworkProtocol() {
+func (p *Protocol) initNetworkProtocol() {
 	p.networkProtocol = core.NewProtocol(p.networkDispatcher, p.Workers.CreatePool("NetworkProtocol"), p) // Use max amount of workers for networking
+}
+
+func (p *Protocol) runNetworkProtocol() {
 	p.Events.Network.LinkTo(p.networkProtocol.Events)
 
 	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks

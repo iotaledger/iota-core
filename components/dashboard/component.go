@@ -191,11 +191,10 @@ func neighborMetrics() []neighbormetric {
 		// }
 
 		stats = append(stats, neighbormetric{
-			ID:               neighbor.Peer.ID.String(),
-			Addresses:        fmt.Sprintf("%s", neighbor.Peer.PeerAddresses),
-			PacketsRead:      neighbor.PacketsRead(),
-			PacketsWritten:   neighbor.PacketsWritten(),
-			ConnectionOrigin: "Inbound", // origin
+			ID:             neighbor.Peer.ID.String(),
+			Addresses:      fmt.Sprintf("%s", neighbor.Peer.PeerAddresses),
+			PacketsRead:    neighbor.PacketsRead(),
+			PacketsWritten: neighbor.PacketsWritten(),
 		})
 	}
 	return stats
