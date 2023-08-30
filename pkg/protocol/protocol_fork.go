@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -213,9 +212,6 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	defer unhook()
 	defer wp.Shutdown()
 
-	ctx, cancel := context.WithTimeout(p.context, 2*time.Minute)
-	defer cancel()
-
 	// Fork-choice rule: switch if p.optsChainSwitchingThreshold slots in a row are heavier than main chain.
 	forkChoiceRule := func(heavierCount int) (decided bool, shouldSwitch bool) {
 		switch heavierCount {
@@ -279,10 +275,8 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 			case <-ticker.C:
 				counter++
 				if counter > p.optsAttestationRequesterMaxRetries {
-					return nil, false, true, ierrors.Wrapf(ctx.Err(), "failed to request commitment for slot %d from src %s", i, fork.Source.String())
+					return nil, false, true, ierrors.Errorf("failed to request commitment for slot %d from src %s", i, fork.Source.String())
 				}
-			case <-ctx.Done():
-				return nil, false, false, ierrors.Wrapf(ctx.Err(), "failed to verify commitment for slot %d", i)
 			}
 		}
 	}
