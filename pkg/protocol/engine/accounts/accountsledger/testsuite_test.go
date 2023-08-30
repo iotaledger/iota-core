@@ -28,9 +28,9 @@ type TestSuite struct {
 
 	apiProvider api.Provider
 
-	accounts map[string]iotago.AccountID
-	pubKeys  map[string]iotago.BlockIssuerKey
-	outputs  map[string]iotago.OutputID
+	accounts        map[string]iotago.AccountID
+	blockIssuerKeys map[string]iotago.BlockIssuerKey
+	outputs         map[string]iotago.OutputID
 
 	slotData               *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *slotData]
 	accountsStatePerSlot   *shrinkingmap.ShrinkingMap[iotago.SlotIndex, map[iotago.AccountID]*AccountState]
@@ -43,11 +43,11 @@ func NewTestSuite(test *testing.T) *TestSuite {
 	testAPI := tpkg.TestAPI
 
 	t := &TestSuite{
-		T:           test,
-		apiProvider: api.SingleVersionProvider(testAPI),
-		accounts:    make(map[string]iotago.AccountID),
-		pubKeys:     make(map[string]iotago.BlockIssuerKey),
-		outputs:     make(map[string]iotago.OutputID),
+		T:               test,
+		apiProvider:     api.SingleVersionProvider(testAPI),
+		accounts:        make(map[string]iotago.AccountID),
+		blockIssuerKeys: make(map[string]iotago.BlockIssuerKey),
+		outputs:         make(map[string]iotago.OutputID),
 
 		blocks:                 memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *blocks.Block](),
 		slotData:               shrinkingmap.New[iotago.SlotIndex, *slotData](),
@@ -225,7 +225,7 @@ func (t *TestSuite) AssertAccountLedgerUntil(slotIndex iotago.SlotIndex, account
 }
 
 func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
-	expectedPubKeys := ds.NewSet(t.BlockIssuerKeys(expectedState.PubKeys, false)...)
+	expectedBlockIssuerKeys := ds.NewSet(t.BlockIssuerKeys(expectedState.BlockIssuerKeys, false)...)
 	expectedCredits := accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(expectedState.BICAmount), expectedState.BICUpdatedTime)
 
 	actualState, exists, err := t.Instance.Account(accountID, slotIndex)
@@ -241,7 +241,7 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 
 	require.Equal(t.T, accountID, actualState.ID)
 	require.Equal(t.T, expectedCredits, actualState.Credits, "slotIndex: %d, accountID %s: expected: %v, actual: %v", slotIndex, accountID, expectedCredits, actualState.Credits)
-	require.Truef(t.T, expectedPubKeys.Equals(actualState.BlockIssuerKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedPubKeys, actualState.BlockIssuerKeys)
+	require.Truef(t.T, expectedBlockIssuerKeys.Equals(actualState.BlockIssuerKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedBlockIssuerKeys, actualState.BlockIssuerKeys)
 
 	require.Equal(t.T, t.OutputID(expectedState.OutputID, false), actualState.OutputID)
 	require.Equal(t.T, expectedState.StakeEndEpoch, actualState.StakeEndEpoch, "slotIndex: %d, accountID %s: expected StakeEndEpoch: %d, actual: %d", slotIndex, accountID, expectedState.StakeEndEpoch, actualState.StakeEndEpoch)
@@ -277,7 +277,7 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 			previousAccountState, exists := t.accountsStatePerSlot.Get(slotIndex - 1)
 			require.True(t.T, exists)
 
-			require.Equal(t.T, t.BlockIssuerKeys(previousAccountState[accountID].PubKeys, false), actualDiff.BlockIssuerKeysRemoved)
+			require.Equal(t.T, t.BlockIssuerKeys(previousAccountState[accountID].BlockIssuerKeys, false), actualDiff.BlockIssuerKeysRemoved)
 			require.Equal(t.T, -iotago.BlockIssuanceCredits(previousAccountState[accountID].BICAmount), actualDiff.BICChange)
 			require.Equal(t.T, iotago.EmptyOutputID, actualDiff.NewOutputID)
 			require.Equal(t.T, iotago.SlotIndex(0), actualDiff.NewExpirySlot)
@@ -321,15 +321,15 @@ func (t *TestSuite) OutputID(alias string, createIfNotExists bool) iotago.Output
 }
 
 func (t *TestSuite) BlockIssuerKey(alias string, createIfNotExists bool) iotago.BlockIssuerKey {
-	if blockIssuerKey, exists := t.pubKeys[alias]; exists {
+	if blockIssuerKey, exists := t.blockIssuerKeys[alias]; exists {
 		return blockIssuerKey
 	} else if !createIfNotExists {
 		panic(fmt.Sprintf("public key with alias '%s' does not exist", alias))
 	}
 
-	t.pubKeys[alias] = utils.RandBlockIssuerKey()
+	t.blockIssuerKeys[alias] = utils.RandBlockIssuerKey()
 
-	return t.pubKeys[alias]
+	return t.blockIssuerKeys[alias]
 }
 
 func (t *TestSuite) BlockIssuerKeys(blockIssuerKeys []string, createIfNotExists bool) iotago.BlockIssuerKeys {
@@ -362,8 +362,8 @@ type AccountState struct {
 	BICAmount      iotago.Mana
 	BICUpdatedTime iotago.SlotIndex
 
-	OutputID string
-	PubKeys  []string
+	OutputID        string
+	BlockIssuerKeys []string
 
 	ValidatorStake                        iotago.BaseToken
 	DelegationStake                       iotago.BaseToken
