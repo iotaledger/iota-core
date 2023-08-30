@@ -6,9 +6,6 @@ import (
 
 // chainWeights is a reactive component that tracks the cumulative weight of a chain.
 type chainWeights struct {
-	// chain is the chain that this chainWeights is tracking the cumulative weight of.
-	chain *Chain
-
 	// claimedWeight contains the total cumulative weight of the chain that is claimed by the latest commitments.
 	claimedWeight reactive.Variable[uint64]
 
@@ -22,7 +19,6 @@ type chainWeights struct {
 // newChainWeights creates a new chainWeights for the given chain.
 func newChainWeights(chain *Chain) *chainWeights {
 	return &chainWeights{
-		chain:          chain,
 		claimedWeight:  reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestCommitment),
 		attestedWeight: reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestAttestedCommitment),
 		verifiedWeight: reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestVerifiedCommitment),
