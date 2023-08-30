@@ -125,7 +125,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 
 		edSig, isEdSig := att.Signature.(*iotago.Ed25519Signature)
 		if !isEdSig {
-			return nil, 0, ierrors.Errorf("only ed2519 signatures supported, got %s", att.Signature.Type())
+			return nil, 0, ierrors.Errorf("only ed25519 signatures supported, got %s", att.Signature.Type())
 		}
 
 		// We found the accountData, but we don't know the public key used to sign this block/attestation. Ignore.
