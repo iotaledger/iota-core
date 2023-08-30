@@ -2,6 +2,8 @@ module github.com/iotaledger/iota-core
 
 go 1.21
 
+replace github.com/fjl/memsize v0.0.1 => github.com/muxxer/memsize v0.0.0-20230830120830-a368d0fcb513
+
 require (
 	github.com/goccy/go-graphviz v0.1.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
