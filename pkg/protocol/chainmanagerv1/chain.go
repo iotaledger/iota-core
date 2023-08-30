@@ -27,11 +27,14 @@ type Chain struct {
 	// evicted is an event that gets triggered when the chain gets evicted.
 	evicted reactive.Event
 
-	// weight is a reactive subcomponent that tracks the cumulative weight of the chain.
+	// chainWeights is a reactive subcomponent that tracks the cumulative weight of the chain.
 	*chainWeights
 
-	// thresholds is a reactive subcomponent that tracks the thresholds of the chain.
+	// chainDispatcherThresholds is a reactive subcomponent that tracks the thresholds of the chain.
 	*chainDispatcherThresholds
+
+	// chainSwitchingFlags is a reactive subcomponent that tracks the chain switching flags of the chain.
+	*chainSwitchingFlags
 }
 
 // NewChain creates a new Chain instance.
@@ -48,6 +51,7 @@ func NewChain(root *Commitment) *Chain {
 	// embed reactive subcomponents
 	c.chainWeights = newChainWeights(c)
 	c.chainDispatcherThresholds = newChainDispatcherThresholds(c)
+	c.chainSwitchingFlags = newChainSwitchingFlags(c)
 
 	// associate the commitment with its chain
 	root.chain.Set(c)

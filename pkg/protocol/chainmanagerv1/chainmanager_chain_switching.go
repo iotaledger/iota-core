@@ -14,10 +14,10 @@ func newChainManagerChainSwitching(chainManager *ChainManager) *chainManagerChai
 	heaviestClaimedCandidate := reactive.NewVariable[*Chain]()
 	heaviestClaimedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
 		if prevCandidate != nil {
-			// prevCandidate.attestationsRequested.Set(false)
+			prevCandidate.requestAttestations.Set(false)
 		}
 
-		// newCandidate.attestationsRequested.Set(true)
+		newCandidate.requestAttestations.Set(true)
 	})
 
 	heaviestAttestedCandidate := reactive.NewVariable[*Chain]()
