@@ -22,7 +22,7 @@ func issueValidatorBlock(ctx context.Context) {
 		executor.ExecuteAt(validatorAccount.ID(), func() { issueValidatorBlock(ctx) }, nextBroadcast)
 	}()
 
-	if !ParamsValidator.IgnoreBootstrapped && !engineInstance.IsBootstrapped() {
+	if !ParamsValidator.IgnoreBootstrapped && !engineInstance.SyncManager.IsBootstrapped() {
 		Component.LogDebug("Not issuing validator block because node is not bootstrapped yet.")
 
 		return

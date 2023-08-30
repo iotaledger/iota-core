@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	mock2 "github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
@@ -88,9 +89,13 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 					eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
 					eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](500*time.Millisecond),
 				),
-				engine.WithIsBootstrappedFunc(func(e *engine.Engine) bool {
-					return e.Storage.Settings().LatestCommitment().Index() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
-				}),
+			),
+			protocol.WithSyncManagerProvider(
+				trivialsyncmanager.NewProvider(
+					trivialsyncmanager.WithBootstrappedFunc(func(e *engine.Engine) bool {
+						return e.Storage.Settings().LatestCommitment().Index() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
+					}),
+				),
 			),
 			protocol.WithStorageOptions(
 				storage.WithPruningDelay(20),

@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -30,6 +29,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
@@ -62,6 +62,7 @@ type Engine struct {
 	TipManager          tipmanager.TipManager
 	TipSelection        tipselection.TipSelection
 	Retainer            retainer.Retainer
+	SyncManager         syncmanager.SyncManager
 	UpgradeOrchestrator upgrade.Orchestrator
 
 	Workers      *workerpool.Group
@@ -69,19 +70,14 @@ type Engine struct {
 
 	BlockCache *blocks.Blocks
 
-	isBootstrapped      bool
-	isBootstrappedMutex syncutils.Mutex
-
 	startupAvailableBlocksWindow iotago.SlotIndex
 	chainID                      iotago.CommitmentID
 	mutex                        syncutils.RWMutex
 
-	optsBootstrappedThreshold time.Duration
-	optsIsBootstrappedFunc    func(*Engine) bool
-	optsSnapshotPath          string
-	optsEntryPointsDepth      int
-	optsSnapshotDepth         int
-	optsBlockRequester        []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
+	optsSnapshotPath     string
+	optsEntryPointsDepth int
+	optsSnapshotDepth    int
+	optsBlockRequester   []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
 
 	module.Module
 }
@@ -106,6 +102,7 @@ func New(
 	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
 	retainerProvider module.Provider[*Engine, retainer.Retainer],
 	upgradeOrchestratorProvider module.Provider[*Engine, upgrade.Orchestrator],
+	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
 	var needsToImportSnapshot bool
@@ -120,12 +117,8 @@ func New(
 			Workers:       workers,
 			errorHandler:  errorHandler,
 
-			optsSnapshotPath: "snapshot.bin",
-			optsIsBootstrappedFunc: func(e *Engine) bool {
-				return time.Since(e.Clock.Accepted().RelativeTime()) < e.optsBootstrappedThreshold && e.Notarization.IsBootstrapped()
-			},
-			optsBootstrappedThreshold: 10 * time.Second,
-			optsSnapshotDepth:         5,
+			optsSnapshotPath:  "snapshot.bin",
+			optsSnapshotDepth: 5,
 		}, opts, func(e *Engine) {
 			needsToImportSnapshot = !e.Storage.Settings().IsSnapshotImported() && e.optsSnapshotPath != ""
 
@@ -161,6 +154,7 @@ func New(
 			e.TipSelection = tipSelectionProvider(e)
 			e.Retainer = retainerProvider(e)
 			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
+			e.SyncManager = syncManagerProvider(e)
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
@@ -223,6 +217,7 @@ func (e *Engine) Shutdown() {
 
 		e.BlockRequester.Shutdown()
 		e.Attestations.Shutdown()
+		e.SyncManager.Shutdown()
 		e.Notarization.Shutdown()
 		e.Booker.Shutdown()
 		e.Ledger.Shutdown()
@@ -277,25 +272,6 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	}
 
 	return modelBlock, modelBlock != nil
-}
-
-func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
-	e.isBootstrappedMutex.Lock()
-	defer e.isBootstrappedMutex.Unlock()
-
-	if e.isBootstrapped {
-		return true
-	}
-
-	if e.optsIsBootstrappedFunc(e) {
-		e.isBootstrapped = true
-	}
-
-	return isBootstrapped
-}
-
-func (e *Engine) IsSynced() (isBootstrapped bool) {
-	return e.IsBootstrapped() // && time.Since(e.Clock.PreAccepted().Time()) < e.optsBootstrappedThreshold
 }
 
 func (e *Engine) APIForSlot(slot iotago.SlotIndex) iotago.API {
@@ -552,18 +528,6 @@ func (e *Engine) ErrorHandler(componentName string) func(error) {
 func WithSnapshotPath(snapshotPath string) options.Option[Engine] {
 	return func(e *Engine) {
 		e.optsSnapshotPath = snapshotPath
-	}
-}
-
-func WithBootstrapThreshold(threshold time.Duration) options.Option[Engine] {
-	return func(e *Engine) {
-		e.optsBootstrappedThreshold = threshold
-	}
-}
-
-func WithIsBootstrappedFunc(isBootstrappedFunc func(*Engine) bool) options.Option[Engine] {
-	return func(e *Engine) {
-		e.optsIsBootstrappedFunc = isBootstrappedFunc
 	}
 }
 
