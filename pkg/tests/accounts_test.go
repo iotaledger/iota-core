@@ -231,6 +231,7 @@ func Test_TransitionAccount(t *testing.T) {
 	block3 := ts.IssueBlockAtSlotWithOptions("block3", slotIndexBlock3, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx3, blockfactory.WithStrongParents(latestParent.ID()))
 
 	latestParent = ts.CommitUntilSlot(slotIndexBlock3, activeNodes, block3)
+	delegatedAmount := inputForNewDelegation[0].BaseTokenAmount()
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock3, &model.AccountDiff{
 		BICChange:              0,
@@ -242,7 +243,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ValidatorStakeChange:   0,
 		StakeEndEpochChange:    0,
 		FixedCostChange:        0,
-		DelegationStakeChange:  965080,
+		DelegationStakeChange:  int64(delegatedAmount),
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -253,7 +254,7 @@ func Test_TransitionAccount(t *testing.T) {
 		BlockIssuerKeys: ds.NewSet(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
-		DelegationStake: 965080,
+		DelegationStake: iotago.BaseToken(delegatedAmount),
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
@@ -275,7 +276,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	block4 := ts.IssueBlockAtSlotWithOptions("block4", slotIndexBlock4, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx4, blockfactory.WithStrongParents(latestParent.ID()))
 
-	latestParent = ts.CommitUntilSlot(slotIndexBlock4, activeNodes, block4)
+	_ = ts.CommitUntilSlot(slotIndexBlock4, activeNodes, block4)
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock4, &model.AccountDiff{
 		BICChange:              0,
@@ -298,7 +299,7 @@ func Test_TransitionAccount(t *testing.T) {
 		BlockIssuerKeys: ds.NewSet(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
-		DelegationStake: 965080,
+		DelegationStake: iotago.BaseToken(delegatedAmount),
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
