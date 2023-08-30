@@ -27,8 +27,8 @@ type AccountDiff struct {
 	// OutputID from which the Account has been transitioned from.
 	PreviousOutputID iotago.OutputID
 
-	PubKeysAdded   []ed25519.PublicKey
-	PubKeysRemoved []ed25519.PublicKey
+	BlockIssuerKeysAdded   iotago.BlockIssuerKeys
+	BlockIssuerKeysRemoved iotago.BlockIssuerKeys
 
 	ValidatorStakeChange              int64
 	DelegationStakeChange             int64
@@ -47,8 +47,8 @@ func NewAccountDiff() *AccountDiff {
 		PreviousExpirySlot:                0,
 		NewOutputID:                       iotago.EmptyOutputID,
 		PreviousOutputID:                  iotago.EmptyOutputID,
-		PubKeysAdded:                      make([]ed25519.PublicKey, 0),
-		PubKeysRemoved:                    make([]ed25519.PublicKey, 0),
+		BlockIssuerKeysAdded:              make(iotago.BlockIssuerKeys, 0),
+		BlockIssuerKeysRemoved:            make(iotago.BlockIssuerKeys, 0),
 		ValidatorStakeChange:              0,
 		DelegationStakeChange:             0,
 		StakeEndEpochChange:               0,
@@ -67,13 +67,13 @@ func (d AccountDiff) Bytes() ([]byte, error) {
 	m.WriteUint64(uint64(d.PreviousExpirySlot))
 	m.WriteBytes(lo.PanicOnErr(d.NewOutputID.Bytes()))
 	m.WriteBytes(lo.PanicOnErr(d.PreviousOutputID.Bytes()))
-	m.WriteUint8(uint8(len(d.PubKeysAdded)))
-	for _, pubKey := range d.PubKeysAdded {
-		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
+	m.WriteUint8(uint8(len(d.BlockIssuerKeysAdded)))
+	for _, blockIssuerKey := range d.BlockIssuerKeysAdded {
+		m.WriteBytes(blockIssuerKey.BlockIssuerKeyBytes())
 	}
-	m.WriteUint8(uint8(len(d.PubKeysRemoved)))
-	for _, pubKey := range d.PubKeysRemoved {
-		m.WriteBytes(lo.PanicOnErr(pubKey.Bytes()))
+	m.WriteUint8(uint8(len(d.BlockIssuerKeysRemoved)))
+	for _, blockIssuerKey := range d.BlockIssuerKeysRemoved {
+		m.WriteBytes(blockIssuerKey.BlockIssuerKeyBytes())
 	}
 
 	m.WriteInt64(d.ValidatorStakeChange)
@@ -94,8 +94,8 @@ func (d *AccountDiff) Clone() *AccountDiff {
 		PreviousExpirySlot:                d.PreviousExpirySlot,
 		NewOutputID:                       d.NewOutputID,
 		PreviousOutputID:                  d.PreviousOutputID,
-		PubKeysAdded:                      lo.CopySlice(d.PubKeysAdded),
-		PubKeysRemoved:                    lo.CopySlice(d.PubKeysRemoved),
+		BlockIssuerKeysAdded:              lo.CopySlice(d.BlockIssuerKeysAdded),
+		BlockIssuerKeysRemoved:            lo.CopySlice(d.BlockIssuerKeysRemoved),
 		ValidatorStakeChange:              d.ValidatorStakeChange,
 		DelegationStakeChange:             d.DelegationStakeChange,
 		FixedCostChange:                   d.FixedCostChange,
@@ -142,21 +142,21 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 		return offset, ierrors.Wrap(err, "unable to read previous outputID in the diff")
 	}
 
-	keysAdded, bytesRead, err := readPubKeys(reader)
+	keysAdded, bytesRead, err := readBlockIssuerKeys(reader)
 	if err != nil {
-		return offset, ierrors.Wrap(err, "unable to read added pubKeys in the diff")
+		return offset, ierrors.Wrap(err, "unable to read added blockIssuerKeys in the diff")
 	}
 	offset += bytesRead
 
-	d.PubKeysAdded = keysAdded
+	d.BlockIssuerKeysAdded = keysAdded
 
-	keysRemoved, bytesRead, err := readPubKeys(reader)
+	keysRemoved, bytesRead, err := readBlockIssuerKeys(reader)
 	if err != nil {
-		return offset, ierrors.Wrap(err, "unable to read removed pubKeys in the diff")
+		return offset, ierrors.Wrap(err, "unable to read removed blockIssuerKey in the diff")
 	}
 	offset += bytesRead
 
-	d.PubKeysRemoved = keysRemoved
+	d.BlockIssuerKeysRemoved = keysRemoved
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.ValidatorStakeChange); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read validator stake change in the diff")
@@ -201,33 +201,48 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 	return offset, nil
 }
 
-func readPubKeys(reader io.ReadSeeker) ([]ed25519.PublicKey, int, error) {
+func readBlockIssuerKeys(reader io.ReadSeeker) (iotago.BlockIssuerKeys, int, error) {
 	var bytesConsumed int
 
-	var pubKeysLength uint8
-	if err := binary.Read(reader, binary.LittleEndian, &pubKeysLength); err != nil {
-		return nil, bytesConsumed, ierrors.Wrap(err, "unable to read pubKeys length in the diff")
+	var blockIssuerKeysCount uint8
+	if err := binary.Read(reader, binary.LittleEndian, &blockIssuerKeysCount); err != nil {
+		return nil, bytesConsumed, ierrors.Wrap(err, "unable to read blockIssuerKeys length in the diff")
 	}
 	bytesConsumed++
 
-	pubKeys := make([]ed25519.PublicKey, 0, pubKeysLength)
-	for k := uint8(0); k < pubKeysLength; k++ {
-		pubKey, bytesRead, err := readPubKey(reader)
+	blockIssuerKeys := make(iotago.BlockIssuerKeys, 0, blockIssuerKeysCount)
+	for k := uint8(0); k < blockIssuerKeysCount; k++ {
+		blockIssuerKey, bytesRead, err := readBlockIssuerKey(reader)
 		if err != nil {
 			return nil, bytesConsumed, err
 		}
 		bytesConsumed += bytesRead
 
-		pubKeys = append(pubKeys, pubKey)
+		blockIssuerKeys = append(blockIssuerKeys, blockIssuerKey)
 	}
 
-	return pubKeys, bytesConsumed, nil
+	return blockIssuerKeys, bytesConsumed, nil
 }
 
-func readPubKey(reader io.ReadSeeker) (pubKey ed25519.PublicKey, offset int, err error) {
-	if offset, err = io.ReadFull(reader, pubKey[:]); err != nil {
-		return ed25519.PublicKey{}, offset, ierrors.Errorf("unable to read public key: %w", err)
+func readBlockIssuerKey(reader io.ReadSeeker) (iotago.BlockIssuerKey, int, error) {
+	bytesConsumed := 0
+	var blockIssuerKeyType iotago.BlockIssuerKeyType
+	if err := binary.Read(reader, binary.LittleEndian, &blockIssuerKeyType); err != nil {
+		return nil, bytesConsumed, ierrors.Wrapf(err, "unable to read block issuer key type in account diff")
 	}
+	bytesConsumed++
 
-	return pubKey, offset, nil
+	switch blockIssuerKeyType {
+	case iotago.Ed25519BlockIssuerKey:
+		var ed25519PublicKey ed25519.PublicKey
+		var bytesRead, err = io.ReadFull(reader, ed25519PublicKey[:])
+		bytesConsumed += bytesRead
+		if err != nil {
+			return nil, bytesConsumed, ierrors.Errorf("unable to read ed25519 public key in account diff: %w", err)
+		}
+
+		return iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519PublicKey), bytesConsumed, nil
+	default:
+		return nil, bytesConsumed, ierrors.Errorf("unsupported block issuer key type %d in account diff", blockIssuerKeyType)
+	}
 }

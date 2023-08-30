@@ -41,8 +41,8 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected expiry slot %s, got %s", node.Name, accountData.ID, accountData.ExpirySlot, actualAccountData.ExpirySlot)
 			}
 
-			if !cmp.Equal(accountData.PubKeys.ToSlice(), actualAccountData.PubKeys.ToSlice()) {
-				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.PubKeys, actualAccountData.PubKeys)
+			if !cmp.Equal(accountData.BlockIssuerKeys.ToSlice(), actualAccountData.BlockIssuerKeys.ToSlice()) {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.BlockIssuerKeys, actualAccountData.BlockIssuerKeys)
 			}
 
 			if accountData.StakeEndEpoch != actualAccountData.StakeEndEpoch {
@@ -118,12 +118,12 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 				return ierrors.Errorf("AssertAccountDiff: %s: expected previous output ID %s but actual %s for account %s at slot %d", node.Name, accountDiff.PreviousOutputID, actualAccountDiff.PreviousOutputID, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.PubKeysAdded, actualAccountDiff.PubKeysAdded) {
-				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys added %s but actual %s for account %s at slot %d", node.Name, accountDiff.PubKeysAdded, actualAccountDiff.PubKeysAdded, accountID, index)
+			if !cmp.Equal(accountDiff.BlockIssuerKeysAdded, actualAccountDiff.BlockIssuerKeysAdded) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys added %s but actual %s for account %s at slot %d", node.Name, accountDiff.BlockIssuerKeysAdded, actualAccountDiff.BlockIssuerKeysAdded, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.PubKeysRemoved, actualAccountDiff.PubKeysRemoved) {
-				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys removed %s but actual %s for account %s at slot %d", node.Name, accountDiff.PubKeysRemoved, actualAccountDiff.PubKeysRemoved, accountID, index)
+			if !cmp.Equal(accountDiff.BlockIssuerKeysRemoved, actualAccountDiff.BlockIssuerKeysRemoved) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys removed %s but actual %s for account %s at slot %d", node.Name, accountDiff.BlockIssuerKeysRemoved, actualAccountDiff.BlockIssuerKeysRemoved, accountID, index)
 			}
 
 			if !cmp.Equal(accountDiff.StakeEndEpochChange, actualAccountDiff.StakeEndEpochChange) {
