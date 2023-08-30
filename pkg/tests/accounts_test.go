@@ -242,7 +242,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ValidatorStakeChange:   0,
 		StakeEndEpochChange:    0,
 		FixedCostChange:        0,
-		DelegationStakeChange:  973040,
+		DelegationStakeChange:  965080,
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -253,7 +253,7 @@ func Test_TransitionAccount(t *testing.T) {
 		BlockIssuerKeys: ds.NewSet(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
-		DelegationStake: 973040,
+		DelegationStake: 965080,
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
@@ -278,16 +278,16 @@ func Test_TransitionAccount(t *testing.T) {
 	latestParent = ts.CommitUntilSlot(slotIndexBlock4, activeNodes, block4)
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock4, &model.AccountDiff{
-		BICChange:             0,
-		PreviousUpdatedTime:   0,
-		NewOutputID:           iotago.EmptyOutputID,
-		PreviousOutputID:      iotago.EmptyOutputID,
-		PubKeysAdded:          []ed25519.PublicKey{},
-		PubKeysRemoved:        []ed25519.PublicKey{},
-		ValidatorStakeChange:  0,
-		StakeEndEpochChange:   0,
-		FixedCostChange:       0,
-		DelegationStakeChange: 0,
+		BICChange:              0,
+		PreviousUpdatedTime:    0,
+		NewOutputID:            iotago.EmptyOutputID,
+		PreviousOutputID:       iotago.EmptyOutputID,
+		BlockIssuerKeysAdded:   iotago.BlockIssuerKeys{},
+		BlockIssuerKeysRemoved: iotago.BlockIssuerKeys{},
+		ValidatorStakeChange:   0,
+		StakeEndEpochChange:    0,
+		FixedCostChange:        0,
+		DelegationStakeChange:  0,
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -295,10 +295,10 @@ func Test_TransitionAccount(t *testing.T) {
 		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock2),
 		ExpirySlot:      newAccountExpirySlot,
 		OutputID:        newAccount.OutputID(),
-		PubKeys:         ds.NewSet(newAccountBlockIssuerKey),
+		BlockIssuerKeys: ds.NewSet(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
-		DelegationStake: 973040,
+		DelegationStake: 965080,
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
