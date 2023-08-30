@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
+	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -73,7 +74,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		panic(err)
 	}
 
-	accountID := iotago.AccountID(blake2b.Sum256(pub))
+	accountID := iotago.AccountID(blake2b.Sum256(iotago.BlockIssuerKeyEd25519FromPublicKey(hiveEd25519.PublicKey(pub)).BlockIssuerKeyBytes()))
 	accountID.RegisterAlias(name)
 
 	peerID := network.PeerID(pub)

@@ -400,12 +400,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 			}
 
 			if accountDetails.AccountID.Empty() {
-				blockIssuerKeyEd25519, ok := accountDetails.IssuerKey.(iotago.BlockIssuerKeyEd25519)
-				if !ok {
-					panic("block issuer key must be of type ed25519")
-				}
-				ed25519PubKey := blockIssuerKeyEd25519.ToEd25519PublicKey()
-				accountDetails.AccountID = blake2b.Sum256(ed25519PubKey[:])
+				accountDetails.AccountID = blake2b.Sum256(accountDetails.IssuerKey.BlockIssuerKeyBytes())
 			}
 
 			return accountDetails
