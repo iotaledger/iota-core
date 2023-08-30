@@ -16,7 +16,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 		e.HookConstructed(func() {
 			e.Ledger.HookInitialized(func() {
 				e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
-					t.SetLivenessThreshold(block.IssuingTime().Add(-e.CurrentAPI().LivenessThresholdDuration()))
+					t.acceptanceTime.Set(block.IssuingTime())
 				})
 
 				t.conflictDAG = e.Ledger.ConflictDAG()

@@ -37,8 +37,8 @@ type TipSelection struct {
 	// livenessThresholdQueue holds a queue of tips that are waiting to reach the liveness threshold.
 	livenessThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
 
-	// livenessThreshold holds the current liveness threshold.
-	livenessThreshold reactive.Variable[time.Time]
+	// acceptanceTime holds the current acceptance time.
+	acceptanceTime reactive.Variable[time.Time]
 
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int
@@ -54,7 +54,7 @@ type TipSelection struct {
 	optMaxWeakReferences int
 
 	// optDynamicLivenessThreshold is a function that is used to dynamically determine the liveness threshold for a tip.
-	optDynamicLivenessThreshold func(tip tipmanager.TipMetadata) time.Time
+	optDynamicLivenessThreshold func(tip tipmanager.TipMetadata) time.Duration
 
 	// Module embeds the required methods of the module.Interface.
 	module.Module
@@ -70,20 +70,20 @@ func New(e *engine.Engine, tipManager tipmanager.TipManager, conflictDAG conflic
 		memPool:                      memPool,
 		rootBlocks:                   rootBlocksRetriever,
 		livenessThresholdQueue:       timed.NewPriorityQueue[tipmanager.TipMetadata](true),
-		livenessThreshold:            reactive.NewVariable[time.Time](),
+		acceptanceTime:               reactive.NewVariable[time.Time](),
 		optMaxStrongParents:          8,
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,
-		optDynamicLivenessThreshold: func(tip tipmanager.TipMetadata) time.Time {
-			// TODO: replace with correct version (issuingTime + approvalModifier * graceDuration)
-			return tip.Block().IssuingTime()
+		optDynamicLivenessThreshold: func(tip tipmanager.TipMetadata) time.Duration {
+			// TODO: replace with correct version (LivenessThresholdLowerBound + approvalModifier * graceDuration)
+			return e.CurrentAPI().LivenessThresholdDuration()
 		},
 	}, opts, func(t *TipSelection) {
 		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
 
-		t.livenessThreshold.OnUpdate(func(_, threshold time.Time) {
+		t.acceptanceTime.OnUpdate(func(_, threshold time.Time) {
 			for _, tip := range t.livenessThresholdQueue.PopUntil(threshold) {
-				if dynamicLivenessThreshold := t.optDynamicLivenessThreshold(tip); dynamicLivenessThreshold.After(threshold) {
+				if dynamicLivenessThreshold := tip.Block().IssuingTime().Add(t.optDynamicLivenessThreshold(tip)); dynamicLivenessThreshold.After(threshold) {
 					t.livenessThresholdQueue.Push(tip, dynamicLivenessThreshold)
 				} else {
 					tip.LivenessThresholdReached().Trigger()
@@ -136,13 +136,6 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 	return references
 }
 
-// SetLivenessThreshold sets the liveness threshold used for tip selection (it can only increase monotonically).
-func (t *TipSelection) SetLivenessThreshold(threshold time.Time) {
-	t.livenessThreshold.Compute(func(currentThreshold time.Time) time.Time {
-		return lo.Cond(threshold.Before(currentThreshold), currentThreshold, threshold)
-	})
-}
-
 // Shutdown does nothing but is required by the module.Interface.
 func (t *TipSelection) Shutdown() {}
 
@@ -156,7 +149,7 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 		tipMetadata.TipPool().Set(tipmanager.DroppedTipPool)
 	}
 
-	t.livenessThresholdQueue.Push(tipMetadata, t.optDynamicLivenessThreshold(tipMetadata))
+	t.livenessThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime().Add(t.optDynamicLivenessThreshold(tipMetadata)))
 }
 
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
