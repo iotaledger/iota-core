@@ -5,8 +5,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// chainThresholds is a reactive component that provides a set of thresholds that are derived from the chain.
-type chainThresholds struct {
+// chainDispatcherThresholds is a reactive component that provides a set of thresholds that are derived from the chain.
+type chainDispatcherThresholds struct {
 	// latestVerifiedCommitmentIndex is the index of the latest verified Commitment object in the chain.
 	latestVerifiedCommitmentIndex reactive.Variable[iotago.SlotIndex]
 
@@ -18,9 +18,9 @@ type chainThresholds struct {
 	warpSyncThreshold reactive.Variable[iotago.SlotIndex]
 }
 
-// newChainThresholds creates a new chainThresholds instance.
-func newChainThresholds(chain *Chain) *chainThresholds {
-	c := &chainThresholds{
+// newChainDispatcherThresholds creates a new chainDispatcherThresholds instance.
+func newChainDispatcherThresholds(chain *Chain) *chainDispatcherThresholds {
+	c := &chainDispatcherThresholds{
 		latestVerifiedCommitmentIndex: reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.latestVerifiedCommitment),
 	}
 
@@ -45,18 +45,18 @@ func newChainThresholds(chain *Chain) *chainThresholds {
 
 // LatestVerifiedCommitmentIndex returns a reactive variable that contains the index of the latest verified Commitment
 // object in the chain.
-func (c *chainThresholds) LatestVerifiedCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
+func (c *chainDispatcherThresholds) LatestVerifiedCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
 	return c.latestVerifiedCommitmentIndex
 }
 
 // SyncThreshold returns a reactive variable that contains the upper bound for slots that are being fed to the
 // engine (to prevent memory exhaustion).
-func (c *chainThresholds) SyncThreshold() reactive.Variable[iotago.SlotIndex] {
+func (c *chainDispatcherThresholds) SyncThreshold() reactive.Variable[iotago.SlotIndex] {
 	return c.syncThreshold
 }
 
 // WarpSyncThreshold returns a reactive variable that contains an offset from latest index where the warp sync
 // process starts (we don't request slots that we are about to commit ourselves).
-func (c *chainThresholds) WarpSyncThreshold() reactive.Variable[iotago.SlotIndex] {
+func (c *chainDispatcherThresholds) WarpSyncThreshold() reactive.Variable[iotago.SlotIndex] {
 	return c.warpSyncThreshold
 }

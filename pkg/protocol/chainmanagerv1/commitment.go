@@ -16,7 +16,6 @@ type Commitment struct {
 	evicted      reactive.Event
 
 	*commitmentFlags
-	*commitmentThresholds
 	*commitmentDispatcherFlags
 }
 
@@ -31,7 +30,6 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 	}
 
 	c.commitmentFlags = newCommitmentFlags(c)
-	c.commitmentThresholds = newCommitmentThresholds(c)
 	c.commitmentDispatcherFlags = newCommitmentDispatcherFlags(c)
 
 	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
@@ -46,7 +44,6 @@ func NewRootCommitment(commitment *model.Commitment) *Commitment {
 	commitmentMetadata.verified.Set(true)
 	commitmentMetadata.isBelowSyncThreshold.Set(true)
 	commitmentMetadata.isBelowWarpSyncThreshold.Set(true)
-	commitmentMetadata.isBelowLatestVerifiedIndex.Set(true)
 	commitmentMetadata.evicted.Set(false)
 
 	return commitmentMetadata

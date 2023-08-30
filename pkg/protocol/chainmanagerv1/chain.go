@@ -31,7 +31,7 @@ type Chain struct {
 	*chainWeights
 
 	// thresholds is a reactive component that tracks the thresholds of the chain.
-	*chainThresholds
+	*chainDispatcherThresholds
 }
 
 // NewChain creates a new Chain instance.
@@ -47,7 +47,7 @@ func NewChain(root *Commitment) *Chain {
 
 	// embed reactive subcomponents
 	c.chainWeights = newChainWeights(c)
-	c.chainThresholds = newChainThresholds(c)
+	c.chainDispatcherThresholds = newChainDispatcherThresholds(c)
 
 	// associate the root commitment with its chain
 	root.chain.Set(c)
