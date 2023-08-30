@@ -16,14 +16,18 @@ func TestManager_Import_Export(t *testing.T) {
 		"A": {
 			PoolStake:                   10,
 			ValidatorStake:              4,
+			Delegators:                  []iotago.BaseToken{3, 3},
 			FixedCost:                   1,
+			ActiveSlotsCount:            8, // we have 8 slots in epoch
 			ValidationBlocksSentPerSlot: 10,
 			SlotPerformance:             7,
 		},
 		"B": {
 			PoolStake:                   20,
 			ValidatorStake:              8,
+			Delegators:                  []iotago.BaseToken{1, 2, 4, 5},
 			FixedCost:                   100,
+			ActiveSlotsCount:            6,
 			ValidationBlocksSentPerSlot: 3,
 			SlotPerformance:             3,
 		},

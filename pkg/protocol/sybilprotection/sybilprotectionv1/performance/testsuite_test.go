@@ -19,8 +19,8 @@ import (
 )
 
 type TestSuite struct {
-	T *testing.T
-
+	T                    *testing.T
+	stores               map[iotago.SlotIndex]kvstore.KVStore
 	accounts             map[string]iotago.AccountID
 	latestCommittedEpoch iotago.EpochIndex
 
@@ -32,9 +32,13 @@ type TestSuite struct {
 
 func NewTestSuite(t *testing.T) *TestSuite {
 	apiProvider := api.NewEpochBasedProvider()
+	params := iotago.NewV3ProtocolParameters(
+		iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 3),
+		iotago.WithRewardsOptions(10, 8, 8, 31, 1154, 2, 1),
+	)
 	// setup params for 8 epochs
 	for i := 0; i <= 8; i++ {
-		apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 3)), iotago.EpochIndex(i))
+		apiProvider.AddProtocolParametersAtEpoch(params, iotago.EpochIndex(i))
 	}
 
 	ts := &TestSuite{
@@ -49,6 +53,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 
 func (t *TestSuite) InitPerformanceTracker() {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
+	t.stores = prunableStores
 	perforanceFactorFunc := func(index iotago.SlotIndex) *prunable.ValidatorSlotPerformance {
 		if _, exists := prunableStores[index]; !exists {
 			prunableStores[index] = mapdb.NewMapDB()
@@ -60,20 +65,10 @@ func (t *TestSuite) InitPerformanceTracker() {
 	}
 	t.perforanceFactorFunc = perforanceFactorFunc
 
-	RegistrationActivityFunc := func(index iotago.SlotIndex) *prunable.RegisteredValidatorSlotActivity {
-		if _, exists := prunableStores[index]; !exists {
-			prunableStores[index] = mapdb.NewMapDB()
-		}
-
-		p := prunable.NewRegisteredValidatorActivity(index, prunableStores[index], t.apiProvider)
-
-		return p
-	}
-
 	rewardsStore := mapdb.NewMapDB()
 	poolStatsStore := mapdb.NewMapDB()
 	committeeStore := mapdb.NewMapDB()
-	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, RegistrationActivityFunc, perforanceFactorFunc, t.latestCommittedEpoch, t.apiProvider, func(err error) {})
+	t.Instance = NewTracker(rewardsStore, poolStatsStore, committeeStore, perforanceFactorFunc, t.latestCommittedEpoch, t.apiProvider, func(err error) {})
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -132,7 +127,7 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 		require.Equal(t.T, expectedValidatorReward, actualValidatorReward)
 
 		for delegatedAmount := range action.Delegators {
-			expectedDelegatorReward := t.delegatorReward(epochIndex, profitMarging, poolRewards, uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost))
+			expectedDelegatorReward := t.delegatorReward(epochIndex, profitMarging, poolRewards, uint64(delegatedAmount), uint64(action.PoolStake))
 			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epochIndex, epochIndex)
 			fmt.Println("actual delegator reward: ", actualDelegatorReward, "expected delegator reward: ", expectedDelegatorReward)
 			require.NoError(t.T, err)
@@ -156,7 +151,7 @@ func (t *TestSuite) validatorReward(epochIndex iotago.EpochIndex, profitMargin, 
 	return decayedEpochRewards
 }
 
-func (t *TestSuite) delegatorReward(epochIndex iotago.EpochIndex, profitMargin, poolRewards, delegatedAmount, poolStake, fixedCost uint64) iotago.Mana {
+func (t *TestSuite) delegatorReward(epochIndex iotago.EpochIndex, profitMargin, poolRewards, delegatedAmount, poolStake uint64) iotago.Mana {
 	profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
 	profitMarginComplement := (1 << profitMarginExponent) - profitMargin
 
