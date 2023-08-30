@@ -13,11 +13,16 @@ type commitmentDispatcherFlags struct {
 	requiresWarpSync                reactive.Variable[bool]
 }
 
-func newCommitmentDispatcherFlags(commitment *Commitment) *commitmentDispatcherFlags {
+func newCommitmentDispatcherFlags(commitment *Commitment, isRoot bool) *commitmentDispatcherFlags {
 	c := &commitmentDispatcherFlags{
 		isAboveLatestVerifiedCommitment: isAboveLatestVerifiedCommitment(commitment),
 		isBelowSyncThreshold:            reactive.NewEvent(),
 		isBelowWarpSyncThreshold:        reactive.NewEvent(),
+	}
+
+	if isRoot {
+		c.isBelowSyncThreshold.Set(true)
+		c.isBelowWarpSyncThreshold.Set(true)
 	}
 
 	c.inSyncWindow = reactive.NewDerivedVariable2(func(belowSyncThreshold, aboveLatestVerifiedCommitment bool) bool {

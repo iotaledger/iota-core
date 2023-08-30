@@ -8,16 +8,22 @@ type commitmentFlags struct {
 	verified reactive.Event
 }
 
-func newCommitmentFlags(commitment *Commitment) *commitmentFlags {
+func newCommitmentFlags(commitment *Commitment, isRoot bool) *commitmentFlags {
 	c := &commitmentFlags{
 		solid:    reactive.NewEvent(),
 		attested: reactive.NewEvent(),
 		verified: reactive.NewEvent(),
 	}
 
-	commitment.parent.OnUpdate(func(_, parent *Commitment) {
-		c.solid.InheritFrom(parent.solid)
-	})
+	if isRoot {
+		c.solid.Set(true)
+		c.attested.Set(true)
+		c.verified.Set(true)
+	} else {
+		commitment.parent.OnUpdate(func(_, parent *Commitment) {
+			c.solid.InheritFrom(parent.solid)
+		})
+	}
 
 	return c
 }

@@ -19,7 +19,7 @@ type Commitment struct {
 	*commitmentDispatcherFlags
 }
 
-func NewCommitment(commitment *model.Commitment) *Commitment {
+func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment {
 	c := &Commitment{
 		Commitment:   commitment,
 		parent:       reactive.NewVariable[*Commitment](),
@@ -29,24 +29,12 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 		evicted:      reactive.NewEvent(),
 	}
 
-	c.commitmentFlags = newCommitmentFlags(c)
-	c.commitmentDispatcherFlags = newCommitmentDispatcherFlags(c)
+	c.commitmentFlags = newCommitmentFlags(c, lo.First(optIsRoot))
+	c.commitmentDispatcherFlags = newCommitmentDispatcherFlags(c, lo.First(optIsRoot))
 
 	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
 
 	return c
-}
-
-func NewRootCommitment(commitment *model.Commitment) *Commitment {
-	commitmentMetadata := NewCommitment(commitment)
-
-	commitmentMetadata.solid.Set(true)
-	commitmentMetadata.verified.Set(true)
-	commitmentMetadata.isBelowSyncThreshold.Set(true)
-	commitmentMetadata.isBelowWarpSyncThreshold.Set(true)
-	commitmentMetadata.evicted.Set(false)
-
-	return commitmentMetadata
 }
 
 func (c *Commitment) Parent() reactive.Variable[*Commitment] {

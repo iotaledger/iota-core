@@ -33,7 +33,7 @@ type ChainManager struct {
 
 func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 	c := &ChainManager{
-		mainChain:                 reactive.NewVariable[*Chain]().Init(NewChain(NewRootCommitment(rootCommitment))),
+		mainChain:                 reactive.NewVariable[*Chain]().Init(NewChain(NewCommitment(rootCommitment, true))),
 		heaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
 		heaviestAttestedCandidate: reactive.NewVariable[*Chain](),
 		heaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
