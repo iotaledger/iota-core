@@ -6,8 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -15,7 +14,12 @@ func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	return iotago.Identifier(t.rewardsMap(epochIndex).Root())
+	m, err := t.rewardsMap(epochIndex)
+	if err != nil {
+		return iotago.Identifier{}, err
+	}
+
+	return iotago.Identifier(m.Root()), nil
 }
 
 func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
@@ -44,9 +48,12 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			continue
 		}
 
-		poolStats, err := t.poolStatsStore.Get(epochIndex)
+		poolStats, err := t.poolStatsStore.Load(epochIndex)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator accountID %s", epochIndex, validatorID)
+		}
+		if poolStats == nil {
+			return 0, 0, 0, ierrors.Errorf("pool stats for epoch %d and validator accountID %s are nil", epochIndex, validatorID)
 		}
 
 		profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
@@ -118,9 +125,12 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			continue
 		}
 
-		poolStats, err := t.poolStatsStore.Get(epochIndex)
+		poolStats, err := t.poolStatsStore.Load(epochIndex)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator account ID %s", epochIndex, validatorID)
+		}
+		if poolStats == nil {
+			return 0, 0, 0, ierrors.Errorf("pool stats for epoch %d and validator accountID %s are nil", epochIndex, validatorID)
 		}
 
 		profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
@@ -150,21 +160,27 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 	return delegatorsReward, epochStart, epochEnd, nil
 }
 
-func (t *Tracker) rewardsStorage(epochIndex iotago.EpochIndex) kvstore.KVStore {
-	return lo.PanicOnErr(t.rewardBaseStore.WithExtendedRealm(epochIndex.MustBytes()))
-}
+func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) (ads.Map[iotago.AccountID, *model.PoolRewards], error) {
+	kv, err := t.rewardsStorePerEpochFunc(epochIndex)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get rewards store for epoch %d", epochIndex)
+	}
 
-func (t *Tracker) rewardsMap(epochIndex iotago.EpochIndex) ads.Map[iotago.AccountID, *PoolRewards] {
-	return ads.NewMap(t.rewardsStorage(epochIndex),
+	return ads.NewMap(kv,
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
-		(*PoolRewards).Bytes,
-		PoolRewardsFromBytes,
-	)
+		(*model.PoolRewards).Bytes,
+		model.PoolRewardsFromBytes,
+	), nil
 }
 
-func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *PoolRewards, exists bool, err error) {
-	return t.rewardsMap(epochIndex).Get(accountID)
+func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotago.EpochIndex) (rewardsForAccount *model.PoolRewards, exists bool, err error) {
+	m, err := t.rewardsMap(epochIndex)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return m.Get(accountID)
 }
 
 func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, fixedCost iotago.Mana, performanceFactor uint64) (iotago.Mana, error) {

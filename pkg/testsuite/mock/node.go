@@ -14,7 +14,6 @@ import (
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/crypto/identity"
-	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -32,7 +31,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -303,12 +301,10 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		})
 		require.NoError(n.Testing, err)
 
-		rootsStorage := instance.Storage.Roots(details.Commitment.ID().Index())
-		rootsBytes, err := rootsStorage.Get(kvstore.Key{prunable.RootsKey})
+		rootsStorage, err := instance.Storage.Roots(details.Commitment.ID().Index())
+		require.NoError(n.Testing, err, "roots storage for slot %d not found", details.Commitment.Index())
+		roots, err := rootsStorage.Load(details.Commitment.ID())
 		require.NoError(n.Testing, err)
-
-		var roots iotago.Roots
-		lo.PanicOnErr(n.Protocol.APIForSlot(details.Commitment.Index()).Decode(rootsBytes, &roots))
 
 		attestationBlockIDs := make([]iotago.BlockID, 0)
 		tree, err := instance.Attestations.GetMap(details.Commitment.Index())

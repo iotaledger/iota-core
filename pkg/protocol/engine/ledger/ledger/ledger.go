@@ -27,7 +27,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -86,16 +86,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 				l.memPool.PublishCommitmentState(scd.Commitment.Commitment())
 			})
 
-			e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-				l.utxoLedger.WriteLockLedger()
-				defer l.utxoLedger.WriteUnlockLedger()
-
-				// TODO: do we want to delay the pruning of the spent ledger state? We can't export pruned slots anyway.
-				if err := l.utxoLedger.PruneSlotIndexWithoutLocking(index); err != nil {
-					l.errorHandler(ierrors.Wrapf(err, "failed to prune ledger for index %d", index))
-				}
-			})
-
 			l.TriggerConstructed()
 			l.TriggerInitialized()
 		})
@@ -105,11 +95,11 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 }
 
 func New(
-	utxoStore,
+	utxoLedger *utxoledger.Manager,
 	accountsStore kvstore.KVStore,
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
-	slotDiffFunc func(iotago.SlotIndex) *prunable.AccountDiffs,
+	slotDiffFunc func(iotago.SlotIndex) (*slotstore.AccountDiffs, error),
 	apiProvider api.Provider,
 	sybilProtection sybilprotection.SybilProtection,
 	errorHandler func(error),
@@ -119,7 +109,7 @@ func New(
 		apiProvider:      apiProvider,
 		accountsLedger:   accountsledger.New(apiProvider, blocksFunc, slotDiffFunc, accountsStore),
 		rmcManager:       rmc.NewManager(apiProvider, commitmentLoader),
-		utxoLedger:       utxoledger.New(utxoStore, apiProvider),
+		utxoLedger:       utxoLedger,
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
 		errorHandler:     errorHandler,
@@ -158,7 +148,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	}
 
 	if index != ledgerIndex+1 {
-		panic(ierrors.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex, index))
+		panic(ierrors.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex+1, index))
 	}
 
 	stateDiff := l.memPool.StateDiff(index)
@@ -377,7 +367,7 @@ func (l *Ledger) Shutdown() {
 // 2. The account was consumed and created in the same slot, the account was transitioned, and we have to store the
 // changes in the diff.
 // 3. The account was only created in this slot, in this case we need to track the output's values as the diff.
-func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable.AccountDiff, index iotago.SlotIndex, consumedAccounts map[iotago.AccountID]*utxoledger.Output, createdAccounts map[iotago.AccountID]*utxoledger.Output) {
+func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.AccountDiff, index iotago.SlotIndex, consumedAccounts map[iotago.AccountID]*utxoledger.Output, createdAccounts map[iotago.AccountID]*utxoledger.Output) {
 	for consumedAccountID, consumedOutput := range consumedAccounts {
 		// We might have had an allotment on this account, and the diff already exists
 		accountDiff := getAccountDiff(accountDiffs, consumedAccountID)
@@ -461,7 +451,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*prunable
 	}
 }
 
-func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff, accountDiffs map[iotago.AccountID]*prunable.AccountDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts ds.Set[iotago.AccountID], err error) {
+func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.StateDiff, accountDiffs map[iotago.AccountID]*model.AccountDiff) (createdAccounts map[iotago.AccountID]*utxoledger.Output, consumedAccounts map[iotago.AccountID]*utxoledger.Output, destroyedAccounts ds.Set[iotago.AccountID], err error) {
 	createdAccounts = make(map[iotago.AccountID]*utxoledger.Output)
 	consumedAccounts = make(map[iotago.AccountID]*utxoledger.Output)
 	destroyedAccounts = ds.NewSet[iotago.AccountID]()
@@ -560,8 +550,8 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	return createdAccounts, consumedAccounts, destroyedAccounts, nil
 }
 
-func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spends utxoledger.Spents, outputs utxoledger.Outputs, accountDiffs map[iotago.AccountID]*prunable.AccountDiff, err error) {
-	accountDiffs = make(map[iotago.AccountID]*prunable.AccountDiff)
+func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spends utxoledger.Spents, outputs utxoledger.Outputs, accountDiffs map[iotago.AccountID]*model.AccountDiff, err error) {
+	accountDiffs = make(map[iotago.AccountID]*model.AccountDiff)
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
 		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
@@ -740,11 +730,11 @@ func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.
 	return c.Commitment(), nil
 }
 
-func getAccountDiff(accountDiffs map[iotago.AccountID]*prunable.AccountDiff, accountID iotago.AccountID) *prunable.AccountDiff {
+func getAccountDiff(accountDiffs map[iotago.AccountID]*model.AccountDiff, accountID iotago.AccountID) *model.AccountDiff {
 	accountDiff, exists := accountDiffs[accountID]
 	if !exists {
 		// initialize the account diff because it didn't exist before
-		accountDiff = prunable.NewAccountDiff()
+		accountDiff = model.NewAccountDiff()
 		accountDiffs[accountID] = accountDiff
 	}
 

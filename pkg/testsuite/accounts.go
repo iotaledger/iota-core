@@ -4,8 +4,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -13,12 +13,12 @@ import (
 func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes ...*mock.Node) {
 	t.Eventually(func() error {
 		for _, node := range nodes {
-			actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountData.ID, node.Protocol.SyncManager.LatestCommitment().Index())
+			actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountData.ID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index())
 			if err != nil {
 				return ierrors.Wrap(err, "AssertAccountData: failed to load account data")
 			}
 			if !exists {
-				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.SyncManager.LatestCommitment().Index())
+				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index())
 			}
 
 			if accountData.ID != actualAccountData.ID {
@@ -44,17 +44,40 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 			if !cmp.Equal(accountData.PubKeys.ToSlice(), actualAccountData.PubKeys.ToSlice()) {
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.PubKeys, actualAccountData.PubKeys)
 			}
+
+			if accountData.StakeEndEpoch != actualAccountData.StakeEndEpoch {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected stake end epoch %s, got %s", node.Name, accountData.ID, accountData.StakeEndEpoch, actualAccountData.StakeEndEpoch)
+			}
+
+			if accountData.FixedCost != actualAccountData.FixedCost {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected fixed cost %d, got %d", node.Name, accountData.ID, accountData.FixedCost, actualAccountData.FixedCost)
+			}
+
+			if accountData.ValidatorStake != actualAccountData.ValidatorStake {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected validator stake %d, got %d", node.Name, accountData.ID, accountData.ValidatorStake, actualAccountData.ValidatorStake)
+			}
+
+			if accountData.DelegationStake != actualAccountData.DelegationStake {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected delegation stake %d, got %d", node.Name, accountData.ID, accountData.DelegationStake, actualAccountData.DelegationStake)
+			}
+
+			if accountData.LatestSupportedProtocolVersionAndHash != actualAccountData.LatestSupportedProtocolVersionAndHash {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected latest supported protocol version and hash %d, got %d", node.Name, accountData.ID, accountData.LatestSupportedProtocolVersionAndHash, actualAccountData.LatestSupportedProtocolVersionAndHash)
+			}
 		}
 
 		return nil
 	})
 }
 
-func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.SlotIndex, accountDiff *prunable.AccountDiff, destroyed bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.SlotIndex, accountDiff *model.AccountDiff, destroyed bool, nodes ...*mock.Node) {
 	t.Eventually(func() error {
 		for _, node := range nodes {
 
-			accountsDiffStorage := node.Protocol.MainEngineInstance().Storage.AccountDiffs(index)
+			accountsDiffStorage, err := node.Protocol.MainEngineInstance().Storage.AccountDiffs(index)
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertAccountDiff: %s: failed to load accounts diff for slot %d", node.Name, index)
+			}
 
 			if has, err := accountsDiffStorage.Has(accountID); err != nil {
 				return ierrors.Wrapf(err, "AssertAccountDiff: %s: failed to load accounts diff for slot %d", node.Name, index)
@@ -117,6 +140,14 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 
 			if !cmp.Equal(accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected delegation stake change epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange, accountID, index)
+			}
+
+			if !cmp.Equal(accountDiff.PrevLatestSupportedVersionAndHash, actualAccountDiff.PrevLatestSupportedVersionAndHash) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected previous latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.PreviousExpirySlot, actualAccountDiff.PrevLatestSupportedVersionAndHash, accountID, index)
+			}
+
+			if !cmp.Equal(accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected new latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash, accountID, index)
 			}
 		}
 

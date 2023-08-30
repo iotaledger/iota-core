@@ -6,15 +6,12 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -42,18 +39,16 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 		return
 	}
 
-	rootsStorage := mainEngine.Storage.Roots(commitmentID.Index())
-	if rootsStorage == nil {
-		p.HandleError(ierrors.Errorf("failed to load roots for commitment %s", commitmentID))
+	rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Index())
+	if err != nil {
+		p.HandleError(ierrors.Errorf("failed to get roots storage for commitment %s", commitmentID))
 		return
 	}
-	rootsBytes, err := rootsStorage.Get(kvstore.Key{prunable.RootsKey})
+	roots, err := rootsStorage.Load(commitmentID)
 	if err != nil {
 		p.HandleError(ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID))
 		return
 	}
-	var roots iotago.Roots
-	lo.PanicOnErr(p.APIForSlot(commitmentID.Index()).Decode(rootsBytes, &roots))
 
 	p.networkProtocol.SendAttestations(commitment, attestations, roots.AttestationsProof(), src)
 }
@@ -136,7 +131,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 
 		p.ChainManager.ProcessCandidateCommitment(commitment)
 
-		if candidateEngineInstance.IsBootstrapped() &&
+		if candidateEngineInstance.SyncManager.IsBootstrapped() &&
 			commitment.CumulativeWeight() > p.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
 			p.switchEngines()
 		}

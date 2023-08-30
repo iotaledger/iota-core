@@ -23,6 +23,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager/trivialsyncmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
@@ -97,6 +98,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		tipselectionv1.NewProvider(),
 		retainer.NewProvider(),
 		signalingupgradeorchestrator.NewProvider(),
+		trivialsyncmanager.NewProvider(),
 		engine.WithSnapshotPath(""), // magic to disable loading snapshot
 	)
 	defer engineInstance.Shutdown()

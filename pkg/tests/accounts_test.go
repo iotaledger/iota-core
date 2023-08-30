@@ -8,10 +8,10 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/utils"
@@ -92,12 +92,14 @@ func Test_TransitionAccount(t *testing.T) {
 
 	var slotIndexBlock1 iotago.SlotIndex = 1
 	activeNodes := []*mock.Node{node1}
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+	genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
 
-	block1 := ts.IssueBlockAtSlotWithOptions("block1", slotIndexBlock1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), node1, tx1)
+	block1 := ts.IssueBlockAtSlotWithOptions("block1", slotIndexBlock1, genesisCommitment, node1, tx1)
 
 	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Index(), activeNodes, block1)
 
-	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock1, &prunable.AccountDiff{
+	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock1, &model.AccountDiff{
 		BICChange:           0,
 		PreviousUpdatedTime: 0,
 		PreviousExpirySlot:  1,
@@ -134,7 +136,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithStakingFeature(&iotago.StakingFeature{
 			StakedAmount: 10000,
 			FixedCost:    421,
-			StartEpoch:   1,
+			StartEpoch:   0,
 			EndEpoch:     10,
 		}),
 	)
@@ -163,7 +165,7 @@ func Test_TransitionAccount(t *testing.T) {
 	latestParent = ts.CommitUntilSlot(slotIndexBlock2, activeNodes, block2)
 
 	// assert diff of a destroyed account, to make sure we can correctly restore it
-	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock2, &prunable.AccountDiff{
+	ts.AssertAccountDiff(genesisAccountOutput.AccountID, slotIndexBlock2, &model.AccountDiff{
 		BICChange:             -iotago.BlockIssuanceCredits(123),
 		PreviousUpdatedTime:   0,
 		NewExpirySlot:         0,
@@ -181,7 +183,7 @@ func Test_TransitionAccount(t *testing.T) {
 	newAccount := ts.AccountOutput("TX2:0")
 	newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
 
-	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock2, &prunable.AccountDiff{
+	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock2, &model.AccountDiff{
 		BICChange:             0,
 		PreviousUpdatedTime:   0,
 		NewExpirySlot:         newAccountExpirySlot,
@@ -213,7 +215,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	inputForNewDelegation, newDelegationOutputs, newDelegationWallets := ts.TransactionFramework.CreateDelegationFromInput("TX1:2",
 		testsuite.WithDelegatedValidatorID(newAccountOutput.AccountID),
-		testsuite.WithDelegationStartEpoch(2),
+		testsuite.WithDelegationStartEpoch(1),
 	)
 
 	slotIndexBlock3 := latestParent.ID().Index()
@@ -233,7 +235,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	_ = ts.CommitUntilSlot(slotIndexBlock3, activeNodes, block3)
 
-	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock3, &prunable.AccountDiff{
+	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock3, &model.AccountDiff{
 		BICChange:             0,
 		PreviousUpdatedTime:   0,
 		NewOutputID:           iotago.EmptyOutputID,

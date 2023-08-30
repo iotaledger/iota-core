@@ -17,7 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -63,14 +63,14 @@ func NewTestSuite(test *testing.T) *TestSuite {
 
 func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
-	slotDiffFunc := func(index iotago.SlotIndex) *prunable.AccountDiffs {
+	slotDiffFunc := func(index iotago.SlotIndex) (*slotstore.AccountDiffs, error) {
 		if _, exists := prunableStores[index]; !exists {
 			prunableStores[index] = mapdb.NewMapDB()
 		}
 
-		p := prunable.NewAccountDiffs(index, prunableStores[index], tpkg.TestAPI)
+		p := slotstore.NewAccountDiffs(index, prunableStores[index], tpkg.TestAPI)
 
-		return p
+		return p, nil
 	}
 
 	blockFunc := func(id iotago.BlockID) (*blocks.Block, bool) {
@@ -93,7 +93,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 
 	// Commit an empty diff if no actions specified.
 	if len(actions) == 0 {
-		err := t.Instance.ApplyDiff(slotIndex, rmc, make(map[iotago.AccountID]*prunable.AccountDiff), ds.NewSet[iotago.AccountID]())
+		err := t.Instance.ApplyDiff(slotIndex, rmc, make(map[iotago.AccountID]*model.AccountDiff), ds.NewSet[iotago.AccountID]())
 		require.NoError(t.T, err)
 		return
 	}
@@ -117,17 +117,18 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 		prevAccountFields, exists := t.latestFieldsPerAccount.Get(accountID)
 		if !exists {
 			prevAccountFields = &latestAccountFields{
-				OutputID:       iotago.EmptyOutputID,
-				BICUpdatedAt:   0,
-				UpdatedInSlots: ds.NewSet[iotago.SlotIndex](),
-				ExpirySlot:     0,
+				OutputID:                      iotago.EmptyOutputID,
+				BICUpdatedAt:                  0,
+				UpdatedInSlots:                ds.NewSet[iotago.SlotIndex](),
+				ExpirySlot:                    0,
+				LatestSupportedVersionAndHash: model.VersionAndHash{},
 			}
 			t.latestFieldsPerAccount.Set(accountID, prevAccountFields)
 		}
 		prevAccountFields.UpdatedInSlots.Add(slotIndex)
 
 		// Put everything together in the format that the manager expects.
-		slotDetails.SlotDiff[accountID] = &prunable.AccountDiff{
+		slotDetails.SlotDiff[accountID] = &model.AccountDiff{
 			BICChange:           iotago.BlockIssuanceCredits(action.TotalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
 			PubKeysAdded:        t.PublicKeys(action.AddedKeys, true),
 			PubKeysRemoved:      t.PublicKeys(action.RemovedKeys, true),
@@ -169,11 +170,17 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 			panic("previous account OutputID in the local map and NewOutputID in slot diff cannot be empty")
 		}
 
-		fmt.Printf("prepared state diffs %+v\nprevAccountdata %+v\n", slotDetails.SlotDiff[accountID], prevAccountFields)
+		if prevAccountFields.LatestSupportedVersionAndHash != action.LatestSupportedProtocolVersionAndHash {
+			slotDetails.SlotDiff[accountID].PrevLatestSupportedVersionAndHash = prevAccountFields.LatestSupportedVersionAndHash
+			slotDetails.SlotDiff[accountID].NewLatestSupportedVersionAndHash = action.LatestSupportedProtocolVersionAndHash
+
+			prevAccountFields.LatestSupportedVersionAndHash = action.LatestSupportedProtocolVersionAndHash
+
+		}
 	}
 
 	// Clone the diffs to prevent the manager from modifying it.
-	diffs := make(map[iotago.AccountID]*prunable.AccountDiff)
+	diffs := make(map[iotago.AccountID]*model.AccountDiff)
 	for accountID, diff := range slotDetails.SlotDiff {
 		diffs[accountID] = diff.Clone()
 	}
@@ -238,11 +245,12 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 	require.Truef(t.T, expectedPubKeys.Equals(actualState.PubKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedPubKeys, actualState.PubKeys)
 
 	require.Equal(t.T, t.OutputID(expectedState.OutputID, false), actualState.OutputID)
-
 	require.Equal(t.T, expectedState.StakeEndEpoch, actualState.StakeEndEpoch, "slotIndex: %d, accountID %s: expected StakeEndEpoch: %d, actual: %d", slotIndex, accountID, expectedState.StakeEndEpoch, actualState.StakeEndEpoch)
 	require.Equal(t.T, expectedState.ValidatorStake, actualState.ValidatorStake, "slotIndex: %d, accountID %s: expected ValidatorStake: %d, actual: %d", slotIndex, accountID, expectedState.ValidatorStake, actualState.ValidatorStake)
 	require.Equal(t.T, expectedState.FixedCost, actualState.FixedCost, "slotIndex: %d, accountID %s: expected FixedCost: %d, actual: %d", slotIndex, accountID, expectedState.FixedCost, actualState.FixedCost)
 	require.Equal(t.T, expectedState.DelegationStake, actualState.DelegationStake, "slotIndex: %d, accountID %s: expected DelegationStake: %d, actual: %d", slotIndex, accountID, expectedState.DelegationStake, actualState.DelegationStake)
+	require.Equal(t.T, expectedState.LatestSupportedProtocolVersionAndHash, actualState.LatestSupportedProtocolVersionAndHash, "slotIndex: %d, accountID %s: expected LatestSupportedProtocolVersionAndHash: %d, actual: %d", slotIndex, accountID, expectedState.LatestSupportedProtocolVersionAndHash, actualState.LatestSupportedProtocolVersionAndHash)
+
 }
 
 func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
@@ -284,6 +292,9 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 	require.Equal(t.T, expectedAccountDiff.BICChange-iotago.BlockIssuanceCredits(accountsSlotBuildData.Burns[accountID]), actualDiff.BICChange)
 	require.Equal(t.T, expectedAccountDiff.PubKeysAdded, actualDiff.PubKeysAdded)
 	require.Equal(t.T, expectedAccountDiff.PubKeysRemoved, actualDiff.PubKeysRemoved)
+	require.Equal(t.T, expectedAccountDiff.PrevLatestSupportedVersionAndHash, actualDiff.PrevLatestSupportedVersionAndHash)
+	require.Equal(t.T, expectedAccountDiff.NewLatestSupportedVersionAndHash, actualDiff.NewLatestSupportedVersionAndHash)
+
 }
 
 func (t *TestSuite) AccountID(alias string, createIfNotExists bool) iotago.AccountID {
@@ -338,9 +349,10 @@ type AccountActions struct {
 	AddedKeys       []string
 	RemovedKeys     []string
 
-	ValidatorStakeChange int64
-	StakeEndEpochChange  int64
-	FixedCostChange      int64
+	ValidatorStakeChange                  int64
+	StakeEndEpochChange                   int64
+	FixedCostChange                       int64
+	LatestSupportedProtocolVersionAndHash model.VersionAndHash
 
 	DelegationStakeChange int64
 
@@ -354,24 +366,26 @@ type AccountState struct {
 	OutputID string
 	PubKeys  []string
 
-	ValidatorStake  iotago.BaseToken
-	DelegationStake iotago.BaseToken
-	FixedCost       iotago.Mana
-	StakeEndEpoch   iotago.EpochIndex
+	ValidatorStake                        iotago.BaseToken
+	DelegationStake                       iotago.BaseToken
+	FixedCost                             iotago.Mana
+	StakeEndEpoch                         iotago.EpochIndex
+	LatestSupportedProtocolVersionAndHash model.VersionAndHash
 
 	Destroyed bool
 }
 
 type latestAccountFields struct {
-	OutputID       iotago.OutputID
-	BICUpdatedAt   iotago.SlotIndex
-	UpdatedInSlots ds.Set[iotago.SlotIndex]
-	ExpirySlot     iotago.SlotIndex
+	OutputID                      iotago.OutputID
+	BICUpdatedAt                  iotago.SlotIndex
+	UpdatedInSlots                ds.Set[iotago.SlotIndex]
+	ExpirySlot                    iotago.SlotIndex
+	LatestSupportedVersionAndHash model.VersionAndHash
 }
 
 type slotData struct {
 	Burns             map[iotago.AccountID]iotago.Mana
-	SlotDiff          map[iotago.AccountID]*prunable.AccountDiff
+	SlotDiff          map[iotago.AccountID]*model.AccountDiff
 	DestroyedAccounts ds.Set[iotago.AccountID]
 }
 
@@ -379,6 +393,6 @@ func newSlotData() *slotData {
 	return &slotData{
 		DestroyedAccounts: ds.NewSet[iotago.AccountID](),
 		Burns:             make(map[iotago.AccountID]iotago.Mana),
-		SlotDiff:          make(map[iotago.AccountID]*prunable.AccountDiff),
+		SlotDiff:          make(map[iotago.AccountID]*model.AccountDiff),
 	}
 }

@@ -10,8 +10,8 @@ import (
 
 func (t *TestSuite) AssertStorageBlock(block *model.Block, node *mock.Node) {
 	t.Eventually(func() error {
-		storage := node.Protocol.MainEngineInstance().Storage.Blocks(block.ID().Index())
-		if storage == nil {
+		storage, err := node.Protocol.MainEngineInstance().Storage.Blocks(block.ID().Index())
+		if err != nil {
 			return ierrors.Errorf("AssertStorageBlock: %s: storage for %s is nil", node.Name, block.ID().Index())
 		}
 
@@ -37,8 +37,9 @@ func (t *TestSuite) AssertStorageBlockExist(block *model.Block, expectedExist bo
 		t.AssertStorageBlock(block, node)
 	} else {
 		t.Eventually(func() error {
-			storage := node.Protocol.MainEngineInstance().Storage.Blocks(block.ID().Index())
-			if storage == nil {
+			storage, err := node.Protocol.MainEngineInstance().Storage.Blocks(block.ID().Index())
+			if err != nil {
+				//nolint:nilerr // expected behavior
 				return nil
 			}
 

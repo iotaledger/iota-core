@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -23,7 +23,7 @@ type State struct {
 
 	rootBlocks           *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID]
 	latestRootBlocks     *ringbuffer.RingBuffer[iotago.BlockID]
-	rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks
+	rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error)
 	lastEvictedSlot      iotago.SlotIndex
 	latestNonEmptyStore  kvstore.KVStore
 	evictionMutex        syncutils.RWMutex
@@ -32,7 +32,7 @@ type State struct {
 }
 
 // NewState creates a new eviction State.
-func NewState(latestNonEmptyStore kvstore.KVStore, rootBlockStorageFunc func(iotago.SlotIndex) *prunable.RootBlocks, opts ...options.Option[State]) (state *State) {
+func NewState(latestNonEmptyStore kvstore.KVStore, rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error), opts ...options.Option[State]) (state *State) {
 	return options.Apply(&State{
 		Events:                      NewEvents(),
 		rootBlocks:                  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID](),
@@ -112,7 +112,7 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	}
 
 	if s.rootBlocks.Get(id.Index(), true).Set(id, commitmentID) {
-		if err := s.rootBlockStorageFunc(id.Index()).Store(id, commitmentID); err != nil {
+		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Index())).Store(id, commitmentID); err != nil {
 			panic(ierrors.Wrapf(err, "failed to store root block %s", id))
 		}
 	}
@@ -126,7 +126,7 @@ func (s *State) RemoveRootBlock(id iotago.BlockID) {
 	defer s.evictionMutex.RUnlock()
 
 	if rootBlocks := s.rootBlocks.Get(id.Index()); rootBlocks != nil && rootBlocks.Delete(id) {
-		if err := s.rootBlockStorageFunc(id.Index()).Delete(id); err != nil {
+		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Index())).Delete(id); err != nil {
 			panic(err)
 		}
 	}
@@ -187,18 +187,17 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 
 	if err := stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		for currentSlot := start; currentSlot <= targetSlot; currentSlot++ {
-			storage := s.rootBlockStorageFunc(currentSlot)
-			if storage == nil {
+			storage, err := s.rootBlockStorageFunc(currentSlot)
+			if err != nil {
 				continue
 			}
-			// TODO: here we should introduce a .StreamBytes() method to avoid deserialize and serialize again.
-			if err = storage.Stream(func(rootBlockID iotago.BlockID, commitmentID iotago.CommitmentID) (err error) {
-				if err = stream.WriteSerializable(writer, rootBlockID, iotago.BlockIDLength); err != nil {
-					return ierrors.Wrapf(err, "failed to write root block ID %s", rootBlockID)
+			if err = storage.StreamBytes(func(rootBlockIDBytes []byte, commitmentIDBytes []byte) (err error) {
+				if err = stream.WriteBlob(writer, rootBlockIDBytes); err != nil {
+					return ierrors.Wrapf(err, "failed to write root block ID %s", rootBlockIDBytes)
 				}
 
-				if err = stream.WriteSerializable(writer, commitmentID, iotago.CommitmentIDLength); err != nil {
-					return ierrors.Wrapf(err, "failed to write root block's %s commitment %s", rootBlockID, commitmentID)
+				if err = stream.WriteBlob(writer, commitmentIDBytes); err != nil {
+					return ierrors.Wrapf(err, "failed to write root block's %s commitment %s", rootBlockIDBytes, commitmentIDBytes)
 				}
 
 				elementsCount++
@@ -232,7 +231,8 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 // Import imports the root blocks from the given reader.
 func (s *State) Import(reader io.ReadSeeker) error {
 	if err := stream.ReadCollection(reader, func(i int) error {
-		blockIDBytes, err := stream.ReadBytes(reader, iotago.BlockIDLength)
+
+		blockIDBytes, err := stream.ReadBlob(reader)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to read root block id %d", i)
 		}
@@ -242,7 +242,7 @@ func (s *State) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "failed to parse root block id %d", i)
 		}
 
-		commitmentIDBytes, err := stream.ReadBytes(reader, iotago.CommitmentIDLength)
+		commitmentIDBytes, err := stream.ReadBlob(reader)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
 		}
@@ -253,7 +253,7 @@ func (s *State) Import(reader io.ReadSeeker) error {
 		}
 
 		if s.rootBlocks.Get(rootBlockID.Index(), true).Set(rootBlockID, commitmentID) {
-			if err := s.rootBlockStorageFunc(rootBlockID.Index()).Store(rootBlockID, commitmentID); err != nil {
+			if err := lo.PanicOnErr(s.rootBlockStorageFunc(rootBlockID.Index())).Store(rootBlockID, commitmentID); err != nil {
 				panic(ierrors.Wrapf(err, "failed to store root block %s", rootBlockID))
 			}
 		}
@@ -281,13 +281,16 @@ func (s *State) Import(reader io.ReadSeeker) error {
 // PopulateFromStorage populates the root blocks from the storage.
 func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 	for index := lo.Return1(s.delayedBlockEvictionThreshold(latestCommitmentIndex)); index <= latestCommitmentIndex; index++ {
-		if storedRootBlocks := s.rootBlockStorageFunc(index); storedRootBlocks != nil {
-			_ = storedRootBlocks.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
-				s.AddRootBlock(id, commitmentID)
-
-				return nil
-			})
+		storedRootBlocks, err := s.rootBlockStorageFunc(index)
+		if err != nil {
+			continue
 		}
+
+		_ = storedRootBlocks.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
+			s.AddRootBlock(id, commitmentID)
+
+			return nil
+		})
 	}
 }
 

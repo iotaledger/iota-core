@@ -6,8 +6,8 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -121,8 +121,8 @@ func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 	destroyedAccounts := make(map[iotago.AccountID]*accounts.AccountData)
 
 	for index := m.latestCommittedSlot; index > targetIndex; index-- {
-		// no need to check if `m.slotDiff(index)` is nil, because it is impossible to export a pruned slot
-		err = m.slotDiff(index).StreamDestroyed(func(accountID iotago.AccountID) bool {
+		// it should be impossible that `m.slotDiff(index)` returns an error, because it is impossible to export a pruned slot
+		err = lo.PanicOnErr(m.slotDiff(index)).StreamDestroyed(func(accountID iotago.AccountID) bool {
 			// actual data will be filled in by rollbackAccountTo
 			accountData := accounts.NewAccountData(accountID)
 
@@ -180,8 +180,8 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 			continue
 		}
 
-		diffStore := m.slotDiff(slotIndex)
-		if diffStore == nil {
+		diffStore, err := m.slotDiff(slotIndex)
+		if err != nil {
 			return ierrors.Errorf("unable to import account slot diffs for slot %d", slotIndex)
 		}
 
@@ -196,7 +196,7 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 				return ierrors.Wrapf(err, "unable to read destroyed flag for accountID %s", accountID)
 			}
 
-			accountDiff := prunable.NewAccountDiff()
+			accountDiff := model.NewAccountDiff()
 			if !destroyed {
 				if err := accountDiff.FromReader(reader); err != nil {
 					return ierrors.Wrapf(err, "unable to read account diff for accountID %s", accountID)
@@ -236,13 +236,13 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 		slotDiffsCount++
 
 		var innerErr error
-		slotDiffs := m.slotDiff(slotIndex)
-		if slotDiffs == nil {
+		slotDiffs, err := m.slotDiff(slotIndex)
+		if err != nil {
 			// if slotIndex is already pruned, then don't write anything
 			continue
 		}
 
-		if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff *prunable.AccountDiff, destroyed bool) bool {
+		if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff *model.AccountDiff, destroyed bool) bool {
 			if err = pWriter.WriteBytes(lo.PanicOnErr(accountID.Bytes())); err != nil {
 				innerErr = ierrors.Wrapf(err, "unable to write accountID for account %s", accountID)
 			}

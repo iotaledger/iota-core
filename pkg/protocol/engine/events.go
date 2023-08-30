@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
@@ -25,7 +26,7 @@ import (
 type Events struct {
 	BlockProcessed         *event.Event1[iotago.BlockID]
 	AcceptedBlockProcessed *event.Event1[*blocks.Block]
-	StoragePruned          *event.Event1[iotago.SlotIndex]
+	StoragePruned          *event.Event1[iotago.EpochIndex]
 
 	EvictionState    *eviction.Events
 	Filter           *filter.Events
@@ -43,6 +44,7 @@ type Events struct {
 	ConflictDAG      *conflictdag.Events[iotago.TransactionID, iotago.OutputID]
 	Scheduler        *scheduler.Events
 	SeatManager      *seatmanager.Events
+	SyncManager      *syncmanager.Events
 
 	event.Group[Events, *Events]
 }
@@ -52,7 +54,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 	return &Events{
 		BlockProcessed:         event.New1[iotago.BlockID](),
 		AcceptedBlockProcessed: event.New1[*blocks.Block](),
-		StoragePruned:          event.New1[iotago.SlotIndex](),
+		StoragePruned:          event.New1[iotago.EpochIndex](),
 		EvictionState:          eviction.NewEvents(),
 		Filter:                 filter.NewEvents(),
 		CommitmentFilter:       commitmentfilter.NewEvents(),
@@ -69,5 +71,6 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		ConflictDAG:            conflictdag.NewEvents[iotago.TransactionID, iotago.OutputID](),
 		Scheduler:              scheduler.NewEvents(),
 		SeatManager:            seatmanager.NewEvents(),
+		SyncManager:            syncmanager.NewEvents(),
 	}
 })

@@ -43,7 +43,7 @@ func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadataResponse, error
 }
 
 func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMetadataResponse, error) {
-	latestCommitment := deps.Protocol.SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
 	resp := &apimodels.OutputMetadataResponse{
 		BlockID:            output.BlockID(),
@@ -55,7 +55,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 
 	includedSlotIndex := output.SlotBooked()
 	if includedSlotIndex <= latestCommitment.Index() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedSlotIndex)
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
 		}
@@ -66,7 +66,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 }
 
 func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadataResponse, error) {
-	latestCommitment := deps.Protocol.SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
 	resp := &apimodels.OutputMetadataResponse{
 		BlockID:            spent.BlockID(),
@@ -79,7 +79,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 
 	includedSlotIndex := spent.Output().SlotBooked()
 	if includedSlotIndex <= latestCommitment.Index() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(includedSlotIndex)
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
 		}
@@ -88,7 +88,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 
 	spentSlotIndex := spent.SlotIndexSpent()
 	if spentSlotIndex <= latestCommitment.Index() {
-		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Permanent.Commitments().Load(spentSlotIndex)
+		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
 		}
