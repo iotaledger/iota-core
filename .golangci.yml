@@ -76,7 +76,7 @@ linters:
         - goheader
         - goimports
         #- gomnd
-        #- gomoddirectives  // TODO: reenable after the replace for memsize was removed
+        - gomoddirectives
         - gomodguard
         - goprintffuncname
         - gosec
