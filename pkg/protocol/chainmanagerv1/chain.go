@@ -15,22 +15,22 @@ type Chain struct {
 	// commitments is a map of Commitment objects that belong to the same chain.
 	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
 
-	// latestCommitment is the latest Commitment object in this collection.
+	// latestCommitment is the latest Commitment object in this chain.
 	latestCommitment reactive.Variable[*Commitment]
 
-	// latestAttestedCommitment is the latest attested Commitment object in this collection.
+	// latestAttestedCommitment is the latest attested Commitment object in this chain.
 	latestAttestedCommitment reactive.Variable[*Commitment]
 
-	// latestVerifiedCommitment is the latest verified Commitment object in this collection.
+	// latestVerifiedCommitment is the latest verified Commitment object in this chain.
 	latestVerifiedCommitment reactive.Variable[*Commitment]
 
 	// evicted is an event that gets triggered when the chain gets evicted.
 	evicted reactive.Event
 
-	// weight is a reactive component that tracks the cumulative weight of the chain.
+	// weight is a reactive subcomponent that tracks the cumulative weight of the chain.
 	*chainWeights
 
-	// thresholds is a reactive component that tracks the thresholds of the chain.
+	// thresholds is a reactive subcomponent that tracks the thresholds of the chain.
 	*chainDispatcherThresholds
 }
 
@@ -49,7 +49,7 @@ func NewChain(root *Commitment) *Chain {
 	c.chainWeights = newChainWeights(c)
 	c.chainDispatcherThresholds = newChainDispatcherThresholds(c)
 
-	// associate the root commitment with its chain
+	// associate the commitment with its chain
 	root.chain.Set(c)
 
 	return c
@@ -90,13 +90,13 @@ func (c *Chain) LatestCommitment() reactive.Variable[*Commitment] {
 }
 
 // LatestAttestedCommitment returns a reactive variable that always contains the latest attested Commitment object
-// in this collection.
+// in this chain.
 func (c *Chain) LatestAttestedCommitment() reactive.Variable[*Commitment] {
 	return c.latestAttestedCommitment
 }
 
 // LatestVerifiedCommitment returns a reactive variable that always contains the latest verified Commitment object
-// in this collection.
+// in this chain.
 func (c *Chain) LatestVerifiedCommitment() reactive.Variable[*Commitment] {
 	return c.latestVerifiedCommitment
 }
@@ -117,6 +117,7 @@ func (c *Chain) registerCommitment(commitment *Commitment) {
 		commitment.verified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(commitment.max) }),
 	)
 
+	// unsubscribe and unregister the commitment when it changes its chain
 	commitment.chain.OnUpdateOnce(func(_, _ *Chain) {
 		unsubscribe()
 
