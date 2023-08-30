@@ -63,19 +63,21 @@ func (c *Chain) Root() *Commitment {
 // Commitment returns the Commitment object with the given index, if it exists.
 func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c; currentChain != nil; {
-		root := currentChain.Root()
-		if root == nil {
+		switch root := currentChain.Root(); {
+		case root == nil:
 			return nil, false
-		} else if index >= root.Index() {
+		case root.Index() == index:
+			return root, true
+		case index > root.Index():
 			return currentChain.commitments.Get(index)
-		}
+		default:
+			parent := root.parent.Get()
+			if parent == nil {
+				return nil, false
+			}
 
-		parent := root.parent.Get()
-		if parent == nil {
-			return nil, false
+			currentChain = parent.chain.Get()
 		}
-
-		currentChain = parent.chain.Get()
 	}
 
 	return nil, false
