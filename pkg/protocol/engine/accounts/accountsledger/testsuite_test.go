@@ -324,7 +324,7 @@ func (t *TestSuite) BlockIssuerKey(alias string, createIfNotExists bool) iotago.
 	if blockIssuerKey, exists := t.blockIssuerKeys[alias]; exists {
 		return blockIssuerKey
 	} else if !createIfNotExists {
-		panic(fmt.Sprintf("public key with alias '%s' does not exist", alias))
+		panic(fmt.Sprintf("block issuer key with alias '%s' does not exist", alias))
 	}
 
 	t.blockIssuerKeys[alias] = utils.RandBlockIssuerKey()
