@@ -65,7 +65,7 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 	for currentChain := c; currentChain != nil; {
 		switch root := currentChain.Root(); {
 		case root == nil:
-			return nil, false
+			return nil, false // this should never happen, but we can handle it gracefully anyway
 		case root.Index() == index:
 			return root, true
 		case index > root.Index():
