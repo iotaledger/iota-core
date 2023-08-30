@@ -21,7 +21,6 @@ type Tracker struct {
 	poolStatsStore  *kvstore.TypedStore[iotago.EpochIndex, *PoolsStats]
 	committeeStore  *kvstore.TypedStore[iotago.EpochIndex, *account.Accounts]
 
-	registeredValidatorsFunc     func(index iotago.SlotIndex) *prunable.RegisteredValidatorSlotActivity
 	validatorSlotPerformanceFunc func(slot iotago.SlotIndex) *prunable.ValidatorSlotPerformance
 	latestAppliedEpoch           iotago.EpochIndex
 
@@ -37,7 +36,6 @@ func NewTracker(
 	rewardsBaseStore kvstore.KVStore,
 	poolStatsStore kvstore.KVStore,
 	committeeStore kvstore.KVStore,
-	registeredValidatorsFunc func(index iotago.SlotIndex) *prunable.RegisteredValidatorSlotActivity,
 	performanceFactorsFunc func(slot iotago.SlotIndex) *prunable.ValidatorSlotPerformance,
 	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider api.Provider,
@@ -57,7 +55,6 @@ func NewTracker(
 			(*account.Accounts).Bytes,
 			account.AccountsFromBytes,
 		),
-		registeredValidatorsFunc:     registeredValidatorsFunc,
 		validatorSlotPerformanceFunc: performanceFactorsFunc,
 		latestAppliedEpoch:           latestAppliedEpoch,
 		apiProvider:                  apiProvider,
@@ -69,7 +66,6 @@ func (t *Tracker) RegisterCommittee(epoch iotago.EpochIndex, committee *account.
 	return t.committeeStore.Set(epoch, committee)
 }
 
-// TODO: doesnt need to to be issued by committee member, when you register you send a validation block as activity proof
 func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	validatorBlock, isValidationBlock := block.ValidationBlock()
 	if !isValidationBlock {
@@ -91,24 +87,6 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 		t.trackCommitteeMemberPerformance(validatorBlock, block)
 
 		return
-	}
-	// not a committee member, just activity proof for registration
-	t.trackRegisteredValidatorActivity(validatorBlock, block)
-}
-
-func (t *Tracker) trackRegisteredValidatorActivity(validationBlock *iotago.ValidationBlock, block *blocks.Block) {
-	epoch := t.apiProvider.APIForSlot(block.ID().Index()).TimeProvider().EpochFromSlot(block.ID().Index())
-	epochEnd := t.apiProvider.APIForEpoch(epoch).TimeProvider().EpochEnd(epoch)
-	nearingThreshold := t.apiProvider.APIForEpoch(epoch).ProtocolParameters().EpochNearingThreshold()
-	activityWindowDuration := t.apiProvider.APIForEpoch(epoch).ProtocolParameters().ActivityWindowDuration()
-	// we track activity for [nextEpochEnd-EpochNearingThreshold-ActivityWindowDuration, nextEpochEnd-EpochNearingThreshold]
-	// only for registered already validators
-	// TODO: shouild I check If committee for nextEpoch was not selected yet?
-	if epochEnd <= block.ID().Index()+nearingThreshold+activityWindowDuration && block.ID().Index()+activityWindowDuration < epochEnd {
-		// TODO use epochs after merging pruning PR changes
-		//nextEpoch := epoch + 1
-		//registeredStore := t.registeredValidatorsFunc(t.apiProvider.APIForEpoch(nextEpoch).TimeProvider().EpochStart(epoch))
-		// check if validator has registered for the next epoch, if yes: update registeredStore with active: true and
 	}
 }
 
@@ -139,18 +117,6 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
-}
-
-func (t *Tracker) ValidatorPerformance(slot iotago.SlotIndex, accountID iotago.AccountID) (*prunable.RegisteredValidatorActivity, error) {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
-	t.performanceFactorsMutex.RLock()
-	defer t.performanceFactorsMutex.RUnlock()
-
-	// TODO finish after refactor of pruning store
-	//validatorSlotPerformanceStore := t.registeredValidatorsFunc(slot)
-	return nil, nil
 }
 
 func (t *Tracker) updateSlotPerformanceBitMap(pf *prunable.ValidatorPerformance, slotIndex iotago.SlotIndex, issuingTime time.Time) *prunable.ValidatorPerformance {

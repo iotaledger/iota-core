@@ -20,7 +20,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1/performance"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
@@ -64,7 +63,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 
 					latestCommitedSlot := e.Storage.Settings().LatestCommitment().Index()
 					latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommitedSlot).TimeProvider().EpochFromSlot(latestCommitedSlot)
-					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.ValidatorActivity, e.Storage.PerformanceFactors, latestCommittedEpoch, e, o.errHandler)
+					o.performanceTracker = performance.NewTracker(e.Storage.Rewards(), e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, latestCommittedEpoch, e, o.errHandler)
 					o.lastCommittedSlot = latestCommitedSlot
 
 					if o.optsInitialCommittee != nil {
@@ -111,10 +110,6 @@ func (o *SybilProtection) Shutdown() {
 
 func (o *SybilProtection) TrackValidationBlock(block *blocks.Block) {
 	o.performanceTracker.TrackValidationBlock(block)
-}
-
-func (o *SybilProtection) ValidatorPerformance(slot iotago.SlotIndex, accountID iotago.AccountID) (*prunable.RegisteredValidatorActivity, error) {
-	return o.performanceTracker.ValidatorPerformance(slot, accountID)
 }
 
 func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewardsRoot iotago.Identifier) {

@@ -120,12 +120,6 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 	active := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, nextEpoch)
 
-	// TODO finish and use version and hash
-	//vp, err := deps.Protocol.MainEngineInstance().SybilProtection.ValidatorPerformance(latestCommittedSlot, accountID)
-	//if err != nil {
-	//	return nil, ierrors.Wrapf(err, "failed to get validator performance for account: %s", accountID.ToHex())
-	//}
-
 	return &apimodels.ValidatorResponse{
 		AccountID:                      accountID,
 		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
