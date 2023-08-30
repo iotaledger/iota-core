@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -96,6 +97,9 @@ type Protocol struct {
 	optsSchedulerProvider           module.Provider[*engine.Engine, scheduler.Scheduler]
 	optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
 
+	optsAttestationRequesterTryInterval time.Duration
+	optsAttestationRequesterMaxRetries  int
+
 	module.Module
 }
 
@@ -124,6 +128,9 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 
 		optsBaseDirectory:           "",
 		optsChainSwitchingThreshold: 3,
+
+		optsAttestationRequesterTryInterval: 3 * time.Second,
+		optsAttestationRequesterMaxRetries:  3,
 	}, opts, func(p *Protocol) {
 		p.BlockDispatcher = NewBlockDispatcher(p)
 	}, (*Protocol).initEngineManager, (*Protocol).initChainManager, (*Protocol).TriggerConstructed)

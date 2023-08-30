@@ -247,32 +247,43 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 		}
 		mainChainCommitment := mainChainChainCommitment.Commitment()
 
-		// TODO: should we retry?
-		p.networkProtocol.RequestAttestations(fork.ForkedChain.Commitment(i).ID(), fork.Source)
+		ticker := time.NewTicker(p.optsAttestationRequesterTryInterval)
+		defer ticker.Stop()
+		counter := 0
+		received := false
+		for !received {
+			p.networkProtocol.RequestAttestations(fork.ForkedChain.Commitment(i).ID(), fork.Source)
 
-		select {
-		case result := <-ch:
-			if result.err != nil {
-				return nil, false, true, ierrors.Wrapf(result.err, "failed to verify commitment %s", result.commitment.ID())
+			select {
+			case result := <-ch:
+				if result.err != nil {
+					return nil, false, true, ierrors.Wrapf(result.err, "failed to verify commitment %s", result.commitment.ID())
+				}
+
+				anchorBlockIDs = append(anchorBlockIDs, result.blockIDs...)
+
+				// Count how many consecutive slots are heavier/lighter than the main chain.
+				switch {
+				case result.actualCumulativeWeight > mainChainCommitment.CumulativeWeight():
+					heavierCount++
+				case result.actualCumulativeWeight < mainChainCommitment.CumulativeWeight():
+					heavierCount--
+				default:
+					heavierCount = 0
+				}
+
+				if decided, doSwitch := forkChoiceRule(heavierCount); decided {
+					return anchorBlockIDs, doSwitch, false, nil
+				}
+				received = true
+			case <-ticker.C:
+				counter++
+				if counter > p.optsAttestationRequesterMaxRetries {
+					return nil, false, true, ierrors.Wrapf(ctx.Err(), "failed to request commitment for slot %d from src %s", i, fork.Source.String())
+				}
+			case <-ctx.Done():
+				return nil, false, false, ierrors.Wrapf(ctx.Err(), "failed to verify commitment for slot %d", i)
 			}
-
-			anchorBlockIDs = append(anchorBlockIDs, result.blockIDs...)
-
-			// Count how many consecutive slots are heavier/lighter than the main chain.
-			switch {
-			case result.actualCumulativeWeight > mainChainCommitment.CumulativeWeight():
-				heavierCount++
-			case result.actualCumulativeWeight < mainChainCommitment.CumulativeWeight():
-				heavierCount--
-			default:
-				heavierCount = 0
-			}
-
-			if decided, doSwitch := forkChoiceRule(heavierCount); decided {
-				return anchorBlockIDs, doSwitch, false, nil
-			}
-		case <-ctx.Done():
-			return nil, false, false, ierrors.Wrapf(ctx.Err(), "failed to verify commitment for slot %d", i)
 		}
 	}
 
