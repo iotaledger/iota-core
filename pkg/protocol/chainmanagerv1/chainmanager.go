@@ -14,12 +14,6 @@ import (
 type ChainManager struct {
 	mainChain reactive.Variable[*Chain]
 
-	heaviestClaimedCandidate reactive.Variable[*Chain]
-
-	heaviestAttestedCandidate reactive.Variable[*Chain]
-
-	heaviestVerifiedCandidate reactive.Variable[*Chain]
-
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
 
 	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
@@ -28,29 +22,28 @@ type ChainManager struct {
 
 	chainCreated *event.Event1[*Chain]
 
+	*chainManagerChainSwitching
+
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
 func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 	c := &ChainManager{
-		mainChain:                 reactive.NewVariable[*Chain]().Init(NewChain(NewCommitment(rootCommitment, true))),
-		heaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
-		heaviestAttestedCandidate: reactive.NewVariable[*Chain](),
-		heaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
-		commitments:               shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
-		commitmentRequester:       eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
-		commitmentCreated:         event.New1[*Commitment](),
-		chainCreated:              event.New1[*Chain](),
-		EvictionState:             reactive.NewEvictionState[iotago.SlotIndex](),
+		mainChain:           reactive.NewVariable[*Chain]().Init(NewChain(NewCommitment(rootCommitment, true))),
+		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
+		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
+		commitmentCreated:   event.New1[*Commitment](),
+		chainCreated:        event.New1[*Chain](),
+		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
 	}
 
-	c.OnChainCreated(func(chain *Chain) {
-		c.selectHeaviestCandidate(c.heaviestClaimedCandidate, chain, (*Chain).ClaimedWeight)
-		c.selectHeaviestCandidate(c.heaviestAttestedCandidate, chain, (*Chain).AttestedWeight)
-		c.selectHeaviestCandidate(c.heaviestVerifiedCandidate, chain, (*Chain).VerifiedWeight)
-	})
+	c.chainManagerChainSwitching = newChainManagerChainSwitching(c)
 
 	return c
+}
+
+func (c *ChainManager) MainChain() reactive.Variable[*Chain] {
+	return c.mainChain
 }
 
 func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment) {
@@ -69,42 +62,6 @@ func (c *ChainManager) OnCommitmentCreated(callback func(commitment *Commitment)
 
 func (c *ChainManager) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
 	return c.chainCreated.Hook(callback).Unhook
-}
-
-func (c *ChainManager) MainChain() *Chain {
-	return c.mainChain.Get()
-}
-
-func (c *ChainManager) MainChainVar() reactive.Variable[*Chain] {
-	return c.mainChain
-}
-
-func (c *ChainManager) HeaviestCandidateChain() reactive.Variable[*Chain] {
-	return c.heaviestClaimedCandidate
-}
-
-func (c *ChainManager) HeaviestAttestedCandidateChain() reactive.Variable[*Chain] {
-	return c.heaviestAttestedCandidate
-}
-
-func (c *ChainManager) HeaviestVerifiedCandidateChain() reactive.Variable[*Chain] {
-	return c.heaviestVerifiedCandidate
-}
-
-func (c *ChainManager) selectHeaviestCandidate(variable reactive.Variable[*Chain], newCandidate *Chain, chainWeight func(*Chain) reactive.Variable[uint64]) {
-	chainWeight(newCandidate).OnUpdate(func(_, newChainWeight uint64) {
-		if newChainWeight <= c.MainChain().verifiedWeight.Get() {
-			return
-		}
-
-		variable.Compute(func(currentCandidate *Chain) *Chain {
-			if currentCandidate == nil || currentCandidate.evicted.WasTriggered() || newChainWeight > chainWeight(currentCandidate).Get() {
-				return newCandidate
-			}
-
-			return currentCandidate
-		})
-	})
 }
 
 func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {

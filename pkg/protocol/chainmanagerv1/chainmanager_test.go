@@ -17,16 +17,8 @@ func TestChainManager(t *testing.T) {
 	rootCommitment := model.NewEmptyCommitment(testAPI)
 	chainManager := NewChainManager(rootCommitment)
 
-	chainManager.HeaviestCandidateChain().OnUpdate(func(oldValue, newValue *Chain) {
-		fmt.Println("HeaviestCandidateChain", oldValue, newValue)
-	})
-
-	chainManager.HeaviestAttestedCandidateChain().OnUpdate(func(oldValue, newValue *Chain) {
-		fmt.Println("HeaviestAttestedCandidateChain", oldValue, newValue)
-	})
-
-	chainManager.HeaviestVerifiedCandidateChain().OnUpdate(func(oldValue, newValue *Chain) {
-		fmt.Println("HeaviestVerifiedCandidateChain", oldValue, newValue)
+	chainManager.CandidateChain().OnUpdate(func(oldValue, newValue *Chain) {
+		fmt.Println("CandidateChain", oldValue, newValue)
 	})
 
 	commitment1 := lo.PanicOnErr(model.CommitmentFromCommitment(iotago.NewCommitment(testAPI.Version(),
