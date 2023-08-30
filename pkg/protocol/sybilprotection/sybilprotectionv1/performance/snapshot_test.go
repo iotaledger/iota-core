@@ -1,6 +1,7 @@
 package performance
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/orcaman/writerseeker"
@@ -41,7 +42,7 @@ func TestManager_Import_Export(t *testing.T) {
 
 		delegatorRewardBeforeImport, validatorRewardBeforeImport := ts.calculateExpectedRewards(epochsCount, epochActions)
 		// export two full epochs
-		targetSlot := ts.apiProvider.CurrentAPI().TimeProvider().EpochEnd(3)
+		targetSlot := ts.api.TimeProvider().EpochEnd(3)
 		err := ts.Instance.Export(writer, targetSlot)
 		require.NoError(t, err)
 
@@ -50,6 +51,8 @@ func TestManager_Import_Export(t *testing.T) {
 		err = ts.Instance.Import(writer.BytesReader())
 		require.NoError(t, err)
 		delegatorRewardAfterImport, validatorRewardAfterImport := ts.calculateExpectedRewards(epochsCount, epochActions)
+		fmt.Println(delegatorRewardBeforeImport, delegatorRewardAfterImport)
+		fmt.Println(validatorRewardBeforeImport, validatorRewardAfterImport)
 		require.Equal(t, delegatorRewardBeforeImport, delegatorRewardAfterImport)
 		require.Equal(t, validatorRewardBeforeImport, validatorRewardAfterImport)
 	}
@@ -58,7 +61,7 @@ func TestManager_Import_Export(t *testing.T) {
 
 		delegatorRewardBeforeImport, validatorRewardBeforeImport := ts.calculateExpectedRewards(epochsCount, epochActions)
 		// export at the beginning of epoch 2, skip epoch 3 at all
-		targetSlot := ts.apiProvider.LatestAPI().TimeProvider().EpochStart(2)
+		targetSlot := ts.api.TimeProvider().EpochStart(2)
 		err := ts.Instance.Export(writer, targetSlot)
 		require.NoError(t, err)
 

@@ -10,7 +10,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) iotago.Identifier {
+func (t *Tracker) RewardsRoot(epochIndex iotago.EpochIndex) (iotago.Identifier, error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 

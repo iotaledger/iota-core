@@ -278,8 +278,8 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 	}
 }
 
-func (o *Orchestrator) maxVersionByCount(versionSupporters map[VersionAndHash]int) (VersionAndHash, int) {
-	var versionWithMostSupporters VersionAndHash
+func (o *Orchestrator) maxVersionByCount(versionSupporters map[model.VersionAndHash]int) (model.VersionAndHash, int) {
+	var versionWithMostSupporters model.VersionAndHash
 	var mostSupporters int
 	for versionAndHash, supportersCount := range versionSupporters {
 		if supportersCount > mostSupporters {

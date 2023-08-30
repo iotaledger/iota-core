@@ -45,8 +45,8 @@ func (s *Storage) AccountDiffs(slot iotago.SlotIndex) (*slotstore.AccountDiffs, 
 	return s.prunable.AccountDiffs(slot)
 }
 
-func (s *Storage) PerformanceFactors(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, uint64], error) {
-	return s.prunable.PerformanceFactors(slot)
+func (s *Storage) ValidatorPerformances(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error) {
+	return s.prunable.ValidatorPerformances(slot)
 }
 
 func (s *Storage) UpgradeSignals(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error) {
