@@ -19,9 +19,9 @@ type chainWeights struct {
 // newChainWeights creates a new chainWeights for the given chain.
 func newChainWeights(chain *Chain) *chainWeights {
 	return &chainWeights{
-		claimedWeight:  reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestCommitment),
-		attestedWeight: reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestAttestedCommitment),
-		verifiedWeight: reactive.NewDerivedVariable[uint64](zeroValueIfNil((*Commitment).CumulativeWeight), chain.latestVerifiedCommitment),
+		claimedWeight:  reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), chain.latestCommitment),
+		attestedWeight: reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), chain.latestAttestedCommitment),
+		verifiedWeight: reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), chain.latestVerifiedCommitment),
 	}
 }
 

@@ -1,13 +1,12 @@
 package chainmanagerv1
 
-// zeroValueIfNil turns a getter function into a getter function that returns the zero value of the return type if the
-// object is nil.
-func zeroValueIfNil[ObjectType, ReturnType any](getterFunc func(*ObjectType) ReturnType) func(*ObjectType) ReturnType {
-	return func(obj *ObjectType) (returnValue ReturnType) {
-		if obj == nil {
-			return returnValue
+// noPanicIfNil prevents a panic of the getter when the receiver is nil by returning the zero value of the return type.
+func noPanicIfNil[ReceiverType, ReturnType any](getter func(*ReceiverType) ReturnType) func(*ReceiverType) ReturnType {
+	return func(receiver *ReceiverType) (zeroValue ReturnType) {
+		if receiver == nil {
+			return zeroValue
 		}
 
-		return getterFunc(obj)
+		return getter(receiver)
 	}
 }
