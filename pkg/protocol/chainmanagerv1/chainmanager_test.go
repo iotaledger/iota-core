@@ -77,7 +77,7 @@ func TestChainManager(t *testing.T) {
 	require.True(t, commitment3Metadata.IsAboveLatestVerifiedIndex())
 	require.True(t, commitment3Metadata.IsBelowSyncThreshold())
 	require.True(t, commitment3Metadata.Solid().WasTriggered())
-	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().Get().LatestIndex().Get())
+	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().Get().LatestCommitment().Get().Index())
 	require.Equal(t, uint64(3), commitment3Metadata.Chain().Get().ClaimedWeight().Get())
 
 	commitment3aMetadata := chainManager.ProcessCommitment(commitment3a)

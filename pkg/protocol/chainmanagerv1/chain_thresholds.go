@@ -7,14 +7,8 @@ import (
 
 // chainThresholds is a reactive component that provides a set of thresholds that are derived from the chain.
 type chainThresholds struct {
-	// latestIndex is the index of the latest Commitment object in the chain.
-	latestIndex reactive.Variable[iotago.SlotIndex]
-
-	// latestAttestedIndex is the index of the latest attested Commitment object in the chain.
-	latestAttestedIndex reactive.Variable[iotago.SlotIndex]
-
-	// latestVerifiedIndex is the index of the latest verified Commitment object in the chain.
-	latestVerifiedIndex reactive.Variable[iotago.SlotIndex]
+	// latestVerifiedCommitmentIndex is the index of the latest verified Commitment object in the chain.
+	latestVerifiedCommitmentIndex reactive.Variable[iotago.SlotIndex]
 
 	// syncThreshold is the upper bound for slots that are being fed to the engine (to prevent memory exhaustion).
 	syncThreshold reactive.Variable[iotago.SlotIndex]
@@ -27,38 +21,32 @@ type chainThresholds struct {
 // newChainThresholds creates a new chainThresholds instance.
 func newChainThresholds(chain *Chain) *chainThresholds {
 	c := &chainThresholds{
-		latestIndex:         reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.latestCommitment),
-		latestAttestedIndex: reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.latestAttestedCommitment),
-		latestVerifiedIndex: reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.latestVerifiedCommitment),
+		latestVerifiedCommitmentIndex: reactive.NewDerivedVariable[iotago.SlotIndex](zeroValueIfNil((*Commitment).Index), chain.latestVerifiedCommitment),
 	}
 
-	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestIndex iotago.SlotIndex) iotago.SlotIndex {
-		return latestIndex - WarpSyncOffset
-	}, c.latestIndex)
+	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {
+		if latestCommitment == nil || latestCommitment.Index() < WarpSyncOffset {
+			return 0
+		}
 
-	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedIndex iotago.SlotIndex) iotago.SlotIndex {
-		return latestVerifiedIndex + 1 + SyncWindow
-	}, c.latestVerifiedIndex)
+		return latestCommitment.Index() - WarpSyncOffset
+	}, chain.latestCommitment)
+
+	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitment *Commitment) iotago.SlotIndex {
+		if latestVerifiedCommitment == nil {
+			return SyncWindow + 1
+		}
+
+		return latestVerifiedCommitment.Index() + SyncWindow + 1
+	}, chain.latestVerifiedCommitment)
 
 	return c
 }
 
-// LatestIndex returns a reactive variable that always contains the index of the latest Commitment
+// LatestVerifiedCommitmentIndex returns a reactive variable that contains the index of the latest verified Commitment
 // object in the chain.
-func (c *chainThresholds) LatestIndex() reactive.Variable[iotago.SlotIndex] {
-	return c.latestIndex
-}
-
-// LatestAttestedIndex returns a reactive variable that contains the index of the latest attested
-// Commitment object in the chain.
-func (c *chainThresholds) LatestAttestedIndex() reactive.Variable[iotago.SlotIndex] {
-	return c.latestAttestedIndex
-}
-
-// LatestVerifiedIndex returns a reactive variable that contains the index of the latest verified
-// Commitment object in the chain.
-func (c *chainThresholds) LatestVerifiedIndex() reactive.Variable[iotago.SlotIndex] {
-	return c.latestVerifiedIndex
+func (c *chainThresholds) LatestVerifiedCommitmentIndex() reactive.Variable[iotago.SlotIndex] {
+	return c.latestVerifiedCommitmentIndex
 }
 
 // SyncThreshold returns a reactive variable that contains the upper bound for slots that are being fed to the
