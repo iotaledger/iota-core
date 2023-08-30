@@ -14,22 +14,24 @@ func newChainManagerChainSwitching(chainManager *ChainManager) *chainManagerChai
 	heaviestClaimedCandidate := reactive.NewVariable[*Chain]()
 	heaviestClaimedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
 		if prevCandidate != nil {
-			// TODO: STOP REQUESTING ATTESTATIONS FOR OLD CANDIDATE
+			// prevCandidate.validateAttestations.Set(false)
 		}
 
-		// TODO: REQUEST ATTESTATIONS FOR NEW CANDIDATE
+		// newCandidate.validateAttestations.Set(true)
 	})
 
 	heaviestAttestedCandidate := reactive.NewVariable[*Chain]()
 	heaviestAttestedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
 		if prevCandidate != nil {
-			// TODO: STOP SYNCING OLD CANDIDATE
+			// prevCandidate.validateState.Set(false)
 		}
 
-		// TODO: START SYNCING NEW CANDIDATE
+		// newCandidate.validateState.Set(true)
 	})
 
 	chainManager.OnChainCreated(func(chain *Chain) {
+		// TODO: ON SOLID
+
 		selectHeaviestCandidate := func(candidate reactive.Variable[*Chain], newCandidate *Chain, chainWeight func(*Chain) reactive.Variable[uint64]) {
 			chainWeight(newCandidate).OnUpdate(func(_, newChainWeight uint64) {
 				if newChainWeight <= chainManager.mainChain.Get().verifiedWeight.Get() {
