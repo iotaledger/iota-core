@@ -105,7 +105,6 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 	resolvedInputs.RewardsInputSet = rewardInputSet
 
-	// TODO: in which slot is this transaction?
 	api := l.apiProvider.APIForSlot(tx.Essence.CreationSlot)
 
 	vmParams := &iotagovm.Params{
