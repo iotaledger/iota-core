@@ -147,7 +147,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	}
 
 	if index != ledgerIndex+1 {
-		panic(ierrors.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex, index))
+		panic(ierrors.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex+1, index))
 	}
 
 	stateDiff := l.memPool.StateDiff(index)

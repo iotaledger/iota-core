@@ -7,7 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
-	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 )
 
 func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
@@ -22,7 +22,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 }
 
 func (s *Server) ReadNodeStatus(context.Context, *inx.NoParams) (*inx.NodeStatus, error) {
-	return inxNodeStatus(deps.Protocol.SyncManager.SyncStatus()), nil
+	return inxNodeStatus(deps.Protocol.MainEngineInstance().SyncManager.SyncStatus()), nil
 }
 
 func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_ListenToNodeStatusServer) error {
@@ -67,7 +67,7 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 	}
 
 	wp.Start()
-	unhook := deps.Protocol.Events.SyncManager.UpdatedStatus.Hook(onUpdate, event.WithWorkerPool(wp)).Unhook
+	unhook := deps.Protocol.Events.Engine.SyncManager.UpdatedStatus.Hook(onUpdate, event.WithWorkerPool(wp)).Unhook
 
 	<-ctx.Done()
 	unhook()

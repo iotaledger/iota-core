@@ -6,12 +6,15 @@ import (
 	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func TestManager_Import_Export(t *testing.T) {
 	ts := NewTestSuite(t)
-
+	latestSupportedVersionHash1 := tpkg.Rand32ByteArray()
+	latestSupportedVersionHash2 := tpkg.Rand32ByteArray()
 	ts.ApplySlotActions(1, 5, map[string]*AccountActions{
 		"A": {
 			TotalAllotments: 10,
@@ -31,10 +34,11 @@ func TestManager_Import_Export(t *testing.T) {
 			TotalAllotments: 0,
 			AddedKeys:       []string{"D.P1"},
 
-			ValidatorStakeChange:  20,
-			DelegationStakeChange: 20,
-			FixedCostChange:       10,
-			StakeEndEpochChange:   10,
+			ValidatorStakeChange:                  20,
+			DelegationStakeChange:                 20,
+			FixedCostChange:                       10,
+			StakeEndEpochChange:                   10,
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 1, Hash: latestSupportedVersionHash1},
 
 			NewOutputID: "D1",
 		},
@@ -54,14 +58,15 @@ func TestManager_Import_Export(t *testing.T) {
 			OutputID:       "B1",
 		},
 		"D": {
-			BICUpdatedTime:  1,
-			BICAmount:       0,
-			PubKeys:         []string{"D.P1"},
-			OutputID:        "D1",
-			ValidatorStake:  20,
-			DelegationStake: 20,
-			FixedCost:       10,
-			StakeEndEpoch:   10,
+			BICUpdatedTime:                        1,
+			BICAmount:                             0,
+			PubKeys:                               []string{"D.P1"},
+			OutputID:                              "D1",
+			ValidatorStake:                        20,
+			DelegationStake:                       20,
+			FixedCost:                             10,
+			StakeEndEpoch:                         10,
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 1, Hash: latestSupportedVersionHash1},
 		},
 	})
 
@@ -80,7 +85,8 @@ func TestManager_Import_Export(t *testing.T) {
 			NewOutputID: "B2",
 		},
 		"D": { // update only delegation stake
-			DelegationStakeChange: -5,
+			DelegationStakeChange:                 -5,
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
 		},
 	})
 
@@ -98,14 +104,15 @@ func TestManager_Import_Export(t *testing.T) {
 			OutputID:       "B2",
 		},
 		"D": {
-			BICUpdatedTime:  1,
-			BICAmount:       0,
-			PubKeys:         []string{"D.P1"},
-			OutputID:        "D1",
-			ValidatorStake:  20,
-			DelegationStake: 15,
-			FixedCost:       10,
-			StakeEndEpoch:   10,
+			BICUpdatedTime:                        1,
+			BICAmount:                             0,
+			PubKeys:                               []string{"D.P1"},
+			OutputID:                              "D1",
+			ValidatorStake:                        20,
+			DelegationStake:                       15,
+			FixedCost:                             10,
+			StakeEndEpoch:                         10,
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
 		},
 	})
 
@@ -128,10 +135,11 @@ func TestManager_Import_Export(t *testing.T) {
 			NewOutputID: "C1",
 		},
 		"D": {
-			ValidatorStakeChange:  40,
-			DelegationStakeChange: -10,
-			StakeEndEpochChange:   8,
-			FixedCostChange:       -2,
+			ValidatorStakeChange:                  40,
+			DelegationStakeChange:                 -10,
+			StakeEndEpochChange:                   8,
+			FixedCostChange:                       -2,
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
 
 			NewOutputID: "D2",
 		},
@@ -156,14 +164,15 @@ func TestManager_Import_Export(t *testing.T) {
 			OutputID:       "C1",
 		},
 		"D": {
-			BICUpdatedTime:  1,
-			BICAmount:       0,
-			PubKeys:         []string{"D.P1"},
-			OutputID:        "D2",
-			ValidatorStake:  60,
-			DelegationStake: 5,
-			FixedCost:       8,
-			StakeEndEpoch:   18,
+			BICUpdatedTime:                        1,
+			BICAmount:                             0,
+			PubKeys:                               []string{"D.P1"},
+			OutputID:                              "D2",
+			ValidatorStake:                        60,
+			DelegationStake:                       5,
+			FixedCost:                             8,
+			StakeEndEpoch:                         18,
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 3, Hash: latestSupportedVersionHash2},
 		},
 	})
 

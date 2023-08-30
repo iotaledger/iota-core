@@ -30,27 +30,31 @@ type AccountDiff struct {
 	BlockIssuerKeysAdded   iotago.BlockIssuerKeys
 	BlockIssuerKeysRemoved iotago.BlockIssuerKeys
 
-	ValidatorStakeChange  int64
-	DelegationStakeChange int64
-	StakeEndEpochChange   int64
-	FixedCostChange       int64
+	ValidatorStakeChange              int64
+	DelegationStakeChange             int64
+	StakeEndEpochChange               int64
+	FixedCostChange                   int64
+	PrevLatestSupportedVersionAndHash VersionAndHash
+	NewLatestSupportedVersionAndHash  VersionAndHash
 }
 
 // NewAccountDiff creates a new AccountDiff instance.
 func NewAccountDiff() *AccountDiff {
 	return &AccountDiff{
-		BICChange:              0,
-		PreviousUpdatedTime:    0,
-		NewExpirySlot:          0,
-		PreviousExpirySlot:     0,
-		NewOutputID:            iotago.EmptyOutputID,
-		PreviousOutputID:       iotago.EmptyOutputID,
-		BlockIssuerKeysAdded:   make(iotago.BlockIssuerKeys, 0),
-		BlockIssuerKeysRemoved: make(iotago.BlockIssuerKeys, 0),
-		ValidatorStakeChange:   0,
-		DelegationStakeChange:  0,
-		StakeEndEpochChange:    0,
-		FixedCostChange:        0,
+		BICChange:                         0,
+		PreviousUpdatedTime:               0,
+		NewExpirySlot:                     0,
+		PreviousExpirySlot:                0,
+		NewOutputID:                       iotago.EmptyOutputID,
+		PreviousOutputID:                  iotago.EmptyOutputID,
+		BlockIssuerKeysAdded:              make(iotago.BlockIssuerKeys, 0),
+		BlockIssuerKeysRemoved:            make(iotago.BlockIssuerKeys, 0),
+		ValidatorStakeChange:              0,
+		DelegationStakeChange:             0,
+		StakeEndEpochChange:               0,
+		FixedCostChange:                   0,
+		PrevLatestSupportedVersionAndHash: VersionAndHash{},
+		NewLatestSupportedVersionAndHash:  VersionAndHash{},
 	}
 }
 
@@ -76,24 +80,28 @@ func (d AccountDiff) Bytes() ([]byte, error) {
 	m.WriteInt64(d.DelegationStakeChange)
 	m.WriteInt64(d.FixedCostChange)
 	m.WriteUint64(uint64(d.StakeEndEpochChange))
+	m.WriteBytes(lo.PanicOnErr(d.NewLatestSupportedVersionAndHash.Bytes()))
+	m.WriteBytes(lo.PanicOnErr(d.PrevLatestSupportedVersionAndHash.Bytes()))
 
 	return m.Bytes(), nil
 }
 
 func (d *AccountDiff) Clone() *AccountDiff {
 	return &AccountDiff{
-		BICChange:              d.BICChange,
-		PreviousUpdatedTime:    d.PreviousUpdatedTime,
-		NewExpirySlot:          d.NewExpirySlot,
-		PreviousExpirySlot:     d.PreviousExpirySlot,
-		NewOutputID:            d.NewOutputID,
-		PreviousOutputID:       d.PreviousOutputID,
-		BlockIssuerKeysAdded:   lo.CopySlice(d.BlockIssuerKeysAdded),
-		BlockIssuerKeysRemoved: lo.CopySlice(d.BlockIssuerKeysRemoved),
-		ValidatorStakeChange:   d.ValidatorStakeChange,
-		DelegationStakeChange:  d.DelegationStakeChange,
-		FixedCostChange:        d.FixedCostChange,
-		StakeEndEpochChange:    d.StakeEndEpochChange,
+		BICChange:                         d.BICChange,
+		PreviousUpdatedTime:               d.PreviousUpdatedTime,
+		NewExpirySlot:                     d.NewExpirySlot,
+		PreviousExpirySlot:                d.PreviousExpirySlot,
+		NewOutputID:                       d.NewOutputID,
+		PreviousOutputID:                  d.PreviousOutputID,
+		BlockIssuerKeysAdded:              lo.CopySlice(d.BlockIssuerKeysAdded),
+		BlockIssuerKeysRemoved:            lo.CopySlice(d.BlockIssuerKeysRemoved),
+		ValidatorStakeChange:              d.ValidatorStakeChange,
+		DelegationStakeChange:             d.DelegationStakeChange,
+		FixedCostChange:                   d.FixedCostChange,
+		StakeEndEpochChange:               d.StakeEndEpochChange,
+		NewLatestSupportedVersionAndHash:  d.NewLatestSupportedVersionAndHash,
+		PrevLatestSupportedVersionAndHash: d.PrevLatestSupportedVersionAndHash,
 	}
 }
 
@@ -169,6 +177,26 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 		return offset, ierrors.Wrap(err, "unable to read new stake end epoch in the diff")
 	}
 	offset += 8
+
+	newVersionAndHashBytes := make([]byte, VersionAndHashSize)
+	if err = binary.Read(reader, binary.LittleEndian, newVersionAndHashBytes); err != nil {
+		return offset, ierrors.Wrap(err, "unable to read new version and hash bytes in the diff")
+	}
+	d.NewLatestSupportedVersionAndHash, _, err = VersionAndHashFromBytes(newVersionAndHashBytes)
+	if err != nil {
+		return offset, ierrors.Wrap(err, "unable to parse new version and hash bytes in the diff")
+	}
+	offset += len(newVersionAndHashBytes)
+
+	prevVersionAndHashBytes := make([]byte, VersionAndHashSize)
+	if err = binary.Read(reader, binary.LittleEndian, prevVersionAndHashBytes); err != nil {
+		return offset, ierrors.Wrap(err, "unable to read prev version and hash bytes in the diff")
+	}
+	d.PrevLatestSupportedVersionAndHash, _, err = VersionAndHashFromBytes(prevVersionAndHashBytes)
+	if err != nil {
+		return offset, ierrors.Wrap(err, "unable to parse prev version and hash bytes in the diff")
+	}
+	offset += len(prevVersionAndHashBytes)
 
 	return offset, nil
 }

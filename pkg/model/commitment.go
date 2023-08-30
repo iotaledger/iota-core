@@ -22,7 +22,10 @@ type Commitment struct {
 }
 
 func NewEmptyCommitment(api iotago.API) *Commitment {
-	return lo.PanicOnErr(CommitmentFromCommitment(iotago.NewEmptyCommitment(api.ProtocolParameters().Version()), api))
+	emptyCommitment := iotago.NewEmptyCommitment(api.ProtocolParameters().Version())
+	emptyCommitment.RMC = api.ProtocolParameters().CongestionControlParameters().RMCMin
+
+	return lo.PanicOnErr(CommitmentFromCommitment(emptyCommitment, api))
 }
 
 func newCommitment(commitmentID iotago.CommitmentID, iotaCommitment *iotago.Commitment, data []byte, api iotago.API) (*Commitment, error) {

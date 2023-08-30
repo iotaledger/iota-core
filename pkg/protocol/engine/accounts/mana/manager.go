@@ -41,7 +41,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	defer m.mutex.Unlock()
 
 	mana, exists := m.manaVectorCache.Get(accountID)
-	if !exists {
+	if !exists || mana.UpdateTime() > currentSlot {
 		output, err := m.accountOutputResolveFunc(accountID, currentSlot)
 		if err != nil {
 			return 0, ierrors.Errorf("failed to resolve AccountOutput for %s in slot %s: %w", accountID, currentSlot, err)
@@ -53,7 +53,9 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 			mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.CreationSlot())
 		}
 
-		m.manaVectorCache.Put(accountID, mana)
+		if !exists {
+			m.manaVectorCache.Put(accountID, mana)
+		}
 	}
 
 	if currentSlot == mana.UpdateTime() {

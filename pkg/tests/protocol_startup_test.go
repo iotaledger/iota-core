@@ -65,13 +65,15 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 
 	// Verify that nodes have the expected states.
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+	genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),
 		testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-		testsuite.WithLatestCommitment(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())),
+		testsuite.WithLatestCommitment(genesisCommitment),
 		testsuite.WithLatestFinalizedSlot(0),
-		testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
-		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())}),
+		testsuite.WithChainID(genesisCommitment.MustID()),
+		testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 		testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 		testsuite.WithEvictedSlot(0),
@@ -81,9 +83,9 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	var expectedStorageRootBlocksFrom0, expectedStorageRootBlocksFrom9 []*blocks.Block
 
-	// Epoch 1: issue 4 rows per slot.
+	// Epoch 0: issue 4 rows per slot.
 	{
-		ts.IssueBlocksAtEpoch("", 1, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, nil)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.Nodes()...)
 
@@ -107,7 +109,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
+			testsuite.WithChainID(genesisCommitment.MustID()),
 			testsuite.WithLatestFinalizedSlot(4),
 			testsuite.WithLatestCommitmentSlotIndex(5),
 			testsuite.WithEqualStoredCommitmentAtIndex(5),
@@ -127,7 +129,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		}
 	}
 
-	// Epoch 2: skip slot 10 and issue 6 rows per slot
+	// Epoch 1: skip slot 10 and issue 6 rows per slot
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{8, 9, 11, 12, 13}, 6, "7.3", ts.Nodes(), true, nil)
 
@@ -155,7 +157,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
+			testsuite.WithChainID(genesisCommitment.MustID()),
 			testsuite.WithLatestFinalizedSlot(11),
 			testsuite.WithLatestCommitmentSlotIndex(11),
 			testsuite.WithEqualStoredCommitmentAtIndex(11),
@@ -282,14 +284,14 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
 	}
 
-	// Epoch 3-5
+	// Epoch 2-4
 	{
 		// Issue on all nodes except nodeD as its account is not yet known.
-		ts.IssueBlocksAtEpoch("", 3, 4, "15.5", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 2, 4, "15.5", ts.Nodes(), true, nil)
 
 		// Issue on all nodes.
-		ts.IssueBlocksAtEpoch("", 4, 4, "23.3", ts.Nodes(), true, nil)
-		ts.IssueBlocksAtEpoch("", 5, 4, "31.3", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 4, 4, "31.3", ts.Nodes(), true, nil)
 
 		var expectedActiveRootBlocks []*blocks.Block
 		for _, slot := range []iotago.SlotIndex{35, 36, 37} {
@@ -309,10 +311,10 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
 		)
 
-		// nodeB, nodeD have pruned until epoch 3.
+		// nodeB, nodeD have pruned until epoch 2.
 		{
 			ts.AssertPrunedUntil(
-				types.NewTuple(3, true),
+				types.NewTuple(2, true),
 				types.NewTuple(0, false),
 				types.NewTuple(0, false),
 				types.NewTuple(0, false),
@@ -320,8 +322,8 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				ts.Nodes("nodeB", "nodeD")...,
 			)
 
-			var expectedStorageRootBlocksFromEpoch4 []*blocks.Block
-			acceptedSlots := ts.SlotsForEpoch(4)
+			var expectedStorageRootBlocksFromEpoch3 []*blocks.Block
+			acceptedSlots := ts.SlotsForEpoch(3)
 			acceptedSlots = append(acceptedSlots, 32, 33, 34, 35, 36, 37)
 			for _, slot := range acceptedSlots {
 				aliases := lo.Map([]string{"nodeA", "nodeB"}, func(s string) string {
@@ -329,10 +331,10 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				})
 				ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes("nodeB", "nodeD")...)
 
-				expectedActiveRootBlocks = append(expectedStorageRootBlocksFromEpoch4, ts.BlocksWithPrefix(fmt.Sprintf("%d.3", slot))...)
+				expectedActiveRootBlocks = append(expectedStorageRootBlocksFromEpoch3, ts.BlocksWithPrefix(fmt.Sprintf("%d.3", slot))...)
 			}
 
-			ts.AssertStorageRootBlocks(expectedStorageRootBlocksFromEpoch4, ts.Nodes("nodeB", "nodeD")...)
+			ts.AssertStorageRootBlocks(expectedStorageRootBlocksFromEpoch3, ts.Nodes("nodeB", "nodeD")...)
 		}
 
 		// nodeA, nodeC-restarted have not pruned.
@@ -347,8 +349,8 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			)
 		}
 
-		acceptedSlots := ts.SlotsForEpoch(3)
-		acceptedSlots = append(acceptedSlots, ts.SlotsForEpoch(4)...)
+		acceptedSlots := ts.SlotsForEpoch(2)
+		acceptedSlots = append(acceptedSlots, ts.SlotsForEpoch(3)...)
 		acceptedSlots = append(acceptedSlots, 32, 33, 34, 35, 36, 37)
 		for _, slot := range acceptedSlots {
 			aliases := lo.Map([]string{"nodeA", "nodeB"}, func(s string) string {
@@ -385,10 +387,10 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		)
 		ts.Wait()
 
-		// Even though we have configured a default pruningDelay=20 epochs, we pruned because the last finalized slot is 36 (epoch 5).
-		// Since it's enforced that we keep at least 1 full epoch, we pruned until epoch 3.
+		// Even though we have configured a default pruningDelay=20 epochs, we pruned because the last finalized slot is 36 (epoch 4).
+		// Since it's enforced that we keep at least 1 full epoch, we pruned until epoch 2.
 		ts.AssertPrunedUntil(
-			types.NewTuple(3, true),
+			types.NewTuple(2, true),
 			types.NewTuple(0, false),
 			types.NewTuple(0, false),
 			types.NewTuple(0, false),

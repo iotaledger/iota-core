@@ -191,8 +191,8 @@ github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230822231018-a16a2b4
 github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230822231018-a16a2b406096/go.mod h1:sCLs3xrJRKcru6UE1WnlvQw8bib74yy2A7s+caMtoZY=
 github.com/iotaledger/hive.go/stringify v0.0.0-20230822231018-a16a2b406096 h1:pnQrSWi5CnInbVseXMXRJw7da59guUd9/aTInbiUdM8=
 github.com/iotaledger/hive.go/stringify v0.0.0-20230822231018-a16a2b406096/go.mod h1:l/F3cA/+67QdNj+sohv2v4HhmsdOcWScoA+sVYoAE4c=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230821085620-f42bfde442b9 h1:cjPfNdu93/h8egN/NWVajcOmKe5RQxfQQ3hPPDrOdc4=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230821085620-f42bfde442b9/go.mod h1:BGmYQp0ZX6OidxsNzH+GbwF2oc4wbsCSNHVnt0P+vl0=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230829074722-df5022934080 h1:Llp0GUlNXGklm6MFPvjQHM7VIZHLNYxAQCflhXU2Uvw=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230829074722-df5022934080/go.mod h1:BGmYQp0ZX6OidxsNzH+GbwF2oc4wbsCSNHVnt0P+vl0=
 github.com/jmespath/go-jmespath v0.4.0/go.mod h1:T8mJZnbsbmF+m6zOOFylbeCJqk5+pHWvzYPziyZiYoo=
 github.com/jmespath/go-jmespath/internal/testify v1.5.1/go.mod h1:L3OGu8Wl2/fWfCI6z80xFu9LTZmf1ZRjMHUOPmWr69U=
 github.com/joho/godotenv v1.3.0 h1:Zjp+RcGpHhGlrMbJzXTrZZPrWj+1vfm90La1wgB6Bhc=
