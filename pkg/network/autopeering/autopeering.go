@@ -68,6 +68,7 @@ func (m *Manager) Start(ctx context.Context) {
 				m.log.Warnln("Failed to parse bootstrap node address from PeerDB:", err)
 				continue
 			}
+
 			if err := m.host.Connect(ctx, *addrInfo); err != nil {
 				m.log.Infoln("Failed to connect to bootstrap node:", seedPeer, err)
 				continue
@@ -122,6 +123,7 @@ func (m *Manager) discoverAndDialPeers() {
 	tctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
 	defer cancel()
 
+	m.log.Debugf("Discovering peers for network ID %s", m.networkID)
 	peerChan, err := m.routingDiscovery.FindPeers(tctx, m.networkID)
 	if err != nil {
 		m.log.Warnf("Failed to find peers: %s", err)
@@ -142,6 +144,10 @@ func (m *Manager) discoverAndDialPeers() {
 		}
 
 		if err := m.p2pManager.DialPeer(m.ctx, peer); err != nil {
+			if ierrors.Is(err, p2p.ErrDuplicateNeighbor) {
+				m.log.Debugf("Already connected to peer %s", peer)
+				continue
+			}
 			m.log.Warnf("Failed to dial peer %s: %w", peer, err)
 		}
 	}
