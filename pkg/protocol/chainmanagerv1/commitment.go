@@ -17,6 +17,7 @@ type Commitment struct {
 
 	*commitmentFlags
 	*commitmentDispatcherFlags
+	*commitmentChainSwitchingFlags
 }
 
 func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment {
@@ -31,6 +32,7 @@ func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment 
 
 	c.commitmentFlags = newCommitmentFlags(c, lo.First(optIsRoot))
 	c.commitmentDispatcherFlags = newCommitmentDispatcherFlags(c, lo.First(optIsRoot))
+	c.commitmentChainSwitchingFlags = newCommitmentChainSwitchingFlags(c, lo.First(optIsRoot))
 
 	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
 
