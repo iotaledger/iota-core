@@ -152,37 +152,37 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 		return
 	}
 
-	// Check that the issuer key is valid for this block issuer and that the signature is valid
-	edSig, isEdSig := block.ProtocolBlock().Signature.(*iotago.Ed25519Signature)
-	if !isEdSig {
-		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
-			Block:  block,
-			Reason: ierrors.Wrapf(ErrInvalidSignature, "only ed2519 signatures supported, got %s", block.ProtocolBlock().Signature.Type()),
-		})
+	switch signature := block.ProtocolBlock().Signature.(type) {
+	case *iotago.Ed25519Signature:
+		if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(signature.PublicKey)) {
+			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.ProtocolBlock().IssuerID, signature.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),
+			})
 
-		return
-	}
-	if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(edSig.PublicKey)) {
-		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
-			Block:  block,
-			Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.ProtocolBlock().IssuerID, edSig.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),
-		})
+			return
+		}
+		signingMessage, err := block.ProtocolBlock().SigningMessage(blockAPI)
+		if err != nil {
+			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Wrapf(ErrInvalidSignature, "error: %s", err.Error()),
+			})
 
-		return
-	}
-	signingMessage, err := block.ProtocolBlock().SigningMessage(blockAPI)
-	if err != nil {
-		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
-			Block:  block,
-			Reason: ierrors.Wrapf(ErrInvalidSignature, "error: %s", err.Error()),
-		})
+			return
+		}
+		if !hiveEd25519.Verify(signature.PublicKey[:], signingMessage, signature.Signature[:]) {
+			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ErrInvalidSignature,
+			})
 
-		return
-	}
-	if !hiveEd25519.Verify(edSig.PublicKey[:], signingMessage, edSig.Signature[:]) {
+			return
+		}
+	default:
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: ErrInvalidSignature,
+			Reason: ierrors.Wrapf(ErrInvalidSignature, "only ed25519 signatures supported, got %s", block.ProtocolBlock().Signature.Type()),
 		})
 
 		return
