@@ -104,18 +104,17 @@ func WithOnlyConnectedPeers() GetPeersOption {
 }
 
 // GetPeers returns the list of known peers.
-func (m *Manager) GetPeers(opts ...GetPeersOption) []*network.KnownPeer {
+func (m *Manager) GetPeers(opts ...GetPeersOption) []*network.PeerDescriptor {
 	conf := BuildGetPeersConfig(opts)
 	m.knownPeersMutex.RLock()
 	defer m.knownPeersMutex.RUnlock()
 
-	peers := make([]*network.KnownPeer, 0, len(m.knownPeers))
+	peers := make([]*network.PeerDescriptor, 0, len(m.knownPeers))
 	for _, kp := range m.knownPeers {
 		connStatus := kp.GetConnStatus()
 		if !conf.OnlyConnected || connStatus == network.ConnStatusConnected {
-			peers = append(peers, &network.KnownPeer{
-				Addresses:  kp.PeerAddresses,
-				ConnStatus: connStatus,
+			peers = append(peers, &network.PeerDescriptor{
+				Addresses: kp.PeerAddresses,
 			})
 		}
 	}

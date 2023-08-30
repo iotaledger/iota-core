@@ -14,13 +14,13 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/libp2putil"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/autopeering"
 	"github.com/iotaledger/iota-core/pkg/network/manualpeering"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
@@ -51,7 +51,7 @@ type dependencies struct {
 	ManualPeeringMgr *manualpeering.Manager
 	AutoPeeringMgr   *autopeering.Manager
 	P2PManager       *p2p.Manager
-	PeerDB           *peer.DB
+	PeerDB           *network.DB
 	Protocol         *protocol.Protocol
 	PeerDBKVSTore    kvstore.KVStore `name:"peerDBKVStore"`
 }
@@ -69,7 +69,7 @@ func provide(c *dig.Container) error {
 		Protocol   *protocol.Protocol
 		P2PManager *p2p.Manager
 		Host       host.Host
-		PeerDB     *peer.DB
+		PeerDB     *network.DB
 	}
 
 	if err := c.Provide(func(deps manualPeeringDeps) *manualpeering.Manager {
@@ -87,7 +87,7 @@ func provide(c *dig.Container) error {
 	type peerOut struct {
 		dig.Out
 
-		PeerDB         *peer.DB
+		PeerDB         *network.DB
 		PeerDBKVSTore  kvstore.KVStore `name:"peerDBKVStore"`
 		NodePrivateKey crypto.PrivKey
 	}
@@ -176,8 +176,8 @@ func provide(c *dig.Container) error {
 		return err
 	}
 
-	return c.Provide(func(host host.Host) *p2p.Manager {
-		return p2p.NewManager(host, Component.Logger())
+	return c.Provide(func(host host.Host, peerDB *network.DB) *p2p.Manager {
+		return p2p.NewManager(host, peerDB, Component.Logger())
 	})
 }
 

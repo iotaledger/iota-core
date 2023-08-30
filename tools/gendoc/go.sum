@@ -276,8 +276,6 @@ github.com/iotaledger/hive.go/app v0.0.0-20230822231018-a16a2b406096 h1:lndWUBJn
 github.com/iotaledger/hive.go/app v0.0.0-20230822231018-a16a2b406096/go.mod h1:fesy1w6A7bOrLbYjkLBb1zfHwkzqaRhpukFBylJYqUQ=
 github.com/iotaledger/hive.go/apputils v0.0.0-20230706083020-ef6c3248369d h1:bsCtNVHZnvIni2pIwb5n79cj9EDMXTc6G+dwYAqn0M8=
 github.com/iotaledger/hive.go/apputils v0.0.0-20230706083020-ef6c3248369d/go.mod h1:MlnA3hnPjJabmq9zymYheZw1Gt6OwyHZD7HiZVSSRjc=
-github.com/iotaledger/hive.go/autopeering v0.0.0-20230822231018-a16a2b406096 h1:3kMEdu+bwCyl6EwzO6PJFlXR8rCH9rtPdlJVUrv0kzs=
-github.com/iotaledger/hive.go/autopeering v0.0.0-20230822231018-a16a2b406096/go.mod h1:EEPTDuGM0fsjuy1YtbnKb0UyLgjWZIh8urd7wDI5j7A=
 github.com/iotaledger/hive.go/constraints v0.0.0-20230822231018-a16a2b406096 h1:1th29Mb7SU0JIfIU3Ib4feNq0lgsoKCd4BPwjV0DUTg=
 github.com/iotaledger/hive.go/constraints v0.0.0-20230822231018-a16a2b406096/go.mod h1:bvXXc6quBdERMMKnirr2+iQU4WnTz4KDbdHcusW9Ats=
 github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230822231018-a16a2b406096 h1:xLwdEeRMD3+hRWgW3AeAxRloVvuDOGdw4zj1gSctCG8=

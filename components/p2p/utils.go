@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/rocksdb"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota.go/v4/hexutil"
 )
@@ -21,7 +21,7 @@ import (
 var ErrMismatchedPrivateKeys = ierrors.New("private key derived from the seed defined in the config does not correspond with the already stored private key in the database")
 
 // checks whether the seed from the cfg corresponds to the one in the peer database.
-func checkCfgSeedAgainstDB(cfgSeed []byte, peerDB *peer.DB) error {
+func checkCfgSeedAgainstDB(cfgSeed []byte, peerDB *network.DB) error {
 	prvKeyDB, err := peerDB.LocalPrivateKey()
 	if err != nil {
 		return ierrors.Wrap(err, "unable to retrieve private key from peer database")
@@ -58,7 +58,7 @@ func readPeerIP() (net.IP, error) {
 }
 
 // inits the peer database, returns a bool indicating whether the database is new.
-func initPeerDB() (peerDB *peer.DB, peerDBKVStore kvstore.KVStore, isNewDB bool, err error) {
+func initPeerDB() (peerDB *network.DB, peerDBKVStore kvstore.KVStore, isNewDB bool, err error) {
 	if err = checkValidPeerDBPath(); err != nil {
 		return nil, nil, false, ierrors.Wrap(err, "invalid peer database path")
 	}
@@ -74,15 +74,7 @@ func initPeerDB() (peerDB *peer.DB, peerDBKVStore kvstore.KVStore, isNewDB bool,
 
 	peerDBKVStore = rocksdb.New(db)
 
-	if peerDB, err = peer.NewDB(peerDBKVStore); err != nil {
-		return nil, nil, false, ierrors.Wrap(err, "error creating peer database")
-	}
-
-	if db == nil {
-		return nil, nil, false, ierrors.New("couldn't create peer database; nil")
-	}
-
-	return
+	return network.NewDB(peerDBKVStore), peerDBKVStore, isNewDB, nil
 }
 
 // checks whether the peer database is new by examining whether the directory

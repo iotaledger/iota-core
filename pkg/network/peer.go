@@ -10,6 +10,7 @@ import (
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 )
 
 const DefaultReconnectInterval = 5 * time.Second
@@ -24,10 +25,9 @@ const (
 	ConnStatusConnected ConnectionStatus = "connected"
 )
 
-// KnownPeer defines a peer record in the manual peering layer.
-type KnownPeer struct {
-	Addresses  []ma.Multiaddr   `json:"addresses"`
-	ConnStatus ConnectionStatus `json:"connectionStatus"`
+// PeerDescriptor defines a peer record in the manual peering layer.
+type PeerDescriptor struct {
+	Addresses []ma.Multiaddr `json:"addresses"`
 }
 
 type Peer struct {
@@ -40,16 +40,16 @@ type Peer struct {
 }
 
 func NewPeerFromAddrInfo(addrInfo *p2ppeer.AddrInfo) (*Peer, error) {
-	kp := &Peer{
+	p := &Peer{
 		ID:            addrInfo.ID,
 		PeerAddresses: addrInfo.Addrs,
 		ConnStatus:    &atomic.Value{},
 		RemoveCh:      make(chan struct{}),
 		DoneCh:        make(chan struct{}),
 	}
-	kp.SetConnStatus(ConnStatusDisconnected)
+	p.SetConnStatus(ConnStatusDisconnected)
 
-	return kp, nil
+	return p, nil
 }
 
 func NewPeerFromMultiAddr(peerAddrs ma.Multiaddr) (*Peer, error) {
@@ -61,15 +61,82 @@ func NewPeerFromMultiAddr(peerAddrs ma.Multiaddr) (*Peer, error) {
 	return NewPeerFromAddrInfo(addrInfo)
 }
 
-func (kp *Peer) GetConnStatus() ConnectionStatus {
+func (p *Peer) ToAddrInfo() *p2ppeer.AddrInfo {
+	return &p2ppeer.AddrInfo{
+		ID:    p.ID,
+		Addrs: p.PeerAddresses,
+	}
+}
+
+func (p *Peer) GetConnStatus() ConnectionStatus {
 	//nolint:forcetypeassert // we do not care
-	return kp.ConnStatus.Load().(ConnectionStatus)
+	return p.ConnStatus.Load().(ConnectionStatus)
 }
 
-func (kp *Peer) SetConnStatus(cs ConnectionStatus) {
-	kp.ConnStatus.Store(cs)
+func (p *Peer) SetConnStatus(cs ConnectionStatus) {
+	p.ConnStatus.Store(cs)
 }
 
-func (kp *Peer) String() string {
-	return fmt.Sprintf("Peer{ID: %s, Addrs: %v, ConnStatus: %s}", kp.ID, kp.PeerAddresses, kp.GetConnStatus())
+func (p *Peer) Bytes() ([]byte, error) {
+	m := marshalutil.New()
+	m.WriteUint64(uint64(len(p.ID)))
+	m.WriteBytes([]byte(p.ID))
+	m.WriteUint8(uint8(len(p.PeerAddresses)))
+	for _, addr := range p.PeerAddresses {
+		addrBytes := addr.Bytes()
+		m.WriteUint64(uint64(len(addrBytes)))
+		m.WriteBytes(addrBytes)
+	}
+
+	return m.Bytes(), nil
+}
+
+func (p *Peer) String() string {
+	return fmt.Sprintf("Peer{ID: %s, Addrs: %v, ConnStatus: %s}", p.ID, p.PeerAddresses, p.GetConnStatus())
+}
+
+// peerFromBytes parses a peer from a byte slice.
+func peerFromBytes(bytes []byte) (*Peer, error) {
+	m := marshalutil.New(bytes)
+	idLen, err := m.ReadUint64()
+	if err != nil {
+		return nil, err
+	}
+	idBytes, err := m.ReadBytes(int(idLen))
+	if err != nil {
+		return nil, err
+	}
+	id := p2ppeer.ID(idBytes)
+
+	peer := &Peer{
+		ID:            id,
+		PeerAddresses: make([]ma.Multiaddr, 0),
+		ConnStatus:    &atomic.Value{},
+		RemoveCh:      make(chan struct{}),
+		DoneCh:        make(chan struct{}),
+	}
+
+	peer.SetConnStatus(ConnStatusDisconnected)
+
+	peerAddrLen, err := m.ReadUint8()
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < int(peerAddrLen); i++ {
+		addrLen, err := m.ReadUint64()
+		if err != nil {
+			return nil, err
+		}
+		addrBytes, err := m.ReadBytes(int(addrLen))
+		if err != nil {
+			return nil, err
+		}
+		addr, err := ma.NewMultiaddrBytes(addrBytes)
+		if err != nil {
+			return nil, err
+		}
+		peer.PeerAddresses = append(peer.PeerAddresses, addr)
+	}
+
+	return peer, nil
 }

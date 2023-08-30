@@ -70,6 +70,7 @@ type Manager struct {
 	Events *NeighborEvents
 
 	libp2pHost host.Host
+	peerDB     *network.DB
 
 	log *logger.Logger
 
@@ -83,9 +84,10 @@ type Manager struct {
 }
 
 // NewManager creates a new Manager.
-func NewManager(libp2pHost host.Host, log *logger.Logger) *Manager {
+func NewManager(libp2pHost host.Host, peerDB *network.DB, log *logger.Logger) *Manager {
 	m := &Manager{
 		libp2pHost: libp2pHost,
+		peerDB:     peerDB,
 		log:        log,
 		Events:     NewNeighborEvents(),
 		neighbors:  make(map[p2ppeer.ID]*Neighbor),
@@ -120,6 +122,7 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 
 	// Adds the peer's multiaddresses to the peerstore, so that they can be used for dialing.
 	m.libp2pHost.Peerstore().AddAddrs(peer.ID, peer.PeerAddresses, peerstore.ConnectedAddrTTL)
+	m.peerDB.UpdatePeer(peer)
 
 	cancelCtx := ctx
 	if conf.useDefaultTimeout {
@@ -265,6 +268,8 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 
 		return
 	}
+
+	m.peerDB.UpdatePeer(peer)
 
 	if err := m.addNeighbor(peer, ps); err != nil {
 		m.log.Errorf("failed to add neighbor %s: %s", peer.ID, err)

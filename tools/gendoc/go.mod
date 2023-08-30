@@ -59,7 +59,6 @@ require (
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
 	github.com/iotaledger/hive.go/ads v0.0.0-20230822231018-a16a2b406096 // indirect
-	github.com/iotaledger/hive.go/autopeering v0.0.0-20230822231018-a16a2b406096 // indirect
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230822231018-a16a2b406096 // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230822231018-a16a2b406096 // indirect
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230822231018-a16a2b406096 // indirect

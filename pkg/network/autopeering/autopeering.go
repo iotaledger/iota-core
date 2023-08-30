@@ -2,7 +2,6 @@ package autopeering
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -14,9 +13,6 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/libp2p/go-libp2p/p2p/discovery/util"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
-
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/iota-core/pkg/network"
@@ -28,7 +24,7 @@ type Manager struct {
 	p2pManager       *p2p.Manager
 	log              *logger.Logger
 	host             host.Host
-	peerDB           *peer.DB
+	peerDB           *network.DB
 	startOnce        sync.Once
 	isStarted        atomic.Bool
 	stopOnce         sync.Once
@@ -38,7 +34,7 @@ type Manager struct {
 	routingDiscovery *routing.RoutingDiscovery
 }
 
-func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *peer.DB, log *logger.Logger) *Manager {
+func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *network.DB, log *logger.Logger) *Manager {
 	return &Manager{
 		networkID:  networkID,
 		p2pManager: p2pManager,
@@ -63,12 +59,7 @@ func (m *Manager) Start(ctx context.Context) {
 		}
 
 		for _, seedPeer := range m.peerDB.SeedPeers() {
-			addrInfo, err := p2ppeer.AddrInfoFromString(fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", seedPeer.IP(), seedPeer.Address().Port, seedPeer.Identity.PublicKey()))
-			if err != nil {
-				m.log.Warnln("Failed to parse bootstrap node address from PeerDB:", err)
-				continue
-			}
-
+			addrInfo := seedPeer.ToAddrInfo()
 			if err := m.host.Connect(ctx, *addrInfo); err != nil {
 				m.log.Infoln("Failed to connect to bootstrap node:", seedPeer, err)
 				continue
