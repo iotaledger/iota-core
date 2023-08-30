@@ -20,11 +20,6 @@ func newCommitmentDispatcherFlags(commitment *Commitment, isRoot bool) *commitme
 		isBelowWarpSyncThreshold:        reactive.NewEvent(),
 	}
 
-	if isRoot {
-		c.isBelowSyncThreshold.Set(true)
-		c.isBelowWarpSyncThreshold.Set(true)
-	}
-
 	c.inSyncWindow = reactive.NewDerivedVariable2(func(belowSyncThreshold, aboveLatestVerifiedCommitment bool) bool {
 		return belowSyncThreshold && aboveLatestVerifiedCommitment
 	}, c.isBelowSyncThreshold, c.isAboveLatestVerifiedCommitment)
@@ -33,10 +28,15 @@ func newCommitmentDispatcherFlags(commitment *Commitment, isRoot bool) *commitme
 		return inSyncWindow && belowWarpSyncThreshold
 	}, c.inSyncWindow, c.isBelowWarpSyncThreshold)
 
-	commitment.parent.OnUpdate(func(_, parent *Commitment) {
-		triggerEventIfCommitmentBelowThreshold((*Commitment).IsBelowSyncThreshold, commitment, (*Chain).SyncThreshold)
-		triggerEventIfCommitmentBelowThreshold((*Commitment).IsBelowWarpSyncThreshold, commitment, (*Chain).WarpSyncThreshold)
-	})
+	if isRoot {
+		c.isBelowSyncThreshold.Set(true)
+		c.isBelowWarpSyncThreshold.Set(true)
+	} else {
+		commitment.parent.OnUpdate(func(_, parent *Commitment) {
+			triggerEventIfCommitmentBelowThreshold((*Commitment).IsBelowSyncThreshold, commitment, (*Chain).SyncThreshold)
+			triggerEventIfCommitmentBelowThreshold((*Commitment).IsBelowWarpSyncThreshold, commitment, (*Chain).WarpSyncThreshold)
+		})
+	}
 
 	return c
 }
