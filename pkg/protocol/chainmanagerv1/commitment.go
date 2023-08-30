@@ -13,6 +13,7 @@ type Commitment struct {
 	successor    reactive.Variable[*Commitment]
 	spawnedChain reactive.Variable[*Chain]
 	chain        reactive.Variable[*Chain]
+	evicted      reactive.Event
 
 	*commitmentFlags
 	*commitmentThresholds
@@ -26,13 +27,14 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 		successor:    reactive.NewVariable[*Commitment](),
 		spawnedChain: reactive.NewVariable[*Chain](),
 		chain:        reactive.NewVariable[*Chain](),
+		evicted:      reactive.NewEvent(),
 	}
-
-	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
 
 	c.commitmentFlags = newCommitmentFlags(c)
 	c.commitmentThresholds = newCommitmentThresholds(c)
 	c.commitmentDispatcherFlags = newCommitmentDispatcherFlags(c)
+
+	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
 
 	return c
 }
@@ -66,13 +68,17 @@ func (c *Commitment) Chain() reactive.Variable[*Chain] {
 	return c.chain
 }
 
+func (c *Commitment) Evicted() reactive.Event {
+	return c.evicted
+}
+
 func (c *Commitment) setParent(parent *Commitment) {
 	c.parent.Compute(func(currentParent *Commitment) *Commitment {
 		if currentParent != nil {
 			panic("parent may not be changed once it was set")
 		}
 
-		parent.registerChild(c, c.createChainUpdater(parent))
+		parent.registerChild(c, c.chainUpdater(parent))
 
 		return parent
 	})
@@ -88,7 +94,7 @@ func (c *Commitment) registerChild(newChild *Commitment, onSuccessorUpdated func
 	c.evicted.OnTrigger(unsubscribe)
 }
 
-func (c *Commitment) createChainUpdater(parent *Commitment) func(*Commitment, *Commitment) {
+func (c *Commitment) chainUpdater(parent *Commitment) func(*Commitment, *Commitment) {
 	var unsubscribeFromParent func()
 
 	return func(_, successor *Commitment) {

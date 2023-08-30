@@ -2,6 +2,9 @@ package chainmanagerv1
 
 import (
 	"github.com/iotaledger/hive.go/ds/reactive"
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/lo"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Chain is a reactive component that manages the state of a chain.
@@ -9,11 +12,20 @@ type Chain struct {
 	// root contains the Commitment object that spawned this chain.
 	root *Commitment
 
+	// commitments is a map of Commitment objects that belong to the same chain.
+	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
+
+	// latestCommitment is the latest Commitment object in this collection.
+	latestCommitment reactive.Variable[*Commitment]
+
+	// latestAttestedCommitment is the latest attested Commitment object in this collection.
+	latestAttestedCommitment reactive.Variable[*Commitment]
+
+	// latestVerifiedCommitment is the latest verified Commitment object in this collection.
+	latestVerifiedCommitment reactive.Variable[*Commitment]
+
 	// evicted is an event that gets triggered when the chain gets evicted.
 	evicted reactive.Event
-
-	// chainDAG is a reactive collection of Commitment objects that belong to the same chain.
-	*chainDAG
 
 	// weight is a reactive component that tracks the cumulative weight of the chain.
 	*chainWeights
@@ -25,12 +37,15 @@ type Chain struct {
 // NewChain creates a new Chain instance.
 func NewChain(root *Commitment) *Chain {
 	c := &Chain{
-		root:    root,
-		evicted: reactive.NewEvent(),
+		root:                     root,
+		commitments:              shrinkingmap.New[iotago.SlotIndex, *Commitment](),
+		latestCommitment:         reactive.NewVariable[*Commitment](),
+		latestAttestedCommitment: reactive.NewVariable[*Commitment](),
+		latestVerifiedCommitment: reactive.NewVariable[*Commitment](),
+		evicted:                  reactive.NewEvent(),
 	}
 
 	// embed reactive subcomponents
-	c.chainDAG = newChainDAG(c)
 	c.chainWeights = newChainWeights(c)
 	c.chainThresholds = newChainThresholds(c)
 
@@ -45,27 +60,81 @@ func (c *Chain) Root() *Commitment {
 	return c.root
 }
 
-// ParentChain returns the parent chain of this chain (if it exists and is solid).
-func (c *Chain) ParentChain() *Chain {
-	root := c.Root()
-	if root == nil {
-		return nil
+// Commitment returns the Commitment object with the given index, if it exists.
+func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exists bool) {
+	for currentChain := c; currentChain != nil; {
+		root := currentChain.Root()
+		if root == nil {
+			return nil, false
+		} else if index >= root.Index() {
+			return currentChain.commitments.Get(index)
+		}
+
+		parent := root.parent.Get()
+		if parent == nil {
+			return nil, false
+		}
+
+		currentChain = parent.chain.Get()
 	}
 
-	parent := root.parent.Get()
-	if parent == nil {
-		return nil
-	}
-
-	return parent.chain.Get()
+	return nil, false
 }
 
-// Evicted returns whether the chain got evicted.
-func (c *Chain) Evicted() bool {
-	return c.evicted.WasTriggered()
+// LatestCommitment returns a reactive variable that always contains the latest Commitment object in this
+// collection.
+func (c *Chain) LatestCommitment() reactive.Variable[*Commitment] {
+	return c.latestCommitment
 }
 
-// EvictedEvent returns a reactive event that gets triggered when the chain is evicted.
-func (c *Chain) EvictedEvent() reactive.Event {
+// LatestAttestedCommitment returns a reactive variable that always contains the latest attested Commitment object
+// in this collection.
+func (c *Chain) LatestAttestedCommitment() reactive.Variable[*Commitment] {
+	return c.latestAttestedCommitment
+}
+
+// LatestVerifiedCommitment returns a reactive variable that always contains the latest verified Commitment object
+// in this collection.
+func (c *Chain) LatestVerifiedCommitment() reactive.Variable[*Commitment] {
+	return c.latestVerifiedCommitment
+}
+
+// Evicted returns a reactive event that gets triggered when the chain is evicted.
+func (c *Chain) Evicted() reactive.Event {
 	return c.evicted
+}
+
+// registerCommitment adds a Commitment object to this collection.
+func (c *Chain) registerCommitment(commitment *Commitment) {
+	c.commitments.Set(commitment.Index(), commitment)
+
+	c.latestCommitment.Compute(commitment.max)
+
+	unsubscribe := lo.Batch(
+		commitment.attested.OnTrigger(func() { c.latestAttestedCommitment.Compute(commitment.max) }),
+		commitment.verified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(commitment.max) }),
+	)
+
+	commitment.chain.OnUpdateOnce(func(_, _ *Chain) {
+		unsubscribe()
+
+		c.unregisterCommitment(commitment)
+	}, func(_, newChain *Chain) bool { return newChain != c })
+}
+
+// unregisterCommitment removes a Commitment object from this collection.
+func (c *Chain) unregisterCommitment(commitment *Commitment) {
+	c.commitments.Delete(commitment.Index())
+
+	resetToParent := func(latestCommitment *Commitment) *Commitment {
+		if commitment.Index() > latestCommitment.Index() {
+			return latestCommitment
+		}
+
+		return commitment.parent.Get()
+	}
+
+	c.latestCommitment.Compute(resetToParent)
+	c.latestAttestedCommitment.Compute(resetToParent)
+	c.latestVerifiedCommitment.Compute(resetToParent)
 }

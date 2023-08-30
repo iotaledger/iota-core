@@ -6,7 +6,6 @@ type commitmentFlags struct {
 	solid    reactive.Event
 	attested reactive.Event
 	verified reactive.Event
-	evicted  reactive.Event
 }
 
 func newCommitmentFlags(commitment *Commitment) *commitmentFlags {
@@ -14,7 +13,6 @@ func newCommitmentFlags(commitment *Commitment) *commitmentFlags {
 		solid:    reactive.NewEvent(),
 		attested: reactive.NewEvent(),
 		verified: reactive.NewEvent(),
-		evicted:  reactive.NewEvent(),
 	}
 
 	commitment.parent.OnUpdate(func(_, parent *Commitment) {
@@ -34,8 +32,4 @@ func (c *commitmentFlags) Attested() reactive.Event {
 
 func (c *commitmentFlags) Verified() reactive.Event {
 	return c.verified
-}
-
-func (c *commitmentFlags) Evicted() reactive.Event {
-	return c.evicted
 }
