@@ -248,7 +248,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 		}
 		mainChainCommitment := mainChainChainCommitment.Commitment()
 
-		result, err := p.requestAttestations(ctx, fork.ForkedChain.Commitment(i).ID(), fork.Source, ch)
+		result, err := p.requestAttestation(ctx, fork.ForkedChain.Commitment(i).ID(), fork.Source, ch)
 		if err != nil {
 			return nil, false, true, ierrors.Wrapf(err, "failed to verify commitment %s", result.commitment.ID())
 		}
@@ -272,26 +272,24 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	return nil, false, false, nil
 }
 
-func (p *Protocol) requestAttestations(ctx context.Context, requestedID iotago.CommitmentID, src identity.ID, resultChan chan *commitmentVerificationResult) (*commitmentVerificationResult, error) {
+func (p *Protocol) requestAttestation(ctx context.Context, requestedID iotago.CommitmentID, src identity.ID, resultChan chan *commitmentVerificationResult) (*commitmentVerificationResult, error) {
 	ticker := time.NewTicker(p.optsAttestationRequesterTryInterval)
 	defer ticker.Stop()
-	counter := 0
 
-	for {
+	for i := 0; i < p.optsAttestationRequesterMaxRetries; i++ {
 		p.networkProtocol.RequestAttestations(requestedID, src)
 
 		select {
+		case <-ticker.C:
+			continue
 		case result := <-resultChan:
 			return result, result.err
-		case <-ticker.C:
-			counter++
-			if counter > p.optsAttestationRequesterMaxRetries {
-				return nil, ierrors.Errorf("request attestation exceeds max retries from src: %s", src.String())
-			}
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
 	}
+
+	return nil, ierrors.Errorf("request attestation exceeds max retries from src: %s", src.String())
 }
 
 func (p *Protocol) switchEngines() {
