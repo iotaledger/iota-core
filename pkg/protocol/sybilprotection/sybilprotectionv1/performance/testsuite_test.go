@@ -102,7 +102,7 @@ func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.Account
 func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
 	committee := account.NewAccounts()
 	for alias, action := range actions {
-		action.validate(t.T)
+		action.validate(t.T, t.api)
 
 		accountID := t.Account(alias, true)
 		committee.Set(accountID, &account.Pool{
@@ -154,14 +154,12 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 
 		accountID := t.Account(alias, true)
 		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID, actions[alias].ValidatorStake, epochIndex, epochIndex)
-		fmt.Println("actual validator reward: ", actualValidatorReward, "expected validator reward: ", expectedValidatorReward)
 		require.NoError(t.T, err)
 		require.Equal(t.T, expectedValidatorReward, actualValidatorReward)
 
 		for delegatedAmount := range action.Delegators {
 			expectedDelegatorReward := t.delegatorReward(epochIndex, t.epochStats[epochIndex].ProfitMargin, uint64(poolRewards), uint64(delegatedAmount), uint64(action.PoolStake), action)
 			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epochIndex, epochIndex)
-			fmt.Println("actual delegator reward: ", actualDelegatorReward, "expected delegator reward: ", expectedDelegatorReward)
 			require.NoError(t.T, err)
 			require.Equal(t.T, expectedDelegatorReward, actualDelegatorReward)
 		}
@@ -187,7 +185,6 @@ func (t *TestSuite) AssertRewardForDelegatorsOnly(alias string, epoch iotago.Epo
 	accID := t.Account(alias, false)
 	actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accID, actions[alias].ValidatorStake, epoch, epoch)
 	require.NoError(t.T, err)
-	fmt.Println(actualValidatorReward)
 	require.Equal(t.T, iotago.Mana(0), actualValidatorReward)
 	action, exists := actions[alias]
 	require.True(t.T, exists)
@@ -203,10 +200,8 @@ func (t *TestSuite) AssertRewardForDelegatorsOnly(alias string, epoch iotago.Epo
 
 func (t *TestSuite) validatorReward(alias string, epochIndex iotago.EpochIndex, profitMargin, poolRewards, stakeAmount, poolStake, fixedCost uint64, action *EpochActions) iotago.Mana {
 	if action.ValidationBlocksSentPerSlot > uint64(t.api.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot) {
-		fmt.Println("to many blocks")
 		return iotago.Mana(0)
 	}
-	fmt.Printf("%d>%d\n", action.FixedCost, t.poolRewards[epochIndex][alias].PoolRewards)
 	if action.FixedCost > t.poolRewards[epochIndex][alias].PoolRewards {
 		fmt.Println("No rewards for validator: ", alias, " epoch: ", epochIndex)
 		return iotago.Mana(0)
@@ -339,7 +334,7 @@ type EpochActions struct {
 	ValidatorStake iotago.BaseToken
 	Delegators     []iotago.BaseToken
 	FixedCost      iotago.Mana
-	// ActiveSlotsCount is the number of firsts slots the validator was active in the epoch.
+	// ActiveSlotsCount is the number of firsts slots the validator was active in the epoch. If lower than slotsPerEpoch then validator went offline after ActiveSlotsCount.
 	ActiveSlotsCount uint64
 	// ValidationBlocksSentPerSlot is the number of validation blocks validator sent per slot.
 	ValidationBlocksSentPerSlot uint64
@@ -347,10 +342,15 @@ type EpochActions struct {
 	SlotPerformance uint64
 }
 
-func (e *EpochActions) validate(t *testing.T) {
+func (e *EpochActions) validate(t *testing.T, api iotago.API) {
 	delegatorsTotal := iotago.BaseToken(0)
 	for _, delegatorStake := range e.Delegators {
 		delegatorsTotal += delegatorStake
 	}
 	require.Equal(t, e.PoolStake, delegatorsTotal+e.ValidatorStake, "pool stake must be equal to the sum of delegators stakes plus validator")
+
+	sumOfSlots := 1 << api.ProtocolParameters().SlotsPerEpochExponent()
+	require.LessOrEqual(t, e.ActiveSlotsCount, uint64(sumOfSlots), "active slots count must be less or equal to the number of slots in the epoch")
+
+	require.LessOrEqual(t, e.SlotPerformance, e.ValidationBlocksSentPerSlot, "number of subslots covered cannot be greated than number of blocks sent in a slot")
 }
