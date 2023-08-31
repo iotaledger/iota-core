@@ -1,9 +1,11 @@
 package protocol
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
@@ -212,6 +214,9 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	defer unhook()
 	defer wp.Shutdown()
 
+	ctx, cancel := context.WithTimeout(p.context, 2*time.Minute)
+	defer cancel()
+
 	// Fork-choice rule: switch if p.optsChainSwitchingThreshold slots in a row are heavier than main chain.
 	forkChoiceRule := func(heavierCount int) (decided bool, shouldSwitch bool) {
 		switch heavierCount {
@@ -243,46 +248,50 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 		}
 		mainChainCommitment := mainChainChainCommitment.Commitment()
 
-		ticker := time.NewTicker(p.optsAttestationRequesterTryInterval)
-		defer ticker.Stop()
-		counter := 0
-		received := false
-		for !received {
-			p.networkProtocol.RequestAttestations(fork.ForkedChain.Commitment(i).ID(), fork.Source)
+		result, err := p.requestAttestations(ctx, fork.ForkedChain.Commitment(i).ID(), fork.Source, ch)
+		if err != nil {
+			return nil, false, true, ierrors.Wrapf(err, "failed to verify commitment %s", result.commitment.ID())
+		}
 
-			select {
-			case result := <-ch:
-				if result.err != nil {
-					return nil, false, true, ierrors.Wrapf(result.err, "failed to verify commitment %s", result.commitment.ID())
-				}
+		// Count how many consecutive slots are heavier/lighter than the main chain.
+		switch {
+		case result.actualCumulativeWeight > mainChainCommitment.CumulativeWeight():
+			heavierCount++
+		case result.actualCumulativeWeight < mainChainCommitment.CumulativeWeight():
+			heavierCount--
+		default:
+			heavierCount = 0
+		}
 
-				anchorBlockIDs = append(anchorBlockIDs, result.blockIDs...)
-
-				// Count how many consecutive slots are heavier/lighter than the main chain.
-				switch {
-				case result.actualCumulativeWeight > mainChainCommitment.CumulativeWeight():
-					heavierCount++
-				case result.actualCumulativeWeight < mainChainCommitment.CumulativeWeight():
-					heavierCount--
-				default:
-					heavierCount = 0
-				}
-
-				if decided, doSwitch := forkChoiceRule(heavierCount); decided {
-					return anchorBlockIDs, doSwitch, false, nil
-				}
-				received = true
-			case <-ticker.C:
-				counter++
-				if counter > p.optsAttestationRequesterMaxRetries {
-					return nil, false, true, ierrors.Errorf("failed to request commitment for slot %d from src %s", i, fork.Source.String())
-				}
-			}
+		if decided, doSwitch := forkChoiceRule(heavierCount); decided {
+			return anchorBlockIDs, doSwitch, false, nil
 		}
 	}
 
 	// If the condition is not met in either direction, we don't switch the chain.
 	return nil, false, false, nil
+}
+
+func (p *Protocol) requestAttestations(ctx context.Context, requestedID iotago.CommitmentID, src identity.ID, resultChan chan *commitmentVerificationResult) (*commitmentVerificationResult, error) {
+	ticker := time.NewTicker(p.optsAttestationRequesterTryInterval)
+	defer ticker.Stop()
+	counter := 0
+
+	for {
+		p.networkProtocol.RequestAttestations(requestedID, src)
+
+		select {
+		case result := <-resultChan:
+			return result, result.err
+		case <-ticker.C:
+			counter++
+			if counter > p.optsAttestationRequesterMaxRetries {
+				return nil, ierrors.Errorf("request attestation exceeds max retries from src: %s", src.String())
+			}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 }
 
 func (p *Protocol) switchEngines() {
