@@ -90,7 +90,9 @@ func provide(c *dig.Container) error {
 				Component.LogFatalfAndExit("Failed to parse bootstrap peer multiaddress: %s", err)
 			}
 
-			deps.PeerDB.UpdatePeer(bootstrapPeer)
+			if err := deps.PeerDB.UpdatePeer(bootstrapPeer); err != nil {
+				Component.LogErrorf("Failed to update bootstrap peer: %s", err)
+			}
 		}
 
 		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger(), ParamsPeers.MaxPeers)

@@ -31,10 +31,10 @@ type Manager struct {
 	stopOnce         sync.Once
 	ctx              context.Context
 	stopFunc         context.CancelFunc
-	isStopped        bool
 	routingDiscovery *routing.RoutingDiscovery
 }
 
+// NewManager creates a new autopeering manager.
 func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *network.DB, log *logger.Logger, maxPeers int) *Manager {
 	return &Manager{
 		networkID:  networkID,
@@ -46,7 +46,9 @@ func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerD
 	}
 }
 
+// Start starts the autopeering manager.
 func (m *Manager) Start(ctx context.Context) {
+	//nolint:contextcheck
 	m.startOnce.Do(func() {
 		m.ctx, m.stopFunc = context.WithCancel(ctx)
 		kademliaDHT, err := dht.New(m.ctx, m.host, dht.Mode(dht.ModeServer))

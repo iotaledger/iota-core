@@ -1,10 +1,11 @@
 package chainmanager
 
 import (
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 type ChainID = iotago.CommitmentID

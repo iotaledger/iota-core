@@ -24,10 +24,6 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-const (
-	protocolID = "iota-core/0.0.1"
-)
-
 type Protocol struct {
 	Events *Events
 

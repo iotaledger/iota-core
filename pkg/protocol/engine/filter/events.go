@@ -1,9 +1,10 @@
 package filter
 
 import (
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 type Events struct {
