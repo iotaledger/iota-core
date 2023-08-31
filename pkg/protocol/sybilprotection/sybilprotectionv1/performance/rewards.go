@@ -62,7 +62,8 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		}
 		profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
 		profitMarginComplement := scaleUpComplement(poolStats.ProfitMargin, profitMarginExponent)
-		result, err := safemath.SafeMul(profitMarginComplement, uint64(rewardsForAccountInEpoch.PoolRewards))
+
+		result, err := safemath.SafeMul(poolStats.ProfitMargin, uint64(rewardsForAccountInEpoch.PoolRewards))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
