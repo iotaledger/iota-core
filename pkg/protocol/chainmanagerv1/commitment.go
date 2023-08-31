@@ -13,9 +13,11 @@ type Commitment struct {
 	successor    reactive.Variable[*Commitment]
 	spawnedChain reactive.Variable[*Chain]
 	chain        reactive.Variable[*Chain]
+	solid        reactive.Event
+	attested     reactive.Event
+	verified     reactive.Event
 	evicted      reactive.Event
 
-	*commitmentFlags
 	*commitmentDispatcherFlags
 	*commitmentChainSwitchingFlags
 }
@@ -27,12 +29,24 @@ func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment 
 		successor:    reactive.NewVariable[*Commitment](),
 		spawnedChain: reactive.NewVariable[*Chain](),
 		chain:        reactive.NewVariable[*Chain](),
+		solid:        reactive.NewEvent(),
+		attested:     reactive.NewEvent(),
+		verified:     reactive.NewEvent(),
 		evicted:      reactive.NewEvent(),
 	}
 
-	c.commitmentFlags = newCommitmentFlags(c, lo.First(optIsRoot))
+	c.parent.OnUpdate(func(_, parent *Commitment) {
+		c.solid.InheritFrom(parent.solid)
+	})
+
 	c.commitmentDispatcherFlags = newCommitmentDispatcherFlags(c, lo.First(optIsRoot))
 	c.commitmentChainSwitchingFlags = newCommitmentChainSwitchingFlags(c, lo.First(optIsRoot))
+
+	if lo.First(optIsRoot) {
+		c.solid.Set(true)
+		c.attested.Set(true)
+		c.verified.Set(true)
+	}
 
 	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
 
@@ -53,6 +67,18 @@ func (c *Commitment) SpawnedChain() reactive.Variable[*Chain] {
 
 func (c *Commitment) Chain() reactive.Variable[*Chain] {
 	return c.chain
+}
+
+func (c *Commitment) Solid() reactive.Event {
+	return c.solid
+}
+
+func (c *Commitment) Attested() reactive.Event {
+	return c.attested
+}
+
+func (c *Commitment) Verified() reactive.Event {
+	return c.verified
 }
 
 func (c *Commitment) Evicted() reactive.Event {
