@@ -133,7 +133,7 @@ func (m *Manager) discoverAndDialPeers() {
 		// Do not dial if we already have enough neighbors.
 		if len(m.p2pManager.AllNeighbors()) >= m.maxPeers {
 			m.log.Debugf("Already have %d neighbors, not dialing %s", m.maxPeers, peerAddrInfo)
-			break
+			return
 		}
 
 		m.log.Debugf("Found peer: %s", peerAddrInfo)
