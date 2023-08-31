@@ -186,6 +186,8 @@ func (s *Settings) StoreFutureProtocolParametersHash(version iotago.Version, has
 		return err
 	}
 
+	// TODO: don't we need to store to protocolVersionEpochMapping here as well?
+
 	s.apiProvider.AddFutureVersion(version, hash, epoch)
 
 	return nil

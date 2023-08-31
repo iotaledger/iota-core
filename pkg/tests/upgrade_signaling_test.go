@@ -238,45 +238,99 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
 	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
 
-	ts.AssertEpochVersions(map[iotago.Version]iotago.EpochIndex{
-		3: 0,
-		5: 13,
-	}, ts.Nodes()...)
+	// Restart node (and add protocol parameters) and add another node from snapshot (also with protocol parameters already set).
+	{
+		var expectedRootBlocks []*blocks.Block
+		for _, slot := range []iotago.SlotIndex{59, 60, 61} {
+			expectedRootBlocks = append(expectedRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+		}
 
-	ts.AssertVersionAndProtocolParameters(map[iotago.Version]iotago.ProtocolParameters{
-		3: ts.API.ProtocolParameters(),
-		5: nil,
-	}, ts.Nodes()...)
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithLatestCommitmentSlotIndex(61),
+			testsuite.WithActiveRootBlocks(expectedRootBlocks),
+		)
 
-	ts.AssertVersionAndProtocolParametersHashes(map[iotago.Version]iotago.Identifier{
-		3: lo.PanicOnErr(ts.API.ProtocolParameters().Hash()),
-		5: hash1,
-	}, ts.Nodes()...)
+		// Shutdown nodeE.1 and restart it from disk. Verify state.
+		{
+			nodeE1 := ts.Node("nodeE.1")
+			nodeE1.Shutdown()
+			ts.RemoveNode("nodeE.1")
 
-	// check account data at the end of the test
-	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    ts.Node("nodeA").AccountID,
-		Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-		ExpirySlot:                            math.MaxUint64,
-		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
-		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
-		ValidatorStake:                        testsuite.MinValidatorAccountAmount,
-		DelegationStake:                       0,
-		FixedCost:                             0,
-		StakeEndEpoch:                         math.MaxUint64,
-		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash1},
-	}, ts.Nodes()...)
+			nodeE2 := ts.AddNode("nodeE.2")
+			nodeE2.CopyIdentityFromNode(nodeE1)
+			nodeE2.Initialize(true,
+				append(nodeOptions,
+					protocol.WithBaseDirectory(ts.Directory.Path(nodeE1.Name)),
+				)...,
+			)
+			ts.Wait()
+		}
 
-	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    ts.Node("nodeD").AccountID,
-		Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-		ExpirySlot:                            math.MaxUint64,
-		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 4),
-		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeD").PubKey))),
-		ValidatorStake:                        testsuite.MinValidatorAccountAmount,
-		DelegationStake:                       0,
-		FixedCost:                             0,
-		StakeEndEpoch:                         math.MaxUint64,
-		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash2},
-	}, ts.Nodes()...)
+		// // Create snapshot.
+		// snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
+		// require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+		//
+		// {
+		// 	nodeG := ts.AddNode("nodeG")
+		// 	nodeG.Initialize(true,
+		// 		append(nodeOptions,
+		// 			protocol.WithSnapshotPath(snapshotPath),
+		// 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeG.Name)),
+		// 		)...,
+		// 	)
+		// 	ts.Wait()
+		//
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithLatestCommitmentSlotIndex(61),
+			testsuite.WithActiveRootBlocks(expectedRootBlocks),
+		)
+		// }
+	}
+
+	// Verify final state of all nodes.
+	{
+		ts.AssertEpochVersions(map[iotago.Version]iotago.EpochIndex{
+			3: 0,
+			5: 13,
+		}, ts.Nodes()...)
+
+		ts.AssertVersionAndProtocolParameters(map[iotago.Version]iotago.ProtocolParameters{
+			3: ts.API.ProtocolParameters(),
+			5: nil,
+		}, ts.Nodes()...)
+
+		ts.AssertVersionAndProtocolParametersHashes(map[iotago.Version]iotago.Identifier{
+			3: lo.PanicOnErr(ts.API.ProtocolParameters().Hash()),
+			5: hash1,
+		}, ts.Nodes()...)
+
+		// check account data at the end of the test
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:                                    ts.Node("nodeA").AccountID,
+			Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
+			ExpirySlot:                            math.MaxUint64,
+			OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
+			BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
+			ValidatorStake:                        testsuite.MinValidatorAccountAmount,
+			DelegationStake:                       0,
+			FixedCost:                             0,
+			StakeEndEpoch:                         math.MaxUint64,
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash1},
+		}, ts.Nodes()...)
+
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:                                    ts.Node("nodeD").AccountID,
+			Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
+			ExpirySlot:                            math.MaxUint64,
+			OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 4),
+			BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeD").PubKey))),
+			ValidatorStake:                        testsuite.MinValidatorAccountAmount,
+			DelegationStake:                       0,
+			FixedCost:                             0,
+			StakeEndEpoch:                         math.MaxUint64,
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash2},
+		}, ts.Nodes()...)
+	}
+
+	// TODO: Check that issuing still produces the same commitments
 }
