@@ -1,7 +1,6 @@
 package snapshotcreator
 
 import (
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -86,7 +85,7 @@ type AccountDetails struct {
 	Address              iotago.Address
 	Amount               iotago.BaseToken
 	Mana                 iotago.Mana
-	IssuerKey            ed25519.PublicKey
+	IssuerKey            iotago.BlockIssuerKey
 	ExpirySlot           iotago.SlotIndex
 	BlockIssuanceCredits iotago.BlockIssuanceCredits
 
