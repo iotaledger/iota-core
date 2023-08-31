@@ -7,7 +7,6 @@ import (
 
 	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
@@ -273,7 +272,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	return nil, false, false, nil
 }
 
-func (p *Protocol) requestAttestation(ctx context.Context, requestedID iotago.CommitmentID, src identity.ID, resultChan chan *commitmentVerificationResult) (*commitmentVerificationResult, error) {
+func (p *Protocol) requestAttestation(ctx context.Context, requestedID iotago.CommitmentID, src p2ppeer.ID, resultChan chan *commitmentVerificationResult) (*commitmentVerificationResult, error) {
 	ticker := time.NewTicker(p.optsAttestationRequesterTryInterval)
 	defer ticker.Stop()
 
