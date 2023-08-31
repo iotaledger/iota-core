@@ -9,16 +9,17 @@ import (
 type Commitment struct {
 	*model.Commitment
 
-	parent       reactive.Variable[*Commitment]
-	successor    reactive.Variable[*Commitment]
-	spawnedChain reactive.Variable[*Chain]
-	chain        reactive.Variable[*Chain]
-	solid        reactive.Event
-	attested     reactive.Event
-	verified     reactive.Event
-	evicted      reactive.Event
+	parent           reactive.Variable[*Commitment]
+	successor        reactive.Variable[*Commitment]
+	spawnedChain     reactive.Variable[*Chain]
+	chain            reactive.Variable[*Chain]
+	solid            reactive.Event
+	attested         reactive.Event
+	verified         reactive.Event
+	inSyncWindow     *inSyncWindow
+	requiresWarpSync *requiresWarpSync
+	evicted          reactive.Event
 
-	*commitmentDispatcherFlags
 	*commitmentChainSwitchingFlags
 }
 
@@ -35,20 +36,20 @@ func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment 
 		evicted:      reactive.NewEvent(),
 	}
 
-	c.parent.OnUpdate(func(_, parent *Commitment) {
-		c.solid.InheritFrom(parent.solid)
-	})
+	c.inSyncWindow = newInSyncWindow(c, lo.First(optIsRoot))
+	c.requiresWarpSync = newRequiresWarpSync(c, lo.First(optIsRoot))
 
-	c.commitmentDispatcherFlags = newCommitmentDispatcherFlags(c, lo.First(optIsRoot))
+	c.parent.OnUpdate(func(_, parent *Commitment) { c.solid.InheritFrom(parent.solid) })
+
 	c.commitmentChainSwitchingFlags = newCommitmentChainSwitchingFlags(c, lo.First(optIsRoot))
+
+	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
 
 	if lo.First(optIsRoot) {
 		c.solid.Set(true)
 		c.attested.Set(true)
 		c.verified.Set(true)
 	}
-
-	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
 
 	return c
 }
@@ -79,6 +80,14 @@ func (c *Commitment) Attested() reactive.Event {
 
 func (c *Commitment) Verified() reactive.Event {
 	return c.verified
+}
+
+func (c *Commitment) InSyncWindow() reactive.Variable[bool] {
+	return c.inSyncWindow
+}
+
+func (c *Commitment) RequiresWarpSync() reactive.Variable[bool] {
+	return c.requiresWarpSync
 }
 
 func (c *Commitment) Evicted() reactive.Event {
