@@ -1,7 +1,6 @@
 package performance
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/iotaledger/hive.go/ads"

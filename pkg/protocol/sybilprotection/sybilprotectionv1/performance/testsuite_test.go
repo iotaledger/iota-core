@@ -76,8 +76,10 @@ func (t *TestSuite) InitPerformanceTracker() {
 	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0)
 	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
-
-	t.Instance = NewTracker(rewardsStore.GetEpoch, poolStatsStore, committeeStore, performanceFactorFunc, t.latestCommittedEpoch, api.SingleVersionProvider(t.api), func(err error) {})
+	latestPrunedFunc := func() (iotago.EpochIndex, bool) {
+		return 0, true
+	}
+	t.Instance = NewTracker(rewardsStore.GetEpoch, poolStatsStore, committeeStore, performanceFactorFunc, latestPrunedFunc, t.latestCommittedEpoch, api.SingleVersionProvider(t.api), func(err error) {})
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -122,7 +124,7 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 		totalStake += action.PoolStake
 		totalValidatorsStake += action.ValidatorStake
 	}
-	profitMarging := t.calculateProfitMargin(totalValidatorsStake, totalStake, epochIndex)
+	profitMarging := t.calculateProfitMargin(totalValidatorsStake, totalStake)
 
 	for alias, action := range actions {
 		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount
@@ -177,7 +179,7 @@ func (t *TestSuite) calculatePoolReward(epoch iotago.EpochIndex, totalValidators
 	targetReward, err := params.RewardsParameters().TargetReward(epoch, uint64(params.TokenSupply()), params.ManaParameters().ManaGenerationRate, params.ManaParameters().ManaGenerationRateExponent, params.SlotsPerEpochExponent(), t.api)
 	require.NoError(t.T, err)
 
-	poolCoefficient := t.calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorsStake, epoch)
+	poolCoefficient := t.calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorsStake)
 	scaledPoolReward := poolCoefficient * uint64(targetReward) * performanceFactor
 	poolRewardNoFixedCost := scaledPoolReward / uint64(params.RewardsParameters().ValidatorBlocksPerSlot) >> (params.RewardsParameters().PoolCoefficientExponent + 1)
 	if poolRewardNoFixedCost < fixedCost {
@@ -188,7 +190,7 @@ func (t *TestSuite) calculatePoolReward(epoch iotago.EpochIndex, totalValidators
 	return poolRewardNoFixedCost - fixedCost
 }
 
-func (t *TestSuite) calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorStake iotago.BaseToken, epoch iotago.EpochIndex) uint64 {
+func (t *TestSuite) calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorStake iotago.BaseToken) uint64 {
 	poolCoeffExponent := t.api.ProtocolParameters().RewardsParameters().PoolCoefficientExponent
 	poolCoeff := (poolStake<<poolCoeffExponent)/totalStake +
 		(validatorStake<<poolCoeffExponent)/totalValidatorStake
@@ -197,7 +199,7 @@ func (t *TestSuite) calculatePoolCoefficient(poolStake, totalStake, validatorSta
 }
 
 // calculateProfitMargin calculates the profit margin of the pool by firstly increasing the accuracy of the given value, so the profit margin is moved to the power of 2^accuracyShift.
-func (t *TestSuite) calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken, epoch iotago.EpochIndex) uint64 {
+func (t *TestSuite) calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken) uint64 {
 	return uint64((totalValidatorsStake << t.api.ProtocolParameters().RewardsParameters().ProfitMarginExponent) / (totalValidatorsStake + totalPoolStake))
 }
 

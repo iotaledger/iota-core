@@ -23,6 +23,7 @@ type Tracker struct {
 	committeeStore           *epochstore.Store[*account.Accounts]
 
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
+	latestPrunedEpoch         func() (iotago.EpochIndex, bool)
 	latestAppliedEpoch        iotago.EpochIndex
 
 	apiProvider api.Provider
@@ -38,6 +39,7 @@ func NewTracker(
 	poolStatsStore *epochstore.Store[*model.PoolsStats],
 	committeeStore *epochstore.Store[*account.Accounts],
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
+	latestPrunedEpoch func() (iotago.EpochIndex, bool),
 	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider api.Provider,
 	errHandler func(error),
@@ -47,6 +49,7 @@ func NewTracker(
 		poolStatsStore:            poolStatsStore,
 		committeeStore:            committeeStore,
 		validatorPerformancesFunc: validatorPerformancesFunc,
+		latestPrunedEpoch:         latestPrunedEpoch,
 		latestAppliedEpoch:        latestAppliedEpoch,
 		apiProvider:               apiProvider,
 		errHandler:                errHandler,

@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/utils"
@@ -82,7 +83,6 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "unable to read slot index")
 		}
 
-		// TODO: if accounts count is limited to the committee size, we can lower this to uint8 or other matching value
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
 			return ierrors.Wrapf(err, "unable to read accounts count for slot index %d", slotIndex)
@@ -97,7 +97,6 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
 				return ierrors.Wrapf(err, "unable to read account id for the slot index %d", slotIndex)
 			}
-			// TODO: performance factor activity vector can be decreased to uint16 or uint32 depending on the size of parameter ValidatorBlocksPerSlot
 			var performanceFactor model.ValidatorPerformance
 			if err := binary.Read(reader, binary.LittleEndian, &performanceFactor); err != nil {
 				return ierrors.Wrapf(err, "unable to read performance factor for account %s and slot index %d", accountID, slotIndex)
@@ -219,12 +218,10 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 		if err := pWriter.WriteValue("slot index", currentSlot); err != nil {
 			return ierrors.Wrapf(err, "unable to write slot index %d", currentSlot)
 		}
-		// TODO: if accounts count is limited to the committee size, we can lower this to uint8 or other matching value
 		var accountsCount uint64
 		if err := pWriter.WriteValue("pf account count", accountsCount, true); err != nil {
 			return ierrors.Wrapf(err, "unable to write pf accounts count for slot index %d", currentSlot)
 		}
-		// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
 		performanceFactors, err := t.validatorPerformancesFunc(currentSlot)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to get performance factors for slot index %d", currentSlot)
@@ -268,32 +265,31 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 	if err := pWriter.WriteValue("pool rewards epoch count", epochCount, true); err != nil {
 		return ierrors.Wrap(err, "unable to write epoch count")
 	}
-	// TODO: make sure to adjust this loop if we add pruning later.
-	for epoch := targetEpoch; epoch > iotago.EpochIndex(0); epoch-- {
+
+	for epoch := targetEpoch; epoch > lo.Return1(t.latestPrunedEpoch()); epoch-- {
 		rewardsMap, err := t.rewardsMap(epoch)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to get rewards tree for epoch index %d", epoch)
 		}
-
-		// if the tree was not present in storage we can skip this epoch and the previous ones, as we never stored any rewards
+		// if the map was not present in storage we can skip this epoch and the previous ones, as we never stored any rewards
 		if !rewardsMap.WasRestoredFromStorage() {
 			break
 		}
 
-		if err := pWriter.WriteValue("epoch index", epoch); err != nil {
+		if err = pWriter.WriteValue("epoch index", epoch); err != nil {
 			return ierrors.Wrapf(err, "unable to write epoch index for epoch index %d", epoch)
 		}
 
 		var accountCount uint64
-		if err := pWriter.WriteValue("pool rewards account count", accountCount, true); err != nil {
+		if err = pWriter.WriteValue("pool rewards account count", accountCount, true); err != nil {
 			return ierrors.Wrapf(err, "unable to write account count for epoch index %d", epoch)
 		}
 
-		if err := rewardsMap.Stream(func(key iotago.AccountID, value *model.PoolRewards) error {
-			if err := pWriter.WriteValue("account id", key); err != nil {
+		if err = rewardsMap.Stream(func(key iotago.AccountID, value *model.PoolRewards) error {
+			if err = pWriter.WriteValue("account id", key); err != nil {
 				return ierrors.Wrapf(err, "unable to write account id for epoch index %d and accountID %s", epoch, key)
 			}
-			if err := pWriter.WriteValue("account rewards", value); err != nil {
+			if err = pWriter.WriteValue("account rewards", value); err != nil {
 				return ierrors.Wrapf(err, "unable to write account rewards for epoch index %d and accountID %s", epoch, key)
 			}
 			accountCount++
@@ -303,7 +299,7 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 			return ierrors.Wrapf(err, "unable to stream rewards for epoch index %d", epoch)
 		}
 
-		if err := pWriter.WriteValueAtBookmark("pool rewards account count", accountCount); err != nil {
+		if err = pWriter.WriteValueAtBookmark("pool rewards account count", accountCount); err != nil {
 			return ierrors.Wrapf(err, "unable to write account count for epoch index %d at bookmarked position", epoch)
 		}
 
