@@ -169,11 +169,17 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	case iotago.OutputDelegation:
 		//nolint:forcetypeassert
 		delegationOutput := utxoOutput.Output().(*iotago.DelegationOutput)
+		latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index()
+		stakingEnd := delegationOutput.EndEpoch
+		// the output is in delayed calaiming state if endEpoch is set, otherwise we use latest possible epoch
+		if delegationOutput.EndEpoch == 0 {
+			stakingEnd = deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index())
+		}
 		reward, actualStart, actualEnd, err = deps.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
 			delegationOutput.ValidatorID,
 			delegationOutput.DelegatedAmount,
 			delegationOutput.StartEpoch,
-			delegationOutput.EndEpoch,
+			stakingEnd,
 		)
 	}
 	if err != nil {
