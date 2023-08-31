@@ -1,6 +1,8 @@
 package chainmanagerv1
 
-import "github.com/iotaledger/hive.go/ds/reactive"
+import (
+	"github.com/iotaledger/hive.go/ds/reactive"
+)
 
 type commitmentChainSwitchingFlags struct {
 	isDirectlyAboveLatestAttestedCommitment reactive.Variable[bool]
@@ -19,8 +21,8 @@ func newCommitmentChainSwitchingFlags(commitment *Commitment, isRoot bool) *comm
 			attestationRequestedByChain.Unsubscribe()
 		}
 
-		attestationRequestedByChain = reactive.NewDerivedVariable2(func(requestAttestations, isAboveLatestAttestedCommitment bool) bool {
-			return requestAttestations && isAboveLatestAttestedCommitment
+		attestationRequestedByChain = reactive.NewDerivedVariable2(func(requestAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
+			return requestAttestations && isDirectlyAboveLatestAttestedCommitment
 		}, newChain.requestAttestations, c.isDirectlyAboveLatestAttestedCommitment)
 
 		c.attestationRequested.InheritFrom(attestationRequestedByChain)

@@ -73,7 +73,12 @@ func TestChainManager(t *testing.T) {
 	require.Equal(t, uint64(3), commitment3Metadata.Chain().Get().ClaimedWeight().Get())
 
 	commitment3aMetadata := chainManager.ProcessCommitment(commitment3a)
-	commitment3aMetadata.Attested().Trigger()
-	commitment3aMetadata.Verified().Trigger()
-	fmt.Println(commitment3aMetadata.Chain().Get())
+
+	fmt.Println(commitment3aMetadata.AttestationRequested().Get())
+	fmt.Println("TRIGGER ATTESTATION")
+	commitment3Metadata.Parent().Get().Attested().Trigger()
+	fmt.Println(commitment3aMetadata.AttestationRequested().Get())
+
+	fmt.Println(commitment3aMetadata.Attested().Trigger())
+	fmt.Println(commitment3aMetadata.AttestationRequested().Get())
 }
