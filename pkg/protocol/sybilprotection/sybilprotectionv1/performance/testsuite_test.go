@@ -218,7 +218,9 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochInde
 		}
 		fmt.Println("New slot: ", slot)
 		for i := uint64(0); i < validationBlocksSentPerSlot; i++ {
-			block := tpkg.RandBasicBlockWithIssuerAndRMC(accountID, 10)
+			valBlock := tpkg.ValidationBlock()
+			block := tpkg.RandProtocolBlock(valBlock, t.api, 10)
+			block.IssuerID = accountID
 			subslotIndex := i
 			// issued more than one block in the same slot to reduce performance factor
 			if i >= slotPerformanceFactor {
