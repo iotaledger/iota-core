@@ -122,8 +122,6 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 
 	// Adds the peer's multiaddresses to the peerstore, so that they can be used for dialing.
 	m.libp2pHost.Peerstore().AddAddrs(peer.ID, peer.PeerAddresses, peerstore.ConnectedAddrTTL)
-	m.peerDB.UpdatePeer(peer)
-
 	cancelCtx := ctx
 	if conf.useDefaultTimeout {
 		var cancel context.CancelFunc
@@ -148,6 +146,10 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 		"addr", ps.Conn().RemoteMultiaddr(),
 		"proto", protocolID,
 	)
+
+	if err := m.peerDB.UpdatePeer(peer); err != nil {
+		return ierrors.Wrapf(err, "failed to update peer %s", peer.ID)
+	}
 
 	if err := m.addNeighbor(peer, ps); err != nil {
 		m.closeStream(stream)
@@ -263,13 +265,18 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 	}
 	peer, err := network.NewPeerFromAddrInfo(peerAddrInfo)
 	if err != nil {
-		m.log.Errorf("failed to create peer from peer addr info %s : %s", peerAddrInfo, err)
+		m.log.Errorf("failed to create peer from peer addr info %s: %s", peerAddrInfo, err)
 		m.closeStream(stream)
 
 		return
 	}
 
-	m.peerDB.UpdatePeer(peer)
+	if err := m.peerDB.UpdatePeer(peer); err != nil {
+		m.log.Errorf("failed to update peer %s in peer database: %s", peer.ID, err)
+		m.closeStream(stream)
+
+		return
+	}
 
 	if err := m.addNeighbor(peer, ps); err != nil {
 		m.log.Errorf("failed to add neighbor %s: %s", peer.ID, err)

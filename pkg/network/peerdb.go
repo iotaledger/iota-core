@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math/rand"
+	"sync"
 	"time"
 
 	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
@@ -24,8 +25,9 @@ const (
 
 // DB is the peer database, storing previously seen peers and any collected properties of them.
 type DB struct {
-	store kvstore.KVStore
-	quit  chan struct{} // Channel to signal the expiring thread to stop
+	store     kvstore.KVStore
+	expirerWg sync.WaitGroup
+	quit      chan struct{} // Channel to signal the expiring thread to stop
 }
 
 // Keys in the node database.
@@ -33,8 +35,8 @@ const (
 	dbNodePrefix  = "n:"     // Identifier to prefix node entries with
 	dbLocalPrefix = "local:" // Identifier to prefix local entries
 
-	dbLocalKey    = "key"
 	dbNodeUpdated = "updated"
+	dbLocalKey    = "key"
 )
 
 // NewDB creates a new peer database.
@@ -43,6 +45,8 @@ func NewDB(store kvstore.KVStore) *DB {
 		store: store,
 		quit:  make(chan struct{}),
 	}
+
+	pDB.expirerWg.Add(1)
 	go pDB.expirer()
 
 	return pDB
@@ -93,7 +97,11 @@ func (db *DB) UpdatePeer(p *Peer) error {
 		return err
 	}
 
-	return db.setInt64(nodeFieldKey(p.ID, dbNodeUpdated), time.Now().Unix())
+	if err := db.setInt64(nodeFieldKey(p.ID, dbNodeUpdated), time.Now().Unix()); err != nil {
+		return err
+	}
+
+	return db.store.Flush()
 }
 
 // Peer retrieves a peer from the database.
@@ -113,8 +121,8 @@ func (db *DB) SeedPeers() []*Peer {
 
 // Close closes the peer database.
 func (db *DB) Close() {
-	// ToDo: add waitgroup to wait until the expirer is done
 	close(db.quit)
+	db.expirerWg.Wait()
 }
 
 // expirer should be started in a go routine, and is responsible for looping ad
@@ -122,11 +130,11 @@ func (db *DB) Close() {
 func (db *DB) expirer() {
 	tick := time.NewTicker(cleanupInterval)
 	defer tick.Stop()
+	defer db.expirerWg.Done()
 
 	for {
 		select {
 		case <-tick.C:
-			// ToDo: add callback to DB to handle errors?
 			_ = db.expireNodes()
 		case <-db.quit:
 			return
@@ -177,7 +185,11 @@ func (db *DB) expireNodes() error {
 		return innerErr
 	}
 
-	return batchedMuts.Commit()
+	if err := batchedMuts.Commit(); err != nil {
+		return err
+	}
+
+	return db.store.Flush()
 }
 
 func (db *DB) getPeers() (peers []*Peer) {
@@ -218,7 +230,7 @@ func localFieldKey(field string) []byte {
 
 // nodeFieldKey returns the database key for a node metadata field.
 func nodeFieldKey(id p2ppeer.ID, field string) []byte {
-	return bytes.Join([][]byte{nodeKey(id), []byte(field)}, []byte{':'})
+	return append(nodeKey(id), []byte(field)...)
 }
 
 func parseInt64(blob []byte) int64 {

@@ -139,7 +139,7 @@ func (m *Manager) discoverAndDialPeers() {
 				m.log.Debugf("Already connected to peer %s", peer)
 				continue
 			}
-			m.log.Warnf("Failed to dial peer %s: %w", peer, err)
+			m.log.Warnf("Failed to dial peer %s: %s", peer, err)
 		}
 	}
 }
