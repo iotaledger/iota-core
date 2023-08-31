@@ -8,7 +8,7 @@ type commitmentChainSwitchingFlags struct {
 	attestationRequested reactive.Variable[bool]
 }
 
-func newCommitmentChainSwitchingFlags(commitment *Commitment, isRoot bool) *commitmentChainSwitchingFlags {
+func newCommitmentChainSwitchingFlags(commitment *Commitment) *commitmentChainSwitchingFlags {
 	c := &commitmentChainSwitchingFlags{
 		attestationRequested: reactive.NewVariable[bool](),
 	}

@@ -41,7 +41,7 @@ func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment 
 
 	c.parent.OnUpdate(func(_, parent *Commitment) { c.solid.InheritFrom(parent.solid) })
 
-	c.commitmentChainSwitchingFlags = newCommitmentChainSwitchingFlags(c, lo.First(optIsRoot))
+	c.commitmentChainSwitchingFlags = newCommitmentChainSwitchingFlags(c)
 
 	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
 
