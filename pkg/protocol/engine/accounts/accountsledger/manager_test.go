@@ -19,10 +19,10 @@ func TestManager_Scenario1(t *testing.T) {
 
 	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
 		"A": {
-			BICUpdatedTime: 1,
-			BICAmount:      5,
-			PubKeys:        []string{"A.P1"},
-			OutputID:       "A1",
+			BICUpdatedTime:  1,
+			BICAmount:       5,
+			BlockIssuerKeys: []string{"A.P1"},
+			OutputID:        "A1",
 		},
 	})
 
@@ -38,10 +38,10 @@ func TestManager_Scenario1(t *testing.T) {
 
 	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
 		"A": {
-			BICAmount:      20,
-			PubKeys:        []string{"A.P1", "A.P2"},
-			OutputID:       "A2",
-			BICUpdatedTime: 2,
+			BICAmount:       20,
+			BlockIssuerKeys: []string{"A.P1", "A.P2"},
+			OutputID:        "A2",
+			BICUpdatedTime:  2,
 		},
 	})
 }
@@ -61,20 +61,20 @@ func TestManager_Scenario2(t *testing.T) {
 
 	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
 		"A": {
-			BICUpdatedTime: 1,
-			BICAmount:      5,
-			PubKeys:        []string{"A.P1"},
-			OutputID:       "A1",
+			BICUpdatedTime:  1,
+			BICAmount:       5,
+			BlockIssuerKeys: []string{"A.P1"},
+			OutputID:        "A1",
 		},
 	})
 
 	ts.ApplySlotActions(2, 0, nil)
 	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
 		"A": {
-			BICUpdatedTime: 1,
-			BICAmount:      5,
-			PubKeys:        []string{"A.P1"},
-			OutputID:       "A1",
+			BICUpdatedTime:  1,
+			BICAmount:       5,
+			BlockIssuerKeys: []string{"A.P1"},
+			OutputID:        "A1",
 		},
 	})
 
@@ -90,10 +90,10 @@ func TestManager_Scenario2(t *testing.T) {
 
 	ts.AssertAccountLedgerUntil(3, map[string]*AccountState{
 		"A": {
-			BICAmount:      20,
-			PubKeys:        []string{"A.P1", "A.P2"},
-			OutputID:       "A2",
-			BICUpdatedTime: 3,
+			BICAmount:       20,
+			BlockIssuerKeys: []string{"A.P1", "A.P2"},
+			OutputID:        "A2",
+			BICUpdatedTime:  3,
 		},
 	})
 }
@@ -112,10 +112,10 @@ func TestManager_Scenario3(t *testing.T) {
 
 	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
 		"A": {
-			BICUpdatedTime: 1,
-			BICAmount:      5,
-			PubKeys:        []string{"A.P1"},
-			OutputID:       "A1",
+			BICUpdatedTime:  1,
+			BICAmount:       5,
+			BlockIssuerKeys: []string{"A.P1"},
+			OutputID:        "A1",
 		},
 	})
 
@@ -148,20 +148,20 @@ func TestManager_Scenario4(t *testing.T) {
 
 	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
 		"A": {
-			BICUpdatedTime: 1,
-			BICAmount:      5,
-			PubKeys:        []string{"A.P1"},
-			OutputID:       "A1",
+			BICUpdatedTime:  1,
+			BICAmount:       5,
+			BlockIssuerKeys: []string{"A.P1"},
+			OutputID:        "A1",
 		},
 	})
 
 	ts.ApplySlotActions(2, 0, nil)
 	ts.AssertAccountLedgerUntil(2, map[string]*AccountState{
 		"A": {
-			BICUpdatedTime: 1,
-			BICAmount:      5,
-			PubKeys:        []string{"A.P1"},
-			OutputID:       "A1",
+			BICUpdatedTime:  1,
+			BICAmount:       5,
+			BlockIssuerKeys: []string{"A.P1"},
+			OutputID:        "A1",
 		},
 	})
 
@@ -176,10 +176,10 @@ func TestManager_Scenario4(t *testing.T) {
 
 	ts.AssertAccountLedgerUntil(3, map[string]*AccountState{
 		"A": {
-			BICAmount:      0,
-			PubKeys:        []string{},
-			OutputID:       "A2",
-			BICUpdatedTime: 3,
+			BICAmount:       0,
+			BlockIssuerKeys: []string{},
+			OutputID:        "A2",
+			BICUpdatedTime:  3,
 		},
 	})
 
@@ -212,10 +212,10 @@ func TestManager_Scenario5(t *testing.T) {
 
 	ts.AssertAccountLedgerUntil(1, map[string]*AccountState{
 		"A": {
-			BICUpdatedTime: 1,
-			BICAmount:      0,
-			PubKeys:        []string{"A1", "A2"},
-			OutputID:       "A1",
+			BICUpdatedTime:  1,
+			BICAmount:       0,
+			BlockIssuerKeys: []string{"A1", "A2"},
+			OutputID:        "A1",
 		},
 	})
 

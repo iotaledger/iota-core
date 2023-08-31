@@ -5,7 +5,6 @@ import (
 
 	"golang.org/x/crypto/blake2b"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -23,6 +22,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager/trivialsyncmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
@@ -70,7 +70,8 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	for _, accountData := range opt.Accounts {
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
-			accounts.Set(blake2b.Sum256(accountData.IssuerKey[:]), &account.Pool{
+			accountID := blake2b.Sum256(accountData.IssuerKey.BlockIssuerKeyBytes())
+			accounts.Set(accountID, &account.Pool{
 				PoolStake:      accountData.StakedAmount,
 				ValidatorStake: accountData.StakedAmount,
 				FixedCost:      accountData.FixedCost,
@@ -97,6 +98,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		tipselectionv1.NewProvider(),
 		retainer.NewProvider(),
 		signalingupgradeorchestrator.NewProvider(),
+		trivialsyncmanager.NewProvider(),
 		engine.WithSnapshotPath(""), // magic to disable loading snapshot
 	)
 	defer engineInstance.Shutdown()
@@ -167,7 +169,7 @@ func createOutput(address iotago.Address, tokenAmount iotago.BaseToken) (output 
 	}
 }
 
-func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmount iotago.BaseToken, mana iotago.Mana, pubkey ed25519.PublicKey, expirySlot iotago.SlotIndex, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
+func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmount iotago.BaseToken, mana iotago.Mana, blockIssuerKey iotago.BlockIssuerKey, expirySlot iotago.SlotIndex, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
 	accountOutput := &iotago.AccountOutput{
 		AccountID: accountID,
 		Amount:    tokenAmount,
@@ -178,7 +180,7 @@ func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmou
 		},
 		Features: iotago.AccountOutputFeatures{
 			&iotago.BlockIssuerFeature{
-				BlockIssuerKeys: []ed25519.PublicKey{pubkey},
+				BlockIssuerKeys: iotago.BlockIssuerKeys{blockIssuerKey},
 				ExpirySlot:      expirySlot,
 			},
 		},

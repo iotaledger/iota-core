@@ -13,12 +13,12 @@ import (
 func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes ...*mock.Node) {
 	t.Eventually(func() error {
 		for _, node := range nodes {
-			actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountData.ID, node.Protocol.SyncManager.LatestCommitment().Index())
+			actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountData.ID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index())
 			if err != nil {
 				return ierrors.Wrap(err, "AssertAccountData: failed to load account data")
 			}
 			if !exists {
-				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.SyncManager.LatestCommitment().Index())
+				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index())
 			}
 
 			if accountData.ID != actualAccountData.ID {
@@ -41,8 +41,28 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected expiry slot %s, got %s", node.Name, accountData.ID, accountData.ExpirySlot, actualAccountData.ExpirySlot)
 			}
 
-			if !cmp.Equal(accountData.PubKeys.ToSlice(), actualAccountData.PubKeys.ToSlice()) {
-				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.PubKeys, actualAccountData.PubKeys)
+			if !cmp.Equal(accountData.BlockIssuerKeys.ToSlice(), actualAccountData.BlockIssuerKeys.ToSlice()) {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.BlockIssuerKeys, actualAccountData.BlockIssuerKeys)
+			}
+
+			if accountData.StakeEndEpoch != actualAccountData.StakeEndEpoch {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected stake end epoch %s, got %s", node.Name, accountData.ID, accountData.StakeEndEpoch, actualAccountData.StakeEndEpoch)
+			}
+
+			if accountData.FixedCost != actualAccountData.FixedCost {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected fixed cost %d, got %d", node.Name, accountData.ID, accountData.FixedCost, actualAccountData.FixedCost)
+			}
+
+			if accountData.ValidatorStake != actualAccountData.ValidatorStake {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected validator stake %d, got %d", node.Name, accountData.ID, accountData.ValidatorStake, actualAccountData.ValidatorStake)
+			}
+
+			if accountData.DelegationStake != actualAccountData.DelegationStake {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected delegation stake %d, got %d", node.Name, accountData.ID, accountData.DelegationStake, actualAccountData.DelegationStake)
+			}
+
+			if accountData.LatestSupportedProtocolVersionAndHash != actualAccountData.LatestSupportedProtocolVersionAndHash {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected latest supported protocol version and hash %d, got %d", node.Name, accountData.ID, accountData.LatestSupportedProtocolVersionAndHash, actualAccountData.LatestSupportedProtocolVersionAndHash)
 			}
 		}
 
@@ -98,12 +118,12 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 				return ierrors.Errorf("AssertAccountDiff: %s: expected previous output ID %s but actual %s for account %s at slot %d", node.Name, accountDiff.PreviousOutputID, actualAccountDiff.PreviousOutputID, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.PubKeysAdded, actualAccountDiff.PubKeysAdded) {
-				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys added %s but actual %s for account %s at slot %d", node.Name, accountDiff.PubKeysAdded, actualAccountDiff.PubKeysAdded, accountID, index)
+			if !cmp.Equal(accountDiff.BlockIssuerKeysAdded, actualAccountDiff.BlockIssuerKeysAdded) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys added %s but actual %s for account %s at slot %d", node.Name, accountDiff.BlockIssuerKeysAdded, actualAccountDiff.BlockIssuerKeysAdded, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.PubKeysRemoved, actualAccountDiff.PubKeysRemoved) {
-				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys removed %s but actual %s for account %s at slot %d", node.Name, accountDiff.PubKeysRemoved, actualAccountDiff.PubKeysRemoved, accountID, index)
+			if !cmp.Equal(accountDiff.BlockIssuerKeysRemoved, actualAccountDiff.BlockIssuerKeysRemoved) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys removed %s but actual %s for account %s at slot %d", node.Name, accountDiff.BlockIssuerKeysRemoved, actualAccountDiff.BlockIssuerKeysRemoved, accountID, index)
 			}
 
 			if !cmp.Equal(accountDiff.StakeEndEpochChange, actualAccountDiff.StakeEndEpochChange) {
@@ -120,6 +140,14 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 
 			if !cmp.Equal(accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected delegation stake change epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange, accountID, index)
+			}
+
+			if !cmp.Equal(accountDiff.PrevLatestSupportedVersionAndHash, actualAccountDiff.PrevLatestSupportedVersionAndHash) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected previous latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.PreviousExpirySlot, actualAccountDiff.PrevLatestSupportedVersionAndHash, accountID, index)
+			}
+
+			if !cmp.Equal(accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash) {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected new latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash, accountID, index)
 			}
 		}
 
