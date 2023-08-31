@@ -104,7 +104,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	} else {
 		updatedPerformance.BlockIssuedCount++
 	}
-	updatedPerformance.HighestSupportedVersionAndHash = iotago.VersionAndHash{
+	updatedPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{
 		Version: validationBlock.HighestSupportedVersion,
 		Hash:    validationBlock.ProtocolParametersHash,
 	}
