@@ -20,6 +20,8 @@ import (
 
 type Deficit int64
 
+type SubSlotIndex int
+
 type Scheduler struct {
 	events *scheduler.Events
 
@@ -29,8 +31,9 @@ type Scheduler struct {
 
 	apiProvider api.Provider
 
-	buffer      *BufferQueue
-	bufferMutex syncutils.RWMutex
+	buffer          *BufferQueue
+	validatorBuffer map[iotago.AccountID]*ValidatorQueue
+	bufferMutex     syncutils.RWMutex
 
 	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, Deficit]
 
@@ -42,6 +45,12 @@ type Scheduler struct {
 	blockChan chan *blocks.Block
 
 	blockCache *blocks.Blocks
+
+	validationBlocksPerSlot SubSlotIndex // TODO: make this a protocol parameter
+
+	blacklist map[iotago.AccountID]struct{}
+
+	validationBlocks map[iotago.SlotIndex]map[SubSlotIndex]*blocks.Block
 
 	errorHandler func(error)
 
@@ -78,18 +87,9 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			})
 			s.TriggerConstructed()
 			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
-				if _, isBasic := block.BasicBlock(); isBasic {
-					s.AddBlock(block)
-					s.selectBlockToScheduleWithLocking()
-				} else { // immediately schedule validator blocks for now. TODO: implement scheduling for validator blocks issue #236
-					block.SetEnqueued()
-					block.SetScheduled()
-					// check for another block ready to schedule
-					s.updateChildrenWithLocking(block)
-					s.selectBlockToScheduleWithLocking()
+				s.AddBlock(block)
+				s.selectBlockToScheduleWithLocking()
 
-					s.events.BlockScheduled.Trigger(block)
-				}
 			})
 			e.Events.Ledger.AccountCreated.Hook(func(accountID iotago.AccountID) {
 				s.bufferMutex.Lock()
@@ -120,6 +120,18 @@ func New(apiProvider api.Provider, opts ...options.Option[Scheduler]) *Scheduler
 			apiProvider:      apiProvider,
 		}, opts,
 	)
+}
+
+func (s *Scheduler) subSlotIndex(block *blocks.Block) SubSlotIndex {
+	apiForBlock, err := s.apiProvider.APIForVersion(block.ProtocolBlock().ProtocolVersion)
+	if err != nil {
+		s.errorHandler(ierrors.Wrapf(err, "failed to get API for version %d", block.ProtocolBlock().ProtocolVersion))
+	}
+	blockSlot := apiForBlock.TimeProvider().SlotFromTime(block.IssuingTime())
+	apiForBlock.TimeProvider().SlotStartTime(blockSlot)
+	timeSinceSlotStart := block.IssuingTime().Sub(apiForBlock.TimeProvider().SlotStartTime(blockSlot))
+
+	return SubSlotIndex(timeSinceSlotStart.Seconds() * float64(s.validationBlocksPerSlot) / float64(apiForBlock.TimeProvider().SlotDurationSeconds()))
 }
 
 func (s *Scheduler) Shutdown() {
@@ -204,6 +216,16 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 }
 
 func (s *Scheduler) AddBlock(block *blocks.Block) {
+	if _, isBasic := block.BasicBlock(); isBasic {
+		s.enqueueBasicBlock(block)
+	} else if _, isValidation := block.ValidationBlock(); isValidation {
+		s.enqueueValidationBlock(block)
+	} else {
+		panic("invalid block type")
+	}
+}
+
+func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
@@ -246,6 +268,43 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	}
 }
 
+func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
+	s.bufferMutex.Lock()
+	defer s.bufferMutex.Unlock()
+
+	if _, exists := s.blacklist[block.ProtocolBlock().IssuerID]; exists {
+		// this validator is blacklisted, so skip this block
+		return
+	}
+
+	// TODO: double check that the validator is in the committee for this epoch?
+	validatorQueue, exists := s.validatorBuffer[block.ProtocolBlock().IssuerID]
+	if !exists {
+		validatorQueue = NewValidatorQueue(block.ProtocolBlock().IssuerID)
+		s.validatorBuffer[block.ProtocolBlock().IssuerID] = validatorQueue
+	}
+	validatorQueue.Submit(block)
+
+	if slotValidationBlocks := s.validationBlocks[block.ID().Index()]; slotValidationBlocks != nil {
+		subSlot := s.subSlotIndex(block)
+		if _, has := slotValidationBlocks[subSlot]; has {
+			// the validator has already issued a block for this subslot, so we need to blacklist them.
+			s.blacklist[block.ProtocolBlock().IssuerID] = struct{}{}
+			// TODO: retrieve the block that has already been issued for the proof of equivocation
+			// continue with enqueueing this block as we want to enqueue the first two blocks for the validator for the subslot
+		}
+		slotValidationBlocks[subSlot] = block
+	}
+
+	if block.SetEnqueued() {
+		s.events.BlockEnqueued.Trigger(block)
+	}
+
+	if s.tryReadyValidationBlock(block) {
+		s.scheduleValidationBlock(block)
+	}
+}
+
 func (s *Scheduler) mainLoop() {
 	var blockToSchedule *blocks.Block
 loop:
@@ -284,6 +343,13 @@ func (s *Scheduler) scheduleBlock(block *blocks.Block) {
 		s.selectBlockToScheduleWithLocking()
 
 		s.events.BlockScheduled.Trigger(block)
+	}
+}
+
+func (s *Scheduler) scheduleValidationBlock(block *blocks.Block) {
+	if block.SetScheduled() {
+		s.events.BlockScheduled.Trigger(block)
+		s.updateChildrenWithoutLocking(block)
 	}
 }
 
@@ -531,8 +597,23 @@ func (s *Scheduler) tryReady(block *blocks.Block) {
 	}
 }
 
+// tryReadyValidator tries to set the given validation block as ready.
+func (s *Scheduler) tryReadyValidationBlock(block *blocks.Block) bool {
+	if s.isReady(block) {
+		s.readyValidationBlock(block)
+
+		return true
+	}
+
+	return false
+}
+
 func (s *Scheduler) ready(block *blocks.Block) {
 	s.buffer.Ready(block)
+}
+
+func (s *Scheduler) readyValidationBlock(block *blocks.Block) {
+	s.validatorBuffer[block.ProtocolBlock().IssuerID].Unsubmit(block)
 }
 
 // updateChildrenWithLocking locks the buffer mutex and iterates over the direct children of the given blockID and
@@ -549,7 +630,15 @@ func (s *Scheduler) updateChildrenWithLocking(block *blocks.Block) {
 func (s *Scheduler) updateChildrenWithoutLocking(block *blocks.Block) {
 	for _, childBlock := range block.Children() {
 		if _, childBlockExists := s.blockCache.Block(childBlock.ID()); childBlockExists && childBlock.IsEnqueued() {
-			s.tryReady(childBlock)
+			if _, isBasic := childBlock.BasicBlock(); isBasic {
+				s.tryReady(childBlock)
+			} else if _, isValidation := childBlock.ValidationBlock(); isValidation {
+				if s.tryReadyValidationBlock(childBlock) {
+					s.scheduleValidationBlock(childBlock)
+				}
+			} else {
+				panic("invalid block type")
+			}
 		}
 	}
 }
