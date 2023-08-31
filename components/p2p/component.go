@@ -93,7 +93,7 @@ func provide(c *dig.Container) error {
 			deps.PeerDB.UpdatePeer(bootstrapPeer)
 		}
 
-		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger())
+		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger(), ParamsPeers.MaxPeers)
 	}); err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(host host.Host, peerDB *network.DB) *p2p.Manager {
-		return p2p.NewManager(host, peerDB, Component.Logger())
+		return p2p.NewManager(host, peerDB, Component.Logger(), ParamsPeers.MaxPeers)
 	})
 }
 

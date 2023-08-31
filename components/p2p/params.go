@@ -24,6 +24,8 @@ type ParametersPeers struct {
 	KnownPeers string `usage:"map of peers that will be used as known peers"`
 	// BootstrapPeers defines the map of peers to be used as discovery for other peers.
 	BootstrapPeers string `usage:"map of peers to be used as discovery for other peers"`
+	// MaxPeers defines the maximum number of peers to connect to.
+	MaxPeers int `default:"10" usage:"maximum number of peers to connect to"`
 }
 
 // ParamsP2P contains the configuration used by the manualPeering plugin.

@@ -79,18 +79,20 @@ type Manager struct {
 
 	neighbors      map[p2ppeer.ID]*Neighbor
 	neighborsMutex syncutils.RWMutex
+	maxPeers       int
 
 	protocolHandler *ProtocolHandler
 }
 
 // NewManager creates a new Manager.
-func NewManager(libp2pHost host.Host, peerDB *network.DB, log *logger.Logger) *Manager {
+func NewManager(libp2pHost host.Host, peerDB *network.DB, log *logger.Logger, maxPeers int) *Manager {
 	m := &Manager{
 		libp2pHost: libp2pHost,
 		peerDB:     peerDB,
 		log:        log,
 		Events:     NewNeighborEvents(),
 		neighbors:  make(map[p2ppeer.ID]*Neighbor),
+		maxPeers:   maxPeers,
 	}
 
 	return m
@@ -251,6 +253,15 @@ func (m *Manager) NeighborsByID(ids []p2ppeer.ID) []*Neighbor {
 }
 
 func (m *Manager) handleStream(stream p2pnetwork.Stream) {
+	// We handle more incoming connections than we allow outgoing connections, so we can
+	// provide network access to new nodes.
+	if len(m.neighbors) >= (m.maxPeers + m.maxPeers/2) {
+		m.log.Debugf("rejecting incoming connection from %s: too many neighbors", stream.Conn().RemotePeer())
+		stream.Close()
+
+		return
+	}
+
 	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
 	if err := ps.receiveNegotiation(); err != nil {
 		m.log.Errorw("failed to receive negotiation message")
