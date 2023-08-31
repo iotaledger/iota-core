@@ -49,7 +49,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 		api: iotago.V3API(
 			iotago.NewV3ProtocolParameters(
 				iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 3),
-				iotago.WithRewardsOptions(10, 8, 8, 31, 1154, 2, 1),
+				iotago.WithRewardsOptions(10, 8, 8, 11, 1154, 2, 1),
 			),
 		),
 	}
