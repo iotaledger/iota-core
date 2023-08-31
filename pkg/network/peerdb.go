@@ -117,29 +117,6 @@ func (db *DB) Close() {
 	close(db.quit)
 }
 
-// nodeKey returns the database key for a node record.
-func nodeKey(id p2ppeer.ID) []byte {
-	return append([]byte(dbNodePrefix), []byte(id)...)
-}
-
-func localFieldKey(field string) []byte {
-	return append([]byte(dbLocalPrefix), []byte(field)...)
-}
-
-// nodeFieldKey returns the database key for a node metadata field.
-func nodeFieldKey(id p2ppeer.ID, field string) []byte {
-	return bytes.Join([][]byte{nodeKey(id), []byte(field)}, []byte{':'})
-}
-
-func parseInt64(blob []byte) int64 {
-	val, read := binary.Varint(blob)
-	if read <= 0 {
-		return 0
-	}
-
-	return val
-}
-
 // expirer should be started in a go routine, and is responsible for looping ad
 // infinitum and dropping stale data from the database.
 func (db *DB) expirer() {
@@ -203,22 +180,6 @@ func (db *DB) expireNodes() error {
 	return batchedMuts.Commit()
 }
 
-func randomSubset(peers []*Peer, m int) []*Peer {
-	if len(peers) <= m {
-		return peers
-	}
-
-	result := make([]*Peer, 0, m)
-	for i, p := range peers {
-		//nolint:gosec // we do not care about weak random numbers here
-		if rand.Intn(len(peers)-i) < m-len(result) {
-			result = append(result, p)
-		}
-	}
-
-	return result
-}
-
 func (db *DB) getPeers() (peers []*Peer) {
 	if err := db.store.Iterate(kvstore.KeyPrefix(dbNodePrefix), func(key kvstore.Key, value kvstore.Value) bool {
 		// skip update fields
@@ -238,20 +199,49 @@ func (db *DB) getPeers() (peers []*Peer) {
 	return peers
 }
 
-// getInt64 retrieves an integer associated with a particular key.
-func (db *DB) getInt64(key []byte) int64 {
-	value, err := db.store.Get(key)
-	if err != nil {
-		return 0
-	}
-
-	return parseInt64(value)
-}
-
 // setInt64 stores an integer in the given key.
 func (db *DB) setInt64(key []byte, n int64) error {
 	blob := make([]byte, binary.MaxVarintLen64)
 	blob = blob[:binary.PutVarint(blob, n)]
 
 	return db.store.Set(key, blob)
+}
+
+// nodeKey returns the database key for a node record.
+func nodeKey(id p2ppeer.ID) []byte {
+	return append([]byte(dbNodePrefix), []byte(id)...)
+}
+
+func localFieldKey(field string) []byte {
+	return append([]byte(dbLocalPrefix), []byte(field)...)
+}
+
+// nodeFieldKey returns the database key for a node metadata field.
+func nodeFieldKey(id p2ppeer.ID, field string) []byte {
+	return bytes.Join([][]byte{nodeKey(id), []byte(field)}, []byte{':'})
+}
+
+func parseInt64(blob []byte) int64 {
+	val, read := binary.Varint(blob)
+	if read <= 0 {
+		return 0
+	}
+
+	return val
+}
+
+func randomSubset(peers []*Peer, m int) []*Peer {
+	if len(peers) <= m {
+		return peers
+	}
+
+	result := make([]*Peer, 0, m)
+	for i, p := range peers {
+		//nolint:gosec // we do not care about weak random numbers here
+		if rand.Intn(len(peers)-i) < m-len(result) {
+			result = append(result, p)
+		}
+	}
+
+	return result
 }
