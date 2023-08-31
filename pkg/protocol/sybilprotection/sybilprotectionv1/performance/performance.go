@@ -68,10 +68,10 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 
 	t.performanceFactorsMutex.Lock()
 	defer t.performanceFactorsMutex.Unlock()
-
 	isCommitteeMember, err := t.isCommitteeMember(block.ID().Index(), block.ProtocolBlock().IssuerID)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to check if account %s is committee member", block.ProtocolBlock().IssuerID))
+
 		return
 	}
 
@@ -95,7 +95,6 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 		validatorPerformance = model.NewValidatorPerformance()
 	}
 	updatedPerformance := t.updateSlotPerformanceBitMap(validatorPerformance, block.ID().Index(), block.ProtocolBlock().IssuingTime)
-
 	if updatedPerformance.BlockIssuedCount == t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot {
 		// no need to store larger number and we can fit into uint8
 		updatedPerformance.BlockIssuedCount = t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot + 1
@@ -106,7 +105,6 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 		Version: validationBlock.HighestSupportedVersion,
 		Hash:    validationBlock.ProtocolParametersHash,
 	}
-
 	err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, updatedPerformance)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
@@ -130,7 +128,7 @@ func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int
 	subslotDur := time.Duration(t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
 	slotStart := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotStartTime(slot)
 
-	return int(issuingTime.Sub(slotStart) / subslotDur)
+	return int(issuingTime.Sub(slotStart)/subslotDur) + 1
 }
 
 func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) {

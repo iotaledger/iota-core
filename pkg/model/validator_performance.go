@@ -6,10 +6,10 @@ import (
 
 type ValidatorPerformance struct {
 	// works if ValidatorBlocksPerSlot is less than 32 because we use it as bit vector
-	SlotActivityVector uint32
+	SlotActivityVector uint32 `serix:"0"`
 	// can be uint8 because max count per slot is maximally ValidatorBlocksPerSlot + 1
-	BlockIssuedCount               uint8
-	HighestSupportedVersionAndHash iotago.VersionAndHash
+	BlockIssuedCount               uint8                 `serix:"1"`
+	HighestSupportedVersionAndHash iotago.VersionAndHash `serix:"2"`
 }
 
 func NewValidatorPerformance() *ValidatorPerformance {

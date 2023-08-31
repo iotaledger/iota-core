@@ -107,7 +107,7 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 	err := t.Instance.RegisterCommittee(epochIndex, committee)
 	require.NoError(t.T, err)
 	for accIDAlias, action := range actions {
-		accID := t.Account(accIDAlias, true)
+		accID := t.Account(accIDAlias, false)
 		t.applyPerformanceFactor(accID, epochIndex, action.ActiveSlotsCount, action.ValidationBlocksSentPerSlot, action.SlotPerformance)
 	}
 
@@ -126,9 +126,7 @@ func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map
 
 	for alias, action := range actions {
 		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount
-		fmt.Println("expected epoch performance factor: ", epochPerformanceFactor)
 		poolRewards := t.calculatePoolReward(epochIndex, totalValidatorsStake, totalStake, action.PoolStake, action.ValidatorStake, uint64(action.FixedCost), epochPerformanceFactor)
-		fmt.Println("pool: ", alias, "rewards: ", poolRewards)
 		expectedValidatorReward := t.validatorReward(epochIndex, profitMarging, poolRewards, uint64(action.ValidatorStake), uint64(action.PoolStake), uint64(action.FixedCost))
 		accountID := t.Account(alias, true)
 		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID, actions[alias].ValidatorStake, epochIndex, epochIndex)
@@ -208,15 +206,13 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochInde
 	valBlocksNum := t.api.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
 	subslotDur := time.Duration(t.api.TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
 
-	fmt.Println("Start slot: ", startSlot, "\nEnd slot: ", endSlot, "\nSubslot duration: ", subslotDur, "\nTarget validation blocks: ", validationBlocksSentPerSlot)
-
 	slotCount := uint64(0)
 	for slot := startSlot; slot <= endSlot; slot++ {
 		if slotCount > activeSlotsCount {
 			// no more blocks issued by this validator in this epoch
 			return
 		}
-		fmt.Println("New slot: ", slot)
+
 		for i := uint64(0); i < validationBlocksSentPerSlot; i++ {
 			valBlock := tpkg.ValidationBlock()
 			block := tpkg.RandProtocolBlock(valBlock, t.api, 10)
@@ -227,10 +223,8 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochInde
 				subslotIndex = 0
 			}
 			block.IssuingTime = t.api.TimeProvider().SlotStartTime(slot).Add(time.Duration(subslotIndex)*subslotDur + 1*time.Nanosecond)
-			fmt.Println("Issue block at: ", block.IssuingTime)
 			modelBlock, err := model.BlockFromBlock(block, t.api)
 			t.Instance.TrackValidationBlock(blocks.NewBlock(modelBlock))
-
 			require.NoError(t.T, err)
 		}
 		slotCount++
