@@ -79,6 +79,20 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps autoPeeringDeps) *autopeering.Manager {
+		peerAddrs, err := getMultiAddrsFromParam(ParamsPeers.BootstrapPeers)
+		if err != nil {
+			Component.LogFatalfAndExit("Failed to parse bootstrapPeers param: %s", err)
+		}
+
+		for _, peerAddr := range peerAddrs {
+			bootstrapPeer, err := network.NewPeerFromMultiAddr(peerAddr)
+			if err != nil {
+				Component.LogFatalfAndExit("Failed to parse bootstrap peer multiaddress: %s", err)
+			}
+
+			deps.PeerDB.UpdatePeer(bootstrapPeer)
+		}
+
 		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger())
 	}); err != nil {
 		return err
@@ -241,7 +255,7 @@ func run() error {
 }
 
 func addPeersFromConfigToManager(manualPeeringMgr *manualpeering.Manager) {
-	peerAddrs, err := getPeerMultiAddrsFromConfig()
+	peerAddrs, err := getMultiAddrsFromParam(ParamsPeers.KnownPeers)
 	if err != nil {
 		Component.LogError("Failed to get known peers from the config file, continuing without them...", "err", err)
 
@@ -254,12 +268,12 @@ func addPeersFromConfigToManager(manualPeeringMgr *manualpeering.Manager) {
 	}
 }
 
-func getPeerMultiAddrsFromConfig() ([]ma.Multiaddr, error) {
-	if ParamsPeers.KnownPeers == "" {
+func getMultiAddrsFromParam(param string) ([]ma.Multiaddr, error) {
+	if param == "" {
 		return nil, nil
 	}
 	var peersMultiAddrStrings []string
-	if err := json.Unmarshal([]byte(ParamsPeers.KnownPeers), &peersMultiAddrStrings); err != nil {
+	if err := json.Unmarshal([]byte(param), &peersMultiAddrStrings); err != nil {
 		return nil, ierrors.Wrap(err, "can't parse peers from json")
 	}
 

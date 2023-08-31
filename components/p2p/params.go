@@ -22,11 +22,15 @@ type ParametersP2P struct {
 type ParametersPeers struct {
 	// KnownPeers defines the map of peers to be used as known peers.
 	KnownPeers string `usage:"map of peers that will be used as known peers"`
+	// BootstrapPeers defines the map of peers to be used as discovery for other peers.
+	BootstrapPeers string `usage:"map of peers to be used as discovery for other peers"`
 }
 
 // ParamsP2P contains the configuration used by the manualPeering plugin.
-var ParamsP2P = &ParametersP2P{}
-var ParamsPeers = &ParametersPeers{}
+var (
+	ParamsP2P   = &ParametersP2P{}
+	ParamsPeers = &ParametersPeers{}
+)
 
 var params = &app.ComponentParams{
 	Params: map[string]any{
