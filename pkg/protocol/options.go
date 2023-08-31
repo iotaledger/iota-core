@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"time"
+
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
@@ -152,5 +154,17 @@ func WithChainManagerOptions(opts ...options.Option[chainmanager.Manager]) optio
 func WithStorageOptions(opts ...options.Option[storage.Storage]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsStorageOptions = append(p.optsStorageOptions, opts...)
+	}
+}
+
+func WithAttestationRequesterTryInterval(t time.Duration) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsAttestationRequesterTryInterval = t
+	}
+}
+
+func WithAttestationRequesterMaxTries(n int) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsAttestationRequesterMaxRetries = n
 	}
 }
