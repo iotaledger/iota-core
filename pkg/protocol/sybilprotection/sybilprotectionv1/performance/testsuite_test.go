@@ -211,7 +211,6 @@ func (t *TestSuite) validatorReward(alias string, epochIndex iotago.EpochIndex, 
 	profitMarginComplement := (1 << profitMarginExponent) - profitMargin
 	profitMarginFactor := (profitMargin * poolRewards) >> profitMarginExponent
 	residualValidatorFactor := ((profitMarginComplement * poolRewards) >> profitMarginExponent) * stakeAmount / poolStake
-
 	unDecayedEpochRewards := fixedCost + profitMarginFactor + residualValidatorFactor
 	decayProvider := t.api.ManaDecayProvider()
 	decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochIndex)
@@ -274,7 +273,7 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochInde
 
 	slotCount := uint64(0)
 	for slot := startSlot; slot <= endSlot; slot++ {
-		if slotCount > activeSlotsCount {
+		if slotCount >= activeSlotsCount {
 			// no more blocks issued by this validator in this epoch
 			return
 		}
