@@ -5,15 +5,22 @@ import (
 )
 
 type commitmentChainSwitchingFlags struct {
-	isDirectlyAboveLatestAttestedCommitment reactive.Variable[bool]
-	attestationRequested                    reactive.Variable[bool]
+	attestationRequested reactive.Variable[bool]
 }
 
 func newCommitmentChainSwitchingFlags(commitment *Commitment, isRoot bool) *commitmentChainSwitchingFlags {
 	c := &commitmentChainSwitchingFlags{
-		isDirectlyAboveLatestAttestedCommitment: isDirectlyAboveLatestAttestedCommitment(commitment),
-		attestationRequested:                    reactive.NewVariable[bool](),
+		attestationRequested: reactive.NewVariable[bool](),
 	}
+
+	parentAttested := reactive.NewEvent()
+	commitment.parent.OnUpdateOnce(func(_, parent *Commitment) {
+		parentAttested.InheritFrom(parent.attested)
+	})
+
+	isDirectlyAboveLatestAttestedCommitment := reactive.NewDerivedVariable2(func(parentAttested, attested bool) bool {
+		return parentAttested && !attested
+	}, parentAttested, commitment.attested)
 
 	var attestationRequestedByChain reactive.DerivedVariable[bool]
 	commitment.chain.OnUpdate(func(_, newChain *Chain) {
@@ -23,7 +30,7 @@ func newCommitmentChainSwitchingFlags(commitment *Commitment, isRoot bool) *comm
 
 		attestationRequestedByChain = reactive.NewDerivedVariable2(func(requestAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
 			return requestAttestations && isDirectlyAboveLatestAttestedCommitment
-		}, newChain.requestAttestations, c.isDirectlyAboveLatestAttestedCommitment)
+		}, newChain.requestAttestations, isDirectlyAboveLatestAttestedCommitment)
 
 		c.attestationRequested.InheritFrom(attestationRequestedByChain)
 	})
@@ -31,21 +38,6 @@ func newCommitmentChainSwitchingFlags(commitment *Commitment, isRoot bool) *comm
 	return c
 }
 
-func (c *commitmentChainSwitchingFlags) IsDirectlyAboveLatestAttestedCommitment() reactive.Variable[bool] {
-	return c.isDirectlyAboveLatestAttestedCommitment
-}
-
 func (c *commitmentChainSwitchingFlags) AttestationRequested() reactive.Variable[bool] {
 	return c.attestationRequested
-}
-
-func isDirectlyAboveLatestAttestedCommitment(commitment *Commitment) reactive.Variable[bool] {
-	parentAttested := reactive.NewEvent()
-	commitment.parent.OnUpdateOnce(func(_, parent *Commitment) {
-		parentAttested.InheritFrom(parent.attested)
-	})
-
-	return reactive.NewDerivedVariable2(func(parentAttested, attested bool) bool {
-		return parentAttested && !attested
-	}, parentAttested, commitment.attested)
 }
