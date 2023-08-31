@@ -6,8 +6,8 @@ import (
 
 // ParametersP2P contains the definition of configuration parameters used by the p2p plugin.
 type ParametersP2P struct {
-	// BindAddress defines on which address the p2p service should listen.
-	BindAddress string `default:"0.0.0.0:14666" usage:"the bind address for p2p connections"`
+	// BindAddress defines on which multi address the p2p service should listen on.
+	BindAddress string `default:"/ip4/0.0.0.0/tcp/14666" usage:"the multi address for p2p connections"`
 	// Seed defines the config flag of the autopeering private key seed.
 	Seed string `usage:"private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively"`
 	// OverwriteStoredSeed defines whether the private key stored in an existing peerdb should be overwritten.

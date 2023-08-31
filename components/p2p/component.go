@@ -168,14 +168,8 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func(nodePrivateKey crypto.PrivKey) host.Host {
 		var err error
 
-		// resolve the bind address
-		localAddr, err = net.ResolveTCPAddr("tcp", ParamsP2P.BindAddress)
-		if err != nil {
-			Component.LogErrorfAndExit("bind address '%s' is invalid: %s", ParamsP2P.BindAddress, err)
-		}
-
 		libp2pHost, err := golibp2p.New(
-			golibp2p.ListenAddrStrings(fmt.Sprintf("/ip4/%s/tcp/%d", localAddr.IP, localAddr.Port)),
+			golibp2p.ListenAddrStrings(ParamsP2P.BindAddress),
 			golibp2p.Identity(nodePrivateKey),
 			golibp2p.NATPortMap(),
 		)
