@@ -176,6 +176,12 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			validatorPerformances = append(validatorPerformances, validatorPerformance)
 		}
 		pf := t.aggregatePerformanceFactors(validatorPerformances, epoch)
+		if pf == 0 {
+			// no rewards for this pool, we do not set pool rewards at all,
+			// to differientiate between situation when poolReward == fixedCost (no reward for delegators)
+
+			return true
+		}
 		poolReward, err := t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, pf)
 
 		if err != nil {
