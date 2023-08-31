@@ -24,17 +24,30 @@ type Chain struct {
 	// latestVerifiedCommitment is the latest verified Commitment object in this chain.
 	latestVerifiedCommitment reactive.Variable[*Commitment]
 
+	// claimedWeight contains the total cumulative weight of the chain that is claimed by the latest commitments.
+	claimedWeight reactive.Variable[uint64]
+
+	// attestedWeight contains the total cumulative weight of the chain that we received attestations for.
+	attestedWeight reactive.Variable[uint64]
+
+	// verifiedWeight contains the total cumulative weight of the chain that we verified ourselves.
+	verifiedWeight reactive.Variable[uint64]
+
+	// syncThreshold is the upper bound for slots that are being fed to the engine (to prevent memory exhaustion).
+	syncThreshold reactive.Variable[iotago.SlotIndex]
+
+	// warpSyncThreshold defines an offset from latest index where the warp sync process starts (we don't request slots
+	// that we are about to commit ourselves).
+	warpSyncThreshold reactive.Variable[iotago.SlotIndex]
+
+	// requestAttestations is a flag that indicates whether this chain shall request attestations.
+	requestAttestations reactive.Variable[bool]
+
+	// instantiated is a flag that indicates whether this chain shall be instantiated.
+	instantiate reactive.Variable[bool]
+
 	// evicted is an event that gets triggered when the chain gets evicted.
 	evicted reactive.Event
-
-	// chainWeights is a reactive subcomponent that tracks the cumulative weight of the chain.
-	*chainWeights
-
-	// chainDispatcherThresholds is a reactive subcomponent that tracks the thresholds of the chain.
-	*chainDispatcherThresholds
-
-	// chainSwitchingFlags is a reactive subcomponent that tracks the chain switching flags of the chain.
-	*chainSwitchingFlags
 }
 
 // NewChain creates a new Chain instance.
@@ -45,13 +58,31 @@ func NewChain(root *Commitment) *Chain {
 		latestCommitment:         reactive.NewVariable[*Commitment](),
 		latestAttestedCommitment: reactive.NewVariable[*Commitment](),
 		latestVerifiedCommitment: reactive.NewVariable[*Commitment](),
+		requestAttestations:      reactive.NewVariable[bool](),
+		instantiate:              reactive.NewVariable[bool](),
 		evicted:                  reactive.NewEvent(),
 	}
 
-	// embed reactive subcomponents
-	c.chainWeights = newChainWeights(c)
-	c.chainDispatcherThresholds = newChainDispatcherThresholds(c)
-	c.chainSwitchingFlags = newChainSwitchingFlags(c)
+	// track weights of the chain
+	c.claimedWeight = reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), c.latestCommitment)
+	c.attestedWeight = reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), c.latestAttestedCommitment)
+	c.verifiedWeight = reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), c.latestVerifiedCommitment)
+
+	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {
+		if latestCommitment == nil || latestCommitment.Index() < WarpSyncOffset {
+			return 0
+		}
+
+		return latestCommitment.Index() - WarpSyncOffset
+	}, c.latestCommitment)
+
+	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitment *Commitment) iotago.SlotIndex {
+		if latestVerifiedCommitment == nil {
+			return SyncWindow + 1
+		}
+
+		return latestVerifiedCommitment.Index() + SyncWindow + 1
+	}, c.latestVerifiedCommitment)
 
 	// associate the commitment with its chain
 	root.chain.Set(c)
@@ -103,6 +134,42 @@ func (c *Chain) LatestAttestedCommitment() reactive.Variable[*Commitment] {
 // in this chain.
 func (c *Chain) LatestVerifiedCommitment() reactive.Variable[*Commitment] {
 	return c.latestVerifiedCommitment
+}
+
+// ClaimedWeight returns a reactive variable that tracks the total cumulative weight of the chain that is claimed by
+// the latest commitments.
+func (c *Chain) ClaimedWeight() reactive.Variable[uint64] {
+	return c.claimedWeight
+}
+
+// AttestedWeight returns a reactive variable that tracks the total cumulative weight of the chain that we received
+// attestations for.
+func (c *Chain) AttestedWeight() reactive.Variable[uint64] {
+	return c.attestedWeight
+}
+
+// VerifiedWeight returns a reactive variable that tracks the total cumulative weight of the chain that we verified
+// ourselves.
+func (c *Chain) VerifiedWeight() reactive.Variable[uint64] {
+	return c.verifiedWeight
+}
+
+// SyncThreshold returns a reactive variable that contains the upper bound for slots that are being fed to the
+// engine (to prevent memory exhaustion).
+func (c *Chain) SyncThreshold() reactive.Variable[iotago.SlotIndex] {
+	return c.syncThreshold
+}
+
+// WarpSyncThreshold returns a reactive variable that contains an offset from latest index where the warp sync
+// process starts (we don't request slots that we are about to commit ourselves).
+func (c *Chain) WarpSyncThreshold() reactive.Variable[iotago.SlotIndex] {
+	return c.warpSyncThreshold
+}
+
+// RequestAttestations returns a reactive variable that contains a flag that indicates whether this chain shall request
+// attestations.
+func (c *Chain) RequestAttestations() reactive.Variable[bool] {
+	return c.requestAttestations
 }
 
 // Evicted returns a reactive event that gets triggered when the chain is evicted.

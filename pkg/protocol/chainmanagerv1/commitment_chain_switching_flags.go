@@ -23,15 +23,19 @@ func newCommitmentChainSwitchingFlags(commitment *Commitment, isRoot bool) *comm
 	}, parentAttested, commitment.attested)
 
 	var attestationRequestedByChain reactive.DerivedVariable[bool]
+
 	commitment.chain.OnUpdate(func(_, newChain *Chain) {
+		// cleanup the old chain specific derived variable if it exists
 		if attestationRequestedByChain != nil {
 			attestationRequestedByChain.Unsubscribe()
 		}
 
+		// create a chain specific derived variable
 		attestationRequestedByChain = reactive.NewDerivedVariable2(func(requestAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
 			return requestAttestations && isDirectlyAboveLatestAttestedCommitment
 		}, newChain.requestAttestations, isDirectlyAboveLatestAttestedCommitment)
 
+		// expose the chain specific derived variable to the commitment property
 		c.attestationRequested.InheritFrom(attestationRequestedByChain)
 	})
 

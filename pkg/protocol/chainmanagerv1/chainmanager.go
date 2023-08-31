@@ -22,22 +22,23 @@ type ChainManager struct {
 
 	chainCreated *event.Event1[*Chain]
 
-	*chainManagerChainSwitching
+	*ChainSwitching
 
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
 func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 	c := &ChainManager{
+		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
 		mainChain:           reactive.NewVariable[*Chain]().Init(NewChain(NewCommitment(rootCommitment, true))),
 		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 		commitmentCreated:   event.New1[*Commitment](),
 		chainCreated:        event.New1[*Chain](),
-		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
 	}
 
-	c.chainManagerChainSwitching = newChainManagerChainSwitching(c)
+	// embed reactive orchestrators
+	c.ChainSwitching = NewChainSwitching(c)
 
 	return c
 }
