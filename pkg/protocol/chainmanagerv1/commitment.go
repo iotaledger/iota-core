@@ -9,18 +9,17 @@ import (
 type Commitment struct {
 	*model.Commitment
 
-	parent           reactive.Variable[*Commitment]
-	successor        reactive.Variable[*Commitment]
-	spawnedChain     reactive.Variable[*Chain]
-	chain            reactive.Variable[*Chain]
-	solid            reactive.Event
-	attested         reactive.Event
-	verified         reactive.Event
-	inSyncWindow     *inSyncWindow
-	requiresWarpSync *requiresWarpSync
-	evicted          reactive.Event
-
-	*commitmentChainSwitchingFlags
+	parent              reactive.Variable[*Commitment]
+	successor           reactive.Variable[*Commitment]
+	spawnedChain        reactive.Variable[*Chain]
+	chain               reactive.Variable[*Chain]
+	solid               reactive.Event
+	attested            reactive.Event
+	verified            reactive.Event
+	inSyncWindow        *inSyncWindow
+	requiresWarpSync    *requiresWarpSync
+	requestAttestations *requestAttestations
+	evicted             reactive.Event
 }
 
 func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment {
@@ -38,10 +37,11 @@ func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment 
 
 	c.inSyncWindow = newInSyncWindow(c, lo.First(optIsRoot))
 	c.requiresWarpSync = newRequiresWarpSync(c, lo.First(optIsRoot))
+	c.requestAttestations = newRequestAttestations(c)
 
 	c.parent.OnUpdate(func(_, parent *Commitment) { c.solid.InheritFrom(parent.solid) })
 
-	c.commitmentChainSwitchingFlags = newCommitmentChainSwitchingFlags(c)
+	c.requestAttestations = newRequestAttestations(c)
 
 	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
 
@@ -88,6 +88,10 @@ func (c *Commitment) InSyncWindow() reactive.Variable[bool] {
 
 func (c *Commitment) RequiresWarpSync() reactive.Variable[bool] {
 	return c.requiresWarpSync
+}
+
+func (c *Commitment) RequestAttestations() reactive.Variable[bool] {
+	return c.requestAttestations
 }
 
 func (c *Commitment) Evicted() reactive.Event {
@@ -155,4 +159,134 @@ func (c *Commitment) max(other *Commitment) *Commitment {
 	}
 
 	return c
+}
+
+type aboveLatestVerifiedCommitment struct {
+	reactive.Variable[bool]
+
+	parentVerified reactive.Event
+
+	parentAboveLatestVerifiedCommitment reactive.Variable[bool]
+
+	directlyAboveLatestVerifiedCommitment reactive.Variable[bool]
+}
+
+func newAboveLatestVerifiedCommitment(commitment *Commitment) *aboveLatestVerifiedCommitment {
+	a := &aboveLatestVerifiedCommitment{
+		parentVerified:                      reactive.NewEvent(),
+		parentAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
+	}
+
+	a.directlyAboveLatestVerifiedCommitment = reactive.NewDerivedVariable2(func(parentVerified, verified bool) bool {
+		return parentVerified && !verified
+	}, a.parentVerified, commitment.verified)
+
+	a.Variable = reactive.NewDerivedVariable2(func(directlyAboveLatestVerifiedCommitment, parentAboveLatestVerifiedCommitment bool) bool {
+		return directlyAboveLatestVerifiedCommitment || parentAboveLatestVerifiedCommitment
+	}, a.directlyAboveLatestVerifiedCommitment, a.parentAboveLatestVerifiedCommitment)
+
+	commitment.parent.OnUpdateOnce(func(_, parent *Commitment) {
+		a.parentVerified.InheritFrom(parent.verified)
+		a.parentAboveLatestVerifiedCommitment.InheritFrom(parent.inSyncWindow.isAboveLatestVerifiedCommitment)
+	})
+
+	return a
+}
+
+type inSyncWindow struct {
+	reactive.Variable[bool]
+
+	isAboveLatestVerifiedCommitment *aboveLatestVerifiedCommitment
+	isBelowSyncThreshold            reactive.Event
+}
+
+func newInSyncWindow(commitment *Commitment, isRoot bool) *inSyncWindow {
+	i := &inSyncWindow{
+		isAboveLatestVerifiedCommitment: newAboveLatestVerifiedCommitment(commitment),
+		isBelowSyncThreshold:            reactive.NewEvent(),
+	}
+
+	commitment.parent.OnUpdate(func(_, parent *Commitment) {
+		triggerEventIfCommitmentBelowThreshold(func(commitment *Commitment) reactive.Event {
+			return commitment.inSyncWindow.isBelowSyncThreshold
+		}, commitment, (*Chain).SyncThreshold)
+	})
+
+	if isRoot {
+		i.isBelowSyncThreshold.Set(true)
+	}
+
+	i.Variable = reactive.NewDerivedVariable2(func(belowSyncThreshold, aboveLatestVerifiedCommitment bool) bool {
+		return belowSyncThreshold && aboveLatestVerifiedCommitment
+	}, i.isBelowSyncThreshold, newAboveLatestVerifiedCommitment(commitment))
+
+	return i
+}
+
+type requestAttestations struct {
+	reactive.Variable[bool]
+
+	parentAttested reactive.Event
+
+	isDirectlyAboveLatestAttestedCommitment reactive.Variable[bool]
+}
+
+func newRequestAttestations(commitment *Commitment) *requestAttestations {
+	c := &requestAttestations{
+		Variable:       reactive.NewVariable[bool](),
+		parentAttested: reactive.NewEvent(),
+	}
+
+	c.isDirectlyAboveLatestAttestedCommitment = reactive.NewDerivedVariable2(func(parentAttested, attested bool) bool {
+		return parentAttested && !attested
+	}, c.parentAttested, commitment.attested)
+
+	commitment.parent.OnUpdateOnce(func(_, parent *Commitment) { c.parentAttested.InheritFrom(parent.attested) })
+
+	var attestationRequestedByChain reactive.DerivedVariable[bool]
+
+	commitment.chain.OnUpdate(func(_, newChain *Chain) {
+		// cleanup the old chain specific derived variable if it exists
+		if attestationRequestedByChain != nil {
+			attestationRequestedByChain.Unsubscribe()
+		}
+
+		// create a chain specific derived variable
+		attestationRequestedByChain = reactive.NewDerivedVariable2(func(requestAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
+			return requestAttestations && isDirectlyAboveLatestAttestedCommitment
+		}, newChain.requestAttestations, c.isDirectlyAboveLatestAttestedCommitment)
+
+		// expose the chain specific derived variable to the commitment property
+		c.InheritFrom(attestationRequestedByChain)
+	})
+
+	return c
+}
+
+type requiresWarpSync struct {
+	reactive.Variable[bool]
+
+	isBelowWarpSyncThreshold reactive.Event
+}
+
+func newRequiresWarpSync(commitment *Commitment, isRoot bool) *requiresWarpSync {
+	r := &requiresWarpSync{
+		isBelowWarpSyncThreshold: reactive.NewEvent(),
+	}
+
+	if isRoot {
+		r.isBelowWarpSyncThreshold.Set(true)
+	}
+
+	r.Variable = reactive.NewDerivedVariable2(func(inSyncWindow, belowWarpSyncThreshold bool) bool {
+		return inSyncWindow && belowWarpSyncThreshold
+	}, commitment.inSyncWindow, r.isBelowWarpSyncThreshold)
+
+	commitment.parent.OnUpdate(func(_, parent *Commitment) {
+		triggerEventIfCommitmentBelowThreshold(func(commitment *Commitment) reactive.Event {
+			return commitment.requiresWarpSync.isBelowWarpSyncThreshold
+		}, commitment, (*Chain).WarpSyncThreshold)
+	})
+
+	return r
 }
