@@ -81,7 +81,8 @@ type Manager struct {
 	neighborsMutex syncutils.RWMutex
 	maxPeers       int
 
-	protocolHandler *ProtocolHandler
+	protocolHandler      *ProtocolHandler
+	protocolHandlerMutex syncutils.RWMutex
 }
 
 // NewManager creates a new Manager.
@@ -100,6 +101,9 @@ func NewManager(libp2pHost host.Host, peerDB *network.DB, log *logger.Logger, ma
 
 // RegisterProtocol registers the handlers for the protocol within the manager.
 func (m *Manager) RegisterProtocol(factory func() proto.Message, handler func(p2ppeer.ID, proto.Message) error) {
+	m.protocolHandlerMutex.Lock()
+	defer m.protocolHandlerMutex.Unlock()
+
 	m.protocolHandler = &ProtocolHandler{
 		PacketFactory: factory,
 		PacketHandler: handler,
@@ -110,12 +114,18 @@ func (m *Manager) RegisterProtocol(factory func() proto.Message, handler func(p2
 
 // UnregisterProtocol unregisters the handlers for the protocol.
 func (m *Manager) UnregisterProtocol() {
+	m.protocolHandlerMutex.Lock()
+	defer m.protocolHandlerMutex.Unlock()
+
 	m.libp2pHost.RemoveStreamHandler(protocol.ID(protocolID))
 	m.protocolHandler = nil
 }
 
 // DialPeer connects to a peer.
 func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...ConnectPeerOption) error {
+	m.protocolHandlerMutex.RLock()
+	defer m.protocolHandlerMutex.RUnlock()
+
 	if m.neighborExists(peer.ID) {
 		return ierrors.Wrapf(ErrDuplicateNeighbor, "peer %s already exists", peer.ID)
 	}
@@ -134,6 +144,10 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 	stream, err := m.P2PHost().NewStream(cancelCtx, peer.ID, protocolID)
 	if err != nil {
 		return ierrors.Wrapf(err, "dial %s / %s failed to open stream for proto %s", peer.PeerAddresses, peer.ID, protocolID)
+	}
+
+	if m.protocolHandler == nil {
+		return ierrors.New("no protocol handler registered")
 	}
 
 	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
@@ -253,6 +267,9 @@ func (m *Manager) NeighborsByID(ids []p2ppeer.ID) []*Neighbor {
 }
 
 func (m *Manager) handleStream(stream p2pnetwork.Stream) {
+	m.protocolHandlerMutex.RLock()
+	defer m.protocolHandlerMutex.RUnlock()
+
 	// We handle more incoming connections than we allow outgoing connections, so we can
 	// provide network access to new nodes.
 	if len(m.neighbors) >= (m.maxPeers + m.maxPeers/2) {
@@ -260,6 +277,10 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 		stream.Close()
 
 		return
+	}
+
+	if m.protocolHandler == nil {
+		m.log.Error("no protocol handler registered")
 	}
 
 	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
@@ -331,6 +352,9 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 
 	// create and add the neighbor
 	nbr := NewNeighbor(peer, ps, m.log, func(nbr *Neighbor, packet proto.Message) {
+		m.protocolHandlerMutex.RLock()
+		defer m.protocolHandlerMutex.RUnlock()
+
 		if m.protocolHandler == nil {
 			nbr.Log.Errorw("Can't handle packet as no protocol is registered")
 		}
