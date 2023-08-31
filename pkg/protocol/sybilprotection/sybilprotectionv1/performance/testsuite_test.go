@@ -174,10 +174,11 @@ func (t *TestSuite) delegatorReward(epochIndex iotago.EpochIndex, profitMargin, 
 
 func (t *TestSuite) calculatePoolReward(epoch iotago.EpochIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, fixedCost, performanceFactor uint64) uint64 {
 	params := t.api.ProtocolParameters()
-	targetReward := params.RewardsParameters().TargetReward(epoch, uint64(params.TokenSupply()), params.ManaParameters().ManaGenerationRate, params.ManaParameters().ManaGenerationRateExponent, params.SlotsPerEpochExponent())
+	targetReward, err := params.RewardsParameters().TargetReward(epoch, uint64(params.TokenSupply()), params.ManaParameters().ManaGenerationRate, params.ManaParameters().ManaGenerationRateExponent, params.SlotsPerEpochExponent(), t.api)
+	require.NoError(t.T, err)
 
 	poolCoefficient := t.calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorsStake, epoch)
-	scaledPoolReward := poolCoefficient * targetReward * performanceFactor
+	scaledPoolReward := poolCoefficient * uint64(targetReward) * performanceFactor
 	poolRewardNoFixedCost := scaledPoolReward / uint64(params.RewardsParameters().ValidatorBlocksPerSlot) >> (params.RewardsParameters().PoolCoefficientExponent + 1)
 	if poolRewardNoFixedCost < fixedCost {
 		fmt.Println("less than fixed cost ", poolRewardNoFixedCost, fixedCost)

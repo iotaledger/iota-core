@@ -1,6 +1,7 @@
 package performance
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/iotaledger/hive.go/ads"
@@ -186,8 +187,10 @@ func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotag
 func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, fixedCost iotago.Mana, performanceFactor uint64) (iotago.Mana, error) {
 	epoch := t.apiProvider.APIForSlot(slotIndex).TimeProvider().EpochFromSlot(slotIndex)
 	params := t.apiProvider.APIForSlot(slotIndex).ProtocolParameters()
-	targetReward := params.RewardsParameters().TargetReward(epoch, uint64(params.TokenSupply()), params.ManaParameters().ManaGenerationRate, params.ManaParameters().ManaGenerationRateExponent, params.SlotsPerEpochExponent())
-
+	targetReward, err := params.RewardsParameters().TargetReward(epoch, uint64(params.TokenSupply()), params.ManaParameters().ManaGenerationRate, params.ManaParameters().ManaGenerationRateExponent, params.SlotsPerEpochExponent(), t.apiProvider.APIForSlot(slotIndex))
+	if err != nil {
+		return 0, ierrors.Wrapf(err, "failed to calculate target reward for slot %d", slotIndex)
+	}
 	// Notice that, since both pool stake  and validator stake use at most 53 bits of the variable,
 	// to not overflow the calculation, PoolCoefficientExponent must be at most 11. Pool Coefficient will then use at most PoolCoefficientExponent + 1 bits.
 	poolCoefficient, err := t.calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorsStake, slotIndex)
@@ -196,7 +199,7 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 	}
 	// Since `Pool Coefficient` uses at most 12 bits, `Target Reward(n)` uses at most 41 bits, and `Performance Factor` uses at most 8 bits,
 	// this multiplication will not overflow using uint64 variables.
-	result, err := safemath.SafeMul(poolCoefficient, targetReward)
+	result, err := safemath.SafeMul(poolCoefficient, uint64(targetReward))
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate pool scaled reward due to overflow for slot %d", slotIndex)
 	}
