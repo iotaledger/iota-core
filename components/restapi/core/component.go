@@ -351,7 +351,7 @@ func AddFeature(feature string) {
 func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if !deps.Protocol.SyncManager.IsNodeSynced() {
+			if !deps.Protocol.MainEngineInstance().SyncManager.IsNodeSynced() {
 				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
 			}
 

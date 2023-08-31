@@ -24,7 +24,7 @@ func protocolParameters() []*apimodels.InfoResProtocolParameters {
 
 func info() *apimodels.InfoResponse {
 	clSnapshot := deps.Protocol.MainEngineInstance().Clock.Snapshot()
-	syncStatus := deps.Protocol.SyncManager.SyncStatus()
+	syncStatus := deps.Protocol.MainEngineInstance().SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
 
 	return &apimodels.InfoResponse{
@@ -40,7 +40,7 @@ func info() *apimodels.InfoResponse {
 			LatestFinalizedSlot:         syncStatus.LatestFinalizedSlot,
 			LatestAcceptedBlockSlot:     syncStatus.LastAcceptedBlockSlot,
 			LatestConfirmedBlockSlot:    syncStatus.LastConfirmedBlockSlot,
-			PruningSlot:                 syncStatus.LatestPrunedSlot,
+			PruningEpoch:                syncStatus.LastPrunedEpoch,
 		},
 		Metrics: &apimodels.InfoResNodeMetrics{
 			BlocksPerSecond:          metrics.BlocksPerSecond,

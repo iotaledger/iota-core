@@ -151,11 +151,11 @@ func currentNodeStatus() *nodestatus {
 	}
 	// get TangleTime
 	cl := deps.Protocol.MainEngineInstance().Clock
-	syncStatus := deps.Protocol.SyncManager.SyncStatus()
+	syncStatus := deps.Protocol.MainEngineInstance().SyncManager.SyncStatus()
 
 	status.TangleTime = tangleTime{
 		Synced:             syncStatus.NodeSynced,
-		Bootstrapped:       deps.Protocol.MainEngineInstance().IsBootstrapped(),
+		Bootstrapped:       deps.Protocol.MainEngineInstance().SyncManager.IsBootstrapped(),
 		AcceptedBlockSlot:  int64(syncStatus.LastAcceptedBlockSlot),
 		ConfirmedBlockSlot: int64(syncStatus.LastConfirmedBlockSlot),
 		CommittedSlot:      int64(syncStatus.LatestCommitment.Index()),

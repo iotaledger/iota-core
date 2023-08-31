@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
+	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
@@ -52,6 +53,7 @@ type dependencies struct {
 	dig.In
 
 	RestRouteManager *restapipkg.RestRouteManager
+	Protocol         *protocol.Protocol
 }
 
 func configure() error {

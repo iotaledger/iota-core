@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"time"
+
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
@@ -15,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
@@ -130,6 +133,12 @@ func WithUpgradeOrchestratorProvider(optsUpgradeOrchestratorProvider module.Prov
 	}
 }
 
+func WithSyncManagerProvider(optsSyncManagerProvider module.Provider[*engine.Engine, syncmanager.SyncManager]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsSyncManagerProvider = optsSyncManagerProvider
+	}
+}
+
 func WithEngineOptions(opts ...options.Option[engine.Engine]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsEngineOptions = append(p.optsEngineOptions, opts...)
@@ -145,5 +154,17 @@ func WithChainManagerOptions(opts ...options.Option[chainmanager.Manager]) optio
 func WithStorageOptions(opts ...options.Option[storage.Storage]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsStorageOptions = append(p.optsStorageOptions, opts...)
+	}
+}
+
+func WithAttestationRequesterTryInterval(t time.Duration) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsAttestationRequesterTryInterval = t
+	}
+}
+
+func WithAttestationRequesterMaxTries(n int) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.optsAttestationRequesterMaxRetries = n
 	}
 }

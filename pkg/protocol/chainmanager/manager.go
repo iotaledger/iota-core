@@ -34,7 +34,7 @@ type Manager struct {
 	optsCommitmentRequester []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]
 
 	commitmentEntityMutex *syncutils.DAGMutex[iotago.CommitmentID]
-	lastEvictedSlot       *model.EvictionIndex
+	lastEvictedSlot       *model.EvictionIndex[iotago.SlotIndex]
 }
 
 func NewManager(opts ...options.Option[Manager]) (manager *Manager) {
@@ -44,7 +44,7 @@ func NewManager(opts ...options.Option[Manager]) (manager *Manager) {
 		commitmentsByID:       memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ChainCommitment](),
 		commitmentEntityMutex: syncutils.NewDAGMutex[iotago.CommitmentID](),
 		forksByForkingPoint:   memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *Fork](),
-		lastEvictedSlot:       model.NewEvictionIndex(),
+		lastEvictedSlot:       model.NewEvictionIndex[iotago.SlotIndex](),
 	}, opts, func(m *Manager) {
 		m.commitmentRequester = eventticker.New(m.optsCommitmentRequester...)
 		m.Events.CommitmentBelowRoot.Hook(m.commitmentRequester.StopTicker)

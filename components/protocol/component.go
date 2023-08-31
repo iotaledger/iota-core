@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/labstack/gommon/bytes"
 	"go.uber.org/dig"
 
 	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
@@ -90,15 +91,28 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
+		pruningSizeEnabled := ParamsDatabase.Size.Enabled
+		pruningTargetDatabaseSizeBytes, err := bytes.Parse(ParamsDatabase.Size.TargetSize)
+		if err != nil {
+			Component.LogPanicf("parameter %s invalid", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)))
+		}
+
+		if pruningSizeEnabled && pruningTargetDatabaseSizeBytes == 0 {
+			Component.LogPanicf("%s has to be specified if %s is enabled", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)), Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.Enabled)))
+		}
+
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
 			protocol.WithStorageOptions(
 				storage.WithDBEngine(deps.DatabaseEngine),
-				storage.WithPruningDelay(iotago.SlotIndex(ParamsDatabase.PruningThreshold)),
-				storage.WithPrunableManagerOptions(
-					prunable.WithGranularity(ParamsDatabase.DBGranularity),
+				storage.WithPruningDelay(iotago.EpochIndex(ParamsDatabase.PruningThreshold)),
+				storage.WithPruningSizeEnable(ParamsDatabase.Size.Enabled),
+				storage.WithPruningSizeMaxTargetSizeBytes(pruningTargetDatabaseSizeBytes),
+				storage.WithPruningSizeReductionPercentage(ParamsDatabase.Size.ReductionPercentage),
+				storage.WithPruningSizeCooldownTime(ParamsDatabase.Size.CooldownTime),
+				storage.WithBucketManagerOptions(
 					prunable.WithMaxOpenDBs(ParamsDatabase.MaxOpenDBs),
 				),
 			),

@@ -11,7 +11,7 @@ type ParametersValidator struct {
 	// Enabled defines whether the Validator component is enabled.
 	Enabled bool `default:"false" usage:"whether the Validator component is enabled"`
 	// CommitteeBroadcastInterval the interval at which the node will broadcast its committee validator block.
-	CommitteeBroadcastInterval time.Duration `default:"2s" usage:"the interval at which the node will broadcast its committee validator block"`
+	CommitteeBroadcastInterval time.Duration `default:"500ms" usage:"the interval at which the node will broadcast its committee validator block"`
 	// CandidateBroadcastInterval the interval at which the node will broadcast its candidate validator block.
 	CandidateBroadcastInterval time.Duration `default:"30m" usage:"the interval at which the node will broadcast its candidate validator block"`
 	// ParentsCount is the number of parents that node will choose for its validator blocks.

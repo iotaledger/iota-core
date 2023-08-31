@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -19,7 +20,7 @@ func TestState_RootBlocks(t *testing.T) {
 	prunableStorage := prunable.New(database.Config{
 		Engine:    hivedb.EngineMapDB,
 		Directory: t.TempDir(),
-	}, 0, errorHandler)
+	}, api.SingleVersionProvider(tpkg.TestAPI), errorHandler)
 
 	ts := NewTestFramework(t, prunableStorage, eviction.NewState(mapdb.NewMapDB(), prunableStorage.RootBlocks, eviction.WithRootBlocksEvictionDelay(3)))
 	ts.CreateAndAddRootBlock("Genesis", 0, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID())

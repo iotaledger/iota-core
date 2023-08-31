@@ -16,7 +16,7 @@ import (
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/iotaledger/hive.go/kvstore"
+	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -33,7 +33,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -90,7 +89,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		panic(err)
 	}
 
-	accountID := iotago.AccountID(blake2b.Sum256(pub))
+	accountID := iotago.AccountID(blake2b.Sum256(iotago.BlockIssuerKeyEd25519FromPublicKey(hiveEd25519.PublicKey(pub)).BlockIssuerKeyBytes()))
 	accountID.RegisterAlias(name)
 
 	peerID := lo.PanicOnErr(p2ppeer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
@@ -318,12 +317,10 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		})
 		require.NoError(n.Testing, err)
 
-		rootsStorage := instance.Storage.Roots(details.Commitment.ID().Index())
-		rootsBytes, err := rootsStorage.Get(kvstore.Key{prunable.RootsKey})
+		rootsStorage, err := instance.Storage.Roots(details.Commitment.ID().Index())
+		require.NoError(n.Testing, err, "roots storage for slot %d not found", details.Commitment.Index())
+		roots, err := rootsStorage.Load(details.Commitment.ID())
 		require.NoError(n.Testing, err)
-
-		var roots iotago.Roots
-		lo.PanicOnErr(n.Protocol.APIForSlot(details.Commitment.Index()).Decode(rootsBytes, &roots))
 
 		attestationBlockIDs := make([]iotago.BlockID, 0)
 		tree, err := instance.Attestations.GetMap(details.Commitment.Index())

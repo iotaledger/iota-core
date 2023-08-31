@@ -123,14 +123,15 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 			return nil, 0, ierrors.Errorf("accountData for issuerID %s does not exist", att.IssuerID)
 		}
 
-		edSig, isEdSig := att.Signature.(*iotago.Ed25519Signature)
-		if !isEdSig {
-			return nil, 0, ierrors.Errorf("only ed2519 signatures supported, got %s", att.Signature.Type())
-		}
+		switch signature := att.Signature.(type) {
+		case *iotago.Ed25519Signature:
+			// We found the accountData, but we don't know the public key used to sign this block/attestation. Ignore.
+			if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(signature.PublicKey)) {
+				continue
+			}
 
-		// We found the accountData, but we don't know the public key used to sign this block/attestation. Ignore.
-		if !accountData.PubKeys.Has(edSig.PublicKey) {
-			continue
+		default:
+			return nil, 0, ierrors.Errorf("only ed25519 signatures supported, got %s", att.Signature.Type())
 		}
 
 		api, err := c.engine.APIForVersion(att.ProtocolVersion)
