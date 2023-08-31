@@ -51,7 +51,6 @@ type TestSuite struct {
 	optsMaxCommittableAge      iotago.SlotIndex
 	optsSlotsPerEpochExponent  uint8
 	optsEpochNearingThreshold  iotago.SlotIndex
-	optsActivityWindowDuration iotago.SlotIndex
 	optsRMCMin                 iotago.Mana
 	optsRMCIncrease            iotago.Mana
 	optsRMCDecrease            iotago.Mana
@@ -92,7 +91,6 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsMaxCommittableAge:      20,
 		optsSlotsPerEpochExponent:  5,
 		optsEpochNearingThreshold:  16,
-		optsActivityWindowDuration: 4,
 		optsRMCMin:                 500,
 		optsRMCIncrease:            500,
 		optsRMCDecrease:            500,
@@ -127,7 +125,6 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsMinCommittableAge,
 					t.optsMaxCommittableAge,
 					t.optsEpochNearingThreshold,
-					t.optsActivityWindowDuration,
 				),
 				iotago.WithCongestionControlOptions(
 					t.optsRMCMin,

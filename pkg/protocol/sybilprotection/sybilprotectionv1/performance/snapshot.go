@@ -2,6 +2,7 @@ package performance
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -87,7 +88,7 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "unable to read accounts count for slot index %d", slotIndex)
 		}
 
-		performanceFactors, err := t.performanceFactorsFunc(slotIndex)
+		performanceFactors, err := t.validatorPerformancesFunc(slotIndex)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to get performance factors for slot index %d", slotIndex)
 		}
@@ -97,7 +98,7 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 				return ierrors.Wrapf(err, "unable to read account id for the slot index %d", slotIndex)
 			}
 			// TODO: performance factor activity vector can be decreased to uint16 or uint32 depending on the size of parameter ValidatorBlocksPerSlot
-			var performanceFactor prunable.ValidatorPerformance
+			var performanceFactor model.ValidatorPerformance
 			if err := binary.Read(reader, binary.LittleEndian, &performanceFactor); err != nil {
 				return ierrors.Wrapf(err, "unable to read performance factor for account %s and slot index %d", accountID, slotIndex)
 			}
@@ -224,11 +225,11 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 			return ierrors.Wrapf(err, "unable to write pf accounts count for slot index %d", currentSlot)
 		}
 		// TODO: decrease this in import/export to uint16 in pf Load/Store/... if we are sure on the performance factor calculation and its expected upper bond
-		performanceFactors, err := t.performanceFactorsFunc(currentSlot)
+		performanceFactors, err := t.validatorPerformancesFunc(currentSlot)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to get performance factors for slot index %d", currentSlot)
 		}
-		if err := performanceFactors.Stream(func(accountID iotago.AccountID, pf uint64) error {
+		if err := performanceFactors.Stream(func(accountID iotago.AccountID, pf *model.ValidatorPerformance) error {
 			if err := pWriter.WriteValue("account id", accountID); err != nil {
 				return ierrors.Wrapf(err, "unable to write account id %s for slot %d", accountID, currentSlot)
 			}
