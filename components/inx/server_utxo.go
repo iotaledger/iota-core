@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -164,6 +165,23 @@ func (s *Server) ReadUnspentOutputs(_ *inx.NoParams, srv inx.INX_ReadUnspentOutp
 	return err
 }
 
+func (s *Server) ReadOutputMetadata(_ context.Context, id *inx.OutputId) (*inx.OutputMetadata, error) {
+	engine := deps.Protocol.MainEngineInstance()
+
+	outputID := id.Unwrap()
+
+	output, spent, err := engine.Ledger.OutputOrSpent(outputID)
+	if err != nil {
+		return nil, err
+	}
+
+	if spent != nil {
+		return newSpentMetadataResponse(spent)
+	}
+
+	return newOutputMetadataResponse(output)
+}
+
 func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_ListenToLedgerUpdatesServer) error {
 	createLedgerUpdatePayloadAndSend := func(slot iotago.SlotIndex, outputs utxoledger.Outputs, spents utxoledger.Spents) error {
 		// Send Begin
@@ -314,4 +332,60 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 	wp.ShutdownComplete.Wait()
 
 	return innerErr
+}
+
+func newOutputMetadataResponse(output *utxoledger.Output) (*inx.OutputMetadata, error) {
+	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+
+	metadata := &inx.OutputMetadata{
+		BlockId:            inx.NewBlockId(output.BlockID()),
+		TransactionId:      inx.NewTransactionId(output.OutputID().TransactionID()),
+		OutputIndex:        uint32(output.OutputID().Index()),
+		IsSpent:            false,
+		LatestCommitmentId: inx.NewCommitmentId(latestCommitment.ID()),
+	}
+
+	includedSlotIndex := output.SlotBooked()
+	if includedSlotIndex <= latestCommitment.Index() {
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
+		}
+		metadata.CommitmentIdIncluded = inx.NewCommitmentId(includedCommitment.ID())
+	}
+
+	return metadata, nil
+}
+
+func newSpentMetadataResponse(spent *utxoledger.Spent) (*inx.OutputMetadata, error) {
+	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+
+	metadata := &inx.OutputMetadata{
+		BlockId:            inx.NewBlockId(spent.BlockID()),
+		TransactionId:      inx.NewTransactionId(spent.OutputID().TransactionID()),
+		OutputIndex:        uint32(spent.OutputID().Index()),
+		IsSpent:            true,
+		TransactionIdSpent: inx.NewTransactionId(spent.TransactionIDSpent()),
+		LatestCommitmentId: inx.NewCommitmentId(latestCommitment.ID()),
+	}
+
+	includedSlotIndex := spent.Output().SlotBooked()
+	if includedSlotIndex <= latestCommitment.Index() {
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
+		}
+		metadata.CommitmentIdIncluded = inx.NewCommitmentId(includedCommitment.ID())
+	}
+
+	spentSlotIndex := spent.SlotIndexSpent()
+	if spentSlotIndex <= latestCommitment.Index() {
+		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
+		}
+		metadata.CommitmentIdSpent = inx.NewCommitmentId(spentCommitment.ID())
+	}
+
+	return metadata, nil
 }
