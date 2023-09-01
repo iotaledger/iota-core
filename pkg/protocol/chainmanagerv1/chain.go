@@ -52,7 +52,7 @@ type Chain struct {
 }
 
 // NewChain creates a new Chain instance.
-func NewChain(root *Commitment) *Chain {
+func NewChain(root *Commitment, optStartingEngine ...*engine.Engine) *Chain {
 	c := &Chain{
 		root:                     root,
 		commitments:              shrinkingmap.New[iotago.SlotIndex, *Commitment](),
@@ -63,7 +63,7 @@ func NewChain(root *Commitment) *Chain {
 		evicted:                  reactive.NewEvent(),
 	}
 
-	c.engine = newEngineVariable(root)
+	c.engine = newEngineVariable(root, optStartingEngine...)
 
 	// track weights of the chain
 	c.claimedWeight = reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), c.latestCommitment)

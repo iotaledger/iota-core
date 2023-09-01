@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -22,8 +23,6 @@ type ChainManager struct {
 
 	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 
-	*EngineManager
-
 	*ChainSwitching
 
 	*AttestationsRequester
@@ -31,10 +30,15 @@ type ChainManager struct {
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
-func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
+func NewChainManager(startingEngine *engine.Engine) *ChainManager {
 	p := &ChainManager{
-		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
-		mainChain:           reactive.NewVariable[*Chain]().Init(NewChain(NewCommitment(rootCommitment, true))),
+		EvictionState: reactive.NewEvictionState[iotago.SlotIndex](),
+		mainChain: reactive.NewVariable[*Chain]().Init(
+			NewChain(
+				NewCommitment(startingEngine.Storage.Settings().LatestCommitment(), true),
+				startingEngine,
+			),
+		),
 		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 		commitmentCreated:   event.New1[*Commitment](),
 		chainCreated:        event.New1[*Chain](),
@@ -42,7 +46,6 @@ func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
 	}
 
 	// embed reactive orchestrators
-	p.EngineManager = NewEngineManager(p)
 	p.ChainSwitching = NewChainSwitching(p)
 	p.AttestationsRequester = NewAttestationsRequester(p)
 
