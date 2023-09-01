@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 )
 
 type Commitment struct {
@@ -41,8 +42,6 @@ func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment 
 
 	c.parent.OnUpdate(func(_, parent *Commitment) { c.solid.InheritFrom(parent.solid) })
 
-	c.requestAttestations = newRequestAttestations(c)
-
 	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
 
 	if lo.First(optIsRoot) {
@@ -52,6 +51,10 @@ func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment 
 	}
 
 	return c
+}
+
+func (c *Commitment) CommitmentModel() *model.Commitment {
+	return c.Commitment
 }
 
 func (c *Commitment) Parent() reactive.Variable[*Commitment] {
@@ -94,20 +97,20 @@ func (c *Commitment) RequestAttestations() reactive.Variable[bool] {
 	return c.requestAttestations
 }
 
+func (c *Commitment) Engine() reactive.Variable[*engine.Engine] {
+	return c.chain.Get().Engine()
+}
+
 func (c *Commitment) Evicted() reactive.Event {
 	return c.evicted
 }
 
 func (c *Commitment) setParent(parent *Commitment) {
-	c.parent.Compute(func(currentParent *Commitment) *Commitment {
-		if currentParent != nil {
-			panic("parent may not be changed once it was set")
-		}
+	parent.registerChild(c, c.chainUpdater(parent))
 
-		parent.registerChild(c, c.chainUpdater(parent))
-
-		return parent
-	})
+	if c.parent.Set(parent) != nil {
+		panic("parent may not be changed once it was set")
+	}
 }
 
 func (c *Commitment) registerChild(newChild *Commitment, onSuccessorUpdated func(*Commitment, *Commitment)) {

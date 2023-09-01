@@ -27,10 +27,10 @@ func NewChainSwitching(chainManager *ChainManager) *ChainSwitching {
 
 	c.heaviestAttestedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
 		if prevCandidate != nil {
-			prevCandidate.instantiate.Set(false)
+			prevCandidate.engine.instantiate.Set(false)
 		}
 
-		newCandidate.instantiate.Set(true)
+		newCandidate.engine.instantiate.Set(true)
 	})
 
 	c.heaviestVerifiedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {

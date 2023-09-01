@@ -16,31 +16,37 @@ type ChainManager struct {
 
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
 
-	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
-
 	commitmentCreated *event.Event1[*Commitment]
 
 	chainCreated *event.Event1[*Chain]
 
+	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+
+	*EngineManager
+
 	*ChainSwitching
+
+	*AttestationsRequester
 
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
 func NewChainManager(rootCommitment *model.Commitment) *ChainManager {
-	c := &ChainManager{
+	p := &ChainManager{
 		EvictionState:       reactive.NewEvictionState[iotago.SlotIndex](),
 		mainChain:           reactive.NewVariable[*Chain]().Init(NewChain(NewCommitment(rootCommitment, true))),
 		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
-		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 		commitmentCreated:   event.New1[*Commitment](),
 		chainCreated:        event.New1[*Chain](),
+		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 	}
 
 	// embed reactive orchestrators
-	c.ChainSwitching = NewChainSwitching(c)
+	p.EngineManager = NewEngineManager(p)
+	p.ChainSwitching = NewChainSwitching(p)
+	p.AttestationsRequester = NewAttestationsRequester(p)
 
-	return c
+	return p
 }
 
 func (c *ChainManager) MainChain() reactive.Variable[*Chain] {

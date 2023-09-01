@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -43,8 +44,8 @@ type Chain struct {
 	// requestAttestations is a flag that indicates whether this chain shall request attestations.
 	requestAttestations reactive.Variable[bool]
 
-	// instantiated is a flag that indicates whether this chain shall be instantiated.
-	instantiate reactive.Variable[bool]
+	// engine is the engine that is used to process blocks of this chain.
+	engine *engineVariable
 
 	// evicted is an event that gets triggered when the chain gets evicted.
 	evicted reactive.Event
@@ -59,9 +60,10 @@ func NewChain(root *Commitment) *Chain {
 		latestAttestedCommitment: reactive.NewVariable[*Commitment](),
 		latestVerifiedCommitment: reactive.NewVariable[*Commitment](),
 		requestAttestations:      reactive.NewVariable[bool](),
-		instantiate:              reactive.NewVariable[bool](),
 		evicted:                  reactive.NewEvent(),
 	}
+
+	c.engine = newEngineVariable(root)
 
 	// track weights of the chain
 	c.claimedWeight = reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), c.latestCommitment)
@@ -170,6 +172,11 @@ func (c *Chain) WarpSyncThreshold() reactive.Variable[iotago.SlotIndex] {
 // attestations.
 func (c *Chain) RequestAttestations() reactive.Variable[bool] {
 	return c.requestAttestations
+}
+
+// Engine returns a reactive variable that contains the engine that is used to process blocks of this chain.
+func (c *Chain) Engine() reactive.Variable[*engine.Engine] {
+	return c.engine
 }
 
 // Evicted returns a reactive event that gets triggered when the chain is evicted.
