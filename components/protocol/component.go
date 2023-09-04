@@ -138,7 +138,7 @@ func configure() error {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})
 
-	deps.Protocol.Chains.OnCommitmentRequested(func(id iotago.CommitmentID) {
+	deps.Protocol.OnCommitmentRequested(func(id iotago.CommitmentID) {
 		Component.LogDebugf("RequestCommitment: %s", id)
 	})
 
