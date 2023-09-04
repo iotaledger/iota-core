@@ -85,13 +85,13 @@ func configure() error {
 
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v2")
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+	deps.Protocol.Engines.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		blocksPerSlot.Set(block.ID().Index(), append(lo.Return1(blocksPerSlot.GetOrCreate(block.ID().Index(), func() []*blocks.Block {
 			return make([]*blocks.Block, 0)
 		})), block))
 	})
 
-	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+	deps.Protocol.Engines.MainEngineEvents.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		if index < iotago.SlotIndex(ParamsDebugAPI.PruningThreshold) {
 			return
 		}
@@ -99,13 +99,13 @@ func configure() error {
 		blocksPrunableStorage.PruneUntilSlot(index - iotago.SlotIndex(ParamsDebugAPI.PruningThreshold))
 	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", 1)))
 
-	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
+	deps.Protocol.MainEngineEvents.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
 		if err := storeTransactionsPerSlot(scd); err != nil {
 			fmt.Printf(">> DebugAPI Error: %s\n", err)
 		}
 	})
 
-	deps.Protocol.Events.Engine.EvictionState.SlotEvicted.Hook(func(index iotago.SlotIndex) {
+	deps.Protocol.MainEngineEvents.EvictionState.SlotEvicted.Hook(func(index iotago.SlotIndex) {
 		blocksInSlot, exists := blocksPerSlot.Get(index)
 		if !exists {
 			return
@@ -134,7 +134,7 @@ func configure() error {
 			return err
 		}
 
-		if block, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID); exists && block.ProtocolBlock() != nil {
+		if block, exists := deps.Protocol.MainEngine().BlockCache.Block(blockID); exists && block.ProtocolBlock() != nil {
 			response := BlockMetadataResponseFromBlock(block)
 
 			return httpserver.JSONResponse(c, http.StatusOK, response)
@@ -157,7 +157,7 @@ func configure() error {
 			return err
 		}
 
-		j, err := deps.Protocol.CurrentAPI().JSONEncode(resp)
+		j, err := deps.Protocol.MainEngine().CurrentAPI().JSONEncode(resp)
 		if err != nil {
 			return err
 		}

@@ -9,7 +9,7 @@ import (
 
 func issueValidatorBlock(ctx context.Context) {
 	// Get the main engine instance in case it changes mid-execution.
-	engineInstance := deps.Protocol.MainEngineInstance()
+	engineInstance := deps.Protocol.MainEngine()
 
 	// Get the latest commitment from the engine before to avoid race conditions if something is committed after we fix block issuing time.
 	latestCommitment := engineInstance.Storage.Settings().LatestCommitment()
@@ -28,7 +28,7 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	protocolParametersHash, err := deps.Protocol.CurrentAPI().ProtocolParameters().Hash()
+	protocolParametersHash, err := deps.Protocol.MainEngine().CurrentAPI().ProtocolParameters().Hash()
 	if err != nil {
 		Component.LogWarnf("failed to get protocol parameters hash: %s", err.Error())
 
@@ -42,7 +42,7 @@ func issueValidatorBlock(ctx context.Context) {
 			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
 		),
 		blockfactory.WithProtocolParametersHash(protocolParametersHash),
-		blockfactory.WithHighestSupportedVersion(deps.Protocol.LatestAPI().Version()),
+		blockfactory.WithHighestSupportedVersion(deps.Protocol.MainEngine().LatestAPI().Version()),
 	)
 	if err != nil {
 		Component.LogWarnf("error creating validator block: %s", err.Error())
@@ -50,7 +50,7 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	if !engineInstance.SybilProtection.SeatManager().Committee(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(validatorAccount.ID()) {
+	if !engineInstance.SybilProtection.SeatManager().Committee(deps.Protocol.MainEngine().CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(validatorAccount.ID()) {
 		// update nextBroadcast value here, so that this updated value is used in the `defer`
 		// callback to schedule issuing of the next block at a different interval than for committee members
 		nextBroadcast = blockIssuingTime.Add(ParamsValidator.CandidateBroadcastInterval)

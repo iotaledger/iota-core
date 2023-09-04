@@ -45,7 +45,7 @@ type Chain struct {
 	requestAttestations reactive.Variable[bool]
 
 	// engine is the engine that is used to process blocks of this chain.
-	engine *engineVariable
+	engine *chainEngine
 
 	// evicted is an event that gets triggered when the chain gets evicted.
 	evicted reactive.Event
@@ -63,7 +63,7 @@ func NewChain(root *Commitment, optStartingEngine ...*engine.Engine) *Chain {
 		evicted:                  reactive.NewEvent(),
 	}
 
-	c.engine = newEngineVariable(root, optStartingEngine...)
+	c.engine = newChainEngine(root, optStartingEngine...)
 
 	// track weights of the chain
 	c.claimedWeight = reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), c.latestCommitment)
@@ -120,9 +120,13 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 	return nil, false
 }
 
-// LatestCommitment returns a reactive variable that always contains the latest Commitment object in this
+func (c *Chain) LatestCommitment() *Commitment {
+	return c.latestCommitment.Get()
+}
+
+// LatestCommitmentR returns a reactive variable that always contains the latest Commitment object in this
 // collection.
-func (c *Chain) LatestCommitment() reactive.Variable[*Commitment] {
+func (c *Chain) LatestCommitmentR() reactive.Variable[*Commitment] {
 	return c.latestCommitment
 }
 
@@ -218,4 +222,34 @@ func (c *Chain) unregisterCommitment(commitment *Commitment) {
 	c.latestCommitment.Compute(resetToParent)
 	c.latestAttestedCommitment.Compute(resetToParent)
 	c.latestVerifiedCommitment.Compute(resetToParent)
+}
+
+type chainEngine struct {
+	reactive.Variable[*engine.Engine]
+
+	parentEngine reactive.Variable[*engine.Engine]
+
+	spawnedEngine reactive.Variable[*engine.Engine]
+
+	instantiate reactive.Variable[bool]
+}
+
+func newChainEngine(commitment *Commitment, optInitEngine ...*engine.Engine) *chainEngine {
+	e := &chainEngine{
+		parentEngine:  reactive.NewVariable[*engine.Engine](),
+		instantiate:   reactive.NewVariable[bool](),
+		spawnedEngine: reactive.NewVariable[*engine.Engine]().Init(lo.First(optInitEngine)),
+	}
+
+	commitment.parent.OnUpdate(func(_, parent *Commitment) { e.parentEngine.InheritFrom(parent.Engine()) })
+
+	e.Variable = reactive.NewDerivedVariable2(func(spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
+		if spawnedEngine != nil {
+			return spawnedEngine
+		}
+
+		return parentEngine
+	}, e.spawnedEngine, e.parentEngine)
+
+	return e
 }

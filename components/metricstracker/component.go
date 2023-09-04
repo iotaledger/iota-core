@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 )
@@ -46,7 +47,7 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps metricsTrackerDeps) *MetricsTracker {
-		m := New(deps.Protocol.MainEngineInstance().IsBootstrapped)
+		m := New(deps.Protocol.MainEngine().IsBootstrapped)
 
 		return m
 	}); err != nil {
@@ -62,22 +63,29 @@ func run() error {
 	if err := Component.Daemon().BackgroundWorker("Metrics Tracker", func(ctx context.Context) {
 		Component.LogInfo("Starting Metrics Tracker ... done")
 
-		unhook := lo.Batch(
-			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
-				deps.MetricsTracker.metrics.Blocks.Inc()
-			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(_ *notarization.SlotCommittedDetails) {
-				deps.MetricsTracker.measure()
-			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
-				deps.MetricsTracker.metrics.ConfirmedBlocks.Inc()
-			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-		)
+		var unhookFromPreviousEngine func()
+
+		deps.Protocol.MainEngineR().OnUpdate(func(_, engine *engine.Engine) {
+			if unhookFromPreviousEngine != nil {
+				unhookFromPreviousEngine()
+			}
+
+			unhookFromPreviousEngine = lo.Batch(
+				engine.Events.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
+					deps.MetricsTracker.metrics.Blocks.Inc()
+				}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
+				engine.Events.Notarization.SlotCommitted.Hook(func(_ *notarization.SlotCommittedDetails) {
+					deps.MetricsTracker.measure()
+				}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
+				engine.Events.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
+					deps.MetricsTracker.metrics.ConfirmedBlocks.Inc()
+				}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
+			)
+		})
 
 		<-ctx.Done()
 		Component.LogInfo("Stopping Metrics Tracker ...")
 
-		unhook()
 		Component.LogInfo("Stopping Metrics Tracker ... done")
 	}, daemon.PriorityDashboardMetrics); err != nil {
 		Component.LogPanicf("failed to start worker: %s", err)

@@ -273,6 +273,10 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	return modelBlock, modelBlock != nil
 }
 
+func (e *Engine) LatestCommitment() *model.Commitment {
+	return e.Storage.Settings().LatestCommitment()
+}
+
 func (e *Engine) IsBootstrapped() (isBootstrapped bool) {
 	e.isBootstrappedMutex.Lock()
 	defer e.isBootstrappedMutex.Unlock()

@@ -105,23 +105,23 @@ func run() error {
 }
 
 func configureComponentCountersEvents() {
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ identity.ID) {
+	deps.Protocol.OnBlockReceived(func(_ *model.Block, _ identity.ID) {
 		incComponentCounter(Received)
 	})
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
+	deps.Protocol.Engines.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
 		incComponentCounter(Attached)
 	})
 
-	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(b *blocks.Block) {
+	deps.Protocol.Engines.MainEngineEvents.BlockDAG.BlockSolid.Hook(func(b *blocks.Block) {
 		incComponentCounter(Solidified)
 	})
 
-	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(b *blocks.Block) {
+	deps.Protocol.Engines.MainEngineEvents.Booker.BlockBooked.Hook(func(b *blocks.Block) {
 		incComponentCounter(Booked)
 	})
 
-	deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(b *blocks.Block) {
+	deps.Protocol.Engines.MainEngineEvents.Scheduler.BlockScheduled.Hook(func(b *blocks.Block) {
 		incComponentCounter(Scheduled)
 	})
 }

@@ -10,7 +10,7 @@ type ChainSwitching struct {
 	heaviestVerifiedCandidate reactive.Variable[*Chain]
 }
 
-func NewChainSwitching(chainManager *ChainManager) *ChainSwitching {
+func NewChainSwitching(chainManager *Chains) *ChainSwitching {
 	c := &ChainSwitching{
 		heaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
 		heaviestAttestedCandidate: reactive.NewVariable[*Chain](),

@@ -19,7 +19,7 @@ import (
 
 func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlock, error) {
 	blkID := blockID.Unwrap()
-	block, exists := deps.Protocol.MainEngineInstance().Block(blkID) // block +1
+	block, exists := deps.Protocol.MainEngine().Block(blkID) // block +1
 	if !exists {
 		return nil, status.Errorf(codes.NotFound, "block %s not found", blkID.ToHex())
 	}
@@ -30,7 +30,7 @@ func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlo
 }
 
 func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*inx.BlockMetadata, error) {
-	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID.Unwrap())
+	blockMetadata, err := deps.Protocol.MainEngine().Retainer.BlockMetadata(blockID.Unwrap())
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (s *Server) ListenToBlocks(_ *inx.NoParams, srv inx.INX_ListenToBlocksServe
 
 	wp := workerpool.New("ListenToBlocks", workerCount).Start()
 
-	unhook := deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+	unhook := deps.Protocol.MainEngineEvents.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
@@ -74,7 +74,7 @@ func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcc
 
 	wp := workerpool.New("ListenToAcceptedBlocks", workerCount).Start()
 
-	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+	unhook := deps.Protocol.MainEngineEvents.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
@@ -99,7 +99,7 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 
 	wp := workerpool.New("ListenToConfirmedBlocks", workerCount).Start()
 
-	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+	unhook := deps.Protocol.MainEngineEvents.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
@@ -125,7 +125,7 @@ func (s *Server) SubmitBlock(ctx context.Context, rawBlock *inx.RawBlock) (*inx.
 		return nil, status.Errorf(codes.InvalidArgument, "failed to parse block version: %s", err.Error())
 	}
 
-	apiForVersion, err := deps.Protocol.APIForVersion(version)
+	apiForVersion, err := deps.Protocol.MainEngine().APIForVersion(version)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block version: %s", err.Error())
 	}
@@ -139,7 +139,7 @@ func (s *Server) SubmitBlock(ctx context.Context, rawBlock *inx.RawBlock) (*inx.
 }
 
 func (s *Server) SubmitPayload(ctx context.Context, rawPayload *inx.RawPayload) (*inx.BlockId, error) {
-	payload, err := rawPayload.Unwrap(deps.Protocol.CurrentAPI(), serix.WithValidation())
+	payload, err := rawPayload.Unwrap(deps.Protocol.MainEngine().CurrentAPI(), serix.WithValidation())
 	if err != nil {
 		return nil, err
 	}

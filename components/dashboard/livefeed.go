@@ -12,7 +12,7 @@ import (
 
 func runLiveFeed(component *app.Component) {
 	if err := component.Daemon().BackgroundWorker("Dashboard[Livefeed]", func(ctx context.Context) {
-		hook := deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
+		hook := deps.Protocol.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
 			payloadType := iotago.PayloadType(0)
 			if basicBlock, isBasicBlock := b.BasicBlock(); isBasicBlock && basicBlock.Payload != nil {
 				payloadType = basicBlock.Payload.PayloadType()

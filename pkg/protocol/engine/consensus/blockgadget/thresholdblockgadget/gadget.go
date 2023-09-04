@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -23,6 +24,9 @@ type Gadget struct {
 
 	seatManager seatmanager.SeatManager
 	blockCache  *blocks.Blocks
+
+	lastAcceptedBlockIndex  reactive.Variable[iotago.SlotIndex]
+	lastConfirmedBlockIndex reactive.Variable[iotago.SlotIndex]
 
 	optsAcceptanceThreshold               float64
 	optsConfirmationThreshold             float64
@@ -50,16 +54,53 @@ func New(blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, opts ..
 		seatManager: seatManager,
 		blockCache:  blockCache,
 
+		lastAcceptedBlockIndex:  reactive.NewVariable[iotago.SlotIndex](),
+		lastConfirmedBlockIndex: reactive.NewVariable[iotago.SlotIndex](),
+
 		optsAcceptanceThreshold:               0.67,
 		optsConfirmationThreshold:             0.67,
 		optsConfirmationRatificationThreshold: 2,
-	}, opts,
-		(*Gadget).TriggerConstructed,
-	)
+	}, opts, func(g *Gadget) {
+		g.events.BlockAccepted.Hook(func(block *blocks.Block) {
+			g.lastAcceptedBlockIndex.Compute(func(lastAcceptedBlockIndex iotago.SlotIndex) iotago.SlotIndex {
+				if block.ID().Index() < lastAcceptedBlockIndex {
+					return lastAcceptedBlockIndex
+				}
+
+				return block.ID().Index()
+			})
+		})
+
+		g.events.BlockConfirmed.Hook(func(block *blocks.Block) {
+			g.lastConfirmedBlockIndex.Compute(func(lastConfirmedBlockIndex iotago.SlotIndex) iotago.SlotIndex {
+				if block.ID().Index() < lastConfirmedBlockIndex {
+					return lastConfirmedBlockIndex
+				}
+
+				return block.ID().Index()
+			})
+		})
+	}, (*Gadget).TriggerConstructed)
 }
 
 func (g *Gadget) Events() *blockgadget.Events {
 	return g.events
+}
+
+func (g *Gadget) LastAcceptedBlockIndex() iotago.SlotIndex {
+	return g.lastAcceptedBlockIndex.Get()
+}
+
+func (g *Gadget) LastAcceptedBlockIndexR() reactive.Variable[iotago.SlotIndex] {
+	return g.lastAcceptedBlockIndex
+}
+
+func (g *Gadget) LastConfirmedBlockIndex() iotago.SlotIndex {
+	return g.lastConfirmedBlockIndex.Get()
+}
+
+func (g *Gadget) LastConfirmedBlockIndexR() reactive.Variable[iotago.SlotIndex] {
+	return g.lastConfirmedBlockIndex
 }
 
 func (g *Gadget) Shutdown() {

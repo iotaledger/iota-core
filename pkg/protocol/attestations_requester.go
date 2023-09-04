@@ -12,12 +12,12 @@ import (
 )
 
 type AttestationsRequester struct {
-	chainManager        *ChainManager
+	chainManager        *Chains
 	requester           *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 	commitmentVerifiers *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *CommitmentVerifier]
 }
 
-func NewAttestationsRequester(chainManager *ChainManager) *AttestationsRequester {
+func NewAttestationsRequester(chainManager *Chains) *AttestationsRequester {
 	a := &AttestationsRequester{
 		chainManager:        chainManager,
 		requester:           eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
@@ -57,7 +57,7 @@ func (a *AttestationsRequester) ProcessAttestationsResponse(commitmentModel *mod
 		return
 	}
 
-	chain := commitment.Chain().Get()
+	chain := commitment.Chain()
 	if chain == nil {
 		// TODO: log warning that we received attestations for an unsolid commitment (we did not request that - maybe punish sender)
 

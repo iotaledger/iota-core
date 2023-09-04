@@ -93,7 +93,7 @@ func NewLedgerUpdateBatchOperationConsumed(spent *utxoledger.Spent) (*inx.Ledger
 }
 
 func (s *Server) ReadOutput(_ context.Context, id *inx.OutputId) (*inx.OutputResponse, error) {
-	engine := deps.Protocol.MainEngineInstance()
+	engine := deps.Protocol.MainEngine()
 
 	latestCommitment := engine.Storage.Settings().LatestCommitment()
 
@@ -132,7 +132,7 @@ func (s *Server) ReadOutput(_ context.Context, id *inx.OutputId) (*inx.OutputRes
 }
 
 func (s *Server) ReadUnspentOutputs(_ *inx.NoParams, srv inx.INX_ReadUnspentOutputsServer) error {
-	engine := deps.Protocol.MainEngineInstance()
+	engine := deps.Protocol.MainEngine()
 	latestCommitment := engine.Storage.Settings().LatestCommitment()
 
 	var innerErr error
@@ -205,7 +205,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	sendStateDiffsRange := func(startIndex iotago.SlotIndex, endIndex iotago.SlotIndex) error {
 		for currentIndex := startIndex; currentIndex <= endIndex; currentIndex++ {
-			stateDiff, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(currentIndex)
+			stateDiff, err := deps.Protocol.MainEngine().Ledger.SlotDiffs(currentIndex)
 			if err != nil {
 				return status.Errorf(codes.NotFound, "ledger update for milestoneIndex %d not found", currentIndex)
 			}
@@ -227,7 +227,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 			return 0, nil
 		}
 
-		latestCommitment := deps.Protocol.SyncManager.LatestCommitment()
+		latestCommitment := deps.Protocol.MainEngine().LatestCommitment()
 
 		if startIndex > latestCommitment.Index() {
 			// no need to send previous milestone diffs
@@ -235,7 +235,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		}
 
 		// Stream all available milestone diffs first
-		pruningIndex := deps.Protocol.SyncManager.LatestFinalizedSlot()
+		pruningIndex := deps.Protocol.MainEngine().SlotGadget.LatestFinalizedSlot()
 		if startIndex <= pruningIndex {
 			return 0, status.Errorf(codes.InvalidArgument, "given startMilestoneIndex %d is older than the current pruningIndex %d", startIndex, pruningIndex)
 		}
@@ -292,7 +292,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	wp := workerpool.New("ListenToLedgerUpdates", workerCount).Start()
 
-	unhook := deps.Protocol.Events.Engine.Ledger.StateDiffApplied.Hook(func(index iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) {
+	unhook := deps.Protocol.MainEngineEvents.Ledger.StateDiffApplied.Hook(func(index iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) {
 		done, err := handleRangedSend2(index, newOutputs, newSpents, stream, catchUpFunc, sendFunc)
 		switch {
 		case err != nil:

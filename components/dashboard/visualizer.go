@@ -42,7 +42,7 @@ type tipinfo struct {
 // }
 
 func sendVertex(blk *blocks.Block, confirmed bool) {
-	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock(), deps.Protocol.APIForSlot(blk.ID().Index()))
+	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock(), deps.Protocol.MainEngine().APIForSlot(blk.ID().Index()))
 	tx, isTx := modelBlk.Transaction()
 
 	broadcastWsBlock(&wsblk{MsgTypeVertex, &vertex{
@@ -54,8 +54,8 @@ func sendVertex(blk *blocks.Block, confirmed bool) {
 		IsTx:                isTx,
 		IsTxAccepted: func() bool {
 			if isTx {
-				api := lo.PanicOnErr(deps.Protocol.APIForVersion(blk.ProtocolBlock().ProtocolVersion))
-				txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID(api)))
+				api := lo.PanicOnErr(deps.Protocol.MainEngine().APIForVersion(blk.ProtocolBlock().ProtocolVersion))
+				txMetadata, exists := deps.Protocol.MainEngine().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID(api)))
 				if exists {
 					return txMetadata.IsAccepted()
 				}
@@ -83,13 +83,13 @@ func sendTipInfo(block *blocks.Block, isTip bool) {
 func runVisualizer(component *app.Component) {
 	if err := component.Daemon().BackgroundWorker("Dashboard[Visualizer]", func(ctx context.Context) {
 		unhook := lo.Batch(
-			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+			deps.Protocol.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 				sendVertex(block, false)
 
 				tx, hasTx := block.Transaction()
 				if hasTx {
-					api := lo.PanicOnErr(deps.Protocol.APIForVersion(block.ProtocolBlock().ProtocolVersion))
-					txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID(api)))
+					api := lo.PanicOnErr(deps.Protocol.MainEngine().APIForVersion(block.ProtocolBlock().ProtocolVersion))
+					txMetadata, exists := deps.Protocol.MainEngine().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID(api)))
 					if exists {
 						txMetadata.OnAccepted(func() {
 							sendTxAccepted(block.ID(), true)
@@ -100,10 +100,10 @@ func runVisualizer(component *app.Component) {
 				// 	currentSlot.Store(int64(block.ID().Index()))
 				// }
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+			deps.Protocol.MainEngineEvents.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 				sendVertex(block, block.IsConfirmed())
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+			deps.Protocol.MainEngineEvents.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
 				tipMetadata.IsStrongTip().OnUpdate(func(_, newValue bool) {
 					sendTipInfo(tipMetadata.Block(), newValue)
 				})

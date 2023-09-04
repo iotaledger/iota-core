@@ -15,7 +15,7 @@ import (
 func TestChainManager(t *testing.T) {
 	testAPI := tpkg.TestAPI
 	rootCommitment := model.NewEmptyCommitment(testAPI)
-	chainManager := NewChainManager(rootCommitment)
+	chainManager := NewChains(rootCommitment)
 
 	chainManager.ChainSwitching.heaviestAttestedCandidate.OnUpdate(func(oldValue, newValue *Chain) {
 		fmt.Println("CandidateChain", oldValue, newValue)
@@ -69,8 +69,8 @@ func TestChainManager(t *testing.T) {
 	require.True(t, commitment3Metadata.InSyncRange().Get())
 	require.False(t, commitment3Metadata.RequestBlocks().Get())
 	require.True(t, commitment3Metadata.Solid().WasTriggered())
-	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().Get().LatestCommitment().Get().Index())
-	require.Equal(t, uint64(3), commitment3Metadata.Chain().Get().ClaimedWeight().Get())
+	require.Equal(t, iotago.SlotIndex(3), commitment3Metadata.Chain().LatestCommitment().Index())
+	require.Equal(t, uint64(3), commitment3Metadata.Chain().ClaimedWeight().Get())
 
 	commitment3aMetadata := chainManager.ProcessCommitment(commitment3a)
 

@@ -518,7 +518,7 @@ func (s *Settings) String() string {
 
 	builder := stringify.NewStructBuilder("Settings")
 	builder.AddField(stringify.NewStructField("IsSnapshotImported", lo.PanicOnErr(s.store.Has([]byte{snapshotImportedKey}))))
-	builder.AddField(stringify.NewStructField("LatestCommitment", s.latestCommitment()))
+	builder.AddField(stringify.NewStructField("LatestCommitmentR", s.latestCommitment()))
 	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.latestFinalizedSlot()))
 	if err := s.store.Iterate([]byte{protocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
 		params, _, err := iotago.ProtocolParametersFromBytes(value)

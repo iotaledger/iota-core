@@ -351,7 +351,7 @@ func AddFeature(feature string) {
 func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if !deps.Protocol.SyncManager.IsNodeSynced() {
+			if !deps.Protocol.MainEngine().IsSynced() {
 				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
 			}
 
@@ -382,7 +382,7 @@ func responseByHeader(c echo.Context, obj any) error {
 	switch mimeType {
 	case httpserver.MIMEApplicationVendorIOTASerializerV2:
 		// TODO: that should take the API that belongs to the object
-		b, err := deps.Protocol.CurrentAPI().Encode(obj)
+		b, err := deps.Protocol.MainEngine().CurrentAPI().Encode(obj)
 		if err != nil {
 			return err
 		}
@@ -392,7 +392,7 @@ func responseByHeader(c echo.Context, obj any) error {
 	// default to echo.MIMEApplicationJSON
 	default:
 		// TODO: that should take the API that belongs to the object
-		j, err := deps.Protocol.CurrentAPI().JSONEncode(obj)
+		j, err := deps.Protocol.MainEngine().CurrentAPI().JSONEncode(obj)
 		if err != nil {
 			return err
 		}

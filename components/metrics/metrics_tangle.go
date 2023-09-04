@@ -21,7 +21,7 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of strong tips in the tangle"),
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
-			count := len(deps.Protocol.MainEngineInstance().TipManager.StrongTips())
+			count := len(deps.Protocol.MainEngine().TipManager.StrongTips())
 
 			return float64(count), nil
 		}),
@@ -30,7 +30,7 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of weak tips in the tangle"),
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
-			count := len(deps.Protocol.MainEngineInstance().TipManager.WeakTips())
+			count := len(deps.Protocol.MainEngine().TipManager.WeakTips())
 
 			return float64(count), nil
 		}),
@@ -39,7 +39,7 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Total number of blocks attached."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
+			deps.Protocol.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
 				deps.Collector.Increment(tangleNamespace, blocksTotal)
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
@@ -48,7 +48,7 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Number of blocks missing during the solidification in the tangle"),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.BlockDAG.BlockMissing.Hook(func(_ *blocks.Block) {
+			deps.Protocol.MainEngineEvents.BlockDAG.BlockMissing.Hook(func(_ *blocks.Block) {
 				deps.Collector.Increment(tangleNamespace, missingBlocksCount)
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
@@ -57,7 +57,7 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Number of accepted blocks"),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(_ *blocks.Block) {
+			deps.Protocol.MainEngineEvents.BlockGadget.BlockAccepted.Hook(func(_ *blocks.Block) {
 				deps.Collector.Increment(tangleNamespace, acceptedBlocksCount)
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),

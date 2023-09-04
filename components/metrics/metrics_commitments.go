@@ -6,7 +6,7 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/components/metrics/collector"
-	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -29,7 +29,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithLabels("commitment"),
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+			deps.Protocol.Engines.MainEngineEvents.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				deps.Collector.Update(commitmentsNamespace, latestCommitment, float64(details.Commitment.ID().Index()), details.Commitment.ID().String())
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
@@ -38,7 +38,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Last commitment finalized by the node."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+			deps.Protocol.Engines.MainEngineEvents.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
 				deps.Collector.Update(commitmentsNamespace, finalizedCommitment, float64(slot))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
@@ -47,9 +47,11 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Number of forks seen by the node."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.ChainManager.ForkDetected.Hook(func(_ *chainmanager.Fork) {
-				deps.Collector.Increment(commitmentsNamespace, forksCount)
-			}, event.WithWorkerPool(Component.WorkerPool))
+			deps.Protocol.OnChainCreated(func(_ *protocol.Chain) {
+				Component.WorkerPool.Submit(func() {
+					deps.Collector.Increment(commitmentsNamespace, forksCount)
+				})
+			})
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(acceptedBlocks,
@@ -59,7 +61,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+			deps.Protocol.MainEngineEvents.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				deps.Collector.Update(commitmentsNamespace, acceptedBlocks, float64(details.AcceptedBlocks.Size()), strconv.Itoa(int(details.Commitment.Index())))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
@@ -71,7 +73,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+			deps.Protocol.MainEngineEvents.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				deps.Collector.Update(commitmentsNamespace, validators, float64(details.ActiveValidatorsCount), strconv.Itoa(int(details.Commitment.Index())))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),

@@ -6,7 +6,7 @@ import (
 
 func protocolParameters() []*apimodels.InfoResProtocolParameters {
 	protoParams := make([]*apimodels.InfoResProtocolParameters, 0)
-	provider := deps.Protocol.MainEngineInstance().Storage.Settings().APIProvider()
+	provider := deps.Protocol.MainEngine().Storage.Settings().APIProvider()
 	for _, version := range provider.ProtocolEpochVersions() {
 		protocolParams := provider.ProtocolParameters(version.Version)
 		if protocolParams == nil {
@@ -23,7 +23,7 @@ func protocolParameters() []*apimodels.InfoResProtocolParameters {
 }
 
 func info() *apimodels.InfoResponse {
-	clSnapshot := deps.Protocol.MainEngineInstance().Clock.Snapshot()
+	clSnapshot := deps.Protocol.MainEngine().Clock.Snapshot()
 	syncStatus := deps.Protocol.SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
 

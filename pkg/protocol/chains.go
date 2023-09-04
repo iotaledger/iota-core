@@ -12,7 +12,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type ChainManager struct {
+type Chains struct {
 	mainChain reactive.Variable[*Chain]
 
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
@@ -21,7 +21,7 @@ type ChainManager struct {
 
 	chainCreated *event.Event1[*Chain]
 
-	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+	CommitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 
 	*ChainSwitching
 
@@ -30,8 +30,8 @@ type ChainManager struct {
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
-func NewChainManager(startingEngine *engine.Engine) *ChainManager {
-	p := &ChainManager{
+func NewChains(startingEngine *engine.Engine) *Chains {
+	p := &Chains{
 		EvictionState: reactive.NewEvictionState[iotago.SlotIndex](),
 		mainChain: reactive.NewVariable[*Chain]().Init(
 			NewChain(
@@ -42,7 +42,7 @@ func NewChainManager(startingEngine *engine.Engine) *ChainManager {
 		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 		commitmentCreated:   event.New1[*Commitment](),
 		chainCreated:        event.New1[*Chain](),
-		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
+		CommitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 	}
 
 	// embed reactive orchestrators
@@ -52,11 +52,15 @@ func NewChainManager(startingEngine *engine.Engine) *ChainManager {
 	return p
 }
 
-func (c *ChainManager) MainChain() reactive.Variable[*Chain] {
+func (c *Chains) MainChain() *Chain {
+	return c.mainChain.Get()
+}
+
+func (c *Chains) MainChainR() reactive.Variable[*Chain] {
 	return c.mainChain
 }
 
-func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment) {
+func (c *Chains) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment) {
 	if commitmentRequest := c.requestCommitment(commitment.ID(), commitment.Index(), false, func(resolvedMetadata *Commitment) {
 		commitmentMetadata = resolvedMetadata
 	}); commitmentRequest != nil {
@@ -66,15 +70,19 @@ func (c *ChainManager) ProcessCommitment(commitment *model.Commitment) (commitme
 	return commitmentMetadata
 }
 
-func (c *ChainManager) OnCommitmentCreated(callback func(commitment *Commitment)) (unsubscribe func()) {
+func (c *Chains) OnCommitmentRequested(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
+	return c.CommitmentRequester.Events.TickerStarted.Hook(callback).Unhook
+}
+
+func (c *Chains) OnCommitmentCreated(callback func(commitment *Commitment)) (unsubscribe func()) {
 	return c.commitmentCreated.Hook(callback).Unhook
 }
 
-func (c *ChainManager) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
+func (c *Chains) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
 	return c.chainCreated.Hook(callback).Unhook
 }
 
-func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
+func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
 	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, commitment.setParent)
 
 	slotEvictedEvent.OnTrigger(func() {
@@ -90,7 +98,7 @@ func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent 
 	})
 }
 
-func (c *ChainManager) requestCommitment(commitmentID iotago.CommitmentID, index iotago.SlotIndex, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment]) {
+func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, index iotago.SlotIndex, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment]) {
 	slotEvicted := c.EvictionEvent(index)
 	if slotEvicted.WasTriggered() {
 		rootCommitment := c.mainChain.Get().Root()
@@ -109,10 +117,10 @@ func (c *ChainManager) requestCommitment(commitmentID iotago.CommitmentID, index
 	commitmentRequest, requestCreated := c.commitments.GetOrCreate(commitmentID, lo.NoVariadic(promise.New[*Commitment]))
 	if requestCreated {
 		if requestFromPeers {
-			c.commitmentRequester.StartTicker(commitmentID)
+			c.CommitmentRequester.StartTicker(commitmentID)
 
 			commitmentRequest.OnComplete(func() {
-				c.commitmentRequester.StopTicker(commitmentID)
+				c.CommitmentRequester.StopTicker(commitmentID)
 			})
 		}
 

@@ -56,7 +56,7 @@ func run() error {
 
 		checkValidatorStatus(ctx)
 
-		deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+		deps.Protocol.MainEngineEvents.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 			checkValidatorStatus(ctx)
 		}, event.WithWorkerPool(Component.WorkerPool))
 
@@ -69,14 +69,14 @@ func run() error {
 }
 
 func checkValidatorStatus(ctx context.Context) {
-	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(validatorAccount.ID(), deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index())
+	account, exists, err := deps.Protocol.MainEngine().Ledger.Account(validatorAccount.ID(), deps.Protocol.MainEngine().Storage.Settings().LatestCommitment().Index())
 	if err != nil {
 		Component.LogErrorf("error when retrieving BlockIssuer account %s: %w", validatorAccount.ID(), err)
 
 		return
 	}
 
-	if !exists || account.StakeEndEpoch <= deps.Protocol.CurrentAPI().TimeProvider().EpochFromSlot(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time.Now())) {
+	if !exists || account.StakeEndEpoch <= deps.Protocol.MainEngine().CurrentAPI().TimeProvider().EpochFromSlot(deps.Protocol.MainEngine().CurrentAPI().TimeProvider().SlotFromTime(time.Now())) {
 		if prevValue := isValidator.Swap(false); prevValue {
 			// If the account stops being a validator, don't issue any blocks.
 			Component.LogInfof("BlockIssuer account %s stopped being a validator", validatorAccount.ID())
