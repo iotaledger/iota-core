@@ -75,8 +75,13 @@ func New(e *engine.Engine, tipManager tipmanager.TipManager, conflictDAG conflic
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,
 		optDynamicLivenessThreshold: func(tip tipmanager.TipMetadata) time.Duration {
-			// TODO: replace with correct version (LivenessThresholdLowerBound + approvalModifier * graceDuration)
-			return e.CurrentAPI().LivenessThresholdDuration()
+			protocolParameters := e.APIForSlot(tip.Block().SlotCommitmentID().Index()).ProtocolParameters()
+			livenessThresholdLowerBound := protocolParameters.LivenessThresholdLowerBound()
+			livenessThresholdUpperBound := protocolParameters.LivenessThresholdUpperBound()
+			livenessWindow := livenessThresholdUpperBound - livenessThresholdLowerBound
+			approvalModifier := time.Duration(1)
+
+			return livenessThresholdLowerBound + approvalModifier*livenessWindow
 		},
 	}, opts, func(t *TipSelection) {
 		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
