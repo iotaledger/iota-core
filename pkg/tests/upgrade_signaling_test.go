@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -72,7 +73,16 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	ts.Wait()
 
-	hash1 := iotago.Identifier{1}
+	v5ProtocolParameters := iotago.NewV3ProtocolParameters(
+		iotago.WithVersion(5),
+		iotago.WithTimeProviderOptions(
+			ts.API.TimeProvider().GenesisUnixTime(),
+			uint8(ts.API.TimeProvider().SlotDurationSeconds()),
+			uint8(math.Log2(float64(ts.API.TimeProvider().EpochDurationSlots()))),
+		),
+	)
+
+	hash1 := lo.PanicOnErr(v5ProtocolParameters.Hash())
 	hash2 := iotago.Identifier{2}
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -197,7 +207,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			nodeE.Shutdown()
 			ts.RemoveNode("nodeE")
 
-			nodeE1 := ts.AddNode("nodeE.1")
+			nodeE1 := ts.AddNode("nodeE1")
 			nodeE1.CopyIdentityFromNode(nodeE)
 			nodeE1.Initialize(true,
 				append(nodeOptions,
@@ -233,10 +243,10 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	// TODO: would be great to dynamically add accounts for later nodes.
 	// Can't issue on nodeG as its account is not known.
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
 
-	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
-	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
+	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
+	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
 
 	// Restart node (and add protocol parameters) and add another node from snapshot (also with protocol parameters already set).
 	{
@@ -250,41 +260,49 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			testsuite.WithActiveRootBlocks(expectedRootBlocks),
 		)
 
-		// Shutdown nodeE.1 and restart it from disk. Verify state.
+		// Shutdown nodeE1 and restart it from disk as nodeE2. Verify state.
 		{
-			nodeE1 := ts.Node("nodeE.1")
+			nodeE1 := ts.Node("nodeE1")
 			nodeE1.Shutdown()
-			ts.RemoveNode("nodeE.1")
+			ts.RemoveNode("nodeE1")
 
-			nodeE2 := ts.AddNode("nodeE.2")
+			nodeE2 := ts.AddNode("nodeE2")
 			nodeE2.CopyIdentityFromNode(nodeE1)
 			nodeE2.Initialize(true,
 				append(nodeOptions,
-					protocol.WithBaseDirectory(ts.Directory.Path(nodeE1.Name)),
+					protocol.WithBaseDirectory(ts.Directory.Path("nodeE")),
+					protocol.WithUpgradeOrchestratorProvider(
+						signalingupgradeorchestrator.NewProvider(signalingupgradeorchestrator.WithProtocolParameters(v5ProtocolParameters)),
+					),
 				)...,
 			)
 			ts.Wait()
 		}
 
-		// // Create snapshot.
-		// snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-		// require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
-		//
-		// {
-		// 	nodeG := ts.AddNode("nodeG")
-		// 	nodeG.Initialize(true,
-		// 		append(nodeOptions,
-		// 			protocol.WithSnapshotPath(snapshotPath),
-		// 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeG.Name)),
-		// 		)...,
-		// 	)
-		// 	ts.Wait()
-		//
+		// Create snapshot and start new nodeH from it.
+		{
+			snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
+			require.NoError(t, ts.Node("nodeE2").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+
+			nodeG := ts.AddNode("nodeH")
+			nodeG.Initialize(true,
+				append(nodeOptions,
+					protocol.WithSnapshotPath(snapshotPath),
+					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeG.Name)),
+					protocol.WithUpgradeOrchestratorProvider(
+						signalingupgradeorchestrator.NewProvider(signalingupgradeorchestrator.WithProtocolParameters(v5ProtocolParameters)),
+					),
+				)...,
+			)
+			ts.Wait()
+		}
+
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestCommitmentSlotIndex(61),
+			testsuite.WithEqualStoredCommitmentAtIndex(61),
+
 			testsuite.WithActiveRootBlocks(expectedRootBlocks),
 		)
-		// }
 	}
 
 	// Verify final state of all nodes.
@@ -297,7 +315,13 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		ts.AssertVersionAndProtocolParameters(map[iotago.Version]iotago.ProtocolParameters{
 			3: ts.API.ProtocolParameters(),
 			5: nil,
-		}, ts.Nodes()...)
+		}, ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeG")...)
+
+		// We've started nodeH with the v5 protocol parameters set. Therefore, they should be available.
+		ts.AssertVersionAndProtocolParameters(map[iotago.Version]iotago.ProtocolParameters{
+			3: ts.API.ProtocolParameters(),
+			5: v5ProtocolParameters,
+		}, ts.Nodes("nodeE2", "nodeH")...)
 
 		ts.AssertVersionAndProtocolParametersHashes(map[iotago.Version]iotago.Identifier{
 			3: lo.PanicOnErr(ts.API.ProtocolParameters().Hash()),
@@ -332,5 +356,10 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		}, ts.Nodes()...)
 	}
 
-	// TODO: Check that issuing still produces the same commitments
+	// Check that issuing still produces the same commitments
+	ts.IssueBlocksAtEpoch("", 8, 4, "63.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, nil)
+	ts.AssertNodeState(ts.Nodes(),
+		testsuite.WithLatestCommitmentSlotIndex(69),
+		testsuite.WithEqualStoredCommitmentAtIndex(69),
+	)
 }
