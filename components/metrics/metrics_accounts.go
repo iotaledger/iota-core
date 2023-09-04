@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/components/metrics/collector"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 
@@ -23,15 +22,12 @@ var AccountMetrics = collector.NewCollection(accountNamespace,
 		collector.WithLabels("account"),
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitFunc(func() {
-			deps.Protocol.MainEngineR().OnUpdate(func(_, engine *engine.Engine) {
-				engine.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-					accountData, exists, _ := engine.Ledger.Account(block.ProtocolBlock().IssuerID, deps.Protocol.MainEngine().LatestCommitment().Index())
-					if exists {
-						deps.Collector.Update(accountNamespace, credits, float64(accountData.Credits.Value), accountData.ID.String())
-					}
-				}, event.WithWorkerPool(Component.WorkerPool))
-			})
-
+			deps.Protocol.MainEngineEvents.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+				accountData, exists, _ := deps.Protocol.MainEngine().Ledger.Account(block.ProtocolBlock().IssuerID, deps.Protocol.MainEngine().LatestCommitment().Index())
+				if exists {
+					deps.Collector.Update(accountNamespace, credits, float64(accountData.Credits.Value), accountData.ID.String())
+				}
+			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(activeSeats,
