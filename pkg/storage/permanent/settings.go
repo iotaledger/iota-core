@@ -42,7 +42,7 @@ func NewSettings(store kvstore.KVStore) (settings *Settings) {
 	s.loadFutureProtocolParameters()
 	s.loadProtocolParameters()
 	if s.IsSnapshotImported() {
-		s.apiProvider.SetCurrentSlot(s.latestCommitment().Index())
+		s.apiProvider.Initialize(s.latestCommitment().Index())
 	}
 
 	return s
@@ -508,6 +508,8 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 	if err != nil {
 		return ierrors.Wrap(err, "failed to parse commitment")
 	}
+
+	s.apiProvider.Initialize(commitment.Index())
 
 	if err := s.SetLatestCommitment(commitment); err != nil {
 		return ierrors.Wrap(err, "failed to set latest commitment")
