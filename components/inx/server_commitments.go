@@ -8,8 +8,11 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -21,6 +24,7 @@ func inxCommitment(commitment *model.Commitment) *inx.Commitment {
 		},
 	}
 }
+
 func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (*inx.Commitment, error) {
 	commitmentIndex := iotago.SlotIndex(req.GetCommitmentIndex())
 
@@ -45,4 +49,68 @@ func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (
 	}
 
 	return inxCommitment(commitment), nil
+}
+
+func (s *Server) ListenToLatestCommitments(_ *inx.NoParams, srv inx.INX_ListenToLatestCommitmentsServer) error {
+	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
+
+	wp := workerpool.New("ListenToCommitments", workerCount).Start()
+
+	unhook := deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(commitmentDetails *notarization.SlotCommittedDetails) {
+		inxCommitment := &inx.CommitmentInfo{
+			CommitmentId:    inx.NewCommitmentId(commitmentDetails.Commitment.ID()),
+			CommitmentIndex: uint64(commitmentDetails.Commitment.Index()),
+		}
+
+		if err := srv.Send(inxCommitment); err != nil {
+			Component.LogErrorf("send error: %v", err)
+			cancel()
+		}
+	}, event.WithWorkerPool(wp)).Unhook
+
+	<-ctx.Done()
+	unhook()
+
+	// We need to wait until all tasks are done, otherwise we might call
+	// "SendMsg" and "CloseSend" in parallel on the grpc stream, which is
+	// not safe according to the grpc docs.
+	wp.Shutdown()
+	wp.ShutdownComplete.Wait()
+
+	return ctx.Err()
+}
+
+func (s *Server) ListenToFinalizedCommitments(_ *inx.NoParams, srv inx.INX_ListenToFinalizedCommitmentsServer) error {
+	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
+
+	wp := workerpool.New("ListenToFinalizedCommitments", workerCount).Start()
+
+	unhook := deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+		commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
+		if err != nil {
+			Component.LogErrorf("load commitment error: %v", err)
+			cancel()
+		}
+
+		inxCommitment := &inx.CommitmentInfo{
+			CommitmentId:    inx.NewCommitmentId(commitment.ID()),
+			CommitmentIndex: uint64(index),
+		}
+
+		if err := srv.Send(inxCommitment); err != nil {
+			Component.LogErrorf("send error: %v", err)
+			cancel()
+		}
+	}, event.WithWorkerPool(wp)).Unhook
+
+	<-ctx.Done()
+	unhook()
+
+	// We need to wait until all tasks are done, otherwise we might call
+	// "SendMsg" and "CloseSend" in parallel on the grpc stream, which is
+	// not safe according to the grpc docs.
+	wp.Shutdown()
+	wp.ShutdownComplete.Wait()
+
+	return ctx.Err()
 }
