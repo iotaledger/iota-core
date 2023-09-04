@@ -292,7 +292,7 @@ func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iot
 			stakingOpts,
 			accounts.WithCredits(accounts.NewBlockIssuanceCredits(blockIssuanceCredits, m.latestCommittedSlot)),
 			accounts.WithOutputID(output.OutputID()),
-			accounts.WithPubKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys...),
+			accounts.WithBlockIssuerKeys(accountOutput.FeatureSet().BlockIssuer().BlockIssuerKeys...),
 			accounts.WithExpirySlot(accountOutput.FeatureSet().BlockIssuer().ExpirySlot),
 		)...,
 	)
