@@ -69,10 +69,10 @@ func prepareCommitmentGraph(g *graphviz.Graphviz, rootCommitment *protocol.Commi
 			return nil, parentErr
 		}
 
-		for _, childCommitment := range parentCommitment.Children().ToSlice() {
+		if err = parentCommitment.Children().ForEach(func(childCommitment *protocol.Commitment) error {
 			child, childErr := createNode(graph, childCommitment)
 			if childErr != nil {
-				return nil, childErr
+				return childErr
 			}
 
 			if childCommitment.Chain() == deps.Protocol.MainChain() {
@@ -80,11 +80,14 @@ func prepareCommitmentGraph(g *graphviz.Graphviz, rootCommitment *protocol.Commi
 			}
 
 			if _, edgeErr := graph.CreateEdge(fmt.Sprintf("%s -> %s", parentCommitment.ID().String()[:8], childCommitment.ID().String()[:8]), parent, child); edgeErr != nil {
-				return nil, ierrors.Wrapf(edgeErr, "could not create edge %s -> %s", parentCommitment.ID().String()[:8], childCommitment.ID().String()[:8])
+				return ierrors.Wrapf(edgeErr, "could not create edge %s -> %s", parentCommitment.ID().String()[:8], childCommitment.ID().String()[:8])
 			}
 
 			commitmentWalker.Push(childCommitment)
 
+			return nil
+		}); err != nil {
+			return nil, err
 		}
 	}
 
