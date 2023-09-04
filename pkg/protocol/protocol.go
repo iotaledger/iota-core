@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/iotaledger/hive.go/crypto/identity"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -18,7 +19,7 @@ type Protocol struct {
 	*Chains
 	*Network
 
-	errorEvent *event.Event1[error]
+	error *event.Event1[error]
 
 	Options *Options
 }
@@ -30,6 +31,8 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 	}, opts, func(p *Protocol) {
 		p.Engines = NewEngines(p)
 		p.Chains = NewChains(p.MainEngine())
+
+		p.Network.OnError(func(err error, src network.PeerID) { p.error.Trigger(ierrors.Wrapf(err, "Network error from %s", src)) })
 	})
 }
 
@@ -38,7 +41,7 @@ func (p *Protocol) Run(ctx context.Context) error {
 }
 
 func (p *Protocol) OnError(callback func(error)) (unsubscribe func()) {
-	return p.errorEvent.Hook(callback).Unhook
+	return p.error.Hook(callback).Unhook
 }
 
 func (p *Protocol) IssueBlock(block *model.Block) error {
