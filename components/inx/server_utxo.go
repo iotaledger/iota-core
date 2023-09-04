@@ -166,11 +166,9 @@ func (s *Server) ReadUnspentOutputs(_ *inx.NoParams, srv inx.INX_ReadUnspentOutp
 }
 
 func (s *Server) ReadOutputMetadata(_ context.Context, id *inx.OutputId) (*inx.OutputMetadata, error) {
-	engine := deps.Protocol.MainEngineInstance()
-
 	outputID := id.Unwrap()
 
-	output, spent, err := engine.Ledger.OutputOrSpent(outputID)
+	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return nil, err
 	}
