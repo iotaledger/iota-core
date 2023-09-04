@@ -1,6 +1,6 @@
 ARG WITH_GO_WORK=0
 # https://hub.docker.com/_/golang
-FROM golang:1.20-bullseye AS base
+FROM golang:1.21-bullseye AS base
 
 ARG BUILD_TAGS=rocksdb
 

@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -36,6 +37,8 @@ import (
 	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
@@ -45,8 +48,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
-	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	retainer1 "github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -57,7 +58,6 @@ import (
 type Protocol struct {
 	context         context.Context
 	Events          *Events
-	SyncManager     syncmanager.SyncManager
 	BlockDispatcher *BlockDispatcher
 	engineManager   *enginemanager.EngineManager
 	ChainManager    *chainmanager.Manager
@@ -96,6 +96,9 @@ type Protocol struct {
 	optsSchedulerProvider           module.Provider[*engine.Engine, scheduler.Scheduler]
 	optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
 
+	optsAttestationRequesterTryInterval time.Duration
+	optsAttestationRequesterMaxRetries  int
+
 	module.Module
 }
 
@@ -124,6 +127,9 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 
 		optsBaseDirectory:           "",
 		optsChainSwitchingThreshold: 3,
+
+		optsAttestationRequesterTryInterval: 3 * time.Second,
+		optsAttestationRequesterMaxRetries:  3,
 	}, opts, func(p *Protocol) {
 		p.BlockDispatcher = NewBlockDispatcher(p)
 	}, (*Protocol).initEngineManager, (*Protocol).initChainManager, (*Protocol).TriggerConstructed)
@@ -170,12 +176,6 @@ func (p *Protocol) Run(ctx context.Context) error {
 }
 
 func (p *Protocol) linkToEngine(engineInstance *engine.Engine) {
-	if p.SyncManager != nil {
-		p.SyncManager.Shutdown()
-		p.SyncManager = nil
-	}
-	p.SyncManager = p.optsSyncManagerProvider(engineInstance)
-
 	p.Events.Engine.LinkTo(engineInstance.Events)
 }
 
@@ -193,8 +193,6 @@ func (p *Protocol) shutdown() {
 		p.candidateEngine.engine.Shutdown()
 	}
 	p.activeEngineMutex.RUnlock()
-
-	p.SyncManager.Shutdown()
 }
 
 func (p *Protocol) initEngineManager() {
@@ -221,6 +219,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsTipSelectionProvider,
 		p.optsRetainerProvider,
 		p.optsUpgradeOrchestratorProvider,
+		p.optsSyncManagerProvider,
 	)
 
 	mainEngine, err := p.engineManager.LoadActiveEngine(p.optsSnapshotPath)

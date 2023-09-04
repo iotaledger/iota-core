@@ -171,7 +171,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		accounts.NewAccountData(
 			accountID,
 			accounts.WithExpirySlot(math.MaxUint64),
-			accounts.WithPubKeys(keyPair.PublicKey),
+			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
 		),
 	)
 
@@ -218,7 +218,7 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 		accounts.NewAccountData(
 			accountID,
 			accounts.WithExpirySlot(math.MaxUint64),
-			accounts.WithPubKeys(keyPair.PublicKey),
+			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
 		),
 	)
 
@@ -255,7 +255,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 		accounts.NewAccountData(
 			accountID,
 			accounts.WithExpirySlot(100),
-			accounts.WithPubKeys(keyPair.PublicKey),
+			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
 		),
 	)
 

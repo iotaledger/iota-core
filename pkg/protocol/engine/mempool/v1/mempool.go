@@ -376,7 +376,7 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 
 	if transaction.IsAccepted() && newIndex != 0 {
 		if stateDiff, evicted := m.stateDiff(newIndex); !evicted {
-			if err := stateDiff.AddTransaction(transaction); err != nil {
+			if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
 				return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
 			}
 		}
@@ -405,7 +405,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
 		if slotIndex := transaction.EarliestIncludedAttachment().Index(); slotIndex > 0 {
 			if stateDiff, evicted := m.stateDiff(slotIndex); !evicted {
-				if err := stateDiff.AddTransaction(transaction); err != nil {
+				if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
 					m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
 				}
 			}
