@@ -42,7 +42,7 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.Engines.MainEngineEvents.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
+			deps.Protocol.MainEngineEvents.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
 				deps.Collector.Update(schedulerNamespace, queueSizePerNodeWork, float64(deps.Protocol.MainEngine().Scheduler.IssuerQueueWork(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
 
 			}, event.WithWorkerPool(Component.WorkerPool))
@@ -65,7 +65,7 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.Engines.MainEngineEvents.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+			deps.Protocol.MainEngineEvents.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
 				deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngine().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
 
 			}, event.WithWorkerPool(Component.WorkerPool))

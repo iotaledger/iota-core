@@ -10,7 +10,7 @@ import (
 )
 
 func getSlotBlockIDs(index iotago.SlotIndex) (*BlockChangesResponse, error) {
-	blocksForSlot := deps.Protocol.Engines.MainEngine().Storage.Blocks(index)
+	blocksForSlot := deps.Protocol.MainEngine().Storage.Blocks(index)
 	if blocksForSlot == nil {
 		return nil, ierrors.Errorf("cannot find block storage bucket for slot %d", index)
 	}

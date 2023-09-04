@@ -29,7 +29,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithLabels("commitment"),
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Engines.MainEngineEvents.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+			deps.Protocol.MainEngineEvents.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				deps.Collector.Update(commitmentsNamespace, latestCommitment, float64(details.Commitment.ID().Index()), details.Commitment.ID().String())
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
@@ -38,7 +38,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Last commitment finalized by the node."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Engines.MainEngineEvents.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+			deps.Protocol.MainEngineEvents.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
 				deps.Collector.Update(commitmentsNamespace, finalizedCommitment, float64(slot))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),

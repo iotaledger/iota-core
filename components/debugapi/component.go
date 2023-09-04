@@ -85,13 +85,13 @@ func configure() error {
 
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v2")
 
-	deps.Protocol.Engines.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+	deps.Protocol.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		blocksPerSlot.Set(block.ID().Index(), append(lo.Return1(blocksPerSlot.GetOrCreate(block.ID().Index(), func() []*blocks.Block {
 			return make([]*blocks.Block, 0)
 		})), block))
 	})
 
-	deps.Protocol.Engines.MainEngineEvents.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+	deps.Protocol.MainEngineEvents.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		if index < iotago.SlotIndex(ParamsDebugAPI.PruningThreshold) {
 			return
 		}
