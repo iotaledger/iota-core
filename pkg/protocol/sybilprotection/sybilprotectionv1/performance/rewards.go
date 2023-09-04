@@ -195,23 +195,31 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate target reward for slot %d", slotIndex)
 	}
+
 	// Notice that, since both pool stake  and validator stake use at most 53 bits of the variable,
 	// to not overflow the calculation, PoolCoefficientExponent must be at most 11. Pool Coefficient will then use at most PoolCoefficientExponent + 1 bits.
 	poolCoefficient, err := t.calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorsStake, slotIndex)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate pool coefficient for slot %d", slotIndex)
 	}
+
 	// Since `Pool Coefficient` uses at most 12 bits, `Target Reward(n)` uses at most 41 bits, and `Performance Factor` uses at most 8 bits,
 	// this multiplication will not overflow using uint64 variables.
 	result, err := safemath.SafeMul(poolCoefficient, uint64(targetReward))
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate pool scaled reward due to overflow for slot %d", slotIndex)
 	}
+
 	scaledPoolReward, err := safemath.SafeMul(result, performanceFactor)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate pool reward without fixed costs due to overflow for slot %d", slotIndex)
 	}
+
 	result, err = safemath.SafeDiv(scaledPoolReward, uint64(params.RewardsParameters().ValidatorBlocksPerSlot))
+	if err != nil {
+		return 0, ierrors.Wrapf(err, "failed to calculate result reward due division by zero for slot %d", slotIndex)
+	}
+
 	poolRewardFixedCost := iotago.Mana(scaleDownWithExponent(result, params.RewardsParameters().PoolCoefficientExponent+1))
 	// if validator's fixed cost is greater than earned reward, all reward goes for delegators
 	if poolRewardFixedCost < fixedCost {
@@ -251,6 +259,7 @@ func scaleUpWithExponent[V iotago.BaseToken | iotago.Mana | uint64](val V, shift
 	if result < val {
 		panic("overflow on a bit shift operation")
 	}
+
 	return val << shift
 }
 
@@ -262,6 +271,7 @@ func scaleDownWithExponent[V iotago.BaseToken | iotago.Mana | uint64](val V, shi
 	if val < result {
 		panic("overflow on a bit shift operation")
 	}
+
 	return val >> shift
 }
 
@@ -271,5 +281,6 @@ func scaleUpComplement[V iotago.BaseToken | iotago.Mana | uint64](val V, shift u
 	if val > math.MaxUint8 {
 		panic("uint8 overflow for bit shift operation")
 	}
+
 	return (1 << shift) - val
 }

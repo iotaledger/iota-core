@@ -205,7 +205,8 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	t.latestAppliedEpoch = epoch
 }
 
-func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.AccountID] {
+func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
+	// TODO: to be implemented for 1.1
 	//epochStart := t.apiProvider.APIForEpoch(epoch).TimeProvider().EpochStart(epoch)
 	//registeredStore := t.registeredValidatorsFunc(epochStart)
 	//eligible := ds.NewSet[iotago.AccountID]()
