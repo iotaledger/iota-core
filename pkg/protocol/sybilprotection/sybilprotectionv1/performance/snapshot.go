@@ -2,7 +2,6 @@ package performance
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -243,7 +242,7 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 		}); err != nil {
 			return ierrors.Wrapf(err, "unable to write performance factors for slot index %d", currentSlot)
 		}
-		fmt.Println("writing pf account count", accountsCount)
+
 		if err := pWriter.WriteValueAtBookmark("pf account count", accountsCount); err != nil {
 			return ierrors.Wrap(err, "unable to write pf accounts count")
 		}
@@ -266,7 +265,7 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 		return ierrors.Wrap(err, "unable to write epoch count")
 	}
 
-	for epoch := targetEpoch; epoch > lo.Return1(t.latestPrunedEpoch()); epoch-- {
+	for epoch := targetEpoch; epoch > iotago.EpochIndex(lo.Max(0, int(targetEpoch)-365)); epoch-- {
 		rewardsMap, err := t.rewardsMap(epoch)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to get rewards tree for epoch index %d", epoch)
