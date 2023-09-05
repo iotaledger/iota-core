@@ -108,7 +108,7 @@ func (c *Commitment) RequestAttestations() reactive.Variable[bool] {
 }
 
 func (c *Commitment) Engine() reactive.Variable[*engine.Engine] {
-	return c.chain.Get().Engine()
+	return c.chain.Get().EngineR()
 }
 
 func (c *Commitment) Evicted() reactive.Event {

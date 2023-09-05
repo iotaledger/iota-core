@@ -64,8 +64,8 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
+		lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
+		lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -220,7 +220,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			{
 				// Create snapshot.
 				snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-				require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+				require.NoError(t, ts.Node("nodeA").Protocol.MainEngine().WriteSnapshot(snapshotPath))
 
 				nodeD := ts.AddNode("nodeD")
 				nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.
@@ -239,7 +239,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
 			}
 
-			slot7Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(7))
+			slot7Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngine().Storage.Commitments().Load(7))
 
 			ts.AssertNodeState(ts.Nodes("nodeC-restarted", "nodeD"),
 				testsuite.WithSnapshotImported(true),

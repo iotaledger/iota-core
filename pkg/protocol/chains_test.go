@@ -15,7 +15,7 @@ import (
 func TestChainManager(t *testing.T) {
 	testAPI := tpkg.TestAPI
 	rootCommitment := model.NewEmptyCommitment(testAPI)
-	chainManager := NewChains(rootCommitment)
+	chainManager := newChains(rootCommitment)
 
 	chainManager.ChainSwitching.heaviestAttestedCandidate.OnUpdate(func(oldValue, newValue *Chain) {
 		fmt.Println("CandidateChain", oldValue, newValue)

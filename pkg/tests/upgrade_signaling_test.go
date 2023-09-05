@@ -120,7 +120,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 		// Create snapshot.
 		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-		require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+		require.NoError(t, ts.Node("nodeA").Protocol.MainEngine().WriteSnapshot(snapshotPath))
 
 		{
 			nodeG := ts.AddNode("nodeG")

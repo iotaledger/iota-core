@@ -33,14 +33,6 @@ func NewChainSwitching(chainManager *Chains) *ChainSwitching {
 		newCandidate.engine.instantiate.Set(true)
 	})
 
-	c.heaviestVerifiedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
-		if prevCandidate != nil {
-			prevCandidate.evicted.Trigger()
-		}
-
-		// TODO: MAKE MAIN CHAIN
-	})
-
 	selectHeaviestCandidate := func(candidate reactive.Variable[*Chain], newCandidate *Chain, chainWeight func(*Chain) reactive.Variable[uint64]) {
 		chainWeight(newCandidate).OnUpdate(func(_, newChainWeight uint64) {
 			if newChainWeight <= chainManager.mainChain.Get().verifiedWeight.Get() {

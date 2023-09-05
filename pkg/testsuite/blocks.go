@@ -16,7 +16,7 @@ func (t *TestSuite) AssertBlock(block *blocks.Block, node *mock.Node) *model.Blo
 	var loadedBlock *model.Block
 	t.Eventually(func() error {
 		var exists bool
-		loadedBlock, exists = node.Protocol.MainEngineInstance().Block(block.ID())
+		loadedBlock, exists = node.Protocol.MainEngine().Block(block.ID())
 		if !exists {
 			return ierrors.Errorf("AssertBlock: %s: block %s does not exist", node.Name, block.ID())
 		}
@@ -47,7 +47,7 @@ func (t *TestSuite) AssertBlocksExist(blocks []*blocks.Block, expectedExist bool
 				t.AssertBlock(block, node)
 			} else {
 				t.Eventually(func() error {
-					if lo.Return2(node.Protocol.MainEngineInstance().Block(block.ID())) {
+					if lo.Return2(node.Protocol.MainEngine().Block(block.ID())) {
 						return ierrors.Errorf("AssertBlocksExist: %s: block %s exists but should not", node.Name, block)
 					}
 
@@ -64,7 +64,7 @@ func (t *TestSuite) assertBlocksInCacheWithFunc(expectedBlocks []*blocks.Block, 
 	for _, node := range nodes {
 		for _, block := range expectedBlocks {
 			t.Eventually(func() error {
-				blockFromCache, exists := node.Protocol.MainEngineInstance().BlockFromCache(block.ID())
+				blockFromCache, exists := node.Protocol.MainEngine().BlockFromCache(block.ID())
 				if !exists {
 					return ierrors.Errorf("assertBlocksInCacheWithFunc[%s]: %s: block %s does not exist", propertyName, node.Name, block.ID())
 				}
@@ -113,7 +113,7 @@ func (t *TestSuite) AssertBlocksInCacheConflicts(blockConflicts map[*blocks.Bloc
 	for _, node := range nodes {
 		for block, conflictAliases := range blockConflicts {
 			t.Eventually(func() error {
-				blockFromCache, exists := node.Protocol.MainEngineInstance().BlockFromCache(block.ID())
+				blockFromCache, exists := node.Protocol.MainEngine().BlockFromCache(block.ID())
 				if !exists {
 					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s does not exist", node.Name, block.ID())
 				}

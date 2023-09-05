@@ -1,6 +1,9 @@
 package protocol
 
 const (
+	// DatabaseVersion defines the current version of the database.
+	DatabaseVersion byte = 1
+
 	// SyncWindow defines the maximum amount of slots that a node requests on top of its latest verified commitment.
 	SyncWindow = 20
 

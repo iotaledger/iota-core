@@ -43,7 +43,7 @@ func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadataResponse, error
 }
 
 func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMetadataResponse, error) {
-	latestCommitment := deps.Protocol.SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.Status().LatestCommitment
 
 	resp := &apimodels.OutputMetadataResponse{
 		BlockID:            output.BlockID(),
@@ -66,7 +66,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 }
 
 func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadataResponse, error) {
-	latestCommitment := deps.Protocol.SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.Status().LatestCommitment
 
 	resp := &apimodels.OutputMetadataResponse{
 		BlockID:            spent.BlockID(),

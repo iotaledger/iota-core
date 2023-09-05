@@ -70,7 +70,7 @@ type Options struct {
 	UpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
 }
 
-func NewOptions() *Options {
+func newOptions() *Options {
 	return &Options{
 		BaseDirectory:           "",
 		ChainSwitchingThreshold: 3,
@@ -97,126 +97,126 @@ func NewOptions() *Options {
 
 func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.BaseDirectory = baseDirectory
+		p.options.BaseDirectory = baseDirectory
 	}
 }
 
 func WithSnapshotPath(snapshot string) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.SnapshotPath = snapshot
+		p.options.SnapshotPath = snapshot
 	}
 }
 
 func WithChainSwitchingThreshold(threshold int) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.ChainSwitchingThreshold = threshold
+		p.options.ChainSwitchingThreshold = threshold
 	}
 }
 
 func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, filter.Filter]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.FilterProvider = optsFilterProvider
+		p.options.FilterProvider = optsFilterProvider
 	}
 }
 
 func WithCommitmentFilterProvider(optsCommitmentFilterProvider module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.CommitmentFilterProvider = optsCommitmentFilterProvider
+		p.options.CommitmentFilterProvider = optsCommitmentFilterProvider
 	}
 }
 
 func WithBlockDAGProvider(optsBlockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.BlockDAGProvider = optsBlockDAGProvider
+		p.options.BlockDAGProvider = optsBlockDAGProvider
 	}
 }
 
 func WithTipManagerProvider(optsTipManagerProvider module.Provider[*engine.Engine, tipmanager.TipManager]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.TipManagerProvider = optsTipManagerProvider
+		p.options.TipManagerProvider = optsTipManagerProvider
 	}
 }
 
 func WithTipSelectionProvider(optsTipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.TipSelectionProvider = optsTipSelectionProvider
+		p.options.TipSelectionProvider = optsTipSelectionProvider
 	}
 }
 
 func WithBookerProvider(optsBookerProvider module.Provider[*engine.Engine, booker.Booker]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.BookerProvider = optsBookerProvider
+		p.options.BookerProvider = optsBookerProvider
 	}
 }
 
 func WithClockProvider(optsClockProvider module.Provider[*engine.Engine, clock.Clock]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.ClockProvider = optsClockProvider
+		p.options.ClockProvider = optsClockProvider
 	}
 }
 
 func WithSybilProtectionProvider(optsSybilProtectionProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.SybilProtectionProvider = optsSybilProtectionProvider
+		p.options.SybilProtectionProvider = optsSybilProtectionProvider
 	}
 }
 
 func WithBlockGadgetProvider(optsBlockGadgetProvider module.Provider[*engine.Engine, blockgadget.Gadget]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.BlockGadgetProvider = optsBlockGadgetProvider
+		p.options.BlockGadgetProvider = optsBlockGadgetProvider
 	}
 }
 
 func WithSlotGadgetProvider(optsSlotGadgetProvider module.Provider[*engine.Engine, slotgadget.Gadget]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.SlotGadgetProvider = optsSlotGadgetProvider
+		p.options.SlotGadgetProvider = optsSlotGadgetProvider
 	}
 }
 
 func WithEpochGadgetProvider(optsEpochGadgetProvider module.Provider[*engine.Engine, sybilprotection.SybilProtection]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.SybilProtectionProvider = optsEpochGadgetProvider
+		p.options.SybilProtectionProvider = optsEpochGadgetProvider
 	}
 }
 
 func WithNotarizationProvider(optsNotarizationProvider module.Provider[*engine.Engine, notarization.Notarization]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.NotarizationProvider = optsNotarizationProvider
+		p.options.NotarizationProvider = optsNotarizationProvider
 	}
 }
 
 func WithAttestationProvider(optsAttestationProvider module.Provider[*engine.Engine, attestation.Attestations]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.AttestationProvider = optsAttestationProvider
+		p.options.AttestationProvider = optsAttestationProvider
 	}
 }
 
 func WithLedgerProvider(optsLedgerProvider module.Provider[*engine.Engine, ledger.Ledger]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.LedgerProvider = optsLedgerProvider
+		p.options.LedgerProvider = optsLedgerProvider
 	}
 }
 
 func WithUpgradeOrchestratorProvider(optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.UpgradeOrchestratorProvider = optsUpgradeOrchestratorProvider
+		p.options.UpgradeOrchestratorProvider = optsUpgradeOrchestratorProvider
 	}
 }
 
 func WithEngineOptions(opts ...options.Option[engine.Engine]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.EngineOptions = append(p.Options.EngineOptions, opts...)
+		p.options.EngineOptions = append(p.options.EngineOptions, opts...)
 	}
 }
 
 func WithChainManagerOptions(opts ...options.Option[chainmanager.Manager]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.ChainManagerOptions = append(p.Options.ChainManagerOptions, opts...)
+		p.options.ChainManagerOptions = append(p.options.ChainManagerOptions, opts...)
 	}
 }
 
 func WithStorageOptions(opts ...options.Option[storage.Storage]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.StorageOptions = append(p.Options.StorageOptions, opts...)
+		p.options.StorageOptions = append(p.options.StorageOptions, opts...)
 	}
 }

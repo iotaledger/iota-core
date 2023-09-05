@@ -15,7 +15,7 @@ func (t *TestSuite) AssertStorageAccountDiffs(slotIndex iotago.SlotIndex, accoun
 	for _, node := range nodes {
 		for accountID, diffChange := range accountDiffs {
 			t.Eventually(func() error {
-				storedDiffChange, _, err := node.Protocol.MainEngineInstance().Storage.AccountDiffs(slotIndex).Load(accountID)
+				storedDiffChange, _, err := node.Protocol.MainEngine().Storage.AccountDiffs(slotIndex).Load(accountID)
 				if err != nil {
 					return ierrors.Wrapf(err, "AssertStorageAccountDiffs: %s: error loading account diff: %s", node.Name, accountID)
 				}

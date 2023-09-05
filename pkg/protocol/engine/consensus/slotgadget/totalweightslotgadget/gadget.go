@@ -44,6 +44,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 		return options.Apply(&Gadget{
 			events:                        slotgadget.NewEvents(),
 			optsSlotFinalizationThreshold: 0.67,
+			lastFinalizedSlot:             reactive.NewVariable[iotago.SlotIndex](),
 			errorHandler:                  e.ErrorHandler("slotgadget"),
 		}, opts, func(g *Gadget) {
 

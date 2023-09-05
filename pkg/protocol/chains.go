@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/network"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -30,14 +30,11 @@ type Chains struct {
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
-func NewChains(startingEngine *engine.Engine) *Chains {
-	p := &Chains{
+func newChains(protocol *Protocol) *Chains {
+	c := &Chains{
 		EvictionState: reactive.NewEvictionState[iotago.SlotIndex](),
 		mainChain: reactive.NewVariable[*Chain]().Init(
-			NewChain(
-				NewCommitment(startingEngine.Storage.Settings().LatestCommitment(), true),
-				startingEngine,
-			),
+			NewChain(NewCommitment(protocol.MainEngine().LatestCommitment(), true), protocol.MainEngine()),
 		),
 		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 		commitmentCreated:   event.New1[*Commitment](),
@@ -46,18 +43,10 @@ func NewChains(startingEngine *engine.Engine) *Chains {
 	}
 
 	// embed reactive orchestrators
-	p.ChainSwitching = NewChainSwitching(p)
-	p.AttestationsRequester = NewAttestationsRequester(p)
+	c.ChainSwitching = NewChainSwitching(c)
+	c.AttestationsRequester = NewAttestationsRequester(protocol)
 
-	return p
-}
-
-func (c *Chains) MainChain() *Chain {
-	return c.mainChain.Get()
-}
-
-func (c *Chains) MainChainR() reactive.Variable[*Chain] {
-	return c.mainChain
+	return c
 }
 
 func (c *Chains) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment) {
@@ -70,6 +59,19 @@ func (c *Chains) ProcessCommitment(commitment *model.Commitment) (commitmentMeta
 	return commitmentMetadata
 }
 
+func (c *Chains) Commitment(commitmentID iotago.CommitmentID) (commitment *Commitment, exists bool) {
+	commitmentRequest, exists := c.commitments.Get(commitmentID)
+	if !exists || !commitmentRequest.WasCompleted() {
+		return nil, false
+	}
+
+	commitmentRequest.OnSuccess(func(result *Commitment) {
+		commitment = result
+	})
+
+	return commitment, true
+}
+
 func (c *Chains) OnCommitmentRequested(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
 	return c.CommitmentRequester.Events.TickerStarted.Hook(callback).Unhook
 }
@@ -80,6 +82,20 @@ func (c *Chains) OnCommitmentCreated(callback func(commitment *Commitment)) (uns
 
 func (c *Chains) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
 	return c.chainCreated.Hook(callback).Unhook
+}
+
+func (c *Chains) MainChain() *Chain {
+	return c.mainChain.Get()
+}
+
+func (c *Chains) MainChainR() reactive.Variable[*Chain] {
+	return c.mainChain
+}
+
+func (c *Chains) ProcessSlotCommitmentRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
+	if commitment, exists := c.protocol.Commitment(commitmentID); !exists {
+		c.protocol.SendSlotCommitment(commitment.CommitmentModel(), src)
+	}
 }
 
 func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {

@@ -113,7 +113,7 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 				return nil, false
 			}
 
-			currentChain = parent.chain.Get()
+			currentChain = parent.Chain()
 		}
 	}
 
@@ -178,8 +178,12 @@ func (c *Chain) RequestAttestations() reactive.Variable[bool] {
 	return c.requestAttestations
 }
 
-// Engine returns a reactive variable that contains the engine that is used to process blocks of this chain.
-func (c *Chain) Engine() reactive.Variable[*engine.Engine] {
+func (c *Chain) Engine() *engine.Engine {
+	return c.engine.Get()
+}
+
+// EngineR returns a reactive variable that contains the engine that is used to process blocks of this chain.
+func (c *Chain) EngineR() reactive.Variable[*engine.Engine] {
 	return c.engine
 }
 

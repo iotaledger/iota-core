@@ -24,7 +24,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
@@ -130,83 +129,77 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 }
 
 func (n *Node) hookEvents() {
-	events := n.Protocol.Events
+	n.Protocol.HeaviestClaimedCandidate().OnUpdate(func(_, newChain *protocol.Chain) {
+		n.forkDetectedCount.Add(1)
+	})
 
-	events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) { n.forkDetectedCount.Add(1) })
+	n.Protocol.HeaviestAttestedCandidate().OnUpdate(func(_, newChain *protocol.Chain) {
+		n.candidateEngineActivatedCount.Add(1)
+	})
 
-	events.CandidateEngineActivated.Hook(func(e *engine.Engine) { n.candidateEngineActivatedCount.Add(1) })
-
-	events.MainEngineSwitched.Hook(func(e *engine.Engine) { n.mainEngineSwitchedCount.Add(1) })
+	n.Protocol.HeaviestVerifiedCandidate().OnUpdate(func(_, newChain *protocol.Chain) {
+		n.mainEngineSwitchedCount.Add(1)
+	})
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
-	events := n.Protocol.Events
+	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngine())
 
-	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngineInstance())
-
-	events.Network.BlockReceived.Hook(func(block *model.Block, source identity.ID) {
+	n.Protocol.OnBlockReceived(func(block *model.Block, source identity.ID) {
 		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
 	})
 
-	events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source identity.ID) {
+	n.Protocol.OnBlockRequestReceived(func(blockID iotago.BlockID, source identity.ID) {
 		fmt.Printf("%s > Network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
 	})
 
-	events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source identity.ID) {
+	n.Protocol.OnSlotCommitmentReceived(func(commitment *model.Commitment, source identity.ID) {
 		fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
 	})
 
-	events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
+	n.Protocol.OnSlotCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, source identity.ID) {
 		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 
-	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
+	n.Protocol.OnAttestationsReceived(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
 		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
-			return lo.PanicOnErr(a.BlockID(lo.PanicOnErr(n.Protocol.APIForVersion(a.ProtocolVersion))))
+			return lo.PanicOnErr(a.BlockID(lo.PanicOnErr(n.Protocol.MainEngine().APIForVersion(a.ProtocolVersion))))
 		}))
 	})
 
-	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source network.PeerID) {
+	n.Protocol.OnAttestationsRequestReceived(func(id iotago.CommitmentID, source network.PeerID) {
 		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
-	events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
+	n.Protocol.OnCommitmentRequested(func(commitmentID iotago.CommitmentID) {
 		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
 	})
 
-	events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
-		fmt.Printf("%s > ChainManager.CommitmentBelowRoot: %s\n", n.Name, commitmentID)
+	n.Protocol.HeaviestAttestedCandidate().OnUpdate(func(_, newChain *protocol.Chain) {
+		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, newChain.Root().ID())
 	})
 
-	events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
-		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
-	})
-
-	events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+	n.Protocol.MainEngineEvents.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
 		fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
 	})
 
-	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
-		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+	n.Protocol.CandidateEngineR().OnUpdate(func(_, engine *engine.Engine) {
+		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, engine.Name(), engine.ChainID(), engine.ChainID().Index())
 
-		n.attachEngineLogs(failOnBlockFiltered, e)
+		n.attachEngineLogs(failOnBlockFiltered, engine)
 	})
 
-	events.MainEngineSwitched.Hook(func(e *engine.Engine) {
-		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+	n.Protocol.MainEngineR().OnUpdate(func(_, engine *engine.Engine) {
+		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, engine.Name(), engine.ChainID(), engine.ChainID().Index())
 	})
 
-	events.Network.Error.Hook(func(err error, id identity.ID) {
-		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
-	})
-
-	events.Error.Hook(func(err error) {
+	n.Protocol.OnError(func(err error) {
 		fmt.Printf("%s > Protocol.Error: %s\n", n.Name, err.Error())
 	})
 }
 
 func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
-	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
+	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngine() != instance, "Candidate", "Main"), instance.Name()[:8])
 	events := instance.Events
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
@@ -447,7 +440,7 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 
 func (n *Node) ProtocolParametersHash() iotago.Identifier {
 	if n.protocolParametersHash == iotago.EmptyIdentifier {
-		return lo.PanicOnErr(n.Protocol.CurrentAPI().ProtocolParameters().Hash())
+		return lo.PanicOnErr(n.Protocol.MainEngine().CurrentAPI().ProtocolParameters().Hash())
 	}
 
 	return n.protocolParametersHash
@@ -459,7 +452,7 @@ func (n *Node) SetProtocolParametersHash(hash iotago.Identifier) {
 
 func (n *Node) HighestSupportedVersion() iotago.Version {
 	if n.highestSupportedVersion == 0 {
-		return n.Protocol.LatestAPI().Version()
+		return n.Protocol.MainEngine().LatestAPI().Version()
 	}
 
 	return n.highestSupportedVersion
@@ -508,7 +501,7 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 }
 
 func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup, startSlot iotago.SlotIndex) {
-	issuingTime := n.Protocol.APIForSlot(startSlot).TimeProvider().SlotStartTime(startSlot)
+	issuingTime := n.Protocol.MainEngine().APIForSlot(startSlot).TimeProvider().SlotStartTime(startSlot)
 	start := time.Now()
 
 	wg.Add(1)

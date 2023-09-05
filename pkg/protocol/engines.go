@@ -11,55 +11,74 @@ import (
 type Engines struct {
 	MainEngineEvents *engine.Events
 
-	protocol *Protocol
+	mainEngine      reactive.Variable[*engine.Engine]
+	candidateEngine reactive.Variable[*engine.Engine]
 
 	*enginemanager.EngineManager
 }
 
-func NewEngines(
-	protocol *Protocol,
-) *Engines {
+func newEngines(protocol *Protocol) *Engines {
 	e := &Engines{
 		MainEngineEvents: engine.NewEvents(),
 		EngineManager: enginemanager.New(
-			protocol.Workers,
+			protocol.Workers(),
 			func(err error) {
 				fmt.Println(err)
 			},
-			protocol.Options.BaseDirectory,
+			protocol.options.BaseDirectory,
 			3,
-			protocol.Options.StorageOptions,
-			protocol.Options.EngineOptions,
-			protocol.Options.FilterProvider,
-			protocol.Options.CommitmentFilterProvider,
-			protocol.Options.BlockDAGProvider,
-			protocol.Options.BookerProvider,
-			protocol.Options.ClockProvider,
-			protocol.Options.BlockGadgetProvider,
-			protocol.Options.SlotGadgetProvider,
-			protocol.Options.SybilProtectionProvider,
-			protocol.Options.NotarizationProvider,
-			protocol.Options.AttestationProvider,
-			protocol.Options.LedgerProvider,
-			protocol.Options.SchedulerProvider,
-			protocol.Options.TipManagerProvider,
-			protocol.Options.TipSelectionProvider,
-			protocol.Options.RetainerProvider,
-			protocol.Options.UpgradeOrchestratorProvider,
+			protocol.options.StorageOptions,
+			protocol.options.EngineOptions,
+			protocol.options.FilterProvider,
+			protocol.options.CommitmentFilterProvider,
+			protocol.options.BlockDAGProvider,
+			protocol.options.BookerProvider,
+			protocol.options.ClockProvider,
+			protocol.options.BlockGadgetProvider,
+			protocol.options.SlotGadgetProvider,
+			protocol.options.SybilProtectionProvider,
+			protocol.options.NotarizationProvider,
+			protocol.options.AttestationProvider,
+			protocol.options.LedgerProvider,
+			protocol.options.SchedulerProvider,
+			protocol.options.TipManagerProvider,
+			protocol.options.TipSelectionProvider,
+			protocol.options.RetainerProvider,
+			protocol.options.UpgradeOrchestratorProvider,
 		),
-
-		protocol: protocol,
+		mainEngine:      reactive.NewVariable[*engine.Engine](),
+		candidateEngine: reactive.NewVariable[*engine.Engine](),
 	}
 
-	protocol.MainEngineR().OnUpdate(func(_, engine *engine.Engine) { e.MainEngineEvents.LinkTo(engine.Events) })
+	if mainEngine, err := e.EngineManager.LoadActiveEngine(protocol.options.SnapshotPath); err != nil {
+		panic(fmt.Sprintf("could not load active engine: %s", err))
+	} else {
+		e.mainEngine.Set(mainEngine)
+	}
+
+	protocol.HookConstructed(func() {
+		protocol.HeaviestVerifiedCandidate().OnUpdate(func(_, newChain *Chain) {
+			e.mainEngine.Set(newChain.Engine())
+		})
+
+		e.MainEngineR().OnUpdate(func(_, engine *engine.Engine) { e.MainEngineEvents.LinkTo(engine.Events) })
+	})
 
 	return e
 }
 
 func (e *Engines) MainEngine() *engine.Engine {
-	return nil
+	return e.mainEngine.Get()
 }
 
 func (e *Engines) MainEngineR() reactive.Variable[*engine.Engine] {
-	return nil
+	return e.mainEngine
+}
+
+func (e *Engines) CandidateEngine() *engine.Engine {
+	return e.candidateEngine.Get()
+}
+
+func (e *Engines) CandidateEngineR() reactive.Variable[*engine.Engine] {
+	return e.candidateEngine
 }
