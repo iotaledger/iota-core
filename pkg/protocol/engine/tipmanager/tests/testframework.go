@@ -34,7 +34,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID()
 
-	t.Instance = tipmanagerv1.NewTipManager(func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
+	t.Instance = tipmanagerv1.New(func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]
 		return block, exists
 	})
@@ -46,7 +46,7 @@ func (t *TestFramework) AddBlock(alias string) tipmanager.TipMetadata {
 	return t.Instance.AddBlock(t.Block(alias))
 }
 
-func (t *TestFramework) CreateBlock(alias string, parents map[iotago.ParentsType][]string) *blocks.Block {
+func (t *TestFramework) CreateBlock(alias string, parents map[iotago.ParentsType][]string, optBlockBuilder ...func(*builder.BasicBlockBuilder)) *blocks.Block {
 	blockBuilder := builder.NewBasicBlockBuilder(tpkg.TestAPI)
 	blockBuilder.IssuingTime(time.Now())
 
@@ -58,6 +58,10 @@ func (t *TestFramework) CreateBlock(alias string, parents map[iotago.ParentsType
 	}
 	if shallowLikeParents, shallowLikeParentsExist := parents[iotago.ShallowLikeParentType]; shallowLikeParentsExist {
 		blockBuilder.ShallowLikeParents(lo.Map(shallowLikeParents, t.BlockID))
+	}
+
+	if len(optBlockBuilder) > 0 {
+		optBlockBuilder[0](blockBuilder)
 	}
 
 	block, err := blockBuilder.Build()
