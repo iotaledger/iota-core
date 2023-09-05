@@ -43,6 +43,11 @@ services:
       {% if 'node-01' in inventory_hostname %}
       --validator.ignoreBootstrapped=true
       {% endif %}
+      --restAPI.allowIncompleteBlock=true
+      --restAPI.blockIssuerAccount={{validatorAccount}}
+      --restAPI.blockIssuerPrivateKey={{validatorPrivKey}}
+      --inx.blockIssuerAccount={{validatorAccount}}
+      --inx.blockIssuerPrivateKey={{validatorPrivKey}}
       --p2p.knownPeers='["/dns/node-01.feature/tcp/14666/p2p/12D3KooWPZt81CSFZLswrV6y6GogLTqUHDAcNxWtov1sSMQiHmSn"]'
       --p2p.seed={{p2pSeed}}
       --inx.enabled=true
