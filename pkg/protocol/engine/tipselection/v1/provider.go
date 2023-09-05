@@ -4,37 +4,61 @@ import (
 	"math"
 	"time"
 
+	"go.uber.org/atomic"
+
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // NewProvider creates a new TipSelection provider, that can be used to inject the component into an engine.
 func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.Engine, tipselection.TipSelection] {
 	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
-		t := New(
-			e.TipManager,
-			e.Ledger.ConflictDAG(),
-			e.Ledger.MemPool().TransactionMetadata,
-			e.EvictionState.LatestRootBlocks,
-			DynamicLivenessThreshold(e, e.SybilProtection.SeatManager().OnlineCommittee().Size),
-			opts...,
-		)
+		t := New(opts...)
 
 		e.HookConstructed(func() {
-			e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
-				t.SetAcceptanceTime(block.IssuingTime())
-			})
+			WaitConstructed(func() {
+				t.Init(
+					e.TipManager,
+					e.Ledger.ConflictDAG(),
+					func(id iotago.TransactionID) (transaction mempool.TransactionMetadata, exists bool) {
+						return e.Ledger.MemPool().TransactionMetadata(id)
+					},
+					e.EvictionState.LatestRootBlocks,
+					DynamicLivenessThreshold(e, e.SybilProtection.SeatManager().OnlineCommittee().Size),
+				)
+
+				e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
+					t.SetAcceptanceTime(block.IssuingTime())
+				})
+			}, e.TipManager, e.Ledger, e.SybilProtection)
 		})
 
 		e.HookShutdown(t.Shutdown)
 
 		return t
 	})
+}
+
+func WaitConstructed(callback func(), modules ...module.Interface) {
+	var (
+		expectedModules    = int64(len(modules))
+		constructedModules atomic.Int64
+	)
+
+	for _, m := range modules {
+		m.HookConstructed(func() {
+			if constructedModules.Inc() == expectedModules {
+				callback()
+			}
+		})
+	}
 }
 
 // DynamicLivenessThreshold returns a function that calculates the liveness threshold for a tip.

@@ -46,7 +46,7 @@ func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) *T
 
 		t.TipManager = tipmanagertests.NewTestFramework(test)
 
-		t.Instance = tipselectionv1.New(
+		t.Instance = tipselectionv1.New().Init(
 			t.TipManager.Instance,
 			conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](t.CommitteeSize),
 			transactionMetadataRetriever,

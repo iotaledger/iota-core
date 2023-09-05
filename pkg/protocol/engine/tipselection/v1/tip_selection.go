@@ -60,29 +60,35 @@ type TipSelection struct {
 }
 
 // New is the constructor for the TipSelection.
-func New(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration, opts ...options.Option[TipSelection]) *TipSelection {
+func New(opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
-		tipManager:                            tipManager,
-		conflictDAG:                           conflictDAG,
-		transactionMetadata:                   transactionMetadataRetriever,
-		rootBlocks:                            rootBlocksRetriever,
 		livenessThresholdQueue:                timed.NewPriorityQueue[tipmanager.TipMetadata](true),
 		acceptanceTime:                        reactive.NewVariable[time.Time](maxTime),
 		optMaxStrongParents:                   8,
 		optMaxLikedInsteadReferences:          8,
 		optMaxLikedInsteadReferencesPerParent: 4,
 		optMaxWeakReferences:                  8,
-		livenessThreshold:                     livenessThresholdFunc,
-	}, opts, func(t *TipSelection) {
-		t.acceptanceTime.OnUpdate(func(_, acceptanceTime time.Time) {
-			t.triggerLivenessThreshold(acceptanceTime)
-		})
+	}, opts)
+}
 
-		tipManager.OnBlockAdded(t.classifyTip)
+func (t *TipSelection) Init(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
+	t.tipManager = tipManager
+	t.conflictDAG = conflictDAG
+	t.transactionMetadata = transactionMetadataRetriever
+	t.rootBlocks = rootBlocksRetriever
+	t.livenessThreshold = livenessThresholdFunc
 
-		t.TriggerConstructed()
-		t.TriggerInitialized()
+	t.TriggerConstructed()
+
+	t.acceptanceTime.OnUpdate(func(_, acceptanceTime time.Time) {
+		t.triggerLivenessThreshold(acceptanceTime)
 	})
+
+	tipManager.OnBlockAdded(t.classifyTip)
+
+	t.TriggerInitialized()
+
+	return t
 }
 
 // SelectTips selects the tips that should be used as references for a new block.
