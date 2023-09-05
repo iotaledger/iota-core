@@ -63,7 +63,7 @@ type TipSelection struct {
 func New(opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
 		livenessThresholdQueue:                timed.NewPriorityQueue[tipmanager.TipMetadata](true),
-		acceptanceTime:                        reactive.NewVariable[time.Time](maxTime),
+		acceptanceTime:                        reactive.NewVariable[time.Time](monotonicallyIncreasing),
 		optMaxStrongParents:                   8,
 		optMaxLikedInsteadReferences:          8,
 		optMaxLikedInsteadReferencesPerParent: 4,
@@ -71,7 +71,12 @@ func New(opts ...options.Option[TipSelection]) *TipSelection {
 	}, opts)
 }
 
-func (t *TipSelection) Init(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
+// Construct fills in the dependencies of the TipSelection and triggers the constructed and initialized events of the
+// module.
+//
+// This method is separated from the constructor so the TipSelection can be initialized lazily after all dependencies
+// are available.
+func (t *TipSelection) Construct(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
 	t.tipManager = tipManager
 	t.conflictDAG = conflictDAG
 	t.transactionMetadata = transactionMetadataRetriever
@@ -137,8 +142,11 @@ func (t *TipSelection) SetAcceptanceTime(acceptanceTime time.Time) (previousValu
 	return t.acceptanceTime.Set(acceptanceTime)
 }
 
-// Shutdown does nothing but is required by the module.Interface.
-func (t *TipSelection) Shutdown() {}
+// Shutdown triggers the shutdown of the TipSelection.
+func (t *TipSelection) Shutdown() {
+	t.TriggerShutdown()
+	t.TriggerStopped()
+}
 
 // classifyTip determines the initial tip pool of the given tip.
 func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
@@ -253,7 +261,9 @@ func WithMaxWeakReferences(maxWeakReferences int) options.Option[TipSelection] {
 	}
 }
 
-func maxTime(currentTime time.Time, newTime time.Time) time.Time {
+// monotonicallyIncreasing returns the maximum of the two given times which is used as a transformation function to make
+// the acceptance time of the TipSelection monotonically increasing.
+func monotonicallyIncreasing(currentTime time.Time, newTime time.Time) time.Time {
 	if currentTime.After(newTime) {
 		return currentTime
 	}

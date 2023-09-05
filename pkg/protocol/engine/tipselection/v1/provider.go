@@ -10,10 +10,8 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
-	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
@@ -22,17 +20,11 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
 		t := New(opts...)
 
+		// wait for all subcomponents of the engine to be available
 		e.HookConstructed(func() {
-			WaitConstructed(func() {
-				t.Init(
-					e.TipManager,
-					e.Ledger.ConflictDAG(),
-					func(id iotago.TransactionID) (transaction mempool.TransactionMetadata, exists bool) {
-						return e.Ledger.MemPool().TransactionMetadata(id)
-					},
-					e.EvictionState.LatestRootBlocks,
-					DynamicLivenessThreshold(e, e.SybilProtection.SeatManager().OnlineCommittee().Size),
-				)
+			// wait for required subcomponents to be constructed (their subcomponents are also available)
+			OnConstructed(func() {
+				t.Construct(e.TipManager, e.Ledger.ConflictDAG(), e.Ledger.MemPool().TransactionMetadata, e.EvictionState.LatestRootBlocks, DynamicLivenessThreshold(e, e.SybilProtection.SeatManager().OnlineCommittee().Size))
 
 				e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
 					t.SetAcceptanceTime(block.IssuingTime())
@@ -46,7 +38,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 	})
 }
 
-func WaitConstructed(callback func(), modules ...module.Interface) {
+func OnConstructed(callback func(), modules ...module.Interface) {
 	var (
 		expectedModules    = int64(len(modules))
 		constructedModules atomic.Int64
