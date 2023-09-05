@@ -35,13 +35,16 @@ services:
       --profiling.enabled=true
       --protocol.snapshot.path=/app/data/snapshot.bin
       --restAPI.allowIncompleteBlock=true
+      {% if 'node-01' in inventory_hostname or 'node-02' in inventory_hostname or 'node-03' in inventory_hostname %}
+      --validator.enabled=true
+      --validator.account={{validatorAccount}}
+      --validator.privateKey={{validatorPrivKey}}
+      {% endif %}
       {% if 'node-01' in inventory_hostname %}
       --validator.ignoreBootstrapped=true
       {% endif %}
       --p2p.knownPeers='["/dns/node-01.feature/tcp/14666/p2p/12D3KooWPZt81CSFZLswrV6y6GogLTqUHDAcNxWtov1sSMQiHmSn"]'
       --p2p.seed={{p2pSeed}}
-      --validator.account={{validatorAccount}}
-      --validator.privateKey={{validatorPrivKey}}
       --inx.enabled=true
       --inx.bindAddress=iota-core:9029
 
