@@ -21,7 +21,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 			e.Ledger.ConflictDAG(),
 			e.Ledger.MemPool().TransactionMetadata,
 			e.EvictionState.LatestRootBlocks,
-			dynamicLivenessThreshold(e, e.SybilProtection.SeatManager().OnlineCommittee().Size),
+			DynamicLivenessThreshold(e, e.SybilProtection.SeatManager().OnlineCommittee().Size),
 			opts...,
 		)
 
@@ -37,8 +37,8 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 	})
 }
 
-// dynamicLivenessThreshold returns a function that dynamically calculates the liveness threshold for a tip.
-func dynamicLivenessThreshold(apiProvider api.Provider, committeeSizeProvider func() int) func(tip tipmanager.TipMetadata) time.Duration {
+// DynamicLivenessThreshold returns a function that calculates the liveness threshold for a tip.
+func DynamicLivenessThreshold(apiProvider api.Provider, committeeSizeProvider func() int) func(tip tipmanager.TipMetadata) time.Duration {
 	return func(tip tipmanager.TipMetadata) time.Duration {
 		var (
 			params                      = apiProvider.APIForSlot(tip.Block().ID().Index()).ProtocolParameters()
