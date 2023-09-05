@@ -87,7 +87,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsWaitFor:                     DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
 		optsTick:                        DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 		optsGenesisTimestampOffset:      0,
-		optsLivenessThresholdLowerBound: 15 * time.Second,
+		optsLivenessThresholdLowerBound: 30 * time.Second,
 		optsLivenessThresholdUpperBound: 30 * time.Second,
 		optsMinCommittableAge:           10,
 		optsMaxCommittableAge:           20,
