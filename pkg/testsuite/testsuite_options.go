@@ -39,11 +39,19 @@ func WithGenesisTimestampOffset(offset int64) options.Option[TestSuite] {
 	}
 }
 
-func WithLivenessThreshold(livenessThreshold iotago.SlotIndex) options.Option[TestSuite] {
+func WithLivenessThresholdLowerBound(lowerBound time.Duration) options.Option[TestSuite] {
 	// TODO: eventually this should not be used and common parameters should be used
 
 	return func(opts *TestSuite) {
-		opts.optsLivenessThreshold = livenessThreshold
+		opts.optsLivenessThresholdLowerBound = lowerBound
+	}
+}
+
+func WithLivenessThresholdUpperBound(upperBound time.Duration) options.Option[TestSuite] {
+	// TODO: eventually this should not be used and common parameters should be used
+
+	return func(opts *TestSuite) {
+		opts.optsLivenessThresholdUpperBound = upperBound
 	}
 }
 
