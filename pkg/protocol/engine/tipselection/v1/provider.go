@@ -10,27 +10,20 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // NewProvider creates a new TipSelection provider, that can be used to inject the component into an engine.
 func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.Engine, tipselection.TipSelection] {
 	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
-		livenessThresholdFunc := func(tip tipmanager.TipMetadata) time.Duration {
-			protocolParameters := e.APIForSlot(tip.Block().ID().Index()).ProtocolParameters()
-
-			livenessThresholdLowerBound := protocolParameters.LivenessThresholdLowerBound()
-
-			livenessWindow := protocolParameters.LivenessThresholdUpperBound() - livenessThresholdLowerBound
-
-			approvalModifier := math.Min(
-				float64(tip.Block().WitnessCount())/float64(e.SybilProtection.SeatManager().OnlineCommittee().Size())/3.0,
-				1.0,
-			)
-
-			return livenessThresholdLowerBound + time.Duration(float64(livenessWindow)*approvalModifier)
-		}
-
-		t := New(e.TipManager, e.Ledger.ConflictDAG(), e.Ledger.MemPool().TransactionMetadata, e.EvictionState.LatestRootBlocks, livenessThresholdFunc, opts...)
+		t := New(
+			e.TipManager,
+			e.Ledger.ConflictDAG(),
+			e.Ledger.MemPool().TransactionMetadata,
+			e.EvictionState.LatestRootBlocks,
+			dynamicLivenessThreshold(e, e.SybilProtection.SeatManager().OnlineCommittee().Size),
+			opts...,
+		)
 
 		e.HookConstructed(func() {
 			e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
@@ -42,4 +35,18 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 
 		return t
 	})
+}
+
+// dynamicLivenessThreshold returns a function that dynamically calculates the liveness threshold for a tip.
+func dynamicLivenessThreshold(apiProvider api.Provider, committeeSizeProvider func() int) func(tip tipmanager.TipMetadata) time.Duration {
+	return func(tip tipmanager.TipMetadata) time.Duration {
+		var (
+			params                      = apiProvider.APIForSlot(tip.Block().ID().Index()).ProtocolParameters()
+			livenessThresholdLowerBound = params.LivenessThresholdLowerBound()
+			livenessWindow              = float64(params.LivenessThresholdUpperBound() - livenessThresholdLowerBound)
+			approvalModifier            = math.Min(float64(tip.Block().WitnessCount())/float64(committeeSizeProvider())/3.0, 1.0)
+		)
+
+		return livenessThresholdLowerBound + time.Duration(approvalModifier*livenessWindow)
+	}
 }
