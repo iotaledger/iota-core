@@ -10,13 +10,11 @@ import (
 	"testing"
 	"time"
 
+	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
-	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
-
-	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -89,7 +87,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		panic(err)
 	}
 
-	accountID := iotago.AccountID(blake2b.Sum256(iotago.BlockIssuerKeyEd25519FromPublicKey(hiveEd25519.PublicKey(pub)).BlockIssuerKeyBytes()))
+	accountID := iotago.AccountID(blake2b.Sum256(pub))
 	accountID.RegisterAlias(name)
 
 	peerID := lo.PanicOnErr(p2ppeer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
