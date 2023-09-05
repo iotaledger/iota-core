@@ -8,22 +8,22 @@ cores:
       hosts:
         node-01.feature.shimmer.iota.cafe:
           issuerAccount: "{{ NODE_01_ACCOUNTID }}"
-          privKey: "{{ NODE_01_PRIVKEY }}"
+          blockIssuerPrivKey: "{{ NODE_01_BLOCKISSUER_PRIVKEY }}"
           p2pSeed: "{{ NODE_01_P2PSEED }}"
         node-02.feature.shimmer.iota.cafe:
           issuerAccount: "{{ NODE_02_ACCOUNTID }}"
-          privKey: "{{ NODE_02_PRIVKEY }}"
+          blockIssuerPrivKey: "{{ NODE_02_BLOCKISSUER_PRIVKEY }}"
           p2pSeed: "{{ NODE_02_P2PSEED }}"
         node-03.feature.shimmer.iota.cafe:
           issuerAccount: "{{ NODE_03_ACCOUNTID }}"
-          privKey: "{{ NODE_03_PRIVKEY }}"
+          blockIssuerPrivKey: "{{ NODE_03_BLOCKISSUER_PRIVKEY }}"
           p2pSeed: "{{ NODE_03_P2PSEED }}"
         node-04.feature.shimmer.iota.cafe:
           issuerAccount: "{{ NODE_04_ACCOUNTID }}"
-          privKey: "{{ NODE_04_PRIVKEY }}"
+          blockIssuerPrivKey: "{{ NODE_04_BLOCKISSUER_PRIVKEY }}"
           p2pSeed: "{{ NODE_04_P2PSEED }}"
         node-05.feature.shimmer.iota.cafe:
           issuerAccount: "{{ NODE_05_ACCOUNTID }}"
-          privKey: "{{ NODE_05_PRIVKEY }}"
+          blockIssuerPrivKey: "{{ NODE_05_BLOCKISSUER_PRIVKEY }}"
           p2pSeed: "{{ NODE_05_P2PSEED }}"
   vars:
