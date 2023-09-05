@@ -6,7 +6,7 @@ type APIProvider struct {
 	protocol *Protocol
 }
 
-func NewAPIProvider(protocol *Protocol) *APIProvider {
+func newAPIProvider(protocol *Protocol) *APIProvider {
 	return &APIProvider{
 		protocol: protocol,
 	}

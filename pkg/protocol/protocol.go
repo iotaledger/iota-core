@@ -13,16 +13,16 @@ import (
 )
 
 type Protocol struct {
+	workers *workerpool.Group
+	status  reactive.Variable[Status]
+	error   *event.Event1[error]
+	options *Options
+
+	*Network
 	*Engines
 	*Chains
-	*Network
 	*Dispatcher
 	*APIProvider
-
-	workers *workerpool.Group
-	options *Options
-	error   *event.Event1[error]
-	status  reactive.Variable[Status]
 
 	module.Module
 }
@@ -30,13 +30,15 @@ type Protocol struct {
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
 	return options.Apply(&Protocol{
 		workers: workers,
-		options: newOptions(),
 		error:   event.New1[error](),
+		options: newOptions(),
 	}, opts, func(p *Protocol) {
+		p.status = newStatusVariable(p)
 		p.Network = newNetwork(p, dispatcher)
 		p.Engines = newEngines(p)
 		p.Chains = newChains(p)
-		p.status = newStatusVariable(p)
+		p.Dispatcher = newDispatcher(p)
+		p.APIProvider = newAPIProvider(p)
 	}, (*Protocol).TriggerConstructed)
 }
 

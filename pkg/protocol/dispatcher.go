@@ -11,6 +11,12 @@ type Dispatcher struct {
 	protocol *Protocol
 }
 
+func newDispatcher(protocol *Protocol) *Dispatcher {
+	return &Dispatcher{
+		protocol: protocol,
+	}
+}
+
 func (p *Dispatcher) IssueBlock(block *model.Block) error {
 	fmt.Println("IssueBlock", block)
 	p.protocol.MainEngine().ProcessBlockFromPeer(block, identity.ID{})
