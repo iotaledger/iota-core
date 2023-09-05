@@ -83,57 +83,41 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	}
 }
 
-func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.ValidationBlock, block *blocks.Block) {
-	validatorPerformances, err := t.validatorPerformancesFunc(block.ID().Index())
-	if err != nil {
-		t.errHandler(ierrors.Errorf("failed to load performance factor for slot %s", block.ID().Index()))
-		return
-	}
-	validatorPerformance, err := validatorPerformances.Load(block.ProtocolBlock().IssuerID)
-	if err != nil {
-		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
-	}
-	// key not found
-	if validatorPerformance == nil {
-		validatorPerformance = model.NewValidatorPerformance()
-	}
-	updatedPerformance := t.updateSlotPerformanceBitMap(validatorPerformance, block.ID().Index(), block.ProtocolBlock().IssuingTime)
-	if updatedPerformance.BlockIssuedCount == t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot {
-		// no need to store larger number and we can fit into uint8
-		updatedPerformance.BlockIssuedCount = t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot + 1
-	} else {
-		updatedPerformance.BlockIssuedCount++
-	}
-	updatedPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{
-		Version: validationBlock.HighestSupportedVersion,
-		Hash:    validationBlock.ProtocolParametersHash,
-	}
-	err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, updatedPerformance)
-	if err != nil {
-		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
-	}
+func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
+	// TODO: to be implemented for 1.1
+	//epochStart := t.apiProvider.APIForEpoch(epoch).TimeProvider().EpochStart(epoch)
+	//registeredStore := t.registeredValidatorsFunc(epochStart)
+	//eligible := ds.NewSet[iotago.AccountID]()
+	//registeredStore.ForEach(func(accountID iotago.AccountID, a *prunable.RegisteredValidatorActivity) bool {
+	//	if a.Active {
+	//		eligible.Add(accountID)
+	//	}
+	//	return true
+	//}
+
+	return nil
 }
 
-func (t *Tracker) updateSlotPerformanceBitMap(pf *model.ValidatorPerformance, slotIndex iotago.SlotIndex, issuingTime time.Time) *model.ValidatorPerformance {
-	if pf == nil {
-		return pf
+// ValidatorCandidates returns the registered validator candidates for the given epoch.
+func (t *Tracker) ValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
+	// TODO: we should choose candidates we tracked performance for no matter if they were active
+
+	return ds.NewSet[iotago.AccountID]()
+}
+
+func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
+	c, err := t.committeeStore.Load(epoch)
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
-	subslotIndex := t.subslotIndex(slotIndex, issuingTime)
-	// set bit at subslotIndex to 1 to indicate activity in that subslot
-	pf.SlotActivityVector = pf.SlotActivityVector | (1 << subslotIndex)
+	if c == nil {
+		return nil, false
+	}
 
-	return pf
+	return c, true
 }
 
-// subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validatorBlocksPerSlot equal parts.
-func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int {
-	valBlocksNum := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
-	subslotDur := time.Duration(t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
-	slotStart := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotStartTime(slot)
-
-	return int(issuingTime.Sub(slotStart)/subslotDur)
-}
-
+// ApplyEpoch calculates and stores pool stats and rewards for the given epoch.
 func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -183,7 +167,6 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			return true
 		}
 		poolReward, err := t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, pf)
-
 		if err != nil {
 			panic(ierrors.Wrapf(err, "failed to calculate pool rewards for account %s", accountID))
 		}
@@ -205,40 +188,6 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	t.latestAppliedEpoch = epoch
 }
 
-func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
-	// TODO: to be implemented for 1.1
-	//epochStart := t.apiProvider.APIForEpoch(epoch).TimeProvider().EpochStart(epoch)
-	//registeredStore := t.registeredValidatorsFunc(epochStart)
-	//eligible := ds.NewSet[iotago.AccountID]()
-	//registeredStore.ForEach(func(accountID iotago.AccountID, a *prunable.RegisteredValidatorActivity) bool {
-	//	if a.Active {
-	//		eligible.Add(accountID)
-	//	}
-	//	return true
-	//}
-
-	return nil
-}
-
-// ValidatorCandidates returns the registered validator candidates for the given epoch.
-func (t *Tracker) ValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
-	// TODO: we should choose candidates we tracked performance for no matter if they were active
-
-	return ds.NewSet[iotago.AccountID]()
-}
-
-func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
-	c, err := t.committeeStore.Load(epoch)
-	if err != nil {
-		panic(ierrors.Wrapf(err, "failed to load committee for epoch %d", epoch))
-	}
-	if c == nil {
-		return nil, false
-	}
-
-	return c, true
-}
-
 // aggregatePerformanceFactors calculates epoch performance factor of a validator based on its performance in each slot by summing up all active subslots.
 func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.ValidatorPerformance, epoch iotago.EpochIndex) uint64 {
 	if len(slotActivityVector) == 0 {
@@ -249,7 +198,6 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.Valida
 	for _, pf := range slotActivityVector {
 		// no activity in a slot
 		if pf == nil {
-
 			continue
 		}
 		// each one bit represents at least one block issued in that subslot,
@@ -275,4 +223,55 @@ func (t *Tracker) isCommitteeMember(slot iotago.SlotIndex, accountID iotago.Acco
 	}
 
 	return committee.Has(accountID), nil
+}
+
+func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.ValidationBlock, block *blocks.Block) {
+	validatorPerformances, err := t.validatorPerformancesFunc(block.ID().Index())
+	if err != nil {
+		t.errHandler(ierrors.Errorf("failed to load performance factor for slot %s", block.ID().Index()))
+		return
+	}
+	validatorPerformance, err := validatorPerformances.Load(block.ProtocolBlock().IssuerID)
+	if err != nil {
+		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
+	}
+	// key not found
+	if validatorPerformance == nil {
+		validatorPerformance = model.NewValidatorPerformance()
+	}
+	updatedPerformance := t.updateSlotPerformanceBitMap(validatorPerformance, block.ID().Index(), block.ProtocolBlock().IssuingTime)
+	if updatedPerformance.BlockIssuedCount == t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot {
+		// no need to store larger number and we can fit into uint8
+		updatedPerformance.BlockIssuedCount = t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot + 1
+	} else {
+		updatedPerformance.BlockIssuedCount++
+	}
+	updatedPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{
+		Version: validationBlock.HighestSupportedVersion,
+		Hash:    validationBlock.ProtocolParametersHash,
+	}
+	err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, updatedPerformance)
+	if err != nil {
+		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
+	}
+}
+
+func (t *Tracker) updateSlotPerformanceBitMap(pf *model.ValidatorPerformance, slotIndex iotago.SlotIndex, issuingTime time.Time) *model.ValidatorPerformance {
+	if pf == nil {
+		return pf
+	}
+
+	// set bit at subslotIndex to 1 to indicate activity in that subslot
+	pf.SlotActivityVector = pf.SlotActivityVector | (1 << t.subslotIndex(slotIndex, issuingTime))
+
+	return pf
+}
+
+// subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validatorBlocksPerSlot equal parts.
+func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int {
+	valBlocksNum := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
+	subslotDur := time.Duration(t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
+	slotStart := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotStartTime(slot)
+
+	return int(issuingTime.Sub(slotStart) / subslotDur)
 }
