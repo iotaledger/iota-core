@@ -1,6 +1,7 @@
 package tipselectionv1
 
 import (
+	"math"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -75,13 +76,16 @@ func New(e *engine.Engine, tipManager tipmanager.TipManager, conflictDAG conflic
 		optMaxLikedInsteadReferences: 8,
 		optMaxWeakReferences:         8,
 		optDynamicLivenessThreshold: func(tip tipmanager.TipMetadata) time.Duration {
-			protocolParameters := e.APIForSlot(tip.Block().SlotCommitmentID().Index()).ProtocolParameters()
+			protocolParameters := e.APIForSlot(tip.Block().ID().Index()).ProtocolParameters()
 			livenessThresholdLowerBound := protocolParameters.LivenessThresholdLowerBound()
-			livenessThresholdUpperBound := protocolParameters.LivenessThresholdUpperBound()
-			livenessWindow := livenessThresholdUpperBound - livenessThresholdLowerBound
-			approvalModifier := time.Duration(1)
+			livenessWindow := protocolParameters.LivenessThresholdUpperBound() - livenessThresholdLowerBound
 
-			return livenessThresholdLowerBound + approvalModifier*livenessWindow
+			approvalModifier := math.Min(
+				float64(tip.Block().WitnessCount())/float64(e.SybilProtection.SeatManager().OnlineCommittee().Size())/3.0,
+				1.0,
+			)
+
+			return livenessThresholdLowerBound + time.Duration(float64(livenessWindow)*approvalModifier)
 		},
 	}, opts, func(t *TipSelection) {
 		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
