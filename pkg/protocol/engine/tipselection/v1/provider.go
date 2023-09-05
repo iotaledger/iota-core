@@ -4,8 +4,6 @@ import (
 	"math"
 	"time"
 
-	"go.uber.org/atomic"
-
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -20,10 +18,9 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
 		t := New(opts...)
 
-		// wait for all subcomponents of the engine to be available
 		e.HookConstructed(func() {
-			// wait for required subcomponents to be constructed (their subcomponents are also available)
-			OnConstructed(func() {
+			// wait for submodules to be constructed (so all of their properties are available)
+			module.OnAllConstructed(func() {
 				t.Construct(e.TipManager, e.Ledger.ConflictDAG(), e.Ledger.MemPool().TransactionMetadata, e.EvictionState.LatestRootBlocks, DynamicLivenessThreshold(e, e.SybilProtection.SeatManager().OnlineCommittee().Size))
 
 				e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
@@ -36,21 +33,6 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 
 		return t
 	})
-}
-
-func OnConstructed(callback func(), modules ...module.Interface) {
-	var (
-		expectedModules    = int64(len(modules))
-		constructedModules atomic.Int64
-	)
-
-	for _, m := range modules {
-		m.HookConstructed(func() {
-			if constructedModules.Inc() == expectedModules {
-				callback()
-			}
-		})
-	}
 }
 
 // DynamicLivenessThreshold returns a function that calculates the liveness threshold for a tip.
