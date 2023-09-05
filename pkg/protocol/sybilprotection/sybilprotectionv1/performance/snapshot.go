@@ -48,23 +48,19 @@ func (t *Tracker) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 		targetEpoch--
 	}
 
-	err := t.exportPerformanceFactor(positionedWriter, timeProvider.EpochStart(targetEpoch+1), targetSlotIndex)
-	if err != nil {
+	if err := t.exportPerformanceFactor(positionedWriter, timeProvider.EpochStart(targetEpoch+1), targetSlotIndex); err != nil {
 		return ierrors.Wrap(err, "unable to export performance factor")
 	}
 
-	err = t.exportPoolRewards(positionedWriter, targetEpoch)
-	if err != nil {
+	if err := t.exportPoolRewards(positionedWriter, targetEpoch); err != nil {
 		return ierrors.Wrap(err, "unable to export pool rewards")
 	}
 
-	err = t.exportPoolsStats(positionedWriter, targetEpoch)
-	if err != nil {
+	if err := t.exportPoolsStats(positionedWriter, targetEpoch); err != nil {
 		return ierrors.Wrap(err, "unable to export pool stats")
 	}
 
-	err = t.exportCommittees(positionedWriter, targetSlotIndex)
-	if err != nil {
+	if err := t.exportCommittees(positionedWriter, targetSlotIndex); err != nil {
 		return ierrors.Wrap(err, "unable to export committees")
 	}
 
@@ -76,6 +72,7 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 	if err := binary.Read(reader, binary.LittleEndian, &slotCount); err != nil {
 		return ierrors.Wrap(err, "unable to read slot count")
 	}
+
 	for i := uint64(0); i < slotCount; i++ {
 		var slotIndex iotago.SlotIndex
 		if err := binary.Read(reader, binary.LittleEndian, &slotIndex); err != nil {
@@ -91,17 +88,19 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to get performance factors for slot index %d", slotIndex)
 		}
+
 		for j := uint64(0); j < accountsCount; j++ {
 			var accountID iotago.AccountID
 			if err := binary.Read(reader, binary.LittleEndian, &accountID); err != nil {
 				return ierrors.Wrapf(err, "unable to read account id for the slot index %d", slotIndex)
 			}
+
 			var performanceFactor model.ValidatorPerformance
 			if err := binary.Read(reader, binary.LittleEndian, &performanceFactor); err != nil {
 				return ierrors.Wrapf(err, "unable to read performance factor for account %s and slot index %d", accountID, slotIndex)
 			}
-			err := performanceFactors.Store(accountID, &performanceFactor)
-			if err != nil {
+
+			if err := performanceFactors.Store(accountID, &performanceFactor); err != nil {
 				return ierrors.Wrapf(err, "unable to store performance factor for account %s and slot index %d", accountID, slotIndex)
 			}
 		}
@@ -217,25 +216,31 @@ func (t *Tracker) exportPerformanceFactor(pWriter *utils.PositionedWriter, start
 		if err := pWriter.WriteValue("slot index", currentSlot); err != nil {
 			return ierrors.Wrapf(err, "unable to write slot index %d", currentSlot)
 		}
+
 		var accountsCount uint64
 		if err := pWriter.WriteValue("pf account count", accountsCount, true); err != nil {
 			return ierrors.Wrapf(err, "unable to write pf accounts count for slot index %d", currentSlot)
 		}
+
 		performanceFactors, err := t.validatorPerformancesFunc(currentSlot)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to get performance factors for slot index %d", currentSlot)
 		}
+
 		if err := performanceFactors.Stream(func(accountID iotago.AccountID, pf *model.ValidatorPerformance) error {
 			if err := pWriter.WriteValue("account id", accountID); err != nil {
 				return ierrors.Wrapf(err, "unable to write account id %s for slot %d", accountID, currentSlot)
 			}
+
 			bytes, err := t.apiProvider.APIForSlot(currentSlot).Encode(pf)
 			if err != nil {
 				return ierrors.Wrapf(err, "unable to encode performance factor for accountID %s and slot index %d", accountID, currentSlot)
 			}
+
 			if err = pWriter.WriteBytes(bytes); err != nil {
 				return ierrors.Wrapf(err, "unable to write performance factor for accountID %s and slot index %d", accountID, currentSlot)
 			}
+
 			accountsCount++
 
 			return nil
