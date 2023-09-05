@@ -131,7 +131,7 @@ func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int
 	subslotDur := time.Duration(t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
 	slotStart := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotStartTime(slot)
 
-	return int(issuingTime.Sub(slotStart)/subslotDur) + 1
+	return int(issuingTime.Sub(slotStart)/subslotDur)
 }
 
 func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) {
