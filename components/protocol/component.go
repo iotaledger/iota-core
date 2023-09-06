@@ -270,11 +270,8 @@ func configure() error {
 		Component.LogWarnf("OnlineCommitteeSeatRemoved: seatIndex: %d", seatIndex)
 	})
 
-	// TODO: create a transaction invalid event in the booker instead of hooking to a specific engine instance
-	deps.Protocol.MainEngineInstance().Ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
-		transaction.OnInvalid(func(err error) {
-			Component.LogWarnf("TransactionInvalid: transaction %s - %s", transaction.ID(), err.Error())
-		})
+	deps.Protocol.Events.Engine.Booker.TransactionInvalid.Hook(func(transaction mempool.TransactionMetadata, reason error) {
+		Component.LogWarnf("TransactionInvalid: transaction %s - %s", transaction.ID(), reason.Error())
 	})
 
 	return nil
