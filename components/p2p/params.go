@@ -6,8 +6,16 @@ import (
 
 // ParametersP2P contains the definition of configuration parameters used by the p2p plugin.
 type ParametersP2P struct {
-	// BindAddress defines on which address the p2p service should listen.
-	BindAddress string `default:"0.0.0.0:14666" usage:"the bind address for p2p connections"`
+	// BindAddress defines on which multi address the p2p service should listen on.
+	BindAddress string `default:"/ip4/0.0.0.0/tcp/14666" usage:"the multi address for p2p connections"`
+
+	ConnectionManager struct {
+		// Defines the high watermark to use within the connection manager.
+		HighWatermark int `default:"10" usage:"the threshold up on which connections count truncates to the lower watermark"`
+		// Defines the low watermark to use within the connection manager.
+		LowWatermark int `default:"5" usage:"the minimum connections count to hold after the high watermark was reached"`
+	}
+
 	// Seed defines the config flag of the autopeering private key seed.
 	Seed string `usage:"private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively"`
 	// OverwriteStoredSeed defines whether the private key stored in an existing peerdb should be overwritten.
@@ -22,11 +30,15 @@ type ParametersP2P struct {
 type ParametersPeers struct {
 	// KnownPeers defines the map of peers to be used as known peers.
 	KnownPeers string `usage:"map of peers that will be used as known peers"`
+	// BootstrapPeers defines the map of peers to be used as discovery for other peers.
+	BootstrapPeers string `usage:"map of peers to be used as discovery for other peers"`
 }
 
 // ParamsP2P contains the configuration used by the manualPeering plugin.
-var ParamsP2P = &ParametersP2P{}
-var ParamsPeers = &ParametersPeers{}
+var (
+	ParamsP2P   = &ParametersP2P{}
+	ParamsPeers = &ParametersPeers{}
+)
 
 var params = &app.ComponentParams{
 	Params: map[string]any{

@@ -46,8 +46,8 @@ type dependencies struct {
 	dig.In
 	Echo               *echo.Echo
 	Host               host.Host
-	RestAPIBindAddress string         `name:"restAPIBindAddress"`
-	NodePrivateKey     crypto.PrivKey `name:"nodePrivateKey"`
+	RestAPIBindAddress string `name:"restAPIBindAddress"`
+	NodePrivateKey     crypto.PrivKey
 	RestRouteManager   *restapi.RestRouteManager
 
 	Protocol *protocolpkg.Protocol

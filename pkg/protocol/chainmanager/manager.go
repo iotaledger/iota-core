@@ -3,6 +3,8 @@ package chainmanager
 import (
 	"fmt"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/walker"
@@ -10,7 +12,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -66,7 +67,7 @@ func (m *Manager) Shutdown() {
 	m.commitmentRequester.Shutdown()
 }
 
-func (m *Manager) ProcessCommitmentFromSource(commitment *model.Commitment, source network.PeerID) (isSolid bool, chain *Chain) {
+func (m *Manager) ProcessCommitmentFromSource(commitment *model.Commitment, source peer.ID) (isSolid bool, chain *Chain) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
@@ -293,7 +294,7 @@ func (m *Manager) evaluateAgainstRootCommitment(commitment *iotago.Commitment) (
 	return
 }
 
-func (m *Manager) detectForks(commitment *ChainCommitment, source network.PeerID) {
+func (m *Manager) detectForks(commitment *ChainCommitment, source peer.ID) {
 	forkingPoint, err := m.forkingPointAgainstMainChain(commitment)
 	if err != nil {
 		return
