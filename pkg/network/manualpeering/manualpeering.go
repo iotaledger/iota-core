@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -36,7 +36,7 @@ type Manager struct {
 	isStopped         bool
 	reconnectInterval time.Duration
 	knownPeersMutex   syncutils.RWMutex
-	knownPeers        map[p2ppeer.ID]*network.Peer
+	knownPeers        map[peer.ID]*network.Peer
 	workerPool        *workerpool.WorkerPool
 
 	onGossipNeighborRemovedHook *event.Hook[func(*p2p.Neighbor)]
@@ -49,7 +49,7 @@ func NewManager(p2pm *p2p.Manager, workerPool *workerpool.WorkerPool, log *logge
 		p2pm:              p2pm,
 		log:               log,
 		reconnectInterval: network.DefaultReconnectInterval,
-		knownPeers:        make(map[p2ppeer.ID]*network.Peer),
+		knownPeers:        make(map[peer.ID]*network.Peer),
 		workerPool:        workerPool,
 	}
 
@@ -204,7 +204,7 @@ func (m *Manager) removeAllKnownPeers() error {
 	return resultErr
 }
 
-func (m *Manager) removePeerByID(peerID p2ppeer.ID) error {
+func (m *Manager) removePeerByID(peerID peer.ID) error {
 	kp, exists := m.knownPeers[peerID]
 	if !exists {
 		return nil

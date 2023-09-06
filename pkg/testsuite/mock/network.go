@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -17,19 +17,19 @@ import (
 const NetworkMainPartition = "main"
 
 type Network struct {
-	dispatchersByPartition map[string]map[p2ppeer.ID]*Endpoint
+	dispatchersByPartition map[string]map[peer.ID]*Endpoint
 	dispatchersMutex       syncutils.RWMutex
 }
 
 func NewNetwork() *Network {
 	return &Network{
-		dispatchersByPartition: map[string]map[p2ppeer.ID]*Endpoint{
-			NetworkMainPartition: make(map[p2ppeer.ID]*Endpoint),
+		dispatchersByPartition: map[string]map[peer.ID]*Endpoint{
+			NetworkMainPartition: make(map[peer.ID]*Endpoint),
 		},
 	}
 }
 
-func (n *Network) JoinWithEndpointID(endpointID p2ppeer.ID, partition string) *Endpoint {
+func (n *Network) JoinWithEndpointID(endpointID peer.ID, partition string) *Endpoint {
 	return n.JoinWithEndpoint(newMockedEndpoint(endpointID, n, partition), partition)
 }
 
@@ -50,7 +50,7 @@ func (n *Network) addEndpointToPartition(endpoint *Endpoint, newPartition string
 	endpoint.partition = newPartition
 	dispatchers, exists := n.dispatchersByPartition[newPartition]
 	if !exists {
-		dispatchers = make(map[p2ppeer.ID]*Endpoint)
+		dispatchers = make(map[peer.ID]*Endpoint)
 		n.dispatchersByPartition[newPartition] = dispatchers
 	}
 	dispatchers[endpoint.id] = endpoint
@@ -96,13 +96,13 @@ func (n *Network) mergePartition(partition string) {
 // region Endpoint ///////////////////////////////////////////////////////////////////////////////////////////////
 
 type Endpoint struct {
-	id        p2ppeer.ID
+	id        peer.ID
 	network   *Network
 	partition string
-	handler   func(p2ppeer.ID, proto.Message) error
+	handler   func(peer.ID, proto.Message) error
 }
 
-func newMockedEndpoint(id p2ppeer.ID, n *Network, partition string) *Endpoint {
+func newMockedEndpoint(id peer.ID, n *Network, partition string) *Endpoint {
 	return &Endpoint{
 		id:        id,
 		network:   n,
@@ -110,11 +110,11 @@ func newMockedEndpoint(id p2ppeer.ID, n *Network, partition string) *Endpoint {
 	}
 }
 
-func (e *Endpoint) LocalPeerID() p2ppeer.ID {
+func (e *Endpoint) LocalPeerID() peer.ID {
 	return e.id
 }
 
-func (e *Endpoint) RegisterProtocol(_ func() proto.Message, handler func(p2ppeer.ID, proto.Message) error) {
+func (e *Endpoint) RegisterProtocol(_ func() proto.Message, handler func(peer.ID, proto.Message) error) {
 	e.handler = handler
 }
 
@@ -130,7 +130,7 @@ func (e *Endpoint) Shutdown() {
 	e.UnregisterProtocol()
 }
 
-func (e *Endpoint) Send(packet proto.Message, to ...p2ppeer.ID) {
+func (e *Endpoint) Send(packet proto.Message, to ...peer.ID) {
 	e.network.dispatchersMutex.RLock()
 	defer e.network.dispatchersMutex.RUnlock()
 

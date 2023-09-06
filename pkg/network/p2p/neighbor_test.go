@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	p2pnetwork "github.com/libp2p/go-libp2p/core/network"
-
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	p2pnetwork "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/stretchr/testify/assert"
@@ -96,12 +95,12 @@ func newTestPeer(_ string) *network.Peer {
 		panic(err)
 	}
 
-	p2pid, err := p2ppeer.IDFromPublicKey(pub)
+	p2pid, err := peer.IDFromPublicKey(pub)
 	if err != nil {
 		panic(err)
 	}
 
-	addrInfo, _ := p2ppeer.AddrInfoFromString("/ip4/0.0.0.0/udp/14666/p2p/" + p2pid.String())
+	addrInfo, _ := peer.AddrInfoFromString("/ip4/0.0.0.0/udp/14666/p2p/" + p2pid.String())
 	return network.NewPeerFromAddrInfo(addrInfo)
 }
 

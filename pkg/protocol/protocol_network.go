@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -19,7 +19,7 @@ func (p *Protocol) runNetworkProtocol() {
 
 	wpBlocks := p.Workers.CreatePool("NetworkEvents.Blocks") // Use max amount of workers for sending, receiving and requesting blocks
 
-	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id p2ppeer.ID) {
+	p.Events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, id peer.ID) {
 		if block, exists := p.MainEngineInstance().Block(blockID); exists {
 			p.networkProtocol.SendBlock(block, id)
 		}
@@ -35,14 +35,14 @@ func (p *Protocol) runNetworkProtocol() {
 
 	wpCommitments := p.Workers.CreatePool("NetworkEvents.SlotCommitments")
 
-	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source p2ppeer.ID) {
+	p.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source peer.ID) {
 		// when we receive a commitment request, do not look it up in the ChainManager but in the storage, else we might answer with commitments we did not issue ourselves and for which we cannot provide attestations
 		if requestedCommitment, err := p.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index()); err == nil && requestedCommitment.ID() == commitmentID {
 			p.networkProtocol.SendSlotCommitment(requestedCommitment, source)
 		}
 	}, event.WithWorkerPool(wpCommitments))
 
-	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source p2ppeer.ID) {
+	p.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source peer.ID) {
 		p.ChainManager.ProcessCommitmentFromSource(commitment, source)
 	}, event.WithWorkerPool(wpCommitments))
 

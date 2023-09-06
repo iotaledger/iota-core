@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -105,7 +105,7 @@ func (db *DB) UpdatePeer(p *Peer) error {
 }
 
 // Peer retrieves a peer from the database.
-func (db *DB) Peer(id p2ppeer.ID) (*Peer, error) {
+func (db *DB) Peer(id peer.ID) (*Peer, error) {
 	data, err := db.store.Get(nodeKey(id))
 	if err != nil {
 		return nil, err
@@ -220,7 +220,7 @@ func (db *DB) setInt64(key []byte, n int64) error {
 }
 
 // nodeKey returns the database key for a node record.
-func nodeKey(id p2ppeer.ID) []byte {
+func nodeKey(id peer.ID) []byte {
 	return append([]byte(dbNodePrefix), []byte(id)...)
 }
 
@@ -229,7 +229,7 @@ func localFieldKey(field string) []byte {
 }
 
 // nodeFieldKey returns the database key for a node metadata field.
-func nodeFieldKey(id p2ppeer.ID, field string) []byte {
+func nodeFieldKey(id peer.ID, field string) []byte {
 	return append(nodeKey(id), []byte(field)...)
 }
 

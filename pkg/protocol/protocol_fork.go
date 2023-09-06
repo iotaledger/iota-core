@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -17,7 +17,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, src p2ppeer.ID) {
+func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) {
 	mainEngine := p.MainEngineInstance()
 
 	if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
@@ -194,7 +194,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	defer close(ch)
 
 	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.MainChain.Commitment(fork.ForkingPoint.Index()-1).Commitment())
-	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ p2ppeer.ID) {
+	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) {
 		blockIDs, actualCumulativeWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 
 		result := &commitmentVerificationResult{
@@ -272,7 +272,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	return nil, false, false, nil
 }
 
-func (p *Protocol) requestAttestation(ctx context.Context, requestedID iotago.CommitmentID, src p2ppeer.ID, resultChan chan *commitmentVerificationResult) (*commitmentVerificationResult, error) {
+func (p *Protocol) requestAttestation(ctx context.Context, requestedID iotago.CommitmentID, src peer.ID, resultChan chan *commitmentVerificationResult) (*commitmentVerificationResult, error) {
 	ticker := time.NewTicker(p.optsAttestationRequesterTryInterval)
 	defer ticker.Stop()
 

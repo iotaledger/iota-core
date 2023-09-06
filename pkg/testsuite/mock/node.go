@@ -11,7 +11,7 @@ import (
 	"time"
 
 	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
@@ -36,17 +36,17 @@ import (
 )
 
 // idAliases contains a list of aliases registered for a set of IDs.
-var idAliases = make(map[p2ppeer.ID]string)
+var idAliases = make(map[peer.ID]string)
 
 // RegisterIDAlias registers an alias that will modify the String() output of the ID to show a human
 // readable string instead of the base58 encoded version of itself.
-func RegisterIDAlias(id p2ppeer.ID, alias string) {
+func RegisterIDAlias(id peer.ID, alias string) {
 	idAliases[id] = alias
 }
 
 // UnregisterIDAliases removes all aliases registered through the RegisterIDAlias function.
 func UnregisterIDAliases() {
-	idAliases = make(map[p2ppeer.ID]string)
+	idAliases = make(map[peer.ID]string)
 }
 
 type Node struct {
@@ -63,7 +63,7 @@ type Node struct {
 	privateKey              ed25519.PrivateKey
 	PubKey                  ed25519.PublicKey
 	AccountID               iotago.AccountID
-	PeerID                  p2ppeer.ID
+	PeerID                  peer.ID
 	protocolParametersHash  iotago.Identifier
 	highestSupportedVersion iotago.Version
 
@@ -90,7 +90,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 	accountID := iotago.AccountID(blake2b.Sum256(pub))
 	accountID.RegisterAlias(name)
 
-	peerID := lo.PanicOnErr(p2ppeer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
+	peerID := lo.PanicOnErr(peer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
 	RegisterIDAlias(peerID, name)
 
 	return &Node{
@@ -156,29 +156,29 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 
 	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngineInstance())
 
-	events.Network.BlockReceived.Hook(func(block *model.Block, source p2ppeer.ID) {
+	events.Network.BlockReceived.Hook(func(block *model.Block, source peer.ID) {
 		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
 	})
 
-	events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source p2ppeer.ID) {
+	events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source peer.ID) {
 		fmt.Printf("%s > Network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
 	})
 
-	events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source p2ppeer.ID) {
+	events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source peer.ID) {
 		fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
 	})
 
-	events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source p2ppeer.ID) {
+	events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source peer.ID) {
 		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 
-	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source p2ppeer.ID) {
+	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
 		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
 			return lo.PanicOnErr(a.BlockID(lo.PanicOnErr(n.Protocol.APIForVersion(a.ProtocolVersion))))
 		}))
 	})
 
-	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source p2ppeer.ID) {
+	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source peer.ID) {
 		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
@@ -208,7 +208,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
 	})
 
-	events.Network.Error.Hook(func(err error, id p2ppeer.ID) {
+	events.Network.Error.Hook(func(err error, id peer.ID) {
 		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
 	})
 

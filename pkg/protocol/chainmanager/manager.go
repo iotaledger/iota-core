@@ -3,7 +3,7 @@ package chainmanager
 import (
 	"fmt"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/core/memstorage"
@@ -67,7 +67,7 @@ func (m *Manager) Shutdown() {
 	m.commitmentRequester.Shutdown()
 }
 
-func (m *Manager) ProcessCommitmentFromSource(commitment *model.Commitment, source p2ppeer.ID) (isSolid bool, chain *Chain) {
+func (m *Manager) ProcessCommitmentFromSource(commitment *model.Commitment, source peer.ID) (isSolid bool, chain *Chain) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
@@ -294,7 +294,7 @@ func (m *Manager) evaluateAgainstRootCommitment(commitment *iotago.Commitment) (
 	return
 }
 
-func (m *Manager) detectForks(commitment *ChainCommitment, source p2ppeer.ID) {
+func (m *Manager) detectForks(commitment *ChainCommitment, source peer.ID) {
 	forkingPoint, err := m.forkingPointAgainstMainChain(commitment)
 	if err != nil {
 		return

@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
@@ -31,7 +31,7 @@ type PeerDescriptor struct {
 }
 
 type Peer struct {
-	ID            p2ppeer.ID
+	ID            peer.ID
 	PublicKey     ed25519.PublicKey
 	PeerAddresses []ma.Multiaddr
 	ConnStatus    *atomic.Value
@@ -39,7 +39,7 @@ type Peer struct {
 	DoneCh        chan struct{}
 }
 
-func NewPeerFromAddrInfo(addrInfo *p2ppeer.AddrInfo) *Peer {
+func NewPeerFromAddrInfo(addrInfo *peer.AddrInfo) *Peer {
 	p := &Peer{
 		ID:            addrInfo.ID,
 		PeerAddresses: addrInfo.Addrs,
@@ -53,7 +53,7 @@ func NewPeerFromAddrInfo(addrInfo *p2ppeer.AddrInfo) *Peer {
 }
 
 func NewPeerFromMultiAddr(peerAddrs ma.Multiaddr) (*Peer, error) {
-	addrInfo, err := p2ppeer.AddrInfoFromP2pAddr(peerAddrs)
+	addrInfo, err := peer.AddrInfoFromP2pAddr(peerAddrs)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to parse p2p multiaddress")
 	}
@@ -61,8 +61,8 @@ func NewPeerFromMultiAddr(peerAddrs ma.Multiaddr) (*Peer, error) {
 	return NewPeerFromAddrInfo(addrInfo), nil
 }
 
-func (p *Peer) ToAddrInfo() *p2ppeer.AddrInfo {
-	return &p2ppeer.AddrInfo{
+func (p *Peer) ToAddrInfo() *peer.AddrInfo {
+	return &peer.AddrInfo{
 		ID:    p.ID,
 		Addrs: p.PeerAddresses,
 	}
@@ -106,7 +106,7 @@ func peerFromBytes(bytes []byte) (*Peer, error) {
 	if err != nil {
 		return nil, err
 	}
-	id := p2ppeer.ID(idBytes)
+	id := peer.ID(idBytes)
 
 	peer := &Peer{
 		ID:            id,
