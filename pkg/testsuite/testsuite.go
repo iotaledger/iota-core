@@ -136,7 +136,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsMinMana,
 					t.optsMaxBufferSize,
 				),
-				iotago.WithStakingOptions(1),
+				iotago.WithStakingOptions(1, 1, 1),
 			),
 		)
 

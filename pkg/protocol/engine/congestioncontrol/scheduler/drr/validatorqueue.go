@@ -1,9 +1,14 @@
 package drr
 
 import (
+	"container/heap"
 	"fmt"
+	"time"
 
+	"github.com/iotaledger/hive.go/ds/generalheap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"go.uber.org/atomic"
@@ -12,13 +17,22 @@ import (
 type ValidatorQueue struct {
 	accountID iotago.AccountID
 	submitted *shrinkingmap.ShrinkingMap[iotago.BlockID, *blocks.Block]
+	inbox     generalheap.Heap[timed.HeapKey, *blocks.Block]
 	size      atomic.Int64
+
+	tokenBucket      float64
+	lastScheduleTime time.Time
+
+	blockChan      chan *blocks.Block
+	shutdownSignal chan struct{}
 }
 
 func NewValidatorQueue(accountID iotago.AccountID) *ValidatorQueue {
 	return &ValidatorQueue{
-		accountID: accountID,
-		submitted: shrinkingmap.New[iotago.BlockID, *blocks.Block](),
+		accountID:      accountID,
+		submitted:      shrinkingmap.New[iotago.BlockID, *blocks.Block](),
+		blockChan:      make(chan *blocks.Block, 1),
+		shutdownSignal: make(chan struct{}),
 	}
 }
 
@@ -58,4 +72,96 @@ func (q *ValidatorQueue) Unsubmit(block *blocks.Block) bool {
 	q.size.Dec()
 
 	return true
+}
+
+func (q *ValidatorQueue) Ready(block *blocks.Block) bool {
+	if _, submitted := q.submitted.Get(block.ID()); !submitted {
+		return false
+	}
+
+	q.submitted.Delete(block.ID())
+	heap.Push(&q.inbox, &generalheap.HeapElement[timed.HeapKey, *blocks.Block]{Value: block, Key: timed.HeapKey(block.IssuingTime())})
+
+	return true
+}
+
+// PopFront removes the first ready block from the queue.
+func (q *ValidatorQueue) PopFront() *blocks.Block {
+	if q.inbox.Len() == 0 {
+		return nil
+	}
+
+	heapElement, isHeapElement := heap.Pop(&q.inbox).(*generalheap.HeapElement[timed.HeapKey, *blocks.Block])
+	if !isHeapElement {
+		return nil
+	}
+	blk := heapElement.Value
+	q.size.Dec()
+
+	return blk
+}
+
+func (q *ValidatorQueue) RemoveTail() *blocks.Block {
+	var oldestSubmittedBlock *blocks.Block
+	q.submitted.ForEach(func(_ iotago.BlockID, block *blocks.Block) bool {
+		if oldestSubmittedBlock == nil || oldestSubmittedBlock.IssuingTime().After(block.IssuingTime()) {
+			oldestSubmittedBlock = block
+		}
+
+		return true
+	})
+
+	tail := q.tail()
+	// if heap tail does not exist or tail is newer than oldest submitted block, unsubmit oldest block
+	if oldestSubmittedBlock != nil && (tail < 0 || q.inbox[tail].Key.CompareTo(timed.HeapKey(oldestSubmittedBlock.IssuingTime())) > 0) {
+		q.Unsubmit(oldestSubmittedBlock)
+
+		return oldestSubmittedBlock
+	} else if tail < 0 {
+		// should never happen that the oldest submitted block does not exist and the tail does not exist.
+		return nil
+	}
+
+	// if the tail exists and is older than the oldest submitted block, drop it
+	heapElement, isHeapElement := heap.Remove(&q.inbox, tail).(*generalheap.HeapElement[timed.HeapKey, *blocks.Block])
+	if !isHeapElement {
+		return nil
+	}
+	blk := heapElement.Value
+	q.size.Dec()
+
+	return blk
+}
+
+func (q *ValidatorQueue) tail() int {
+	h := q.inbox
+	if h.Len() <= 0 {
+		return -1
+	}
+	tail := 0
+	for i := range h {
+		if !h.Less(i, tail) { // less means older issue time
+			tail = i
+		}
+	}
+
+	return tail
+}
+
+func (q *ValidatorQueue) waitTime(rate float64) time.Duration {
+	tokensRequired := 1 - (q.tokenBucket + rate*time.Since(q.lastScheduleTime).Seconds())
+
+	return lo.Max(0, time.Duration(tokensRequired/rate))
+}
+
+func (q *ValidatorQueue) updateTokenBucket(rate float64, tokenBucketSize float64) {
+	q.tokenBucket = lo.Min(
+		tokenBucketSize,
+		q.tokenBucket+rate*time.Since(q.lastScheduleTime).Seconds(),
+	)
+	q.lastScheduleTime = time.Now()
+}
+
+func (q *ValidatorQueue) deductTokens(tokens float64) {
+	q.tokenBucket -= tokens
 }

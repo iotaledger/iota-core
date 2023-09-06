@@ -7,7 +7,7 @@ import (
 )
 
 type Scheduler interface {
-	// AddBasicBlock adds a basic block to the scheduling buffer.
+	// AddBlock adds a block to the scheduling buffer.
 	AddBlock(*blocks.Block)
 	// IsBlockIssuerReady returns true if the block issuer is ready to issuer a block, i.e., if the block issuer were to add a block to the scheduler, would it be scheduled.
 	IsBlockIssuerReady(iotago.AccountID, ...*blocks.Block) bool

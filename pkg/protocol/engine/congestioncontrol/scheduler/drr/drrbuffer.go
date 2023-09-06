@@ -3,9 +3,11 @@ package drr
 import (
 	"container/ring"
 	"math"
+	"time"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -25,14 +27,22 @@ type BufferQueue struct {
 	ring          *ring.Ring
 	// size is the number of blocks in the buffer.
 	size int
+
+	tokenBucket      float64
+	lastScheduleTime time.Time
+
+	blockChan chan *blocks.Block
+	timer     *time.Timer
 }
 
 // NewBufferQueue returns a new BufferQueue.
 func NewBufferQueue(maxBuffer int) *BufferQueue {
 	return &BufferQueue{
-		maxBuffer:     maxBuffer,
-		activeIssuers: shrinkingmap.New[iotago.AccountID, *ring.Ring](),
-		ring:          nil,
+		maxBuffer:        maxBuffer,
+		activeIssuers:    shrinkingmap.New[iotago.AccountID, *ring.Ring](),
+		ring:             nil,
+		lastScheduleTime: time.Now(),
+		blockChan:        make(chan *blocks.Block, 1),
 	}
 }
 
@@ -318,6 +328,24 @@ func (b *BufferQueue) ringInsert(v interface{}) *ring.Ring {
 	}
 
 	return p.Link(b.ring)
+}
+
+func (b *BufferQueue) waitTime(rate float64, block *blocks.Block) time.Duration {
+	tokensRequired := float64(block.WorkScore()) - (b.tokenBucket + rate*time.Since(b.lastScheduleTime).Seconds())
+
+	return lo.Max(0, time.Duration(tokensRequired/rate))
+}
+
+func (b *BufferQueue) updateTokenBucket(rate float64, tokenBucketSize float64) {
+	b.tokenBucket = lo.Min(
+		tokenBucketSize,
+		b.tokenBucket+rate*time.Since(b.lastScheduleTime).Seconds(),
+	)
+	b.lastScheduleTime = time.Now()
+}
+
+func (b *BufferQueue) deductTokens(tokens float64) {
+	b.tokenBucket -= tokens
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
