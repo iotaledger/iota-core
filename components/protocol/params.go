@@ -21,6 +21,8 @@ type ParametersProtocol struct {
 		MaxAllowedClockDrift time.Duration `default:"5s" usage:"the maximum drift our wall clock can have to future blocks being received from the network"`
 	}
 
+	ProtocolParametersPath string `default:"testnet/protocol_parameters.json" usage:"the path of the protocol parameters file"`
+
 	BaseToken BaseToken
 }
 
