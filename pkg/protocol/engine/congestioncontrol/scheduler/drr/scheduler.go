@@ -329,7 +329,7 @@ loop:
 			// allow a maximum burst of validationBlocksPerSlot by setting this as max token bucket size.
 			validatorQueue.updateTokenBucket(rate, validationBlocksPerSlot)
 
-			s.scheduleValidationBlock(blockToSchedule)
+			s.scheduleValidationBlock(blockToSchedule, validatorQueue)
 		}
 	}
 }
@@ -347,10 +347,10 @@ func (s *Scheduler) scheduleBasicBlock(block *blocks.Block) {
 	}
 }
 
-func (s *Scheduler) scheduleValidationBlock(block *blocks.Block) {
+func (s *Scheduler) scheduleValidationBlock(block *blocks.Block, validatorQueue *ValidatorQueue) {
 	if block.SetScheduled() {
 		// deduct 1 token from the token bucket of this validator's queue.
-		s.validatorBuffer[block.ProtocolBlock().IssuerID].deductTokens(1)
+		validatorQueue.deductTokens(1)
 
 		// check for another block ready to schedule
 		s.updateChildrenWithLocking(block)
