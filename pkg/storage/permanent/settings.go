@@ -30,6 +30,9 @@ const (
 type Settings struct {
 	mutex                            syncutils.RWMutex
 	store                            kvstore.KVStore
+	storeSnapshotImported            *kvstore.TypedValue[byte]
+	storeLatestCommitment            *kvstore.TypedValue[*model.Commitment]
+	storeLatestFinalizedSlot         *kvstore.TypedValue[iotago.SlotIndex]
 	storeProtocolVersionEpochMapping *kvstore.TypedStore[iotago.Version, iotago.EpochIndex]
 	storeFutureProtocolParameters    *kvstore.TypedStore[iotago.Version, *types.Tuple[iotago.EpochIndex, iotago.Identifier]]
 	storeProtocolParameters          *kvstore.TypedStore[iotago.Version, iotago.ProtocolParameters]
@@ -38,17 +41,51 @@ type Settings struct {
 }
 
 func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedProvider]) (settings *Settings) {
+	apiProvider := api.NewEpochBasedProvider(opts...)
+
 	s := &Settings{
 		store:       store,
-		apiProvider: api.NewEpochBasedProvider(opts...),
-		storeProtocolVersionEpochMapping: kvstore.NewTypedStore[iotago.Version, iotago.EpochIndex](
+		apiProvider: apiProvider,
+		storeSnapshotImported: kvstore.NewTypedValue(
+			store,
+			[]byte{snapshotImportedKey},
+			func(v byte) ([]byte, error) {
+				return []byte{v}, nil
+			},
+			func(bytes []byte) (byte, int, error) {
+				return bytes[0], 1, nil
+			},
+		),
+		storeLatestCommitment: kvstore.NewTypedValue(
+			store,
+			[]byte{latestCommitmentKey},
+			func(commitment *model.Commitment) ([]byte, error) {
+				return commitment.Data(), nil
+			},
+			func(bytes []byte) (*model.Commitment, int, error) {
+				commitment, err := model.CommitmentFromBytes(bytes, apiProvider)
+				if err != nil {
+					return nil, 0, err
+				}
+
+				return commitment, len(bytes), nil
+			},
+		),
+		storeLatestFinalizedSlot: kvstore.NewTypedValue(
+			store,
+			[]byte{latestFinalizedSlotKey},
+			iotago.SlotIndex.Bytes,
+			iotago.SlotIndexFromBytes,
+		),
+
+		storeProtocolVersionEpochMapping: kvstore.NewTypedStore(
 			lo.PanicOnErr(store.WithExtendedRealm([]byte{protocolVersionEpochMappingKey})),
 			iotago.Version.Bytes,
 			iotago.VersionFromBytes,
 			iotago.EpochIndex.Bytes,
 			iotago.EpochIndexFromBytes,
 		),
-		storeFutureProtocolParameters: kvstore.NewTypedStore[iotago.Version, *types.Tuple[iotago.EpochIndex, iotago.Identifier]](
+		storeFutureProtocolParameters: kvstore.NewTypedStore(
 			lo.PanicOnErr(store.WithExtendedRealm([]byte{futureProtocolParametersKey})),
 			iotago.Version.Bytes,
 			iotago.VersionFromBytes,
@@ -69,7 +106,7 @@ func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedPro
 				return types.NewTuple(epoch, hash), consumedBytes + consumedBytes2, nil
 			},
 		),
-		storeProtocolParameters: kvstore.NewTypedStore[iotago.Version, iotago.ProtocolParameters](
+		storeProtocolParameters: kvstore.NewTypedStore(
 			lo.PanicOnErr(store.WithExtendedRealm([]byte{protocolParametersKey})),
 			iotago.Version.Bytes,
 			iotago.VersionFromBytes,
@@ -190,14 +227,14 @@ func (s *Settings) IsSnapshotImported() bool {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return lo.PanicOnErr(s.store.Has([]byte{snapshotImportedKey}))
+	return lo.PanicOnErr(s.storeSnapshotImported.Has())
 }
 
 func (s *Settings) SetSnapshotImported() (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	return s.store.Set([]byte{snapshotImportedKey}, []byte{1})
+	return s.storeSnapshotImported.Set(1)
 }
 
 func (s *Settings) LatestCommitment() *model.Commitment {
@@ -216,11 +253,11 @@ func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err 
 	// Delete the old future protocol parameters if they exist.
 	_ = s.storeFutureProtocolParameters.Delete(s.apiProvider.VersionForSlot(latestCommitment.Index()))
 
-	return s.store.Set([]byte{latestCommitmentKey}, latestCommitment.Data())
+	return s.storeLatestCommitment.Set(latestCommitment)
 }
 
 func (s *Settings) latestCommitment() *model.Commitment {
-	bytes, err := s.store.Get([]byte{latestCommitmentKey})
+	commitment, err := s.storeLatestCommitment.Get()
 
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
@@ -229,7 +266,7 @@ func (s *Settings) latestCommitment() *model.Commitment {
 		panic(err)
 	}
 
-	return lo.PanicOnErr(model.CommitmentFromBytes(bytes, s.apiProvider))
+	return commitment
 }
 
 func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
@@ -243,23 +280,19 @@ func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	return s.store.Set([]byte{latestFinalizedSlotKey}, index.MustBytes())
+	return s.storeLatestFinalizedSlot.Set(index)
 }
 
 func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
-	bytes, err := s.store.Get([]byte{latestFinalizedSlotKey})
+	latestFinalizedSlot, err := s.storeLatestFinalizedSlot.Get()
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return 0
 		}
 		panic(err)
 	}
-	i, _, err := iotago.SlotIndexFromBytes(bytes)
-	if err != nil {
-		panic(err)
-	}
 
-	return i
+	return latestFinalizedSlot
 }
 
 func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commitment) error {
@@ -495,7 +528,7 @@ func (s *Settings) String() string {
 	defer s.mutex.RUnlock()
 
 	builder := stringify.NewStructBuilder("Settings")
-	builder.AddField(stringify.NewStructField("IsSnapshotImported", lo.PanicOnErr(s.store.Has([]byte{snapshotImportedKey}))))
+	builder.AddField(stringify.NewStructField("IsSnapshotImported", lo.PanicOnErr(s.storeSnapshotImported.Has())))
 	builder.AddField(stringify.NewStructField("LatestCommitment", s.latestCommitment()))
 	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.latestFinalizedSlot()))
 	if err := s.storeProtocolParameters.Iterate(kvstore.EmptyPrefix, func(version iotago.Version, protocolParams iotago.ProtocolParameters) bool {
