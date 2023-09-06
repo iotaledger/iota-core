@@ -60,7 +60,6 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	if err := s.Settings().StoreProtocolParametersForStartEpoch(opt.ProtocolParameters, 0); err != nil {
 		return ierrors.Wrap(err, "failed to store the protocol parameters for epoch 0")
 	}
-	s.Settings().APIProvider().Initialize(0)
 
 	api := s.Settings().APIProvider().CurrentAPI()
 	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {

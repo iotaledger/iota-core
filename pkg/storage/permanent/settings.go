@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
@@ -32,17 +33,17 @@ type Settings struct {
 	apiProvider *api.EpochBasedProvider
 }
 
-func NewSettings(store kvstore.KVStore) (settings *Settings) {
+func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedProvider]) (settings *Settings) {
 	s := &Settings{
 		store:       store,
-		apiProvider: api.NewEpochBasedProvider(),
+		apiProvider: api.NewEpochBasedProvider(opts...),
 	}
 
-	s.loadProtocolParametersEpochMappings()
-	s.loadFutureProtocolParameters()
 	s.loadProtocolParameters()
+	s.loadFutureProtocolParameters()
+	s.loadProtocolParametersEpochMappings()
 	if s.IsSnapshotImported() {
-		s.apiProvider.Initialize(s.latestCommitment().Index())
+		s.apiProvider.SetCurrentSlot(s.latestCommitment().Index())
 	}
 
 	return s
@@ -122,11 +123,15 @@ func (s *Settings) APIProvider() *api.EpochBasedProvider {
 }
 
 func (s *Settings) StoreProtocolParametersForStartEpoch(params iotago.ProtocolParameters, startEpoch iotago.EpochIndex) error {
-	if err := s.storeProtocolParametersEpochMapping(params.Version(), startEpoch); err != nil {
-		return err
+	if err := s.StoreProtocolParameters(params); err != nil {
+		return ierrors.Wrap(err, "failed to store protocol parameters")
 	}
 
-	return s.StoreProtocolParameters(params)
+	if err := s.storeProtocolParametersEpochMapping(params.Version(), startEpoch); err != nil {
+		return ierrors.Wrap(err, "failed to store protocol version epoch mapping")
+	}
+
+	return nil
 }
 
 func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) error {
@@ -508,8 +513,6 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 	if err != nil {
 		return ierrors.Wrap(err, "failed to parse commitment")
 	}
-
-	s.apiProvider.Initialize(commitment.Index())
 
 	if err := s.SetLatestCommitment(commitment); err != nil {
 		return ierrors.Wrap(err, "failed to set latest commitment")

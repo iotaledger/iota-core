@@ -22,8 +22,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func Test_Upgrade_Signaling(t *testing.T) {
@@ -52,6 +54,13 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		),
 		protocol.WithStorageOptions(
 			storage.WithPruningDelay(20),
+			storage.WithPermanentOptions(
+				permanent.WithEpochBasedProviderOptions(
+					api.WithAPIForMissingVersionCallback(func(version iotago.Version) (iotago.API, error) {
+						return ts.API, nil
+					}),
+				),
+			),
 		),
 	}
 
