@@ -120,9 +120,10 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 func New(apiProvider api.Provider, opts ...options.Option[Scheduler]) *Scheduler {
 	return options.Apply(
 		&Scheduler{
-			events:      scheduler.NewEvents(),
-			deficits:    shrinkingmap.New[iotago.AccountID, Deficit](),
-			apiProvider: apiProvider,
+			events:          scheduler.NewEvents(),
+			deficits:        shrinkingmap.New[iotago.AccountID, Deficit](),
+			apiProvider:     apiProvider,
+			validatorBuffer: make(map[iotago.AccountID]*ValidatorQueue),
 		}, opts,
 	)
 }
@@ -271,9 +272,8 @@ func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
 
 	if block.SetEnqueued() {
 		s.events.BlockEnqueued.Trigger(block)
+		s.tryReadyValidationBlock(block)
 	}
-
-	s.tryReadyValidationBlock(block)
 
 	//s.scheduleValidationBlock(block)
 }
@@ -361,6 +361,25 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
+	for _, validatorQueue := range s.validatorBuffer {
+		s.selectValidationBlockWithoutLocking(validatorQueue)
+	}
+	s.selectBasicBlockWithoutLocking()
+
+}
+
+func (s *Scheduler) selectValidationBlockWithoutLocking(validatorQueue *ValidatorQueue) {
+	// already a block selected to be scheduled.
+	if len(validatorQueue.blockChan) > 0 {
+		return
+	}
+
+	if blockToSchedule := validatorQueue.PopFront(); blockToSchedule != nil {
+		validatorQueue.blockChan <- blockToSchedule
+	}
+}
+
+func (s *Scheduler) selectBasicBlockWithoutLocking() {
 	slotIndex := s.latestCommittedSlot()
 
 	// already a block selected to be scheduled.
