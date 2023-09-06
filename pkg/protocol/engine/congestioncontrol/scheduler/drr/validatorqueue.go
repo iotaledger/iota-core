@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"go.uber.org/atomic"
+
 	"github.com/iotaledger/hive.go/ds/generalheap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+
 	iotago "github.com/iotaledger/iota.go/v4"
-	"go.uber.org/atomic"
 )
 
 type ValidatorQueue struct {

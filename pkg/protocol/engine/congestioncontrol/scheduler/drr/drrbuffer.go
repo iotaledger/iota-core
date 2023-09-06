@@ -32,7 +32,6 @@ type BufferQueue struct {
 	lastScheduleTime time.Time
 
 	blockChan chan *blocks.Block
-	timer     *time.Timer
 }
 
 // NewBufferQueue returns a new BufferQueue.
