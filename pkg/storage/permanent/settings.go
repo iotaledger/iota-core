@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -27,8 +28,11 @@ const (
 )
 
 type Settings struct {
-	mutex syncutils.RWMutex
-	store kvstore.KVStore
+	mutex                            syncutils.RWMutex
+	store                            kvstore.KVStore
+	storeProtocolVersionEpochMapping *kvstore.TypedStore[iotago.Version, iotago.EpochIndex]
+	storeFutureProtocolParameters    *kvstore.TypedStore[iotago.Version, *types.Tuple[iotago.EpochIndex, iotago.Identifier]]
+	storeProtocolParameters          *kvstore.TypedStore[iotago.Version, iotago.ProtocolParameters]
 
 	apiProvider *api.EpochBasedProvider
 }
@@ -37,6 +41,41 @@ func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedPro
 	s := &Settings{
 		store:       store,
 		apiProvider: api.NewEpochBasedProvider(opts...),
+		storeProtocolVersionEpochMapping: kvstore.NewTypedStore[iotago.Version, iotago.EpochIndex](
+			lo.PanicOnErr(store.WithExtendedRealm([]byte{protocolVersionEpochMappingKey})),
+			iotago.Version.Bytes,
+			iotago.VersionFromBytes,
+			iotago.EpochIndex.Bytes,
+			iotago.EpochIndexFromBytes,
+		),
+		storeFutureProtocolParameters: kvstore.NewTypedStore[iotago.Version, *types.Tuple[iotago.EpochIndex, iotago.Identifier]](
+			lo.PanicOnErr(store.WithExtendedRealm([]byte{futureProtocolParametersKey})),
+			iotago.Version.Bytes,
+			iotago.VersionFromBytes,
+			func(t *types.Tuple[iotago.EpochIndex, iotago.Identifier]) ([]byte, error) {
+				return byteutils.ConcatBytes(t.A.MustBytes(), lo.PanicOnErr(t.B.Bytes())), nil
+			},
+			func(b []byte) (*types.Tuple[iotago.EpochIndex, iotago.Identifier], int, error) {
+				epoch, consumedBytes, err := iotago.EpochIndexFromBytes(b)
+				if err != nil {
+					return nil, 0, ierrors.Wrap(err, "failed to parse epoch index")
+				}
+
+				hash, consumedBytes2, err := iotago.IdentifierFromBytes(b[consumedBytes:])
+				if err != nil {
+					return nil, 0, ierrors.Wrap(err, "failed to parse identifier")
+				}
+
+				return types.NewTuple(epoch, hash), consumedBytes + consumedBytes2, nil
+			},
+		),
+		storeProtocolParameters: kvstore.NewTypedStore[iotago.Version, iotago.ProtocolParameters](
+			lo.PanicOnErr(store.WithExtendedRealm([]byte{protocolParametersKey})),
+			iotago.Version.Bytes,
+			iotago.VersionFromBytes,
+			iotago.ProtocolParameters.Bytes,
+			iotago.ProtocolParametersFromBytes,
+		),
 	}
 
 	s.loadProtocolParameters()
@@ -53,17 +92,7 @@ func (s *Settings) loadProtocolParametersEpochMappings() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if err := s.store.Iterate([]byte{protocolVersionEpochMappingKey}, func(key kvstore.Key, value kvstore.Value) bool {
-		version, _, err := iotago.VersionFromBytes(key[1:])
-		if err != nil {
-			panic(err)
-		}
-
-		epoch, _, err := iotago.EpochIndexFromBytes(value)
-		if err != nil {
-			panic(err)
-		}
-
+	if err := s.storeProtocolVersionEpochMapping.Iterate(kvstore.EmptyPrefix, func(version iotago.Version, epoch iotago.EpochIndex) bool {
 		s.apiProvider.AddVersion(version, epoch)
 
 		return true
@@ -76,12 +105,7 @@ func (s *Settings) loadProtocolParameters() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if err := s.store.Iterate([]byte{protocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
-		protocolParams, _, err := iotago.ProtocolParametersFromBytes(value)
-		if err != nil {
-			return true // skip over invalid protocol parameters
-		}
-
+	if err := s.storeProtocolParameters.Iterate(kvstore.EmptyPrefix, func(version iotago.Version, protocolParams iotago.ProtocolParameters) bool {
 		s.apiProvider.AddProtocolParameters(protocolParams)
 
 		return true
@@ -94,23 +118,8 @@ func (s *Settings) loadFutureProtocolParameters() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if err := s.store.Iterate([]byte{futureProtocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
-		version, _, err := iotago.VersionFromBytes(key[1:])
-		if err != nil {
-			panic(err)
-		}
-
-		epoch, read, err := iotago.EpochIndexFromBytes(value)
-		if err != nil {
-			panic(err)
-		}
-
-		hash, _, err := iotago.IdentifierFromBytes(value[read:])
-		if err != nil {
-			panic(err)
-		}
-
-		s.apiProvider.AddFutureVersion(version, hash, epoch)
+	if err := s.storeFutureProtocolParameters.Iterate(kvstore.EmptyPrefix, func(version iotago.Version, tuple *types.Tuple[iotago.EpochIndex, iotago.Identifier]) bool {
+		s.apiProvider.AddFutureVersion(version, tuple.B, tuple.A)
 
 		return true
 	}); err != nil {
@@ -138,13 +147,8 @@ func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) err
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	bytes, err := params.Bytes()
-	if err != nil {
-		return err
-	}
-
-	if err := s.store.Set([]byte{protocolParametersKey, byte(params.Version())}, bytes); err != nil {
-		return err
+	if err := s.storeProtocolParameters.Set(params.Version(), params); err != nil {
+		return ierrors.Wrap(err, "failed to store protocol parameters")
 	}
 
 	s.apiProvider.AddProtocolParameters(params)
@@ -156,13 +160,8 @@ func (s *Settings) storeProtocolParametersEpochMapping(version iotago.Version, e
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	epochBytes, err := epoch.Bytes()
-	if err != nil {
-		return err
-	}
-
-	if err := s.store.Set([]byte{protocolVersionEpochMappingKey, byte(version)}, epochBytes); err != nil {
-		return err
+	if err := s.storeProtocolVersionEpochMapping.Set(version, epoch); err != nil {
+		return ierrors.Wrap(err, "failed to store protocol version epoch mapping")
 	}
 
 	s.apiProvider.AddVersion(version, epoch)
@@ -174,22 +173,12 @@ func (s *Settings) StoreFutureProtocolParametersHash(version iotago.Version, has
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	epochBytes, err := epoch.Bytes()
-	if err != nil {
-		return err
+	if err := s.storeFutureProtocolParameters.Set(version, types.NewTuple(epoch, hash)); err != nil {
+		return ierrors.Wrap(err, "failed to store future protocol parameters")
 	}
 
-	hashBytes, err := hash.Bytes()
-	if err != nil {
-		return err
-	}
-
-	if err := s.store.Set([]byte{futureProtocolParametersKey, byte(version)}, byteutils.ConcatBytes(epochBytes, hashBytes)); err != nil {
-		return err
-	}
-
-	if err := s.store.Set([]byte{protocolVersionEpochMappingKey, byte(version)}, epochBytes); err != nil {
-		return err
+	if err := s.storeProtocolVersionEpochMapping.Set(version, epoch); err != nil {
+		return ierrors.Wrap(err, "failed to store protocol version epoch mapping")
 	}
 
 	s.apiProvider.AddFutureVersion(version, hash, epoch)
@@ -225,7 +214,7 @@ func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err 
 	s.apiProvider.SetCurrentSlot(latestCommitment.Index())
 
 	// Delete the old future protocol parameters if they exist.
-	_ = s.store.Delete([]byte{futureProtocolParametersKey, byte(s.apiProvider.VersionForSlot(latestCommitment.Index()))})
+	_ = s.storeFutureProtocolParameters.Delete(s.apiProvider.VersionForSlot(latestCommitment.Index()))
 
 	return s.store.Set([]byte{latestCommitmentKey}, latestCommitment.Data())
 }
@@ -301,21 +290,10 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
 		var count uint64
 		var innerErr error
-		if err := s.store.Iterate([]byte{protocolVersionEpochMappingKey}, func(key kvstore.Key, value kvstore.Value) bool {
-			version, _, err := iotago.VersionFromBytes(key[1:])
-			if err != nil {
-				innerErr = ierrors.Wrap(err, "failed to read version")
-				return false
-			}
 
+		if err := s.storeProtocolVersionEpochMapping.Iterate(kvstore.EmptyPrefix, func(version iotago.Version, epoch iotago.EpochIndex) bool {
 			if err := stream.Write(writer, version); err != nil {
 				innerErr = ierrors.Wrap(err, "failed to encode version")
-				return false
-			}
-
-			epoch, _, err := iotago.EpochIndexFromBytes(value)
-			if err != nil {
-				innerErr = ierrors.Wrap(err, "failed to encode epoch")
 				return false
 			}
 
@@ -330,6 +308,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		}); err != nil {
 			return 0, ierrors.Wrap(err, "failed to iterate over protocol version epoch mapping")
 		}
+
 		if innerErr != nil {
 			return 0, ierrors.Wrap(innerErr, "failed to write protocol version epoch mapping")
 		}
@@ -343,36 +322,19 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
 		var count uint64
 		var innerErr error
-		if err := s.store.Iterate([]byte{futureProtocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
-			version, _, err := iotago.VersionFromBytes(key[1:])
-			if err != nil {
-				innerErr = ierrors.Wrap(err, "failed to read version")
-				return false
-			}
 
+		if err := s.storeFutureProtocolParameters.Iterate(kvstore.EmptyPrefix, func(version iotago.Version, tuple *types.Tuple[iotago.EpochIndex, iotago.Identifier]) bool {
 			if err := stream.Write(writer, version); err != nil {
 				innerErr = ierrors.Wrap(err, "failed to encode version")
 				return false
 			}
 
-			epoch, read, err := iotago.EpochIndexFromBytes(value)
-			if err != nil {
+			if err := stream.Write(writer, tuple.A); err != nil {
 				innerErr = ierrors.Wrap(err, "failed to encode epoch")
 				return false
 			}
 
-			if err := stream.Write(writer, epoch); err != nil {
-				innerErr = ierrors.Wrap(err, "failed to encode epoch")
-				return false
-			}
-
-			hash, _, err := iotago.IdentifierFromBytes(value[read:])
-			if err != nil {
-				innerErr = ierrors.Wrap(err, "failed to read hash")
-				return false
-			}
-
-			if err := stream.Write(writer, hash); err != nil {
+			if err := stream.Write(writer, tuple.B); err != nil {
 				innerErr = ierrors.Wrap(err, "failed to encode hash")
 				return false
 			}
@@ -383,6 +345,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		}); err != nil {
 			return 0, ierrors.Wrap(err, "failed to iterate over future protocol parameters")
 		}
+
 		if innerErr != nil {
 			return 0, ierrors.Wrap(innerErr, "failed to write future protocol parameters")
 		}
@@ -396,8 +359,9 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
 		var paramsCount uint64
 		var innerErr error
-		if err := s.store.Iterate([]byte{protocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
-			version, _, err := iotago.VersionFromBytes(key[1:])
+
+		if err := s.storeProtocolParameters.KVStore().Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
+			version, _, err := iotago.VersionFromBytes(key)
 			if err != nil {
 				innerErr = ierrors.Wrap(err, "failed to read version")
 				return false
@@ -534,12 +498,8 @@ func (s *Settings) String() string {
 	builder.AddField(stringify.NewStructField("IsSnapshotImported", lo.PanicOnErr(s.store.Has([]byte{snapshotImportedKey}))))
 	builder.AddField(stringify.NewStructField("LatestCommitment", s.latestCommitment()))
 	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.latestFinalizedSlot()))
-	if err := s.store.Iterate([]byte{protocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
-		params, _, err := iotago.ProtocolParametersFromBytes(value)
-		if err != nil {
-			panic(err)
-		}
-		builder.AddField(stringify.NewStructField(fmt.Sprintf("ProtocolParameters(%d)", key[1]), params))
+	if err := s.storeProtocolParameters.Iterate(kvstore.EmptyPrefix, func(version iotago.Version, protocolParams iotago.ProtocolParameters) bool {
+		builder.AddField(stringify.NewStructField(fmt.Sprintf("ProtocolParameters(%d)", version), protocolParams))
 
 		return true
 	}); err != nil {
