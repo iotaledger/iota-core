@@ -78,21 +78,19 @@ type Manager struct {
 
 	neighbors      map[peer.ID]*Neighbor
 	neighborsMutex syncutils.RWMutex
-	maxPeers       int
 
 	protocolHandler      *ProtocolHandler
 	protocolHandlerMutex syncutils.RWMutex
 }
 
 // NewManager creates a new Manager.
-func NewManager(libp2pHost host.Host, peerDB *network.DB, log *logger.Logger, maxPeers int) *Manager {
+func NewManager(libp2pHost host.Host, peerDB *network.DB, log *logger.Logger) *Manager {
 	m := &Manager{
 		libp2pHost: libp2pHost,
 		peerDB:     peerDB,
 		log:        log,
 		Events:     NewNeighborEvents(),
 		neighbors:  make(map[peer.ID]*Neighbor),
-		maxPeers:   maxPeers,
 	}
 
 	return m
@@ -271,18 +269,10 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 	m.protocolHandlerMutex.RLock()
 	defer m.protocolHandlerMutex.RUnlock()
 
-	// We handle more incoming connections than we allow outgoing connections, so we can
-	// provide network access to new nodes.
-	if len(m.neighbors) >= (m.maxPeers + m.maxPeers/2) {
-		m.log.Debugf("rejecting incoming connection from %s: too many neighbors", stream.Conn().RemotePeer())
-		stream.Close()
-
-		return
-	}
-
 	if m.protocolHandler == nil {
 		m.log.Error("no protocol handler registered")
 		stream.Close()
+
 		return
 	}
 

@@ -22,7 +22,6 @@ type Manager struct {
 	networkID        string
 	p2pManager       *p2p.Manager
 	log              *logger.Logger
-	maxPeers         int
 	host             host.Host
 	peerDB           *network.DB
 	startOnce        sync.Once
@@ -34,14 +33,13 @@ type Manager struct {
 }
 
 // NewManager creates a new autopeering manager.
-func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *network.DB, log *logger.Logger, maxPeers int) *Manager {
+func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *network.DB, log *logger.Logger) *Manager {
 	return &Manager{
 		networkID:  networkID,
 		p2pManager: p2pManager,
 		host:       host,
 		peerDB:     peerDB,
 		log:        log,
-		maxPeers:   maxPeers,
 	}
 }
 
@@ -131,12 +129,6 @@ func (m *Manager) discoverAndDialPeers() {
 		// Do not self-dial.
 		if peerAddrInfo.ID == m.host.ID() {
 			continue
-		}
-
-		// Do not dial if we already have enough neighbors.
-		if len(m.p2pManager.AllNeighbors()) >= m.maxPeers {
-			m.log.Debugf("Already have %d neighbors, not dialing %s", m.maxPeers, peerAddrInfo)
-			return
 		}
 
 		m.log.Debugf("Found peer: %s", peerAddrInfo)

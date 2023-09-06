@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"time"
 
 	golibp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	ma "github.com/multiformats/go-multiaddr"
 	"go.uber.org/dig"
 
@@ -94,7 +96,7 @@ func provide(c *dig.Container) error {
 			}
 		}
 
-		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger(), ParamsPeers.MaxPeers)
+		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger())
 	}); err != nil {
 		return err
 	}
@@ -169,9 +171,19 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func(nodePrivateKey crypto.PrivKey) host.Host {
 		var err error
 
+		connManager, err := connmgr.NewConnManager(
+			ParamsP2P.ConnectionManager.LowWatermark,
+			ParamsP2P.ConnectionManager.HighWatermark,
+			connmgr.WithGracePeriod(time.Minute),
+		)
+		if err != nil {
+			Component.LogErrorfAndExit("unable to initialize connection manager: %s", err)
+		}
+
 		libp2pHost, err := golibp2p.New(
 			golibp2p.ListenAddrStrings(ParamsP2P.BindAddress),
 			golibp2p.Identity(nodePrivateKey),
+			golibp2p.ConnectionManager(connManager),
 			golibp2p.NATPortMap(),
 		)
 		if err != nil {
@@ -186,7 +198,7 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(host host.Host, peerDB *network.DB) *p2p.Manager {
-		return p2p.NewManager(host, peerDB, Component.Logger(), ParamsPeers.MaxPeers)
+		return p2p.NewManager(host, peerDB, Component.Logger())
 	})
 }
 
