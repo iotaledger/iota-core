@@ -71,7 +71,6 @@ func (m *Manager) AddPeers(peerAddrs ...multiaddr.Multiaddr) error {
 // RemovePeer removes a peer from the list of known peers.
 func (m *Manager) RemovePeer(peerID peer.ID) error {
 	m.knownPeersMutex.Lock()
-	defer m.knownPeersMutex.Unlock()
 
 	kp, exists := m.knownPeers[peerID]
 	if !exists {
@@ -79,6 +78,9 @@ func (m *Manager) RemovePeer(peerID peer.ID) error {
 	}
 	delete(m.knownPeers, peerID)
 	close(kp.RemoveCh)
+
+	m.knownPeersMutex.Unlock()
+
 	<-kp.DoneCh
 	if err := m.p2pm.DropNeighbor(peerID); err != nil && !ierrors.Is(err, p2p.ErrUnknownNeighbor) {
 		return ierrors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID)
