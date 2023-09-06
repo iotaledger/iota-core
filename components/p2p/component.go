@@ -11,7 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multiaddr"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
@@ -278,7 +278,7 @@ func addPeersFromConfigToManager(manualPeeringMgr *manualpeering.Manager) {
 	}
 }
 
-func getMultiAddrsFromParam(param string) ([]ma.Multiaddr, error) {
+func getMultiAddrsFromParam(param string) ([]multiaddr.Multiaddr, error) {
 	if param == "" {
 		return nil, nil
 	}
@@ -287,9 +287,9 @@ func getMultiAddrsFromParam(param string) ([]ma.Multiaddr, error) {
 		return nil, ierrors.Wrap(err, "can't parse peers from json")
 	}
 
-	peersMultiAddr := make([]ma.Multiaddr, 0, len(peersMultiAddrStrings))
+	peersMultiAddr := make([]multiaddr.Multiaddr, 0, len(peersMultiAddrStrings))
 	for _, peerMultiAddrString := range peersMultiAddrStrings {
-		peerMultiAddr, err := ma.NewMultiaddr(peerMultiAddrString)
+		peerMultiAddr, err := multiaddr.NewMultiaddr(peerMultiAddrString)
 		if err != nil {
 			return nil, ierrors.Wrap(err, "can't parse peer multiaddr")
 		}

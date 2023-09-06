@@ -9,7 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multiaddr"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -286,7 +286,7 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 
 	peerAddrInfo := &peer.AddrInfo{
 		ID:    stream.Conn().RemotePeer(),
-		Addrs: []ma.Multiaddr{stream.Conn().RemoteMultiaddr()},
+		Addrs: []multiaddr.Multiaddr{stream.Conn().RemoteMultiaddr()},
 	}
 	peer := network.NewPeerFromAddrInfo(peerAddrInfo)
 	if err := m.peerDB.UpdatePeer(peer); err != nil {
