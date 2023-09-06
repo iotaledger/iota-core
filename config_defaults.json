@@ -24,7 +24,10 @@
     "disableEvents": true
   },
   "p2p": {
-    "bindAddress": "/ip4/0.0.0.0/tcp/14666",
+    "bindMultiAddresses": [
+      "/ip4/0.0.0.0/tcp/14666",
+      "/ip6/::/tcp/14666"
+    ],
     "connectionManager": {
       "highWatermark": 10,
       "lowWatermark": 5
@@ -32,7 +35,10 @@
     "seed": "",
     "overwriteStoredSeed": false,
     "externalAddress": "auto",
-    "peerDBDirectory": "testnet/peerdb"
+    "identityPrivateKey": "",
+    "db": {
+      "path": "testnet/p2pstore"
+    }
   },
   "profiling": {
     "enabled": false,
