@@ -95,7 +95,7 @@ func (m *Manager) Stop() (err error) {
 		m.stopFunc()
 	})
 
-	return err
+	return nil
 }
 
 func (m *Manager) discoveryLoop() {
