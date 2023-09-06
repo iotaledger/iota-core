@@ -70,7 +70,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	testAPI := iotago.V3API(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("TestJungle", "tgl"),
-			iotago.WithSupplyOptions(10000, 0, 0, 0, 0, 0),
+			iotago.WithSupplyOptions(10000, 0, 0, 0, 0, 0, 0),
 			iotago.WithLivenessOptions(1, 1, 2, 8),
 		),
 	)
