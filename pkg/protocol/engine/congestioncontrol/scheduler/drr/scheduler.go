@@ -68,9 +68,13 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 				// when the last slot of an epoch is committed, remove the queues of validators that are no longer in the committee.
 				if e.CurrentAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Index()) == 0 {
+					s.bufferMutex.Lock()
+					defer s.bufferMutex.Unlock()
+
 					for accountID, validatorQueue := range s.validatorBuffer {
 						if !s.seatManager.Committee(commitment.Index() + 1).HasAccount(accountID) {
-							s.removeValidator(validatorQueue)
+							s.shutdownValidatorQueue(validatorQueue)
+							delete(s.validatorBuffer, accountID)
 						}
 					}
 				}
@@ -130,7 +134,7 @@ func New(apiProvider api.Provider, opts ...options.Option[Scheduler]) *Scheduler
 
 func (s *Scheduler) Shutdown() {
 	for _, validatorQueue := range s.validatorBuffer {
-		s.removeValidator(validatorQueue)
+		s.shutdownValidatorQueue(validatorQueue)
 	}
 	close(s.shutdownSignal)
 	s.TriggerStopped()
@@ -311,11 +315,6 @@ loop:
 		select {
 		// on close, exit the loop
 		case <-validatorQueue.shutdownSignal:
-			s.bufferMutex.Lock()
-			defer s.bufferMutex.Unlock()
-
-			delete(s.validatorBuffer, validatorQueue.accountID)
-
 			break loop
 		// when a block is pushed by this validator queue.
 		case blockToSchedule = <-validatorQueue.blockChan:
@@ -682,6 +681,6 @@ func (s *Scheduler) addValidator(accountID iotago.AccountID) *ValidatorQueue {
 	return s.validatorBuffer[accountID]
 }
 
-func (s *Scheduler) removeValidator(validatorQueue *ValidatorQueue) {
+func (s *Scheduler) shutdownValidatorQueue(validatorQueue *ValidatorQueue) {
 	validatorQueue.shutdownSignal <- struct{}{}
 }
