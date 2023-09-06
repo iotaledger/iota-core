@@ -112,7 +112,7 @@ func (m *Manager) RegisterProtocol(factory func() proto.Message, handler func(p2
 	m.libp2pHost.SetStreamHandler(protocol.ID(protocolID), m.handleStream)
 }
 
-// UnregisterProtocol unregisters the handlers for the protocol.
+// UnregisterProtocol unregisters the handler for the protocol.
 func (m *Manager) UnregisterProtocol() {
 	m.protocolHandlerMutex.Lock()
 	defer m.protocolHandlerMutex.Unlock()
