@@ -68,6 +68,25 @@ func (m *Manager) AddPeers(peerAddrs ...multiaddr.Multiaddr) error {
 	return resultErr
 }
 
+// RemovePeer removes a peer from the list of known peers.
+func (m *Manager) RemovePeer(peerID peer.ID) error {
+	m.knownPeersMutex.Lock()
+	defer m.knownPeersMutex.Unlock()
+
+	kp, exists := m.knownPeers[peerID]
+	if !exists {
+		return nil
+	}
+	delete(m.knownPeers, peerID)
+	close(kp.RemoveCh)
+	<-kp.DoneCh
+	if err := m.p2pm.DropNeighbor(peerID); err != nil && !ierrors.Is(err, p2p.ErrUnknownNeighbor) {
+		return ierrors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID)
+	}
+
+	return nil
+}
+
 // GetPeersConfig holds optional parameters for the GetPeers method.
 type GetPeersConfig struct {
 	// If true, GetPeers returns peers that have actual connection established in the gossip layer.
@@ -191,32 +210,14 @@ func (m *Manager) addPeer(peerAddr multiaddr.Multiaddr) error {
 }
 
 func (m *Manager) removeAllKnownPeers() error {
-	m.knownPeersMutex.Lock()
-	defer m.knownPeersMutex.Unlock()
-
 	var resultErr error
 	for peerID := range m.knownPeers {
-		if err := m.removePeerByID(peerID); err != nil {
+		if err := m.RemovePeer(peerID); err != nil {
 			resultErr = err
 		}
 	}
 
 	return resultErr
-}
-
-func (m *Manager) removePeerByID(peerID peer.ID) error {
-	kp, exists := m.knownPeers[peerID]
-	if !exists {
-		return nil
-	}
-	delete(m.knownPeers, peerID)
-	close(kp.RemoveCh)
-	<-kp.DoneCh
-	if err := m.p2pm.DropNeighbor(peerID); err != nil && !ierrors.Is(err, p2p.ErrUnknownNeighbor) {
-		return ierrors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID)
-	}
-
-	return nil
 }
 
 func (m *Manager) keepPeerConnected(peer *network.Peer) {
