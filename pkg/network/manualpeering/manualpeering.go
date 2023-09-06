@@ -74,6 +74,8 @@ func (m *Manager) RemovePeer(peerID peer.ID) error {
 
 	kp, exists := m.knownPeers[peerID]
 	if !exists {
+		m.knownPeersMutex.Unlock()
+
 		return nil
 	}
 	delete(m.knownPeers, peerID)
