@@ -50,6 +50,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to get pool stats for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
+
 		if poolStats == nil {
 			return 0, 0, 0, ierrors.Errorf("pool stats for epoch %d and validator accountID %s are nil", epochIndex, validatorID)
 		}
@@ -58,6 +59,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		if rewardsForAccountInEpoch.PoolRewards < rewardsForAccountInEpoch.FixedCost {
 			return 0, 0, 0, nil
 		}
+
 		profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
 		profitMarginComplement, err := scaleUpComplement(poolStats.ProfitMargin, profitMarginExponent)
 		if err != nil {
@@ -68,28 +70,34 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
+
 		profitMarginFactor := result >> profitMarginExponent
 
 		result, err = safemath.SafeMul(profitMarginComplement, uint64(rewardsForAccountInEpoch.PoolRewards))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
+
 		result, err = safemath.SafeMul(result>>profitMarginExponent, uint64(stakeAmount))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
+
 		residualValidatorFactor, err := safemath.SafeDiv(result, uint64(rewardsForAccountInEpoch.PoolStake))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate residual validator factor due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
+
 		result, err = safemath.SafeAdd(uint64(rewardsForAccountInEpoch.FixedCost), profitMarginFactor)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate un-decayed epoch reward due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
+
 		unDecayedEpochRewards, err := safemath.SafeAdd(result, residualValidatorFactor)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate un-decayed epoch rewards due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
+
 		decayProvider := t.apiProvider.APIForEpoch(epochIndex).ManaDecayProvider()
 		decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochEnd)
 		if err != nil {
