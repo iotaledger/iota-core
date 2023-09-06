@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -27,13 +27,13 @@ const (
 
 // PeerDescriptor defines a peer record in the manual peering layer.
 type PeerDescriptor struct {
-	Addresses []ma.Multiaddr `json:"addresses"`
+	Addresses []multiaddr.Multiaddr `json:"addresses"`
 }
 
 type Peer struct {
 	ID            peer.ID
 	PublicKey     ed25519.PublicKey
-	PeerAddresses []ma.Multiaddr
+	PeerAddresses []multiaddr.Multiaddr
 	ConnStatus    *atomic.Value
 	RemoveCh      chan struct{}
 	DoneCh        chan struct{}
@@ -52,7 +52,7 @@ func NewPeerFromAddrInfo(addrInfo *peer.AddrInfo) *Peer {
 	return p
 }
 
-func NewPeerFromMultiAddr(peerAddrs ma.Multiaddr) (*Peer, error) {
+func NewPeerFromMultiAddr(peerAddrs multiaddr.Multiaddr) (*Peer, error) {
 	addrInfo, err := peer.AddrInfoFromP2pAddr(peerAddrs)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to parse p2p multiaddress")
@@ -110,7 +110,7 @@ func peerFromBytes(bytes []byte) (*Peer, error) {
 
 	peer := &Peer{
 		ID:            id,
-		PeerAddresses: make([]ma.Multiaddr, 0),
+		PeerAddresses: make([]multiaddr.Multiaddr, 0),
 		ConnStatus:    &atomic.Value{},
 		RemoveCh:      make(chan struct{}),
 		DoneCh:        make(chan struct{}),
@@ -131,7 +131,7 @@ func peerFromBytes(bytes []byte) (*Peer, error) {
 		if err != nil {
 			return nil, err
 		}
-		addr, err := ma.NewMultiaddrBytes(addrBytes)
+		addr, err := multiaddr.NewMultiaddrBytes(addrBytes)
 		if err != nil {
 			return nil, err
 		}

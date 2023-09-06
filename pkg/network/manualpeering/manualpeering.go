@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
-	ma "github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
@@ -57,7 +57,7 @@ func NewManager(p2pm *p2p.Manager, workerPool *workerpool.WorkerPool, log *logge
 }
 
 // AddPeers adds multiple peers to the list of known peers.
-func (m *Manager) AddPeers(peerAddrs ...ma.Multiaddr) error {
+func (m *Manager) AddPeers(peerAddrs ...multiaddr.Multiaddr) error {
 	var resultErr error
 	for _, peerAddr := range peerAddrs {
 		if err := m.addPeer(peerAddr); err != nil {
@@ -155,7 +155,7 @@ func (m *Manager) Stop() (err error) {
 	return err
 }
 
-func (m *Manager) addPeer(peerAddr ma.Multiaddr) error {
+func (m *Manager) addPeer(peerAddr multiaddr.Multiaddr) error {
 	if !m.isStarted.Load() {
 		return ierrors.New("manual peering manager hasn't been started yet")
 	}
