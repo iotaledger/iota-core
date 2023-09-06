@@ -9,7 +9,7 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/libp2p/go-libp2p/core/host"
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
@@ -106,7 +106,7 @@ func run() error {
 }
 
 func configureComponentCountersEvents() {
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ p2ppeer.ID) {
+	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ peer.ID) {
 		incComponentCounter(Received)
 	})
 

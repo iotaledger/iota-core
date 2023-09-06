@@ -104,13 +104,13 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func(deps autoPeeringDeps) *autopeering.Manager {
 		peersMultiAddresses, err := getMultiAddrsFromString(ParamsPeers.BootstrapPeers)
 		if err != nil {
-			Component.LogFatalfAndExit("Failed to parse bootstrapPeers param: %s", err)
+			Component.LogErrorfAndExit("Failed to parse bootstrapPeers param: %s", err)
 		}
 
 		for _, multiAddr := range peersMultiAddresses {
 			bootstrapPeer, err := network.NewPeerFromMultiAddr(multiAddr)
 			if err != nil {
-				Component.LogFatalfAndExit("Failed to parse bootstrap peer multiaddress: %s", err)
+				Component.LogErrorfAndExit("Failed to parse bootstrap peer multiaddress: %s", err)
 			}
 
 			if err := deps.PeerDB.UpdatePeer(bootstrapPeer); err != nil {
@@ -118,7 +118,7 @@ func provide(c *dig.Container) error {
 			}
 		}
 
-		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger(), ParamsP2P.MaxPeers)
+		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger())
 	}); err != nil {
 		return err
 	}
@@ -290,7 +290,7 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(host host.Host, peerDB *network.DB) *p2p.Manager {
-		return p2p.NewManager(host, peerDB, Component.Logger(), ParamsP2P.MaxPeers)
+		return p2p.NewManager(host, peerDB, Component.Logger())
 	})
 
 }
@@ -331,7 +331,10 @@ func configure() error {
 func run() error {
 	if err := Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		deps.ManualPeeringMgr.Start()
-		deps.AutoPeeringMgr.Start(ctx)
+		if err := deps.AutoPeeringMgr.Start(ctx); err != nil {
+			Component.LogErrorAndExit("Failed to start autopeering manager: %s", err)
+		}
+
 		defer func() {
 			if err := deps.ManualPeeringMgr.Stop(); err != nil {
 				Component.LogErrorf("Failed to stop the manager", "err", err)

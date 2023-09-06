@@ -3,7 +3,7 @@ package core
 import (
 	"encoding/json"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-func (p *Protocol) SendWarpSyncRequest(id iotago.CommitmentID, to ...p2ppeer.ID) {
+func (p *Protocol) SendWarpSyncRequest(id iotago.CommitmentID, to ...peer.ID) {
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_WarpSyncRequest{
 		WarpSyncRequest: &nwmodels.WarpSyncRequest{
 			CommitmentId: lo.PanicOnErr(id.Bytes()),
@@ -21,7 +21,7 @@ func (p *Protocol) SendWarpSyncRequest(id iotago.CommitmentID, to ...p2ppeer.ID)
 	}}, to...)
 }
 
-func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], to ...p2ppeer.ID) {
+func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], to ...peer.ID) {
 	serializer := p.apiProvider.APIForSlot(id.Index())
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_WarpSyncResponse{
@@ -33,7 +33,7 @@ func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.
 	}}, to...)
 }
 
-func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id p2ppeer.ID) {
+func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id peer.ID) {
 	p.workerPool.Submit(func() {
 		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
 		if err != nil {
@@ -46,7 +46,7 @@ func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id p2ppeer.ID
 	})
 }
 
-func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, merkleProofBytes []byte, id p2ppeer.ID) {
+func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, merkleProofBytes []byte, id peer.ID) {
 	p.workerPool.Submit(func() {
 		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
 		if err != nil {

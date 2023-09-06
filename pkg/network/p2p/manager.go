@@ -6,12 +6,11 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/host"
 	p2pnetwork "github.com/libp2p/go-libp2p/core/network"
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"google.golang.org/protobuf/proto"
-
 	ma "github.com/multiformats/go-multiaddr"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
@@ -20,7 +19,7 @@ import (
 )
 
 const (
-	protocolID               = "iota-core/0.0.1"
+	protocolID               = "iota-core/1.0.0"
 	defaultConnectionTimeout = 5 * time.Second // timeout after which the connection must be established.
 	ioTimeout                = 4 * time.Second
 )
@@ -44,7 +43,7 @@ type connectPeerConfig struct {
 // ProtocolHandler holds callbacks to handle a protocol.
 type ProtocolHandler struct {
 	PacketFactory func() proto.Message
-	PacketHandler func(p2ppeer.ID, proto.Message) error
+	PacketHandler func(peer.ID, proto.Message) error
 }
 
 func buildConnectPeerConfig(opts []ConnectPeerOption) *connectPeerConfig {
@@ -77,30 +76,28 @@ type Manager struct {
 	shutdownMutex syncutils.RWMutex
 	isShutdown    bool
 
-	neighbors      map[p2ppeer.ID]*Neighbor
+	neighbors      map[peer.ID]*Neighbor
 	neighborsMutex syncutils.RWMutex
-	maxPeers       int
 
 	protocolHandler      *ProtocolHandler
 	protocolHandlerMutex syncutils.RWMutex
 }
 
 // NewManager creates a new Manager.
-func NewManager(libp2pHost host.Host, peerDB *network.DB, log *logger.Logger, maxPeers int) *Manager {
+func NewManager(libp2pHost host.Host, peerDB *network.DB, log *logger.Logger) *Manager {
 	m := &Manager{
 		libp2pHost: libp2pHost,
 		peerDB:     peerDB,
 		log:        log,
 		Events:     NewNeighborEvents(),
-		neighbors:  make(map[p2ppeer.ID]*Neighbor),
-		maxPeers:   maxPeers,
+		neighbors:  make(map[peer.ID]*Neighbor),
 	}
 
 	return m
 }
 
-// RegisterProtocol registers the handlers for the protocol within the manager.
-func (m *Manager) RegisterProtocol(factory func() proto.Message, handler func(p2ppeer.ID, proto.Message) error) {
+// RegisterProtocol registers the handler for the protocol within the manager.
+func (m *Manager) RegisterProtocol(factory func() proto.Message, handler func(peer.ID, proto.Message) error) {
 	m.protocolHandlerMutex.Lock()
 	defer m.protocolHandlerMutex.Unlock()
 
@@ -112,7 +109,7 @@ func (m *Manager) RegisterProtocol(factory func() proto.Message, handler func(p2
 	m.libp2pHost.SetStreamHandler(protocol.ID(protocolID), m.handleStream)
 }
 
-// UnregisterProtocol unregisters the handlers for the protocol.
+// UnregisterProtocol unregisters the handler for the protocol.
 func (m *Manager) UnregisterProtocol() {
 	m.protocolHandlerMutex.Lock()
 	defer m.protocolHandlerMutex.Unlock()
@@ -125,6 +122,10 @@ func (m *Manager) UnregisterProtocol() {
 func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...ConnectPeerOption) error {
 	m.protocolHandlerMutex.RLock()
 	defer m.protocolHandlerMutex.RUnlock()
+
+	if m.protocolHandler == nil {
+		return ierrors.New("no protocol handler registered to dial peer")
+	}
 
 	if m.neighborExists(peer.ID) {
 		return ierrors.Wrapf(ErrDuplicateNeighbor, "peer %s already exists", peer.ID)
@@ -146,10 +147,6 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 		return ierrors.Wrapf(err, "dial %s / %s failed to open stream for proto %s", peer.PeerAddresses, peer.ID, protocolID)
 	}
 
-	if m.protocolHandler == nil {
-		return ierrors.New("no protocol handler registered")
-	}
-
 	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
 	if err := ps.sendNegotiation(); err != nil {
 		m.closeStream(stream)
@@ -164,6 +161,8 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 	)
 
 	if err := m.peerDB.UpdatePeer(peer); err != nil {
+		m.closeStream(stream)
+
 		return ierrors.Wrapf(err, "failed to update peer %s", peer.ID)
 	}
 
@@ -191,7 +190,7 @@ func (m *Manager) Shutdown() {
 }
 
 // LocalPeerID returns the local peer ID.
-func (m *Manager) LocalPeerID() p2ppeer.ID {
+func (m *Manager) LocalPeerID() peer.ID {
 	return m.libp2pHost.ID()
 }
 
@@ -201,7 +200,7 @@ func (m *Manager) P2PHost() host.Host {
 }
 
 // DropNeighbor disconnects the neighbor with the given ID and the group.
-func (m *Manager) DropNeighbor(id p2ppeer.ID) error {
+func (m *Manager) DropNeighbor(id peer.ID) error {
 	nbr, err := m.neighbor(id)
 	if err != nil {
 		return ierrors.WithStack(err)
@@ -212,7 +211,7 @@ func (m *Manager) DropNeighbor(id p2ppeer.ID) error {
 }
 
 // Send sends a message with the specific protocol to a set of neighbors.
-func (m *Manager) Send(packet proto.Message, to ...p2ppeer.ID) {
+func (m *Manager) Send(packet proto.Message, to ...peer.ID) {
 	var neighbors []*Neighbor
 	if len(to) == 0 {
 		neighbors = m.AllNeighbors()
@@ -238,8 +237,8 @@ func (m *Manager) AllNeighbors() []*Neighbor {
 }
 
 // AllNeighborsIDs returns all the ids of the neighbors that are currently connected.
-func (m *Manager) AllNeighborsIDs() (ids []p2ppeer.ID) {
-	ids = make([]p2ppeer.ID, 0)
+func (m *Manager) AllNeighborsIDs() (ids []peer.ID) {
+	ids = make([]peer.ID, 0)
 	neighbors := m.AllNeighbors()
 	for _, nbr := range neighbors {
 		ids = append(ids, nbr.ID)
@@ -249,7 +248,7 @@ func (m *Manager) AllNeighborsIDs() (ids []p2ppeer.ID) {
 }
 
 // NeighborsByID returns all the neighbors that are currently connected corresponding to the supplied ids.
-func (m *Manager) NeighborsByID(ids []p2ppeer.ID) []*Neighbor {
+func (m *Manager) NeighborsByID(ids []peer.ID) []*Neighbor {
 	result := make([]*Neighbor, 0, len(ids))
 	if len(ids) == 0 {
 		return result
@@ -270,17 +269,11 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 	m.protocolHandlerMutex.RLock()
 	defer m.protocolHandlerMutex.RUnlock()
 
-	// We handle more incoming connections than we allow outgoing connections, so we can
-	// provide network access to new nodes.
-	if len(m.neighbors) >= (m.maxPeers + m.maxPeers/2) {
-		m.log.Debugf("rejecting incoming connection from %s: too many neighbors", stream.Conn().RemotePeer())
+	if m.protocolHandler == nil {
+		m.log.Error("no protocol handler registered")
 		stream.Close()
 
 		return
-	}
-
-	if m.protocolHandler == nil {
-		m.log.Error("no protocol handler registered")
 	}
 
 	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
@@ -291,18 +284,11 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 		return
 	}
 
-	peerAddrInfo := &p2ppeer.AddrInfo{
+	peerAddrInfo := &peer.AddrInfo{
 		ID:    stream.Conn().RemotePeer(),
 		Addrs: []ma.Multiaddr{stream.Conn().RemoteMultiaddr()},
 	}
-	peer, err := network.NewPeerFromAddrInfo(peerAddrInfo)
-	if err != nil {
-		m.log.Errorf("failed to create peer from peer addr info %s: %s", peerAddrInfo, err)
-		m.closeStream(stream)
-
-		return
-	}
-
+	peer := network.NewPeerFromAddrInfo(peerAddrInfo)
 	if err := m.peerDB.UpdatePeer(peer); err != nil {
 		m.log.Errorf("failed to update peer %s in peer database: %s", peer.ID, err)
 		m.closeStream(stream)
@@ -325,7 +311,7 @@ func (m *Manager) closeStream(s p2pnetwork.Stream) {
 }
 
 // neighborWithGroup returns neighbor by ID and group.
-func (m *Manager) neighbor(id p2ppeer.ID) (*Neighbor, error) {
+func (m *Manager) neighbor(id peer.ID) (*Neighbor, error) {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 
@@ -357,6 +343,7 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 
 		if m.protocolHandler == nil {
 			nbr.Log.Errorw("Can't handle packet as no protocol is registered")
+			return
 		}
 		if err := m.protocolHandler.PacketHandler(nbr.ID, packet); err != nil {
 			nbr.Log.Debugw("Can't handle packet", "err", err)
@@ -380,7 +367,7 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 	return nil
 }
 
-func (m *Manager) neighborExists(id p2ppeer.ID) bool {
+func (m *Manager) neighborExists(id peer.ID) bool {
 	m.neighborsMutex.RLock()
 	defer m.neighborsMutex.RUnlock()
 	_, exists := m.neighbors[id]

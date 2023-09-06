@@ -2,7 +2,6 @@ package autopeering
 
 import (
 	"context"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,7 +22,6 @@ type Manager struct {
 	networkID        string
 	p2pManager       *p2p.Manager
 	log              *logger.Logger
-	maxPeers         int
 	host             host.Host
 	peerDB           *network.DB
 	startOnce        sync.Once
@@ -35,42 +33,43 @@ type Manager struct {
 }
 
 // NewManager creates a new autopeering manager.
-func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *network.DB, log *logger.Logger, maxPeers int) *Manager {
+func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *network.DB, log *logger.Logger) *Manager {
 	return &Manager{
 		networkID:  networkID,
 		p2pManager: p2pManager,
 		host:       host,
 		peerDB:     peerDB,
 		log:        log,
-		maxPeers:   maxPeers,
 	}
 }
 
 // Start starts the autopeering manager.
-func (m *Manager) Start(ctx context.Context) {
+func (m *Manager) Start(ctx context.Context) (err error) {
 	//nolint:contextcheck
 	m.startOnce.Do(func() {
 		m.ctx, m.stopFunc = context.WithCancel(ctx)
-		kademliaDHT, err := dht.New(m.ctx, m.host, dht.Mode(dht.ModeServer))
-		if err != nil {
-			log.Fatal(err)
+		kademliaDHT, innerErr := dht.New(m.ctx, m.host, dht.Mode(dht.ModeServer))
+		if innerErr != nil {
+			err = innerErr
+			return
 		}
 
 		// Bootstrap the DHT. In the default configuration, this spawns a Background worker that will keep the
 		// node connected to the bootstrap peers and will disconnect from peers that are not useful.
-		if err = kademliaDHT.Bootstrap(m.ctx); err != nil {
-			log.Fatal(err)
+		if innerErr = kademliaDHT.Bootstrap(m.ctx); innerErr != nil {
+			err = innerErr
+			return
 		}
 
 		for _, seedPeer := range m.peerDB.SeedPeers() {
 			addrInfo := seedPeer.ToAddrInfo()
-			if err := m.host.Connect(ctx, *addrInfo); err != nil {
-				m.log.Infoln("Failed to connect to bootstrap node:", seedPeer, err)
+			if innerErr := m.host.Connect(ctx, *addrInfo); innerErr != nil {
+				m.log.Infoln("Failed to connect to bootstrap node:", seedPeer, innerErr)
 				continue
 			}
 
-			if _, err := kademliaDHT.RoutingTable().TryAddPeer(addrInfo.ID, true, true); err != nil {
-				m.log.Warnln("Failed to add bootstrap node to routing table:", err)
+			if _, innerErr := kademliaDHT.RoutingTable().TryAddPeer(addrInfo.ID, true, true); innerErr != nil {
+				m.log.Warnln("Failed to add bootstrap node to routing table:", innerErr)
 				continue
 			}
 
@@ -84,10 +83,12 @@ func (m *Manager) Start(ctx context.Context) {
 
 		m.isStarted.Store(true)
 	})
+
+	return err
 }
 
 // Stop terminates internal background workers. Calling multiple times has no effect.
-func (m *Manager) Stop() (err error) {
+func (m *Manager) Stop() error {
 	if !m.isStarted.Load() {
 		return ierrors.New("can't stop the manager: it hasn't been started yet")
 	}
@@ -95,7 +96,7 @@ func (m *Manager) Stop() (err error) {
 		m.stopFunc()
 	})
 
-	return err
+	return nil
 }
 
 func (m *Manager) discoveryLoop() {
@@ -130,20 +131,9 @@ func (m *Manager) discoverAndDialPeers() {
 			continue
 		}
 
-		// Do not dial if we already have enough neighbors.
-		if len(m.p2pManager.AllNeighbors()) >= m.maxPeers {
-			m.log.Debugf("Already have %d neighbors, not dialing %s", m.maxPeers, peerAddrInfo)
-			return
-		}
-
 		m.log.Debugf("Found peer: %s", peerAddrInfo)
 
-		peer, err := network.NewPeerFromAddrInfo(&peerAddrInfo)
-		if err != nil {
-			m.log.Warnf("Failed to create peer from address %s: %w", peerAddrInfo.Addrs, err)
-			continue
-		}
-
+		peer := network.NewPeerFromAddrInfo(&peerAddrInfo)
 		if err := m.p2pManager.DialPeer(m.ctx, peer); err != nil {
 			if ierrors.Is(err, p2p.ErrDuplicateNeighbor) {
 				m.log.Debugf("Already connected to peer %s", peer)

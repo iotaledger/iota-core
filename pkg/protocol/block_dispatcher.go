@@ -3,7 +3,7 @@ package protocol
 import (
 	"time"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/eventticker"
@@ -36,7 +36,7 @@ type BlockDispatcher struct {
 	warpSyncWorkers *workerpool.WorkerPool
 
 	// unsolidCommitmentBlocks is a buffer that stores blocks that have an unsolid slot commitment.
-	unsolidCommitmentBlocks *buffer.UnsolidCommitmentBuffer[*types.Tuple[*model.Block, p2ppeer.ID]]
+	unsolidCommitmentBlocks *buffer.UnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]]
 
 	// pendingWarpSyncRequests is the set of pending requests that are waiting to be processed.
 	pendingWarpSyncRequests *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
@@ -57,7 +57,7 @@ func NewBlockDispatcher(protocol *Protocol, opts ...options.Option[BlockDispatch
 		protocol:                  protocol,
 		dispatchWorkers:           protocol.Workers.CreatePool("BlockDispatcher.Dispatch"),
 		warpSyncWorkers:           protocol.Workers.CreatePool("BlockDispatcher.WarpSync", 1),
-		unsolidCommitmentBlocks:   buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, p2ppeer.ID]](20, 100),
+		unsolidCommitmentBlocks:   buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]](20, 100),
 		pendingWarpSyncRequests:   eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
 		processedWarpSyncRequests: ds.NewSet[iotago.CommitmentID](),
 		shutdownEvent:             reactive.NewEvent(),
@@ -69,7 +69,7 @@ func NewBlockDispatcher(protocol *Protocol, opts ...options.Option[BlockDispatch
 }
 
 // Dispatch dispatches the given block to the correct engine instance.
-func (b *BlockDispatcher) Dispatch(block *model.Block, src p2ppeer.ID) error {
+func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
 	slotCommitment := b.protocol.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
 	if !slotCommitment.SolidEvent().WasTriggered() {
 		if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
@@ -139,19 +139,19 @@ func (b *BlockDispatcher) initNetworkConnection() {
 		}, b.dispatchWorkers)
 	})
 
-	b.protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, src p2ppeer.ID) {
+	b.protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, src peer.ID) {
 		b.runTask(func() {
 			b.protocol.HandleError(b.Dispatch(block, src))
 		}, b.dispatchWorkers)
 	})
 
-	b.protocol.Events.Network.WarpSyncRequestReceived.Hook(func(commitmentID iotago.CommitmentID, src p2ppeer.ID) {
+	b.protocol.Events.Network.WarpSyncRequestReceived.Hook(func(commitmentID iotago.CommitmentID, src peer.ID) {
 		b.runTask(func() {
 			b.protocol.HandleError(b.processWarpSyncRequest(commitmentID, src))
 		}, b.warpSyncWorkers)
 	})
 
-	b.protocol.Events.Network.WarpSyncResponseReceived.Hook(func(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], src p2ppeer.ID) {
+	b.protocol.Events.Network.WarpSyncResponseReceived.Hook(func(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], src peer.ID) {
 		b.runTask(func() {
 			b.protocol.HandleError(b.processWarpSyncResponse(commitmentID, blockIDs, merkleProof, src))
 		}, b.warpSyncWorkers)
@@ -159,7 +159,7 @@ func (b *BlockDispatcher) initNetworkConnection() {
 }
 
 // processWarpSyncRequest processes a WarpSync request.
-func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentID, src p2ppeer.ID) error {
+func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentID, src peer.ID) error {
 	// TODO: check if the peer is allowed to request the warp sync
 
 	committedSlot, err := b.protocol.MainEngineInstance().CommittedSlot(commitmentID)
@@ -190,7 +190,7 @@ func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentI
 }
 
 // processWarpSyncResponse processes a WarpSync response.
-func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ p2ppeer.ID) error {
+func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) error {
 	if b.processedWarpSyncRequests.Has(commitmentID) {
 		return nil
 	}

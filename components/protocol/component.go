@@ -7,7 +7,7 @@ import (
 	"github.com/labstack/gommon/bytes"
 	"go.uber.org/dig"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -142,11 +142,11 @@ func configure() error {
 		Component.LogErrorf("Error in Protocol: %s", err)
 	})
 
-	deps.Protocol.Events.Network.Error.Hook(func(err error, id p2ppeer.ID) {
+	deps.Protocol.Events.Network.Error.Hook(func(err error, id peer.ID) {
 		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})
 
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source p2ppeer.ID) {
+	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source peer.ID) {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})
 
@@ -242,11 +242,11 @@ func configure() error {
 		Component.LogDebugf("RequestCommitment: %s", id)
 	})
 
-	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id p2ppeer.ID) {
+	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentRequestReceived: %s", commitmentID)
 	})
 
-	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id p2ppeer.ID) {
+	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentReceived: %s", commitment.ID())
 	})
 

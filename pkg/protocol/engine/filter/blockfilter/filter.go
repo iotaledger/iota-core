@@ -3,7 +3,7 @@ package blockfilter
 import (
 	"time"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -56,7 +56,7 @@ func New(apiProvider api.Provider, opts ...options.Option[Filter]) *Filter {
 }
 
 // ProcessReceivedBlock processes block from the given source.
-func (f *Filter) ProcessReceivedBlock(block *model.Block, source p2ppeer.ID) {
+func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 	// Verify the timestamp is not too far in the future.
 	timeDelta := time.Since(block.ProtocolBlock().IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {

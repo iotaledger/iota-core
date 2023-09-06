@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -238,7 +238,7 @@ func (e *Engine) Shutdown() {
 	}
 }
 
-func (e *Engine) ProcessBlockFromPeer(block *model.Block, source p2ppeer.ID) {
+func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 	e.Filter.ProcessReceivedBlock(block, source)
 	e.Events.BlockProcessed.Trigger(block.ID())
 }

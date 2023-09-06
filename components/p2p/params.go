@@ -13,11 +13,6 @@ const (
 type ParametersP2P struct {
 	// BindAddress defines on which multi addresses the p2p service should listen on.
 	BindMultiAddresses []string `default:"/ip4/0.0.0.0/tcp/14666,/ip6/::/tcp/14666" usage:"the bind multi addresses for p2p connections"`
-	// ExternalAddress defines the config flag of the network external address.
-	ExternalAddress string `default:"auto" usage:"external IP address under which the node is reachable; or 'auto' to determine it automatically"`
-
-	// MaxPeers defines the maximum number of peers to connect to.
-	MaxPeers int `default:"10" usage:"maximum number of peers to connect to"`
 
 	ConnectionManager struct {
 		// Defines the high watermark to use within the connection manager.
@@ -25,6 +20,13 @@ type ParametersP2P struct {
 		// Defines the low watermark to use within the connection manager.
 		LowWatermark int `default:"5" usage:"the minimum connections count to hold after the high watermark was reached"`
 	}
+
+	// Seed defines the config flag of the autopeering private key seed.
+	Seed string `usage:"private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively"`
+	// OverwriteStoredSeed defines whether the private key stored in an existing peerdb should be overwritten.
+	OverwriteStoredSeed bool `default:"false" usage:"whether to overwrite the private key if an existing peerdb exists"`
+	// ExternalAddress defines the config flag of the network external address.
+	ExternalAddress string `default:"auto" usage:"external IP address under which the node is reachable; or 'auto' to determine it automatically"`
 
 	// Defines the private key used to derive the node identity (optional).
 	IdentityPrivateKey string `default:"" usage:"private key used to derive the node identity (optional)"`
@@ -45,8 +47,10 @@ type ParametersPeers struct {
 	BootstrapPeers []string `default:"" usage:"peers to be used as discovery for other peers (CLI)"`
 }
 
-var ParamsP2P = &ParametersP2P{}
-var ParamsPeers = &ParametersPeers{}
+var (
+	ParamsP2P   = &ParametersP2P{}
+	ParamsPeers = &ParametersPeers{}
+)
 
 var params = &app.ComponentParams{
 	Params: map[string]any{
