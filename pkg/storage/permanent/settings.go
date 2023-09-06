@@ -149,9 +149,6 @@ func (s *Settings) StoreProtocolParameters(params iotago.ProtocolParameters) err
 
 	s.apiProvider.AddProtocolParameters(params)
 
-	// Delete the old future protocol parameters if they exist.
-	_ = s.store.Delete([]byte{futureProtocolParametersKey, byte(params.Version())})
-
 	return nil
 }
 
@@ -227,6 +224,9 @@ func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err 
 
 	s.apiProvider.SetCurrentSlot(latestCommitment.Index())
 
+	// Delete the old future protocol parameters if they exist.
+	_ = s.store.Delete([]byte{futureProtocolParametersKey, byte(s.apiProvider.VersionForSlot(latestCommitment.Index()))})
+
 	return s.store.Set([]byte{latestCommitmentKey}, latestCommitment.Data())
 }
 
@@ -294,11 +294,11 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		return ierrors.Wrap(err, "failed to write latest finalized slot")
 	}
 
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
 	// Export protocol versions
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
-		s.mutex.RLock()
-		defer s.mutex.RUnlock()
-
 		var count uint64
 		var innerErr error
 		if err := s.store.Iterate([]byte{protocolVersionEpochMappingKey}, func(key kvstore.Key, value kvstore.Value) bool {
@@ -341,9 +341,6 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 
 	// Export future protocol parameters
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
-		s.mutex.RLock()
-		defer s.mutex.RUnlock()
-
 		var count uint64
 		var innerErr error
 		if err := s.store.Iterate([]byte{futureProtocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
@@ -395,14 +392,22 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		return ierrors.Wrap(err, "failed to stream write future protocol parameters")
 	}
 
-	// Export protocol parameters
+	// Export protocol parameters: we only export the parameters up until the current active ones.
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
-		s.mutex.RLock()
-		defer s.mutex.RUnlock()
-
 		var paramsCount uint64
 		var innerErr error
-		if err := s.store.Iterate([]byte{protocolParametersKey}, func(_ kvstore.Key, value kvstore.Value) bool {
+		if err := s.store.Iterate([]byte{protocolParametersKey}, func(key kvstore.Key, value kvstore.Value) bool {
+			version, _, err := iotago.VersionFromBytes(key[1:])
+			if err != nil {
+				innerErr = ierrors.Wrap(err, "failed to read version")
+				return false
+			}
+
+			if s.apiProvider.IsFutureVersion(version) {
+				// We don't export future protocol parameters, just skip to the next ones.
+				return true
+			}
+
 			if err := stream.WriteBlob(writer, value); err != nil {
 				innerErr = err
 				return false
