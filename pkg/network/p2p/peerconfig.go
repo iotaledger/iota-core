@@ -4,8 +4,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 
+	"github.com/iotaledger/hive.go/ds/onchangemap"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/onchangemap"
 )
 
 // ComparablePeerID implements the constraints.ComparableStringer interface for the onChangeMap.
