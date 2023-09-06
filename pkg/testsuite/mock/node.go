@@ -240,8 +240,13 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 	})
 
 	events.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
-		fmt.Printf("%s > [%s] Booker.BlockInvalid: %s\n", n.Name, engineName, block.ID())
+		fmt.Printf("%s > [%s] Booker.BlockInvalid: %s - %s\n", n.Name, engineName, block.ID(), err.Error())
 	})
+
+	events.Booker.TransactionInvalid.Hook(func(metadata mempool.TransactionMetadata, err error) {
+		fmt.Printf("%s > [%s] Booker.TransactionInvalid: %s - %s\n", n.Name, engineName, metadata.ID(), err.Error())
+	})
+
 	events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Scheduler.BlockScheduled: %s\n", n.Name, engineName, block.ID())
 	})

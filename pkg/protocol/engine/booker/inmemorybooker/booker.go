@@ -172,7 +172,7 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 		case iotago.ShallowLikeParentType:
 			// Check whether the parent contains a conflicting TX,
 			// otherwise reference is invalid and the block should be marked as invalid as well.
-			if tx, hasTx := parentBlock.Transaction(); !hasTx || !parentBlock.PayloadConflictIDs().Has(lo.PanicOnErr(tx.ID(b.apiProvider.APIForSlot(block.ID().Index())))) {
+			if tx, hasTx := parentBlock.Transaction(); !hasTx || !parentBlock.PayloadConflictIDs().Has(lo.PanicOnErr(tx.ID(b.apiProvider.APIForSlot(parentBlock.ID().Index())))) {
 				return nil, ierrors.Wrapf(err, "shallow like parent %s does not contain a conflicting transaction", parent.ID.String())
 			}
 
