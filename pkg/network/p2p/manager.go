@@ -98,7 +98,7 @@ func NewManager(libp2pHost host.Host, peerDB *network.DB, log *logger.Logger, ma
 	return m
 }
 
-// RegisterProtocol registers the handlers for the protocol within the manager.
+// RegisterProtocol registers the handler for the protocol within the manager.
 func (m *Manager) RegisterProtocol(factory func() proto.Message, handler func(p2ppeer.ID, proto.Message) error) {
 	m.protocolHandlerMutex.Lock()
 	defer m.protocolHandlerMutex.Unlock()
@@ -111,7 +111,7 @@ func (m *Manager) RegisterProtocol(factory func() proto.Message, handler func(p2
 	m.libp2pHost.SetStreamHandler(protocol.ID(protocolID), m.handleStream)
 }
 
-// UnregisterProtocol unregisters the handlers for the protocol.
+// UnregisterProtocol unregisters the handler for the protocol.
 func (m *Manager) UnregisterProtocol() {
 	m.protocolHandlerMutex.Lock()
 	defer m.protocolHandlerMutex.Unlock()
