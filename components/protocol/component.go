@@ -7,15 +7,15 @@ import (
 	"github.com/labstack/gommon/bytes"
 	"go.uber.org/dig"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
@@ -55,7 +55,6 @@ var (
 type dependencies struct {
 	dig.In
 
-	Peer     *peer.Local
 	Protocol *protocol.Protocol
 }
 
@@ -143,11 +142,11 @@ func configure() error {
 		Component.LogErrorf("Error in Protocol: %s", err)
 	})
 
-	deps.Protocol.Events.Network.Error.Hook(func(err error, id network.PeerID) {
+	deps.Protocol.Events.Network.Error.Hook(func(err error, id peer.ID) {
 		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})
 
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
+	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source peer.ID) {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})
 
@@ -243,11 +242,11 @@ func configure() error {
 		Component.LogDebugf("RequestCommitment: %s", id)
 	})
 
-	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id network.PeerID) {
+	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentRequestReceived: %s", commitmentID)
 	})
 
-	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id network.PeerID) {
+	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentReceived: %s", commitment.ID())
 	})
 
@@ -271,11 +270,8 @@ func configure() error {
 		Component.LogWarnf("OnlineCommitteeSeatRemoved: seatIndex: %d", seatIndex)
 	})
 
-	// TODO: create a transaction invalid event in the booker instead of hooking to a specific engine instance
-	deps.Protocol.MainEngineInstance().Ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
-		transaction.OnInvalid(func(err error) {
-			Component.LogWarnf("TransactionInvalid: transaction %s - %s", transaction.ID(), err.Error())
-		})
+	deps.Protocol.Events.Engine.Booker.TransactionInvalid.Hook(func(transaction mempool.TransactionMetadata, reason error) {
+		Component.LogWarnf("TransactionInvalid: transaction %s - %s", transaction.ID(), reason.Error())
 	})
 
 	return nil

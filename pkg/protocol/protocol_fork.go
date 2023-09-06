@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
+func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) {
 	mainEngine := p.MainEngineInstance()
 
 	if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
@@ -193,7 +194,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	defer close(ch)
 
 	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.MainChain.Commitment(fork.ForkingPoint.Index()-1).Commitment())
-	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ network.PeerID) {
+	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) {
 		blockIDs, actualCumulativeWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 
 		result := &commitmentVerificationResult{
@@ -247,37 +248,48 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 		}
 		mainChainCommitment := mainChainChainCommitment.Commitment()
 
-		// TODO: should we retry?
-		p.networkProtocol.RequestAttestations(fork.ForkedChain.Commitment(i).ID(), fork.Source)
+		result, err := p.requestAttestation(ctx, fork.ForkedChain.Commitment(i).ID(), fork.Source, ch)
+		if err != nil {
+			return nil, false, true, ierrors.Wrapf(err, "failed to verify commitment %s", result.commitment.ID())
+		}
 
-		select {
-		case result := <-ch:
-			if result.err != nil {
-				return nil, false, true, ierrors.Wrapf(result.err, "failed to verify commitment %s", result.commitment.ID())
-			}
+		// Count how many consecutive slots are heavier/lighter than the main chain.
+		switch {
+		case result.actualCumulativeWeight > mainChainCommitment.CumulativeWeight():
+			heavierCount++
+		case result.actualCumulativeWeight < mainChainCommitment.CumulativeWeight():
+			heavierCount--
+		default:
+			heavierCount = 0
+		}
 
-			anchorBlockIDs = append(anchorBlockIDs, result.blockIDs...)
-
-			// Count how many consecutive slots are heavier/lighter than the main chain.
-			switch {
-			case result.actualCumulativeWeight > mainChainCommitment.CumulativeWeight():
-				heavierCount++
-			case result.actualCumulativeWeight < mainChainCommitment.CumulativeWeight():
-				heavierCount--
-			default:
-				heavierCount = 0
-			}
-
-			if decided, doSwitch := forkChoiceRule(heavierCount); decided {
-				return anchorBlockIDs, doSwitch, false, nil
-			}
-		case <-ctx.Done():
-			return nil, false, false, ierrors.Wrapf(ctx.Err(), "failed to verify commitment for slot %d", i)
+		if decided, doSwitch := forkChoiceRule(heavierCount); decided {
+			return anchorBlockIDs, doSwitch, false, nil
 		}
 	}
 
 	// If the condition is not met in either direction, we don't switch the chain.
 	return nil, false, false, nil
+}
+
+func (p *Protocol) requestAttestation(ctx context.Context, requestedID iotago.CommitmentID, src peer.ID, resultChan chan *commitmentVerificationResult) (*commitmentVerificationResult, error) {
+	ticker := time.NewTicker(p.optsAttestationRequesterTryInterval)
+	defer ticker.Stop()
+
+	for i := 0; i < p.optsAttestationRequesterMaxRetries; i++ {
+		p.networkProtocol.RequestAttestations(requestedID, src)
+
+		select {
+		case <-ticker.C:
+			continue
+		case result := <-resultChan:
+			return result, result.err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
+	return nil, ierrors.Errorf("request attestation exceeds max retries from src: %s", src.String())
 }
 
 func (p *Protocol) switchEngines() {

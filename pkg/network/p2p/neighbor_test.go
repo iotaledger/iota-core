@@ -2,31 +2,28 @@ package p2p
 
 import (
 	"context"
-	"net"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p/core/network"
+	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	p2pnetwork "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/iotaledger/hive.go/autopeering/peer"
-	"github.com/iotaledger/hive.go/autopeering/peer/service"
-	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/iota-core/pkg/network"
 	p2pproto "github.com/iotaledger/iota-core/pkg/network/p2p/proto"
 )
 
 var (
-	testPacket1             = &p2pproto.Negotiation{}
-	log                     = logger.NewExampleLogger("p2p_test")
-	protocolID  protocol.ID = "testgossip/0.0.1"
+	testPacket1 = &p2pproto.Negotiation{}
+	log         = logger.NewExampleLogger("p2p_test")
 )
 
 func TestNeighborClose(t *testing.T) {
@@ -53,7 +50,7 @@ func TestNeighborWrite(t *testing.T) {
 	defer teardown()
 
 	var countA uint32
-	neighborA := newTestNeighbor("A", a, func(neighbor *Neighbor, protocol protocol.ID, packet proto.Message) {
+	neighborA := newTestNeighbor("A", a, func(neighbor *Neighbor, packet proto.Message) {
 		_ = packet.(*p2pproto.Negotiation)
 		atomic.AddUint32(&countA, 1)
 	})
@@ -61,50 +58,54 @@ func TestNeighborWrite(t *testing.T) {
 	neighborA.readLoop()
 
 	var countB uint32
-	neighborB := newTestNeighbor("B", b, func(neighbor *Neighbor, protocol protocol.ID, packet proto.Message) {
+	neighborB := newTestNeighbor("B", b, func(neighbor *Neighbor, packet proto.Message) {
 		_ = packet.(*p2pproto.Negotiation)
 		atomic.AddUint32(&countB, 1)
 	})
 	defer neighborB.disconnect()
 	neighborB.readLoop()
 
-	err := neighborA.protocols[protocolID].WritePacket(testPacket1)
+	err := neighborA.stream.WritePacket(testPacket1)
 	require.NoError(t, err)
-	err = neighborB.protocols[protocolID].WritePacket(testPacket1)
+	err = neighborB.stream.WritePacket(testPacket1)
 	require.NoError(t, err)
 
 	assert.Eventually(t, func() bool { return atomic.LoadUint32(&countA) == 1 }, time.Second, 10*time.Millisecond)
 	assert.Eventually(t, func() bool { return atomic.LoadUint32(&countB) == 1 }, time.Second, 10*time.Millisecond)
 }
 
-func newTestNeighbor(name string, stream network.Stream, packetReceivedFunc ...PacketReceivedFunc) *Neighbor {
+func newTestNeighbor(name string, stream p2pnetwork.Stream, packetReceivedFunc ...PacketReceivedFunc) *Neighbor {
 	var packetReceived PacketReceivedFunc
 	if len(packetReceivedFunc) > 0 {
 		packetReceived = packetReceivedFunc[0]
 	} else {
-		packetReceived = func(neighbor *Neighbor, protocol protocol.ID, packet proto.Message) {}
+		packetReceived = func(neighbor *Neighbor, packet proto.Message) {}
 	}
 
-	return NewNeighbor(newTestPeer(name), NeighborsGroupAuto, map[protocol.ID]*PacketsStream{protocolID: NewPacketsStream(stream, packetFactory)}, log.Named(name), packetReceived, func(neighbor *Neighbor) {})
+	return NewNeighbor(newTestPeer(name), NewPacketsStream(stream, packetFactory), log.Named(name), packetReceived, func(neighbor *Neighbor) {})
 }
 
 func packetFactory() proto.Message {
 	return &p2pproto.Negotiation{}
 }
 
-func newTestPeer(name string) *peer.Peer {
-	services := service.New()
-	services.Update(service.PeeringKey, "tcp", 0)
-	services.Update(service.P2PKey, "tcp", 0)
+func newTestPeer(_ string) *network.Peer {
+	_, pub, err := p2pcrypto.GenerateEd25519Key(nil)
+	if err != nil {
+		panic(err)
+	}
 
-	var publicKey ed25519.PublicKey
-	copy(publicKey[:], name)
+	p2pid, err := peer.IDFromPublicKey(pub)
+	if err != nil {
+		panic(err)
+	}
 
-	return peer.NewPeer(identity.New(publicKey), net.IPv4zero, services)
+	addrInfo, _ := peer.AddrInfoFromString("/ip4/0.0.0.0/udp/14666/p2p/" + p2pid.String())
+	return network.NewPeerFromAddrInfo(addrInfo)
 }
 
 // newStreamsPipe returns a pair of libp2p Stream that are talking to each other.
-func newStreamsPipe(t testing.TB) (network.Stream, network.Stream, func()) {
+func newStreamsPipe(t testing.TB) (p2pnetwork.Stream, p2pnetwork.Stream, func()) {
 	ctx := context.Background()
 	host1, err := libp2p.New(
 		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
@@ -116,9 +117,9 @@ func newStreamsPipe(t testing.TB) (network.Stream, network.Stream, func()) {
 		libp2p.DisableRelay(),
 	)
 	require.NoError(t, err)
-	acceptStremCh := make(chan network.Stream, 1)
+	acceptStremCh := make(chan p2pnetwork.Stream, 1)
 	host2.Peerstore().AddAddrs(host1.ID(), host1.Addrs(), peerstore.PermanentAddrTTL)
-	host2.SetStreamHandler(protocol.TestingID, func(s network.Stream) {
+	host2.SetStreamHandler(protocol.TestingID, func(s p2pnetwork.Stream) {
 		acceptStremCh <- s
 	})
 	host1.Peerstore().AddAddrs(host2.ID(), host2.Addrs(), peerstore.PermanentAddrTTL)

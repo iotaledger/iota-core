@@ -15,12 +15,12 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/components/metrics/collector"
 	"github.com/iotaledger/iota-core/pkg/daemon"
@@ -53,9 +53,8 @@ var (
 type dependencies struct {
 	dig.In
 
-	Local    *peer.Local
-	Protocol *protocol.Protocol
-
+	Host      host.Host
+	Protocol  *protocol.Protocol
 	Collector *collector.Collector
 }
 
