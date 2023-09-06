@@ -30,7 +30,7 @@ const (
 type Settings struct {
 	mutex                            syncutils.RWMutex
 	store                            kvstore.KVStore
-	storeSnapshotImported            *kvstore.TypedValue[byte]
+	storeSnapshotImported            *kvstore.TypedValue[bool]
 	storeLatestCommitment            *kvstore.TypedValue[*model.Commitment]
 	storeLatestFinalizedSlot         *kvstore.TypedValue[iotago.SlotIndex]
 	storeProtocolVersionEpochMapping *kvstore.TypedStore[iotago.Version, iotago.EpochIndex]
@@ -49,11 +49,15 @@ func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedPro
 		storeSnapshotImported: kvstore.NewTypedValue(
 			store,
 			[]byte{snapshotImportedKey},
-			func(v byte) ([]byte, error) {
-				return []byte{v}, nil
+			func(v bool) ([]byte, error) {
+				return []byte{lo.Cond[byte](v, 1, 0)}, nil
 			},
-			func(bytes []byte) (byte, int, error) {
-				return bytes[0], 1, nil
+			func(b []byte) (bool, int, error) {
+				if len(b) != 1 {
+					return false, 0, ierrors.Errorf("expected 1 byte, but got %d", len(b))
+				}
+
+				return b[0] == 1, 1, nil
 			},
 		),
 		storeLatestCommitment: kvstore.NewTypedValue(
@@ -234,7 +238,7 @@ func (s *Settings) SetSnapshotImported() (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	return s.storeSnapshotImported.Set(1)
+	return s.storeSnapshotImported.Set(true)
 }
 
 func (s *Settings) LatestCommitment() *model.Commitment {
