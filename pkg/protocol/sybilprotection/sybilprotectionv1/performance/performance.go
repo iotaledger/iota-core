@@ -126,7 +126,11 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	epochStartSlot := timeProvider.EpochStart(epoch)
 	epochEndSlot := timeProvider.EpochEnd(epoch)
 
-	profitMargin := t.calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake(), epoch)
+	profitMargin, err := t.calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake(), epoch)
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to calculate profit margin for epoch %d", epoch))
+	}
+
 	poolsStats := &model.PoolsStats{
 		TotalStake:          committee.TotalStake(),
 		TotalValidatorStake: committee.TotalValidatorStake(),

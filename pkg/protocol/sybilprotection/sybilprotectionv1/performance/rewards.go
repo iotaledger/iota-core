@@ -1,8 +1,6 @@
 package performance
 
 import (
-	"math"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -61,19 +59,22 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			return 0, 0, 0, nil
 		}
 		profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
-		profitMarginComplement := scaleUpComplement(poolStats.ProfitMargin, profitMarginExponent)
+		profitMarginComplement, err := scaleUpComplement(poolStats.ProfitMargin, profitMarginExponent)
+		if err != nil {
+			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
+		}
 
 		result, err := safemath.SafeMul(poolStats.ProfitMargin, uint64(rewardsForAccountInEpoch.PoolRewards))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
-		profitMarginFactor := scaleDownWithExponent(result, profitMarginExponent)
+		profitMarginFactor := result >> profitMarginExponent
 
 		result, err = safemath.SafeMul(profitMarginComplement, uint64(rewardsForAccountInEpoch.PoolRewards))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
-		result, err = safemath.SafeMul(scaleDownWithExponent(result, profitMarginExponent), uint64(stakeAmount))
+		result, err = safemath.SafeMul(result>>profitMarginExponent, uint64(stakeAmount))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
@@ -139,15 +140,21 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 		}
 
 		profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
-		profitMarginComplement := scaleUpComplement(poolStats.ProfitMargin, profitMarginExponent)
+		profitMarginComplement, err := scaleUpComplement(poolStats.ProfitMargin, profitMarginExponent)
+		if err != nil {
+			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
+		}
+
 		result, err := safemath.SafeMul(profitMarginComplement, uint64(rewardsForAccountInEpoch.PoolRewards))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
-		result, err = safemath.SafeMul(scaleDownWithExponent(result, profitMarginExponent), uint64(delegatedAmount))
+
+		result, err = safemath.SafeMul(result>>profitMarginExponent, uint64(delegatedAmount))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
 		}
+
 		unDecayedEpochRewards, err := safemath.SafeDiv(result, uint64(rewardsForAccountInEpoch.PoolStake))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epochIndex, validatorID)
@@ -220,7 +227,7 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 		return 0, ierrors.Wrapf(err, "failed to calculate result reward due division by zero for slot %d", slotIndex)
 	}
 
-	poolRewardFixedCost := iotago.Mana(scaleDownWithExponent(result, params.RewardsParameters().PoolCoefficientExponent+1))
+	poolRewardFixedCost := iotago.Mana(result >> (params.RewardsParameters().PoolCoefficientExponent + 1))
 	// if validator's fixed cost is greater than earned reward, all reward goes for delegators
 	if poolRewardFixedCost < fixedCost {
 		return poolRewardFixedCost, nil
@@ -231,14 +238,26 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 
 func (t *Tracker) calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorStake iotago.BaseToken, slot iotago.SlotIndex) (uint64, error) {
 	poolCoeffExponent := t.apiProvider.APIForSlot(slot).ProtocolParameters().RewardsParameters().PoolCoefficientExponent
-	result1, err := safemath.SafeDiv(scaleUpWithExponent(poolStake, poolCoeffExponent), totalStake)
+	scaledUpPoolStake, err := safemath.SafeLeftShift(poolStake, poolCoeffExponent)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate pool coefficient due to overflow for slot %d", slot)
 	}
-	result2, err := safemath.SafeDiv(scaleUpWithExponent(validatorStake, poolCoeffExponent), totalValidatorStake)
+
+	result1, err := safemath.SafeDiv(scaledUpPoolStake, totalStake)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate pool coefficient due to overflow for slot %d", slot)
 	}
+
+	scaledUpValidatorStake, err := safemath.SafeLeftShift(validatorStake, poolCoeffExponent)
+	if err != nil {
+		return 0, ierrors.Wrapf(err, "failed to calculate pool coefficient due to overflow for slot %d", slot)
+	}
+
+	result2, err := safemath.SafeDiv(scaledUpValidatorStake, totalValidatorStake)
+	if err != nil {
+		return 0, ierrors.Wrapf(err, "failed to calculate pool coefficient due to overflow for slot %d", slot)
+	}
+
 	poolCoeff, err := safemath.SafeAdd(result1, result2)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate pool coefficient due to overflow for slot %d", slot)
@@ -248,39 +267,21 @@ func (t *Tracker) calculatePoolCoefficient(poolStake, totalStake, validatorStake
 }
 
 // calculateProfitMargin calculates a common profit margin for all validators by firstly increasing the accuracy of the given value, so the profit margin is moved to the power of 2^accuracyShift.
-func (t *Tracker) calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken, epoch iotago.EpochIndex) uint64 {
-	return uint64(scaleUpWithExponent(totalValidatorsStake, t.apiProvider.APIForEpoch(epoch).ProtocolParameters().RewardsParameters().ProfitMarginExponent) / (totalValidatorsStake + totalPoolStake))
-}
-
-// scaleUpWithExponent shifts the bits of the given value to the left by the given amount, so that the value is moved to the power of 2^accuracyShift.
-func scaleUpWithExponent[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint8) V {
-	result := val << shift
-	// if the result is smaller than the original value, we have an overflow
-	if result < val {
-		panic("overflow on a bit shift operation")
+func (t *Tracker) calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken, epoch iotago.EpochIndex) (uint64, error) {
+	scaledUpTotalValidatorStake, err := safemath.SafeLeftShift(totalValidatorsStake, t.apiProvider.APIForEpoch(epoch).ProtocolParameters().RewardsParameters().ProfitMarginExponent)
+	if err != nil {
+		return 0, ierrors.Wrapf(err, "failed to calculate profit margin due to overflow for epoch %d", epoch)
 	}
 
-	return val << shift
-}
-
-// scaleDownWithExponent reversts the accuracy operation of scaleUpWithExponent by shifting the bits of the given value to the right by the profitMarginExponent.
-// This is a lossy operation. All values less than 2^accuracyShift will be rounded to 0.
-func scaleDownWithExponent[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint8) V {
-	result := val >> shift
-	// if the result is greater than the original value, we have an overflow
-	if val < result {
-		panic("overflow on a bit shift operation")
-	}
-
-	return val >> shift
+	return uint64(scaledUpTotalValidatorStake / (totalValidatorsStake + totalPoolStake)), nil
 }
 
 // scaleUpComplement returns the 'shifted' completition to "one" for the shifted value where one is the 2^accuracyShift.
-func scaleUpComplement[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint8) V {
-	// it should never overflow for val=profit margin, if profit margin was previously scaled with scaleUpWithExponent.
-	if val > math.MaxUint8 {
-		panic("uint8 overflow for bit shift operation")
+func scaleUpComplement[V iotago.BaseToken | iotago.Mana | uint64](val V, shift uint8) (V, error) {
+	shiftedOne, err := safemath.SafeLeftShift(V(1), shift)
+	if err != nil {
+		return 0, err
 	}
 
-	return (1 << shift) - val
+	return safemath.SafeSub(shiftedOne, val)
 }

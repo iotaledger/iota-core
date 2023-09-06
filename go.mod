@@ -13,7 +13,7 @@ require (
 	github.com/iotaledger/hive.go/app v0.0.0-20230829152614-7afc7a4d89b3
 	github.com/iotaledger/hive.go/autopeering v0.0.0-20230829152614-7afc7a4d89b3
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230829152614-7afc7a4d89b3
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230829152614-7afc7a4d89b3
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230906094804-43ffcb238fe1
 	github.com/iotaledger/hive.go/crypto v0.0.0-20230829152614-7afc7a4d89b3
 	github.com/iotaledger/hive.go/ds v0.0.0-20230829152614-7afc7a4d89b3
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20230829152614-7afc7a4d89b3
