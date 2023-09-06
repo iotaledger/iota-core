@@ -40,8 +40,7 @@ func NewPacketsStream(stream p2pnetwork.Stream, packetFactory func() proto.Messa
 func (ps *PacketsStream) WritePacket(message proto.Message) error {
 	ps.writerLock.Lock()
 	defer ps.writerLock.Unlock()
-	err := ps.writer.WriteBlk(message)
-	if err != nil {
+	if err := ps.writer.WriteBlk(message); err != nil {
 		return ierrors.WithStack(err)
 	}
 	ps.packetsWritten.Inc()
