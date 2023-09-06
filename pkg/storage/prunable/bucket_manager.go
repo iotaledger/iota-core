@@ -77,6 +77,7 @@ func (b *BucketManager) Shutdown() {
 
 	b.openDBs.Each(func(index iotago.EpochIndex, db *database.DBInstance) {
 		db.Close()
+		b.openDBs.Remove(index)
 	})
 }
 
@@ -96,7 +97,8 @@ func (b *BucketManager) TotalSize() int64 {
 	b.openDBs.Each(func(key iotago.EpochIndex, val *database.DBInstance) {
 		size, err := dbPrunableDirectorySize(b.dbConfig.Directory, key)
 		if err != nil {
-			b.errorHandler(ierrors.Wrapf(err, "dbPrunableDirectorySize failed for %s: %s", b.dbConfig.Directory, key))
+			b.errorHandler(ierrors.Wrapf(err, "dbPrunableDirectorySize failed for key %s: %s", b.dbConfig.Directory, key))
+
 			return
 		}
 		sum += size
@@ -123,7 +125,7 @@ func (b *BucketManager) BucketSize(epoch iotago.EpochIndex) (int64, error) {
 
 	size, err := dbPrunableDirectorySize(b.dbConfig.Directory, epoch)
 	if err != nil {
-		return 0, ierrors.Wrapf(err, "dbPrunableDirectorySize failed for %s: %s", b.dbConfig.Directory, epoch)
+		return 0, ierrors.Wrapf(err, "dbPrunableDirectorySize failed for epoch %s: %s", b.dbConfig.Directory, epoch)
 	}
 
 	return size, nil

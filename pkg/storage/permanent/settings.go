@@ -330,6 +330,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		return ierrors.Wrap(err, "failed to stream write protocol version epoch mapping")
 	}
 
+	// TODO: rollback future protocol parameters if it was added after targetCommitment.Index()
 	// Export future protocol parameters
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
 		s.mutex.RLock()
@@ -506,6 +507,16 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 	}
 
 	if err := s.SetLatestCommitment(commitment); err != nil {
+		return ierrors.Wrap(err, "failed to set latest commitment")
+	}
+
+	return nil
+}
+
+func (s *Settings) Rollback(targetCommitment *model.Commitment) error {
+	// TODO: rollback future protocol parameters if it was added after targetCommitment.Index()
+
+	if err := s.SetLatestCommitment(targetCommitment); err != nil {
 		return ierrors.Wrap(err, "failed to set latest commitment")
 	}
 

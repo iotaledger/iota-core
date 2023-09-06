@@ -312,3 +312,31 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 
 	return nil
 }
+
+// Rollback rolls back ledger state to the given target slot.
+func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
+	m.WriteLockLedger()
+	defer m.WriteUnlockLedger()
+
+	ledgerIndex, err := m.ReadLedgerIndexWithoutLocking()
+	if err != nil {
+		return err
+	}
+
+	for diffIndex := ledgerIndex; diffIndex > targetSlot; diffIndex-- {
+		slotDiff, err := m.SlotDiffWithoutLocking(diffIndex)
+		if err != nil {
+			return err
+		}
+
+		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
+			return err
+		}
+	}
+
+	if err := m.stateTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "unable to commit state tree")
+	}
+
+	return nil
+}

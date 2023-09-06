@@ -331,8 +331,6 @@ func (p *Protocol) switchEngines() {
 	if success {
 		p.Events.MainEngineSwitched.Trigger(p.MainEngineInstance())
 
-		// TODO: copy over old slots from the old engine to the new one
-
 		// Cleanup filesystem
 		if err := oldEngine.RemoveFromFilesystem(); err != nil {
 			p.HandleError(ierrors.Wrap(err, "error removing storage directory after switching engines"))

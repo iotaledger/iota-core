@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -76,6 +77,41 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 		})
 }
 
+func CloneStorage(source *Storage, directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) (*Storage, error) {
+	s := options.Apply(&Storage{
+		dir:                                utils.NewDirectory(directory, true),
+		errorHandler:                       errorHandler,
+		lastPrunedEpoch:                    model.NewEvictionIndex[iotago.EpochIndex](),
+		optsDBEngine:                       hivedb.EngineRocksDB,
+		optsPruningDelay:                   30,
+		optPruningSizeEnabled:              false,
+		optsPruningSizeMaxTargetSizeBytes:  30 * 1024 * 1024 * 1024, // 30GB
+		optsPruningSizeReductionPercentage: 0.1,
+		optsPruningSizeCooldownTime:        5 * time.Minute,
+	}, opts)
+
+	dbConfig := database.Config{
+		Engine:       s.optsDBEngine,
+		Directory:    s.dir.PathWithCreate(permanentDirName),
+		Version:      dbVersion,
+		PrefixHealth: []byte{storePrefixHealth},
+	}
+
+	permanentClone, err := permanent.Clone(source.permanent, dbConfig, errorHandler)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "error while cloning permanent storage")
+	}
+	prunableClone, err := prunable.Clone(source.prunable, dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), permanentClone.Settings().APIProvider(), s.errorHandler, s.optsBucketManagerOptions...)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "error while cloning prunable storage")
+	}
+
+	s.permanent = permanentClone
+	s.prunable = prunableClone
+
+	return s, nil
+}
+
 func (s *Storage) Directory() string {
 	return s.dir.Path()
 }
@@ -105,4 +141,8 @@ func (s *Storage) Shutdown() {
 func (s *Storage) Flush() {
 	s.permanent.Flush()
 	s.prunable.Flush()
+}
+
+func (s *Storage) RollbackPrunable(forkingSlot iotago.SlotIndex) error {
+	return s.prunable.Rollback(forkingSlot)
 }
