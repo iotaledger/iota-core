@@ -216,7 +216,7 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.Valida
 		epochPerformanceFactor += uint64(slotPerformanceFactor)
 	}
 
-	return epochPerformanceFactor
+	return epochPerformanceFactor >> uint64(t.apiProvider.CurrentAPI().ProtocolParameters().SlotsPerEpochExponent())
 }
 
 func (t *Tracker) isCommitteeMember(slot iotago.SlotIndex, accountID iotago.AccountID) (bool, error) {
