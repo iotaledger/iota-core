@@ -9,9 +9,8 @@ import (
 	p2ppeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
-	"google.golang.org/protobuf/proto"
-
 	ma "github.com/multiformats/go-multiaddr"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
@@ -20,7 +19,7 @@ import (
 )
 
 const (
-	protocolID               = "iota-core/0.0.1"
+	protocolID               = "iota-core/1.0.0"
 	defaultConnectionTimeout = 5 * time.Second // timeout after which the connection must be established.
 	ioTimeout                = 4 * time.Second
 )
@@ -126,6 +125,10 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 	m.protocolHandlerMutex.RLock()
 	defer m.protocolHandlerMutex.RUnlock()
 
+	if m.protocolHandler == nil {
+		return ierrors.New("no protocol handler registered to dial peer")
+	}
+
 	if m.neighborExists(peer.ID) {
 		return ierrors.Wrapf(ErrDuplicateNeighbor, "peer %s already exists", peer.ID)
 	}
@@ -146,10 +149,6 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 		return ierrors.Wrapf(err, "dial %s / %s failed to open stream for proto %s", peer.PeerAddresses, peer.ID, protocolID)
 	}
 
-	if m.protocolHandler == nil {
-		return ierrors.New("no protocol handler registered")
-	}
-
 	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
 	if err := ps.sendNegotiation(); err != nil {
 		m.closeStream(stream)
@@ -164,6 +163,8 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 	)
 
 	if err := m.peerDB.UpdatePeer(peer); err != nil {
+		m.closeStream(stream)
+
 		return ierrors.Wrapf(err, "failed to update peer %s", peer.ID)
 	}
 
@@ -281,6 +282,8 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 
 	if m.protocolHandler == nil {
 		m.log.Error("no protocol handler registered")
+		stream.Close()
+		return
 	}
 
 	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
@@ -295,14 +298,7 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 		ID:    stream.Conn().RemotePeer(),
 		Addrs: []ma.Multiaddr{stream.Conn().RemoteMultiaddr()},
 	}
-	peer, err := network.NewPeerFromAddrInfo(peerAddrInfo)
-	if err != nil {
-		m.log.Errorf("failed to create peer from peer addr info %s: %s", peerAddrInfo, err)
-		m.closeStream(stream)
-
-		return
-	}
-
+	peer := network.NewPeerFromAddrInfo(peerAddrInfo)
 	if err := m.peerDB.UpdatePeer(peer); err != nil {
 		m.log.Errorf("failed to update peer %s in peer database: %s", peer.ID, err)
 		m.closeStream(stream)
@@ -357,6 +353,7 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 
 		if m.protocolHandler == nil {
 			nbr.Log.Errorw("Can't handle packet as no protocol is registered")
+			return
 		}
 		if err := m.protocolHandler.PacketHandler(nbr.ID, packet); err != nil {
 			nbr.Log.Debugw("Can't handle packet", "err", err)

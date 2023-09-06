@@ -102,12 +102,7 @@ func newTestPeer(_ string) *network.Peer {
 	}
 
 	addrInfo, _ := p2ppeer.AddrInfoFromString("/ip4/0.0.0.0/udp/14666/p2p/" + p2pid.String())
-	peer, err := network.NewPeerFromAddrInfo(addrInfo)
-	if err != nil {
-		panic(err)
-	}
-
-	return peer
+	return network.NewPeerFromAddrInfo(addrInfo)
 }
 
 // newStreamsPipe returns a pair of libp2p Stream that are talking to each other.

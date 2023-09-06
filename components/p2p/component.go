@@ -9,9 +9,8 @@ import (
 	golibp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
-	"go.uber.org/dig"
-
 	ma "github.com/multiformats/go-multiaddr"
+	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/crypto/ed25519"
@@ -81,13 +80,13 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func(deps autoPeeringDeps) *autopeering.Manager {
 		peerAddrs, err := getMultiAddrsFromParam(ParamsPeers.BootstrapPeers)
 		if err != nil {
-			Component.LogFatalfAndExit("Failed to parse bootstrapPeers param: %s", err)
+			Component.LogErrorfAndExit("Failed to parse bootstrapPeers param: %s", err)
 		}
 
 		for _, peerAddr := range peerAddrs {
 			bootstrapPeer, err := network.NewPeerFromMultiAddr(peerAddr)
 			if err != nil {
-				Component.LogFatalfAndExit("Failed to parse bootstrap peer multiaddress: %s", err)
+				Component.LogErrorfAndExit("Failed to parse bootstrap peer multiaddress: %s", err)
 			}
 
 			if err := deps.PeerDB.UpdatePeer(bootstrapPeer); err != nil {
@@ -135,7 +134,7 @@ func provide(c *dig.Container) error {
 			key := ed25519.PrivateKeyFromSeed(seed[0])
 			if peerDB != nil {
 				if updatePrivKeyErr := peerDB.UpdateLocalPrivateKey(key); updatePrivKeyErr != nil {
-					Component.LogFatalAndExit(ierrors.Wrap(updatePrivKeyErr, "unable to update local private key"))
+					Component.LogErrorAndExit(ierrors.Wrap(updatePrivKeyErr, "unable to update local private key"))
 				}
 			}
 		}
@@ -176,7 +175,7 @@ func provide(c *dig.Container) error {
 			golibp2p.NATPortMap(),
 		)
 		if err != nil {
-			Component.LogFatalfAndExit("Couldn't create libp2p host: %s", err)
+			Component.LogErrorfAndExit("Couldn't create libp2p host: %s", err)
 		}
 
 		Component.LogInfof("Initialized P2P host %s %s", libp2pHost.ID().String(), libp2pHost.Addrs())
@@ -207,7 +206,10 @@ func configure() error {
 func run() error {
 	if err := Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		deps.ManualPeeringMgr.Start()
-		deps.AutoPeeringMgr.Start(ctx)
+		if err := deps.AutoPeeringMgr.Start(ctx); err != nil {
+			Component.LogErrorAndExit("Failed to start autopeering manager: %s", err)
+		}
+
 		defer func() {
 			if err := deps.ManualPeeringMgr.Stop(); err != nil {
 				Component.LogErrorf("Failed to stop the manager", "err", err)

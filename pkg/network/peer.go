@@ -39,7 +39,7 @@ type Peer struct {
 	DoneCh        chan struct{}
 }
 
-func NewPeerFromAddrInfo(addrInfo *p2ppeer.AddrInfo) (*Peer, error) {
+func NewPeerFromAddrInfo(addrInfo *p2ppeer.AddrInfo) *Peer {
 	p := &Peer{
 		ID:            addrInfo.ID,
 		PeerAddresses: addrInfo.Addrs,
@@ -49,7 +49,7 @@ func NewPeerFromAddrInfo(addrInfo *p2ppeer.AddrInfo) (*Peer, error) {
 	}
 	p.SetConnStatus(ConnStatusDisconnected)
 
-	return p, nil
+	return p
 }
 
 func NewPeerFromMultiAddr(peerAddrs ma.Multiaddr) (*Peer, error) {
@@ -58,7 +58,7 @@ func NewPeerFromMultiAddr(peerAddrs ma.Multiaddr) (*Peer, error) {
 		return nil, ierrors.Wrap(err, "failed to parse p2p multiaddress")
 	}
 
-	return NewPeerFromAddrInfo(addrInfo)
+	return NewPeerFromAddrInfo(addrInfo), nil
 }
 
 func (p *Peer) ToAddrInfo() *p2ppeer.AddrInfo {
