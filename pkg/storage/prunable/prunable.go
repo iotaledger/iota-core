@@ -53,15 +53,12 @@ func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(e
 }
 
 func Clone(source *Prunable, dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[BucketManager]) (*Prunable, error) {
-	dir := utils.NewDirectory(dbConfig.Directory, true)
-	semiPermanentDBConfig := dbConfig.WithDirectory(dir.PathWithCreate("semipermanent"))
-
 	// Close forked prunable storage before copying its contents.
 	source.semiPermanentDB.Close()
 	source.prunableSlotStore.Shutdown()
 
 	// Copy the storage on disk to new location.
-	if err := copydir.Copy(source.prunableSlotStore.dbConfig.Directory, semiPermanentDBConfig.Directory); err != nil {
+	if err := copydir.Copy(source.prunableSlotStore.dbConfig.Directory, dbConfig.Directory); err != nil {
 		return nil, ierrors.Wrap(err, "failed to copy prunable storage directory to new storage path")
 	}
 
