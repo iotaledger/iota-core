@@ -4,10 +4,15 @@ import (
 	"github.com/iotaledger/hive.go/app"
 )
 
+const (
+	// CfgPeers defines the static peers this node should retain a connection to (CLI).
+	CfgPeers = "peers"
+)
+
 // ParametersP2P contains the definition of configuration parameters used by the p2p plugin.
 type ParametersP2P struct {
-	// BindAddress defines on which multi address the p2p service should listen on.
-	BindAddress string `default:"/ip4/0.0.0.0/tcp/14666" usage:"the multi address for p2p connections"`
+	// BindAddress defines on which multi addresses the p2p service should listen on.
+	BindMultiAddresses []string `default:"/ip4/0.0.0.0/tcp/14666,/ip6/::/tcp/14666" usage:"the bind multi addresses for p2p connections"`
 
 	ConnectionManager struct {
 		// Defines the high watermark to use within the connection manager.
@@ -22,19 +27,26 @@ type ParametersP2P struct {
 	OverwriteStoredSeed bool `default:"false" usage:"whether to overwrite the private key if an existing peerdb exists"`
 	// ExternalAddress defines the config flag of the network external address.
 	ExternalAddress string `default:"auto" usage:"external IP address under which the node is reachable; or 'auto' to determine it automatically"`
-	// PeerDBDirectory defines the path to the peer database.
-	PeerDBDirectory string `default:"testnet/peerdb" usage:"path to the peer database directory"`
+
+	// Defines the private key used to derive the node identity (optional).
+	IdentityPrivateKey string `default:"" usage:"private key used to derive the node identity (optional)"`
+
+	Database struct {
+		// Defines the path to the p2p database.
+		Path string `default:"testnet/p2pstore" usage:"the path to the p2p database"`
+	} `name:"db"`
 }
 
-// ParametersPeers contains the definition of the parameters used by the manualPeering plugin.
+// ParametersPeers contains the definition of the parameters used by peers.
 type ParametersPeers struct {
-	// KnownPeers defines the map of peers to be used as known peers.
-	KnownPeers string `usage:"map of peers that will be used as known peers"`
-	// BootstrapPeers defines the map of peers to be used as discovery for other peers.
-	BootstrapPeers string `usage:"map of peers to be used as discovery for other peers"`
+	// Defines the static peers this node should retain a connection to (CLI).
+	Peers []string `default:"" usage:"the static peers this node should retain a connection to (CLI)"`
+	// Defines the aliases of the static peers (must be the same length like CfgP2PPeers) (CLI).
+	PeerAliases []string `default:"" usage:"the aliases of the static peers (must be the same amount like \"p2p.peers\""`
+	// Defines the peers to be used as discovery for other peers (CLI).
+	BootstrapPeers []string `default:"" usage:"peers to be used as discovery for other peers (CLI)"`
 }
 
-// ParamsP2P contains the configuration used by the manualPeering plugin.
 var (
 	ParamsP2P   = &ParametersP2P{}
 	ParamsPeers = &ParametersPeers{}
@@ -49,4 +61,5 @@ var params = &app.ComponentParams{
 			"p2p": ParamsPeers,
 		},
 	},
+	Masked: []string{"p2p.identityPrivateKey"},
 }

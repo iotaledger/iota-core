@@ -9,8 +9,6 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 )
 
@@ -32,11 +30,9 @@ type DB struct {
 
 // Keys in the node database.
 const (
-	dbNodePrefix  = "n:"     // Identifier to prefix node entries with
-	dbLocalPrefix = "local:" // Identifier to prefix local entries
+	dbNodePrefix = "n:" // Identifier to prefix node entries with
 
 	dbNodeUpdated = "updated"
-	dbLocalKey    = "key"
 )
 
 // NewDB creates a new peer database.
@@ -50,40 +46,6 @@ func NewDB(store kvstore.KVStore) *DB {
 	go pDB.expirer()
 
 	return pDB
-}
-
-// LocalPrivateKey returns the private key stored in the database or creates a new one.
-func (db *DB) LocalPrivateKey() (privateKey ed25519.PrivateKey, err error) {
-	value, err := db.store.Get(localFieldKey(dbLocalKey))
-	if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-		key, genErr := ed25519.GeneratePrivateKey()
-		if genErr == nil {
-			err = db.UpdateLocalPrivateKey(key)
-		}
-
-		return key, err
-	}
-	if err != nil {
-		return
-	}
-
-	copy(privateKey[:], value)
-
-	return
-}
-
-// UpdateLocalPrivateKey stores the provided key in the database.
-func (db *DB) UpdateLocalPrivateKey(key ed25519.PrivateKey) error {
-	keyBytes, err := key.Bytes()
-	if err != nil {
-		return err
-	}
-
-	if err := db.store.Set(localFieldKey(dbLocalKey), keyBytes); err != nil {
-		return err
-	}
-
-	return db.store.Flush()
 }
 
 // UpdatePeer updates a peer in the database.
@@ -222,10 +184,6 @@ func (db *DB) setInt64(key []byte, n int64) error {
 // nodeKey returns the database key for a node record.
 func nodeKey(id peer.ID) []byte {
 	return append([]byte(dbNodePrefix), []byte(id)...)
-}
-
-func localFieldKey(field string) []byte {
-	return append([]byte(dbLocalPrefix), []byte(field)...)
 }
 
 // nodeFieldKey returns the database key for a node metadata field.
