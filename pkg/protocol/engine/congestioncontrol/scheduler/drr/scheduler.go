@@ -129,6 +129,9 @@ func New(apiProvider api.Provider, opts ...options.Option[Scheduler]) *Scheduler
 }
 
 func (s *Scheduler) Shutdown() {
+	for _, validatorQueue := range s.validatorBuffer {
+		s.removeValidator(validatorQueue)
+	}
 	close(s.shutdownSignal)
 	s.TriggerStopped()
 }
