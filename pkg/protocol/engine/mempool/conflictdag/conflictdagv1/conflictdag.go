@@ -366,11 +366,6 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AcceptanceState(conflict
 // UnacceptedConflicts takes a set of ConflictIDs and removes all the accepted Conflicts (leaving only the
 // pending or rejected ones behind).
 func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UnacceptedConflicts(conflictIDs ds.Set[ConflictID]) ds.Set[ConflictID] {
-	// TODO: introduce optsMergeToMaster
-	// if !c.optsMergeToMaster {
-	//	return conflictIDs.Clone()
-	// }
-
 	pendingConflictIDs := ds.NewSet[ConflictID]()
 	conflictIDs.Range(func(currentConflictID ConflictID) {
 		if conflict, exists := c.conflictsByID.Get(currentConflictID); exists && !conflict.IsAccepted() {

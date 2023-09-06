@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -15,7 +17,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -237,7 +238,7 @@ func (e *Engine) Shutdown() {
 	}
 }
 
-func (e *Engine) ProcessBlockFromPeer(block *model.Block, source network.PeerID) {
+func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 	e.Filter.ProcessReceivedBlock(block, source)
 	e.Events.BlockProcessed.Trigger(block.ID())
 }

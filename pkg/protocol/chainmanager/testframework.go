@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -80,7 +78,7 @@ func (t *TestFramework) ProcessCommitment(alias string) (isSolid bool, chain *Ch
 }
 
 func (t *TestFramework) ProcessCommitmentFromOtherSource(alias string) (isSolid bool, chain *Chain) {
-	return t.Instance.ProcessCommitmentFromSource(t.commitment(alias), identity.NewID(ed25519.PublicKey{}))
+	return t.Instance.ProcessCommitmentFromSource(t.commitment(alias), "otherid")
 }
 
 func (t *TestFramework) Chain(alias string) (chain *Chain) {
