@@ -76,7 +76,7 @@ func New(workers *workerpool.Group, blockCache *blocks.Blocks, errorHandler func
 			b.book,
 			b.markInvalid,
 			(*blocks.Block).Parents,
-			causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](isReferenceValid),
+			causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](b.isReferenceValid),
 		)
 
 		blockCache.Evict.Hook(b.evict)
@@ -137,7 +137,6 @@ func (b *Booker) book(block *blocks.Block) error {
 
 func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	if block.SetInvalid() {
-		b.retainBlockFailure(block.ID(), apimodels.BlockFailureBookingFailure)
 		b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "block marked as invalid in Booker"))
 	}
 }
@@ -149,6 +148,7 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 	for _, parent := range block.ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
+			b.retainBlockFailure(block.ID(), apimodels.BlockFailureParentNotFound)
 			return nil, ierrors.Errorf("parent %s does not exist", parent.ID)
 		}
 
@@ -180,8 +180,9 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 }
 
 // isReferenceValid checks if the reference between the child and its parent is valid.
-func isReferenceValid(child *blocks.Block, parent *blocks.Block) (err error) {
+func (b *Booker) isReferenceValid(child *blocks.Block, parent *blocks.Block) (err error) {
 	if parent.IsInvalid() {
+		b.retainBlockFailure(child.ID(), apimodels.BlockFailureParentInvalid)
 		return ierrors.Errorf("parent %s of child %s is marked as invalid", parent.ID(), child.ID())
 	}
 
