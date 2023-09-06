@@ -73,7 +73,6 @@ func NewSortedConflicts[ConflictID, ResourceID conflictdag.IDType, VoteRank conf
 	s.heaviestMember = s.owner
 	s.heaviestPreferredMember = s.owner
 
-	// TODO: move to WorkerPool so we are consistent with the rest of the codebase
 	go s.fixMemberPositionWorker()
 	go s.fixHeaviestPreferredMemberWorker()
 

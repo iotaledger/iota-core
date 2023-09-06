@@ -10,7 +10,7 @@ services:
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
-      --p2p.seed=0x88ce2019dd99fd5a3c46e10ffc192549fc4491eee07552153ff66cf792b6a0af
+      --p2p.identityPrivateKey=08735375679f3d8031353e94282ed1d65119e5c288fe56d6639d9184a3f978fee8febfedff11cc376daea0f59c395ae2e9a870a25ac4e36093000fbf4d0e8f18
       --blockIssuer.rateSetterEnabled=true
       --validator.enabled=true
       --validator.ignoreBootstrapped=true
@@ -49,7 +49,7 @@ services:
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
-      --p2p.seed=0xf739eea09eb0f4820f26504a3135131a075089b4c901c19c2099513ee016f516
+      --p2p.identityPrivateKey=ba771419c52132a0dfb2521ed18667813f398da159010a55a0a482af939affb92d3338789ad4a07a7631b91791deb11f82ed5dc612822f24275e9f7a313b691f
       --blockIssuer.rateSetterEnabled=true
       --validator.enabled=true
       --validator.account=0x375358f92cc94750669598b0aaa55a6ff73310b90710e1fad524c0f911be0fea
@@ -79,7 +79,7 @@ services:
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
-      --p2p.seed=0x2ab2792bba8ab6deb7978165e4072d3f00def97a0138b98ba2d21eba54159705
+      --p2p.identityPrivateKey=a6261ac049755675ff1437654ca9f83b305055f01ff08c4f039209ef5a4a7d96d06fb61df77a8815209a8f4d204226dee593e50d0ec897ec440a2c1fbde77656
       --blockIssuer.rateSetterEnabled=true
       --validator.enabled=true
       --validator.account=0x6aee704f25558e8aa7630fed0121da53074188abc423b3c5810f80be4936eb6e
@@ -108,7 +108,7 @@ services:
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
-      --p2p.seed=0x6bd12a0398f9264788bc6481e2665eb90bd58a33b82347fb70f612cc8a91fcce
+      --p2p.identityPrivateKey=03feb3bcd25e57f75697bb329e6e0100680431e4c45c85bc013da2aea9e9d0345e08a0c37407dc62369deebc64cb0fb3ea26127d19d141ee7fb8eaa6b92019d7
       --restAPI.allowIncompleteBlock=true
       --restAPI.blockIssuerAccount=0xd057230f48fdf59ae093e2179857c590e960b05389399399ce69ad169a9c7f37
       --restAPI.blockIssuerPrivateKey=dcf7adb000f03826f1964a3e5378874b1972c38229fb740a8e47f2c421cddcf9a54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39
@@ -133,7 +133,7 @@ services:
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
-      --p2p.seed=0x4da1119dc9cc3750ebb313c3c7dcb50120465544d256ee3c0d4586ce1772c96b
+      --p2p.identityPrivateKey=7d1491df3ef334dee988d6cdfc4b430b996d520bd63375a01d6754f8cee979b855b200fbea8c936ea1937a27e6ad72a7c9a21c1b17c2bd3c11f1f6994d813446
       --restAPI.allowIncompleteBlock=true
       --restAPI.blockIssuerAccount=0x7a9ec5d9c0c145bae03b20cbe481cfea306e688c00525b410eb8cb18a169ed7f
       --restAPI.blockIssuerPrivateKey=0d8ecad4cefe927d2b6c64ee56576c52450f9a7a0113f96683cf8e8cc5c64264cb5ea14175ce649149ee41217c44aa70c3205b9939968449eae408727a71f91b
