@@ -109,24 +109,49 @@ Example:
 
 ## <a id="p2p"></a> 3. P2p
 
-| Name                | Description                                                                                                                                          | Type    | Default value    |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------- |
-| bindAddress         | The bind address for p2p connections                                                                                                                 | string  | "0.0.0.0:14666"  |
-| seed                | Private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively | string  | ""               |
-| overwriteStoredSeed | Whether to overwrite the private key if an existing peerdb exists                                                                                    | boolean | false            |
-| externalAddress     | External IP address under which the node is reachable; or 'auto' to determine it automatically                                                       | string  | "auto"           |
-| peerDBDirectory     | Path to the peer database directory                                                                                                                  | string  | "testnet/peerdb" |
+| Name                                        | Description                                                                                                                                          | Type    | Default value                                |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------------------------- |
+| bindMultiAddresses                          | The bind multi addresses for p2p connections                                                                                                         | array   | /ip4/0.0.0.0/tcp/14666<br/>/ip6/::/tcp/14666 |
+| [connectionManager](#p2p_connectionmanager) | Configuration for connectionManager                                                                                                                  | object  |                                              |
+| seed                                        | Private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively | string  | ""                                           |
+| overwriteStoredSeed                         | Whether to overwrite the private key if an existing peerdb exists                                                                                    | boolean | false                                        |
+| externalAddress                             | External IP address under which the node is reachable; or 'auto' to determine it automatically                                                       | string  | "auto"                                       |
+| identityPrivateKey                          | Private key used to derive the node identity (optional)                                                                                              | string  | ""                                           |
+| [db](#p2p_db)                               | Configuration for db                                                                                                                                 | object  |                                              |
+
+### <a id="p2p_connectionmanager"></a> ConnectionManager
+
+| Name          | Description                                                                  | Type | Default value |
+| ------------- | ---------------------------------------------------------------------------- | ---- | ------------- |
+| highWatermark | The threshold up on which connections count truncates to the lower watermark | int  | 10            |
+| lowWatermark  | The minimum connections count to hold after the high watermark was reached   | int  | 5             |
+
+### <a id="p2p_db"></a> Db
+
+| Name | Description                  | Type   | Default value      |
+| ---- | ---------------------------- | ------ | ------------------ |
+| path | The path to the p2p database | string | "testnet/p2pstore" |
 
 Example:
 
 ```json
   {
     "p2p": {
-      "bindAddress": "0.0.0.0:14666",
+      "bindMultiAddresses": [
+        "/ip4/0.0.0.0/tcp/14666",
+        "/ip6/::/tcp/14666"
+      ],
+      "connectionManager": {
+        "highWatermark": 10,
+        "lowWatermark": 5
+      },
       "seed": "",
       "overwriteStoredSeed": false,
       "externalAddress": "auto",
-      "peerDBDirectory": "testnet/peerdb"
+      "identityPrivateKey": "",
+      "db": {
+        "path": "testnet/p2pstore"
+      }
     }
   }
 ```
