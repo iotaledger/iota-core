@@ -26,6 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
@@ -70,6 +71,7 @@ type EngineManager struct {
 	tipSelectionProvider        module.Provider[*engine.Engine, tipselection.TipSelection]
 	retainerProvider            module.Provider[*engine.Engine, retainer.Retainer]
 	upgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
+	syncManagerProvider         module.Provider[*engine.Engine, syncmanager.SyncManager]
 }
 
 func New(
@@ -95,6 +97,7 @@ func New(
 	tipSelectionProvider module.Provider[*engine.Engine, tipselection.TipSelection],
 	retainerProvider module.Provider[*engine.Engine, retainer.Retainer],
 	upgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator],
+	syncManagerProvider module.Provider[*engine.Engine, syncmanager.SyncManager],
 ) *EngineManager {
 	return &EngineManager{
 		directory:                   utils.NewDirectory(dir),
@@ -120,6 +123,7 @@ func New(
 		tipSelectionProvider:        tipSelectionProvider,
 		retainerProvider:            retainerProvider,
 		upgradeOrchestratorProvider: upgradeOrchestratorProvider,
+		syncManagerProvider:         syncManagerProvider,
 	}
 }
 
@@ -211,6 +215,7 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.tipSelectionProvider,
 		e.retainerProvider,
 		e.upgradeOrchestratorProvider,
+		e.syncManagerProvider,
 		append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))...,
 	)
 

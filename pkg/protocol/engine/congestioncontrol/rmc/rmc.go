@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -54,11 +55,9 @@ func (m *Manager) BlockAccepted(block *blocks.Block) error {
 		return ierrors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
 	}
 
-	slotWork, exists := m.slotWork.Get(blockID.Index())
-	if !exists {
-		slotWork = 0
-	}
-	m.slotWork.Set(blockID.Index(), slotWork+block.WorkScore())
+	m.slotWork.Compute(blockID.Index(), func(currentValue iotago.WorkScore, _ bool) iotago.WorkScore {
+		return currentValue + block.WorkScore()
+	})
 
 	return nil
 }
@@ -86,9 +85,10 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	// calculate the new RMC
 	var newRMC iotago.Mana
 	ccParameters := m.apiProvider.APIForSlot(index).ProtocolParameters().CongestionControlParameters()
-	if currentSlotWork < ccParameters.DecreaseThreshold {
-		if lastRMC >= ccParameters.RMCMin {
-			newRMC, err = safemath.SafeSub(lastRMC, ccParameters.Decrease)
+	if currentSlotWork < ccParameters.DecreaseThreshold && lastRMC > ccParameters.RMCMin {
+		newRMC, err = safemath.SafeSub(lastRMC, ccParameters.Decrease)
+		if err == nil {
+			newRMC = lo.Max(newRMC, ccParameters.RMCMin)
 		}
 	} else if currentSlotWork > ccParameters.IncreaseThreshold {
 		newRMC, err = safemath.SafeAdd(lastRMC, ccParameters.Increase)

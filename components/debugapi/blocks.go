@@ -10,15 +10,15 @@ import (
 )
 
 func getSlotBlockIDs(index iotago.SlotIndex) (*BlockChangesResponse, error) {
-	blocksForSlot := deps.Protocol.MainEngine().Storage.Blocks(index)
-	if blocksForSlot == nil {
-		return nil, ierrors.Errorf("cannot find block storage bucket for slot %d", index)
+	blocksForSlot, err := deps.Protocol.MainEngine().Storage.Blocks(index)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get block storage bucket for slot %d", index)
 	}
 
 	includedBlocks := make([]string, 0)
 	tangleTree := ads.NewSet(mapdb.NewMapDB(), iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes)
 
-	_ = blocksForSlot.ForEachBlockIDInSlot(func(blockID iotago.BlockID) error {
+	_ = blocksForSlot.StreamKeys(func(blockID iotago.BlockID) error {
 		includedBlocks = append(includedBlocks, blockID.String())
 		if err := tangleTree.Add(blockID); err != nil {
 			return ierrors.Wrapf(err, "failed to add block to tangle tree, blockID: %s", blockID.ToHex())

@@ -109,24 +109,49 @@ Example:
 
 ## <a id="p2p"></a> 3. P2p
 
-| Name                | Description                                                                                                                                          | Type    | Default value    |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------- |
-| bindAddress         | The bind address for p2p connections                                                                                                                 | string  | "0.0.0.0:14666"  |
-| seed                | Private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively | string  | ""               |
-| overwriteStoredSeed | Whether to overwrite the private key if an existing peerdb exists                                                                                    | boolean | false            |
-| externalAddress     | External IP address under which the node is reachable; or 'auto' to determine it automatically                                                       | string  | "auto"           |
-| peerDBDirectory     | Path to the peer database directory                                                                                                                  | string  | "testnet/peerdb" |
+| Name                                        | Description                                                                                                                                          | Type    | Default value                                |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------------------------- |
+| bindMultiAddresses                          | The bind multi addresses for p2p connections                                                                                                         | array   | /ip4/0.0.0.0/tcp/14666<br/>/ip6/::/tcp/14666 |
+| [connectionManager](#p2p_connectionmanager) | Configuration for connectionManager                                                                                                                  | object  |                                              |
+| seed                                        | Private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively | string  | ""                                           |
+| overwriteStoredSeed                         | Whether to overwrite the private key if an existing peerdb exists                                                                                    | boolean | false                                        |
+| externalAddress                             | External IP address under which the node is reachable; or 'auto' to determine it automatically                                                       | string  | "auto"                                       |
+| identityPrivateKey                          | Private key used to derive the node identity (optional)                                                                                              | string  | ""                                           |
+| [db](#p2p_db)                               | Configuration for db                                                                                                                                 | object  |                                              |
+
+### <a id="p2p_connectionmanager"></a> ConnectionManager
+
+| Name          | Description                                                                  | Type | Default value |
+| ------------- | ---------------------------------------------------------------------------- | ---- | ------------- |
+| highWatermark | The threshold up on which connections count truncates to the lower watermark | int  | 10            |
+| lowWatermark  | The minimum connections count to hold after the high watermark was reached   | int  | 5             |
+
+### <a id="p2p_db"></a> Db
+
+| Name | Description                  | Type   | Default value      |
+| ---- | ---------------------------- | ------ | ------------------ |
+| path | The path to the p2p database | string | "testnet/p2pstore" |
 
 Example:
 
 ```json
   {
     "p2p": {
-      "bindAddress": "0.0.0.0:14666",
+      "bindMultiAddresses": [
+        "/ip4/0.0.0.0/tcp/14666",
+        "/ip6/::/tcp/14666"
+      ],
+      "connectionManager": {
+        "highWatermark": 10,
+        "lowWatermark": 5
+      },
       "seed": "",
       "overwriteStoredSeed": false,
       "externalAddress": "auto",
-      "peerDBDirectory": "testnet/peerdb"
+      "identityPrivateKey": "",
+      "db": {
+        "path": "testnet/p2pstore"
+      }
     }
   }
 ```
@@ -162,6 +187,8 @@ Example:
 | maxPageSize                 | The maximum number of results per page                                                         | uint    | 100                                                                                                                                                                                                                                                                                                                  |
 | [jwtAuth](#restapi_jwtauth) | Configuration for jwtAuth                                                                      | object  |                                                                                                                                                                                                                                                                                                                      |
 | [limits](#restapi_limits)   | Configuration for limits                                                                       | object  |                                                                                                                                                                                                                                                                                                                      |
+| blockIssuerAccount          | The accountID of the account that will issue the blocks                                        | string  | ""                                                                                                                                                                                                                                                                                                                   |
+| blockIssuerPrivateKey       | The private key of the account that will issue the blocks                                      | string  | ""                                                                                                                                                                                                                                                                                                                   |
 
 ### <a id="restapi_jwtauth"></a> JwtAuth
 
@@ -210,7 +237,9 @@ Example:
       "limits": {
         "maxBodyLength": "1M",
         "maxResults": 1000
-      }
+      },
+      "blockIssuerAccount": "",
+      "blockIssuerPrivateKey": ""
     }
   }
 ```
@@ -222,7 +251,7 @@ Example:
 | enabled          | Whether the DebugAPI component is enabled                  | boolean | true            |
 | path             | The path to the database folder                            | string  | "testnet/debug" |
 | maxOpenDBs       | Maximum number of open database instances                  | int     | 2               |
-| pruningThreshold | How many confirmed slots should be retained                | uint    | 8640            |
+| pruningThreshold | How many epochs should be retained                         | uint    | 1               |
 | dbGranularity    | How many slots should be contained in a single DB instance | int     | 100             |
 
 Example:
@@ -233,7 +262,7 @@ Example:
       "enabled": true,
       "path": "testnet/debug",
       "maxOpenDBs": 2,
-      "pruningThreshold": 8640,
+      "pruningThreshold": 1,
       "dbGranularity": 100
     }
   }
@@ -257,13 +286,22 @@ Example:
 
 ## <a id="database"></a> 8. Database
 
-| Name             | Description                                                | Type   | Default value      |
-| ---------------- | ---------------------------------------------------------- | ------ | ------------------ |
-| engine           | The used database engine (rocksdb/mapdb)                   | string | "rocksdb"          |
-| path             | The path to the database folder                            | string | "testnet/database" |
-| maxOpenDBs       | Maximum number of open database instances                  | int    | 10                 |
-| pruningThreshold | How many confirmed slots should be retained                | uint   | 16384              |
-| dbGranularity    | How many slots should be contained in a single DB instance | int    | 8192               |
+| Name                   | Description                                  | Type   | Default value      |
+| ---------------------- | -------------------------------------------- | ------ | ------------------ |
+| engine                 | The used database engine (rocksdb/mapdb)     | string | "rocksdb"          |
+| path                   | The path to the database folder              | string | "testnet/database" |
+| maxOpenDBs             | Maximum number of open database instances    | int    | 5                  |
+| pruningThreshold       | How many finalized epochs should be retained | uint   | 30                 |
+| [size](#database_size) | Configuration for size                       | object |                    |
+
+### <a id="database_size"></a> Size
+
+| Name                | Description                                                                       | Type    | Default value |
+| ------------------- | --------------------------------------------------------------------------------- | ------- | ------------- |
+| enabled             | Whether to delete old block data from the database based on maximum database size | boolean | true          |
+| targetSize          | Target size of the database                                                       | string  | "30GB"        |
+| reductionPercentage | The percentage the database size gets reduced if the target size is reached       | float   | 10.0          |
+| cooldownTime        | Cooldown time between two pruning by database size events                         | string  | "5m"          |
 
 Example:
 
@@ -272,9 +310,14 @@ Example:
     "database": {
       "engine": "rocksdb",
       "path": "testnet/database",
-      "maxOpenDBs": 10,
-      "pruningThreshold": 16384,
-      "dbGranularity": 8192
+      "maxOpenDBs": 5,
+      "pruningThreshold": 30,
+      "size": {
+        "enabled": true,
+        "targetSize": "30GB",
+        "reductionPercentage": 10,
+        "cooldownTime": "5m"
+      }
     }
   }
 ```
@@ -299,8 +342,6 @@ Example:
 | Name                 | Description                                                                                | Type   | Default value |
 | -------------------- | ------------------------------------------------------------------------------------------ | ------ | ------------- |
 | maxAllowedClockDrift | The maximum drift our wall clock can have to future blocks being received from the network | string | "5s"          |
-| minCommittableAge    | The minimum age of a commitment or commitment input, relative to block issuance time       | uint   | 6             |
-| maxCommittableAge    | The maximum age of a commitment or commitment input, relative to block issuance time       | uint   | 12            |
 
 ### <a id="protocol_basetoken"></a> BaseToken
 
@@ -323,9 +364,7 @@ Example:
         "depth": 5
       },
       "filter": {
-        "maxAllowedClockDrift": "5s",
-        "minCommittableAge": 6,
-        "maxCommittableAge": 12
+        "maxAllowedClockDrift": "5s"
       },
       "baseToken": {
         "name": "Shimmer",
@@ -346,8 +385,6 @@ Example:
 | enabled                   | Whether the BlockIssuer component is enabled                            | boolean | true          |
 | tipSelectionTimeout       | The timeout for tip selection                                           | string  | "10s"         |
 | tipSelectionRetryInterval | The interval for retrying tip selection                                 | string  | "200ms"       |
-| issuerAccount             | The accountID of the account that will issue the blocks                 | string  | ""            |
-| privateKey                | The private key of the account that will issue the blocks               | string  | ""            |
 | rateSetterEnabled         | Whether the RateSetter should be taken into account when issuing blocks | boolean | false         |
 
 Example:
@@ -358,8 +395,6 @@ Example:
       "enabled": true,
       "tipSelectionTimeout": "10s",
       "tipSelectionRetryInterval": "200ms",
-      "issuerAccount": "",
-      "privateKey": "",
       "rateSetterEnabled": false
     }
   }
@@ -369,22 +404,26 @@ Example:
 
 | Name                       | Description                                                                                                  | Type    | Default value |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------- |
-| enabled                    | Whether the Validator component is enabled                                                                   | boolean | true          |
-| committeeBroadcastInterval | The interval at which the node will broadcast its committee validator block                                  | string  | "2s"          |
+| enabled                    | Whether the Validator component is enabled                                                                   | boolean | false         |
+| committeeBroadcastInterval | The interval at which the node will broadcast its committee validator block                                  | string  | "500ms"       |
 | candidateBroadcastInterval | The interval at which the node will broadcast its candidate validator block                                  | string  | "30m"         |
 | parentsCount               | The number of parents that node will choose for its validator blocks                                         | int     | 8             |
 | ignoreBootstrapped         | Whether the Validator component should start issuing validator blocks before the main engine is bootstrapped | boolean | false         |
+| account                    | The accountID of the validator account that will issue the blocks                                            | string  | ""            |
+| privateKey                 | The private key of the validator account that will issue the blocks                                          | string  | ""            |
 
 Example:
 
 ```json
   {
     "validator": {
-      "enabled": true,
-      "committeeBroadcastInterval": "2s",
+      "enabled": false,
+      "committeeBroadcastInterval": "500ms",
       "candidateBroadcastInterval": "30m",
       "parentsCount": 8,
-      "ignoreBootstrapped": false
+      "ignoreBootstrapped": false,
+      "account": "",
+      "privateKey": ""
     }
   }
 ```
@@ -457,10 +496,12 @@ Example:
 
 ## <a id="inx"></a> 14. Inx
 
-| Name        | Description                                            | Type    | Default value    |
-| ----------- | ------------------------------------------------------ | ------- | ---------------- |
-| enabled     | Whether the INX plugin is enabled                      | boolean | false            |
-| bindAddress | The bind address on which the INX can be accessed from | string  | "localhost:9029" |
+| Name                  | Description                                               | Type    | Default value    |
+| --------------------- | --------------------------------------------------------- | ------- | ---------------- |
+| enabled               | Whether the INX plugin is enabled                         | boolean | false            |
+| bindAddress           | The bind address on which the INX can be accessed from    | string  | "localhost:9029" |
+| blockIssuerAccount    | The accountID of the account that will issue the blocks   | string  | ""               |
+| blockIssuerPrivateKey | The private key of the account that will issue the blocks | string  | ""               |
 
 Example:
 
@@ -468,7 +509,9 @@ Example:
   {
     "inx": {
       "enabled": false,
-      "bindAddress": "localhost:9029"
+      "bindAddress": "localhost:9029",
+      "blockIssuerAccount": "",
+      "blockIssuerPrivateKey": ""
     }
   }
 ```

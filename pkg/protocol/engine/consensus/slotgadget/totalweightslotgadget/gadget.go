@@ -71,7 +71,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				func() {
 					g.mutex.Lock()
 					defer g.mutex.Unlock()
-					g.lastFinalizedSlot.Set(e.Storage.Permanent.Settings().LatestFinalizedSlot())
+					g.lastFinalizedSlot.Set(e.Storage.Settings().LatestFinalizedSlot())
 				}()
 
 				g.TriggerInitialized()

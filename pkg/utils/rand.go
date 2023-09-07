@@ -231,16 +231,17 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 	return iotaOutput
 }
 
-func RandPubKey() ed25519.PublicKey {
-	return ed25519.PublicKey(RandBytes(32))
+func RandBlockIssuerKey() iotago.BlockIssuerKey {
+	return iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(RandBytes(32)))
 }
 
-func RandPubKeys() []ed25519.PublicKey {
-	length := RandomIntn(10)
-	pubKeys := make([]ed25519.PublicKey, length)
+func RandBlockIssuerKeys() iotago.BlockIssuerKeys {
+	// We always generate at least one key.
+	length := RandomIntn(10) + 1
+	blockIssuerKeys := make(iotago.BlockIssuerKeys, length)
 	for i := 0; i < length; i++ {
-		pubKeys[i] = RandPubKey()
+		blockIssuerKeys[i] = RandBlockIssuerKey()
 	}
 
-	return pubKeys
+	return blockIssuerKeys
 }

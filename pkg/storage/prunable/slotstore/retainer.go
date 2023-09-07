@@ -1,4 +1,4 @@
-package prunable
+package slotstore
 
 import (
 	"github.com/iotaledger/hive.go/ierrors"

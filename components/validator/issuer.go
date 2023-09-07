@@ -22,7 +22,7 @@ func issueValidatorBlock(ctx context.Context) {
 		executor.ExecuteAt(validatorAccount.ID(), func() { issueValidatorBlock(ctx) }, nextBroadcast)
 	}()
 
-	if !ParamsValidator.IgnoreBootstrapped && !engineInstance.IsBootstrapped() {
+	if !ParamsValidator.IgnoreBootstrapped && !engineInstance.SyncManager.IsBootstrapped() {
 		Component.LogDebug("Not issuing validator block because node is not bootstrapped yet.")
 
 		return
@@ -62,6 +62,6 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	Component.LogInfof("Issued validator block: %s - commitment %s %d - latest finalized slot %d", modelBlock.ID(), modelBlock.ProtocolBlock().SlotCommitmentID, modelBlock.ProtocolBlock().SlotCommitmentID.Index(), modelBlock.ProtocolBlock().LatestFinalizedSlot)
+	Component.LogDebug("Issued validator block: %s - commitment %s %d - latest finalized slot %d", modelBlock.ID(), modelBlock.ProtocolBlock().SlotCommitmentID, modelBlock.ProtocolBlock().SlotCommitmentID.Index(), modelBlock.ProtocolBlock().LatestFinalizedSlot)
 
 }

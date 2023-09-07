@@ -3,15 +3,15 @@ package protocol
 import (
 	"fmt"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/core/eventticker"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
@@ -56,12 +56,12 @@ func NewGossip(protocol *Protocol) *Gossip {
 }
 
 func (r *Gossip) IssueBlock(block *model.Block) error {
-	r.protocol.MainEngine().ProcessBlockFromPeer(block, identity.ID{})
+	r.protocol.MainEngine().ProcessBlockFromPeer(block, "self")
 
 	return nil
 }
 
-func (r *Gossip) ProcessBlock(block *model.Block, src identity.ID) error {
+func (r *Gossip) ProcessBlock(block *model.Block, src peer.ID) error {
 	commitmentRequest, err := r.protocol.requestCommitment(block.ProtocolBlock().SlotCommitmentID, true)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to process block %s from peer %s", block.ID(), src)
@@ -83,7 +83,7 @@ func (r *Gossip) ProcessBlock(block *model.Block, src identity.ID) error {
 	return nil
 }
 
-func (r *Gossip) ProcessBlockRequest(blockID iotago.BlockID, src network.PeerID) error {
+func (r *Gossip) ProcessBlockRequest(blockID iotago.BlockID, src peer.ID) error {
 	block, exists := r.protocol.MainEngine().Block(blockID)
 	if !exists {
 		// TODO: CREATE SENTINAL ERRORS
@@ -95,7 +95,7 @@ func (r *Gossip) ProcessBlockRequest(blockID iotago.BlockID, src network.PeerID)
 	return nil
 }
 
-func (r *Gossip) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src network.PeerID) error {
+func (r *Gossip) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src peer.ID) error {
 	if commitment, err := r.protocol.Commitment(commitmentID); err == nil {
 		r.protocol.SendSlotCommitment(commitment.CommitmentModel(), src)
 	} else if !ierrors.Is(err, ErrorCommitmentNotFound) {
@@ -105,7 +105,7 @@ func (r *Gossip) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src 
 	return nil
 }
 
-func (r *Gossip) ProcessAttestationsResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) (err error) {
+func (r *Gossip) ProcessAttestationsResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) (err error) {
 	commitment, err := r.protocol.PublishCommitment(commitmentModel)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to publish commitment %s when processing attestations", commitmentModel.ID())
@@ -134,7 +134,7 @@ func (r *Gossip) ProcessAttestationsResponse(commitmentModel *model.Commitment, 
 	return nil
 }
 
-func (r *Gossip) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src network.PeerID) error {
+func (r *Gossip) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) error {
 	mainEngine := r.protocol.MainEngine()
 
 	if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {

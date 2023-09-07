@@ -16,9 +16,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	mock2 "github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
+	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -87,9 +89,16 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 					eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
 					eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](500*time.Millisecond),
 				),
-				engine.WithIsBootstrappedFunc(func(e *engine.Engine) bool {
-					return e.Storage.Settings().LatestCommitment().Index() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
-				}),
+			),
+			protocol.WithSyncManagerProvider(
+				trivialsyncmanager.NewProvider(
+					trivialsyncmanager.WithBootstrappedFunc(func(e *engine.Engine) bool {
+						return e.Storage.Settings().LatestCommitment().Index() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
+					}),
+				),
+			),
+			protocol.WithStorageOptions(
+				storage.WithPruningDelay(20),
 			),
 		}
 	}
@@ -123,14 +132,17 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}
 
 	// Verify that nodes have the expected states.
+
 	{
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithLatestCommitment(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())),
+			testsuite.WithLatestCommitment(genesisCommitment),
 			testsuite.WithLatestFinalizedSlot(0),
-			testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
-			testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())}),
+			testsuite.WithChainID(genesisCommitment.MustID()),
+			testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 
 			testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),

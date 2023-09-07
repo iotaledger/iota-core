@@ -36,7 +36,7 @@ func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
 		protocol:                  protocol,
 		EvictionState:             reactive.NewEvictionState[iotago.SlotIndex](),
-		mainChain:                 reactive.NewVariable[*Chain]().Init(NewChain(NewCommitment(protocol.MainEngine().LatestCommitment(), true), protocol.MainEngine())),
+		mainChain:                 reactive.NewVariable[*Chain]().Init(NewChain(NewCommitment(protocol.MainEngine().SyncStatus().LatestCommitment, true), protocol.MainEngine())),
 		heaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
 		heaviestAttestedCandidate: reactive.NewVariable[*Chain](),
 		heaviestVerifiedCandidate: reactive.NewVariable[*Chain](),

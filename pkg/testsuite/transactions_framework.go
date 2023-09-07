@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -241,6 +240,26 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 	return utxoledger.Outputs{input}, outputStates, []*mock.HDWallet{t.wallet}
 }
 
+// DelayedClaimingTransition transitions DelegationOutput into delayed claiming state by setting DelegationID and EndEpoch.
+func (t *TransactionFramework) DelayedClaimingTransition(inputAlias string, delegationEndEpoch iotago.EpochIndex) (utxoledger.Outputs, iotago.Outputs[iotago.Output], []*mock.HDWallet) {
+	input := t.Output(inputAlias)
+	if input.OutputType() != iotago.OutputDelegation {
+		panic(ierrors.Errorf("%s is not a delegation output, cannot transition to delayed claiming state", inputAlias))
+	}
+
+	delegationOutput, ok := input.Output().Clone().(*iotago.DelegationOutput)
+	if !ok {
+		panic(ierrors.Errorf("cloned output %s is not a delegation output, cannot transition to delayed claiming state", inputAlias))
+	}
+
+	if delegationOutput.DelegationID == iotago.EmptyDelegationID() {
+		delegationOutput.DelegationID = iotago.DelegationIDFromOutputID(input.OutputID())
+	}
+	delegationOutput.EndEpoch = delegationEndEpoch
+
+	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{delegationOutput}, []*mock.HDWallet{t.wallet}
+}
+
 func (t *TransactionFramework) DestroyAccount(alias string) (consumedInputs *utxoledger.Output, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
 	output := t.Output(alias)
 
@@ -362,7 +381,7 @@ func WithBlockIssuerFeature(blockIssuerFeature *iotago.BlockIssuerFeature) optio
 	}
 }
 
-func AddBlockIssuerKey(key ed25519.PublicKey) options.Option[iotago.AccountOutput] {
+func AddBlockIssuerKey(key iotago.BlockIssuerKey) options.Option[iotago.AccountOutput] {
 	return func(accountOutput *iotago.AccountOutput) {
 		blockIssuer := accountOutput.FeatureSet().BlockIssuer()
 		if blockIssuer == nil {

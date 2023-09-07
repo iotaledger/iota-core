@@ -87,13 +87,15 @@ func TestConfirmationFlags(t *testing.T) {
 	})
 
 	// Verify that nodes have the expected states.
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+	genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),
 		testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-		testsuite.WithLatestCommitment(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())),
+		testsuite.WithLatestCommitment(genesisCommitment),
 		testsuite.WithLatestFinalizedSlot(0),
-		testsuite.WithChainID(iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()).MustID()),
-		testsuite.WithStorageCommitments([]*iotago.Commitment{iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())}),
+		testsuite.WithChainID(genesisCommitment.MustID()),
+		testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
 		testsuite.WithSybilProtectionOnlineCommittee(lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID))),
 		testsuite.WithEvictedSlot(0),
@@ -103,11 +105,11 @@ func TestConfirmationFlags(t *testing.T) {
 
 	// Slots 1-3: only node A is online and issues blocks, make slot 1 committed.
 	{
-		ts.IssueBlockAtSlot("A.1.0", 1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("Genesis"))
-		ts.IssueBlockAtSlot("A.1.1", 1, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.1.0"))
-		ts.IssueBlockAtSlot("A.2.0", 2, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.1.1"))
-		ts.IssueBlockAtSlot("A.2.1", 2, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.2.0"))
-		ts.IssueBlockAtSlot("A.3.0", 3, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.2.1"))
+		ts.IssueBlockAtSlot("A.1.0", 1, genesisCommitment, nodeA, ts.BlockID("Genesis"))
+		ts.IssueBlockAtSlot("A.1.1", 1, genesisCommitment, nodeA, ts.BlockID("A.1.0"))
+		ts.IssueBlockAtSlot("A.2.0", 2, genesisCommitment, nodeA, ts.BlockID("A.1.1"))
+		ts.IssueBlockAtSlot("A.2.1", 2, genesisCommitment, nodeA, ts.BlockID("A.2.0"))
+		ts.IssueBlockAtSlot("A.3.0", 3, genesisCommitment, nodeA, ts.BlockID("A.2.1"))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.1.0", "A.1.1", "A.2.0", "A.2.1", "A.3.0"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1.0", "A.1.1", "A.2.0", "A.2.1"), true, ts.Nodes()...)
@@ -119,8 +121,8 @@ func TestConfirmationFlags(t *testing.T) {
 		slot1CommittableIndex := 1 + ts.API.ProtocolParameters().MinCommittableAge()
 		alias1A0 := fmt.Sprintf("A.%d.0", slot1CommittableIndex)
 		alias1A1 := fmt.Sprintf("A.%d.1", slot1CommittableIndex)
-		ts.IssueBlockAtSlot(alias1A0, slot1CommittableIndex, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID("A.3.0"))
-		ts.IssueBlockAtSlot(alias1A1, slot1CommittableIndex, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID(alias1A0))
+		ts.IssueBlockAtSlot(alias1A0, slot1CommittableIndex, genesisCommitment, nodeA, ts.BlockID("A.3.0"))
+		ts.IssueBlockAtSlot(alias1A1, slot1CommittableIndex, genesisCommitment, nodeA, ts.BlockID(alias1A0))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks(alias1A0), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3.0"), true, ts.Nodes()...)
@@ -138,7 +140,7 @@ func TestConfirmationFlags(t *testing.T) {
 		alias2A1 := fmt.Sprintf("A.%d.1", slot2CommittableIndex)
 		alias2A2 := fmt.Sprintf("A.%d.2", slot2CommittableIndex)
 		alias2B0 := fmt.Sprintf("B.%d.0", slot2CommittableIndex)
-		ts.IssueBlockAtSlot(alias2A0, slot2CommittableIndex, iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version()), nodeA, ts.BlockID(alias1A1))
+		ts.IssueBlockAtSlot(alias2A0, slot2CommittableIndex, genesisCommitment, nodeA, ts.BlockID(alias1A1))
 		ts.IssueBlockAtSlot(alias2A1, slot2CommittableIndex, slot1Commitment, nodeA, ts.BlockID(alias2A0))
 		ts.IssueBlockAtSlot(alias2B0, slot2CommittableIndex, slot1Commitment, nodeB, ts.BlockID(alias2A1))
 		ts.IssueBlockAtSlot(alias2A2, slot2CommittableIndex, slot1Commitment, nodeA, ts.BlockID(alias2B0))

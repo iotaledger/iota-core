@@ -6,22 +6,22 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
-	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 )
 
-func inxNodeStatus(status protocol.Status) *inx.NodeStatus {
+func inxNodeStatus(status engine.SyncStatus) *inx.NodeStatus {
 	return &inx.NodeStatus{
 		IsHealthy:              status.NodeSynced,
 		LastAcceptedBlockSlot:  uint64(status.LastAcceptedBlockSlot),
 		LastConfirmedBlockSlot: uint64(status.LastConfirmedBlockSlot),
 		LatestCommitment:       inxCommitment(status.LatestCommitment),
 		LatestFinalizedSlot:    uint64(status.LatestFinalizedSlot),
-		PruningSlot:            uint64(status.LatestPrunedSlot),
+		PruningSlot:            uint64(status.LastPrunedEpoch), // TODO: change name to PruningEpoch
 	}
 }
 
 func (s *Server) ReadNodeStatus(context.Context, *inx.NoParams) (*inx.NodeStatus, error) {
-	return inxNodeStatus(deps.Protocol.Status()), nil
+	return inxNodeStatus(deps.Protocol.MainEngine().SyncStatus()), nil
 }
 
 func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_ListenToNodeStatusServer) error {

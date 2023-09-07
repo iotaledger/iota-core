@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -28,7 +29,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		return nil, err
 	}
 
-	slotIndex := deps.Protocol.MainEngine().LatestCommitment().Index()
+	slotIndex := deps.Protocol.MainEngine().SyncStatus().LatestCommitment.Index()
 
 	acc, exists, err := deps.Protocol.MainEngine().Ledger.Account(accountID, slotIndex)
 	if err != nil {
@@ -66,7 +67,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 			pageSize = restapi.ParamsRestAPI.MaxPageSize
 		}
 	}
-	latestCommittedSlot := deps.Protocol.MainEngine().LatestCommitment().Index()
+	latestCommittedSlot := deps.Protocol.MainEngine().SyncStatus().LatestCommitment.Index()
 	// no cursor provided will be the first request
 	requestedSlotIndex := latestCommittedSlot
 	var cursorIndex uint32
@@ -94,7 +95,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 		deps.Protocol.MainEngine().Retainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
 	}
 
-	page := registeredValidators[cursorIndex : cursorIndex+pageSize]
+	page := registeredValidators[cursorIndex:lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))]
 	resp := &apimodels.ValidatorsResponse{
 		Validators: page,
 		PageSize:   pageSize,
@@ -114,7 +115,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterAccountID)
 	}
-	latestCommittedSlot := deps.Protocol.MainEngine().LatestCommitment().Index()
+	latestCommittedSlot := deps.Protocol.MainEngine().SyncStatus().LatestCommitment.Index()
 
 	accountData, exists, err := deps.Protocol.MainEngine().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
@@ -133,7 +134,8 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 		StakingEpochEnd:                accountData.StakeEndEpoch,
 		FixedCost:                      accountData.FixedCost,
 		Active:                         active,
-		LatestSupportedProtocolVersion: 1, // TODO: update after protocol versioning is included in the account ledger
+		LatestSupportedProtocolVersion: accountData.LatestSupportedProtocolVersionAndHash.Version,
+		LatestSupportedProtocolHash:    accountData.LatestSupportedProtocolVersionAndHash.Hash,
 	}, nil
 }
 

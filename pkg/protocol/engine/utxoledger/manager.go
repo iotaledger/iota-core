@@ -76,6 +76,11 @@ func (m *Manager) WriteUnlockLedger() {
 func (m *Manager) PruneSlotIndexWithoutLocking(index iotago.SlotIndex) error {
 	diff, err := m.SlotDiffWithoutLocking(index)
 	if err != nil {
+		// There's no need to prune this slot.
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil
+		}
+
 		return err
 	}
 

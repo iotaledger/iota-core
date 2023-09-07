@@ -330,6 +330,24 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
+	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock && basicBlock.BurnedMana == 0 {
+		rmcSlot, err := safemath.SafeSub(apiForVesion.TimeProvider().SlotFromTime(iotaBlock.IssuingTime), apiForVesion.ProtocolParameters().MaxCommittableAge())
+		if err != nil {
+			rmcSlot = 0
+		}
+		rmc, err := i.protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
+		if err != nil {
+			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
+		}
+
+		// only set the burned Mana as the last step before signing, so workscore calculation is correct.
+		basicBlock.BurnedMana, err = basicBlock.ManaCost(rmc, apiForVesion.ProtocolParameters().WorkScoreStructure())
+		if err != nil {
+			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "could not calculate Mana cost for block")
+		}
+		resign = true
+	}
+
 	if iotaBlock.IssuerID.Empty() || resign {
 		if i.optsIncompleteBlockAccepted && len(optIssuerAccount) > 0 {
 			issuerAccount := optIssuerAccount[0]

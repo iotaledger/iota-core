@@ -4,17 +4,18 @@ import (
 	"context"
 	"time"
 
+	"github.com/labstack/gommon/bytes"
 	"go.uber.org/dig"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
@@ -54,7 +55,6 @@ var (
 type dependencies struct {
 	dig.In
 
-	Peer     *peer.Local
 	Protocol *protocol.Protocol
 }
 
@@ -91,15 +91,28 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
+		pruningSizeEnabled := ParamsDatabase.Size.Enabled
+		pruningTargetDatabaseSizeBytes, err := bytes.Parse(ParamsDatabase.Size.TargetSize)
+		if err != nil {
+			Component.LogPanicf("parameter %s invalid", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)))
+		}
+
+		if pruningSizeEnabled && pruningTargetDatabaseSizeBytes == 0 {
+			Component.LogPanicf("%s has to be specified if %s is enabled", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)), Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.Enabled)))
+		}
+
 		return protocol.New(
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
 			protocol.WithStorageOptions(
 				storage.WithDBEngine(deps.DatabaseEngine),
-				storage.WithPruningDelay(iotago.SlotIndex(ParamsDatabase.PruningThreshold)),
-				storage.WithPrunableManagerOptions(
-					prunable.WithGranularity(ParamsDatabase.DBGranularity),
+				storage.WithPruningDelay(iotago.EpochIndex(ParamsDatabase.PruningThreshold)),
+				storage.WithPruningSizeEnable(ParamsDatabase.Size.Enabled),
+				storage.WithPruningSizeMaxTargetSizeBytes(pruningTargetDatabaseSizeBytes),
+				storage.WithPruningSizeReductionPercentage(ParamsDatabase.Size.ReductionPercentage),
+				storage.WithPruningSizeCooldownTime(ParamsDatabase.Size.CooldownTime),
+				storage.WithBucketManagerOptions(
 					prunable.WithMaxOpenDBs(ParamsDatabase.MaxOpenDBs),
 				),
 			),
@@ -129,7 +142,7 @@ func configure() error {
 		Component.LogErrorf("Error in Protocol: %s", err)
 	})
 
-	deps.Protocol.OnBlockReceived(func(block *model.Block, source network.PeerID) {
+	deps.Protocol.OnBlockReceived(func(block *model.Block, source peer.ID) {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})
 
@@ -225,11 +238,11 @@ func configure() error {
 		Component.LogDebugf("RequestCommitment: %s", id)
 	})
 
-	deps.Protocol.OnSlotCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, id network.PeerID) {
+	deps.Protocol.OnSlotCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentRequestReceived: %s", commitmentID)
 	})
 
-	deps.Protocol.OnSlotCommitmentReceived(func(commitment *model.Commitment, id network.PeerID) {
+	deps.Protocol.OnSlotCommitmentReceived(func(commitment *model.Commitment, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentReceived: %s", commitment.ID())
 	})
 
@@ -253,11 +266,8 @@ func configure() error {
 		Component.LogWarnf("OnlineCommitteeSeatRemoved: seatIndex: %d", seatIndex)
 	})
 
-	// TODO: create a transaction invalid event in the booker instead of hooking to a specific engine instance
-	deps.Protocol.MainEngine().Ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
-		transaction.OnInvalid(func(err error) {
-			Component.LogWarnf("TransactionInvalid: transaction %s - %s", transaction.ID(), err.Error())
-		})
+	deps.Protocol.MainEngineEvents.Booker.TransactionInvalid.Hook(func(transaction mempool.TransactionMetadata, reason error) {
+		Component.LogWarnf("TransactionInvalid: transaction %s - %s", transaction.ID(), reason.Error())
 	})
 
 	return nil

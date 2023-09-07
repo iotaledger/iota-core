@@ -88,7 +88,7 @@ func (b *BufferQueue) GetIssuerQueue(issuerID iotago.AccountID) (*IssuerQueue, e
 
 // Submit submits a block. Return blocks dropped from the scheduler to make room for the submitted block.
 // The submitted block can also be returned as dropped if the issuer does not have enough mana.
-func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantumFunc func(iotago.AccountID) (Deficit, error)) (elements []*blocks.Block, err error) {
+func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantumFunc func(iotago.AccountID) Deficit) (elements []*blocks.Block, err error) {
 
 	// first we submit the block, and if it turns out that the issuer doesn't have enough bandwidth to submit, it will be removed by dropTail
 	if !issuerQueue.Submit(blk) {
@@ -105,7 +105,7 @@ func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantu
 	return nil, nil
 }
 
-func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) (Deficit, error)) (droppedBlocks []*blocks.Block) {
+func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) Deficit) (droppedBlocks []*blocks.Block) {
 	start := b.Current()
 	ringStart := b.ring
 	// remove as many blocks as necessary to stay within max buffer size
@@ -115,8 +115,7 @@ func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) (Deficit, erro
 		maxScale := math.Inf(-1)
 		var maxIssuerID iotago.AccountID
 		for q := start; ; {
-			issuerQuantum, err := quantumFunc(q.IssuerID())
-			if err == nil {
+			if issuerQuantum := quantumFunc(q.IssuerID()); issuerQuantum > 0 {
 				if scale := float64(q.Work()) / float64(issuerQuantum); scale > maxScale {
 					maxScale = scale
 					maxIssuerID = q.IssuerID()

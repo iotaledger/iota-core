@@ -1,19 +1,21 @@
 #!/bin/bash
 
 COMMIT=$1
-MODULES="ads app ierrors autopeering constraints core crypto ds kvstore lo logger objectstorage runtime serializer/v2 stringify"
-
 if [ -z "$COMMIT" ]
 then
     echo "ERROR: no commit hash given!"
     exit 1
 fi
 
-for i in $MODULES
+HIVE_MODULES=$(grep -E "^\sgithub.com/iotaledger/hive.go" "go.mod" | awk '{print $1}')
+for dependency in $HIVE_MODULES
 do
-	go get -u github.com/iotaledger/hive.go/$i@$COMMIT
+    echo "go get -u $dependency@$COMMIT..."
+    go get -u "$dependency@$COMMIT" >/dev/null
 done
 
+# Run go mod tidy
+echo "Running go mod tidy..."
 pushd $(dirname $0)
 ./go_mod_tidy.sh
 popd

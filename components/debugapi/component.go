@@ -2,7 +2,6 @@ package debugapi
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -37,6 +36,11 @@ const (
 	RouteCommitmentByIndexTransactionIDs = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/transactions"
 )
 
+const (
+	debugPrefixHealth byte = iota
+	debugPrefixBlocks
+)
+
 func init() {
 	Component = &app.Component{
 		Name:      "DebugAPIV3",
@@ -54,7 +58,7 @@ var (
 	deps      dependencies
 
 	blocksPerSlot         *shrinkingmap.ShrinkingMap[iotago.SlotIndex, []*blocks.Block]
-	blocksPrunableStorage *prunable.Manager
+	blocksPrunableStorage *prunable.BucketManager
 )
 
 type dependencies struct {
@@ -72,15 +76,15 @@ func configure() error {
 	}
 
 	blocksPerSlot = shrinkingmap.New[iotago.SlotIndex, []*blocks.Block]()
-	blocksPrunableStorage = prunable.NewManager(database.Config{
+	blocksPrunableStorage = prunable.NewBucketManager(database.Config{
 		Engine:    hivedb.EngineRocksDB,
 		Directory: ParamsDebugAPI.Path,
 
 		Version:      1,
-		PrefixHealth: []byte{0},
+		PrefixHealth: []byte{debugPrefixHealth},
 	}, func(err error) {
-		fmt.Printf(">> DebugAPI Error: %s\n", err)
-	}, prunable.WithGranularity(ParamsDebugAPI.DBGranularity), prunable.WithMaxOpenDBs(ParamsDebugAPI.MaxOpenDBs),
+		Component.LogWarnf(">> DebugAPI Error: %s\n", err)
+	}, prunable.WithMaxOpenDBs(ParamsDebugAPI.MaxOpenDBs),
 	)
 
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v2")
@@ -92,16 +96,27 @@ func configure() error {
 	})
 
 	deps.Protocol.MainEngineEvents.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		if index < iotago.SlotIndex(ParamsDebugAPI.PruningThreshold) {
+		epoch := deps.Protocol.APIForSlot(index).TimeProvider().EpochFromSlot(index)
+		if epoch < iotago.EpochIndex(ParamsDebugAPI.PruningThreshold) {
 			return
 		}
 
-		blocksPrunableStorage.PruneUntilSlot(index - iotago.SlotIndex(ParamsDebugAPI.PruningThreshold))
+		lastPruned, hasPruned := blocksPrunableStorage.LastPrunedEpoch()
+		if hasPruned {
+			lastPruned++
+		}
+
+		for i := lastPruned; i < epoch-iotago.EpochIndex(ParamsDebugAPI.PruningThreshold); i++ {
+			if err := blocksPrunableStorage.Prune(i); err != nil {
+				Component.LogWarnf(">> DebugAPI Error: %s\n", err)
+			}
+		}
+
 	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", 1)))
 
 	deps.Protocol.MainEngineEvents.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
 		if err := storeTransactionsPerSlot(scd); err != nil {
-			fmt.Printf(">> DebugAPI Error: %s\n", err)
+			Component.LogWarnf(">> DebugAPI Error: %s\n", err)
 		}
 	})
 
@@ -113,13 +128,17 @@ func configure() error {
 
 		for _, block := range blocksInSlot {
 			if block.ProtocolBlock() == nil {
-				fmt.Println("block is a root block", block.ID())
+				Component.LogInfof("block is a root block", block.ID())
 				continue
 			}
 
-			blockStore := blocksPrunableStorage.Get(block.ID().Index(), []byte{1})
+			epoch := deps.Protocol.APIForSlot(block.ID().Index()).TimeProvider().EpochFromSlot(block.ID().Index())
+			blockStore, err := blocksPrunableStorage.Get(epoch, []byte{debugPrefixBlocks})
+			if err != nil {
+				panic(err)
+			}
 
-			err := blockStore.Set(lo.PanicOnErr(block.ID().Bytes()), lo.PanicOnErr(json.Marshal(BlockMetadataResponseFromBlock(block))))
+			err = blockStore.Set(lo.PanicOnErr(block.ID().Bytes()), lo.PanicOnErr(json.Marshal(BlockMetadataResponseFromBlock(block))))
 			if err != nil {
 				panic(err)
 			}
@@ -141,7 +160,11 @@ func configure() error {
 
 		}
 
-		blockStore := blocksPrunableStorage.Get(blockID.Index(), []byte{1})
+		epoch := deps.Protocol.APIForSlot(blockID.Index()).TimeProvider().EpochFromSlot(blockID.Index())
+		blockStore, err := blocksPrunableStorage.Get(epoch, []byte{debugPrefixBlocks})
+		if err != nil {
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
 
 		blockJSON, err := blockStore.Get(lo.PanicOnErr(blockID.Bytes()))
 		if err != nil {

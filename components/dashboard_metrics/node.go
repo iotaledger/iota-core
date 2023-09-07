@@ -17,7 +17,7 @@ func nodeInfoExtended() *NodeInfoExtended {
 		Version:       deps.AppInfo.Version,
 		LatestVersion: deps.AppInfo.LatestGitHubVersion,
 		Uptime:        time.Since(nodeStartupTimestamp).Milliseconds(),
-		NodeID:        deps.LocalPeer.ID().String(),
+		NodeID:        deps.Host.ID().String(),
 		NodeAlias:     deps.AppInfo.Name,
 		MemoryUsage:   int64(m.HeapAlloc + m.StackSys + m.MSpanSys + m.MCacheSys + m.BuckHashSys + m.GCSys + m.OtherSys),
 	}

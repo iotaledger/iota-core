@@ -29,7 +29,7 @@ import (
 )
 
 const MinIssuerAccountAmount = iotago.BaseToken(372900)
-const MinValidatorAccountAmount = iotago.BaseToken(702900)
+const MinValidatorAccountAmount = iotago.BaseToken(722800)
 
 type TestSuite struct {
 	Testing     *testing.T
@@ -350,7 +350,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			Address:              iotago.Ed25519AddressFromPubKey(node.PubKey),
 			Amount:               amount,
 			Mana:                 iotago.Mana(amount),
-			IssuerKey:            ed25519.PublicKey(node.PubKey),
+			IssuerKey:            iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(node.PubKey)),
 			ExpirySlot:           math.MaxUint64,
 			BlockIssuanceCredits: iotago.BlockIssuanceCredits(math.MaxInt64),
 		}
@@ -400,7 +400,13 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 			}
 
 			if accountDetails.AccountID.Empty() {
-				accountDetails.AccountID = blake2b.Sum256(accountDetails.IssuerKey[:])
+				blockIssuerKeyEd25519, ok := accountDetails.IssuerKey.(iotago.BlockIssuerKeyEd25519)
+				if !ok {
+					panic("block issuer key must be of type ed25519")
+				}
+				ed25519PubKey := blockIssuerKeyEd25519.ToEd25519PublicKey()
+				accountID := blake2b.Sum256(ed25519PubKey[:])
+				accountDetails.AccountID = accountID
 			}
 
 			return accountDetails

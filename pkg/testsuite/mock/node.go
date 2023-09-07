@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
+	p2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
-	"github.com/iotaledger/hive.go/crypto/identity"
-	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -22,7 +22,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -31,10 +30,23 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
+
+// idAliases contains a list of aliases registered for a set of IDs.
+var idAliases = make(map[peer.ID]string)
+
+// RegisterIDAlias registers an alias that will modify the String() output of the ID to show a human
+// readable string instead of the base58 encoded version of itself.
+func RegisterIDAlias(id peer.ID, alias string) {
+	idAliases[id] = alias
+}
+
+// UnregisterIDAliases removes all aliases registered through the RegisterIDAlias function.
+func UnregisterIDAliases() {
+	idAliases = make(map[peer.ID]string)
+}
 
 type Node struct {
 	Testing *testing.T
@@ -50,7 +62,7 @@ type Node struct {
 	privateKey              ed25519.PrivateKey
 	PubKey                  ed25519.PublicKey
 	AccountID               iotago.AccountID
-	PeerID                  network.PeerID
+	PeerID                  peer.ID
 	protocolParametersHash  iotago.Identifier
 	highestSupportedVersion iotago.Version
 
@@ -77,8 +89,8 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 	accountID := iotago.AccountID(blake2b.Sum256(pub))
 	accountID.RegisterAlias(name)
 
-	peerID := network.PeerID(pub)
-	identity.RegisterIDAlias(peerID, name)
+	peerID := lo.PanicOnErr(peer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
+	RegisterIDAlias(peerID, name)
 
 	return &Node{
 		Testing: t,
@@ -145,29 +157,31 @@ func (n *Node) hookEvents() {
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngine())
 
-	n.Protocol.OnBlockReceived(func(block *model.Block, source identity.ID) {
+	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngineInstance())
+
+	n.Protocol.OnBlockReceived(func(block *model.Block, source peer.ID) {
 		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
 	})
 
-	n.Protocol.OnBlockRequestReceived(func(blockID iotago.BlockID, source identity.ID) {
+	n.Protocol.OnBlockRequestReceived(func(blockID iotago.BlockID, source peer.ID) {
 		fmt.Printf("%s > Network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
 	})
 
-	n.Protocol.OnSlotCommitmentReceived(func(commitment *model.Commitment, source identity.ID) {
+	n.Protocol.OnSlotCommitmentReceived(func(commitment *model.Commitment, source peer.ID) {
 		fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
 	})
 
-	n.Protocol.OnSlotCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, source identity.ID) {
+	n.Protocol.OnSlotCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, source peer.ID) {
 		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 
-	n.Protocol.OnAttestationsReceived(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
+	n.Protocol.OnAttestationsReceived(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
 		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
 			return lo.PanicOnErr(a.BlockID(lo.PanicOnErr(n.Protocol.MainEngine().APIForVersion(a.ProtocolVersion))))
 		}))
 	})
 
-	n.Protocol.OnAttestationsRequestReceived(func(id iotago.CommitmentID, source network.PeerID) {
+	n.Protocol.OnAttestationsRequestReceived(func(id iotago.CommitmentID, source peer.ID) {
 		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
@@ -234,6 +248,14 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
 	})
 
+	events.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+		fmt.Printf("%s > [%s] Booker.BlockInvalid: %s - %s\n", n.Name, engineName, block.ID(), err.Error())
+	})
+
+	events.Booker.TransactionInvalid.Hook(func(metadata mempool.TransactionMetadata, err error) {
+		fmt.Printf("%s > [%s] Booker.TransactionInvalid: %s - %s\n", n.Name, engineName, metadata.ID(), err.Error())
+	})
+
 	events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] Scheduler.BlockScheduled: %s\n", n.Name, engineName, block.ID())
 	})
@@ -296,12 +318,10 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		})
 		require.NoError(n.Testing, err)
 
-		rootsStorage := instance.Storage.Roots(details.Commitment.ID().Index())
-		rootsBytes, err := rootsStorage.Get(kvstore.Key{prunable.RootsKey})
+		rootsStorage, err := instance.Storage.Roots(details.Commitment.ID().Index())
+		require.NoError(n.Testing, err, "roots storage for slot %d not found", details.Commitment.Index())
+		roots, err := rootsStorage.Load(details.Commitment.ID())
 		require.NoError(n.Testing, err)
-
-		var roots iotago.Roots
-		lo.PanicOnErr(n.Protocol.APIForSlot(details.Commitment.Index()).Decode(rootsBytes, &roots))
 
 		attestationBlockIDs := make([]iotago.BlockID, 0)
 		tree, err := instance.Attestations.GetMap(details.Commitment.Index())

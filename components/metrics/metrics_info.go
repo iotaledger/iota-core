@@ -25,8 +25,8 @@ var InfoMetrics = collector.NewCollection(infoNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitValueFunc(func() (metricValue float64, labelValues []string) {
 			var nodeID string
-			if deps.Local != nil {
-				nodeID = deps.Local.ID().String()
+			if deps.Host != nil {
+				nodeID = deps.Host.ID().String()
 			}
 
 			return 0, []string{nodeID, runtime.GOOS, runtime.GOARCH, strconv.Itoa(runtime.NumCPU())}
@@ -36,7 +36,7 @@ var InfoMetrics = collector.NewCollection(infoNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Node sync status based on ATT."),
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
-			if deps.Protocol.MainEngine().IsSynced() {
+			if deps.Protocol.MainEngine().SyncStatus().IsNodeSynced {
 				return 1, nil
 			}
 

@@ -12,18 +12,14 @@ func (t *TestSuite) AssertStorageRootBlocks(blocks []*blocks.Block, nodes ...*mo
 	for _, node := range nodes {
 		for _, block := range blocks {
 			t.Eventually(func() error {
-				storage := node.Protocol.MainEngine().Storage.RootBlocks(block.ID().Index())
-				if storage == nil {
-					return ierrors.Errorf("AssertStorageRootBlocks: %s: storage for %s is nil", node.Name, block.ID().Index())
+				storage, err := node.Protocol.MainEngine().Storage.RootBlocks(block.ID().Index())
+				if err != nil {
+					return ierrors.Errorf("AssertStorageRootBlocks: %s: error loading root blocks for %s: %v", node.Name, block.ID().Index(), err)
 				}
 
-				loadedBlockID, loadedCommitmentID, err := storage.Load(block.ID())
+				loadedCommitmentID, err := storage.Load(block.ID())
 				if err != nil {
 					return ierrors.Wrapf(err, "AssertStorageRootBlocks: %s: failed to load root block %s", node.Name, block.ID())
-				}
-
-				if block.ID() != loadedBlockID {
-					return ierrors.Errorf("AssertStorageRootBlocks: %s: expected block %s, got %s", node.Name, block.ID(), loadedBlockID)
 				}
 
 				if block.SlotCommitmentID() != loadedCommitmentID {
