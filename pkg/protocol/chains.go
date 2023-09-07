@@ -114,7 +114,9 @@ func (c *Chains) HeaviestVerifiedCandidate() reactive.Variable[*Chain] {
 }
 
 func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
-	c.requestCommitment(commitment.PrevID(), true, commitment.setParent)
+	if _, err := c.requestCommitment(commitment.PrevID(), true, commitment.setParent); err != nil {
+		c.protocol.TriggerError(ierrors.Wrapf(err, "failed to request parent commitment %s", commitment.PrevID()))
+	}
 
 	slotEvictedEvent.OnTrigger(func() {
 		commitment.evicted.Trigger()
