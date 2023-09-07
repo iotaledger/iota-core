@@ -3,7 +3,6 @@ package protocol
 import (
 	"context"
 
-	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -14,7 +13,6 @@ import (
 
 type Protocol struct {
 	workers *workerpool.Group
-	status  reactive.Variable[Status]
 	error   *event.Event1[error]
 	options *Options
 
@@ -32,7 +30,6 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		error:   event.New1[error](),
 		options: newOptions(),
 	}, opts, func(p *Protocol) {
-		p.status = newStatusVariable(p)
 		p.Network = newNetwork(p, dispatcher)
 		p.Engines = newEngines(p)
 		p.Chains = newChains(p)
@@ -57,33 +54,25 @@ func (p *Protocol) Workers() *workerpool.Group {
 }
 
 // APIForVersion returns the API for the given version.
-func (a *Protocol) APIForVersion(version iotago.Version) (api iotago.API, err error) {
-	return a.MainEngine().APIForVersion(version)
+func (p *Protocol) APIForVersion(version iotago.Version) (api iotago.API, err error) {
+	return p.MainEngine().APIForVersion(version)
 }
 
 // APIForSlot returns the API for the given slot.
-func (a *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
-	return a.MainEngine().APIForSlot(slot)
+func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
+	return p.MainEngine().APIForSlot(slot)
 }
 
-func (a *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
-	return a.MainEngine().APIForEpoch(epoch)
+func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
+	return p.MainEngine().APIForEpoch(epoch)
 }
 
-func (a *Protocol) CurrentAPI() iotago.API {
-	return a.MainEngine().CurrentAPI()
+func (p *Protocol) CurrentAPI() iotago.API {
+	return p.MainEngine().CurrentAPI()
 }
 
-func (a *Protocol) LatestAPI() iotago.API {
-	return a.MainEngine().LatestAPI()
-}
-
-func (p *Protocol) Status() Status {
-	return p.status.Get()
-}
-
-func (p *Protocol) StatusR() reactive.Variable[Status] {
-	return p.status
+func (p *Protocol) LatestAPI() iotago.API {
+	return p.MainEngine().LatestAPI()
 }
 
 func (p *Protocol) OnError(callback func(error)) (unsubscribe func()) {

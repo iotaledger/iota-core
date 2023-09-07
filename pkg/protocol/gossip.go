@@ -8,13 +8,11 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -155,19 +153,14 @@ func (r *Gossip) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, sr
 		return ierrors.Wrapf(err, "failed to load attestations for commitment %s", commitmentID)
 	}
 
-	rootsStorage := mainEngine.Storage.Roots(commitmentID.Index())
-	if rootsStorage == nil {
-		return ierrors.Errorf("failed to load roots for commitment %s", commitmentID)
-	}
-
-	rootsBytes, err := rootsStorage.Get(kvstore.Key{prunable.RootsKey})
+	rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Index())
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID)
 	}
 
-	var roots iotago.Roots
-	if _, err = r.protocol.APIForSlot(commitmentID.Index()).Decode(rootsBytes, &roots); err != nil {
-		return ierrors.Wrapf(err, "failed to decode roots for commitment %s", commitmentID)
+	roots, err := rootsStorage.Load(commitmentID)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID)
 	}
 
 	r.protocol.SendAttestations(commitment, attestations, roots.AttestationsProof(), src)

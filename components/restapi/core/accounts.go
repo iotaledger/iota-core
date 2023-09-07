@@ -29,7 +29,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		return nil, err
 	}
 
-	slotIndex := deps.Protocol.MainEngine().SyncStatus().LatestCommitment.Index()
+	slotIndex := deps.Protocol.MainEngine().SyncManager.LatestCommitment().Index()
 
 	acc, exists, err := deps.Protocol.MainEngine().Ledger.Account(accountID, slotIndex)
 	if err != nil {
@@ -67,7 +67,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 			pageSize = restapi.ParamsRestAPI.MaxPageSize
 		}
 	}
-	latestCommittedSlot := deps.Protocol.MainEngine().SyncStatus().LatestCommitment.Index()
+	latestCommittedSlot := deps.Protocol.MainEngine().SyncManager.LatestCommitment().Index()
 	// no cursor provided will be the first request
 	requestedSlotIndex := latestCommittedSlot
 	var cursorIndex uint32
@@ -115,7 +115,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterAccountID)
 	}
-	latestCommittedSlot := deps.Protocol.MainEngine().SyncStatus().LatestCommitment.Index()
+	latestCommittedSlot := deps.Protocol.MainEngine().SyncManager.LatestCommitment().Index()
 
 	accountData, exists, err := deps.Protocol.MainEngine().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {

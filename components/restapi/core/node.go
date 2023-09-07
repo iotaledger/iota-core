@@ -24,7 +24,7 @@ func protocolParameters() []*apimodels.InfoResProtocolParameters {
 
 func info() *apimodels.InfoResponse {
 	clSnapshot := deps.Protocol.MainEngine().Clock.Snapshot()
-	syncStatus := deps.Protocol.MainEngine().SyncStatus()
+	syncStatus := deps.Protocol.MainEngine().SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
 
 	return &apimodels.InfoResponse{

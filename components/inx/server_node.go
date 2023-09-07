@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 )
 
-func inxNodeStatus(status engine.SyncStatus) *inx.NodeStatus {
+func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 	return &inx.NodeStatus{
 		IsHealthy:              status.NodeSynced,
 		LastAcceptedBlockSlot:  uint64(status.LastAcceptedBlockSlot),
@@ -21,7 +22,7 @@ func inxNodeStatus(status engine.SyncStatus) *inx.NodeStatus {
 }
 
 func (s *Server) ReadNodeStatus(context.Context, *inx.NoParams) (*inx.NodeStatus, error) {
-	return inxNodeStatus(deps.Protocol.MainEngine().SyncStatus()), nil
+	return inxNodeStatus(deps.Protocol.MainEngine().SyncManager.SyncStatus()), nil
 }
 
 func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_ListenToNodeStatusServer) error {
@@ -42,7 +43,7 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 	coolDownDuration := time.Duration(req.GetCooldownInMilliseconds()) * time.Millisecond
 	wp := workerpool.New("ListenToNodeStatus", workerCount)
 
-	onUpdate := func(status protocol.Status) {
+	onUpdate := func(status *syncmanager.SyncStatus) {
 		if lastUpdateTimer != nil {
 			lastUpdateTimer.Stop()
 			lastUpdateTimer = nil
@@ -66,9 +67,7 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 	}
 
 	wp.Start()
-	unhook := deps.Protocol.StatusR().OnUpdate(func(oldValue, newValue protocol.Status) {
-		wp.Submit(func() { onUpdate(newValue) })
-	})
+	unhook := deps.Protocol.MainEngineEvents.SyncManager.UpdatedStatus.Hook(onUpdate, event.WithWorkerPool(wp)).Unhook
 
 	<-ctx.Done()
 	unhook()

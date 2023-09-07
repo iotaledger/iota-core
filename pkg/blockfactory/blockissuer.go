@@ -335,7 +335,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		if err != nil {
 			rmcSlot = 0
 		}
-		rmc, err := i.protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
+		rmc, err := i.protocol.MainEngine().Ledger.RMCManager().RMC(rmcSlot)
 		if err != nil {
 			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
 		}

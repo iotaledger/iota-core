@@ -21,7 +21,7 @@ type Network struct {
 
 func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 	n := &Network{
-		Protocol: core.NewProtocol(endpoint, protocol.Workers().CreatePool("NetworkProtocol"), protocol),
+		Protocol: core.NewProtocol(endpoint, protocol.Workers().CreatePool("NetworkProtocol"), protocol.MainEngine()),
 	}
 
 	protocol.HookInitialized(func() {
