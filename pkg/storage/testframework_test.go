@@ -79,7 +79,7 @@ func (t *TestFramework) RestoreFromDisk() {
 
 func (t *TestFramework) SetLatestFinalizedEpoch(epoch iotago.EpochIndex) {
 	// We make sure that the given epoch is seen as finalized by setting the latest finalized slot to the start slot of the next epoch.
-	startSlotNextEpoch := t.Instance.Settings().APIProvider().CurrentAPI().TimeProvider().EpochStart(epoch + 1)
+	startSlotNextEpoch := t.Instance.Settings().APIProvider().LatestAPI().TimeProvider().EpochStart(epoch + 1)
 	require.NoError(t.t, t.Instance.Settings().SetLatestFinalizedSlot(startSlotNextEpoch))
 }
 

@@ -19,10 +19,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func Test_Upgrade_Signaling(t *testing.T) {
@@ -51,6 +54,13 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		),
 		protocol.WithStorageOptions(
 			storage.WithPruningDelay(20),
+			storage.WithPermanentOptions(
+				permanent.WithEpochBasedProviderOptions(
+					api.WithAPIForMissingVersionCallback(func(version iotago.Version) (iotago.API, error) {
+						return ts.API, nil
+					}),
+				),
+			),
 		),
 	}
 
@@ -72,7 +82,16 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	ts.Wait()
 
-	hash1 := iotago.Identifier{1}
+	v5ProtocolParameters := iotago.NewV3ProtocolParameters(
+		iotago.WithVersion(5),
+		iotago.WithTimeProviderOptions(
+			ts.API.TimeProvider().GenesisUnixTime(),
+			uint8(ts.API.TimeProvider().SlotDurationSeconds()),
+			uint8(math.Log2(float64(ts.API.TimeProvider().EpochDurationSlots()))),
+		),
+	)
+
+	hash1 := lo.PanicOnErr(v5ProtocolParameters.Hash())
 	hash2 := iotago.Identifier{2}
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -197,7 +216,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			nodeE.Shutdown()
 			ts.RemoveNode("nodeE")
 
-			nodeE1 := ts.AddNode("nodeE.1")
+			nodeE1 := ts.AddNode("nodeE1")
 			nodeE1.CopyIdentityFromNode(nodeE)
 			nodeE1.Initialize(true,
 				append(nodeOptions,
@@ -233,50 +252,123 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	// TODO: would be great to dynamically add accounts for later nodes.
 	// Can't issue on nodeG as its account is not known.
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
 
-	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
-	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE.1"), true, nil)
+	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
+	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
 
-	ts.AssertEpochVersions(map[iotago.Version]iotago.EpochIndex{
-		3: 0,
-		5: 13,
-	}, ts.Nodes()...)
+	// Restart node (and add protocol parameters) and add another node from snapshot (also with protocol parameters already set).
+	{
+		var expectedRootBlocks []*blocks.Block
+		for _, slot := range []iotago.SlotIndex{59, 60, 61} {
+			expectedRootBlocks = append(expectedRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+		}
 
-	ts.AssertVersionAndProtocolParameters(map[iotago.Version]iotago.ProtocolParameters{
-		3: ts.API.ProtocolParameters(),
-		5: nil,
-	}, ts.Nodes()...)
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithLatestCommitmentSlotIndex(61),
+			testsuite.WithActiveRootBlocks(expectedRootBlocks),
+		)
 
-	ts.AssertVersionAndProtocolParametersHashes(map[iotago.Version]iotago.Identifier{
-		3: lo.PanicOnErr(ts.API.ProtocolParameters().Hash()),
-		5: hash1,
-	}, ts.Nodes()...)
+		// Shutdown nodeE1 and restart it from disk as nodeE2. Verify state.
+		{
+			nodeE1 := ts.Node("nodeE1")
+			nodeE1.Shutdown()
+			ts.RemoveNode("nodeE1")
 
-	// check account data at the end of the test
-	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    ts.Node("nodeA").AccountID,
-		Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-		ExpirySlot:                            math.MaxUint64,
-		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
-		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
-		ValidatorStake:                        testsuite.MinValidatorAccountAmount,
-		DelegationStake:                       0,
-		FixedCost:                             0,
-		StakeEndEpoch:                         math.MaxUint64,
-		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash1},
-	}, ts.Nodes()...)
+			nodeE2 := ts.AddNode("nodeE2")
+			nodeE2.CopyIdentityFromNode(nodeE1)
+			nodeE2.Initialize(true,
+				append(nodeOptions,
+					protocol.WithBaseDirectory(ts.Directory.Path("nodeE")),
+					protocol.WithUpgradeOrchestratorProvider(
+						signalingupgradeorchestrator.NewProvider(signalingupgradeorchestrator.WithProtocolParameters(v5ProtocolParameters)),
+					),
+				)...,
+			)
+			ts.Wait()
+		}
 
-	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    ts.Node("nodeD").AccountID,
-		Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-		ExpirySlot:                            math.MaxUint64,
-		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 4),
-		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeD").PubKey))),
-		ValidatorStake:                        testsuite.MinValidatorAccountAmount,
-		DelegationStake:                       0,
-		FixedCost:                             0,
-		StakeEndEpoch:                         math.MaxUint64,
-		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash2},
-	}, ts.Nodes()...)
+		// Create snapshot and start new nodeH from it.
+		{
+			snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
+			require.NoError(t, ts.Node("nodeE2").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+
+			nodeG := ts.AddNode("nodeH")
+			nodeG.Initialize(true,
+				append(nodeOptions,
+					protocol.WithSnapshotPath(snapshotPath),
+					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeG.Name)),
+					protocol.WithUpgradeOrchestratorProvider(
+						signalingupgradeorchestrator.NewProvider(signalingupgradeorchestrator.WithProtocolParameters(v5ProtocolParameters)),
+					),
+				)...,
+			)
+			ts.Wait()
+		}
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithLatestCommitmentSlotIndex(61),
+			testsuite.WithEqualStoredCommitmentAtIndex(61),
+
+			testsuite.WithActiveRootBlocks(expectedRootBlocks),
+		)
+	}
+
+	// Verify final state of all nodes.
+	{
+		ts.AssertEpochVersions(map[iotago.Version]iotago.EpochIndex{
+			3: 0,
+			5: 13,
+		}, ts.Nodes()...)
+
+		ts.AssertVersionAndProtocolParameters(map[iotago.Version]iotago.ProtocolParameters{
+			3: ts.API.ProtocolParameters(),
+			5: nil,
+		}, ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeG")...)
+
+		// We've started nodeH with the v5 protocol parameters set. Therefore, they should be available.
+		ts.AssertVersionAndProtocolParameters(map[iotago.Version]iotago.ProtocolParameters{
+			3: ts.API.ProtocolParameters(),
+			5: v5ProtocolParameters,
+		}, ts.Nodes("nodeE2", "nodeH")...)
+
+		ts.AssertVersionAndProtocolParametersHashes(map[iotago.Version]iotago.Identifier{
+			3: lo.PanicOnErr(ts.API.ProtocolParameters().Hash()),
+			5: hash1,
+		}, ts.Nodes()...)
+
+		// check account data at the end of the test
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:                                    ts.Node("nodeA").AccountID,
+			Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
+			ExpirySlot:                            math.MaxUint64,
+			OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
+			BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
+			ValidatorStake:                        testsuite.MinValidatorAccountAmount,
+			DelegationStake:                       0,
+			FixedCost:                             0,
+			StakeEndEpoch:                         math.MaxUint64,
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash1},
+		}, ts.Nodes()...)
+
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:                                    ts.Node("nodeD").AccountID,
+			Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
+			ExpirySlot:                            math.MaxUint64,
+			OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 4),
+			BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeD").PubKey))),
+			ValidatorStake:                        testsuite.MinValidatorAccountAmount,
+			DelegationStake:                       0,
+			FixedCost:                             0,
+			StakeEndEpoch:                         math.MaxUint64,
+			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash2},
+		}, ts.Nodes()...)
+	}
+
+	// Check that issuing still produces the same commitments
+	ts.IssueBlocksAtEpoch("", 8, 4, "63.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, nil)
+	ts.AssertNodeState(ts.Nodes(),
+		testsuite.WithLatestCommitmentSlotIndex(69),
+		testsuite.WithEqualStoredCommitmentAtIndex(69),
+	)
 }
