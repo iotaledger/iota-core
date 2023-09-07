@@ -97,7 +97,7 @@ func TestConfirmationFlags(t *testing.T) {
 		testsuite.WithChainID(genesisCommitment.MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
-		testsuite.WithSybilProtectionOnlineCommittee(lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID))),
+		testsuite.WithSybilProtectionOnlineCommittee(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID))),
 		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -134,7 +134,7 @@ func TestConfirmationFlags(t *testing.T) {
 
 		// Issue in the next slot so that slot 2 becomes committed.
 
-		slot1Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngine().Storage.Commitments().Load(1)).Commitment()
+		slot1Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 		slot2CommittableIndex := slot1CommittableIndex + 1
 		alias2A0 := fmt.Sprintf("A.%d.0", slot2CommittableIndex)
 		alias2A1 := fmt.Sprintf("A.%d.1", slot2CommittableIndex)
@@ -154,15 +154,15 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(slot2CommittableIndex, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(
-				lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
-				lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
 			),
 			testsuite.WithEvictedSlot(2),
 		)
 
 		// Confirm aliasA0 by pre-confirming a block a 3rd validator in the next slot.
 
-		slot2Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngine().Storage.Commitments().Load(2)).Commitment()
+		slot2Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(2)).Commitment()
 		slot3CommittableIndex := slot2CommittableIndex + 1
 
 		alias3C0 := fmt.Sprintf("C.%d.0", slot3CommittableIndex)
@@ -194,9 +194,9 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(slot3CommittableIndex, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(
-				lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
-				lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
-				lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeC.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeC.AccountID)),
 			),
 			testsuite.WithEvictedSlot(2),
 		)
@@ -249,9 +249,9 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithSybilProtectionCommittee(slot4CommittableIndex, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(
-				lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
-				lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
-				lo.Return1(nodeA.Protocol.MainEngine().SybilProtection.SeatManager().Committee(1).GetSeat(nodeC.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
+				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeC.AccountID)),
 			),
 			testsuite.WithEvictedSlot(3),
 		)

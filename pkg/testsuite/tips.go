@@ -17,7 +17,7 @@ func (t *TestSuite) AssertStrongTips(expectedBlocks []*blocks.Block, nodes ...*m
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			storedTipsBlocks := node.Protocol.MainEngine().TipManager.StrongTips()
+			storedTipsBlocks := node.Protocol.MainEngineInstance().TipManager.StrongTips()
 			storedTipsBlockIDs := lo.Map(storedTipsBlocks, tipmanager.TipMetadata.ID)
 
 			if !assert.ElementsMatch(t.fakeTesting, expectedBlockIDs, storedTipsBlockIDs) {

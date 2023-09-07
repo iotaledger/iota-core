@@ -69,10 +69,10 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithHelp("Number of accepted attachments by the node per slot."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.MainEngine().Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
+			deps.Protocol.MainEngineInstance().Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
 				transactionMetadata.OnAccepted(func() {
 					for _, attachmentBlockID := range transactionMetadata.Attachments() {
-						if block, exists := deps.Protocol.MainEngine().BlockCache.Block(attachmentBlockID); exists && block.IsAccepted() {
+						if block, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(attachmentBlockID); exists && block.IsAccepted() {
 							deps.Collector.Increment(slotNamespace, acceptedAttachments, strconv.Itoa(int(attachmentBlockID.Index())))
 						}
 					}
@@ -94,7 +94,7 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 			}, event.WithWorkerPool(Component.WorkerPool))
 
 			deps.Protocol.MainEngineEvents.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
-				if txMetadata, exists := deps.Protocol.MainEngine().Ledger.TransactionMetadata(conflictID); exists {
+				if txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadata(conflictID); exists {
 					for _, attachment := range txMetadata.Attachments() {
 						deps.Collector.Increment(slotNamespace, createdConflicts, strconv.Itoa(int(attachment.Index())))
 					}
@@ -116,9 +116,9 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 			}, event.WithWorkerPool(Component.WorkerPool))
 
 			deps.Protocol.MainEngineEvents.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
-				if txMetadata, exists := deps.Protocol.MainEngine().Ledger.TransactionMetadata(conflictID); exists {
+				if txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadata(conflictID); exists {
 					for _, attachmentBlockID := range txMetadata.Attachments() {
-						if attachment, exists := deps.Protocol.MainEngine().BlockCache.Block(attachmentBlockID); exists && attachment.IsAccepted() {
+						if attachment, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(attachmentBlockID); exists && attachment.IsAccepted() {
 							deps.Collector.Increment(slotNamespace, acceptedConflicts, strconv.Itoa(int(attachment.ID().Index())))
 						}
 					}
@@ -140,9 +140,9 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 			}, event.WithWorkerPool(Component.WorkerPool))
 
 			deps.Protocol.MainEngineEvents.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
-				if txMetadata, exists := deps.Protocol.MainEngine().Ledger.TransactionMetadata(conflictID); exists {
+				if txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadata(conflictID); exists {
 					for _, attachmentBlockID := range txMetadata.Attachments() {
-						if attachment, exists := deps.Protocol.MainEngine().BlockCache.Block(attachmentBlockID); exists && attachment.IsAccepted() {
+						if attachment, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(attachmentBlockID); exists && attachment.IsAccepted() {
 							deps.Collector.Increment(slotNamespace, rejectedConflicts, strconv.Itoa(int(attachment.ID().Index())))
 						}
 					}

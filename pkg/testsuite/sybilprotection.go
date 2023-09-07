@@ -14,7 +14,7 @@ func (t *TestSuite) AssertSybilProtectionCommittee(slotIndex iotago.SlotIndex, e
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			accounts := node.Protocol.MainEngine().SybilProtection.SeatManager().Committee(slotIndex).Accounts().IDs()
+			accounts := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(slotIndex).Accounts().IDs()
 			if !assert.ElementsMatch(t.fakeTesting, expectedAccounts, accounts) {
 				return ierrors.Errorf("AssertSybilProtectionCommittee: %s: expected %s, got %s", node.Name, expectedAccounts, accounts)
 			}
@@ -33,7 +33,7 @@ func (t *TestSuite) AssertSybilProtectionOnlineCommittee(expectedSeats []account
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			seats := node.Protocol.MainEngine().SybilProtection.SeatManager().OnlineCommittee().ToSlice()
+			seats := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().OnlineCommittee().ToSlice()
 			if !assert.ElementsMatch(t.fakeTesting, expectedSeats, seats) {
 				return ierrors.Errorf("AssertSybilProtectionOnlineCommittee: %s: expected %v, got %v", node.Name, expectedSeats, seats)
 			}

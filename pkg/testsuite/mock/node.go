@@ -155,9 +155,9 @@ func (n *Node) hookEvents() {
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
-	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngine())
+	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngineInstance())
 
-	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngine())
+	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngineInstance())
 
 	n.Protocol.OnBlockReceived(func(block *model.Block, source peer.ID) {
 		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
@@ -213,7 +213,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 }
 
 func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
-	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngine() != instance, "Candidate", "Main"), instance.Name()[:8])
+	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
 	events := instance.Events
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
@@ -472,7 +472,7 @@ func (n *Node) SetProtocolParametersHash(hash iotago.Identifier) {
 
 func (n *Node) HighestSupportedVersion() iotago.Version {
 	if n.highestSupportedVersion == 0 {
-		return n.Protocol.MainEngine().LatestAPI().Version()
+		return n.Protocol.MainEngineInstance().LatestAPI().Version()
 	}
 
 	return n.highestSupportedVersion

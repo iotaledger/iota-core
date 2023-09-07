@@ -64,7 +64,7 @@ func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
 }
 
 func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
-	return p.MainEngine().APIForEpoch(epoch)
+	return p.MainEngineInstance().APIForEpoch(epoch)
 }
 
 func (p *Protocol) CurrentAPI() iotago.API {
@@ -72,7 +72,7 @@ func (p *Protocol) CurrentAPI() iotago.API {
 }
 
 func (p *Protocol) LatestAPI() iotago.API {
-	return p.MainEngine().LatestAPI()
+	return p.MainEngineInstance().LatestAPI()
 }
 
 func (p *Protocol) OnError(callback func(error)) (unsubscribe func()) {

@@ -153,7 +153,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// check that rollback is correct
-	account, exists, err := ts.Node("nodeA").Protocol.MainEngine().Ledger.Account(ts.Node("nodeA").AccountID, 7)
+	account, exists, err := ts.Node("nodeA").Protocol.MainEngineInstance().Ledger.Account(ts.Node("nodeA").AccountID, 7)
 	require.NoError(t, err)
 	require.True(t, exists)
 	require.Equal(t, model.VersionAndHash{Version: 4, Hash: hash2}, account.LatestSupportedProtocolVersionAndHash)
@@ -202,7 +202,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 		// Create snapshot.
 		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-		require.NoError(t, ts.Node("nodeA").Protocol.MainEngine().WriteSnapshot(snapshotPath))
+		require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
 
 		{
 			nodeG := ts.AddNode("nodeG")

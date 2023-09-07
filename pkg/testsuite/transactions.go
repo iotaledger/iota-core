@@ -19,7 +19,7 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 
 	t.Eventually(func() error {
 		var exists bool
-		loadedTransaction, exists = node.Protocol.MainEngine().Ledger.TransactionMetadata(transactionID)
+		loadedTransaction, exists = node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
 		if !exists {
 			return ierrors.Errorf("AssertTransaction: %s: transaction %s does not exist", node.Name, transactionID)
 		}
@@ -51,7 +51,7 @@ func (t *TestSuite) AssertTransactionsExist(transactions []*iotago.Transaction, 
 					t.AssertTransaction(transaction, node)
 				} else {
 					t.Eventually(func() error {
-						if lo.Return2(node.Protocol.MainEngine().Ledger.TransactionMetadata(transactionID)) {
+						if lo.Return2(node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)) {
 							return ierrors.Errorf("AssertTransactionsExist: %s: transaction %s exists but should not", node.Name, transactionID)
 						}
 
@@ -74,7 +74,7 @@ func (t *TestSuite) assertTransactionsInCacheWithFunc(expectedTransactions []*io
 			require.NoError(t.Testing, err)
 
 			t.Eventually(func() error {
-				blockFromCache, exists := node.Protocol.MainEngine().Ledger.TransactionMetadata(transactionID)
+				blockFromCache, exists := node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
 				if !exists {
 					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: transaction %s does not exist", node.Name, transactionID)
 				}
@@ -122,7 +122,7 @@ func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*
 			require.NoError(t.Testing, err)
 
 			t.Eventually(func() error {
-				transactionFromCache, exists := node.Protocol.MainEngine().Ledger.TransactionMetadata(transactionID)
+				transactionFromCache, exists := node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
 				if !exists {
 					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: block %s does not exist", node.Name, transactionID)
 				}

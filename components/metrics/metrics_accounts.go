@@ -23,7 +23,7 @@ var AccountMetrics = collector.NewCollection(accountNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitFunc(func() {
 			deps.Protocol.MainEngineEvents.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-				accountData, exists, _ := deps.Protocol.MainEngine().Ledger.Account(block.ProtocolBlock().IssuerID, deps.Protocol.MainEngine().SyncManager.LatestCommitment().Index())
+				accountData, exists, _ := deps.Protocol.MainEngineInstance().Ledger.Account(block.ProtocolBlock().IssuerID, deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index())
 				if exists {
 					deps.Collector.Update(accountNamespace, credits, float64(accountData.Credits.Value), accountData.ID.String())
 				}
@@ -34,7 +34,7 @@ var AccountMetrics = collector.NewCollection(accountNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Seats seen as active by the node."),
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
-			return float64(deps.Protocol.MainEngine().SybilProtection.SeatManager().OnlineCommittee().Size()), nil
+			return float64(deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().OnlineCommittee().Size()), nil
 		}),
 	)),
 )

@@ -15,7 +15,7 @@ func (t *TestSuite) AssertStorageCommitments(commitments []*iotago.Commitment, n
 	for _, node := range nodes {
 		for _, commitment := range commitments {
 			t.Eventually(func() error {
-				storedCommitment, err := node.Protocol.MainEngine().Storage.Commitments().Load(commitment.Index)
+				storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(commitment.Index)
 				if err != nil {
 					return ierrors.Wrapf(err, "AssertStorageCommitments: %s: error loading commitment: %s", node.Name, commitment.MustID())
 				}
@@ -37,7 +37,7 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 		var commitment *model.Commitment
 		var commitmentNode *mock.Node
 		for _, node := range nodes {
-			storedCommitment, err := node.Protocol.MainEngine().Storage.Commitments().Load(index)
+			storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
 			if err != nil {
 				return ierrors.Wrapf(err, "AssertEqualStoredCommitmentAtIndex: %s: error loading commitment for slot: %d", node.Name, index)
 			}

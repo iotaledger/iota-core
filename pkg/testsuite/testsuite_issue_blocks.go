@@ -275,7 +275,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, activeNodes []*mock.N
 	// first issue a chain of blocks with step size minCA up until slot + minCA + 1
 	// then issue one more block to accept the last in the chain which will trigger commitment of the second last in the chain
 
-	latestCommittedSlot := activeNodes[0].Protocol.MainEngine().Storage.Settings().LatestCommitment().Index()
+	latestCommittedSlot := activeNodes[0].Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index()
 	if latestCommittedSlot >= slot {
 		return parent
 	}
@@ -286,12 +286,12 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, activeNodes []*mock.N
 		// preacceptance of nextBlockSlot
 		for _, node := range activeNodes {
 			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex, node.Name)
-			tip = t.IssueBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngine().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			tip = t.IssueBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
 		}
 		// acceptance of nextBlockSlot
 		for _, node := range activeNodes {
 			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
-			tip = t.IssueBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngine().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			tip = t.IssueBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
 		}
 		if nextBlockSlot == slot+t.optsMinCommittableAge {
 			break

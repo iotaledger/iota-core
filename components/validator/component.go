@@ -69,7 +69,7 @@ func run() error {
 }
 
 func checkValidatorStatus(ctx context.Context) {
-	account, exists, err := deps.Protocol.MainEngine().Ledger.Account(validatorAccount.ID(), deps.Protocol.MainEngine().Storage.Settings().LatestCommitment().Index())
+	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(validatorAccount.ID(), deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index())
 	if err != nil {
 		Component.LogErrorf("error when retrieving BlockIssuer account %s: %w", validatorAccount.ID(), err)
 

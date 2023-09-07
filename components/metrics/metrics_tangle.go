@@ -21,7 +21,7 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of strong tips in the tangle"),
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
-			count := len(deps.Protocol.MainEngine().TipManager.StrongTips())
+			count := len(deps.Protocol.MainEngineInstance().TipManager.StrongTips())
 
 			return float64(count), nil
 		}),
@@ -30,7 +30,7 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of weak tips in the tangle"),
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
-			count := len(deps.Protocol.MainEngine().TipManager.WeakTips())
+			count := len(deps.Protocol.MainEngineInstance().TipManager.WeakTips())
 
 			return float64(count), nil
 		}),

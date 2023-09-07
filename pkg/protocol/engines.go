@@ -68,7 +68,7 @@ func newEngines(protocol *Protocol) *Engines {
 	return e
 }
 
-func (e *Engines) MainEngine() *engine.Engine {
+func (e *Engines) MainEngineInstance() *engine.Engine {
 	return e.mainEngine.Get()
 }
 

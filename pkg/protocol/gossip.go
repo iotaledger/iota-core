@@ -54,7 +54,7 @@ func NewGossip(protocol *Protocol) *Gossip {
 }
 
 func (r *Gossip) IssueBlock(block *model.Block) error {
-	r.protocol.MainEngine().ProcessBlockFromPeer(block, "self")
+	r.protocol.MainEngineInstance().ProcessBlockFromPeer(block, "self")
 
 	return nil
 }
@@ -82,7 +82,7 @@ func (r *Gossip) ProcessBlock(block *model.Block, src peer.ID) error {
 }
 
 func (r *Gossip) ProcessBlockRequest(blockID iotago.BlockID, src peer.ID) error {
-	block, exists := r.protocol.MainEngine().Block(blockID)
+	block, exists := r.protocol.MainEngineInstance().Block(blockID)
 	if !exists {
 		// TODO: CREATE SENTINAL ERRORS
 		return ierrors.Errorf("requested block %s not found", blockID)
@@ -133,7 +133,7 @@ func (r *Gossip) ProcessAttestationsResponse(commitmentModel *model.Commitment, 
 }
 
 func (r *Gossip) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) error {
-	mainEngine := r.protocol.MainEngine()
+	mainEngine := r.protocol.MainEngineInstance()
 
 	if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
 		return ierrors.Errorf("main engine has produced the requested commitment %s, yet", commitmentID)
@@ -253,7 +253,7 @@ func (r *Gossip) startBlockRequester() {
 		engine.HookShutdown(unsubscribe)
 	}
 
-	startBlockRequester(r.protocol.MainEngine())
+	startBlockRequester(r.protocol.MainEngineInstance())
 
 	r.protocol.OnEngineCreated(startBlockRequester)
 }

@@ -82,7 +82,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount A
 
 	if blockParams.HighestSupportedVersion == nil {
 		// We use the latest supported version and not the current one.
-		version := i.protocol.MainEngine().LatestAPI().Version()
+		version := i.protocol.MainEngineInstance().LatestAPI().Version()
 		blockParams.HighestSupportedVersion = &version
 	}
 
@@ -194,7 +194,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, issuerAccount Account, op
 	if err != nil {
 		rmcSlot = 0
 	}
-	rmc, err := i.protocol.MainEngine().Ledger.RMCManager().RMC(rmcSlot)
+	rmc, err := i.protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
 	}
@@ -284,8 +284,8 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	if iotaBlock.SlotCommitmentID == iotago.EmptyCommitmentID {
-		iotaBlock.SlotCommitmentID = i.protocol.MainEngine().Storage.Settings().LatestCommitment().Commitment().MustID()
-		iotaBlock.LatestFinalizedSlot = i.protocol.MainEngine().Storage.Settings().LatestFinalizedSlot()
+		iotaBlock.SlotCommitmentID = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID()
+		iotaBlock.LatestFinalizedSlot = i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		resign = true
 	}
 
@@ -335,7 +335,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		if err != nil {
 			rmcSlot = 0
 		}
-		rmc, err := i.protocol.MainEngine().Ledger.RMCManager().RMC(rmcSlot)
+		rmc, err := i.protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
 		if err != nil {
 			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
 		}
@@ -374,7 +374,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if !i.optsRateSetterEnabled || i.protocol.MainEngine().Scheduler.IsBlockIssuerReady(modelBlock.ProtocolBlock().IssuerID) {
+	if !i.optsRateSetterEnabled || i.protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(modelBlock.ProtocolBlock().IssuerID) {
 		i.events.BlockConstructed.Trigger(modelBlock)
 
 		if err = i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.MainEngineEvents.BlockDAG.BlockAttached); err != nil {
@@ -400,7 +400,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, issu
 	}
 
 	if blockParams.LatestFinalizedSlot == nil {
-		latestFinalizedSlot := i.protocol.MainEngine().Storage.Settings().LatestFinalizedSlot()
+		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		blockParams.LatestFinalizedSlot = &latestFinalizedSlot
 	}
 
@@ -419,7 +419,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, issu
 
 func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
 	protoParams := i.protocol.CurrentAPI().ProtocolParameters()
-	commitment := i.protocol.MainEngine().Storage.Settings().LatestCommitment().Commitment()
+	commitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 
 	if blockSlot > commitment.Index+protoParams.MaxCommittableAge() {
 		return nil, ierrors.Errorf("can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Index)
@@ -431,7 +431,7 @@ func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitm
 		}
 
 		commitmentSlot := commitment.Index - protoParams.MinCommittableAge()
-		loadedCommitment, err := i.protocol.MainEngine().Storage.Commitments().Load(commitmentSlot)
+		loadedCommitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(commitmentSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "error loading valid commitment of slot %d according to minCommittableAge from storage", commitmentSlot)
 		}
@@ -453,7 +453,7 @@ func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, stron
 
 func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIndex iotago.SlotIndex, references model.ParentReferences) error {
 	for _, parent := range lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds })) {
-		b, exists := i.protocol.MainEngine().BlockFromCache(parent)
+		b, exists := i.protocol.MainEngineInstance().BlockFromCache(parent)
 		if !exists {
 			return ierrors.Errorf("cannot issue block if the parents are not known: %s", parent)
 		}
@@ -488,7 +488,7 @@ func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, _ iotago.Paylo
 	defer timeutil.CleanupTicker(interval)
 
 	for {
-		references = i.protocol.MainEngine().TipSelection.SelectTips(parentsCount)
+		references = i.protocol.MainEngineInstance().TipSelection.SelectTips(parentsCount)
 		if len(references[iotago.StrongParentType]) > 0 {
 			return references, nil
 		}

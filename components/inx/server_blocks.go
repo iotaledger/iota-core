@@ -19,7 +19,7 @@ import (
 
 func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlock, error) {
 	blkID := blockID.Unwrap()
-	block, exists := deps.Protocol.MainEngine().Block(blkID) // block +1
+	block, exists := deps.Protocol.MainEngineInstance().Block(blkID) // block +1
 	if !exists {
 		return nil, status.Errorf(codes.NotFound, "block %s not found", blkID.ToHex())
 	}
@@ -30,7 +30,7 @@ func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlo
 }
 
 func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*inx.BlockMetadata, error) {
-	blockMetadata, err := deps.Protocol.MainEngine().Retainer.BlockMetadata(blockID.Unwrap())
+	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID.Unwrap())
 	if err != nil {
 		return nil, err
 	}

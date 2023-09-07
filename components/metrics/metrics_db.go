@@ -17,14 +17,14 @@ var DBMetrics = collector.NewCollection(dbNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("DB size in bytes for permanent storage."),
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
-			return float64(deps.Protocol.MainEngine().Storage.PermanentDatabaseSize()), nil
+			return float64(deps.Protocol.MainEngineInstance().Storage.PermanentDatabaseSize()), nil
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(sizeBytesPrunable,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("DB size in bytes for prunable storage."),
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
-			return float64(deps.Protocol.MainEngine().Storage.PrunableDatabaseSize()), nil
+			return float64(deps.Protocol.MainEngineInstance().Storage.PrunableDatabaseSize()), nil
 		}),
 	)),
 )

@@ -22,7 +22,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 }
 
 func (s *Server) ReadNodeStatus(context.Context, *inx.NoParams) (*inx.NodeStatus, error) {
-	return inxNodeStatus(deps.Protocol.MainEngine().SyncManager.SyncStatus()), nil
+	return inxNodeStatus(deps.Protocol.MainEngineInstance().SyncManager.SyncStatus()), nil
 }
 
 func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_ListenToNodeStatusServer) error {
@@ -83,7 +83,7 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 
 func (s *Server) ReadNodeConfiguration(context.Context, *inx.NoParams) (*inx.NodeConfiguration, error) {
 	protoParams := make([]*inx.RawProtocolParameters, 0)
-	provider := deps.Protocol.MainEngine().Storage.Settings().APIProvider()
+	provider := deps.Protocol.MainEngineInstance().Storage.Settings().APIProvider()
 	for _, version := range provider.ProtocolEpochVersions() {
 		protocolParams := provider.ProtocolParameters(version.Version)
 		if protocolParams == nil {

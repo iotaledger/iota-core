@@ -9,7 +9,7 @@ import (
 
 func issueValidatorBlock(ctx context.Context) {
 	// Get the main engine instance in case it changes mid-execution.
-	engineInstance := deps.Protocol.MainEngine()
+	engineInstance := deps.Protocol.MainEngineInstance()
 
 	// Get the latest commitment from the engine before to avoid race conditions if something is committed after we fix block issuing time.
 	latestCommitment := engineInstance.Storage.Settings().LatestCommitment()
@@ -42,7 +42,7 @@ func issueValidatorBlock(ctx context.Context) {
 			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
 		),
 		blockfactory.WithProtocolParametersHash(protocolParametersHash),
-		blockfactory.WithHighestSupportedVersion(deps.Protocol.MainEngine().LatestAPI().Version()),
+		blockfactory.WithHighestSupportedVersion(deps.Protocol.MainEngineInstance().LatestAPI().Version()),
 	)
 	if err != nil {
 		Component.LogWarnf("error creating validator block: %s", err.Error())
