@@ -57,10 +57,7 @@ func (s *Server) ListenToLatestCommitments(_ *inx.NoParams, srv inx.INX_ListenTo
 	wp := workerpool.New("ListenToCommitments", workerCount).Start()
 
 	unhook := deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(commitmentDetails *notarization.SlotCommittedDetails) {
-		inxCommitment := &inx.CommitmentInfo{
-			CommitmentId:    inx.NewCommitmentId(commitmentDetails.Commitment.ID()),
-			CommitmentIndex: uint64(commitmentDetails.Commitment.Index()),
-		}
+		inxCommitment := inx.NewCommitmentWithBytes(commitmentDetails.Commitment.ID(), commitmentDetails.Commitment.Data())
 
 		if err := srv.Send(inxCommitment); err != nil {
 			Component.LogErrorf("send error: %v", err)
@@ -92,10 +89,7 @@ func (s *Server) ListenToFinalizedCommitments(_ *inx.NoParams, srv inx.INX_Liste
 			cancel()
 		}
 
-		inxCommitment := &inx.CommitmentInfo{
-			CommitmentId:    inx.NewCommitmentId(commitment.ID()),
-			CommitmentIndex: uint64(index),
-		}
+		inxCommitment := inx.NewCommitmentWithBytes(commitment.ID(), commitment.Data())
 
 		if err := srv.Send(inxCommitment); err != nil {
 			Component.LogErrorf("send error: %v", err)
