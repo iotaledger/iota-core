@@ -54,7 +54,7 @@ func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, nodes
 	for _, node := range nodes {
 		t.Eventually(func() error {
 			if node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().ID().Index() < slot {
-				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment with at least %v not found in settings.LatestCommitmentR()", node.Name, slot)
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment with at least %v not found in settings.LatestCommitment()", node.Name, slot)
 			}
 
 			cm, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
@@ -123,8 +123,9 @@ func (t *TestSuite) AssertChainID(expectedChainID iotago.CommitmentID, nodes ...
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if expectedChainID != node.Protocol.MainChain().Root().ID() {
-				return ierrors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID, expectedChainID.Index(), node.Protocol.MainChain().Root().ID(), node.Protocol.MainChain().Root().ID().Index())
+			actualChainID := node.Protocol.MainChain().Root().ID()
+			if expectedChainID != actualChainID {
+				return ierrors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID, expectedChainID.Index(), actualChainID, actualChainID.Index())
 			}
 
 			return nil
