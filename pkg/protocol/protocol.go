@@ -55,12 +55,12 @@ func (p *Protocol) Workers() *workerpool.Group {
 
 // APIForVersion returns the API for the given version.
 func (p *Protocol) APIForVersion(version iotago.Version) (api iotago.API, err error) {
-	return p.APIForVersion(version)
+	return p.MainEngineInstance().APIForVersion(version)
 }
 
 // APIForSlot returns the API for the given slot.
 func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
-	return p.APIForSlot(slot)
+	return p.MainEngineInstance().APIForSlot(slot)
 }
 
 func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
@@ -68,11 +68,11 @@ func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 }
 
 func (p *Protocol) CurrentAPI() iotago.API {
-	return p.CurrentAPI()
+	return p.MainEngineInstance().CurrentAPI()
 }
 
 func (p *Protocol) LatestAPI() iotago.API {
-	return p.LatestAPI()
+	return p.MainEngineInstance().LatestAPI()
 }
 
 func (p *Protocol) OnError(callback func(error)) (unsubscribe func()) {
