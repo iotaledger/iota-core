@@ -53,7 +53,9 @@ func New(blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, opts ..
 		optsAcceptanceThreshold:               0.67,
 		optsConfirmationThreshold:             0.67,
 		optsConfirmationRatificationThreshold: 2,
-	}, opts, (*Gadget).TriggerConstructed)
+	}, opts,
+		(*Gadget).TriggerConstructed,
+	)
 }
 
 func (g *Gadget) Events() *blockgadget.Events {
