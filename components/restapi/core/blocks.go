@@ -96,7 +96,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 
-		apiForVersion, err := deps.Protocol.MainEngine().APIForVersion(version)
+		apiForVersion, err := deps.Protocol.APIForVersion(version)
 		if err != nil {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}

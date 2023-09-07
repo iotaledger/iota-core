@@ -142,7 +142,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount A
 
 func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams) (iotago.API, error) {
 	if blockParams.ProtocolVersion != nil {
-		return i.protocol.MainEngine().APIForVersion(*blockParams.ProtocolVersion)
+		return i.protocol.APIForVersion(*blockParams.ProtocolVersion)
 	}
 
 	return i.protocol.CurrentAPI(), nil
@@ -271,7 +271,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	// if anything changes, need to make a new signature
 	var resign bool
 
-	apiForVesion, err := i.protocol.MainEngine().APIForVersion(iotaBlock.ProtocolVersion)
+	apiForVesion, err := i.protocol.APIForVersion(iotaBlock.ProtocolVersion)
 	if err != nil {
 		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
 	}

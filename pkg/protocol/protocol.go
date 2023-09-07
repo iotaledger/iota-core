@@ -55,7 +55,7 @@ func (p *Protocol) Workers() *workerpool.Group {
 
 // APIForVersion returns the API for the given version.
 func (p *Protocol) APIForVersion(version iotago.Version) (api iotago.API, err error) {
-	return p.MainEngine().APIForVersion(version)
+	return p.APIForVersion(version)
 }
 
 // APIForSlot returns the API for the given slot.

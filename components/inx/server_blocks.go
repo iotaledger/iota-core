@@ -125,7 +125,7 @@ func (s *Server) SubmitBlock(ctx context.Context, rawBlock *inx.RawBlock) (*inx.
 		return nil, status.Errorf(codes.InvalidArgument, "failed to parse block version: %s", err.Error())
 	}
 
-	apiForVersion, err := deps.Protocol.MainEngine().APIForVersion(version)
+	apiForVersion, err := deps.Protocol.APIForVersion(version)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid block version: %s", err.Error())
 	}
