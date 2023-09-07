@@ -1,7 +1,6 @@
 package totalweightslotgadget
 
 import (
-	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -28,7 +27,7 @@ type Gadget struct {
 	slotTrackers *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *slottracker.SlotTracker]
 	seatManager  seatmanager.SeatManager
 
-	lastFinalizedSlot          reactive.Variable[iotago.SlotIndex]
+	lastFinalizedSlot          iotago.SlotIndex
 	storeLastFinalizedSlotFunc func(index iotago.SlotIndex)
 
 	mutex        syncutils.RWMutex
@@ -44,7 +43,6 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 		return options.Apply(&Gadget{
 			events:                        slotgadget.NewEvents(),
 			optsSlotFinalizationThreshold: 0.67,
-			lastFinalizedSlot:             reactive.NewVariable[iotago.SlotIndex](),
 			errorHandler:                  e.ErrorHandler("slotgadget"),
 		}, opts, func(g *Gadget) {
 
@@ -71,7 +69,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				func() {
 					g.mutex.Lock()
 					defer g.mutex.Unlock()
-					g.lastFinalizedSlot.Set(e.Storage.Settings().LatestFinalizedSlot())
+					g.lastFinalizedSlot = e.Storage.Settings().LatestFinalizedSlot()
 				}()
 
 				g.TriggerInitialized()
@@ -82,21 +80,13 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	})
 }
 
-func (g *Gadget) LatestFinalizedSlot() iotago.SlotIndex {
-	return g.lastFinalizedSlot.Get()
-}
-
-func (g *Gadget) LatestFinalizedSlotR() reactive.Variable[iotago.SlotIndex] {
-	return g.lastFinalizedSlot
-}
-
 func (g *Gadget) Shutdown() {
 	g.TriggerStopped()
 	g.workers.Shutdown()
 }
 
 func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {
-	g.lastFinalizedSlot.Set(i)
+	g.lastFinalizedSlot = i
 	g.storeLastFinalizedSlotFunc(i)
 }
 
@@ -109,7 +99,7 @@ func (g *Gadget) trackVotes(block *blocks.Block) {
 			return slottracker.NewSlotTracker()
 		})
 
-		prevLatestSlot, latestSlot, updated := tracker.TrackVotes(block.SlotCommitmentID().Index(), block.ProtocolBlock().IssuerID, g.LatestFinalizedSlot())
+		prevLatestSlot, latestSlot, updated := tracker.TrackVotes(block.SlotCommitmentID().Index(), block.ProtocolBlock().IssuerID, g.lastFinalizedSlot)
 		if !updated {
 			return nil
 		}
@@ -127,7 +117,7 @@ func (g *Gadget) trackVotes(block *blocks.Block) {
 func (g *Gadget) refreshSlotFinalization(tracker *slottracker.SlotTracker, previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) (finalizedSlots []iotago.SlotIndex) {
 	committeeTotalSeats := g.seatManager.SeatCount()
 
-	for i := lo.Max(g.LatestFinalizedSlot(), previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
+	for i := lo.Max(g.lastFinalizedSlot, previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
 		attestorsTotalSeats := len(tracker.Voters(i))
 
 		if !votes.IsThresholdReached(attestorsTotalSeats, committeeTotalSeats, g.optsSlotFinalizationThreshold) {
