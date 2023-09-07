@@ -86,7 +86,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 	switch mimeType {
 	case echo.MIMEApplicationJSON:
 		// Do not validate here, the parents might need to be set
-		if err := deps.Protocol.MainEngine().CurrentAPI().JSONDecode(bytes, iotaBlock); err != nil {
+		if err := deps.Protocol.CurrentAPI().JSONDecode(bytes, iotaBlock); err != nil {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 

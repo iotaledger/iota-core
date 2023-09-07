@@ -139,7 +139,7 @@ func (s *Server) SubmitBlock(ctx context.Context, rawBlock *inx.RawBlock) (*inx.
 }
 
 func (s *Server) SubmitPayload(ctx context.Context, rawPayload *inx.RawPayload) (*inx.BlockId, error) {
-	payload, err := rawPayload.Unwrap(deps.Protocol.MainEngine().CurrentAPI(), serix.WithValidation())
+	payload, err := rawPayload.Unwrap(deps.Protocol.CurrentAPI(), serix.WithValidation())
 	if err != nil {
 		return nil, err
 	}

@@ -194,7 +194,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 }
 
 func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
-	timeProvider := deps.Protocol.MainEngine().CurrentAPI().TimeProvider()
+	timeProvider := deps.Protocol.CurrentAPI().TimeProvider()
 
 	var slotIndex iotago.SlotIndex
 

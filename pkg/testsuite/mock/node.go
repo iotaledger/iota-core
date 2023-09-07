@@ -460,7 +460,7 @@ func (n *Node) CopyIdentityFromNode(otherNode *Node) {
 
 func (n *Node) ProtocolParametersHash() iotago.Identifier {
 	if n.protocolParametersHash == iotago.EmptyIdentifier {
-		return lo.PanicOnErr(n.Protocol.MainEngine().CurrentAPI().ProtocolParameters().Hash())
+		return lo.PanicOnErr(n.Protocol.CurrentAPI().ProtocolParameters().Hash())
 	}
 
 	return n.protocolParametersHash

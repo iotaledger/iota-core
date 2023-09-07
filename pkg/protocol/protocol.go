@@ -68,7 +68,7 @@ func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 }
 
 func (p *Protocol) CurrentAPI() iotago.API {
-	return p.MainEngine().CurrentAPI()
+	return p.CurrentAPI()
 }
 
 func (p *Protocol) LatestAPI() iotago.API {

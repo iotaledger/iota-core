@@ -87,7 +87,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount A
 	}
 
 	if blockParams.ProtocolParametersHash == nil {
-		protocolParametersHash, err := i.protocol.MainEngine().CurrentAPI().ProtocolParameters().Hash()
+		protocolParametersHash, err := i.protocol.CurrentAPI().ProtocolParameters().Hash()
 		if err != nil {
 			return nil, ierrors.Wrap(err, "error getting protocol parameters hash")
 		}
@@ -145,7 +145,7 @@ func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams) (iotago.API, e
 		return i.protocol.MainEngine().APIForVersion(*blockParams.ProtocolVersion)
 	}
 
-	return i.protocol.MainEngine().CurrentAPI(), nil
+	return i.protocol.CurrentAPI(), nil
 }
 
 // CreateBlock creates a new block with the options.
@@ -393,7 +393,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, issu
 
 	if blockParams.SlotCommitment == nil {
 		var err error
-		blockParams.SlotCommitment, err = i.getCommitment(i.protocol.MainEngine().CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime))
+		blockParams.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime))
 		if err != nil {
 			return ierrors.Wrap(err, "error getting commitment")
 		}
@@ -418,7 +418,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, issu
 }
 
 func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
-	protoParams := i.protocol.MainEngine().CurrentAPI().ProtocolParameters()
+	protoParams := i.protocol.CurrentAPI().ProtocolParameters()
 	commitment := i.protocol.MainEngine().Storage.Settings().LatestCommitment().Commitment()
 
 	if blockSlot > commitment.Index+protoParams.MaxCommittableAge() {
