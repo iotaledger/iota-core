@@ -72,7 +72,7 @@ func (p *Protocol) CurrentAPI() iotago.API {
 }
 
 func (p *Protocol) LatestAPI() iotago.API {
-	return p.MainEngineInstance().LatestAPI()
+	return p.LatestAPI()
 }
 
 func (p *Protocol) OnError(callback func(error)) (unsubscribe func()) {

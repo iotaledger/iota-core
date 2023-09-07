@@ -42,7 +42,7 @@ func issueValidatorBlock(ctx context.Context) {
 			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
 		),
 		blockfactory.WithProtocolParametersHash(protocolParametersHash),
-		blockfactory.WithHighestSupportedVersion(deps.Protocol.MainEngineInstance().LatestAPI().Version()),
+		blockfactory.WithHighestSupportedVersion(deps.Protocol.LatestAPI().Version()),
 	)
 	if err != nil {
 		Component.LogWarnf("error creating validator block: %s", err.Error())

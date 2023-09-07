@@ -472,7 +472,7 @@ func (n *Node) SetProtocolParametersHash(hash iotago.Identifier) {
 
 func (n *Node) HighestSupportedVersion() iotago.Version {
 	if n.highestSupportedVersion == 0 {
-		return n.Protocol.MainEngineInstance().LatestAPI().Version()
+		return n.Protocol.LatestAPI().Version()
 	}
 
 	return n.highestSupportedVersion

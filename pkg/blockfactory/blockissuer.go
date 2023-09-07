@@ -82,7 +82,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount A
 
 	if blockParams.HighestSupportedVersion == nil {
 		// We use the latest supported version and not the current one.
-		version := i.protocol.MainEngineInstance().LatestAPI().Version()
+		version := i.protocol.LatestAPI().Version()
 		blockParams.HighestSupportedVersion = &version
 	}
 
