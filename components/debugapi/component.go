@@ -89,13 +89,13 @@ func configure() error {
 
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v2")
 
-	deps.Protocol.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		blocksPerSlot.Set(block.ID().Index(), append(lo.Return1(blocksPerSlot.GetOrCreate(block.ID().Index(), func() []*blocks.Block {
 			return make([]*blocks.Block, 0)
 		})), block))
 	})
 
-	deps.Protocol.MainEngineEvents.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		epoch := deps.Protocol.APIForSlot(index).TimeProvider().EpochFromSlot(index)
 		if epoch < iotago.EpochIndex(ParamsDebugAPI.PruningThreshold) {
 			return
@@ -114,13 +114,13 @@ func configure() error {
 
 	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", 1)))
 
-	deps.Protocol.MainEngineEvents.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
+	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
 		if err := storeTransactionsPerSlot(scd); err != nil {
 			Component.LogWarnf(">> DebugAPI Error: %s\n", err)
 		}
 	})
 
-	deps.Protocol.MainEngineEvents.EvictionState.SlotEvicted.Hook(func(index iotago.SlotIndex) {
+	deps.Protocol.Events.Engine.EvictionState.SlotEvicted.Hook(func(index iotago.SlotIndex) {
 		blocksInSlot, exists := blocksPerSlot.Get(index)
 		if !exists {
 			return

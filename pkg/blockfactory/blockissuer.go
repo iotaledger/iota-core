@@ -241,7 +241,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
 
-	defer i.protocol.MainEngineEvents.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	defer i.protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		if block.ID() != event.Block.ID() {
 			return
 		}
@@ -377,7 +377,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	if !i.optsRateSetterEnabled || i.protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(modelBlock.ProtocolBlock().IssuerID) {
 		i.events.BlockConstructed.Trigger(modelBlock)
 
-		if err = i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.MainEngineEvents.BlockDAG.BlockAttached); err != nil {
+		if err = i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
 			return iotago.EmptyBlockID(), ierrors.Wrap(err, "error issuing model block")
 		}
 	}

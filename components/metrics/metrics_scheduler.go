@@ -34,22 +34,22 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithHelp("Current size of each node's queue (in work units)."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.MainEngineEvents.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
 				deps.Collector.Update(schedulerNamespace, queueSizePerNodeWork, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueWork(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.MainEngineEvents.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
 				deps.Collector.Update(schedulerNamespace, queueSizePerNodeWork, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueWork(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.MainEngineEvents.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
+			deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
 				deps.Collector.Update(schedulerNamespace, queueSizePerNodeWork, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueWork(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.MainEngineEvents.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
 				deps.Collector.Update(schedulerNamespace, queueSizePerNodeWork, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueWork(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
 
 			}, event.WithWorkerPool(Component.WorkerPool))
@@ -62,22 +62,22 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithHelp("Current size of each node's queue (as block count)."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.MainEngineEvents.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
 				deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.MainEngineEvents.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
 				deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.MainEngineEvents.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
+			deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
 				deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.MainEngineEvents.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
 				deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
 
 			}, event.WithWorkerPool(Component.WorkerPool))
@@ -89,7 +89,7 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithHelp("Current amount of mana of each issuer in the queue."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.MainEngineEvents.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
 				mana, err := deps.Protocol.MainEngineInstance().Ledger.ManaManager().GetManaOnAccount(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Index())
 				if err != nil {
 					deps.Protocol.MainEngineInstance().ErrorHandler("metrics")(ierrors.Wrapf(err, "failed to retrieve mana on account %s for slot %d", block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Index()))
@@ -106,22 +106,22 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 		collector.WithLabels("state"),
 		collector.WithHelp("Number of blocks processed by the scheduler."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.MainEngineEvents.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
 				deps.Collector.Increment(schedulerNamespace, schedulerProcessedBlocks, enqueuedBlockLabel)
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.MainEngineEvents.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
+			deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
 				deps.Collector.Increment(schedulerNamespace, schedulerProcessedBlocks, droppedBlockLabel)
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.MainEngineEvents.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
 				deps.Collector.Increment(schedulerNamespace, schedulerProcessedBlocks, skippedBlockLabel)
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.MainEngineEvents.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
 				deps.Collector.Increment(schedulerNamespace, schedulerProcessedBlocks, scheduledBlockLabel)
 
 			}, event.WithWorkerPool(Component.WorkerPool))

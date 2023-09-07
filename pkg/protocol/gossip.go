@@ -44,8 +44,9 @@ func NewGossip(protocol *Protocol) *Gossip {
 	g.startBlockRequester()
 
 	for _, gossipEvent := range []*event.Event1[*blocks.Block]{
-		protocol.MainEngineEvents.Scheduler.BlockScheduled,
-		protocol.MainEngineEvents.Scheduler.BlockSkipped,
+		// TODO: REPLACE WITH REACTIVE VERSION
+		protocol.Events.Engine.Scheduler.BlockScheduled,
+		protocol.Events.Engine.Scheduler.BlockSkipped,
 	} {
 		gossipEvent.Hook(func(block *blocks.Block) { g.gossip.Trigger(block.ModelBlock()) })
 	}

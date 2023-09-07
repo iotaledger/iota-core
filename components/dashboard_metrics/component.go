@@ -110,19 +110,19 @@ func configureComponentCountersEvents() {
 		incComponentCounter(Received)
 	})
 
-	deps.Protocol.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
+	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
 		incComponentCounter(Attached)
 	})
 
-	deps.Protocol.MainEngineEvents.BlockDAG.BlockSolid.Hook(func(b *blocks.Block) {
+	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(b *blocks.Block) {
 		incComponentCounter(Solidified)
 	})
 
-	deps.Protocol.MainEngineEvents.Booker.BlockBooked.Hook(func(b *blocks.Block) {
+	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(b *blocks.Block) {
 		incComponentCounter(Booked)
 	})
 
-	deps.Protocol.MainEngineEvents.Scheduler.BlockScheduled.Hook(func(b *blocks.Block) {
+	deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(b *blocks.Block) {
 		incComponentCounter(Scheduled)
 	})
 }

@@ -83,7 +83,7 @@ func sendTipInfo(block *blocks.Block, isTip bool) {
 func runVisualizer(component *app.Component) {
 	if err := component.Daemon().BackgroundWorker("Dashboard[Visualizer]", func(ctx context.Context) {
 		unhook := lo.Batch(
-			deps.Protocol.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 				sendVertex(block, false)
 
 				tx, hasTx := block.Transaction()
@@ -100,10 +100,10 @@ func runVisualizer(component *app.Component) {
 				// 	currentSlot.Store(int64(block.ID().Index()))
 				// }
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.MainEngineEvents.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 				sendVertex(block, block.IsConfirmed())
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.MainEngineEvents.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+			deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
 				tipMetadata.IsStrongTip().OnUpdate(func(_, newValue bool) {
 					sendTipInfo(tipMetadata.Block(), newValue)
 				})

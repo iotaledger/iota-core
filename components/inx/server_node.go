@@ -67,7 +67,7 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 	}
 
 	wp.Start()
-	unhook := deps.Protocol.MainEngineEvents.SyncManager.UpdatedStatus.Hook(onUpdate, event.WithWorkerPool(wp)).Unhook
+	unhook := deps.Protocol.Events.Engine.SyncManager.UpdatedStatus.Hook(onUpdate, event.WithWorkerPool(wp)).Unhook
 
 	<-ctx.Done()
 	unhook()

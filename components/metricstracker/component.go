@@ -63,13 +63,13 @@ func run() error {
 		Component.LogInfo("Starting Metrics Tracker ... done")
 
 		unhook := lo.Batch(
-			deps.Protocol.MainEngineEvents.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
+			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
 				deps.MetricsTracker.metrics.Blocks.Inc()
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-			deps.Protocol.MainEngineEvents.Notarization.SlotCommitted.Hook(func(_ *notarization.SlotCommittedDetails) {
+			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(_ *notarization.SlotCommittedDetails) {
 				deps.MetricsTracker.measure()
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-			deps.Protocol.MainEngineEvents.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
+			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
 				deps.MetricsTracker.metrics.ConfirmedBlocks.Inc()
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
 		)

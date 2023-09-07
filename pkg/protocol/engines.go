@@ -9,8 +9,6 @@ import (
 )
 
 type Engines struct {
-	MainEngineEvents *engine.Events
-
 	mainEngine      reactive.Variable[*engine.Engine]
 	candidateEngine reactive.Variable[*engine.Engine]
 
@@ -19,7 +17,6 @@ type Engines struct {
 
 func newEngines(protocol *Protocol) *Engines {
 	e := &Engines{
-		MainEngineEvents: engine.NewEvents(),
 		EngineManager: enginemanager.New(
 			protocol.Workers(),
 			func(err error) {
@@ -62,7 +59,7 @@ func newEngines(protocol *Protocol) *Engines {
 			e.mainEngine.Set(newChain.Engine())
 		})
 
-		e.MainEngineR().OnUpdate(func(_, engine *engine.Engine) { e.MainEngineEvents.LinkTo(engine.Events) })
+		e.MainEngineR().OnUpdate(func(_, engine *engine.Engine) { protocol.Events.Engine.LinkTo(engine.Events) })
 	})
 
 	return e

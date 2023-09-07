@@ -193,7 +193,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, newChain.Root().ID())
 	})
 
-	n.Protocol.MainEngineEvents.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+	n.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
 		fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
 	})
 

@@ -12,6 +12,8 @@ import (
 )
 
 type Protocol struct {
+	Events *Events
+
 	workers *workerpool.Group
 	error   *event.Event1[error]
 	options *Options
@@ -26,6 +28,7 @@ type Protocol struct {
 
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
 	return options.Apply(&Protocol{
+		Events:  NewEvents(),
 		workers: workers,
 		error:   event.New1[error](),
 		options: newOptions(),

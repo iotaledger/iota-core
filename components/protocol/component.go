@@ -146,91 +146,91 @@ func configure() error {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.BlockProcessed.Hook(func(blockID iotago.BlockID) {
+	deps.Protocol.Events.Engine.BlockProcessed.Hook(func(blockID iotago.BlockID) {
 		Component.LogDebugf("BlockProcessed: %s", blockID)
 	})
 
-	deps.Protocol.MainEngineEvents.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("AcceptedBlockProcessed: %s", block.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	deps.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
 		Component.LogDebugf("BlockPreFiltered: %s - %s", event.Block.ID(), event.Reason.Error())
 	})
 
-	deps.Protocol.MainEngineEvents.Filter.BlockPreAllowed.Hook(func(blk *model.Block) {
+	deps.Protocol.Events.Engine.Filter.BlockPreAllowed.Hook(func(blk *model.Block) {
 		Component.LogDebugf("BlockPreAllowed: %s - %s", blk.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("CommitmentFilter.BlockAllowed: %s\n", block.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+	deps.Protocol.Events.Engine.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
 		Component.LogWarnf("CommitmentFilter.BlockFiltered: %s - %s\n", event.Block.ID(), event.Reason.Error())
 	})
 
-	deps.Protocol.MainEngineEvents.TipManager.BlockAdded.Hook(func(tip tipmanager.TipMetadata) {
+	deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tip tipmanager.TipMetadata) {
 		Component.LogDebugf("BlockAdded to tip pool: %s; is strong: %v; is weak: %v", tip.ID(), tip.IsStrongTip(), tip.IsWeakTip())
 	})
 
-	deps.Protocol.MainEngineEvents.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockSolid: %s", block.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+	deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
 		Component.LogDebugf("BlockInvalid in blockDAG: %s, error: %v", block.ID(), err.Error())
 	})
 
-	deps.Protocol.MainEngineEvents.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockBooked: %s", block.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+	deps.Protocol.Events.Engine.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
 		Component.LogDebugf("BlockInvalid in booker: %s, error: %v", block.ID(), err.Error())
 	})
 
-	deps.Protocol.MainEngineEvents.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockPreAccepted: %s", block.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockAccepted: %s", block.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockPreConfirmed: %s", block.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockConfirmed: %s", block.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
+	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
 		Component.LogDebugf("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
-	deps.Protocol.MainEngineEvents.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
+	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
 		Component.LogDebugf("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
-	deps.Protocol.MainEngineEvents.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 		Component.LogInfof("SlotCommitted: %s - %d", details.Commitment.ID(), details.Commitment.Index())
 	})
 
-	deps.Protocol.MainEngineEvents.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
+	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		Component.LogInfof("SlotFinalized: %d", index)
 	})
 
-	deps.Protocol.MainEngineEvents.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockScheduled: %s", block.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.Scheduler.BlockDropped.Hook(func(block *blocks.Block, err error) {
+	deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block, err error) {
 		Component.LogDebugf("BlockDropped: %s; reason: %s", block.ID(), err)
 	})
 
-	deps.Protocol.MainEngineEvents.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("BlockSkipped: %s", block.ID())
 	})
 
@@ -246,27 +246,27 @@ func configure() error {
 		Component.LogDebugf("SlotCommitmentReceived: %s", commitment.ID())
 	})
 
-	deps.Protocol.MainEngineEvents.SybilProtection.CommitteeSelected.Hook(func(committee *account.Accounts, epoch iotago.EpochIndex) {
+	deps.Protocol.Events.Engine.SybilProtection.CommitteeSelected.Hook(func(committee *account.Accounts, epoch iotago.EpochIndex) {
 		Component.LogInfof("CommitteeSelected: Epoch %d - %s (reused: %t)", epoch, committee.IDs(), committee.IsReused())
 	})
 
-	deps.Protocol.MainEngineEvents.SybilProtection.RewardsCommitted.Hook(func(epoch iotago.EpochIndex) {
+	deps.Protocol.Events.Engine.SybilProtection.RewardsCommitted.Hook(func(epoch iotago.EpochIndex) {
 		Component.LogInfof("RewardsCommitted: Epoch %d", epoch)
 	})
 
-	deps.Protocol.MainEngineEvents.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+	deps.Protocol.Events.Engine.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
 		Component.LogWarnf("Booker BlockInvalid: Block %s - %s", block.ID(), err.Error())
 	})
 
-	deps.Protocol.MainEngineEvents.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seatIndex account.SeatIndex, account iotago.AccountID) {
+	deps.Protocol.Events.Engine.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seatIndex account.SeatIndex, account iotago.AccountID) {
 		Component.LogWarnf("OnlineCommitteeSeatAdded: %s - %d", account.ToHex(), seatIndex)
 	})
 
-	deps.Protocol.MainEngineEvents.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seatIndex account.SeatIndex) {
+	deps.Protocol.Events.Engine.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seatIndex account.SeatIndex) {
 		Component.LogWarnf("OnlineCommitteeSeatRemoved: seatIndex: %d", seatIndex)
 	})
 
-	deps.Protocol.MainEngineEvents.Booker.TransactionInvalid.Hook(func(transaction mempool.TransactionMetadata, reason error) {
+	deps.Protocol.Events.Engine.Booker.TransactionInvalid.Hook(func(transaction mempool.TransactionMetadata, reason error) {
 		Component.LogWarnf("TransactionInvalid: transaction %s - %s", transaction.ID(), reason.Error())
 	})
 

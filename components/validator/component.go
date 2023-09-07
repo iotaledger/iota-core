@@ -56,7 +56,7 @@ func run() error {
 
 		checkValidatorStatus(ctx)
 
-		deps.Protocol.MainEngineEvents.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+		deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 			checkValidatorStatus(ctx)
 		}, event.WithWorkerPool(Component.WorkerPool))
 

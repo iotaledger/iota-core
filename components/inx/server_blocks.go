@@ -49,7 +49,7 @@ func (s *Server) ListenToBlocks(_ *inx.NoParams, srv inx.INX_ListenToBlocksServe
 
 	wp := workerpool.New("ListenToBlocks", workerCount).Start()
 
-	unhook := deps.Protocol.MainEngineEvents.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+	unhook := deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
@@ -74,7 +74,7 @@ func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcc
 
 	wp := workerpool.New("ListenToAcceptedBlocks", workerCount).Start()
 
-	unhook := deps.Protocol.MainEngineEvents.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
@@ -99,7 +99,7 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 
 	wp := workerpool.New("ListenToConfirmedBlocks", workerCount).Start()
 
-	unhook := deps.Protocol.MainEngineEvents.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
