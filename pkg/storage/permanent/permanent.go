@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 const (
@@ -30,6 +31,8 @@ type Permanent struct {
 	utxoLedger         *utxoledger.Manager
 	accounts           kvstore.KVStore
 	latestNonEmptySlot kvstore.KVStore
+
+	optsEpochBasedProvider []options.Option[api.EpochBasedProvider]
 }
 
 // New returns a new permanent storage instance.
@@ -39,7 +42,7 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 		dbConfig:     dbConfig,
 	}, opts, func(p *Permanent) {
 		p.store = database.NewDBInstance(p.dbConfig)
-		p.settings = NewSettings(lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{settingsPrefix})))
+		p.settings = NewSettings(lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{settingsPrefix})), p.optsEpochBasedProvider...)
 		p.commitments = NewCommitments(lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{commitmentsPrefix})), p.settings.APIProvider())
 		p.utxoLedger = utxoledger.New(lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{ledgerPrefix})), p.settings.APIProvider())
 		p.accounts = lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{accountsPrefix}))

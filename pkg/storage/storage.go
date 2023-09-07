@@ -48,6 +48,7 @@ type Storage struct {
 	optsPruningSizeReductionPercentage float64
 	optsBucketManagerOptions           []options.Option[prunable.BucketManager]
 	optsPruningSizeCooldownTime        time.Duration
+	optsPermanent                      []options.Option[permanent.Permanent]
 }
 
 // New creates a new storage instance with the named database version in the given directory.
@@ -71,7 +72,7 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 				PrefixHealth: []byte{storePrefixHealth},
 			}
 
-			s.permanent = permanent.New(dbConfig, errorHandler)
+			s.permanent = permanent.New(dbConfig, errorHandler, s.optsPermanent...)
 			s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.Settings().APIProvider(), s.errorHandler, s.optsBucketManagerOptions...)
 		})
 }
