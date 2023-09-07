@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -42,6 +43,7 @@ import (
 )
 
 type Options struct {
+	Logger                  *logger.Logger
 	BaseDirectory           string
 	SnapshotPath            string
 	ChainSwitchingThreshold int

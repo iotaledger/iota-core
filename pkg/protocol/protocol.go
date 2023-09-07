@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 
+	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -23,20 +24,23 @@ type Protocol struct {
 	*Chains
 	*Gossip
 
+	*logger.WrappedLogger
 	module.Module
 }
 
-func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
+func New(loggerInstance *logger.Logger, workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
 	return options.Apply(&Protocol{
-		Events:  NewEvents(),
-		Workers: workers,
-		error:   event.New1[error](),
-		options: newOptions(),
+		Events:        NewEvents(),
+		Workers:       workers,
+		WrappedLogger: logger.NewWrappedLogger(loggerInstance),
+		error:         event.New1[error](),
+		options:       newOptions(),
 	}, opts, func(p *Protocol) {
 		p.Network = newNetwork(p, dispatcher)
 		p.Engines = newEngines(p)
 		p.Chains = newChains(p)
 		p.Gossip = NewGossip(p)
+
 	}, (*Protocol).TriggerConstructed)
 }
 
@@ -76,8 +80,4 @@ func (p *Protocol) LatestAPI() iotago.API {
 
 func (p *Protocol) OnError(callback func(error)) (unsubscribe func()) {
 	return p.error.Hook(callback).Unhook
-}
-
-func (p *Protocol) TriggerError(err error) {
-	p.error.Trigger(err)
 }

@@ -107,11 +107,11 @@ func (p *Protocol) OnBlockRequestReceived(callback func(blockID iotago.BlockID, 
 	return p.Events.BlockRequestReceived.Hook(callback).Unhook
 }
 
-func (p *Protocol) OnSlotCommitmentReceived(callback func(commitment *model.Commitment, src peer.ID)) (unsubscribe func()) {
+func (p *Protocol) OnCommitmentReceived(callback func(commitment *model.Commitment, src peer.ID)) (unsubscribe func()) {
 	return p.Events.SlotCommitmentReceived.Hook(callback).Unhook
 }
 
-func (p *Protocol) OnSlotCommitmentRequestReceived(callback func(commitmentID iotago.CommitmentID, src peer.ID)) (unsubscribe func()) {
+func (p *Protocol) OnCommitmentRequestReceived(callback func(commitmentID iotago.CommitmentID, src peer.ID)) (unsubscribe func()) {
 	return p.Events.SlotCommitmentRequestReceived.Hook(callback).Unhook
 }
 

@@ -115,7 +115,7 @@ func (c *Chains) HeaviestVerifiedCandidate() reactive.Variable[*Chain] {
 
 func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
 	if _, err := c.requestCommitment(commitment.PrevID(), true, commitment.setParent); err != nil {
-		c.protocol.TriggerError(ierrors.Wrapf(err, "failed to request parent commitment %s", commitment.PrevID()))
+		c.protocol.LogDebug(ierrors.Wrapf(err, "failed to request parent commitment %s", commitment.PrevID()))
 	}
 
 	slotEvictedEvent.OnTrigger(func() {
@@ -175,10 +175,10 @@ func (c *Chains) publishLatestEngineCommitment(engine *engine.Engine) {
 	unsubscribe := engine.Events.Notarization.LatestCommitmentUpdated.Hook(func(modelCommitment *model.Commitment) {
 		commitment, err := c.PublishCommitment(modelCommitment)
 		if err != nil {
-			c.protocol.TriggerError(ierrors.Wrapf(err, "failed to add commitment %s", modelCommitment.ID()))
+			c.protocol.LogDebug(ierrors.Wrapf(err, "failed to add commitment %s", modelCommitment.ID()))
 		}
 
-		// TODO: WHAT TO DO IF OUR VERIFIED COMMITMENT IS IN A FORK
+		commitment.Parent().Get().successor.Set(commitment)
 
 		commitment.Verified().Trigger()
 	}).Unhook

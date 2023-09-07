@@ -111,7 +111,9 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 }
 
 func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[protocol.Protocol]) {
-	n.Protocol = protocol.New(n.Workers.CreateGroup("Protocol"),
+	n.Protocol = protocol.New(
+		nil, // TODO: REPLACE WITH A REAL LOGGER
+		n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
 	)
@@ -167,11 +169,11 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > Network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
 	})
 
-	n.Protocol.OnSlotCommitmentReceived(func(commitment *model.Commitment, source peer.ID) {
+	n.Protocol.OnCommitmentReceived(func(commitment *model.Commitment, source peer.ID) {
 		fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
 	})
 
-	n.Protocol.OnSlotCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, source peer.ID) {
+	n.Protocol.OnCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, source peer.ID) {
 		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
 	})
 

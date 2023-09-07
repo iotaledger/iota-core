@@ -102,6 +102,7 @@ func provide(c *dig.Container) error {
 		}
 
 		return protocol.New(
+			Component.Logger(), // TODO: USE REAL LOGGER
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
@@ -238,11 +239,11 @@ func configure() error {
 		Component.LogDebugf("RequestCommitment: %s", id)
 	})
 
-	deps.Protocol.OnSlotCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, id peer.ID) {
+	deps.Protocol.OnCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentRequestReceived: %s", commitmentID)
 	})
 
-	deps.Protocol.OnSlotCommitmentReceived(func(commitment *model.Commitment, id peer.ID) {
+	deps.Protocol.OnCommitmentReceived(func(commitment *model.Commitment, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentReceived: %s", commitment.ID())
 	})
 

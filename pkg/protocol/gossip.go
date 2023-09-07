@@ -8,7 +8,9 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -26,6 +28,8 @@ type Gossip struct {
 	blockRequestStopped   *event.Event2[iotago.BlockID, *engine.Engine]
 	blockRequested        *event.Event2[iotago.BlockID, *engine.Engine]
 	commitmentVerifiers   *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *CommitmentVerifier]
+
+	*logger.WrappedLogger
 }
 
 func NewGossip(protocol *Protocol) *Gossip {
@@ -38,6 +42,7 @@ func NewGossip(protocol *Protocol) *Gossip {
 		blockRequestStopped:   event.New2[iotago.BlockID, *engine.Engine](),
 		blockRequested:        event.New2[iotago.BlockID, *engine.Engine](),
 		commitmentVerifiers:   shrinkingmap.New[iotago.CommitmentID, *CommitmentVerifier](),
+		WrappedLogger:         logger.NewWrappedLogger(protocol.WrappedLogger.LoggerNamed("gossip")),
 	}
 
 	g.startAttestationsRequester()
@@ -60,13 +65,21 @@ func (r *Gossip) IssueBlock(block *model.Block) error {
 	return nil
 }
 
-func (r *Gossip) ProcessBlock(block *model.Block, src peer.ID) error {
+func (r *Gossip) ProcessBlock(block *model.Block, src peer.ID) {
 	commitmentRequest, err := r.protocol.requestCommitment(block.ProtocolBlock().SlotCommitmentID, true)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to process block %s from peer %s", block.ID(), src)
-	} else if commitmentRequest.WasRejected() {
-		return ierrors.Wrapf(commitmentRequest.Err(), "failed to process block %s from peer %s", block.ID(), src)
-	} else if !commitmentRequest.WasCompleted() {
+		r.protocol.LogDebug(ierrors.Wrapf(err, "failed to process block %s from peer %s", block.ID(), src))
+
+		return
+	}
+
+	if commitmentRequest.WasRejected() {
+		r.protocol.LogDebug(ierrors.Wrapf(commitmentRequest.Err(), "failed to process block %s from peer %s", block.ID(), src))
+
+		return
+	}
+
+	if !commitmentRequest.WasCompleted() {
 		fmt.Println("WARNING3", block.ProtocolBlock().SlotCommitmentID)
 		// TODO: QUEUE TO UNSOLID COMMITMENT BLOCKS
 	} else {
@@ -78,95 +91,118 @@ func (r *Gossip) ProcessBlock(block *model.Block, src peer.ID) error {
 			}
 		}
 	}
-
-	return nil
 }
 
-func (r *Gossip) ProcessBlockRequest(blockID iotago.BlockID, src peer.ID) error {
+func (r *Gossip) ProcessBlockRequest(blockID iotago.BlockID, src peer.ID) {
 	block, exists := r.protocol.MainEngineInstance().Block(blockID)
 	if !exists {
-		// TODO: CREATE SENTINAL ERRORS
-		return ierrors.Errorf("requested block %s not found", blockID)
+		r.LogDebug(ierrors.Errorf("requested block %s not found", blockID))
 	}
 
 	r.protocol.SendBlock(block, src)
-
-	return nil
 }
 
-func (r *Gossip) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src peer.ID) error {
-	if commitment, err := r.protocol.Commitment(commitmentID); err == nil {
-		r.protocol.SendSlotCommitment(commitment.CommitmentModel(), src)
-	} else if !ierrors.Is(err, ErrorCommitmentNotFound) {
-		return ierrors.Wrapf(err, "failed to process slot commitment request for commitment %s from peer %s", commitmentID, src)
+func (r *Gossip) ProcessCommitment(commitmentModel *model.Commitment, src peer.ID) {
+	if _, err := r.protocol.PublishCommitment(commitmentModel); err != nil {
+		r.LogDebug(ierrors.Wrapf(err, "failed to publish commitment %s from peer %s", commitmentModel.ID(), src))
 	}
-
-	return nil
 }
 
-func (r *Gossip) ProcessAttestationsResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) (err error) {
+func (r *Gossip) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src peer.ID) {
+	if commitment, err := r.protocol.Commitment(commitmentID); err != nil {
+		r.LogDebug(ierrors.Wrapf(err, "failed to process commitment request for commitment %s from peer %s", commitmentID, src))
+	} else {
+		r.protocol.SendSlotCommitment(commitment.CommitmentModel(), src)
+	}
+}
+
+func (r *Gossip) ProcessAttestations(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
 	commitment, err := r.protocol.PublishCommitment(commitmentModel)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to publish commitment %s when processing attestations", commitmentModel.ID())
+		r.LogDebug(ierrors.Wrapf(err, "failed to publish commitment %s when processing attestations", commitmentModel.ID()))
+		return
 	}
 
 	chain := commitment.Chain()
 	if chain == nil {
-		return ierrors.Errorf("failed to find chain for commitment %s when processing attestations", commitmentModel.ID())
+		r.LogDebug(ierrors.Errorf("failed to find chain for commitment %s when processing attestations", commitmentModel.ID()))
+		return
 	}
 
 	commitmentVerifier, exists := r.commitmentVerifiers.Get(chain.Root().ID())
 	if !exists {
-		return ierrors.Errorf("failed to find commitment verifier for commitment %s when processing attestations", commitmentModel.ID())
+		r.LogDebug(ierrors.Errorf("failed to find commitment verifier for commitment %s when processing attestations", commitmentModel.ID()))
+		return
 	}
 
 	blockIDs, actualCumulativeWeight, err := commitmentVerifier.verifyCommitment(commitmentModel, attestations, merkleProof)
 	if err != nil {
-		return ierrors.Errorf("failed to verify commitment %s when processing attestations", commitmentModel.ID())
+		r.LogError(ierrors.Errorf("failed to verify commitment %s when processing attestations", commitmentModel.ID()))
+		return
 	}
 
 	// TODO: publish blockIDs, actualCumulativeWeight to target commitment
 	commitment.Attested().Set(true)
 
 	fmt.Println("ATTESTATIONS", blockIDs, actualCumulativeWeight, source)
-
-	return nil
 }
 
-func (r *Gossip) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) error {
+func (r *Gossip) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) {
 	mainEngine := r.protocol.MainEngineInstance()
 
 	if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
-		return ierrors.Errorf("main engine has produced the requested commitment %s, yet", commitmentID)
+		r.LogDebug(ierrors.Errorf("requested commitment %s is not available, yet", commitmentID))
+
+		return
 	}
 
 	commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Index())
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to load commitment %s", commitmentID)
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			r.LogDebug(ierrors.Wrapf(err, "failed to load commitment %s", commitmentID))
+		} else {
+			r.LogError(ierrors.Wrapf(err, "failed to load commitment %s", commitmentID))
+		}
+
+		return
 	}
 
 	if commitment.ID() != commitmentID {
-		return ierrors.Errorf("requested commitment is not from the main chain %s", commitmentID)
+		r.LogDebug(ierrors.Errorf("requested commitment is not from the main engine %s", commitmentID))
+
+		return
 	}
 
 	attestations, err := mainEngine.Attestations.Get(commitmentID.Index())
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to load attestations for commitment %s", commitmentID)
+		r.LogError(ierrors.Wrapf(err, "failed to load attestations for commitment %s", commitmentID))
+
+		return
 	}
 
 	rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Index())
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID)
+		r.LogError(ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID))
+
+		return
 	}
 
 	roots, err := rootsStorage.Load(commitmentID)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID)
+		r.LogError(ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID))
+
+		return
 	}
 
 	r.protocol.SendAttestations(commitment, attestations, roots.AttestationsProof(), src)
+}
 
-	return nil
+func (r *Gossip) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], src peer.ID) {
+	panic("implement me")
+}
+
+func (r *Gossip) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID, src peer.ID) {
+	panic("implement me")
 }
 
 func (r *Gossip) OnSendBlock(callback func(block *model.Block)) (unsubscribe func()) {
