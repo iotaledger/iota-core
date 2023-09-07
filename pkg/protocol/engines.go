@@ -18,7 +18,7 @@ type Engines struct {
 func newEngines(protocol *Protocol) *Engines {
 	e := &Engines{
 		EngineManager: enginemanager.New(
-			protocol.Workers(),
+			protocol.Workers,
 			func(err error) {
 				fmt.Println(err)
 			},

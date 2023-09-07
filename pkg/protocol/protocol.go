@@ -14,7 +14,7 @@ import (
 type Protocol struct {
 	Events *Events
 
-	workers *workerpool.Group
+	Workers *workerpool.Group
 	error   *event.Event1[error]
 	options *Options
 
@@ -29,7 +29,7 @@ type Protocol struct {
 func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
 	return options.Apply(&Protocol{
 		Events:  NewEvents(),
-		workers: workers,
+		Workers: workers,
 		error:   event.New1[error](),
 		options: newOptions(),
 	}, opts, func(p *Protocol) {
@@ -50,10 +50,6 @@ func (p *Protocol) Run(ctx context.Context) error {
 	p.TriggerShutdown()
 
 	return ctx.Err()
-}
-
-func (p *Protocol) Workers() *workerpool.Group {
-	return p.workers
 }
 
 // APIForVersion returns the API for the given version.

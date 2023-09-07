@@ -49,7 +49,7 @@ type BlockIssuer struct {
 func New(p *protocol.Protocol, opts ...options.Option[BlockIssuer]) *BlockIssuer {
 	return options.Apply(&BlockIssuer{
 		events:                        NewEvents(),
-		workerPool:                    p.Workers().CreatePool("BlockIssuer"),
+		workerPool:                    p.Workers.CreatePool("BlockIssuer"),
 		protocol:                      p,
 		optsIncompleteBlockAccepted:   false,
 		optsRateSetterEnabled:         false,
