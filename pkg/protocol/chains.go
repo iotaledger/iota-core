@@ -48,7 +48,7 @@ func newChains(protocol *Protocol) *Chains {
 	c.publishLatestEngineCommitment(protocol.MainEngineInstance())
 	protocol.OnEngineCreated(c.publishLatestEngineCommitment)
 
-	c.enableChainSwitching()
+	c.initChainSwitching()
 
 	return c
 }
@@ -186,7 +186,7 @@ func (c *Chains) publishLatestEngineCommitment(engine *engine.Engine) {
 	engine.HookShutdown(unsubscribe)
 }
 
-func (c *Chains) enableChainSwitching() {
+func (c *Chains) initChainSwitching() {
 	c.heaviestClaimedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
 		if prevCandidate != nil {
 			prevCandidate.requestAttestations.Set(false)
@@ -203,26 +203,25 @@ func (c *Chains) enableChainSwitching() {
 		newCandidate.engine.instantiate.Set(true)
 	})
 
-	selectHeaviestCandidate := func(candidate reactive.Variable[*Chain], newCandidate *Chain, chainWeight func(*Chain) reactive.Variable[uint64]) {
-		chainWeight(newCandidate).OnUpdate(func(_, newChainWeight uint64) {
-			if newChainWeight <= c.mainChain.Get().verifiedWeight.Get() {
-				return
+	c.OnChainCreated(func(chain *Chain) {
+		c.trackHeaviestCandidate(c.heaviestClaimedCandidate, (*Chain).ClaimedWeight, chain)
+		c.trackHeaviestCandidate(c.heaviestAttestedCandidate, (*Chain).AttestedWeight, chain)
+		c.trackHeaviestCandidate(c.heaviestVerifiedCandidate, (*Chain).VerifiedWeight, chain)
+	})
+}
+
+func (c *Chains) trackHeaviestCandidate(candidateVariable reactive.Variable[*Chain], chainWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) {
+	chainWeightVariable(candidate).OnUpdate(func(_, newChainWeight uint64) {
+		if newChainWeight <= c.mainChain.Get().verifiedWeight.Get() {
+			return
+		}
+
+		candidateVariable.Compute(func(currentCandidate *Chain) *Chain {
+			if currentCandidate == nil || currentCandidate.evicted.WasTriggered() || newChainWeight > chainWeightVariable(currentCandidate).Get() {
+				return candidate
 			}
 
-			candidate.Compute(func(currentCandidate *Chain) *Chain {
-				if currentCandidate == nil || currentCandidate.evicted.WasTriggered() || newChainWeight > chainWeight(currentCandidate).Get() {
-					return newCandidate
-				}
-
-				return currentCandidate
-			})
+			return currentCandidate
 		})
-	}
-
-	c.OnChainCreated(func(chain *Chain) {
-		// TODO: ON SOLID
-		selectHeaviestCandidate(c.heaviestClaimedCandidate, chain, (*Chain).ClaimedWeight)
-		selectHeaviestCandidate(c.heaviestAttestedCandidate, chain, (*Chain).AttestedWeight)
-		selectHeaviestCandidate(c.heaviestVerifiedCandidate, chain, (*Chain).VerifiedWeight)
 	})
 }

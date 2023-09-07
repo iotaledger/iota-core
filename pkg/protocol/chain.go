@@ -65,10 +65,9 @@ func NewChain(root *Commitment, optStartingEngine ...*engine.Engine) *Chain {
 
 	c.engine = newChainEngine(root, optStartingEngine...)
 
-	// track weights of the chain
-	c.claimedWeight = reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), c.latestCommitment)
-	c.attestedWeight = reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), c.latestAttestedCommitment)
-	c.verifiedWeight = reactive.NewDerivedVariable[uint64](noPanicIfNil((*Commitment).CumulativeWeight), c.latestVerifiedCommitment)
+	c.claimedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.latestCommitment)
+	c.attestedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.latestAttestedCommitment)
+	c.verifiedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.latestVerifiedCommitment)
 
 	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {
 		if latestCommitment == nil || latestCommitment.Index() < WarpSyncOffset {

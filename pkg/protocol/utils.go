@@ -5,17 +5,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// noPanicIfNil prevents a panic of the getter when the receiver is nil by returning the zero value of the return type.
-func noPanicIfNil[ReceiverType, ReturnType any](getter func(*ReceiverType) ReturnType) func(*ReceiverType) ReturnType {
-	return func(receiver *ReceiverType) (zeroValue ReturnType) {
-		if receiver == nil {
-			return zeroValue
-		}
-
-		return getter(receiver)
-	}
-}
-
 // triggerEventIfCommitmentBelowThreshold triggers the given event if the given commitment is below the given threshold.
 func triggerEventIfCommitmentBelowThreshold(event func(*Commitment) reactive.Event, commitment *Commitment, chainThreshold func(*Chain) reactive.Variable[iotago.SlotIndex]) {
 	// only monitor the threshold after the parent event was triggered (minimize listeners to same threshold)

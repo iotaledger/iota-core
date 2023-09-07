@@ -176,6 +176,14 @@ func (c *Commitment) max(other *Commitment) *Commitment {
 	return c
 }
 
+func (c *Commitment) cumulativeWeight() uint64 {
+	if c == nil {
+		return 0
+	}
+
+	return c.CumulativeWeight()
+}
+
 type commitmentInSyncRange struct {
 	reactive.Variable[bool]
 
