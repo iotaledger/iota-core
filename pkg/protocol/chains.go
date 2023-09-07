@@ -1,18 +1,20 @@
 package protocol
 
 import (
-	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Chains struct {
+	protocol *Protocol
+
 	mainChain reactive.Variable[*Chain]
 
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
@@ -21,59 +23,61 @@ type Chains struct {
 
 	chainCreated *event.Event1[*Chain]
 
-	CommitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
-
 	*ChainSwitching
-
-	*AttestationsRequester
 
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
 func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
-		EvictionState: reactive.NewEvictionState[iotago.SlotIndex](),
-		mainChain: reactive.NewVariable[*Chain]().Init(
-			NewChain(NewCommitment(protocol.MainEngine().LatestCommitment(), true), protocol.MainEngine()),
-		),
-		commitments:         shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
-		commitmentCreated:   event.New1[*Commitment](),
-		chainCreated:        event.New1[*Chain](),
-		CommitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
+		protocol:          protocol,
+		EvictionState:     reactive.NewEvictionState[iotago.SlotIndex](),
+		mainChain:         reactive.NewVariable[*Chain]().Init(NewChain(NewCommitment(protocol.MainEngine().LatestCommitment(), true), protocol.MainEngine())),
+		commitments:       shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
+		commitmentCreated: event.New1[*Commitment](),
+		chainCreated:      event.New1[*Chain](),
 	}
 
 	// embed reactive orchestrators
 	c.ChainSwitching = NewChainSwitching(c)
-	c.AttestationsRequester = NewAttestationsRequester(protocol)
+
+	c.publishLatestEngineCommitment(protocol.MainEngine())
+
+	protocol.OnEngineCreated(c.publishLatestEngineCommitment)
 
 	return c
 }
 
-func (c *Chains) ProcessCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment) {
-	if commitmentRequest := c.requestCommitment(commitment.ID(), commitment.Index(), false, func(resolvedMetadata *Commitment) {
+func (c *Chains) PublishCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment, err error) {
+	request, requestErr := c.requestCommitment(commitment.ID(), false)
+	if requestErr != nil {
+		return nil, ierrors.Wrapf(requestErr, "failed to request commitment %s", commitment.ID())
+	}
+
+	request.Resolve(NewCommitment(commitment)).OnSuccess(func(resolvedMetadata *Commitment) {
 		commitmentMetadata = resolvedMetadata
-	}); commitmentRequest != nil {
-		commitmentRequest.Resolve(NewCommitment(commitment))
-	}
-
-	return commitmentMetadata
-}
-
-func (c *Chains) Commitment(commitmentID iotago.CommitmentID) (commitment *Commitment, exists bool) {
-	commitmentRequest, exists := c.commitments.Get(commitmentID)
-	if !exists || !commitmentRequest.WasCompleted() {
-		return nil, false
-	}
-
-	commitmentRequest.OnSuccess(func(result *Commitment) {
-		commitment = result
 	})
 
-	return commitment, true
+	return commitmentMetadata, nil
 }
 
-func (c *Chains) OnCommitmentRequested(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
-	return c.CommitmentRequester.Events.TickerStarted.Hook(callback).Unhook
+func (c *Chains) Commitment(commitmentID iotago.CommitmentID, requestMissing ...bool) (commitment *Commitment, err error) {
+	commitmentRequest, exists := c.commitments.Get(commitmentID)
+	if !exists && lo.First(requestMissing) {
+		if commitmentRequest, err = c.requestCommitment(commitmentID, true); err != nil {
+			return nil, ierrors.Wrapf(err, "failed to request commitment %s", commitmentID)
+		}
+	}
+
+	if commitmentRequest == nil || !commitmentRequest.WasCompleted() {
+		return nil, ErrorCommitmentNotFound
+	}
+
+	if commitmentRequest.WasRejected() {
+		return nil, commitmentRequest.Err()
+	}
+
+	return commitmentRequest.Result(), nil
 }
 
 func (c *Chains) OnCommitmentCreated(callback func(commitment *Commitment)) (unsubscribe func()) {
@@ -92,14 +96,8 @@ func (c *Chains) MainChainR() reactive.Variable[*Chain] {
 	return c.mainChain
 }
 
-func (c *Chains) ProcessSlotCommitmentRequest(commitmentID iotago.CommitmentID, src network.PeerID) {
-	if commitment, exists := c.protocol.Commitment(commitmentID); !exists {
-		c.protocol.SendSlotCommitment(commitment.CommitmentModel(), src)
-	}
-}
-
 func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
-	c.requestCommitment(commitment.PrevID(), commitment.Index()-1, true, commitment.setParent)
+	c.requestCommitment(commitment.PrevID(), true, commitment.setParent)
 
 	slotEvictedEvent.OnTrigger(func() {
 		commitment.evicted.Trigger()
@@ -114,29 +112,29 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 	})
 }
 
-func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, index iotago.SlotIndex, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment]) {
-	slotEvicted := c.EvictionEvent(index)
+func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment], err error) {
+	slotEvicted := c.EvictionEvent(commitmentID.Index())
 	if slotEvicted.WasTriggered() {
 		rootCommitment := c.mainChain.Get().Root()
 
 		if rootCommitment == nil || commitmentID != rootCommitment.ID() {
-			return nil
+			return nil, ErrorSlotEvicted
 		}
 
 		for _, successCallback := range optSuccessCallbacks {
 			successCallback(rootCommitment)
 		}
 
-		return promise.New[*Commitment]().Resolve(rootCommitment)
+		return promise.New[*Commitment]().Resolve(rootCommitment), nil
 	}
 
 	commitmentRequest, requestCreated := c.commitments.GetOrCreate(commitmentID, lo.NoVariadic(promise.New[*Commitment]))
 	if requestCreated {
 		if requestFromPeers {
-			c.CommitmentRequester.StartTicker(commitmentID)
+			c.protocol.commitmentRequester.StartTicker(commitmentID)
 
 			commitmentRequest.OnComplete(func() {
-				c.CommitmentRequester.StopTicker(commitmentID)
+				c.protocol.commitmentRequester.StopTicker(commitmentID)
 			})
 		}
 
@@ -151,5 +149,20 @@ func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, index iotag
 		commitmentRequest.OnSuccess(successCallback)
 	}
 
-	return commitmentRequest
+	return commitmentRequest, nil
+}
+
+func (c *Chains) publishLatestEngineCommitment(engine *engine.Engine) {
+	unsubscribe := engine.Events.Notarization.LatestCommitmentUpdated.Hook(func(modelCommitment *model.Commitment) {
+		commitment, err := c.PublishCommitment(modelCommitment)
+		if err != nil {
+			c.protocol.TriggerError(ierrors.Wrapf(err, "failed to add commitment %s", modelCommitment.ID()))
+		}
+
+		// TODO: WHAT TO DO IF OUR VERIFIED COMMITMENT IS IN A FORK
+
+		commitment.Verified().Trigger()
+	}).Unhook
+
+	engine.HookShutdown(unsubscribe)
 }

@@ -221,7 +221,7 @@ func configure() error {
 		Component.LogDebugf("BlockSkipped: %s", block.ID())
 	})
 
-	deps.Protocol.OnCommitmentRequested(func(id iotago.CommitmentID) {
+	deps.Protocol.OnCommitmentRequestStarted(func(id iotago.CommitmentID) {
 		Component.LogDebugf("RequestCommitment: %s", id)
 	})
 

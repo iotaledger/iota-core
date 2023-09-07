@@ -120,12 +120,12 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 	return nil, false
 }
 
+// LatestCommitment returns the latest Commitment object in this chain.
 func (c *Chain) LatestCommitment() *Commitment {
 	return c.latestCommitment.Get()
 }
 
-// LatestCommitmentR returns a reactive variable that always contains the latest Commitment object in this
-// collection.
+// LatestCommitmentR returns a reactive variable that always contains the latest Commitment object in this chain.
 func (c *Chain) LatestCommitmentR() reactive.Variable[*Commitment] {
 	return c.latestCommitment
 }
@@ -185,6 +185,11 @@ func (c *Chain) Engine() *engine.Engine {
 // EngineR returns a reactive variable that contains the engine that is used to process blocks of this chain.
 func (c *Chain) EngineR() reactive.Variable[*engine.Engine] {
 	return c.engine
+}
+
+// InSyncRange returns true if the given index is in the sync range of this chain.
+func (c *Chain) InSyncRange(index iotago.SlotIndex) bool {
+	return index > c.latestVerifiedCommitment.Get().Index() && index < c.syncThreshold.Get()
 }
 
 // Evicted returns a reactive event that gets triggered when the chain is evicted.

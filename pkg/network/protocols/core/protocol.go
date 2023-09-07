@@ -102,6 +102,42 @@ func (p *Protocol) RequestAttestations(id iotago.CommitmentID, to ...network.Pee
 	}}}, protocolID, to...)
 }
 
+func (p *Protocol) OnBlockReceived(callback func(block *model.Block, src network.PeerID)) (unsubscribe func()) {
+	return p.Events.BlockReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnBlockRequestReceived(callback func(blockID iotago.BlockID, src network.PeerID)) (unsubscribe func()) {
+	return p.Events.BlockRequestReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnSlotCommitmentReceived(callback func(commitment *model.Commitment, src network.PeerID)) (unsubscribe func()) {
+	return p.Events.SlotCommitmentReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnSlotCommitmentRequestReceived(callback func(commitmentID iotago.CommitmentID, src network.PeerID)) (unsubscribe func()) {
+	return p.Events.SlotCommitmentRequestReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnAttestationsReceived(callback func(*model.Commitment, []*iotago.Attestation, *merklehasher.Proof[iotago.Identifier], network.PeerID)) (unsubscribe func()) {
+	return p.Events.AttestationsReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnAttestationsRequestReceived(callback func(commitmentID iotago.CommitmentID, src network.PeerID)) (unsubscribe func()) {
+	return p.Events.AttestationsRequestReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnWarpSyncResponseReceived(callback func(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], src network.PeerID)) (unsubscribe func()) {
+	return p.Events.WarpSyncResponseReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnWarpSyncRequestReceived(callback func(commitmentID iotago.CommitmentID, src network.PeerID)) (unsubscribe func()) {
+	return p.Events.WarpSyncRequestReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnError(callback func(err error, src network.PeerID)) (unsubscribe func()) {
+	return p.Events.Error.Hook(callback).Unhook
+}
+
 func (p *Protocol) Shutdown() {
 	p.network.UnregisterProtocol(protocolID)
 

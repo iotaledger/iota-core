@@ -171,7 +171,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
-	n.Protocol.OnCommitmentRequested(func(commitmentID iotago.CommitmentID) {
+	n.Protocol.OnCommitmentRequestStarted(func(commitmentID iotago.CommitmentID) {
 		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
 	})
 
