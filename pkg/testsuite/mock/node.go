@@ -157,7 +157,7 @@ func (n *Node) hookEvents() {
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngine())
 
-	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngineInstance())
+	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngine())
 
 	n.Protocol.OnBlockReceived(func(block *model.Block, source peer.ID) {
 		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())

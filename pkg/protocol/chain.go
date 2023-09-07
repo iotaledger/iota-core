@@ -188,7 +188,11 @@ func (c *Chain) EngineR() reactive.Variable[*engine.Engine] {
 
 // InSyncRange returns true if the given index is in the sync range of this chain.
 func (c *Chain) InSyncRange(index iotago.SlotIndex) bool {
-	return index > c.latestVerifiedCommitment.Get().Index() && index < c.syncThreshold.Get()
+	if latestVerifiedCommitment := c.latestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
+		return index > c.latestVerifiedCommitment.Get().Index() && index < c.syncThreshold.Get()
+	}
+
+	return false
 }
 
 // Evicted returns a reactive event that gets triggered when the chain is evicted.

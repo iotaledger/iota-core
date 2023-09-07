@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -37,12 +36,6 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	defer ts.Shutdown()
 
 	nodeOptions := []options.Option[protocol.Protocol]{
-		protocol.WithChainManagerOptions(
-			chainmanager.WithCommitmentRequesterOptions(
-				eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](1*time.Second),
-				eventticker.RetryJitter[iotago.SlotIndex, iotago.CommitmentID](500*time.Millisecond),
-			),
-		),
 		protocol.WithEngineOptions(
 			engine.WithBlockRequesterOptions(
 				eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
@@ -160,7 +153,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// check that rollback is correct
-	account, exists, err := ts.Node("nodeA").Protocol.MainEngineInstance().Ledger.Account(ts.Node("nodeA").AccountID, 7)
+	account, exists, err := ts.Node("nodeA").Protocol.MainEngine().Ledger.Account(ts.Node("nodeA").AccountID, 7)
 	require.NoError(t, err)
 	require.True(t, exists)
 	require.Equal(t, model.VersionAndHash{Version: 4, Hash: hash2}, account.LatestSupportedProtocolVersionAndHash)

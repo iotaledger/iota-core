@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager/trivialsyncmanager"
@@ -71,12 +70,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	nodeOptions := make(map[string][]options.Option[protocol.Protocol])
 	for _, node := range ts.Nodes() {
 		nodeOptions[node.Name] = []options.Option[protocol.Protocol]{
-			protocol.WithChainManagerOptions(
-				chainmanager.WithCommitmentRequesterOptions(
-					eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](1*time.Second),
-					eventticker.RetryJitter[iotago.SlotIndex, iotago.CommitmentID](500*time.Millisecond),
-				),
-			),
 			protocol.WithSybilProtectionProvider(
 				sybilprotectionv1.NewProvider(
 					sybilprotectionv1.WithSeatManagerProvider(

@@ -264,7 +264,7 @@ func Test_TransitionAccount(t *testing.T) {
 	tx4 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX4", delegationTransitionWallets,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
-				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+				CommitmentID: node1.Protocol.MainEngine().Storage.Settings().LatestCommitment().Commitment().MustID(),
 			},
 		}),
 		testsuite.WithInputs(inputForDelegationTransition),
@@ -274,7 +274,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	slotIndexBlock4 := latestParent.ID().Index()
 
-	block4 := ts.IssueBlockAtSlotWithOptions("block4", slotIndexBlock4, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx4, blockfactory.WithStrongParents(latestParent.ID()))
+	block4 := ts.IssueBlockAtSlotWithOptions("block4", slotIndexBlock4, node1.Protocol.MainEngine().Storage.Settings().LatestCommitment().Commitment(), node1, tx4, blockfactory.WithStrongParents(latestParent.ID()))
 
 	_ = ts.CommitUntilSlot(slotIndexBlock4, activeNodes, block4)
 

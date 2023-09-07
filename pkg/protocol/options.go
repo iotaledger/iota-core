@@ -201,6 +201,12 @@ func WithUpgradeOrchestratorProvider(optsUpgradeOrchestratorProvider module.Prov
 	}
 }
 
+func WithSyncManagerProvider(optsSyncManagerProvider module.Provider[*engine.Engine, syncmanager.SyncManager]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.options.SyncManagerProvider = optsSyncManagerProvider
+	}
+}
+
 func WithEngineOptions(opts ...options.Option[engine.Engine]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.options.EngineOptions = append(p.options.EngineOptions, opts...)

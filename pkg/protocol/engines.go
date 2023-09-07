@@ -45,7 +45,7 @@ func newEngines(protocol *Protocol) *Engines {
 			protocol.options.TipSelectionProvider,
 			protocol.options.RetainerProvider,
 			protocol.options.UpgradeOrchestratorProvider,
-			nil,
+			protocol.options.SyncManagerProvider,
 		),
 		mainEngine:      reactive.NewVariable[*engine.Engine](),
 		candidateEngine: reactive.NewVariable[*engine.Engine](),

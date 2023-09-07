@@ -368,7 +368,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	{
 		// Create snapshot.
 		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-		require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+		require.NoError(t, ts.Node("nodeA").Protocol.MainEngine().WriteSnapshot(snapshotPath))
 
 		nodeD := ts.AddNode("nodeE")
 		nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.

@@ -155,6 +155,7 @@ func New(
 			e.TipSelection = tipSelectionProvider(e)
 			e.Retainer = retainerProvider(e)
 			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
+			e.SyncManager = syncManagerProvider(e)
 		},
 		(*Engine).setupBlockStorage,
 		(*Engine).setupEvictionState,
