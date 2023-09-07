@@ -52,7 +52,7 @@ func NewOutput(output iotago.Output) (result *Output) {
 
 // NewOutput returns an Output from the given ledgerstate.Output.
 func NewOutputFromLedgerstateOutput(output *utxoledger.Output) (result *Output) {
-	outputJSON, err := deps.Protocol.MainEngine().APIForSlot(output.SlotCreated()).JSONEncode(output)
+	outputJSON, err := deps.Protocol.APIForSlot(output.SlotCreated()).JSONEncode(output)
 	if err != nil {
 		return nil
 	}

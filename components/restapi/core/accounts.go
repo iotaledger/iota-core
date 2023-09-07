@@ -38,7 +38,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
 	}
-	rmcSlot, err := safemath.SafeSub(slotIndex, deps.Protocol.MainEngine().APIForSlot(slotIndex).ProtocolParameters().MaxCommittableAge())
+	rmcSlot, err := safemath.SafeSub(slotIndex, deps.Protocol.APIForSlot(slotIndex).ProtocolParameters().MaxCommittableAge())
 	if err != nil {
 		rmcSlot = 0
 	}
@@ -83,7 +83,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 		return nil, ierrors.Errorf("request is too old, request started at %d, latest committed slot index is %d", requestedSlotIndex, latestCommittedSlot)
 	}
 
-	nextEpoch := deps.Protocol.MainEngine().APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
+	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
 	slotRange := uint32(requestedSlotIndex / RequestsMemoryCacheGranularity)
 	registeredValidators, exists := deps.Protocol.MainEngine().Retainer.RegisteredValidatorsCache(slotRange)
@@ -124,7 +124,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
-	nextEpoch := deps.Protocol.MainEngine().APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
+	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 	active := deps.Protocol.MainEngine().SybilProtection.IsCandidateActive(accountID, nextEpoch)
 
 	return &apimodels.ValidatorResponse{

@@ -42,7 +42,7 @@ type tipinfo struct {
 // }
 
 func sendVertex(blk *blocks.Block, confirmed bool) {
-	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock(), deps.Protocol.MainEngine().APIForSlot(blk.ID().Index()))
+	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock(), deps.Protocol.APIForSlot(blk.ID().Index()))
 	tx, isTx := modelBlk.Transaction()
 
 	broadcastWsBlock(&wsblk{MsgTypeVertex, &vertex{

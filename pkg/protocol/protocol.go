@@ -60,7 +60,7 @@ func (p *Protocol) APIForVersion(version iotago.Version) (api iotago.API, err er
 
 // APIForSlot returns the API for the given slot.
 func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
-	return p.MainEngine().APIForSlot(slot)
+	return p.APIForSlot(slot)
 }
 
 func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {

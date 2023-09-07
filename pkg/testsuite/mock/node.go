@@ -521,7 +521,7 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 }
 
 func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup, startSlot iotago.SlotIndex) {
-	issuingTime := n.Protocol.MainEngine().APIForSlot(startSlot).TimeProvider().SlotStartTime(startSlot)
+	issuingTime := n.Protocol.APIForSlot(startSlot).TimeProvider().SlotStartTime(startSlot)
 	start := time.Now()
 
 	wg.Add(1)
