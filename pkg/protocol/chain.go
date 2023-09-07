@@ -41,7 +41,7 @@ type Chain struct {
 	// that we are about to commit ourselves).
 	warpSyncThreshold reactive.Variable[iotago.SlotIndex]
 
-	// requestAttestations is a flag that indicates whether this chain shall request attestations.
+	// requestAttestations is a flag that indicates whether this chain wants to request attestations.
 	requestAttestations reactive.Variable[bool]
 
 	// engine is the engine that is used to process blocks of this chain.
@@ -86,7 +86,6 @@ func NewChain(root *Commitment, optStartingEngine ...*engine.Engine) *Chain {
 		return latestVerifiedCommitment.Index() + SyncWindow + 1
 	}, c.latestVerifiedCommitment)
 
-	// associate the commitment with its chain
 	root.chain.Set(c)
 
 	return c
