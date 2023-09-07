@@ -59,15 +59,15 @@ type dependencies struct {
 	Protocol *protocol.Protocol
 }
 
+type jsonProtocolParameters struct {
+	ProtocolParameters []iotago.ProtocolParameters `serix:"0,mapKey=protocolParameters"`
+}
+
 func readProtocolParameters() []iotago.ProtocolParameters {
 	fileBytes, err := os.ReadFile(ParamsProtocol.ProtocolParametersPath)
 	if err != nil {
 		Component.LogInfof("No protocol parameters file (%s) found, skipping import: %s", ParamsProtocol.ProtocolParametersPath, err)
 		return nil
-	}
-
-	type jsonProtocolParameters struct {
-		ProtocolParameters []iotago.ProtocolParameters `serix:"0,mapKey=protocolParameters"`
 	}
 
 	parsedParams := &jsonProtocolParameters{}
@@ -76,18 +76,20 @@ func readProtocolParameters() []iotago.ProtocolParameters {
 		return nil
 	}
 
+	return parsedParams.ProtocolParameters
+}
+
+func resetProtocolParameters() {
 	bytesToWrite, err := iotago.CommonSerixAPI().JSONEncode(context.Background(), jsonProtocolParameters{})
 	if err != nil {
 		Component.LogInfof("Error writing protocol parameters file (%s): %s", ParamsProtocol.ProtocolParametersPath, err)
-		return parsedParams.ProtocolParameters
+		return
 	}
 
 	if err := os.WriteFile(ParamsProtocol.ProtocolParametersPath, bytesToWrite, 0600); err != nil {
 		Component.LogInfof("Error writing protocol parameters file (%s): %s", ParamsProtocol.ProtocolParametersPath, err)
-		return parsedParams.ProtocolParameters
+		return
 	}
-
-	return parsedParams.ProtocolParameters
 }
 
 func initConfigParams(c *dig.Container) error {
@@ -320,6 +322,10 @@ func run() error {
 				Component.LogErrorfAndExit("Error running the Protocol: %s", err.Error())
 			}
 		}
+
+		//nolint:contextcheck // context might be canceled
+		resetProtocolParameters()
+
 		Component.LogInfo("Gracefully shutting down the Protocol...")
 	}, daemon.PriorityProtocol)
 }
