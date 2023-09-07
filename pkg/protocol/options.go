@@ -3,7 +3,6 @@ package protocol
 import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
@@ -47,9 +46,8 @@ type Options struct {
 	SnapshotPath            string
 	ChainSwitchingThreshold int
 
-	EngineOptions       []options.Option[engine.Engine]
-	ChainManagerOptions []options.Option[chainmanager.Manager]
-	StorageOptions      []options.Option[storage.Storage]
+	EngineOptions  []options.Option[engine.Engine]
+	StorageOptions []options.Option[storage.Storage]
 
 	FilterProvider              module.Provider[*engine.Engine, filter.Filter]
 	CommitmentFilterProvider    module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
@@ -206,12 +204,6 @@ func WithUpgradeOrchestratorProvider(optsUpgradeOrchestratorProvider module.Prov
 func WithEngineOptions(opts ...options.Option[engine.Engine]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.options.EngineOptions = append(p.options.EngineOptions, opts...)
-	}
-}
-
-func WithChainManagerOptions(opts ...options.Option[chainmanager.Manager]) options.Option[Protocol] {
-	return func(p *Protocol) {
-		p.options.ChainManagerOptions = append(p.options.ChainManagerOptions, opts...)
 	}
 }
 
