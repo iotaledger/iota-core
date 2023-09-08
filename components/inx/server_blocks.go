@@ -64,13 +64,13 @@ func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcc
 	wp := workerpool.New("ListenToAcceptedBlocks", workerCount).Start()
 
 	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		inxBlkMetadata, err := getINXBlockMetadata(block.ID())
+		payload, err := getINXBlockMetadata(block.ID())
 		if err != nil {
-			Component.LogErrorf("get blockmetadata error: %v", err)
+			Component.LogErrorf("get block metadata error: %v", err)
 			cancel()
 		}
 
-		if err := srv.Send(inxBlkMetadata); err != nil {
+		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
 			cancel()
 		}
@@ -94,13 +94,13 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 	wp := workerpool.New("ListenToConfirmedBlocks", workerCount).Start()
 
 	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-		inxBlkMetadata, err := getINXBlockMetadata(block.ID())
+		payload, err := getINXBlockMetadata(block.ID())
 		if err != nil {
-			Component.LogErrorf("get blockmetadata error: %v", err)
+			Component.LogErrorf("get block metadata error: %v", err)
 			cancel()
 		}
 
-		if err := srv.Send(inxBlkMetadata); err != nil {
+		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
 			cancel()
 		}

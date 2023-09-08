@@ -54,12 +54,12 @@ func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (
 func (s *Server) ListenToLatestCommitments(_ *inx.NoParams, srv inx.INX_ListenToLatestCommitmentsServer) error {
 	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
 
-	wp := workerpool.New("ListenToCommitments", workerCount).Start()
+	wp := workerpool.New("ListenToLatestCommitments", workerCount).Start()
 
 	unhook := deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(commitmentDetails *notarization.SlotCommittedDetails) {
-		inxCommitment := inx.NewCommitmentWithBytes(commitmentDetails.Commitment.ID(), commitmentDetails.Commitment.Data())
+		payload := inx.NewCommitmentWithBytes(commitmentDetails.Commitment.ID(), commitmentDetails.Commitment.Data())
 
-		if err := srv.Send(inxCommitment); err != nil {
+		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
 			cancel()
 		}
@@ -83,13 +83,13 @@ func (s *Server) ListenToFinalizedCommitments(_ *inx.NoParams, srv inx.INX_Liste
 	wp := workerpool.New("ListenToFinalizedCommitments", workerCount).Start()
 
 	unhook := deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
+		payload, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
 		if err != nil {
 			Component.LogErrorf("load commitment error: %v", err)
 			cancel()
 		}
 
-		inxCommitment := inx.NewCommitmentWithBytes(commitment.ID(), commitment.Data())
+		inxCommitment := inx.NewCommitmentWithBytes(payload.ID(), payload.Data())
 
 		if err := srv.Send(inxCommitment); err != nil {
 			Component.LogErrorf("send error: %v", err)
