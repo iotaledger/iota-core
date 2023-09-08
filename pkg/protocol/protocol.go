@@ -40,8 +40,6 @@ func New(loggerInstance *logger.Logger, workers *workerpool.Group, dispatcher ne
 		p.Engines = newEngines(p)
 		p.Chains = newChains(p)
 		p.Gossip = NewGossip(p)
-	}, func(p *Protocol) {
-		p.HookShutdown(workers.Shutdown)
 	}, (*Protocol).TriggerConstructed)
 }
 
@@ -52,6 +50,8 @@ func (p *Protocol) Run(ctx context.Context) error {
 
 	p.TriggerShutdown()
 	p.TriggerStopped()
+
+	p.Workers.Shutdown()
 
 	return ctx.Err()
 }
