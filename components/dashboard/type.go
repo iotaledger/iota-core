@@ -88,11 +88,10 @@ type memmetrics struct {
 }
 
 type neighbormetric struct {
-	ID               string `json:"id"`
-	Address          string `json:"address"`
-	ConnectionOrigin string `json:"connection_origin"`
-	PacketsRead      uint64 `json:"packets_read"`
-	PacketsWritten   uint64 `json:"packets_written"`
+	ID             string `json:"id"`
+	Addresses      string `json:"addresses"`
+	PacketsRead    uint64 `json:"packets_read"`
+	PacketsWritten uint64 `json:"packets_written"`
 }
 
 type tipsInfo struct {

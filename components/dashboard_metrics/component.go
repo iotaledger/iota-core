@@ -8,9 +8,10 @@ import (
 	"github.com/labstack/echo/v4"
 	"go.uber.org/dig"
 
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/autopeering/peer"
-	"github.com/iotaledger/hive.go/crypto/identity"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
@@ -55,10 +56,10 @@ var (
 type dependencies struct {
 	dig.In
 
+	Host             host.Host
 	Protocol         *protocol.Protocol
 	RestRouteManager *restapipkg.RestRouteManager
 	AppInfo          *app.Info
-	LocalPeer        *peer.Local
 }
 
 func configure() error {
@@ -105,7 +106,7 @@ func run() error {
 }
 
 func configureComponentCountersEvents() {
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ identity.ID) {
+	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ peer.ID) {
 		incComponentCounter(Received)
 	})
 

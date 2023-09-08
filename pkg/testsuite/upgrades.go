@@ -50,6 +50,10 @@ func (t *TestSuite) AssertVersionAndProtocolParameters(versionsAndProtocolParame
 					return ierrors.Errorf("AssertVersionAndProtocolParameters: %s: for version %d protocol parameters not equal. expected %s, got nil", node.Name, version, lo.PanicOnErr(expectedProtocolParameters.Hash()))
 				}
 
+				if !expectedProtocolParameters.Equals(protocolParameters) {
+					return ierrors.Errorf("AssertVersionAndProtocolParameters: %s: for version %d protocol parameters not equal. expected %v, got %v", node.Name, version, expectedProtocolParameters, protocolParameters)
+				}
+
 				if lo.PanicOnErr(expectedProtocolParameters.Hash()) != lo.PanicOnErr(protocolParameters.Hash()) {
 					return ierrors.Errorf("AssertVersionAndProtocolParameters: %s: for version %d protocol parameters not equal. expected %s, got %s", node.Name, version, lo.PanicOnErr(expectedProtocolParameters.Hash()), lo.PanicOnErr(protocolParameters.Hash()))
 				}
