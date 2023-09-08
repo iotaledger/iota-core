@@ -1,7 +1,6 @@
 package enginemanager
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -263,7 +262,6 @@ func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storag
 
 func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine, error) {
 	engineAlias := lo.PanicOnErr(uuid.NewUUID()).String()
-	fmt.Println("fork", e.activeInstance.Name(), "into", engineAlias)
 	errorHandler := func(err error) {
 		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", engineAlias[0:8]))
 	}
@@ -280,7 +278,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	if err := newStorage.Commitments().Rollback(index, latestCommitment.Index()); err != nil {
 		return nil, ierrors.Wrap(err, "failed to rollback commitments")
 	}
-	// Create temporary components and rollback their state, which will be reflected on disk.
+	// Create temporary components and rollback their permanent state, which will be reflected on disk.
 	evictionState := eviction.NewState(newStorage.LatestNonEmptySlot(), newStorage.RootBlocks)
 	evictionState.Initialize(latestCommitment.Index())
 
@@ -308,12 +306,13 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 		return nil, err
 	}
 
-	if err := newStorage.RollbackPrunable(index, latestCommitment.Index()); err != nil {
+	if err := newStorage.RollbackPrunable(index); err != nil {
 		return nil, err
 	}
 
 	candidateEngine := e.loadEngineInstanceWithStorage(engineAlias, newStorage)
 
+	// Rollback attestations already on created engine instance, because this action modifies the in-memory storage.
 	if err := candidateEngine.Attestations.Rollback(index); err != nil {
 		return nil, ierrors.Wrap(err, "error while rolling back attestations storage on candidate engine")
 	}

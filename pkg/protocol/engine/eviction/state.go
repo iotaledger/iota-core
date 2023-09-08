@@ -303,6 +303,7 @@ func (s *State) Rollback(lowerTarget, targetIndex iotago.SlotIndex) error {
 	if err := s.latestNonEmptyStore.Set([]byte{latestNonEmptySlotKey}, latestNonEmptySlot.MustBytes()); err != nil {
 		return ierrors.Wrap(err, "failed to store latest non empty slot")
 	}
+
 	return nil
 }
 

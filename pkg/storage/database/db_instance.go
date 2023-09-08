@@ -38,6 +38,10 @@ func (d *DBInstance) Close() {
 	}
 }
 
+//func (d *DBInstance) Open() {
+//	d.store.Replace(StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine))
+//}
+
 func (d *DBInstance) KVStore() kvstore.KVStore {
 	return d.store
 }

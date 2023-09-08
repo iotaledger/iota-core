@@ -1,15 +1,12 @@
 package prunable
 
 import (
-	"os"
-
 	copydir "github.com/otiai10/copy"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -64,6 +61,7 @@ func Clone(source *Prunable, dbConfig database.Config, apiProvider api.Provider,
 
 	// Create a newly opened instance of prunable database.
 	// `prunableSlotStore` will be opened automatically as the engine requests it, so no need to open it here.
+	// TODO: create a re-openable and lockable KVStore
 	source.semiPermanentDB = database.NewDBInstance(source.semiPermanentDBConfig)
 	source.decidedUpgradeSignals = epochstore.NewStore(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, kvstore.Realm{lastPrunedEpochKey}, source.semiPermanentDB.KVStore(), pruningDelayDecidedUpgradeSignals, model.VersionAndHash.Bytes, model.VersionAndHashFromBytes)
 	source.poolRewards = epochstore.NewEpochKVStore(kvstore.Realm{epochPrefixPoolRewards}, kvstore.Realm{lastPrunedEpochKey}, source.semiPermanentDB.KVStore(), pruningDelayPoolRewards)
@@ -145,7 +143,7 @@ func (p *Prunable) Flush() {
 	}
 }
 
-func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex, lastCommittedIndex iotago.SlotIndex) error {
+func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex) error {
 	timeProvider := p.apiProvider.APIForSlot(targetSlotIndex).TimeProvider()
 	targetSlotEpoch := timeProvider.EpochFromSlot(targetSlotIndex)
 	lastCommittedEpoch := targetSlotEpoch
@@ -153,77 +151,61 @@ func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex, lastCommittedIndex
 	if timeProvider.EpochEnd(targetSlotEpoch) != targetSlotIndex {
 		lastCommittedEpoch--
 	}
-	pointOfNoReturn := timeProvider.EpochEnd(targetSlotEpoch) - p.apiProvider.APIForSlot(targetSlotIndex).ProtocolParameters().MaxCommittableAge()
 
-	// Shutdown prunable slot store in order to flush and get consistent state on disk after reopening.
+	if err := p.prunableSlotStore.RollbackBucket(targetSlotEpoch, targetSlotIndex, timeProvider.EpochEnd(targetSlotEpoch)); err != nil {
+		return ierrors.Wrapf(err, "error while rolling back slots in a bucket for epoch %d", targetSlotEpoch)
+	}
+
+	// Shut down the prunableSlotStore in order to flush and get consistent state on disk after reopening.
 	p.prunableSlotStore.Shutdown()
 
+	// Removed entries that belong to the old fork and cannot be re-used.
 	for epochIdx := lastCommittedEpoch + 1; ; epochIdx++ {
-		// only remove if epochIdx bigger than epoch of target slot index
 		if epochIdx > targetSlotEpoch {
-			if exists, err := PathExists(dbPathFromIndex(p.prunableSlotStore.dbConfig.Directory, epochIdx)); err != nil {
-				return ierrors.Wrapf(err, "failed to check if bucket directory exists in forkedPrunable storage for epoch %d", epochIdx)
-			} else if !exists {
+			if deleted := p.prunableSlotStore.DeleteBucket(epochIdx); !deleted {
 				break
 			}
 
-			if err := os.RemoveAll(dbPathFromIndex(p.prunableSlotStore.dbConfig.Directory, epochIdx)); err != nil {
-				return ierrors.Wrapf(err, "failed to remove bucket directory in forkedPrunable storage for epoch %d", epochIdx)
+			shouldRollback, err := p.shouldRollbackCommittee(epochIdx+1, targetSlotIndex)
+			if err != nil {
+				return ierrors.Wrapf(err, "error while checking if committee for epoch %d should be rolled back", epochIdx)
 			}
-		}
-		// Remove entries for epochs bigger or equal epochFromSlot(forkingPoint+1) in semiPermanent storage.
-		// Those entries are part of the fork and values from the old storage should not be used
-		// values from the candidate storage should be used in its place; that's why we copy those entries
-		// from the candidate engine to old storage.
-		if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixPoolRewards}, epochIdx.MustBytes())); err != nil {
-			return err
-		}
-		if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixPoolStats}, epochIdx.MustBytes())); err != nil {
-			return err
-		}
-		if epochIdx > targetSlotEpoch && targetSlotIndex < pointOfNoReturn {
-			// TODO: rollback committee using
-			//committee, _, err := account.AccountsFromBytes(committeeBytes)
-			//if err != nil {
-			//	innerErr = ierrors.Wrapf(err, "failed to parse committee bytes for epoch %d", epoch)
-			//	return innerErr
-			//}
-			//if committee.IsReused() {
-			//	return nil
-			//}
-			if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixCommittee}, (epochIdx + 1).MustBytes())); err != nil {
-				return err
+			if shouldRollback {
+				if err := p.committee.DeleteEpoch(epochIdx + 1); err != nil {
+					return ierrors.Wrapf(err, "error while deleting committee for epoch %d", epochIdx)
+				}
 			}
 		}
 
-		if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, epochIdx.MustBytes())); err != nil {
-			return err
+		if err := p.poolRewards.DeleteEpoch(epochIdx); err != nil {
+			return ierrors.Wrapf(err, "error while deleting pool rewards for epoch %d", epochIdx)
 		}
-	}
+		if err := p.poolStats.DeleteEpoch(epochIdx); err != nil {
+			return ierrors.Wrapf(err, "error while deleting pool stats for epoch %d", epochIdx)
+		}
 
-	// If the forking slot is the last slot of an epoch, then don't need to clean anything as the bucket with the
-	// first forked slot contains only forked blocks and was removed in the previous step.
-	// We need to remove data in the bucket in slots [forkingSlot+1; bucketEnd].
-	if lastCommittedEpoch != targetSlotEpoch {
-		oldBucketKvStore := p.prunableSlotStore.getDBInstance(targetSlotEpoch).KVStore()
-		for clearSlot := targetSlotIndex + 1; clearSlot <= timeProvider.EpochEnd(targetSlotEpoch); clearSlot++ {
-			// delete slot prefix from forkedPrunable storage that will be eventually copied into the new engine
-			if err := oldBucketKvStore.DeletePrefix(clearSlot.MustBytes()); err != nil {
-				return ierrors.Wrapf(err, "error while clearing slot %d in bucket for epoch %d", clearSlot, targetSlotEpoch)
-			}
+		if err := p.decidedUpgradeSignals.DeleteEpoch(epochIdx); err != nil {
+			return ierrors.Wrapf(err, "error while deleting decided upgrade signals for epoch %d", epochIdx)
 		}
 	}
 
 	return nil
 }
 
-func PathExists(path string) (bool, error) {
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
+// Remove committee for the next epoch only if forking point is before point of no return and committee is reused.
+// Always remove committees for epochs that are newer than targetSlotEpoch+1.
+func (p *Prunable) shouldRollbackCommittee(epochIndex iotago.EpochIndex, targetSlotIndex iotago.SlotIndex) (bool, error) {
+	timeProvider := p.apiProvider.APIForSlot(targetSlotIndex).TimeProvider()
+	targetSlotEpoch := timeProvider.EpochFromSlot(targetSlotIndex)
+	pointOfNoReturn := timeProvider.EpochEnd(targetSlotEpoch) - p.apiProvider.APIForSlot(targetSlotIndex).ProtocolParameters().MaxCommittableAge()
+
+	if epochIndex == targetSlotEpoch+1 && targetSlotIndex < pointOfNoReturn {
+		committee, err := p.committee.Load(targetSlotEpoch + 1)
+		if err != nil {
+			return false, err
 		}
 
-		return false, err
+		return committee.IsReused(), nil
 	}
 
 	return true, nil

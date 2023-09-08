@@ -143,6 +143,6 @@ func (s *Storage) Flush() {
 	s.prunable.Flush()
 }
 
-func (s *Storage) RollbackPrunable(targetIndex iotago.SlotIndex, lastCommittedIndex iotago.SlotIndex) error {
-	return s.prunable.Rollback(targetIndex, lastCommittedIndex)
+func (s *Storage) RollbackPrunable(targetIndex iotago.SlotIndex) error {
+	return s.prunable.Rollback(targetIndex)
 }

@@ -195,13 +195,28 @@ func (b *BucketManager) Prune(epoch iotago.EpochIndex) error {
 		return ierrors.Wrapf(database.ErrNoPruningNeeded, "epoch %d is already pruned", epoch)
 	}
 
+	b.DeleteBucket(epoch)
+
+	b.lastPrunedEpoch.MarkEvicted(epoch)
+
+	return nil
+}
+
+// DeleteBucket deletes directory that stores the data for the given bucket and returns boolean
+// flag indicating whether a directory for that bucket existed.
+func (b *BucketManager) DeleteBucket(epoch iotago.EpochIndex) (deleted bool) {
 	b.openDBsMutex.Lock()
 	defer b.openDBsMutex.Unlock()
+
+	if exists, err := PathExists(dbPathFromIndex(b.dbConfig.Directory, epoch)); err != nil {
+		panic(err)
+	} else if !exists {
+		return false
+	}
 
 	db, exists := b.openDBs.Get(epoch)
 	if exists {
 		db.Close()
-
 		b.openDBs.Remove(epoch)
 	}
 
@@ -211,11 +226,22 @@ func (b *BucketManager) Prune(epoch iotago.EpochIndex) error {
 
 	// Delete the db size since we pruned the whole directory
 	b.dbSizes.Delete(epoch)
-	b.lastPrunedEpoch.MarkEvicted(epoch)
+
+	return true
+}
+
+// RollbackBucket removes data in the bucket in slots [targetSlotIndex+1; epochEndSlot].
+func (b *BucketManager) RollbackBucket(epochIndex iotago.EpochIndex, targetSlotIndex, epochEndSlot iotago.SlotIndex) error {
+	oldBucketKvStore := b.getDBInstance(epochIndex).KVStore()
+	for clearSlot := targetSlotIndex + 1; clearSlot <= epochEndSlot; clearSlot++ {
+		// delete slot prefix from forkedPrunable storage that will be eventually copied into the new engine
+		if err := oldBucketKvStore.DeletePrefix(clearSlot.MustBytes()); err != nil {
+			return ierrors.Wrapf(err, "error while clearing slot %d in bucket for epoch %d", clearSlot, epochIndex)
+		}
+	}
 
 	return nil
 }
-
 func (b *BucketManager) Flush() error {
 	b.openDBsMutex.RLock()
 	defer b.openDBsMutex.RUnlock()
@@ -228,4 +254,16 @@ func (b *BucketManager) Flush() error {
 	})
 
 	return err
+}
+
+func PathExists(path string) (bool, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return true, nil
 }
