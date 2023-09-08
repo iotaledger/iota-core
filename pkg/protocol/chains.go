@@ -120,18 +120,22 @@ func (c *Chains) HeaviestVerifiedCandidate() reactive.Variable[*Chain] {
 }
 
 func (c *Chains) initMainChain() {
-	mainEngine := c.protocol.MainEngineInstance()
-	rootCommitment := mainEngine.EarliestRootCommitment(mainEngine.Storage.Settings().LatestFinalizedSlot())
+	var (
+		engine     = c.protocol.MainEngineInstance()
+		syncStatus = engine.SyncManager.SyncStatus()
+		root       = NewCommitment(engine.EarliestRootCommitment(syncStatus.LatestFinalizedSlot), true)
+	)
 
-	c.Evict(rootCommitment.Index())
+	c.Evict(root.Index())
 
-	c.mainChain.Set(NewChain(NewCommitment(rootCommitment, true), mainEngine))
+	c.mainChain.Set(NewChain(root, engine))
 
-	for i := rootCommitment.Index() + 1; i <= mainEngine.Storage.Settings().LatestCommitment().Index(); i++ {
-		lo.PanicOnErr(c.PublishCommitment(lo.PanicOnErr(mainEngine.Storage.Commitments().Load(i))))
+	for i := root.Index() + 1; i <= syncStatus.LatestCommitment.Index(); i++ {
+		lo.PanicOnErr(c.PublishCommitment(lo.PanicOnErr(engine.Storage.Commitments().Load(i))))
 	}
 
-	c.monitorLatestEngineCommitment(mainEngine)
+	c.monitorLatestEngineCommitment(engine)
+
 }
 
 func (c *Chains) initChainSwitching() {
