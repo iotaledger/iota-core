@@ -262,9 +262,8 @@ func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storag
 }
 
 func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine, error) {
-	fmt.Println("fork at slot ", index)
 	engineAlias := lo.PanicOnErr(uuid.NewUUID()).String()
-
+	fmt.Println("fork", e.activeInstance.Name(), "into", engineAlias)
 	errorHandler := func(err error) {
 		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", engineAlias[0:8]))
 	}
@@ -277,16 +276,18 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	}
 
 	// Remove commitments that after forking point.
-	if err := newStorage.Commitments().Rollback(index, newStorage.Settings().LatestCommitment().Index()); err != nil {
+	latestCommitment := newStorage.Settings().LatestCommitment()
+	if err := newStorage.Commitments().Rollback(index, latestCommitment.Index()); err != nil {
 		return nil, ierrors.Wrap(err, "failed to rollback commitments")
 	}
-
 	// Create temporary components and rollback their state, which will be reflected on disk.
 	evictionState := eviction.NewState(newStorage.LatestNonEmptySlot(), newStorage.RootBlocks)
+	evictionState.Initialize(latestCommitment.Index())
+
 	blockCache := blocks.New(evictionState, newStorage.Settings().APIProvider())
 	accountsManager := accountsledger.New(newStorage.Settings().APIProvider(), blockCache.Block, newStorage.AccountDiffs, newStorage.Accounts())
-	accountsManager.SetLatestCommittedSlot(newStorage.Settings().LatestCommitment().Index())
 
+	accountsManager.SetLatestCommittedSlot(latestCommitment.Index())
 	if err := accountsManager.Rollback(index); err != nil {
 		return nil, ierrors.Wrap(err, "failed to rollback accounts manager")
 	}
@@ -294,7 +295,6 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	if err := evictionState.Rollback(newStorage.Settings().LatestFinalizedSlot(), index); err != nil {
 		return nil, ierrors.Wrap(err, "failed to rollback eviction state")
 	}
-
 	if err := newStorage.Ledger().Rollback(index); err != nil {
 		return nil, err
 	}
@@ -308,11 +308,17 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 		return nil, err
 	}
 
-	if err := newStorage.RollbackPrunable(index); err != nil {
+	if err := newStorage.RollbackPrunable(index, latestCommitment.Index()); err != nil {
 		return nil, err
 	}
 
-	return e.loadEngineInstanceWithStorage(engineAlias, newStorage), nil
+	candidateEngine := e.loadEngineInstanceWithStorage(engineAlias, newStorage)
+
+	if err := candidateEngine.Attestations.Rollback(index); err != nil {
+		return nil, ierrors.Wrap(err, "error while rolling back attestations storage on candidate engine")
+	}
+
+	return candidateEngine, nil
 }
 
 func (e *EngineManager) OnEngineCreated(handler func(*engine.Engine)) (unsubscribe func()) {

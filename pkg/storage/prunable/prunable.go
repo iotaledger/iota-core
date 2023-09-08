@@ -145,56 +145,69 @@ func (p *Prunable) Flush() {
 	}
 }
 
-func (p *Prunable) Rollback(forkingSlot iotago.SlotIndex) error {
-	forkingSlotTimeProvider := p.apiProvider.APIForSlot(forkingSlot).TimeProvider()
-	// remove all buckets that are newer than epoch of the forkingSlot
-	forkingEpoch := forkingSlotTimeProvider.EpochFromSlot(forkingSlot)
-	firstForkedSlotEpoch := forkingSlotTimeProvider.EpochFromSlot(forkingSlot + 1)
+func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex, lastCommittedIndex iotago.SlotIndex) error {
+	timeProvider := p.apiProvider.APIForSlot(targetSlotIndex).TimeProvider()
+	targetSlotEpoch := timeProvider.EpochFromSlot(targetSlotIndex)
+	lastCommittedEpoch := targetSlotEpoch
+	// if the target index is the last slot of the epoch, the epoch was committed
+	if timeProvider.EpochEnd(targetSlotEpoch) != targetSlotIndex {
+		lastCommittedEpoch--
+	}
+	pointOfNoReturn := timeProvider.EpochEnd(targetSlotEpoch) - p.apiProvider.APIForSlot(targetSlotIndex).ProtocolParameters().MaxCommittableAge()
 
-	for epochIdx := forkingEpoch + 1; ; epochIdx++ {
-		if exists, err := PathExists(dbPathFromIndex(p.prunableSlotStore.dbConfig.Directory, epochIdx)); err != nil {
-			return ierrors.Wrapf(err, "failed to check if bucket directory exists in forkedPrunable storage for epoch %d", epochIdx)
-		} else if !exists {
-			break
+	for epochIdx := lastCommittedEpoch + 1; ; epochIdx++ {
+		// only remove if epochIdx bigger than epoch of target slot index
+		if epochIdx > targetSlotEpoch {
+			if exists, err := PathExists(dbPathFromIndex(p.prunableSlotStore.dbConfig.Directory, epochIdx)); err != nil {
+				return ierrors.Wrapf(err, "failed to check if bucket directory exists in forkedPrunable storage for epoch %d", epochIdx)
+			} else if !exists {
+				break
+			}
+
+			if err := os.RemoveAll(dbPathFromIndex(p.prunableSlotStore.dbConfig.Directory, epochIdx)); err != nil {
+				return ierrors.Wrapf(err, "failed to remove bucket directory in forkedPrunable storage for epoch %d", epochIdx)
+			}
+
 		}
-
-		if err := os.RemoveAll(dbPathFromIndex(p.prunableSlotStore.dbConfig.Directory, epochIdx)); err != nil {
-			return ierrors.Wrapf(err, "failed to remove bucket directory in forkedPrunable storage for epoch %d", epochIdx)
-		}
-
 		// Remove entries for epochs bigger or equal epochFromSlot(forkingPoint+1) in semiPermanent storage.
 		// Those entries are part of the fork and values from the old storage should not be used
 		// values from the candidate storage should be used in its place; that's why we copy those entries
 		// from the candidate engine to old storage.
-		if epochIdx >= firstForkedSlotEpoch {
-			if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixPoolRewards}, epochIdx.MustBytes())); err != nil {
-				return err
-			}
-			if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixPoolStats}, epochIdx.MustBytes())); err != nil {
-				return err
-			}
-			if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, epochIdx.MustBytes())); err != nil {
-				return err
-			}
-			// TODO: remove committee for the  next epoch in some conditions
+		if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixPoolRewards}, epochIdx.MustBytes())); err != nil {
+			return err
+		}
+		if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixPoolStats}, epochIdx.MustBytes())); err != nil {
+			return err
+		}
+		if epochIdx > targetSlotEpoch && targetSlotIndex < pointOfNoReturn {
+			// TODO: rollback committee using
+			//committee, _, err := account.AccountsFromBytes(committeeBytes)
+			//if err != nil {
+			//	innerErr = ierrors.Wrapf(err, "failed to parse committee bytes for epoch %d", epoch)
+			//	return innerErr
+			//}
+			//if committee.IsReused() {
+			//	return nil
+			//}
 			if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixCommittee}, (epochIdx + 1).MustBytes())); err != nil {
 				return err
 			}
+		}
+
+		if err := p.semiPermanentDB.KVStore().DeletePrefix(byteutils.ConcatBytes(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, epochIdx.MustBytes())); err != nil {
+			return err
 		}
 	}
 
 	// If the forking slot is the last slot of an epoch, then don't need to clean anything as the bucket with the
 	// first forked slot contains only forked blocks and was removed in the previous step.
-	// The only situation in which blocks need to be copied is if the first forked slot is in the middle of the bucket.
-	// Then, we need to remove data in source bucket in slots [forkingSlot+1; bucketEnd],
-	// and then copy data for those slots from the candidate storage to avoid syncing the data again.
-	if forkingSlotTimeProvider.EpochStart(firstForkedSlotEpoch) < forkingSlot+1 {
-		// getDBInstance opens the DB if needed, so no need to manually create KV instance as with semiPermanentDB
-		oldBucketKvStore := p.prunableSlotStore.getDBInstance(firstForkedSlotEpoch).KVStore()
-		for clearSlot := forkingSlot + 1; clearSlot <= forkingSlotTimeProvider.EpochEnd(firstForkedSlotEpoch); clearSlot++ {
+	// We need to remove data in the bucket in slots [forkingSlot+1; bucketEnd].
+	if lastCommittedEpoch != targetSlotEpoch {
+		oldBucketKvStore := p.prunableSlotStore.getDBInstance(targetSlotEpoch).KVStore()
+		for clearSlot := targetSlotIndex + 1; clearSlot <= timeProvider.EpochEnd(targetSlotEpoch); clearSlot++ {
 			// delete slot prefix from forkedPrunable storage that will be eventually copied into the new engine
 			if err := oldBucketKvStore.DeletePrefix(clearSlot.MustBytes()); err != nil {
-				return ierrors.Wrapf(err, "error while clearing slot %d in bucket for epoch %d", clearSlot, firstForkedSlotEpoch)
+				return ierrors.Wrapf(err, "error while clearing slot %d in bucket for epoch %d", clearSlot, targetSlotEpoch)
 			}
 		}
 	}

@@ -3,7 +3,6 @@ package mock
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -19,20 +18,14 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
-	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
 type Node struct {
@@ -146,43 +139,43 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
 	})
 
-	events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source identity.ID) {
-		fmt.Printf("%s > Network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
-	})
+	//events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source identity.ID) {
+	//	fmt.Printf("%s > Network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
+	//})
 
-	events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source identity.ID) {
-		fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
-	})
+	//events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, source identity.ID) {
+	//	fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
+	//})
+	//
+	//events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
+	//	fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
+	//})
 
-	events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, source identity.ID) {
-		fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
-	})
+	//events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
+	//	fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
+	//		return lo.PanicOnErr(a.BlockID(lo.PanicOnErr(n.Protocol.APIForVersion(a.ProtocolVersion))))
+	//	}))
+	//})
+	//
+	//events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source network.PeerID) {
+	//	fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
+	//})
 
-	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source network.PeerID) {
-		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
-			return lo.PanicOnErr(a.BlockID(lo.PanicOnErr(n.Protocol.APIForVersion(a.ProtocolVersion))))
-		}))
-	})
+	//events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
+	//	fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
+	//})
 
-	events.Network.AttestationsRequestReceived.Hook(func(id iotago.CommitmentID, source network.PeerID) {
-		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
-	})
-
-	events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
-		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
-	})
-
-	events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
-		fmt.Printf("%s > ChainManager.CommitmentBelowRoot: %s\n", n.Name, commitmentID)
-	})
+	//events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
+	//	fmt.Printf("%s > ChainManager.CommitmentBelowRoot: %s\n", n.Name, commitmentID)
+	//})
 
 	events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
 	})
 
-	events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
-		fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
-	})
+	//events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+	//	fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
+	//})
 
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
 		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
@@ -214,84 +207,84 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		defer n.mutex.Unlock()
 		n.attachedBlocks = append(n.attachedBlocks, block)
 	})
-
-	events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] BlockDAG.BlockSolid: %s\n", n.Name, engineName, block.ID())
-	})
-
+	//
+	//events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] BlockDAG.BlockSolid: %s\n", n.Name, engineName, block.ID())
+	//})
+	//
 	events.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
 		fmt.Printf("%s > [%s] BlockDAG.BlockInvalid: %s - %s\n", n.Name, engineName, block.ID(), err)
 	})
-
-	events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] BlockDAG.BlockMissing: %s\n", n.Name, engineName, block.ID())
-	})
-
-	events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] BlockDAG.MissingBlockAttached: %s\n", n.Name, engineName, block.ID())
-	})
-
-	events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] SybilProtection.BlockProcessed: %s\n", n.Name, engineName, block.ID())
-	})
-
-	events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
-	})
-
-	events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Scheduler.BlockScheduled: %s\n", n.Name, engineName, block.ID())
-	})
-
-	events.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Scheduler.BlockEnqueued: %s\n", n.Name, engineName, block.ID())
-	})
-
-	events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Scheduler.BlockSkipped: %s\n", n.Name, engineName, block.ID())
-	})
-
-	events.Scheduler.BlockDropped.Hook(func(block *blocks.Block, err error) {
-		fmt.Printf("%s > [%s] Scheduler.BlockDropped: %s - %s\n", n.Name, engineName, block.ID(), err.Error())
-	})
-
-	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.CurrentAPI().TimeProvider().SlotFromTime(newTime))
-	})
-
-	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.CurrentAPI().TimeProvider().SlotFromTime(newTime))
-	})
-
-	events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
-		fmt.Printf("%s > [%s] Filter.BlockPreAllowed: %s\n", n.Name, engineName, block.ID())
-	})
-
-	events.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
-		fmt.Printf("%s > [%s] Filter.BlockPreFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
-		if failOnBlockFiltered {
-			n.Testing.Fatal("no blocks should be prefiltered")
-		}
-	})
-
-	events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] CommitmentFilter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
-	})
-
-	events.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
-		fmt.Printf("%s > [%s] CommitmentFilter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
-		if failOnBlockFiltered {
-			n.Testing.Fatal("no blocks should be filtered")
-		}
-	})
-
-	events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
-		fmt.Printf("%s > [%s] BlockRequester.Tick: %s\n", n.Name, engineName, blockID)
-	})
-
-	events.BlockProcessed.Hook(func(blockID iotago.BlockID) {
-		fmt.Printf("%s > [%s] Engine.BlockProcessed: %s\n", n.Name, engineName, blockID)
-	})
+	//
+	//events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] BlockDAG.BlockMissing: %s\n", n.Name, engineName, block.ID())
+	//})
+	//
+	//events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] BlockDAG.MissingBlockAttached: %s\n", n.Name, engineName, block.ID())
+	//})
+	//
+	//events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] SybilProtection.BlockProcessed: %s\n", n.Name, engineName, block.ID())
+	//})
+	//
+	//events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
+	//})
+	//
+	//events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] Scheduler.BlockScheduled: %s\n", n.Name, engineName, block.ID())
+	//})
+	//
+	//events.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] Scheduler.BlockEnqueued: %s\n", n.Name, engineName, block.ID())
+	//})
+	//
+	//events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] Scheduler.BlockSkipped: %s\n", n.Name, engineName, block.ID())
+	//})
+	//
+	//events.Scheduler.BlockDropped.Hook(func(block *blocks.Block, err error) {
+	//	fmt.Printf("%s > [%s] Scheduler.BlockDropped: %s - %s\n", n.Name, engineName, block.ID(), err.Error())
+	//})
+	//
+	//events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
+	//	fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.CurrentAPI().TimeProvider().SlotFromTime(newTime))
+	//})
+	//
+	//events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
+	//	fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.CurrentAPI().TimeProvider().SlotFromTime(newTime))
+	//})
+	//
+	//events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
+	//	fmt.Printf("%s > [%s] Filter.BlockPreAllowed: %s\n", n.Name, engineName, block.ID())
+	//})
+	//
+	//events.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	//	fmt.Printf("%s > [%s] Filter.BlockPreFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+	//	if failOnBlockFiltered {
+	//		n.Testing.Fatal("no blocks should be prefiltered")
+	//	}
+	//})
+	//
+	//events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] CommitmentFilter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
+	//})
+	//
+	//events.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+	//	fmt.Printf("%s > [%s] CommitmentFilter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+	//	if failOnBlockFiltered {
+	//		n.Testing.Fatal("no blocks should be filtered")
+	//	}
+	//})
+	//
+	//events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
+	//	fmt.Printf("%s > [%s] BlockRequester.Tick: %s\n", n.Name, engineName, blockID)
+	//})
+	//
+	//events.BlockProcessed.Hook(func(blockID iotago.BlockID) {
+	//	fmt.Printf("%s > [%s] Engine.BlockProcessed: %s\n", n.Name, engineName, blockID)
+	//})
 
 	events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 		var acceptedBlocks iotago.BlockIDs
@@ -324,92 +317,92 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		fmt.Printf("%s > [%s] NotarizationManager.LatestCommitmentUpdated: %s\n", n.Name, engineName, commitment.ID())
 	})
 
-	events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
-	})
-
-	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Index(), block.ProtocolBlock().SlotCommitmentID)
-	})
-
-	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
-	})
-
-	events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
-	})
-
-	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
-		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
-	})
-
-	events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
-		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatAdded: %d - %s\n", n.Name, engineName, seat, accountID)
-	})
-
-	events.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
-		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatRemoved: %d\n", n.Name, engineName, seat)
-	})
-
-	events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictCreated: %s\n", n.Name, engineName, conflictID)
-	})
-
-	events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictEvicted: %s\n", n.Name, engineName, conflictID)
-	})
-	events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictRejected: %s\n", n.Name, engineName, conflictID)
-	})
-
-	events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
-	})
-
-	instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
-		fmt.Printf("%s > [%s] Ledger.TransactionAttached: %s\n", n.Name, engineName, transactionMetadata.ID())
-
-		transactionMetadata.OnSolid(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionSolid: %s\n", n.Name, engineName, transactionMetadata.ID())
-		})
-
-		transactionMetadata.OnExecuted(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionExecuted: %s\n", n.Name, engineName, transactionMetadata.ID())
-		})
-
-		transactionMetadata.OnBooked(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionBooked: %s\n", n.Name, engineName, transactionMetadata.ID())
-		})
-
-		transactionMetadata.OnConflicting(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionConflicting: %s\n", n.Name, engineName, transactionMetadata.ID())
-		})
-
-		transactionMetadata.OnAccepted(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionAccepted: %s\n", n.Name, engineName, transactionMetadata.ID())
-		})
-
-		transactionMetadata.OnRejected(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionRejected: %s\n", n.Name, engineName, transactionMetadata.ID())
-		})
-
-		transactionMetadata.OnInvalid(func(err error) {
-			fmt.Printf("%s > [%s] MemPool.TransactionInvalid(%s): %s\n", n.Name, engineName, err, transactionMetadata.ID())
-		})
-
-		transactionMetadata.OnOrphaned(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionOrphaned: %s\n", n.Name, engineName, transactionMetadata.ID())
-		})
-
-		transactionMetadata.OnCommitted(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionCommitted: %s\n", n.Name, engineName, transactionMetadata.ID())
-		})
-
-		transactionMetadata.OnPending(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionPending: %s\n", n.Name, engineName, transactionMetadata.ID())
-		})
-	})
+	//events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
+	//})
+	//
+	//events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Index(), block.ProtocolBlock().SlotCommitmentID)
+	//})
+	//
+	//events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
+	//})
+	//
+	//events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+	//	fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
+	//})
+	//
+	//events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
+	//	fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
+	//})
+	//
+	//events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
+	//	fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatAdded: %d - %s\n", n.Name, engineName, seat, accountID)
+	//})
+	//
+	//events.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
+	//	fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatRemoved: %d\n", n.Name, engineName, seat)
+	//})
+	//
+	//events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
+	//	fmt.Printf("%s > [%s] ConflictDAG.ConflictCreated: %s\n", n.Name, engineName, conflictID)
+	//})
+	//
+	//events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
+	//	fmt.Printf("%s > [%s] ConflictDAG.ConflictEvicted: %s\n", n.Name, engineName, conflictID)
+	//})
+	//events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
+	//	fmt.Printf("%s > [%s] ConflictDAG.ConflictRejected: %s\n", n.Name, engineName, conflictID)
+	//})
+	//
+	//events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
+	//	fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
+	//})
+	//
+	//instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
+	//	fmt.Printf("%s > [%s] Ledger.TransactionAttached: %s\n", n.Name, engineName, transactionMetadata.ID())
+	//
+	//	transactionMetadata.OnSolid(func() {
+	//		fmt.Printf("%s > [%s] MemPool.TransactionSolid: %s\n", n.Name, engineName, transactionMetadata.ID())
+	//	})
+	//
+	//	transactionMetadata.OnExecuted(func() {
+	//		fmt.Printf("%s > [%s] MemPool.TransactionExecuted: %s\n", n.Name, engineName, transactionMetadata.ID())
+	//	})
+	//
+	//	transactionMetadata.OnBooked(func() {
+	//		fmt.Printf("%s > [%s] MemPool.TransactionBooked: %s\n", n.Name, engineName, transactionMetadata.ID())
+	//	})
+	//
+	//	transactionMetadata.OnConflicting(func() {
+	//		fmt.Printf("%s > [%s] MemPool.TransactionConflicting: %s\n", n.Name, engineName, transactionMetadata.ID())
+	//	})
+	//
+	//	transactionMetadata.OnAccepted(func() {
+	//		fmt.Printf("%s > [%s] MemPool.TransactionAccepted: %s\n", n.Name, engineName, transactionMetadata.ID())
+	//	})
+	//
+	//	transactionMetadata.OnRejected(func() {
+	//		fmt.Printf("%s > [%s] MemPool.TransactionRejected: %s\n", n.Name, engineName, transactionMetadata.ID())
+	//	})
+	//
+	//	transactionMetadata.OnInvalid(func(err error) {
+	//		fmt.Printf("%s > [%s] MemPool.TransactionInvalid(%s): %s\n", n.Name, engineName, err, transactionMetadata.ID())
+	//	})
+	//
+	//	transactionMetadata.OnOrphaned(func() {
+	//		fmt.Printf("%s > [%s] MemPool.TransactionOrphaned: %s\n", n.Name, engineName, transactionMetadata.ID())
+	//	})
+	//
+	//	transactionMetadata.OnCommitted(func() {
+	//		fmt.Printf("%s > [%s] MemPool.TransactionCommitted: %s\n", n.Name, engineName, transactionMetadata.ID())
+	//	})
+	//
+	//	transactionMetadata.OnPending(func() {
+	//		fmt.Printf("%s > [%s] MemPool.TransactionPending: %s\n", n.Name, engineName, transactionMetadata.ID())
+	//	})
+	//})
 }
 
 func (n *Node) Wait() {

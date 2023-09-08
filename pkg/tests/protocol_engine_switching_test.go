@@ -319,7 +319,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		manualPOA := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock2.ManualPOA)
 		manualPOA.SetOnline("node0", "node1", "node2", "node3", "node4", "node6", "node7")
 	}
-
 	// Merge the partitions
 	{
 		ts.MergePartitionsToMain()

@@ -1,10 +1,13 @@
 package slotattestation
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -147,6 +150,7 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (ads.Map[iotago.AccountID, *iot
 
 // AddAttestationFromValidationBlock adds an attestation from a block to the future attestations (beyond the attestation window).
 func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
+	fmt.Println("AddAttestationFromValidationBlock", block.ID())
 	// Only track validator blocks.
 	if _, isValidationBlock := block.ValidationBlock(); !isValidationBlock {
 		return
@@ -256,6 +260,7 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 
 	// Add all attestations to the tree and calculate the new cumulative weight.
 	for _, a := range attestations {
+		fmt.Println("pending attestation while committing", index, lo.PanicOnErr(a.BlockID(m.apiProvider.APIForSlot(index))))
 		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
 		if _, exists := m.committeeFunc(index).GetSeat(a.IssuerID); exists {
 			if err := tree.Set(a.IssuerID, a); err != nil {
@@ -273,6 +278,40 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	m.lastCommittedSlot = index
 
 	return m.lastCumulativeWeight, iotago.Identifier(tree.Root()), nil
+}
+
+// Rollback rolls back the component state as if the last committed slot was targetSlot.
+// It populates pendingAttestation store with previously committed attestations in order to create correct commitment in the future.
+// As it modifies in-memory storage, it should only be called on the target engine as calling it on a temporary component will have no effect.
+func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
+	m.commitmentMutex.RLock()
+	defer m.commitmentMutex.RUnlock()
+
+	if targetSlot > m.lastCommittedSlot {
+		return ierrors.Errorf("slot %d is newer than last committed slot %d", targetSlot, m.lastCommittedSlot)
+	}
+	attestationSlotIndex, isValid := m.computeAttestationCommitmentOffset(targetSlot)
+	if !isValid {
+		return nil
+	}
+
+	// We only need to export the committed attestations at targetSlot as these contain all the attestations for the
+	// slots of targetSlot - attestationCommitmentOffset to targetSlot. This is sufficient to reconstruct the pending attestations
+	// for targetSlot+1.
+	attestationsStorage, err := m.attestationsForSlot(targetSlot)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get attestations of slot %d", targetSlot)
+	}
+
+	if err = attestationsStorage.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
+		m.applyToPendingAttestations(value, attestationSlotIndex)
+
+		return nil
+	}); err != nil {
+		return ierrors.Wrapf(err, "failed to stream attestations of slot %d", targetSlot)
+	}
+
+	return nil
 }
 
 func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cutoffIndex iotago.SlotIndex, isValid bool) {
