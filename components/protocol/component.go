@@ -102,7 +102,7 @@ func provide(c *dig.Container) error {
 		}
 
 		return protocol.New(
-			Component.Logger(), // TODO: USE REAL LOGGER
+			Component.Logger().Named("Protocol"),
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
@@ -139,10 +139,6 @@ func provide(c *dig.Container) error {
 }
 
 func configure() error {
-	deps.Protocol.OnError(func(err error) {
-		Component.LogErrorf("Error in Protocol: %s", err)
-	})
-
 	deps.Protocol.OnBlockReceived(func(block *model.Block, source peer.ID) {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})

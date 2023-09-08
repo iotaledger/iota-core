@@ -19,7 +19,7 @@ func (t *TestSuite) AssertChainManagerIsSolid(nodes ...*mock.Node) {
 			latestCommitment := node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
 
 			if latestCommitment.ID() != latestChainCommitment.ID() {
-				return ierrors.Errorf("AssertChainManagerIsSolid: %s: latest commitment is not equal, expected %d, got %d", node.Name, latestCommitment.ID(), latestChainCommitment.ID())
+				return ierrors.Errorf("AssertChainManagerIsSolid: %s: latest commitment is not equal, expected %s, got %s", node.Name, latestCommitment.ID(), latestChainCommitment.ID())
 			}
 			if !latestChainCommitment.Solid().WasTriggered() {
 				return ierrors.Errorf("AssertChainManagerIsSolid: %s: is not solid", node.Name)

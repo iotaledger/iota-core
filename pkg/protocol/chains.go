@@ -36,7 +36,7 @@ func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
 		protocol:                  protocol,
 		EvictionState:             reactive.NewEvictionState[iotago.SlotIndex](),
-		mainChain:                 reactive.NewVariable[*Chain]().Init(NewChain(NewCommitment(protocol.MainEngineInstance().SyncManager.LatestCommitment(), true), protocol.MainEngineInstance())),
+		mainChain:                 reactive.NewVariable[*Chain](),
 		heaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
 		heaviestAttestedCandidate: reactive.NewVariable[*Chain](),
 		heaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
@@ -45,10 +45,12 @@ func newChains(protocol *Protocol) *Chains {
 		chainCreated:              event.New1[*Chain](),
 	}
 
-	c.publishLatestEngineCommitment(protocol.MainEngineInstance())
-	protocol.OnEngineCreated(c.publishLatestEngineCommitment)
+	protocol.HookConstructed(func() {
+		c.initMainChain()
+		c.initChainSwitching()
 
-	c.initChainSwitching()
+		protocol.OnEngineCreated(c.monitorLatestEngineCommitment)
+	})
 
 	return c
 }
@@ -67,6 +69,10 @@ func (c *Chains) PublishCommitment(commitment *model.Commitment) (commitmentMeta
 }
 
 func (c *Chains) Commitment(commitmentID iotago.CommitmentID, requestMissing ...bool) (commitment *Commitment, err error) {
+	if root := c.MainChain().Root(); root != nil && commitmentID == root.ID() {
+		return root, nil
+	}
+
 	commitmentRequest, exists := c.commitments.Get(commitmentID)
 	if !exists && lo.First(requestMissing) {
 		if commitmentRequest, err = c.requestCommitment(commitmentID, true); err != nil {
@@ -111,6 +117,45 @@ func (c *Chains) HeaviestAttestedCandidate() reactive.Variable[*Chain] {
 
 func (c *Chains) HeaviestVerifiedCandidate() reactive.Variable[*Chain] {
 	return c.heaviestVerifiedCandidate
+}
+
+func (c *Chains) initMainChain() {
+	mainEngine := c.protocol.MainEngineInstance()
+	rootCommitment := mainEngine.EarliestRootCommitment(mainEngine.Storage.Settings().LatestFinalizedSlot())
+
+	c.Evict(rootCommitment.Index())
+
+	c.mainChain.Set(NewChain(NewCommitment(rootCommitment, true), mainEngine))
+
+	for i := rootCommitment.Index() + 1; i <= mainEngine.Storage.Settings().LatestCommitment().Index(); i++ {
+		lo.PanicOnErr(c.PublishCommitment(lo.PanicOnErr(mainEngine.Storage.Commitments().Load(i))))
+	}
+
+	c.monitorLatestEngineCommitment(mainEngine)
+}
+
+func (c *Chains) initChainSwitching() {
+	c.heaviestClaimedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
+		if prevCandidate != nil {
+			prevCandidate.requestAttestations.Set(false)
+		}
+
+		newCandidate.requestAttestations.Set(true)
+	})
+
+	c.heaviestAttestedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
+		if prevCandidate != nil {
+			prevCandidate.engine.instantiate.Set(false)
+		}
+
+		newCandidate.engine.instantiate.Set(true)
+	})
+
+	c.OnChainCreated(func(chain *Chain) {
+		c.trackHeaviestCandidate(c.heaviestClaimedCandidate, (*Chain).ClaimedWeight, chain)
+		c.trackHeaviestCandidate(c.heaviestAttestedCandidate, (*Chain).AttestedWeight, chain)
+		c.trackHeaviestCandidate(c.heaviestVerifiedCandidate, (*Chain).VerifiedWeight, chain)
+	})
 }
 
 func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
@@ -171,7 +216,7 @@ func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFrom
 	return commitmentRequest, nil
 }
 
-func (c *Chains) publishLatestEngineCommitment(engine *engine.Engine) {
+func (c *Chains) monitorLatestEngineCommitment(engine *engine.Engine) {
 	unsubscribe := engine.Events.Notarization.LatestCommitmentUpdated.Hook(func(modelCommitment *model.Commitment) {
 		commitment, err := c.PublishCommitment(modelCommitment)
 		if err != nil {
@@ -184,30 +229,6 @@ func (c *Chains) publishLatestEngineCommitment(engine *engine.Engine) {
 	}).Unhook
 
 	engine.HookShutdown(unsubscribe)
-}
-
-func (c *Chains) initChainSwitching() {
-	c.heaviestClaimedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
-		if prevCandidate != nil {
-			prevCandidate.requestAttestations.Set(false)
-		}
-
-		newCandidate.requestAttestations.Set(true)
-	})
-
-	c.heaviestAttestedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
-		if prevCandidate != nil {
-			prevCandidate.engine.instantiate.Set(false)
-		}
-
-		newCandidate.engine.instantiate.Set(true)
-	})
-
-	c.OnChainCreated(func(chain *Chain) {
-		c.trackHeaviestCandidate(c.heaviestClaimedCandidate, (*Chain).ClaimedWeight, chain)
-		c.trackHeaviestCandidate(c.heaviestAttestedCandidate, (*Chain).AttestedWeight, chain)
-		c.trackHeaviestCandidate(c.heaviestVerifiedCandidate, (*Chain).VerifiedWeight, chain)
-	})
 }
 
 func (c *Chains) trackHeaviestCandidate(candidateVariable reactive.Variable[*Chain], chainWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) {

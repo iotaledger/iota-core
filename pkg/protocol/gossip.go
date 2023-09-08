@@ -97,6 +97,8 @@ func (r *Gossip) ProcessBlockRequest(blockID iotago.BlockID, src peer.ID) {
 	block, exists := r.protocol.MainEngineInstance().Block(blockID)
 	if !exists {
 		r.LogDebug(ierrors.Errorf("requested block %s not found", blockID))
+
+		return
 	}
 
 	r.protocol.SendBlock(block, src)

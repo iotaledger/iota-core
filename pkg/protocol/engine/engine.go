@@ -235,6 +235,8 @@ func (e *Engine) Shutdown() {
 		e.Retainer.Shutdown()
 		e.Storage.Shutdown()
 		e.Workers.Shutdown()
+
+		e.TriggerStopped()
 	}
 }
 

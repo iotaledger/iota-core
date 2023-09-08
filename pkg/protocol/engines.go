@@ -51,7 +51,11 @@ func newEngines(protocol *Protocol) *Engines {
 	if mainEngine, err := e.EngineManager.LoadActiveEngine(protocol.options.SnapshotPath); err != nil {
 		panic(fmt.Sprintf("could not load active engine: %s", err))
 	} else {
+		mainEngine.SetChainID(mainEngine.EarliestRootCommitment(mainEngine.Storage.Settings().LatestFinalizedSlot()).ID())
+
 		e.mainEngine.Set(mainEngine)
+
+		protocol.HookStopped(mainEngine.Shutdown)
 	}
 
 	protocol.HookConstructed(func() {
