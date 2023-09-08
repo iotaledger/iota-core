@@ -19,9 +19,7 @@ func newEngines(protocol *Protocol) *Engines {
 	e := &Engines{
 		EngineManager: enginemanager.New(
 			protocol.Workers,
-			func(err error) {
-				fmt.Println(err)
-			},
+			func(err error) { protocol.LogError(err) },
 			protocol.options.BaseDirectory,
 			3,
 			protocol.options.StorageOptions,
@@ -55,7 +53,7 @@ func newEngines(protocol *Protocol) *Engines {
 
 		e.mainEngine.Set(mainEngine)
 
-		protocol.HookStopped(mainEngine.Shutdown)
+		protocol.Network.HookStopped(mainEngine.Shutdown)
 	}
 
 	protocol.HookConstructed(func() {

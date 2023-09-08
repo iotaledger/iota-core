@@ -135,8 +135,6 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 	})
 
 	go func() {
-		defer n.ctxCancel()
-
 		if err := n.Protocol.Run(n.ctx); err != nil {
 			fmt.Printf("%s > Run finished with error: %s\n", n.Name, err.Error())
 		}
