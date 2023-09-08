@@ -1,13 +1,10 @@
 package slotattestation
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -150,7 +147,6 @@ func (m *Manager) GetMap(index iotago.SlotIndex) (ads.Map[iotago.AccountID, *iot
 
 // AddAttestationFromValidationBlock adds an attestation from a block to the future attestations (beyond the attestation window).
 func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
-	fmt.Println("AddAttestationFromValidationBlock", block.ID())
 	// Only track validator blocks.
 	if _, isValidationBlock := block.ValidationBlock(); !isValidationBlock {
 		return
@@ -260,7 +256,6 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 
 	// Add all attestations to the tree and calculate the new cumulative weight.
 	for _, a := range attestations {
-		fmt.Println("pending attestation while committing", index, lo.PanicOnErr(a.BlockID(m.apiProvider.APIForSlot(index))))
 		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
 		if _, exists := m.committeeFunc(index).GetSeat(a.IssuerID); exists {
 			if err := tree.Set(a.IssuerID, a); err != nil {

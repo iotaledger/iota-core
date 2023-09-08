@@ -155,6 +155,9 @@ func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex, lastCommittedIndex
 	}
 	pointOfNoReturn := timeProvider.EpochEnd(targetSlotEpoch) - p.apiProvider.APIForSlot(targetSlotIndex).ProtocolParameters().MaxCommittableAge()
 
+	// Shutdown prunable slot store in order to flush and get consistent state on disk after reopening.
+	p.prunableSlotStore.Shutdown()
+
 	for epochIdx := lastCommittedEpoch + 1; ; epochIdx++ {
 		// only remove if epochIdx bigger than epoch of target slot index
 		if epochIdx > targetSlotEpoch {
@@ -167,7 +170,6 @@ func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex, lastCommittedIndex
 			if err := os.RemoveAll(dbPathFromIndex(p.prunableSlotStore.dbConfig.Directory, epochIdx)); err != nil {
 				return ierrors.Wrapf(err, "failed to remove bucket directory in forkedPrunable storage for epoch %d", epochIdx)
 			}
-
 		}
 		// Remove entries for epochs bigger or equal epochFromSlot(forkingPoint+1) in semiPermanent storage.
 		// Those entries are part of the fork and values from the old storage should not be used
