@@ -25,7 +25,7 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230905220648-a178ca76a3a3
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230829161228-3f4eb50a4d14
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230829160617-69b96c7c9f9b
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230831045805-6473f44f73a1
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230908073546-4fbdf7ebba1f
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.30.0

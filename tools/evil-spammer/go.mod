@@ -17,7 +17,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230905220648-a178ca76a3a3
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230831045805-6473f44f73a1
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230908073546-4fbdf7ebba1f
 	github.com/mr-tron/base58 v1.2.0
 	go.uber.org/atomic v1.11.0
 )
