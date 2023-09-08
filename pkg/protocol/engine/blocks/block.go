@@ -661,3 +661,7 @@ func (b *Block) ModelBlock() *model.Block {
 func (b *Block) WorkScore() iotago.WorkScore {
 	return b.workScore
 }
+
+func (b *Block) API() iotago.API {
+	return b.modelBlock.API()
+}

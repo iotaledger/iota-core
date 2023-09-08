@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // NewProvider creates a new TipSelection provider, that can be used to inject the component into an engine.
@@ -21,7 +20,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 		e.HookConstructed(func() {
 			// wait for submodules to be constructed (so all of their properties are available)
 			module.OnAllConstructed(func() {
-				t.Construct(e.TipManager, e.Ledger.ConflictDAG(), e.Ledger.MemPool().TransactionMetadata, e.EvictionState.LatestRootBlocks, DynamicLivenessThreshold(e, e.SybilProtection.SeatManager().OnlineCommittee().Size))
+				t.Construct(e.TipManager, e.Ledger.ConflictDAG(), e.Ledger.MemPool().TransactionMetadata, e.EvictionState.LatestRootBlocks, DynamicLivenessThreshold(e.SybilProtection.SeatManager().OnlineCommittee().Size))
 
 				e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
 					t.SetAcceptanceTime(block.IssuingTime())
@@ -36,13 +35,14 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 }
 
 // DynamicLivenessThreshold returns a function that calculates the liveness threshold for a tip.
-func DynamicLivenessThreshold(apiProvider api.Provider, committeeSizeProvider func() int) func(tip tipmanager.TipMetadata) time.Duration {
+func DynamicLivenessThreshold(committeeSizeProvider func() int) func(tip tipmanager.TipMetadata) time.Duration {
 	return func(tip tipmanager.TipMetadata) time.Duration {
 		var (
-			params                      = apiProvider.APIForSlot(tip.Block().ID().Index()).ProtocolParameters()
+			params                      = tip.Block().API().ProtocolParameters()
 			livenessThresholdLowerBound = params.LivenessThresholdLowerBound()
 			livenessWindow              = float64(params.LivenessThresholdUpperBound() - livenessThresholdLowerBound)
-			approvalModifier            = math.Min(float64(tip.Block().WitnessCount())/float64(committeeSizeProvider())/3.0, 1.0)
+			expectedWitnessCount        = math.Ceil(float64(committeeSizeProvider()) / 3.0)
+			approvalModifier            = math.Min(float64(tip.Block().WitnessCount())/expectedWitnessCount, 1.0)
 		)
 
 		return livenessThresholdLowerBound + time.Duration(approvalModifier*livenessWindow)

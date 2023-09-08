@@ -147,3 +147,7 @@ func (blk *Block) WorkScore() iotago.WorkScore {
 	return iotago.WorkScore(0)
 
 }
+
+func (blk *Block) API() iotago.API {
+	return blk.api
+}

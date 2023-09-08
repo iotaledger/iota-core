@@ -22,8 +22,9 @@ type TestFramework struct {
 	test          *testing.T
 	createdBlocks map[iotago.BlockID]*blocks.Block
 
-	optCommitteeSize     int
-	optLivenessThreshold func(tipmanager.TipMetadata) time.Duration
+	expectedLivenessDuration func(tip tipmanager.TipMetadata) time.Duration
+
+	optCommitteeSize int
 }
 
 func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) *TestFramework {
@@ -31,11 +32,9 @@ func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) *T
 		test:             test,
 		createdBlocks:    make(map[iotago.BlockID]*blocks.Block),
 		optCommitteeSize: 10,
-		optLivenessThreshold: func(tipmanager.TipMetadata) time.Duration {
-			// TODO: implement default
-			return 0
-		},
 	}, opts, func(t *TestFramework) {
+		t.expectedLivenessDuration = tipselectionv1.DynamicLivenessThreshold(func() int { return t.optCommitteeSize })
+
 		transactionMetadataRetriever := func(iotago.TransactionID) (mempool.TransactionMetadata, bool) {
 			return nil, false
 		}
@@ -51,9 +50,27 @@ func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) *T
 			conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](t.CommitteeSize),
 			transactionMetadataRetriever,
 			rootBlocksRetriever,
-			t.optLivenessThreshold,
+			t.expectedLivenessDuration,
 		)
 	})
+}
+
+func (t *TestFramework) LowerLivenessThreshold(alias string) time.Time {
+	block := t.TipManager.Block(alias)
+
+	return block.IssuingTime().Add(block.API().ProtocolParameters().LivenessThresholdLowerBound())
+}
+
+func (t *TestFramework) UpperLivenessThreshold(alias string) time.Time {
+	block := t.TipManager.Block(alias)
+
+	return block.IssuingTime().Add(block.API().ProtocolParameters().LivenessThresholdUpperBound())
+}
+
+func (t *TestFramework) ExpectedLivenessThreshold(alias string) time.Time {
+	tipMetadata := t.TipManager.TipMetadata(alias)
+
+	return tipMetadata.Block().IssuingTime().Add(t.expectedLivenessDuration(tipMetadata))
 }
 
 func (t *TestFramework) CommitteeSize() int {
