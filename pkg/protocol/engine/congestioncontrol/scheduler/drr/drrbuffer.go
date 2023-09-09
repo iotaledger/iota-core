@@ -20,9 +20,6 @@ var ErrInsufficientMana = ierrors.New("insufficient issuer's mana to schedule th
 
 // BufferQueue represents a buffer of IssuerQueue.
 type BufferQueue struct {
-	// maxBuffer is the maximum buffer size in number of blocks.
-	maxBuffer int
-
 	activeIssuers *shrinkingmap.ShrinkingMap[iotago.AccountID, *ring.Ring]
 	ring          *ring.Ring
 	// size is the number of blocks in the buffer.
@@ -35,9 +32,8 @@ type BufferQueue struct {
 }
 
 // NewBufferQueue returns a new BufferQueue.
-func NewBufferQueue(maxBuffer int) *BufferQueue {
+func NewBufferQueue() *BufferQueue {
 	return &BufferQueue{
-		maxBuffer:        maxBuffer,
 		activeIssuers:    shrinkingmap.New[iotago.AccountID, *ring.Ring](),
 		ring:             nil,
 		lastScheduleTime: time.Now(),
@@ -48,11 +44,6 @@ func NewBufferQueue(maxBuffer int) *BufferQueue {
 // NumActiveIssuers returns the number of active issuers in b.
 func (b *BufferQueue) NumActiveIssuers() int {
 	return b.activeIssuers.Size()
-}
-
-// MaxSize returns the max number of blocks in BufferQueue.
-func (b *BufferQueue) MaxSize() int {
-	return b.maxBuffer
 }
 
 // Size returns the total number of blocks in BufferQueue.
@@ -97,28 +88,28 @@ func (b *BufferQueue) GetIssuerQueue(issuerID iotago.AccountID) (*IssuerQueue, e
 
 // Submit submits a block. Return blocks dropped from the scheduler to make room for the submitted block.
 // The submitted block can also be returned as dropped if the issuer does not have enough mana.
-func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantumFunc func(iotago.AccountID) Deficit) (elements []*blocks.Block, err error) {
+func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantumFunc func(iotago.AccountID) Deficit, maxBuffer int) ([]*blocks.Block, bool) {
 
 	// first we submit the block, and if it turns out that the issuer doesn't have enough bandwidth to submit, it will be removed by dropTail
 	if !issuerQueue.Submit(blk) {
-		return nil, ierrors.Errorf("block already submitted %s", blk)
+		return nil, false
 	}
 
 	b.size++
 
 	// if max buffer size exceeded, drop from tail of the longest mana-scaled queue
-	if b.Size() > b.maxBuffer {
-		return b.dropTail(quantumFunc), nil
+	if b.Size() > maxBuffer {
+		return b.dropTail(quantumFunc, maxBuffer), true
 	}
 
-	return nil, nil
+	return nil, true
 }
 
-func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) Deficit) (droppedBlocks []*blocks.Block) {
+func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) Deficit, maxBuffer int) (droppedBlocks []*blocks.Block) {
 	start := b.Current()
 	ringStart := b.ring
 	// remove as many blocks as necessary to stay within max buffer size
-	for b.Size() > b.maxBuffer {
+	for b.Size() > maxBuffer {
 		// TODO: extract to util func
 		// find longest mana-scaled queue
 		maxScale := math.Inf(-1)

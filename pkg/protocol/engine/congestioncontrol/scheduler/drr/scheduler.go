@@ -54,7 +54,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 	return module.Provide(func(e *engine.Engine) scheduler.Scheduler {
 		s := New(e, opts...)
 		s.errorHandler = e.ErrorHandler("scheduler")
-		s.basicBuffer = NewBufferQueue(int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize))
+		s.basicBuffer = NewBufferQueue()
 
 		e.HookConstructed(func() {
 			s.latestCommittedSlot = func() iotago.SlotIndex {
@@ -246,23 +246,28 @@ func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
 		issuerQueue = s.createIssuer(issuerID)
 	}
 
-	droppedBlocks, err := s.basicBuffer.Submit(block, issuerQueue, func(issuerID iotago.AccountID) Deficit {
-		quantum, quantumErr := s.quantumFunc(issuerID, slotIndex)
-		if quantumErr != nil {
-			s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve deficit for issuerID %d in slot %d when submitting a block", issuerID, slotIndex))
+	droppedBlocks, submitted := s.basicBuffer.Submit(
+		block,
+		issuerQueue,
+		func(issuerID iotago.AccountID) Deficit {
+			quantum, quantumErr := s.quantumFunc(issuerID, slotIndex)
+			if quantumErr != nil {
+				s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve deficit for issuerID %d in slot %d when submitting a block", issuerID, slotIndex))
 
-			return 0
-		}
+				return 0
+			}
 
-		return quantum
-	})
+			return quantum
+		},
+		int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize),
+	)
 	// error submitting indicates that the block was already submitted so we do nothing else.
-	if err != nil {
+	if !submitted {
 		return
 	}
 	for _, b := range droppedBlocks {
 		b.SetDropped()
-		s.events.BlockDropped.Trigger(b, ierrors.New("block dropped from buffer"))
+		s.events.BlockDropped.Trigger(b, ierrors.New("basic block dropped from buffer"))
 	}
 	if block.SetEnqueued() {
 		s.events.BlockEnqueued.Trigger(block)
@@ -278,14 +283,19 @@ func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
 	if !exists {
 		validatorQueue = s.addValidator(block.ProtocolBlock().IssuerID)
 	}
-	validatorQueue.Submit(block)
+	droppedBlock, submitted := validatorQueue.Submit(block, int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize))
+	if !submitted {
+		return
+	}
+	if droppedBlock != nil {
+		droppedBlock.SetDropped()
+		s.events.BlockDropped.Trigger(droppedBlock, ierrors.New("validation block dropped from buffer"))
+	}
 
 	if block.SetEnqueued() {
 		s.events.BlockEnqueued.Trigger(block)
 		s.tryReadyValidationBlock(block)
 	}
-
-	//s.scheduleValidationBlock(block)
 }
 
 func (s *Scheduler) basicBlockLoop() {

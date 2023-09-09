@@ -31,10 +31,12 @@ type ValidatorQueue struct {
 
 func NewValidatorQueue(accountID iotago.AccountID) *ValidatorQueue {
 	return &ValidatorQueue{
-		accountID:      accountID,
-		submitted:      shrinkingmap.New[iotago.BlockID, *blocks.Block](),
-		blockChan:      make(chan *blocks.Block, 1),
-		shutdownSignal: make(chan struct{}),
+		accountID:        accountID,
+		submitted:        shrinkingmap.New[iotago.BlockID, *blocks.Block](),
+		blockChan:        make(chan *blocks.Block, 1),
+		shutdownSignal:   make(chan struct{}),
+		tokenBucket:      1,
+		lastScheduleTime: time.Now(),
 	}
 }
 
@@ -50,19 +52,23 @@ func (q *ValidatorQueue) AccountID() iotago.AccountID {
 	return q.accountID
 }
 
-func (q *ValidatorQueue) Submit(block *blocks.Block) bool {
+func (q *ValidatorQueue) Submit(block *blocks.Block, maxBuffer int) (*blocks.Block, bool) {
 	if blkAccountID := block.ProtocolBlock().IssuerID; q.accountID != blkAccountID {
 		panic(fmt.Sprintf("issuerqueue: queue issuer ID(%x) and issuer ID(%x) does not match.", q.accountID, blkAccountID))
 	}
 
 	if _, submitted := q.submitted.Get(block.ID()); submitted {
-		return false
+		return nil, false
 	}
 
 	q.submitted.Set(block.ID(), block)
 	q.size.Inc()
 
-	return true
+	if int(q.size.Load()) > maxBuffer {
+		return q.RemoveTail(), true
+	}
+
+	return nil, true
 }
 
 func (q *ValidatorQueue) Unsubmit(block *blocks.Block) bool {
