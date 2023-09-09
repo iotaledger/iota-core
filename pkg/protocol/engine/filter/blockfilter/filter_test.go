@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -68,6 +69,30 @@ func (t *TestFramework) IssueUnsignedBlockAtTime(alias string, issuingTime time.
 	return t.processBlock(alias, block)
 }
 
+func (t *TestFramework) IssueValidationBlockAtTime(alias string, issuingTime time.Time, validatorAccountID iotago.AccountID) error {
+	version := t.apiProvider.LatestAPI().ProtocolParameters().Version()
+	block, err := builder.NewValidationBlockBuilder(t.apiProvider.LatestAPI()).
+		StrongParents(iotago.BlockIDs{tpkg.RandBlockID()}).
+		HighestSupportedVersion(version).
+		Sign(validatorAccountID, tpkg.RandEd25519PrivateKey()).
+		IssuingTime(issuingTime).
+		Build()
+	require.NoError(t.Test, err)
+
+	return t.processBlock(alias, block)
+}
+
+func mockedCommitteeFunc(validatorAccountID iotago.AccountID) func(iotago.SlotIndex) *account.SeatedAccounts {
+	mockedAccounts := account.NewAccounts()
+	mockedAccounts.Set(validatorAccountID, new(account.Pool))
+	seatedAccounts := account.NewSeatedAccounts(mockedAccounts)
+	seatedAccounts.Set(account.SeatIndex(0), validatorAccountID)
+
+	return func(slotIndex iotago.SlotIndex) *account.SeatedAccounts {
+		return seatedAccounts
+	}
+}
+
 func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 	allowedDrift := 3 * time.Second
 
@@ -91,4 +116,31 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 	require.NoError(t, tf.IssueUnsignedBlockAtTime("present", time.Now()))
 	require.NoError(t, tf.IssueUnsignedBlockAtTime("acceptedFuture", time.Now().Add(allowedDrift)))
 	require.NoError(t, tf.IssueUnsignedBlockAtTime("tooFarAheadFuture", time.Now().Add(allowedDrift).Add(1*time.Second)))
+}
+
+func TestFilter_ValidationBlocks(t *testing.T) {
+	testAPI := tpkg.TestAPI
+
+	tf := NewTestFramework(t,
+		api.SingleVersionProvider(testAPI),
+	)
+
+	validatorAccountID := tpkg.RandAccountID()
+	nonValidatorAccountID := tpkg.RandAccountID()
+
+	tf.Filter.committeeFunc = mockedCommitteeFunc(validatorAccountID)
+
+	tf.Filter.events.BlockPreAllowed.Hook(func(block *model.Block) {
+		require.Equal(t, "validator", block.ID().Alias())
+		require.NotEqual(t, "nonValidator", block.ID().Alias())
+	})
+
+	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+		require.NotEqual(t, "validator", event.Block.ID().Alias())
+		require.Equal(t, "nonValidator", event.Block.ID().Alias())
+		require.True(t, ierrors.Is(event.Reason, ErrValidatorNotInCommittee))
+	})
+
+	require.NoError(t, tf.IssueValidationBlockAtTime("validator", time.Now(), validatorAccountID))
+	require.NoError(t, tf.IssueValidationBlockAtTime("nonValidator", time.Now(), nonValidatorAccountID))
 }

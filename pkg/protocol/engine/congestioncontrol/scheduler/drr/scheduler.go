@@ -36,7 +36,7 @@ type Scheduler struct {
 	seatManager seatmanager.SeatManager
 
 	basicBuffer     *BufferQueue
-	validatorBuffer map[iotago.AccountID]*ValidatorQueue
+	validatorBuffer *shrinkingmap.ShrinkingMap[iotago.AccountID, *ValidatorQueue]
 	bufferMutex     syncutils.RWMutex
 
 	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, Deficit]
@@ -71,12 +71,14 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 					s.bufferMutex.Lock()
 					defer s.bufferMutex.Unlock()
 
-					for accountID, validatorQueue := range s.validatorBuffer {
+					s.validatorBuffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 						if !s.seatManager.Committee(commitment.Index() + 1).HasAccount(accountID) {
 							s.shutdownValidatorQueue(validatorQueue)
-							delete(s.validatorBuffer, accountID)
+							s.validatorBuffer.Delete(accountID)
 						}
-					}
+
+						return true
+					})
 				}
 			})
 			e.Ledger.HookInitialized(func() {
@@ -127,15 +129,17 @@ func New(apiProvider api.Provider, opts ...options.Option[Scheduler]) *Scheduler
 			events:          scheduler.NewEvents(),
 			deficits:        shrinkingmap.New[iotago.AccountID, Deficit](),
 			apiProvider:     apiProvider,
-			validatorBuffer: make(map[iotago.AccountID]*ValidatorQueue),
+			validatorBuffer: shrinkingmap.New[iotago.AccountID, *ValidatorQueue](),
 		}, opts,
 	)
 }
 
 func (s *Scheduler) Shutdown() {
-	for _, validatorQueue := range s.validatorBuffer {
+	s.validatorBuffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 		s.shutdownValidatorQueue(validatorQueue)
-	}
+
+		return true
+	})
 	close(s.shutdownSignal)
 	s.TriggerStopped()
 }
@@ -216,8 +220,7 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 }
 
 func (s *Scheduler) AddBlock(block *blocks.Block) {
-	// TODO: can we remove the check for committee membership here? It should be checked before this in the accounts filter perhaps.
-	if _, isValidation := block.ValidationBlock(); isValidation && s.seatManager.Committee(block.ID().Index()).HasAccount(block.ProtocolBlock().IssuerID) {
+	if _, isValidation := block.ValidationBlock(); isValidation {
 		s.enqueueValidationBlock(block)
 	} else if _, isBasic := block.BasicBlock(); isBasic {
 		s.enqueueBasicBlock(block)
@@ -271,7 +274,7 @@ func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	validatorQueue, exists := s.validatorBuffer[block.ProtocolBlock().IssuerID]
+	validatorQueue, exists := s.validatorBuffer.Get(block.ProtocolBlock().IssuerID)
 	if !exists {
 		validatorQueue = s.addValidator(block.ProtocolBlock().IssuerID)
 	}
@@ -308,7 +311,7 @@ loop:
 	}
 }
 
-func (s *Scheduler) ValidatorLoop(validatorQueue *ValidatorQueue) {
+func (s *Scheduler) validatorLoop(validatorQueue *ValidatorQueue) {
 	var blockToSchedule *blocks.Block
 loop:
 	for {
@@ -363,9 +366,11 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	for _, validatorQueue := range s.validatorBuffer {
+	s.validatorBuffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 		s.selectValidationBlockWithoutLocking(validatorQueue)
-	}
+
+		return true
+	})
 	s.selectBasicBlockWithoutLocking()
 
 }
@@ -634,7 +639,7 @@ func (s *Scheduler) ready(block *blocks.Block) {
 }
 
 func (s *Scheduler) readyValidationBlock(block *blocks.Block) {
-	if validatorQueue, exists := s.validatorBuffer[block.ProtocolBlock().IssuerID]; exists {
+	if validatorQueue, exists := s.validatorBuffer.Get(block.ProtocolBlock().IssuerID); exists {
 		validatorQueue.Ready(block)
 	}
 }
@@ -675,10 +680,11 @@ func (s *Scheduler) deficitFromWork(work iotago.WorkScore) Deficit {
 }
 
 func (s *Scheduler) addValidator(accountID iotago.AccountID) *ValidatorQueue {
-	s.validatorBuffer[accountID] = NewValidatorQueue(accountID)
-	go s.ValidatorLoop(s.validatorBuffer[accountID])
+	validatorQueue := NewValidatorQueue(accountID)
+	s.validatorBuffer.Set(accountID, validatorQueue)
+	go s.validatorLoop(validatorQueue)
 
-	return s.validatorBuffer[accountID]
+	return validatorQueue
 }
 
 func (s *Scheduler) shutdownValidatorQueue(validatorQueue *ValidatorQueue) {
