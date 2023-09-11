@@ -145,7 +145,7 @@ func CheckEngine(dbPath string, createDatabaseIfNotExists bool, dbEngine hivedb.
 			//nolint:stylecheck,revive // this error message is shown to the user
 			return hivedb.EngineUnknown, ierrors.Errorf(`database (%s) engine does not match the configuration: '%v' != '%v'
 
-			If you want to use another database engine, you can use the tool './iota-core tool db-migration' to convert the current database.`, dbPath, targetEngine, dbEngine[0])
+			If you want to use another database engine, you can use the tool './iota-core tool db-migration' to convert the current database.`, dbPath, targetEngine, dbEngine)
 		}
 
 		return hivedb.EngineUnknown, err

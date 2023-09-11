@@ -1,16 +1,17 @@
 package chainmanager
 
 import (
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type ChainID = iotago.CommitmentID
 
 type Fork struct {
-	Source               network.PeerID
+	Source               peer.ID
 	MainChain            *Chain
 	ForkedChain          *Chain
 	ForkingPoint         *model.Commitment

@@ -2,20 +2,21 @@ package protocol
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/labstack/gommon/bytes"
 	"go.uber.org/dig"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/hive.go/autopeering/peer"
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
@@ -55,15 +56,48 @@ var (
 type dependencies struct {
 	dig.In
 
-	Peer     *peer.Local
 	Protocol *protocol.Protocol
+}
+
+type jsonProtocolParameters struct {
+	ProtocolParameters []iotago.ProtocolParameters `serix:"0,mapKey=protocolParameters"`
+}
+
+func readProtocolParameters() []iotago.ProtocolParameters {
+	fileBytes, err := os.ReadFile(ParamsProtocol.ProtocolParametersPath)
+	if err != nil {
+		Component.LogInfof("No protocol parameters file (%s) found, skipping import: %s", ParamsProtocol.ProtocolParametersPath, err)
+		return nil
+	}
+
+	parsedParams := &jsonProtocolParameters{}
+	if err := iotago.CommonSerixAPI().JSONDecode(context.Background(), fileBytes, parsedParams); err != nil {
+		Component.LogWarnf("Error parsing protocol parameters file (%s): %s", ParamsProtocol.ProtocolParametersPath, err)
+		return nil
+	}
+
+	return parsedParams.ProtocolParameters
+}
+
+func resetProtocolParameters() {
+	bytesToWrite, err := iotago.CommonSerixAPI().JSONEncode(context.Background(), jsonProtocolParameters{})
+	if err != nil {
+		Component.LogInfof("Error writing protocol parameters file (%s): %s", ParamsProtocol.ProtocolParametersPath, err)
+		return
+	}
+
+	if err := os.WriteFile(ParamsProtocol.ProtocolParametersPath, bytesToWrite, 0600); err != nil {
+		Component.LogInfof("Error writing protocol parameters file (%s): %s", ParamsProtocol.ProtocolParametersPath, err)
+		return
+	}
 }
 
 func initConfigParams(c *dig.Container) error {
 	type cfgResult struct {
 		dig.Out
-		DatabaseEngine hivedb.Engine `name:"databaseEngine"`
-		BaseToken      *BaseToken
+		DatabaseEngine     hivedb.Engine `name:"databaseEngine"`
+		BaseToken          *BaseToken
+		ProtocolParameters []iotago.ProtocolParameters
 	}
 
 	if err := c.Provide(func() cfgResult {
@@ -73,8 +107,9 @@ func initConfigParams(c *dig.Container) error {
 		}
 
 		return cfgResult{
-			DatabaseEngine: dbEngine,
-			BaseToken:      &ParamsProtocol.BaseToken,
+			DatabaseEngine:     dbEngine,
+			BaseToken:          &ParamsProtocol.BaseToken,
+			ProtocolParameters: readProtocolParameters(),
 		}
 	}); err != nil {
 		Component.LogPanic(err)
@@ -87,8 +122,9 @@ func provide(c *dig.Container) error {
 	type protocolDeps struct {
 		dig.In
 
-		DatabaseEngine hivedb.Engine `name:"databaseEngine"`
-		P2PManager     *p2p.Manager
+		DatabaseEngine     hivedb.Engine `name:"databaseEngine"`
+		ProtocolParameters []iotago.ProtocolParameters
+		P2PManager         *p2p.Manager
 	}
 
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
@@ -132,8 +168,9 @@ func provide(c *dig.Container) error {
 					blockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
 				),
 			),
-			// TODO: here we should pass the protocol parameters from the config.
-			protocol.WithUpgradeOrchestratorProvider(signalingupgradeorchestrator.NewProvider()),
+			protocol.WithUpgradeOrchestratorProvider(
+				signalingupgradeorchestrator.NewProvider(signalingupgradeorchestrator.WithProtocolParameters(deps.ProtocolParameters...)),
+			),
 		)
 	})
 }
@@ -143,11 +180,11 @@ func configure() error {
 		Component.LogErrorf("Error in Protocol: %s", err)
 	})
 
-	deps.Protocol.Events.Network.Error.Hook(func(err error, id network.PeerID) {
+	deps.Protocol.Events.Network.Error.Hook(func(err error, id peer.ID) {
 		Component.LogErrorf("NetworkError: %s Source: %s", err.Error(), id)
 	})
 
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source network.PeerID) {
+	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source peer.ID) {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})
 
@@ -243,11 +280,11 @@ func configure() error {
 		Component.LogDebugf("RequestCommitment: %s", id)
 	})
 
-	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id network.PeerID) {
+	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentRequestReceived: %s", commitmentID)
 	})
 
-	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id network.PeerID) {
+	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentReceived: %s", commitment.ID())
 	})
 
@@ -271,11 +308,8 @@ func configure() error {
 		Component.LogWarnf("OnlineCommitteeSeatRemoved: seatIndex: %d", seatIndex)
 	})
 
-	// TODO: create a transaction invalid event in the booker instead of hooking to a specific engine instance
-	deps.Protocol.MainEngineInstance().Ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
-		transaction.OnInvalid(func(err error) {
-			Component.LogWarnf("TransactionInvalid: transaction %s - %s", transaction.ID(), err.Error())
-		})
+	deps.Protocol.Events.Engine.Booker.TransactionInvalid.Hook(func(transaction mempool.TransactionMetadata, reason error) {
+		Component.LogWarnf("TransactionInvalid: transaction %s - %s", transaction.ID(), reason.Error())
 	})
 
 	return nil
@@ -288,6 +322,10 @@ func run() error {
 				Component.LogErrorfAndExit("Error running the Protocol: %s", err.Error())
 			}
 		}
+
+		//nolint:contextcheck // context might be canceled
+		resetProtocolParameters()
+
 		Component.LogInfo("Gracefully shutting down the Protocol...")
 	}, daemon.PriorityProtocol)
 }

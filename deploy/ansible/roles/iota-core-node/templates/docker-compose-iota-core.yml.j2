@@ -18,7 +18,7 @@ services:
       # prometheus
       - "0.0.0.0:9311:9311/tcp"
     environment:
-      - P2P_BINDADDRESS=0.0.0.0:14666
+      - P2P_BINDMULTIADDRESSES=/ip4/0.0.0.0/tcp/14666
       - WEBAPI_BINDADDRESS=0.0.0.0:8080
       - DASHBOARD_BINDADDRESS=0.0.0.0:8081
       - PROFILING_BINDADDRESS=0.0.0.0:6061
@@ -30,18 +30,26 @@ services:
       --logger.encoding=console
       --logger.outputPaths=stdout
       --database.path=/app/data/database
-      --p2p.peerDBDirectory=/app/data/peerdb
+      --p2p.db.path=/app/data/peerdb
       --profiling.bindAddress=0.0.0.0:6061
       --profiling.enabled=true
       --protocol.snapshot.path=/app/data/snapshot.bin
       --restAPI.allowIncompleteBlock=true
-      {% if 'node-01' in inventory_hostname %}
-      --activity.ignoreBootstrapped=true
+      {% if 'node-01' in inventory_hostname or 'node-02' in inventory_hostname or 'node-03' in inventory_hostname %}
+      --validator.enabled=true
+      --validator.account={{validatorAccount}}
+      --validator.privateKey={{validatorPrivKey}}
       {% endif %}
-      --p2p.knownPeers='[{"address":"node-01.feature:14666", "publicKey":"EkWxG4rYNScTSbbYTg4LZfkdnt7yMGSQrKer4NFpPpir"}, {"address":"node-02.feature:14666", "publicKey":"FKyTy3ymS6K4Wh9ZWiVNcnWLEgnCVPfsNTJbKe41o53w"}, {"address":"node-03.feature:14666", "publicKey":"Hrngzn39Eedm2YDZME8XQNXc5F5umxCwAj6GCdScGAxR"}, {"address":"node-04.feature:14666", "publicKey":"2Nke9T3vtLDHu5pn8nX3iCmkcA5ti3etir37LSuPkUwe"}, {"address":"node-05.feature:14666", "publicKey":"Dzydp9QHYSFBpRtp21eimY2vfFdSPmP4ZMToJrHoFjrF"}]'
-      --p2p.seed={{p2pSeed}}
-      --blockIssuer.issuerAccount={{issuerAccount}}
-      --blockIssuer.privateKey={{privKey}}
+      {% if 'node-01' in inventory_hostname %}
+      --validator.ignoreBootstrapped=true
+      {% endif %}
+      --restAPI.allowIncompleteBlock=true
+      --restAPI.blockIssuerAccount={{validatorAccount}}
+      --restAPI.blockIssuerPrivateKey={{validatorPrivKey}}
+      --inx.blockIssuerAccount={{validatorAccount}}
+      --inx.blockIssuerPrivateKey={{validatorPrivKey}}
+      --p2p.peers=/dns/node-01.feature/tcp/14666/p2p/12D3KooWPZt81CSFZLswrV6y6GogLTqUHDAcNxWtov1sSMQiHmSn
+      --p2p.identityPrivateKey={{p2pIdentityPrivateKey}}
       --inx.enabled=true
       --inx.bindAddress=iota-core:9029
 

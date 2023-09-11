@@ -3,11 +3,12 @@ package blockfilter
 import (
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -28,7 +29,6 @@ type Filter struct {
 
 func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
 	return module.Provide(func(e *engine.Engine) filter.Filter {
-
 		f := New(e, opts...)
 		f.TriggerConstructed()
 
@@ -56,7 +56,7 @@ func New(apiProvider api.Provider, opts ...options.Option[Filter]) *Filter {
 }
 
 // ProcessReceivedBlock processes block from the given source.
-func (f *Filter) ProcessReceivedBlock(block *model.Block, source network.PeerID) {
+func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 	// Verify the timestamp is not too far in the future.
 	timeDelta := time.Since(block.ProtocolBlock().IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {

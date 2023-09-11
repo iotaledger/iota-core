@@ -5,6 +5,8 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/network"
@@ -15,19 +17,19 @@ import (
 const NetworkMainPartition = "main"
 
 type Network struct {
-	dispatchersByPartition map[string]map[network.PeerID]*Endpoint
+	dispatchersByPartition map[string]map[peer.ID]*Endpoint
 	dispatchersMutex       syncutils.RWMutex
 }
 
 func NewNetwork() *Network {
 	return &Network{
-		dispatchersByPartition: map[string]map[network.PeerID]*Endpoint{
-			NetworkMainPartition: make(map[network.PeerID]*Endpoint),
+		dispatchersByPartition: map[string]map[peer.ID]*Endpoint{
+			NetworkMainPartition: make(map[peer.ID]*Endpoint),
 		},
 	}
 }
 
-func (n *Network) JoinWithEndpointID(endpointID network.PeerID, partition string) *Endpoint {
+func (n *Network) JoinWithEndpointID(endpointID peer.ID, partition string) *Endpoint {
 	return n.JoinWithEndpoint(newMockedEndpoint(endpointID, n, partition), partition)
 }
 
@@ -48,7 +50,7 @@ func (n *Network) addEndpointToPartition(endpoint *Endpoint, newPartition string
 	endpoint.partition = newPartition
 	dispatchers, exists := n.dispatchersByPartition[newPartition]
 	if !exists {
-		dispatchers = make(map[network.PeerID]*Endpoint)
+		dispatchers = make(map[peer.ID]*Endpoint)
 		n.dispatchersByPartition[newPartition] = dispatchers
 	}
 	dispatchers[endpoint.id] = endpoint
@@ -94,45 +96,41 @@ func (n *Network) mergePartition(partition string) {
 // region Endpoint ///////////////////////////////////////////////////////////////////////////////////////////////
 
 type Endpoint struct {
-	id            network.PeerID
-	network       *Network
-	partition     string
-	handlers      map[string]func(network.PeerID, proto.Message) error
-	handlersMutex syncutils.RWMutex
+	id        peer.ID
+	network   *Network
+	partition string
+	handler   func(peer.ID, proto.Message) error
 }
 
-func newMockedEndpoint(id network.PeerID, n *Network, partition string) *Endpoint {
+func newMockedEndpoint(id peer.ID, n *Network, partition string) *Endpoint {
 	return &Endpoint{
 		id:        id,
 		network:   n,
 		partition: partition,
-		handlers:  make(map[string]func(network.PeerID, proto.Message) error),
 	}
 }
 
-func (e *Endpoint) LocalPeerID() network.PeerID {
+func (e *Endpoint) LocalPeerID() peer.ID {
 	return e.id
 }
 
-func (e *Endpoint) RegisterProtocol(protocolID string, _ func() proto.Message, handler func(network.PeerID, proto.Message) error) {
-	e.handlersMutex.Lock()
-	defer e.handlersMutex.Unlock()
-
-	e.handlers[protocolID] = handler
+func (e *Endpoint) RegisterProtocol(_ func() proto.Message, handler func(peer.ID, proto.Message) error) {
+	e.handler = handler
 }
 
-func (e *Endpoint) UnregisterProtocol(protocolID string) {
+func (e *Endpoint) UnregisterProtocol() {
 	e.network.dispatchersMutex.Lock()
 	defer e.network.dispatchersMutex.Unlock()
 
-	e.handlersMutex.Lock()
-	defer e.handlersMutex.Unlock()
-
-	delete(e.handlers, protocolID)
+	e.handler = nil
 	delete(e.network.dispatchersByPartition[e.partition], e.id)
 }
 
-func (e *Endpoint) Send(packet proto.Message, protocolID string, to ...network.PeerID) {
+func (e *Endpoint) Shutdown() {
+	e.UnregisterProtocol()
+}
+
+func (e *Endpoint) Send(packet proto.Message, to ...peer.ID) {
 	e.network.dispatchersMutex.RLock()
 	defer e.network.dispatchersMutex.RUnlock()
 
@@ -151,29 +149,15 @@ func (e *Endpoint) Send(packet proto.Message, protocolID string, to ...network.P
 			continue
 		}
 
-		protocolHandler, exists := dispatcher.handler(protocolID)
-		if !exists {
-			fmt.Println(e.id, "ERROR: no protocol handler for", protocolID, id)
-			continue
-		}
-
 		go func() {
-			if err := protocolHandler(e.id, packet); err != nil {
+			e.network.dispatchersMutex.RLock()
+			defer e.network.dispatchersMutex.RUnlock()
+
+			if err := dispatcher.handler(e.id, packet); err != nil {
 				fmt.Println(e.id, "ERROR: ", err)
 			}
 		}()
-
 	}
-
-}
-
-func (e *Endpoint) handler(protocolID string) (handler func(network.PeerID, proto.Message) error, exists bool) {
-	e.handlersMutex.RLock()
-	defer e.handlersMutex.RUnlock()
-
-	handler, exists = e.handlers[protocolID]
-
-	return
 }
 
 var _ network.Endpoint = &Endpoint{}
