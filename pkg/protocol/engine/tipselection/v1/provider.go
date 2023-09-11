@@ -37,6 +37,10 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 // DynamicLivenessThreshold returns a function that calculates the liveness threshold for a tip.
 func DynamicLivenessThreshold(committeeSizeProvider func() int) func(tip tipmanager.TipMetadata) time.Duration {
 	return func(tip tipmanager.TipMetadata) time.Duration {
+		// We want to scale the liveness threshold based on the number of witnesses:
+		//  0 witnesses: approval modifier is 0 -> LivenessThresholdLowerBound
+		//  <=1/3: scale linearly
+		//  >1/3: approval modifier is 1 -> LivenessThresholdUpperBound
 		var (
 			params                      = tip.Block().API().ProtocolParameters()
 			livenessThresholdLowerBound = params.LivenessThresholdLowerBound()

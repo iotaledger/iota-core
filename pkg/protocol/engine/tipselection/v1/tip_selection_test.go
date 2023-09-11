@@ -1,7 +1,9 @@
 package tipselectionv1_test
 
 import (
+	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -171,4 +173,41 @@ func TestTipSelection_DynamicLivenessThreshold_WithMaxWitnesses(t *testing.T) {
 		tf.TipManager.RequireLivenessThresholdReached("Block", true)
 		tf.TipManager.RequireStrongTips()
 	}
+}
+
+func TestDynamicLivenessThreshold(t *testing.T) {
+	const committeeSize = 10
+	tf := NewTestFramework(t, WithCommitteeSize(committeeSize))
+	tf.TipManager.CreateBlock("Block", map[iotago.ParentsType][]string{iotago.StrongParentType: {"Genesis"}})
+	tf.TipManager.AddBlock("Block")
+
+	livenessThresholdLowerBound := tf.TipManager.API.ProtocolParameters().LivenessThresholdLowerBound()
+	livenessWindow := float64(tf.TipManager.API.ProtocolParameters().LivenessThresholdUpperBound() - livenessThresholdLowerBound)
+
+	tf.RequireLivenessThreshold("Block", livenessThresholdLowerBound)
+
+	tf.TipManager.Block("Block").AddWitness(0)
+	tf.RequireLivenessThreshold("Block", livenessThresholdLowerBound+time.Duration(approvalModifier(1, committeeSize)*livenessWindow))
+
+	tf.TipManager.Block("Block").AddWitness(1)
+	tf.RequireLivenessThreshold("Block", livenessThresholdLowerBound+time.Duration(approvalModifier(2, committeeSize)*livenessWindow))
+
+	tf.TipManager.Block("Block").AddWitness(2)
+	tf.RequireLivenessThreshold("Block", livenessThresholdLowerBound+time.Duration(approvalModifier(3, committeeSize)*livenessWindow))
+
+	// We've reached > 1/3 -> liveness threshold should be at upper bound
+	tf.TipManager.Block("Block").AddWitness(3)
+	tf.RequireLivenessThreshold("Block", tf.TipManager.API.ProtocolParameters().LivenessThresholdUpperBound())
+
+	tf.TipManager.Block("Block").AddWitness(4)
+	tf.TipManager.Block("Block").AddWitness(5)
+	tf.TipManager.Block("Block").AddWitness(6)
+	tf.TipManager.Block("Block").AddWitness(7)
+	tf.TipManager.Block("Block").AddWitness(8)
+	tf.TipManager.Block("Block").AddWitness(9)
+	tf.RequireLivenessThreshold("Block", tf.TipManager.API.ProtocolParameters().LivenessThresholdUpperBound())
+}
+
+func approvalModifier(witnessCount float64, committeeSize float64) float64 {
+	return witnessCount / math.Ceil(committeeSize/3.0)
 }

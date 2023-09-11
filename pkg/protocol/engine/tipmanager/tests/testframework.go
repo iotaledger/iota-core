@@ -24,6 +24,8 @@ type TestFramework struct {
 	tipMetadataByAlias map[string]tipmanager.TipMetadata
 	blocksByID         map[iotago.BlockID]*blocks.Block
 	test               *testing.T
+
+	API iotago.API
 }
 
 func NewTestFramework(test *testing.T) *TestFramework {
@@ -32,6 +34,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		tipMetadataByAlias: make(map[string]tipmanager.TipMetadata),
 		blocksByID:         make(map[iotago.BlockID]*blocks.Block),
 		test:               test,
+		API:                tpkg.TestAPI,
 	}
 
 	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID()
@@ -51,7 +54,7 @@ func (t *TestFramework) AddBlock(alias string) tipmanager.TipMetadata {
 }
 
 func (t *TestFramework) CreateBlock(alias string, parents map[iotago.ParentsType][]string, optBlockBuilder ...func(*builder.BasicBlockBuilder)) *blocks.Block {
-	blockBuilder := builder.NewBasicBlockBuilder(tpkg.TestAPI)
+	blockBuilder := builder.NewBasicBlockBuilder(t.API)
 	blockBuilder.IssuingTime(time.Now())
 
 	if strongParents, strongParentsExist := parents[iotago.StrongParentType]; strongParentsExist {
@@ -71,7 +74,7 @@ func (t *TestFramework) CreateBlock(alias string, parents map[iotago.ParentsType
 	block, err := blockBuilder.Build()
 	require.NoError(t.test, err)
 
-	modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
+	modelBlock, err := model.BlockFromBlock(block, t.API)
 	require.NoError(t.test, err)
 
 	t.blocksByID[modelBlock.ID()] = blocks.NewBlock(modelBlock)

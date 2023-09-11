@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -71,6 +73,12 @@ func (t *TestFramework) ExpectedLivenessThreshold(alias string) time.Time {
 	tipMetadata := t.TipManager.TipMetadata(alias)
 
 	return tipMetadata.Block().IssuingTime().Add(t.expectedLivenessDuration(tipMetadata))
+}
+
+func (t *TestFramework) RequireLivenessThreshold(alias string, expectedDuration time.Duration) {
+	tipMetadata := t.TipManager.TipMetadata(alias)
+
+	require.Equal(t.test, expectedDuration, t.expectedLivenessDuration(tipMetadata))
 }
 
 func (t *TestFramework) CommitteeSize() int {
