@@ -173,3 +173,56 @@ func (q *ValidatorQueue) updateTokenBucket(rate float64, tokenBucketSize float64
 func (q *ValidatorQueue) deductTokens(tokens float64) {
 	q.tokenBucket -= tokens
 }
+
+type ValidatorBuffer struct {
+	buffer *shrinkingmap.ShrinkingMap[iotago.AccountID, *ValidatorQueue]
+	size   int
+}
+
+func NewValidatorBuffer() *ValidatorBuffer {
+	return &ValidatorBuffer{
+		buffer: shrinkingmap.New[iotago.AccountID, *ValidatorQueue](),
+	}
+}
+
+func (b *ValidatorBuffer) Size() int {
+	if b == nil {
+		return 0
+	}
+
+	return b.size
+}
+
+func (b *ValidatorBuffer) Get(accountID iotago.AccountID) (*ValidatorQueue, bool) {
+	return b.buffer.Get(accountID)
+}
+
+func (b *ValidatorBuffer) Set(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+	return b.buffer.Set(accountID, validatorQueue)
+}
+
+func (b *ValidatorBuffer) Submit(block *blocks.Block, maxBuffer int) (*blocks.Block, bool) {
+	validatorQueue, exists := b.buffer.Get(block.ProtocolBlock().IssuerID)
+	if !exists {
+		return nil, false
+	}
+	droppedBlock, submitted := validatorQueue.Submit(block, maxBuffer)
+	if submitted {
+		b.size++
+	}
+	if droppedBlock != nil {
+		b.size--
+	}
+
+	return droppedBlock, submitted
+}
+
+func (b *ValidatorBuffer) Delete(accountID iotago.AccountID) {
+	validatorQueue, exists := b.buffer.Get(accountID)
+	if !exists {
+		return
+	}
+	b.size -= validatorQueue.Size()
+
+	b.buffer.Delete(accountID)
+}

@@ -36,7 +36,7 @@ type Scheduler struct {
 	seatManager seatmanager.SeatManager
 
 	basicBuffer     *BufferQueue
-	validatorBuffer *shrinkingmap.ShrinkingMap[iotago.AccountID, *ValidatorQueue]
+	validatorBuffer *ValidatorBuffer
 	bufferMutex     syncutils.RWMutex
 
 	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, Deficit]
@@ -71,7 +71,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 					s.bufferMutex.Lock()
 					defer s.bufferMutex.Unlock()
 
-					s.validatorBuffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+					s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 						if !s.seatManager.Committee(commitment.Index() + 1).HasAccount(accountID) {
 							s.shutdownValidatorQueue(validatorQueue)
 							s.validatorBuffer.Delete(accountID)
@@ -129,13 +129,13 @@ func New(apiProvider api.Provider, opts ...options.Option[Scheduler]) *Scheduler
 			events:          scheduler.NewEvents(),
 			deficits:        shrinkingmap.New[iotago.AccountID, Deficit](),
 			apiProvider:     apiProvider,
-			validatorBuffer: shrinkingmap.New[iotago.AccountID, *ValidatorQueue](),
+			validatorBuffer: NewValidatorBuffer(),
 		}, opts,
 	)
 }
 
 func (s *Scheduler) Shutdown() {
-	s.validatorBuffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+	s.validatorBuffer.buffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 		s.shutdownValidatorQueue(validatorQueue)
 
 		return true
@@ -152,12 +152,7 @@ func (s *Scheduler) Start() {
 	s.TriggerInitialized()
 }
 
-// Rate gets the rate of the scheduler in units of work per second.
-func (s *Scheduler) Rate() iotago.WorkScore {
-	return s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().SchedulerRate
-}
-
-// IssuerQueueSizeCount returns the queue size of the given issuer as block count.
+// IssuerQueueSizeCount returns the number of blocks in the queue of the given issuer.
 func (s *Scheduler) IssuerQueueBlockCount(issuerID iotago.AccountID) int {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
@@ -173,12 +168,32 @@ func (s *Scheduler) IssuerQueueWork(issuerID iotago.AccountID) iotago.WorkScore 
 	return s.basicBuffer.IssuerQueue(issuerID).Work()
 }
 
+// ValidatorQueueBlockCount returns the number of validation blocks in the validator queue of the given issuer.
+func (s *Scheduler) ValidatorQueueBlockCount(issuerID iotago.AccountID) int {
+	s.bufferMutex.RLock()
+	defer s.bufferMutex.RUnlock()
+
+	validatorQueue, exists := s.validatorBuffer.Get(issuerID)
+	if !exists {
+		return 0
+	}
+
+	return validatorQueue.Size()
+}
+
 // BufferSize returns the current buffer size of the Scheduler as block count.
-func (s *Scheduler) BufferSize() int {
+func (s *Scheduler) BasicBufferSize() int {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
 	return s.basicBuffer.Size()
+}
+
+func (s *Scheduler) ValidatorBufferSize() int {
+	s.bufferMutex.RLock()
+	defer s.bufferMutex.RUnlock()
+
+	return s.validatorBuffer.Size()
 }
 
 // MaxBufferSize returns the max buffer size of the Scheduler as block count.
@@ -279,11 +294,11 @@ func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	validatorQueue, exists := s.validatorBuffer.Get(block.ProtocolBlock().IssuerID)
+	_, exists := s.validatorBuffer.Get(block.ProtocolBlock().IssuerID)
 	if !exists {
-		validatorQueue = s.addValidator(block.ProtocolBlock().IssuerID)
+		s.addValidator(block.ProtocolBlock().IssuerID)
 	}
-	droppedBlock, submitted := validatorQueue.Submit(block, int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize))
+	droppedBlock, submitted := s.validatorBuffer.Submit(block, int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize))
 	if !submitted {
 		return
 	}
@@ -376,8 +391,10 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	s.validatorBuffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
-		s.selectValidationBlockWithoutLocking(validatorQueue)
+	s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+		if s.selectValidationBlockWithoutLocking(validatorQueue) {
+			s.validatorBuffer.size--
+		}
 
 		return true
 	})
@@ -385,15 +402,19 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 
 }
 
-func (s *Scheduler) selectValidationBlockWithoutLocking(validatorQueue *ValidatorQueue) {
+func (s *Scheduler) selectValidationBlockWithoutLocking(validatorQueue *ValidatorQueue) bool {
 	// already a block selected to be scheduled.
 	if len(validatorQueue.blockChan) > 0 {
-		return
+		return false
 	}
 
 	if blockToSchedule := validatorQueue.PopFront(); blockToSchedule != nil {
 		validatorQueue.blockChan <- blockToSchedule
+
+		return true
 	}
+
+	return false
 }
 
 func (s *Scheduler) selectBasicBlockWithoutLocking() {
