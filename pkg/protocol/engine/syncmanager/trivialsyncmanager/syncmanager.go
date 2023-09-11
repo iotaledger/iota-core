@@ -227,6 +227,7 @@ func (s *SyncManager) updatePrunedEpoch(index iotago.EpochIndex, hasPruned bool)
 	if s.lastPrunedEpoch != index {
 		s.lastPrunedEpoch = index
 		s.hasPruned = hasPruned
+
 		return true
 	}
 
