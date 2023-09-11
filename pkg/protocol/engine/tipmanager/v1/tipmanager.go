@@ -146,7 +146,13 @@ func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(pare
 
 	for _, parent := range block.ParentsWithType() {
 		if metadataStorage := t.metadataStorage(parent.ID.Index()); metadataStorage != nil {
-			if parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) }); parentMetadata.Block() != nil {
+			// Make sure we don't add rootblocks back to the tips.
+			parentBlock, exists := t.retrieveBlock(parent.ID)
+			if !exists || parentBlock.IsRootBlock() {
+				continue
+			}
+
+			if parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(parentBlock) }); parentMetadata.Block() != nil {
 				consumer(parent.Type, parentMetadata)
 
 				if created {
