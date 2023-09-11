@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/core/causalorder"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -11,8 +12,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
@@ -32,17 +35,24 @@ type Booker struct {
 	retainBlockFailure func(id iotago.BlockID, reason apimodels.BlockFailureReason)
 
 	errorHandler func(error)
+	apiProvider  api.Provider
 
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e.BlockCache, e.ErrorHandler("booker"), opts...)
+		b := New(e.Workers.CreateGroup("Booker"), e, e.BlockCache, e.ErrorHandler("booker"), opts...)
 		e.HookConstructed(func() {
 			b.ledger = e.Ledger
 			b.ledger.HookConstructed(func() {
 				b.conflictDAG = b.ledger.ConflictDAG()
+
+				b.ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
+					transaction.OnInvalid(func(err error) {
+						b.events.TransactionInvalid.Trigger(transaction, err)
+					})
+				})
 			})
 
 			e.Events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {
@@ -62,9 +72,11 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, apiProvider api.Provider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
-		events:       booker.NewEvents(),
+		events:      booker.NewEvents(),
+		apiProvider: apiProvider,
+
 		blockCache:   blockCache,
 		workers:      workers,
 		errorHandler: errorHandler,
@@ -76,7 +88,7 @@ func New(workers *workerpool.Group, blockCache *blocks.Blocks, errorHandler func
 			b.book,
 			b.markInvalid,
 			(*blocks.Block).Parents,
-			causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](isReferenceValid),
+			causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](b.isReferenceValid),
 		)
 
 		blockCache.Evict.Hook(b.evict)
@@ -137,7 +149,6 @@ func (b *Booker) book(block *blocks.Block) error {
 
 func (b *Booker) markInvalid(block *blocks.Block, err error) {
 	if block.SetInvalid() {
-		b.retainBlockFailure(block.ID(), apimodels.BlockFailureBookingFailure)
 		b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "block marked as invalid in Booker"))
 	}
 }
@@ -149,6 +160,7 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 	for _, parent := range block.ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
+			b.retainBlockFailure(block.ID(), apimodels.BlockFailureParentNotFound)
 			return nil, ierrors.Errorf("parent %s does not exist", parent.ID)
 		}
 
@@ -158,9 +170,12 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 		case iotago.WeakParentType:
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
 		case iotago.ShallowLikeParentType:
-			// TODO: check whether it contains a (conflicting) TX, otherwise shallow like reference is invalid?
-			//  if a block contains a transaction that itself is not conflicting, then it's possible to vote on any transaction in the UTXO-future cone of the conflict
-			//  NOTE: the above only applies when we don't fork all transactions.
+			// Check whether the parent contains a conflicting TX,
+			// otherwise reference is invalid and the block should be marked as invalid as well.
+			if tx, hasTx := parentBlock.Transaction(); !hasTx || !parentBlock.PayloadConflictIDs().Has(lo.PanicOnErr(tx.ID(b.apiProvider.APIForSlot(parentBlock.ID().Index())))) {
+				return nil, ierrors.Wrapf(err, "shallow like parent %s does not contain a conflicting transaction", parent.ID.String())
+			}
+
 			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
 			//  remove all conflicting conflicts from conflictIDsToInherit
 			for _, conflictID := range parentBlock.PayloadConflictIDs().ToSlice() {
@@ -180,8 +195,9 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 }
 
 // isReferenceValid checks if the reference between the child and its parent is valid.
-func isReferenceValid(child *blocks.Block, parent *blocks.Block) (err error) {
+func (b *Booker) isReferenceValid(child *blocks.Block, parent *blocks.Block) (err error) {
 	if parent.IsInvalid() {
+		b.retainBlockFailure(child.ID(), apimodels.BlockFailureParentInvalid)
 		return ierrors.Errorf("parent %s of child %s is marked as invalid", parent.ID(), child.ID())
 	}
 

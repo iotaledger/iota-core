@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -53,7 +52,7 @@ func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) 
 	}
 
 	modelBlock.ID().RegisterAlias(alias)
-	t.Filter.ProcessReceivedBlock(modelBlock, network.PeerID{})
+	t.Filter.ProcessReceivedBlock(modelBlock, "")
 
 	return nil
 }

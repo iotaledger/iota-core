@@ -90,11 +90,13 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 		for _, protocolParams := range o.optsProtocolParameters {
 			storedProtocolParams := e.Storage.Settings().APIProvider().ProtocolParameters(protocolParams.Version())
 			if storedProtocolParams != nil {
-				if lo.PanicOnErr(storedProtocolParams.Hash()) == lo.PanicOnErr(protocolParams.Hash()) {
-					continue
+				if lo.PanicOnErr(storedProtocolParams.Hash()) != lo.PanicOnErr(protocolParams.Hash()) {
+					panic(ierrors.Errorf("protocol parameters for version %d already exist with different hash", protocolParams.Version()))
 				}
 
-				panic(ierrors.Errorf("protocol parameters for version %d already exist with different hash", protocolParams.Version()))
+				if !storedProtocolParams.Equals(protocolParams) {
+					panic(ierrors.Errorf("protocol parameters for version %d already exist but are not equal", protocolParams.Version()))
+				}
 			}
 
 			if err := e.Storage.Settings().StoreProtocolParameters(protocolParams); err != nil {
