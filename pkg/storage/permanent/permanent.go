@@ -50,18 +50,16 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 }
 
 func Clone(source *Permanent, dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) (*Permanent, error) {
+	source.store.Lock()
+	defer source.store.Unlock()
+
 	source.store.Close()
 
 	if err := copydir.Copy(source.dbConfig.Directory, dbConfig.Directory); err != nil {
 		return nil, ierrors.Wrap(err, "failed to copy permanent storage directory to new storage path")
 	}
 
-	source.store = database.NewDBInstance(source.dbConfig)
-	source.settings = NewSettings(lo.PanicOnErr(source.store.KVStore().WithExtendedRealm(kvstore.Realm{settingsPrefix})))
-	source.commitments = NewCommitments(lo.PanicOnErr(source.store.KVStore().WithExtendedRealm(kvstore.Realm{commitmentsPrefix})), source.settings.APIProvider())
-	source.utxoLedger = utxoledger.New(lo.PanicOnErr(source.store.KVStore().WithExtendedRealm(kvstore.Realm{ledgerPrefix})), source.settings.APIProvider())
-	source.accounts = lo.PanicOnErr(source.store.KVStore().WithExtendedRealm(kvstore.Realm{accountsPrefix}))
-	source.latestNonEmptySlot = lo.PanicOnErr(source.store.KVStore().WithExtendedRealm(kvstore.Realm{latestNonEmptySlotPrefix}))
+	source.store.Open()
 
 	return New(dbConfig, errorHandler, opts...), nil
 }

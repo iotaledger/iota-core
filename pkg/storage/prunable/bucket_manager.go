@@ -29,6 +29,8 @@ type BucketManager struct {
 	dbSizes *shrinkingmap.ShrinkingMap[iotago.EpochIndex, int64]
 
 	optsMaxOpenDBs int
+
+	mutex syncutils.RWMutex
 }
 
 func NewBucketManager(dbConfig database.Config, errorHandler func(error), opts ...options.Option[BucketManager]) *BucketManager {
@@ -171,6 +173,10 @@ func (b *BucketManager) RestoreFromDisk() (lastPrunedEpoch iotago.EpochIndex) {
 //	epochIndex 1 -> db 1
 //	epochIndex 2 -> db 2
 func (b *BucketManager) getDBInstance(index iotago.EpochIndex) (db *database.DBInstance) {
+	// Lock global mutex
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
 	b.openDBsMutex.Lock()
 	defer b.openDBsMutex.Unlock()
 

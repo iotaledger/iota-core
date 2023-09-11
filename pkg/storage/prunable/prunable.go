@@ -50,6 +50,13 @@ func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(e
 }
 
 func Clone(source *Prunable, dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[BucketManager]) (*Prunable, error) {
+	// Lock semi pemanent DB and prunable slot store so that nobody can try to use or open them while cloning.
+	source.semiPermanentDB.Lock()
+	defer source.semiPermanentDB.Unlock()
+
+	source.prunableSlotStore.mutex.Lock()
+	defer source.prunableSlotStore.mutex.Unlock()
+
 	// Close forked prunable storage before copying its contents.
 	source.semiPermanentDB.Close()
 	source.prunableSlotStore.Shutdown()
@@ -61,12 +68,8 @@ func Clone(source *Prunable, dbConfig database.Config, apiProvider api.Provider,
 
 	// Create a newly opened instance of prunable database.
 	// `prunableSlotStore` will be opened automatically as the engine requests it, so no need to open it here.
-	// TODO: create a re-openable and lockable KVStore
-	source.semiPermanentDB = database.NewDBInstance(source.semiPermanentDBConfig)
-	source.decidedUpgradeSignals = epochstore.NewStore(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, kvstore.Realm{lastPrunedEpochKey}, source.semiPermanentDB.KVStore(), pruningDelayDecidedUpgradeSignals, model.VersionAndHash.Bytes, model.VersionAndHashFromBytes)
-	source.poolRewards = epochstore.NewEpochKVStore(kvstore.Realm{epochPrefixPoolRewards}, kvstore.Realm{lastPrunedEpochKey}, source.semiPermanentDB.KVStore(), pruningDelayPoolRewards)
-	source.poolStats = epochstore.NewStore(kvstore.Realm{epochPrefixPoolStats}, kvstore.Realm{lastPrunedEpochKey}, source.semiPermanentDB.KVStore(), pruningDelayPoolStats, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
-	source.committee = epochstore.NewStore(kvstore.Realm{epochPrefixCommittee}, kvstore.Realm{lastPrunedEpochKey}, source.semiPermanentDB.KVStore(), pruningDelayCommittee, (*account.Accounts).Bytes, account.AccountsFromBytes)
+
+	source.semiPermanentDB.Open()
 
 	return New(dbConfig, apiProvider, errorHandler, opts...), nil
 }
