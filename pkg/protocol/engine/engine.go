@@ -66,6 +66,8 @@ type Engine struct {
 	Retainer            retainer.Retainer
 	SyncManager         syncmanager.SyncManager
 	UpgradeOrchestrator upgrade.Orchestrator
+	RootCommitment      reactive.Variable[*model.Commitment]
+	LatestCommitment    reactive.Variable[*model.Commitment]
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -74,8 +76,6 @@ type Engine struct {
 
 	startupAvailableBlocksWindow iotago.SlotIndex
 	chainID                      iotago.CommitmentID
-	rootCommitment               reactive.Variable[*model.Commitment]
-	latestCommitment             reactive.Variable[*model.Commitment]
 	mutex                        syncutils.RWMutex
 
 	optsSnapshotPath     string
@@ -115,11 +115,13 @@ func New(
 
 	return options.Apply(
 		&Engine{
-			Events:        NewEvents(),
-			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
-			Workers:       workers,
-			errorHandler:  errorHandler,
+			Events:           NewEvents(),
+			Storage:          storageInstance,
+			EvictionState:    eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
+			RootCommitment:   reactive.NewVariable[*model.Commitment](),
+			LatestCommitment: reactive.NewVariable[*model.Commitment](),
+			Workers:          workers,
+			errorHandler:     errorHandler,
 
 			optsSnapshotPath:  "snapshot.bin",
 			optsSnapshotDepth: 5,
@@ -138,8 +140,8 @@ func New(
 		},
 		func(e *Engine) {
 			// setup reactive variables
-			e.rootCommitment = newEngineRootCommitmentVariable(e)
-			e.latestCommitment = newEngineLatestCommitmentVariable(e)
+			e.initRootCommitment()
+			e.initLatestCommitment()
 
 			// setup all components
 			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings().APIProvider())
@@ -506,14 +508,6 @@ func (e *Engine) setupPruning() {
 	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))
 }
 
-func (e *Engine) RootCommitment() reactive.Variable[*model.Commitment] {
-	return e.rootCommitment
-}
-
-func (e *Engine) LatestCommitment() reactive.Variable[*model.Commitment] {
-	return e.latestCommitment
-}
-
 // EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
 // commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
 // from being processed as their chain will be deemed unsolid.
@@ -545,13 +539,11 @@ func (e *Engine) ErrorHandler(componentName string) func(error) {
 	}
 }
 
-func newEngineRootCommitmentVariable(e *Engine) reactive.Variable[*model.Commitment] {
-	v := reactive.NewVariable[*model.Commitment]()
-
+func (e *Engine) initRootCommitment() {
 	updateRootCommitment := func(lastFinalizedSlot iotago.SlotIndex) {
 		maxCommittableAge := e.APIForSlot(lastFinalizedSlot).ProtocolParameters().MaxCommittableAge()
 
-		v.Compute(func(rootCommitment *model.Commitment) *model.Commitment {
+		e.RootCommitment.Compute(func(rootCommitment *model.Commitment) *model.Commitment {
 			return lo.Return1(e.Storage.Commitments().Load(lo.Cond(lastFinalizedSlot < maxCommittableAge, 0, lastFinalizedSlot-maxCommittableAge)))
 		})
 	}
@@ -565,15 +557,11 @@ func newEngineRootCommitmentVariable(e *Engine) reactive.Variable[*model.Commitm
 
 		e.HookShutdown(unsubscribe)
 	})
-
-	return v
 }
 
-func newEngineLatestCommitmentVariable(e *Engine) reactive.Variable[*model.Commitment] {
-	l := reactive.NewVariable[*model.Commitment]()
-
+func (e *Engine) initLatestCommitment() {
 	updateLatestCommitment := func(latestCommitment *model.Commitment) {
-		l.Compute(func(currentLatestComponent *model.Commitment) *model.Commitment {
+		e.LatestCommitment.Compute(func(currentLatestComponent *model.Commitment) *model.Commitment {
 			return lo.Cond(currentLatestComponent == nil || currentLatestComponent.Index() < latestCommitment.Index(), latestCommitment, currentLatestComponent)
 		})
 	}
@@ -587,8 +575,6 @@ func newEngineLatestCommitmentVariable(e *Engine) reactive.Variable[*model.Commi
 
 		e.HookShutdown(unsubscribe)
 	})
-
-	return l
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

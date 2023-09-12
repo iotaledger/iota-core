@@ -263,14 +263,14 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 				}
 
 				var rootPublished bool
-				return engine.LatestCommitment().OnUpdate(func(_, latestModelCommitment *model.Commitment) {
+				return engine.LatestCommitment.OnUpdate(func(_, latestModelCommitment *model.Commitment) {
 					if !rootPublished {
 						chain.ForkingPoint.Compute(func(currentValue *Commitment) *Commitment {
 							if currentValue != nil {
 								return currentValue
 							}
 
-							return publishCommitment(engine.RootCommitment().Get())
+							return publishCommitment(engine.RootCommitment.Get())
 						})
 
 						rootPublished = true
