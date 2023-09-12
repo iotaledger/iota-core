@@ -81,8 +81,8 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 		return inSyncWindow && belowWarpSyncThreshold
 	}, c.InSyncRange, c.isBelowWarpSyncThreshold)
 
-	c.Parent.OnUpdate(func(_, parent *Commitment) {
-		parent.registerChild(c, c.inheritChain(parent))
+	c.Parent.OnUpdateOnce(func(_, parent *Commitment) {
+		parent.registerChild(c)
 
 		c.IsSolid.InheritFrom(parent.IsSolid)
 		c.isParentAttested.InheritFrom(parent.IsAttested)
@@ -124,19 +124,19 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 	return c
 }
 
-func (c *Commitment) registerChild(newChild *Commitment, onMainChildUpdated func(*Commitment, *Commitment)) {
-	if c.Children.Add(newChild) {
+func (c *Commitment) registerChild(child *Commitment) {
+	if c.Children.Add(child) {
 		c.MainChild.Compute(func(currentMainChild *Commitment) *Commitment {
 			if currentMainChild != nil {
 				return currentMainChild
 			}
 
-			return newChild
+			return child
 		})
 
-		unsubscribe := c.MainChild.OnUpdate(onMainChildUpdated)
+		unsubscribeChild := c.MainChild.OnUpdate(child.inheritChain(c))
 
-		c.IsEvicted.OnTrigger(unsubscribe)
+		c.IsEvicted.OnTrigger(unsubscribeChild)
 	}
 }
 
