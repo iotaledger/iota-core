@@ -101,7 +101,9 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 	})
 
 	c.Chain.OnUpdateWithContext(func(_, chain *Chain, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
-		chain.registerCommitment(c)
+		withinContext(func() (unsubscribe func()) {
+			return chain.registerCommitment(c)
+		})
 
 		withinContext(func() (unsubscribe func()) {
 			return chain.Engine.OnUpdate(func(_, chainEngine *engine.Engine) {
@@ -209,4 +211,12 @@ func (c *Commitment) triggerEventIfBelowThreshold(event func(*Commitment) reacti
 			})
 		})
 	})
+}
+
+func (c *Commitment) cumulativeWeight() uint64 {
+	if c == nil {
+		return 0
+	}
+
+	return c.CumulativeWeight()
 }

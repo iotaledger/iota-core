@@ -94,7 +94,7 @@ func newChains(protocol *Protocol) *Chains {
 
 func (c *Chains) initMainChain() {
 	mainChain := c.MainChain.Get()
-	mainChain.Engine.instantiate.Set(true)
+	mainChain.instantiate.Set(true)
 	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) {
 		c.protocol.Events.Engine.LinkTo(newEngine.Events)
 	})
@@ -102,9 +102,9 @@ func (c *Chains) initMainChain() {
 }
 
 func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
-	return chain.Engine.instantiate.OnUpdate(func(_, instantiate bool) {
+	return chain.instantiate.OnUpdate(func(_, instantiate bool) {
 		if !instantiate {
-			chain.Engine.spawnedEngine.Set(nil)
+			chain.spawnedEngine.Set(nil)
 
 			return
 		}
@@ -115,7 +115,7 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 				panic(fmt.Sprintf("could not load active engine: %s", err))
 			}
 
-			chain.Engine.spawnedEngine.Set(mainEngine)
+			chain.spawnedEngine.Set(mainEngine)
 
 			c.protocol.Network.HookStopped(mainEngine.Shutdown)
 		} else {
@@ -191,10 +191,10 @@ func (c *Chains) initChainSwitching() {
 
 	c.heaviestAttestedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
 		if prevCandidate != nil {
-			prevCandidate.Engine.instantiate.Set(false)
+			prevCandidate.instantiate.Set(false)
 		}
 
-		newCandidate.Engine.instantiate.Set(true)
+		newCandidate.instantiate.Set(true)
 	})
 
 	c.OnChainCreated(func(chain *Chain) {
