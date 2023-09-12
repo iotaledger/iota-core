@@ -123,7 +123,7 @@ func (t *TestSuite) AssertChainID(expectedChainID iotago.CommitmentID, nodes ...
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			actualChainID := node.Protocol.MainChain().ForkingPoint().ID()
+			actualChainID := node.Protocol.MainChain().ForkingPoint.Get().ID()
 			if expectedChainID != actualChainID {
 				return ierrors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID, expectedChainID.Index(), actualChainID, actualChainID.Index())
 			}

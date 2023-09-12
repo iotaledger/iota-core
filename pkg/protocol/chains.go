@@ -98,7 +98,7 @@ func (c *Chains) initMainChain() {
 	mainChain.engine.OnUpdate(func(_, newEngine *engine.Engine) {
 		c.protocol.Events.Engine.LinkTo(newEngine.Events)
 	})
-	mainChain.forkingPoint.Get().IsRoot.Trigger()
+	mainChain.ForkingPoint.Get().IsRoot.Trigger()
 }
 
 func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
@@ -237,7 +237,7 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment], err error) {
 	slotEvicted := c.EvictionEvent(commitmentID.Index())
 	if slotEvicted.WasTriggered() && c.LastEvictedSlot().Get() != 0 {
-		forkingPoint := c.mainChain.Get().ForkingPoint()
+		forkingPoint := c.mainChain.Get().ForkingPoint.Get()
 
 		if forkingPoint == nil || commitmentID != forkingPoint.ID() {
 			return nil, ErrorSlotEvicted
@@ -301,7 +301,7 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 					if !rootPublished {
 						publishedRoot := publishCommitment(engine.RootCommitment().Get())
 
-						chain.ForkingPointR().Compute(func(currentValue *Commitment) *Commitment {
+						chain.ForkingPoint.Compute(func(currentValue *Commitment) *Commitment {
 							if currentValue != nil {
 								return currentValue
 							}

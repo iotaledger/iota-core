@@ -167,7 +167,7 @@ func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitm
 					}
 
 					spawnedChain = NewChain()
-					spawnedChain.forkingPoint.Set(c)
+					spawnedChain.ForkingPoint.Set(c)
 				}
 
 				return spawnedChain

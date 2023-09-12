@@ -11,7 +11,7 @@ import (
 // Chain is a reactive component that manages the state of a chain.
 type Chain struct {
 	// forkingPoint contains the Commitment object that spawned this chain.
-	forkingPoint reactive.Variable[*Commitment]
+	ForkingPoint reactive.Variable[*Commitment]
 
 	// commitments is a map of Commitment objects that belong to the same chain.
 	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
@@ -58,7 +58,7 @@ type Chain struct {
 // NewChain creates a new Chain instance.
 func NewChain() *Chain {
 	c := &Chain{
-		forkingPoint:             reactive.NewVariable[*Commitment](),
+		ForkingPoint:             reactive.NewVariable[*Commitment](),
 		commitments:              shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 		latestCommitment:         reactive.NewVariable[*Commitment](),
 		latestAttestedCommitment: reactive.NewVariable[*Commitment](),
@@ -92,20 +92,10 @@ func NewChain() *Chain {
 	return c
 }
 
-// ForkingPoint returns the Commitment object that spawned this chain.
-func (c *Chain) ForkingPoint() *Commitment {
-	return c.forkingPoint.Get()
-}
-
-// ForkingPointR returns the Commitment object that spawned this chain.
-func (c *Chain) ForkingPointR() reactive.Variable[*Commitment] {
-	return c.forkingPoint
-}
-
 // Commitment returns the Commitment object with the given index, if it exists.
 func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c; currentChain != nil; {
-		switch root := currentChain.ForkingPoint(); {
+		switch root := currentChain.ForkingPoint.Get(); {
 		case root == nil:
 			return nil, false // this should never happen, but we can handle it gracefully anyway
 		case root.Index() == index:
@@ -268,7 +258,7 @@ func newChainEngine(chain *Chain) *chainEngine {
 		spawnedEngine: reactive.NewVariable[*engine.Engine](),
 	}
 
-	chain.forkingPoint.OnUpdateWithContext(func(_, forkingPoint *Commitment, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
+	chain.ForkingPoint.OnUpdateWithContext(func(_, forkingPoint *Commitment, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
 		withinContext(func() func() {
 			return forkingPoint.Parent.OnUpdate(func(_, parent *Commitment) {
 				withinContext(func() func() {

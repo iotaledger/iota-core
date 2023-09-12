@@ -13,7 +13,7 @@ import (
 )
 
 func chainManagerAllChainsDot() (string, error) {
-	rootCommitment := deps.Protocol.MainChain().ForkingPoint()
+	rootCommitment := deps.Protocol.MainChain().ForkingPoint.Get()
 	g := graphviz.New()
 	defer g.Close()
 
@@ -32,7 +32,7 @@ func chainManagerAllChainsDot() (string, error) {
 }
 
 func chainManagerAllChainsRendered() ([]byte, error) {
-	rootCommitment := deps.Protocol.MainChain().ForkingPoint()
+	rootCommitment := deps.Protocol.MainChain().ForkingPoint.Get()
 	g := graphviz.New()
 	defer g.Close()
 

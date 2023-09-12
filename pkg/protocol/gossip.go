@@ -131,7 +131,7 @@ func (r *Gossip) ProcessAttestations(commitmentModel *model.Commitment, attestat
 		return
 	}
 
-	commitmentVerifier, exists := r.commitmentVerifiers.Get(chain.ForkingPoint().ID())
+	commitmentVerifier, exists := r.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
 	if !exists {
 		r.LogDebug(ierrors.Errorf("failed to find commitment verifier for commitment %s when processing attestations", commitmentModel.ID()))
 		return
@@ -252,11 +252,11 @@ func (r *Gossip) startAttestationsRequester() {
 		r.protocol.OnChainCreated(func(chain *Chain) {
 			chain.RequestAttestations().OnUpdate(func(_, requestAttestations bool) {
 				if requestAttestations {
-					r.commitmentVerifiers.GetOrCreate(chain.ForkingPoint().ID(), func() *CommitmentVerifier {
-						return NewCommitmentVerifier(chain.EngineR().Get(), chain.ForkingPoint().Parent.Get().Commitment)
+					r.commitmentVerifiers.GetOrCreate(chain.ForkingPoint.Get().ID(), func() *CommitmentVerifier {
+						return NewCommitmentVerifier(chain.EngineR().Get(), chain.ForkingPoint.Get().Parent.Get().Commitment)
 					})
 				} else {
-					r.commitmentVerifiers.Delete(chain.ForkingPoint().ID())
+					r.commitmentVerifiers.Delete(chain.ForkingPoint.Get().ID())
 				}
 			})
 		})

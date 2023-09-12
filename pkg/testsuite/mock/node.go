@@ -193,7 +193,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	})
 
 	n.Protocol.HeaviestAttestedCandidate().OnUpdate(func(_, newChain *protocol.Chain) {
-		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, newChain.ForkingPoint().ID())
+		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, newChain.ForkingPoint.Get().ID())
 	})
 
 	n.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
