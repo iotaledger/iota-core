@@ -193,18 +193,19 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	})
 
 	n.Protocol.HeaviestAttestedCandidate().OnUpdate(func(_, newChain *protocol.Chain) {
-		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, newChain.Root().ID())
+		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, newChain.ForkingPoint().ID())
 	})
 
 	n.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
 		fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
 	})
 
-	n.Protocol.CandidateEngineR().OnUpdate(func(_, engine *engine.Engine) {
-		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, engine.Name(), engine.ChainID(), engine.ChainID().Index())
+	// TODO: FIX
+	//n.Protocol.CandidateEngineR().OnUpdate(func(_, engine *engine.Engine) {
+	//	fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, engine.Name(), engine.ChainID(), engine.ChainID().Index())
 
-		n.attachEngineLogs(failOnBlockFiltered, engine)
-	})
+	//	n.attachEngineLogs(failOnBlockFiltered, engine)
+	//})
 
 	n.Protocol.MainEngineR().OnUpdate(func(_, engine *engine.Engine) {
 		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, engine.Name(), engine.ChainID(), engine.ChainID().Index())

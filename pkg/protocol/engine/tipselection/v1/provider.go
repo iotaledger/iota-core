@@ -28,7 +28,10 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 			e.TipManager.OnBlockAdded(t.classifyTip)
 		})
 
-		e.HookStopped(t.TriggerStopped)
+		e.HookShutdown(func() {
+			t.TriggerShutdown()
+			t.TriggerStopped()
+		})
 
 		return t
 	})

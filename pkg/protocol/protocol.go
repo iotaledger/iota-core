@@ -20,7 +20,6 @@ type Protocol struct {
 	options *Options
 
 	*Network
-	*Engines
 	*Chains
 	*Gossip
 
@@ -37,7 +36,6 @@ func New(loggerInstance *logger.Logger, workers *workerpool.Group, dispatcher ne
 		options:       newOptions(),
 	}, opts, func(p *Protocol) {
 		p.Network = newNetwork(p, dispatcher)
-		p.Engines = newEngines(p)
 		p.Chains = newChains(p)
 		p.Gossip = NewGossip(p)
 	}, (*Protocol).TriggerConstructed)

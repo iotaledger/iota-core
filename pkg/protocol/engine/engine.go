@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -73,6 +74,8 @@ type Engine struct {
 
 	startupAvailableBlocksWindow iotago.SlotIndex
 	chainID                      iotago.CommitmentID
+	rootCommitment               reactive.Variable[*model.Commitment]
+	latestCommitment             reactive.Variable[*model.Commitment]
 	mutex                        syncutils.RWMutex
 
 	optsSnapshotPath     string
@@ -106,7 +109,7 @@ func New(
 	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
-	var needsToImportSnapshot bool
+	var importSnapshot bool
 	var file *os.File
 	var fileErr error
 
@@ -121,10 +124,8 @@ func New(
 			optsSnapshotPath:  "snapshot.bin",
 			optsSnapshotDepth: 5,
 		}, opts, func(e *Engine) {
-			needsToImportSnapshot = !e.Storage.Settings().IsSnapshotImported() && e.optsSnapshotPath != ""
-
 			// Import the settings from the snapshot file if needed.
-			if needsToImportSnapshot {
+			if importSnapshot = !e.Storage.Settings().IsSnapshotImported() && e.optsSnapshotPath != ""; importSnapshot {
 				file, fileErr = os.Open(e.optsSnapshotPath)
 				if fileErr != nil {
 					panic(ierrors.Wrap(fileErr, "failed to open snapshot file"))
@@ -136,7 +137,11 @@ func New(
 			}
 		},
 		func(e *Engine) {
-			// Setup all components
+			// setup reactive variables
+			e.rootCommitment = newEngineRootCommitmentVariable(e)
+			e.latestCommitment = newEngineLatestCommitmentVariable(e)
+
+			// setup all components
 			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings().APIProvider())
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 			e.SybilProtection = sybilProtectionProvider(e)
@@ -165,7 +170,7 @@ func New(
 		(*Engine).TriggerConstructed,
 		func(e *Engine) {
 			// Import the rest of the snapshot if needed.
-			if needsToImportSnapshot {
+			if importSnapshot {
 				if err := e.ImportContents(file); err != nil {
 					panic(ierrors.Wrap(err, "failed to import snapshot contents"))
 				}
@@ -214,7 +219,7 @@ func New(
 
 func (e *Engine) Shutdown() {
 	if !e.WasStopped() {
-		e.TriggerStopped()
+		e.TriggerShutdown()
 
 		e.BlockRequester.Shutdown()
 		e.Attestations.Shutdown()
@@ -493,6 +498,14 @@ func (e *Engine) setupPruning() {
 	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))
 }
 
+func (e *Engine) RootCommitment() reactive.Variable[*model.Commitment] {
+	return e.rootCommitment
+}
+
+func (e *Engine) LatestCommitment() reactive.Variable[*model.Commitment] {
+	return e.latestCommitment
+}
+
 // EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
 // commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
 // from being processed as their chain will be deemed unsolid.
@@ -522,6 +535,52 @@ func (e *Engine) ErrorHandler(componentName string) func(error) {
 	return func(err error) {
 		e.errorHandler(ierrors.Wrap(err, componentName))
 	}
+}
+
+func newEngineRootCommitmentVariable(e *Engine) reactive.Variable[*model.Commitment] {
+	v := reactive.NewVariable[*model.Commitment]()
+
+	updateRootCommitment := func(lastFinalizedSlot iotago.SlotIndex) {
+		maxCommittableAge := e.APIForSlot(lastFinalizedSlot).ProtocolParameters().MaxCommittableAge()
+
+		v.Compute(func(rootCommitment *model.Commitment) *model.Commitment {
+			return lo.Return1(e.Storage.Commitments().Load(lo.Cond(lastFinalizedSlot < maxCommittableAge, 0, lastFinalizedSlot-maxCommittableAge)))
+		})
+	}
+
+	e.HookConstructed(func() {
+		unsubscribe := e.Events.SlotGadget.SlotFinalized.Hook(updateRootCommitment).Unhook
+
+		e.HookInitialized(func() {
+			updateRootCommitment(e.Storage.Settings().LatestFinalizedSlot())
+		})
+
+		e.HookShutdown(unsubscribe)
+	})
+
+	return v
+}
+
+func newEngineLatestCommitmentVariable(e *Engine) reactive.Variable[*model.Commitment] {
+	l := reactive.NewVariable[*model.Commitment]()
+
+	updateLatestCommitment := func(latestCommitment *model.Commitment) {
+		l.Compute(func(currentLatestComponent *model.Commitment) *model.Commitment {
+			return lo.Cond(currentLatestComponent == nil || currentLatestComponent.Index() < latestCommitment.Index(), latestCommitment, currentLatestComponent)
+		})
+	}
+
+	e.HookConstructed(func() {
+		unsubscribe := e.Events.Notarization.LatestCommitmentUpdated.Hook(updateLatestCommitment).Unhook
+
+		e.HookInitialized(func() {
+			updateLatestCommitment(e.Storage.Settings().LatestCommitment())
+		})
+
+		e.HookShutdown(unsubscribe)
+	})
+
+	return l
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

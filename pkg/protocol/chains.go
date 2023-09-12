@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -9,11 +11,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Chains struct {
 	protocol *Protocol
+
+	engineManager *enginemanager.EngineManager
 
 	mainChain reactive.Variable[*Chain]
 
@@ -34,7 +39,32 @@ type Chains struct {
 
 func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
-		protocol:                  protocol,
+		protocol: protocol,
+		engineManager: enginemanager.New(
+			protocol.Workers,
+			func(err error) { protocol.LogError(err) },
+			protocol.options.BaseDirectory,
+			3,
+			protocol.options.StorageOptions,
+			protocol.options.EngineOptions,
+			protocol.options.FilterProvider,
+			protocol.options.CommitmentFilterProvider,
+			protocol.options.BlockDAGProvider,
+			protocol.options.BookerProvider,
+			protocol.options.ClockProvider,
+			protocol.options.BlockGadgetProvider,
+			protocol.options.SlotGadgetProvider,
+			protocol.options.SybilProtectionProvider,
+			protocol.options.NotarizationProvider,
+			protocol.options.AttestationProvider,
+			protocol.options.LedgerProvider,
+			protocol.options.SchedulerProvider,
+			protocol.options.TipManagerProvider,
+			protocol.options.TipSelectionProvider,
+			protocol.options.RetainerProvider,
+			protocol.options.UpgradeOrchestratorProvider,
+			protocol.options.SyncManagerProvider,
+		),
 		EvictionState:             reactive.NewEvictionState[iotago.SlotIndex](),
 		mainChain:                 reactive.NewVariable[*Chain](),
 		heaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
@@ -45,14 +75,60 @@ func newChains(protocol *Protocol) *Chains {
 		chainCreated:              event.New1[*Chain](),
 	}
 
+	c.OnChainCreated(func(chain *Chain) {
+		c.provideEngines(chain)
+		c.publishEngineCommitments(chain)
+	})
+
+	mainChain := NewChain()
+	c.mainChain.Set(mainChain)
+	c.chainCreated.Trigger(mainChain)
+
 	protocol.HookConstructed(func() {
-		c.initMainChain()
+		mainChain.engine.instantiate.Set(true)
+
+		c.mainChain.Set(mainChain)
+
+		mainChain.forkingPoint.Get().IsRoot.Trigger()
+
+		//protocol.HeaviestVerifiedCandidate().OnUpdate(func(_, newChain *Chain) {
+		//	e.mainEngine.Set(newChain.Engine())
+		//})
+
+		mainChain.EngineR().OnUpdate(func(_, newEngine *engine.Engine) {
+			protocol.Events.Engine.LinkTo(newEngine.Events)
+		})
+
 		c.initChainSwitching()
 
-		protocol.OnEngineCreated(c.monitorLatestEngineCommitment)
+		// TODO: trigger initialized
 	})
 
 	return c
+}
+
+func (c *Chains) provideEngines(chain *Chain) func() {
+	return chain.engine.instantiate.OnUpdate(func(_, instantiate bool) {
+		if !instantiate {
+			chain.engine.spawnedEngine.Set(nil)
+
+			return
+		}
+
+		currentEngine := chain.engine.Get()
+		if currentEngine == nil {
+			mainEngine, err := c.engineManager.LoadActiveEngine(c.protocol.options.SnapshotPath)
+			if err != nil {
+				panic(fmt.Sprintf("could not load active engine: %s", err))
+			}
+
+			chain.engine.spawnedEngine.Set(mainEngine)
+
+			c.protocol.Network.HookStopped(mainEngine.Shutdown)
+		} else {
+			fmt.Println("WATT IS HIER LOS? EIN FORK?")
+		}
+	})
 }
 
 func (c *Chains) PublishCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment, err error) {
@@ -69,10 +145,6 @@ func (c *Chains) PublishCommitment(commitment *model.Commitment) (commitmentMeta
 }
 
 func (c *Chains) Commitment(commitmentID iotago.CommitmentID, requestMissing ...bool) (commitment *Commitment, err error) {
-	if root := c.MainChain().Root(); root != nil && commitmentID == root.ID() {
-		return root, nil
-	}
-
 	commitmentRequest, exists := c.commitments.Get(commitmentID)
 	if !exists && lo.First(requestMissing) {
 		if commitmentRequest, err = c.requestCommitment(commitmentID, true); err != nil {
@@ -107,6 +179,14 @@ func (c *Chains) MainChainR() reactive.Variable[*Chain] {
 	return c.mainChain
 }
 
+func (c *Chains) MainEngineInstance() *engine.Engine {
+	return c.mainChain.Get().Engine()
+}
+
+func (c *Chains) MainEngineR() reactive.Variable[*engine.Engine] {
+	return c.mainChain.Get().EngineR()
+}
+
 func (c *Chains) HeaviestClaimedCandidate() reactive.Variable[*Chain] {
 	return c.heaviestClaimedCandidate
 }
@@ -117,25 +197,6 @@ func (c *Chains) HeaviestAttestedCandidate() reactive.Variable[*Chain] {
 
 func (c *Chains) HeaviestVerifiedCandidate() reactive.Variable[*Chain] {
 	return c.heaviestVerifiedCandidate
-}
-
-func (c *Chains) initMainChain() {
-	var (
-		engine     = c.protocol.MainEngineInstance()
-		syncStatus = engine.SyncManager.SyncStatus()
-		root       = NewCommitment(engine.EarliestRootCommitment(syncStatus.LatestFinalizedSlot), true)
-	)
-
-	c.Evict(root.Index())
-
-	c.mainChain.Set(NewChain(root, engine))
-
-	for i := root.Index() + 1; i <= syncStatus.LatestCommitment.Index(); i++ {
-		lo.PanicOnErr(c.PublishCommitment(lo.PanicOnErr(engine.Storage.Commitments().Load(i))))
-	}
-
-	c.monitorLatestEngineCommitment(engine)
-
 }
 
 func (c *Chains) initChainSwitching() {
@@ -163,17 +224,17 @@ func (c *Chains) initChainSwitching() {
 }
 
 func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
-	if _, err := c.requestCommitment(commitment.PrevID(), true, commitment.setParent); err != nil {
+	if _, err := c.requestCommitment(commitment.PrevID(), true, lo.Void(commitment.Parent.Set)); err != nil {
 		c.protocol.LogDebug(ierrors.Wrapf(err, "failed to request parent commitment %s", commitment.PrevID()))
 	}
 
 	slotEvictedEvent.OnTrigger(func() {
-		commitment.evicted.Trigger()
+		commitment.IsEvicted.Trigger()
 	})
 
 	c.commitmentCreated.Trigger(commitment)
 
-	commitment.spawnedChain.OnUpdate(func(_, newChain *Chain) {
+	commitment.SpawnedChain.OnUpdate(func(_, newChain *Chain) {
 		if newChain != nil {
 			c.chainCreated.Trigger(newChain)
 		}
@@ -182,18 +243,18 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 
 func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment], err error) {
 	slotEvicted := c.EvictionEvent(commitmentID.Index())
-	if slotEvicted.WasTriggered() {
-		rootCommitment := c.mainChain.Get().Root()
+	if slotEvicted.WasTriggered() && c.LastEvictedSlot().Get() != 0 {
+		forkingPoint := c.mainChain.Get().ForkingPoint()
 
-		if rootCommitment == nil || commitmentID != rootCommitment.ID() {
+		if forkingPoint == nil || commitmentID != forkingPoint.ID() {
 			return nil, ErrorSlotEvicted
 		}
 
 		for _, successCallback := range optSuccessCallbacks {
-			successCallback(rootCommitment)
+			successCallback(forkingPoint)
 		}
 
-		return promise.New[*Commitment]().Resolve(rootCommitment), nil
+		return promise.New[*Commitment]().Resolve(forkingPoint), nil
 	}
 
 	commitmentRequest, requestCreated := c.commitments.GetOrCreate(commitmentID, lo.NoVariadic(promise.New[*Commitment]))
@@ -220,19 +281,55 @@ func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFrom
 	return commitmentRequest, nil
 }
 
-func (c *Chains) monitorLatestEngineCommitment(engine *engine.Engine) {
-	unsubscribe := engine.Events.Notarization.LatestCommitmentUpdated.Hook(func(modelCommitment *model.Commitment) {
-		commitment, err := c.PublishCommitment(modelCommitment)
-		if err != nil {
-			c.protocol.LogDebug(ierrors.Wrapf(err, "failed to add commitment %s", modelCommitment.ID()))
+func (c *Chains) publishEngineCommitments(chain *Chain) {
+	chain.engine.OnUpdateWithContext(func(_, engine *engine.Engine, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
+		if engine != nil {
+			withinContext(func() (unsubscribe func()) {
+				var (
+					latestPublishedIndex iotago.SlotIndex
+					rootPublished        bool
+				)
+
+				publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment) {
+					publishedCommitment, err := c.PublishCommitment(commitment)
+					if err != nil {
+						panic(err) // this can never happen, but we panic to get a stack trace if it ever does
+					}
+
+					publishedCommitment.promote(chain)
+					publishedCommitment.IsVerified.Trigger()
+
+					latestPublishedIndex = commitment.Index()
+
+					return publishedCommitment
+				}
+
+				return engine.LatestCommitment().OnUpdate(func(_, latestModelCommitment *model.Commitment) {
+					if !rootPublished {
+						publishedRoot := publishCommitment(engine.RootCommitment().Get())
+
+						chain.ForkingPointR().Compute(func(currentValue *Commitment) *Commitment {
+							if currentValue != nil {
+								return currentValue
+							}
+
+							return publishedRoot
+						})
+
+						rootPublished = true
+					}
+
+					for latestPublishedIndex < latestModelCommitment.Index() {
+						if commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedIndex + 1); err != nil {
+							panic(err) // this should never happen, but we panic to get a stack trace if it does
+						} else {
+							publishCommitment(commitmentToPublish)
+						}
+					}
+				})
+			})
 		}
-
-		commitment.Parent().Get().successor.Set(commitment)
-
-		commitment.Verified().Trigger()
-	}).Unhook
-
-	engine.HookShutdown(unsubscribe)
+	})
 }
 
 func (c *Chains) trackHeaviestCandidate(candidateVariable reactive.Variable[*Chain], chainWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) {

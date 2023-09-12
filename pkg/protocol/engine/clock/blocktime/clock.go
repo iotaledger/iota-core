@@ -49,7 +49,7 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 				e.Events.Clock.ConfirmedTimeUpdated.LinkTo(c.confirmedTime.OnUpdated)
 
 				asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("Clock", 1))
-				c.HookStopped(lo.Batch(
+				c.HookShutdown(lo.Batch(
 					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 						c.advanceAccepted(block.IssuingTime())
 					}, asyncOpt).Unhook,
@@ -64,10 +64,10 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 
 						c.onSlotFinalized(slotEndTime)
 					}, asyncOpt).Unhook,
+
+					c.TriggerStopped,
 				))
 			})
-
-			e.HookStopped(c.TriggerStopped)
 		}, (*Clock).TriggerConstructed)
 	})
 }

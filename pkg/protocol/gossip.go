@@ -80,13 +80,13 @@ func (r *Gossip) ProcessBlock(block *model.Block, src peer.ID) {
 	}
 
 	if !commitmentRequest.WasCompleted() {
-		fmt.Println("WARNING3", block.ProtocolBlock().SlotCommitmentID)
+		fmt.Println(r.protocol.MainEngineInstance().Name(), "WARNING3", block.ProtocolBlock().SlotCommitmentID, block.ProtocolBlock().SlotCommitmentID.Index())
 		// TODO: QUEUE TO UNSOLID COMMITMENT BLOCKS
 	} else {
 		commitment := commitmentRequest.Result()
 
-		if chain := commitment.Chain(); chain != nil && chain.InSyncRange(block.ID().Index()) {
-			if engine := commitment.Engine().Get(); engine != nil {
+		if chain := commitment.Chain.Get(); chain != nil && chain.InSyncRange(block.ID().Index()) {
+			if engine := commitment.Engine.Get(); engine != nil {
 				engine.ProcessBlockFromPeer(block, src)
 			}
 		}
@@ -114,7 +114,7 @@ func (r *Gossip) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src 
 	if commitment, err := r.protocol.Commitment(commitmentID); err != nil {
 		r.LogDebug(ierrors.Wrapf(err, "failed to process commitment request for commitment %s from peer %s", commitmentID, src))
 	} else {
-		r.protocol.SendSlotCommitment(commitment.CommitmentModel(), src)
+		r.protocol.SendSlotCommitment(commitment.Commitment, src)
 	}
 }
 
@@ -125,13 +125,13 @@ func (r *Gossip) ProcessAttestations(commitmentModel *model.Commitment, attestat
 		return
 	}
 
-	chain := commitment.Chain()
+	chain := commitment.Chain.Get()
 	if chain == nil {
 		r.LogDebug(ierrors.Errorf("failed to find chain for commitment %s when processing attestations", commitmentModel.ID()))
 		return
 	}
 
-	commitmentVerifier, exists := r.commitmentVerifiers.Get(chain.Root().ID())
+	commitmentVerifier, exists := r.commitmentVerifiers.Get(chain.ForkingPoint().ID())
 	if !exists {
 		r.LogDebug(ierrors.Errorf("failed to find commitment verifier for commitment %s when processing attestations", commitmentModel.ID()))
 		return
@@ -144,7 +144,7 @@ func (r *Gossip) ProcessAttestations(commitmentModel *model.Commitment, attestat
 	}
 
 	// TODO: publish blockIDs, actualCumulativeWeight to target commitment
-	commitment.Attested().Set(true)
+	commitment.IsAttested.Set(true)
 
 	fmt.Println("ATTESTATIONS", blockIDs, actualCumulativeWeight, source)
 }
@@ -252,17 +252,17 @@ func (r *Gossip) startAttestationsRequester() {
 		r.protocol.OnChainCreated(func(chain *Chain) {
 			chain.RequestAttestations().OnUpdate(func(_, requestAttestations bool) {
 				if requestAttestations {
-					r.commitmentVerifiers.GetOrCreate(chain.Root().ID(), func() *CommitmentVerifier {
-						return NewCommitmentVerifier(chain.EngineR().Get(), chain.Root().Parent().Get().CommitmentModel())
+					r.commitmentVerifiers.GetOrCreate(chain.ForkingPoint().ID(), func() *CommitmentVerifier {
+						return NewCommitmentVerifier(chain.EngineR().Get(), chain.ForkingPoint().Parent.Get().Commitment)
 					})
 				} else {
-					r.commitmentVerifiers.Delete(chain.Root().ID())
+					r.commitmentVerifiers.Delete(chain.ForkingPoint().ID())
 				}
 			})
 		})
 
 		r.protocol.OnCommitmentCreated(func(commitment *Commitment) {
-			commitment.requestAttestations.OnUpdate(func(_, requestAttestations bool) {
+			commitment.RequestAttestations.OnUpdate(func(_, requestAttestations bool) {
 				if requestAttestations {
 					r.attestationsRequester.StartTicker(commitment.ID())
 				} else {
@@ -292,7 +292,11 @@ func (r *Gossip) startBlockRequester() {
 		engine.HookShutdown(unsubscribe)
 	}
 
-	startBlockRequester(r.protocol.MainEngineInstance())
+	r.protocol.MainEngineR().OnUpdate(func(_, engine *engine.Engine) {
+		startBlockRequester(engine)
+	})
 
-	r.protocol.OnEngineCreated(startBlockRequester)
+	r.protocol.OnChainCreated(func(chain *Chain) {
+		chain.EngineR().OnUpdate(func(_, engine *engine.Engine) { startBlockRequester(engine) })
+	})
 }

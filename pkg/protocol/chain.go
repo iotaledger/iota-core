@@ -10,8 +10,8 @@ import (
 
 // Chain is a reactive component that manages the state of a chain.
 type Chain struct {
-	// root contains the Commitment object that spawned this chain.
-	root *Commitment
+	// forkingPoint contains the Commitment object that spawned this chain.
+	forkingPoint reactive.Variable[*Commitment]
 
 	// commitments is a map of Commitment objects that belong to the same chain.
 	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
@@ -47,14 +47,18 @@ type Chain struct {
 	// engine is the engine that is used to process blocks of this chain.
 	engine *chainEngine
 
+	// isSolid is an event that gets triggered when the chain becomes solid (all blocks till the forking point of the
+	// main chain are available).
+	isSolid reactive.Event
+
 	// evicted is an event that gets triggered when the chain gets evicted.
 	evicted reactive.Event
 }
 
 // NewChain creates a new Chain instance.
-func NewChain(root *Commitment, optStartingEngine ...*engine.Engine) *Chain {
+func NewChain() *Chain {
 	c := &Chain{
-		root:                     root,
+		forkingPoint:             reactive.NewVariable[*Commitment](),
 		commitments:              shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 		latestCommitment:         reactive.NewVariable[*Commitment](),
 		latestAttestedCommitment: reactive.NewVariable[*Commitment](),
@@ -63,11 +67,11 @@ func NewChain(root *Commitment, optStartingEngine ...*engine.Engine) *Chain {
 		evicted:                  reactive.NewEvent(),
 	}
 
-	c.engine = newChainEngine(root, optStartingEngine...)
+	c.engine = newChainEngine(c)
 
-	c.claimedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.latestCommitment)
-	c.attestedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.latestAttestedCommitment)
-	c.verifiedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.latestVerifiedCommitment)
+	c.claimedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.latestCommitment)
+	c.attestedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.latestAttestedCommitment)
+	c.verifiedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.latestVerifiedCommitment)
 
 	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {
 		if latestCommitment == nil || latestCommitment.Index() < WarpSyncOffset {
@@ -85,20 +89,23 @@ func NewChain(root *Commitment, optStartingEngine ...*engine.Engine) *Chain {
 		return latestVerifiedCommitment.Index() + SyncWindow + 1
 	}, c.latestVerifiedCommitment)
 
-	root.chain.Set(c)
-
 	return c
 }
 
-// Root returns the Commitment object that spawned this chain.
-func (c *Chain) Root() *Commitment {
-	return c.root
+// ForkingPoint returns the Commitment object that spawned this chain.
+func (c *Chain) ForkingPoint() *Commitment {
+	return c.forkingPoint.Get()
+}
+
+// ForkingPointR returns the Commitment object that spawned this chain.
+func (c *Chain) ForkingPointR() reactive.Variable[*Commitment] {
+	return c.forkingPoint
 }
 
 // Commitment returns the Commitment object with the given index, if it exists.
 func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c; currentChain != nil; {
-		switch root := currentChain.Root(); {
+		switch root := currentChain.ForkingPoint(); {
 		case root == nil:
 			return nil, false // this should never happen, but we can handle it gracefully anyway
 		case root.Index() == index:
@@ -106,12 +113,12 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 		case index > root.Index():
 			return currentChain.commitments.Get(index)
 		default:
-			parent := root.parent.Get()
+			parent := root.Parent.Get()
 			if parent == nil {
 				return nil, false
 			}
 
-			currentChain = parent.Chain()
+			currentChain = parent.Chain.Get()
 		}
 	}
 
@@ -203,15 +210,24 @@ func (c *Chain) Evicted() reactive.Event {
 func (c *Chain) registerCommitment(commitment *Commitment) {
 	c.commitments.Set(commitment.Index(), commitment)
 
-	c.latestCommitment.Compute(commitment.max)
+	// maxCommitment returns the Commitment object with the higher index.
+	maxCommitment := func(other *Commitment) *Commitment {
+		if commitment == nil || other != nil && other.Index() >= commitment.Index() {
+			return other
+		}
+
+		return commitment
+	}
+
+	c.latestCommitment.Compute(maxCommitment)
 
 	unsubscribe := lo.Batch(
-		commitment.attested.OnTrigger(func() { c.latestAttestedCommitment.Compute(commitment.max) }),
-		commitment.verified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(commitment.max) }),
+		commitment.IsAttested.OnTrigger(func() { c.latestAttestedCommitment.Compute(maxCommitment) }),
+		commitment.IsVerified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(maxCommitment) }),
 	)
 
 	// unsubscribe and unregister the commitment when it changes its chain
-	commitment.chain.OnUpdateOnce(func(_, _ *Chain) {
+	commitment.Chain.OnUpdateOnce(func(_, _ *Chain) {
 		unsubscribe()
 
 		c.unregisterCommitment(commitment)
@@ -227,7 +243,7 @@ func (c *Chain) unregisterCommitment(commitment *Commitment) {
 			return latestCommitment
 		}
 
-		return commitment.parent.Get()
+		return commitment.Parent.Get()
 	}
 
 	c.latestCommitment.Compute(resetToParent)
@@ -245,14 +261,22 @@ type chainEngine struct {
 	instantiate reactive.Variable[bool]
 }
 
-func newChainEngine(commitment *Commitment, optInitEngine ...*engine.Engine) *chainEngine {
+func newChainEngine(chain *Chain) *chainEngine {
 	e := &chainEngine{
 		parentEngine:  reactive.NewVariable[*engine.Engine](),
 		instantiate:   reactive.NewVariable[bool](),
-		spawnedEngine: reactive.NewVariable[*engine.Engine]().Init(lo.First(optInitEngine)),
+		spawnedEngine: reactive.NewVariable[*engine.Engine](),
 	}
 
-	commitment.parent.OnUpdate(func(_, parent *Commitment) { e.parentEngine.InheritFrom(parent.Engine()) })
+	chain.forkingPoint.OnUpdateWithContext(func(_, forkingPoint *Commitment, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
+		withinContext(func() func() {
+			return forkingPoint.Parent.OnUpdate(func(_, parent *Commitment) {
+				withinContext(func() func() {
+					return e.parentEngine.InheritFrom(parent.Engine)
+				})
+			})
+		})
+	})
 
 	e.Variable = reactive.NewDerivedVariable2(func(spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
 		if spawnedEngine != nil {
@@ -263,4 +287,12 @@ func newChainEngine(commitment *Commitment, optInitEngine ...*engine.Engine) *ch
 	}, e.spawnedEngine, e.parentEngine)
 
 	return e
+}
+
+func cumulativeWeight(commitment *Commitment) uint64 {
+	if commitment == nil {
+		return 0
+	}
+
+	return commitment.CumulativeWeight()
 }

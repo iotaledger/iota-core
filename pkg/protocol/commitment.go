@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -10,240 +12,172 @@ import (
 type Commitment struct {
 	*model.Commitment
 
-	parent              reactive.Variable[*Commitment]
-	successor           reactive.Variable[*Commitment]
-	children            reactive.Set[*Commitment]
-	spawnedChain        reactive.Variable[*Chain]
-	chain               reactive.Variable[*Chain]
-	solid               reactive.Event
-	attested            reactive.Event
-	verified            reactive.Event
-	inSyncRange         *commitmentInSyncRange
-	requestBlocks       *commitmentRequestBlocks
-	requestAttestations *commitmentRequestAttestations
-	evicted             reactive.Event
+	Parent              reactive.Variable[*Commitment]
+	Children            reactive.Set[*Commitment]
+	MainChild           reactive.Variable[*Commitment]
+	SpawnedChain        reactive.Variable[*Chain]
+	Chain               reactive.Variable[*Chain]
+	Engine              reactive.Variable[*engine.Engine]
+	InSyncRange         *commitmentInSyncRange
+	RequestBlocks       *commitmentRequestBlocks
+	RequestAttestations *commitmentRequestAttestations
+	IsSolid             reactive.Event
+	IsAttested          reactive.Event
+	IsVerified          reactive.Event
+	IsRoot              reactive.Event
+	IsEvicted           reactive.Event
 }
 
-func NewCommitment(commitment *model.Commitment, optIsRoot ...bool) *Commitment {
+func NewCommitment(commitment *model.Commitment) *Commitment {
 	c := &Commitment{
 		Commitment:   commitment,
-		parent:       reactive.NewVariable[*Commitment](),
-		successor:    reactive.NewVariable[*Commitment](),
-		children:     reactive.NewSet[*Commitment](),
-		spawnedChain: reactive.NewVariable[*Chain](),
-		chain:        reactive.NewVariable[*Chain](),
-		solid:        reactive.NewEvent(),
-		attested:     reactive.NewEvent(),
-		verified:     reactive.NewEvent(),
-		evicted:      reactive.NewEvent(),
+		Parent:       reactive.NewVariable[*Commitment](),
+		MainChild:    reactive.NewVariable[*Commitment](),
+		Children:     reactive.NewSet[*Commitment](),
+		SpawnedChain: reactive.NewVariable[*Chain](),
+		Chain:        reactive.NewVariable[*Chain](),
+		Engine:       reactive.NewVariable[*engine.Engine](),
+		IsSolid:      reactive.NewEvent(),
+		IsAttested:   reactive.NewEvent(),
+		IsVerified:   reactive.NewEvent(),
+		IsRoot:       reactive.NewEvent(),
+		IsEvicted:    reactive.NewEvent(),
 	}
 
-	c.inSyncRange = newCommitmentInSyncRange(c, lo.First(optIsRoot))
-	c.requestBlocks = newCommitmentRequestBlocks(c, lo.First(optIsRoot))
-	c.requestAttestations = newCommitmentRequestAttestations(c)
+	c.InSyncRange = newCommitmentInSyncRange(c)
+	c.RequestBlocks = newCommitmentRequestBlocks(c)
+	c.RequestAttestations = newCommitmentRequestAttestations(c)
 
-	c.parent.OnUpdate(func(_, parent *Commitment) { c.solid.InheritFrom(parent.solid) })
+	c.IsRoot.OnTrigger(func() {
+		c.IsSolid.Set(true)
+		c.IsAttested.Set(true)
+		c.IsVerified.Set(true)
+	})
 
-	c.chain.OnUpdate(func(_, chain *Chain) { chain.registerCommitment(c) })
+	c.Parent.OnUpdate(func(_, parent *Commitment) {
+		c.IsSolid.InheritFrom(parent.IsSolid)
 
-	if lo.First(optIsRoot) {
-		c.solid.Set(true)
-		c.attested.Set(true)
-		c.verified.Set(true)
-	}
+		parent.registerChild(c, c.inheritChain(parent))
+	})
+
+	c.Chain.OnUpdate(func(_, chain *Chain) {
+		chain.registerCommitment(c)
+
+		// commitments inherit the engine from the chain
+		chain.engine.OnUpdate(func(_, chainEngine *engine.Engine) {
+			c.Engine.Set(chainEngine)
+		})
+	})
 
 	return c
 }
 
-func (c *Commitment) CommitmentModel() *model.Commitment {
-	return c.Commitment
-}
-
-func (c *Commitment) Parent() reactive.Variable[*Commitment] {
-	return c.parent
-}
-
-func (c *Commitment) Successor() reactive.Variable[*Commitment] {
-	return c.successor
-}
-
-func (c *Commitment) Children() reactive.Set[*Commitment] {
-	return c.children
-}
-
-func (c *Commitment) SpawnedChain() reactive.Variable[*Chain] {
-	return c.spawnedChain
-}
-
-func (c *Commitment) Chain() *Chain {
-	return c.chain.Get()
-}
-
-func (c *Commitment) ChainR() reactive.Variable[*Chain] {
-	return c.chain
-}
-
-func (c *Commitment) Solid() reactive.Event {
-	return c.solid
-}
-
-func (c *Commitment) Attested() reactive.Event {
-	return c.attested
-}
-
-func (c *Commitment) Verified() reactive.Event {
-	return c.verified
-}
-
-func (c *Commitment) InSyncRange() reactive.Variable[bool] {
-	return c.inSyncRange
-}
-
-func (c *Commitment) RequestBlocks() reactive.Variable[bool] {
-	return c.requestBlocks
-}
-
-func (c *Commitment) RequestAttestations() reactive.Variable[bool] {
-	return c.requestAttestations
-}
-
-func (c *Commitment) Engine() reactive.Variable[*engine.Engine] {
-	return c.chain.Get().EngineR()
-}
-
-func (c *Commitment) Evicted() reactive.Event {
-	return c.evicted
-}
-
-func (c *Commitment) setParent(parent *Commitment) {
-	parent.registerChild(c, c.chainUpdater(parent))
-
-	if c.parent.Set(parent) != nil {
-		panic("parent may not be changed once it was set")
-	}
-}
-
 func (c *Commitment) registerChild(newChild *Commitment, onSuccessorUpdated func(*Commitment, *Commitment)) {
-	if c.children.Add(newChild) {
-		c.successor.Compute(func(currentSuccessor *Commitment) *Commitment {
+	if c.Children.Add(newChild) {
+		c.MainChild.Compute(func(currentSuccessor *Commitment) *Commitment {
 			return lo.Cond(currentSuccessor != nil, currentSuccessor, newChild)
 		})
 
-		unsubscribe := c.successor.OnUpdate(onSuccessorUpdated)
+		unsubscribe := c.MainChild.OnUpdate(onSuccessorUpdated)
 
-		c.evicted.OnTrigger(unsubscribe)
+		c.IsEvicted.OnTrigger(unsubscribe)
 	}
 }
 
-func (c *Commitment) chainUpdater(parent *Commitment) func(*Commitment, *Commitment) {
+func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitment) {
 	var unsubscribeFromParent func()
 
 	return func(_, successor *Commitment) {
-		c.spawnedChain.Compute(func(spawnedChain *Chain) (newSpawnedChain *Chain) {
-			if successor == nil {
-				panic("successor may not be changed back to nil")
-			}
+		c.SpawnedChain.Compute(func(spawnedChain *Chain) (newSpawnedChain *Chain) {
+			switch successor {
+			case nil:
+				panic("Successor may not be changed back to nil")
 
-			if successor == c {
+			case c:
 				if spawnedChain != nil {
 					spawnedChain.evicted.Trigger()
 				}
 
-				unsubscribeFromParent = parent.chain.OnUpdate(func(_, chain *Chain) { c.chain.Set(chain) })
+				unsubscribeFromParent = parent.Chain.OnUpdate(func(_, chain *Chain) {
+					c.Chain.Set(chain)
+				})
 
 				return nil
-			}
 
-			if spawnedChain != nil {
+			default:
+				if spawnedChain == nil {
+					if unsubscribeFromParent != nil {
+						unsubscribeFromParent()
+					}
+
+					spawnedChain = NewChain()
+					spawnedChain.forkingPoint.Set(c)
+				}
+
 				return spawnedChain
 			}
-
-			if unsubscribeFromParent != nil {
-				unsubscribeFromParent()
-			}
-
-			return NewChain(c)
 		})
 	}
 }
 
-// max compares the commitment with the given other commitment and returns the one with the higher index.
-func (c *Commitment) max(other *Commitment) *Commitment {
-	if c == nil || other != nil && other.Index() >= c.Index() {
-		return other
-	}
+func (c *Commitment) promote(targetChain *Chain) {
+	c.Chain.Compute(func(currentChain *Chain) *Chain {
+		if currentChain != nil {
+			fmt.Println("SHOULD PROMOTE")
+			//currentChain.Promote(targetChain)
+		}
 
-	return c
-}
-
-func (c *Commitment) cumulativeWeight() uint64 {
-	if c == nil {
-		return 0
-	}
-
-	return c.CumulativeWeight()
+		return targetChain
+	})
 }
 
 type commitmentInSyncRange struct {
 	reactive.Variable[bool]
 
-	aboveLatestVerifiedCommitment *commitmentAboveLatestVerifiedCommitment
+	aboveLatestVerifiedCommitment reactive.Variable[bool]
 	isBelowSyncThreshold          reactive.Event
 }
 
-func newCommitmentInSyncRange(commitment *Commitment, isRoot bool) *commitmentInSyncRange {
+func newCommitmentInSyncRange(commitment *Commitment) *commitmentInSyncRange {
 	i := &commitmentInSyncRange{
 		aboveLatestVerifiedCommitment: newCommitmentAboveLatestVerifiedCommitment(commitment),
 		isBelowSyncThreshold:          reactive.NewEvent(),
 	}
 
-	commitment.parent.OnUpdate(func(_, parent *Commitment) {
+	commitment.Parent.OnUpdate(func(_, parent *Commitment) {
 		triggerEventIfCommitmentBelowThreshold(func(commitment *Commitment) reactive.Event {
-			return commitment.inSyncRange.isBelowSyncThreshold
+			return commitment.InSyncRange.isBelowSyncThreshold
 		}, commitment, (*Chain).SyncThreshold)
 	})
 
-	if isRoot {
+	commitment.IsRoot.OnTrigger(func() {
 		i.isBelowSyncThreshold.Set(true)
-	}
+	})
 
 	i.Variable = reactive.NewDerivedVariable2(func(belowSyncThreshold, aboveLatestVerifiedCommitment bool) bool {
 		return belowSyncThreshold && aboveLatestVerifiedCommitment
-	}, i.isBelowSyncThreshold, newCommitmentAboveLatestVerifiedCommitment(commitment))
+	}, i.isBelowSyncThreshold, i.aboveLatestVerifiedCommitment)
 
 	return i
 }
 
-type commitmentAboveLatestVerifiedCommitment struct {
-	reactive.Variable[bool]
+func newCommitmentAboveLatestVerifiedCommitment(commitment *Commitment) reactive.Variable[bool] {
+	var (
+		parentVerified                        = reactive.NewEvent()
+		parentAboveLatestVerifiedCommitment   = reactive.NewVariable[bool]()
+		directlyAboveLatestVerifiedCommitment = reactive.NewDerivedVariable2(func(parentVerified, verified bool) bool {
+			return parentVerified && !verified
+		}, parentVerified, commitment.IsVerified)
+	)
 
-	parentVerified reactive.Event
-
-	parentAboveLatestVerifiedCommitment reactive.Variable[bool]
-
-	directlyAboveLatestVerifiedCommitment reactive.Variable[bool]
-}
-
-func newCommitmentAboveLatestVerifiedCommitment(commitment *Commitment) *commitmentAboveLatestVerifiedCommitment {
-	a := &commitmentAboveLatestVerifiedCommitment{
-		parentVerified:                      reactive.NewEvent(),
-		parentAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
-	}
-
-	a.directlyAboveLatestVerifiedCommitment = reactive.NewDerivedVariable2(func(parentVerified, verified bool) bool {
-		return parentVerified && !verified
-	}, a.parentVerified, commitment.verified)
-
-	a.Variable = reactive.NewDerivedVariable2(func(directlyAboveLatestVerifiedCommitment, parentAboveLatestVerifiedCommitment bool) bool {
-		return directlyAboveLatestVerifiedCommitment || parentAboveLatestVerifiedCommitment
-	}, a.directlyAboveLatestVerifiedCommitment, a.parentAboveLatestVerifiedCommitment)
-
-	commitment.parent.OnUpdateOnce(func(_, parent *Commitment) {
-		a.parentVerified.InheritFrom(parent.verified)
-		a.parentAboveLatestVerifiedCommitment.InheritFrom(parent.inSyncRange.aboveLatestVerifiedCommitment)
+	commitment.Parent.OnUpdateOnce(func(_, parent *Commitment) {
+		parentVerified.InheritFrom(parent.IsVerified)
+		parentAboveLatestVerifiedCommitment.InheritFrom(parent.InSyncRange.aboveLatestVerifiedCommitment)
 	})
 
-	return a
+	return reactive.NewDerivedVariable2(func(directlyAboveLatestVerifiedCommitment, parentAboveLatestVerifiedCommitment bool) bool {
+		return directlyAboveLatestVerifiedCommitment || parentAboveLatestVerifiedCommitment
+	}, directlyAboveLatestVerifiedCommitment, parentAboveLatestVerifiedCommitment)
 }
 
 type commitmentRequestAttestations struct {
@@ -262,13 +196,13 @@ func newCommitmentRequestAttestations(commitment *Commitment) *commitmentRequest
 
 	c.isDirectlyAboveLatestAttestedCommitment = reactive.NewDerivedVariable2(func(parentAttested, attested bool) bool {
 		return parentAttested && !attested
-	}, c.parentAttested, commitment.attested)
+	}, c.parentAttested, commitment.IsAttested)
 
-	commitment.parent.OnUpdateOnce(func(_, parent *Commitment) { c.parentAttested.InheritFrom(parent.attested) })
+	commitment.Parent.OnUpdateOnce(func(_, parent *Commitment) { c.parentAttested.InheritFrom(parent.IsAttested) })
 
 	var attestationRequestedByChain reactive.DerivedVariable[bool]
 
-	commitment.chain.OnUpdate(func(_, newChain *Chain) {
+	commitment.Chain.OnUpdate(func(_, newChain *Chain) {
 		// cleanup the old chain specific derived variable if it exists
 		if attestationRequestedByChain != nil {
 			attestationRequestedByChain.Unsubscribe()
@@ -292,22 +226,22 @@ type commitmentRequestBlocks struct {
 	isBelowWarpSyncThreshold reactive.Event
 }
 
-func newCommitmentRequestBlocks(commitment *Commitment, isRoot bool) *commitmentRequestBlocks {
+func newCommitmentRequestBlocks(commitment *Commitment) *commitmentRequestBlocks {
 	r := &commitmentRequestBlocks{
 		isBelowWarpSyncThreshold: reactive.NewEvent(),
 	}
 
-	if isRoot {
+	commitment.IsRoot.OnTrigger(func() {
 		r.isBelowWarpSyncThreshold.Set(true)
-	}
+	})
 
 	r.Variable = reactive.NewDerivedVariable2(func(inSyncWindow, belowWarpSyncThreshold bool) bool {
 		return inSyncWindow && belowWarpSyncThreshold
-	}, commitment.inSyncRange, r.isBelowWarpSyncThreshold)
+	}, commitment.InSyncRange, r.isBelowWarpSyncThreshold)
 
-	commitment.parent.OnUpdate(func(_, parent *Commitment) {
+	commitment.Parent.OnUpdate(func(_, parent *Commitment) {
 		triggerEventIfCommitmentBelowThreshold(func(commitment *Commitment) reactive.Event {
-			return commitment.requestBlocks.isBelowWarpSyncThreshold
+			return commitment.RequestBlocks.isBelowWarpSyncThreshold
 		}, commitment, (*Chain).WarpSyncThreshold)
 	})
 

@@ -25,7 +25,10 @@ func NewProvider(opts ...options.Option[TipManager]) module.Provider[*engine.Eng
 			t.TriggerInitialized()
 		})
 
-		e.HookStopped(t.TriggerStopped)
+		e.HookShutdown(func() {
+			t.TriggerShutdown()
+			t.TriggerStopped()
+		})
 
 		return t
 	})
