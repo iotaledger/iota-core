@@ -250,10 +250,10 @@ func (r *Gossip) OnAttestationsRequested(callback func(commitmentID iotago.Commi
 func (r *Gossip) startAttestationsRequester() {
 	r.protocol.HookConstructed(func() {
 		r.protocol.OnChainCreated(func(chain *Chain) {
-			chain.RequestAttestations().OnUpdate(func(_, requestAttestations bool) {
+			chain.RequestAttestations.OnUpdate(func(_, requestAttestations bool) {
 				if requestAttestations {
 					r.commitmentVerifiers.GetOrCreate(chain.ForkingPoint.Get().ID(), func() *CommitmentVerifier {
-						return NewCommitmentVerifier(chain.EngineR().Get(), chain.ForkingPoint.Get().Parent.Get().Commitment)
+						return NewCommitmentVerifier(chain.Engine.Get(), chain.ForkingPoint.Get().Parent.Get().Commitment)
 					})
 				} else {
 					r.commitmentVerifiers.Delete(chain.ForkingPoint.Get().ID())
@@ -292,11 +292,11 @@ func (r *Gossip) startBlockRequester() {
 		engine.HookShutdown(unsubscribe)
 	}
 
-	r.protocol.MainEngineR().OnUpdate(func(_, engine *engine.Engine) {
+	r.protocol.MainChain.Get().Engine.OnUpdate(func(_, engine *engine.Engine) {
 		startBlockRequester(engine)
 	})
 
 	r.protocol.OnChainCreated(func(chain *Chain) {
-		chain.EngineR().OnUpdate(func(_, engine *engine.Engine) { startBlockRequester(engine) })
+		chain.Engine.OnUpdate(func(_, engine *engine.Engine) { startBlockRequester(engine) })
 	})
 }

@@ -18,25 +18,27 @@ type Chain struct {
 	VerifiedWeight           reactive.Variable[uint64]
 	SyncThreshold            reactive.Variable[iotago.SlotIndex]
 	WarpSyncThreshold        reactive.Variable[iotago.SlotIndex]
-	requestAttestations      reactive.Variable[bool]
-	engine                   *chainEngine
-	isSolid                  reactive.Event
-	evicted                  reactive.Event
-	commitments              *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
+	RequestAttestations      reactive.Variable[bool]
+	Engine                   *chainEngine
+	IsSolid                  reactive.Event
+	IsEvicted                reactive.Event
+
+	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
 }
 
 func NewChain() *Chain {
 	c := &Chain{
 		ForkingPoint:             reactive.NewVariable[*Commitment](),
-		commitments:              shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 		LatestCommitment:         reactive.NewVariable[*Commitment](),
 		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
 		LatestVerifiedCommitment: reactive.NewVariable[*Commitment](),
-		requestAttestations:      reactive.NewVariable[bool](),
-		evicted:                  reactive.NewEvent(),
+		RequestAttestations:      reactive.NewVariable[bool](),
+		IsEvicted:                reactive.NewEvent(),
+
+		commitments: shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 	}
 
-	c.engine = newChainEngine(c)
+	c.Engine = newChainEngine(c)
 
 	c.ClaimedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestCommitment)
 	c.AttestedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestAttestedCommitment)
@@ -83,28 +85,12 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 	return nil, false
 }
 
-func (c *Chain) RequestAttestations() reactive.Variable[bool] {
-	return c.requestAttestations
-}
-
-func (c *Chain) Engine() *engine.Engine {
-	return c.engine.Get()
-}
-
-func (c *Chain) EngineR() reactive.Variable[*engine.Engine] {
-	return c.engine
-}
-
 func (c *Chain) InSyncRange(index iotago.SlotIndex) bool {
 	if latestVerifiedCommitment := c.LatestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
 		return index > c.LatestVerifiedCommitment.Get().Index() && index < c.SyncThreshold.Get()
 	}
 
 	return false
-}
-
-func (c *Chain) Evicted() reactive.Event {
-	return c.evicted
 }
 
 func (c *Chain) registerCommitment(commitment *Commitment) {

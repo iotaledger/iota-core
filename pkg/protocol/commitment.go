@@ -104,7 +104,7 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 		chain.registerCommitment(c)
 
 		withinContext(func() (unsubscribe func()) {
-			return chain.engine.OnUpdate(func(_, chainEngine *engine.Engine) {
+			return chain.Engine.OnUpdate(func(_, chainEngine *engine.Engine) {
 				c.Engine.Set(chainEngine)
 			})
 		})
@@ -112,7 +112,7 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 		withinContext(func() (unsubscribe func()) {
 			requestAttestations := reactive.NewDerivedVariable2(func(requestAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
 				return requestAttestations && isDirectlyAboveLatestAttestedCommitment
-			}, chain.requestAttestations, c.isDirectlyAboveLatestAttestedCommitment)
+			}, chain.RequestAttestations, c.isDirectlyAboveLatestAttestedCommitment)
 
 			c.RequestAttestations.InheritFrom(requestAttestations)
 
@@ -158,7 +158,7 @@ func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitm
 
 			case c:
 				if spawnedChain != nil {
-					spawnedChain.evicted.Trigger()
+					spawnedChain.IsEvicted.Trigger()
 				}
 
 				unsubscribeFromParent = parent.Chain.OnUpdate(func(_, chain *Chain) {

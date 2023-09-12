@@ -207,7 +207,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	//	n.attachEngineLogs(failOnBlockFiltered, engine)
 	//})
 
-	n.Protocol.MainEngineR().OnUpdate(func(_, engine *engine.Engine) {
+	n.Protocol.MainChain.Get().Engine.OnUpdate(func(_, engine *engine.Engine) {
 		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, engine.Name(), engine.ChainID(), engine.ChainID().Index())
 	})
 
