@@ -210,9 +210,17 @@ func (c *Chains) initChainSwitching() {
 	})
 
 	c.OnChainCreated(func(chain *Chain) {
-		c.trackHeaviestCandidate(c.heaviestClaimedCandidate, (*Chain).ClaimedWeight, chain)
-		c.trackHeaviestCandidate(c.heaviestAttestedCandidate, (*Chain).AttestedWeight, chain)
-		c.trackHeaviestCandidate(c.heaviestVerifiedCandidate, (*Chain).VerifiedWeight, chain)
+		c.trackHeaviestCandidate(c.heaviestClaimedCandidate, func(chain *Chain) reactive.Variable[uint64] {
+			return chain.ClaimedWeight
+		}, chain)
+
+		c.trackHeaviestCandidate(c.heaviestAttestedCandidate, func(chain *Chain) reactive.Variable[uint64] {
+			return chain.AttestedWeight
+		}, chain)
+
+		c.trackHeaviestCandidate(c.heaviestVerifiedCandidate, func(chain *Chain) reactive.Variable[uint64] {
+			return chain.VerifiedWeight
+		}, chain)
 	})
 }
 
@@ -327,7 +335,7 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 
 func (c *Chains) trackHeaviestCandidate(candidateVariable reactive.Variable[*Chain], chainWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) {
 	chainWeightVariable(candidate).OnUpdate(func(_, newChainWeight uint64) {
-		if newChainWeight <= c.mainChain.Get().verifiedWeight.Get() {
+		if newChainWeight <= c.mainChain.Get().VerifiedWeight.Get() {
 			return
 		}
 

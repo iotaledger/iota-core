@@ -13,9 +13,6 @@ type Chain struct {
 	// forkingPoint contains the Commitment object that spawned this chain.
 	ForkingPoint reactive.Variable[*Commitment]
 
-	// commitments is a map of Commitment objects that belong to the same chain.
-	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
-
 	// latestCommitment is the latest Commitment object in this chain.
 	LatestCommitment reactive.Variable[*Commitment]
 
@@ -23,16 +20,16 @@ type Chain struct {
 	LatestAttestedCommitment reactive.Variable[*Commitment]
 
 	// latestVerifiedCommitment is the latest verified Commitment object in this chain.
-	latestVerifiedCommitment reactive.Variable[*Commitment]
+	LatestVerifiedCommitment reactive.Variable[*Commitment]
 
-	// claimedWeight contains the total cumulative weight of the chain that is claimed by the latest commitments.
-	claimedWeight reactive.Variable[uint64]
+	// ClaimedWeight contains the total cumulative weight of the chain that is claimed by the latest commitments.
+	ClaimedWeight reactive.Variable[uint64]
 
-	// attestedWeight contains the total cumulative weight of the chain that we received attestations for.
-	attestedWeight reactive.Variable[uint64]
+	// AttestedWeight contains the total cumulative weight of the chain that we received attestations for.
+	AttestedWeight reactive.Variable[uint64]
 
-	// verifiedWeight contains the total cumulative weight of the chain that we verified ourselves.
-	verifiedWeight reactive.Variable[uint64]
+	// VerifiedWeight contains the total cumulative weight of the chain that we verified ourselves.
+	VerifiedWeight reactive.Variable[uint64]
 
 	// syncThreshold is the upper bound for slots that are being fed to the engine (to prevent memory exhaustion).
 	syncThreshold reactive.Variable[iotago.SlotIndex]
@@ -53,6 +50,9 @@ type Chain struct {
 
 	// evicted is an event that gets triggered when the chain gets evicted.
 	evicted reactive.Event
+
+	// commitments is a map of Commitment objects that belong to the same chain.
+	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
 }
 
 // NewChain creates a new Chain instance.
@@ -62,16 +62,16 @@ func NewChain() *Chain {
 		commitments:              shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 		LatestCommitment:         reactive.NewVariable[*Commitment](),
 		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
-		latestVerifiedCommitment: reactive.NewVariable[*Commitment](),
+		LatestVerifiedCommitment: reactive.NewVariable[*Commitment](),
 		requestAttestations:      reactive.NewVariable[bool](),
 		evicted:                  reactive.NewEvent(),
 	}
 
 	c.engine = newChainEngine(c)
 
-	c.claimedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestCommitment)
-	c.attestedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestAttestedCommitment)
-	c.verifiedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.latestVerifiedCommitment)
+	c.ClaimedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestCommitment)
+	c.AttestedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestAttestedCommitment)
+	c.VerifiedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestVerifiedCommitment)
 
 	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {
 		if latestCommitment == nil || latestCommitment.Index() < WarpSyncOffset {
@@ -87,7 +87,7 @@ func NewChain() *Chain {
 		}
 
 		return latestVerifiedCommitment.Index() + SyncWindow + 1
-	}, c.latestVerifiedCommitment)
+	}, c.LatestVerifiedCommitment)
 
 	return c
 }
@@ -95,15 +95,15 @@ func NewChain() *Chain {
 // Commitment returns the Commitment object with the given index, if it exists.
 func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c; currentChain != nil; {
-		switch root := currentChain.ForkingPoint.Get(); {
-		case root == nil:
+		switch forkingPoint := currentChain.ForkingPoint.Get(); {
+		case forkingPoint == nil:
 			return nil, false // this should never happen, but we can handle it gracefully anyway
-		case root.Index() == index:
-			return root, true
-		case index > root.Index():
+		case forkingPoint.Index() == index:
+			return forkingPoint, true
+		case index > forkingPoint.Index():
 			return currentChain.commitments.Get(index)
 		default:
-			parent := root.Parent.Get()
+			parent := forkingPoint.Parent.Get()
 			if parent == nil {
 				return nil, false
 			}
@@ -113,30 +113,6 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 	}
 
 	return nil, false
-}
-
-// LatestVerifiedCommitment returns a reactive variable that always contains the latest verified Commitment object
-// in this chain.
-func (c *Chain) LatestVerifiedCommitment() reactive.Variable[*Commitment] {
-	return c.latestVerifiedCommitment
-}
-
-// ClaimedWeight returns a reactive variable that tracks the total cumulative weight of the chain that is claimed by
-// the latest commitments.
-func (c *Chain) ClaimedWeight() reactive.Variable[uint64] {
-	return c.claimedWeight
-}
-
-// AttestedWeight returns a reactive variable that tracks the total cumulative weight of the chain that we received
-// attestations for.
-func (c *Chain) AttestedWeight() reactive.Variable[uint64] {
-	return c.attestedWeight
-}
-
-// VerifiedWeight returns a reactive variable that tracks the total cumulative weight of the chain that we verified
-// ourselves.
-func (c *Chain) VerifiedWeight() reactive.Variable[uint64] {
-	return c.verifiedWeight
 }
 
 // SyncThreshold returns a reactive variable that contains the upper bound for slots that are being fed to the
@@ -168,8 +144,8 @@ func (c *Chain) EngineR() reactive.Variable[*engine.Engine] {
 
 // InSyncRange returns true if the given index is in the sync range of this chain.
 func (c *Chain) InSyncRange(index iotago.SlotIndex) bool {
-	if latestVerifiedCommitment := c.latestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
-		return index > c.latestVerifiedCommitment.Get().Index() && index < c.syncThreshold.Get()
+	if latestVerifiedCommitment := c.LatestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
+		return index > c.LatestVerifiedCommitment.Get().Index() && index < c.syncThreshold.Get()
 	}
 
 	return false
@@ -197,7 +173,7 @@ func (c *Chain) registerCommitment(commitment *Commitment) {
 
 	unsubscribe := lo.Batch(
 		commitment.IsAttested.OnTrigger(func() { c.LatestAttestedCommitment.Compute(maxCommitment) }),
-		commitment.IsVerified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(maxCommitment) }),
+		commitment.IsVerified.OnTrigger(func() { c.LatestVerifiedCommitment.Compute(maxCommitment) }),
 	)
 
 	// unsubscribe and unregister the commitment when it changes its chain
@@ -222,7 +198,7 @@ func (c *Chain) unregisterCommitment(commitment *Commitment) {
 
 	c.LatestCommitment.Compute(resetToParent)
 	c.LatestAttestedCommitment.Compute(resetToParent)
-	c.latestVerifiedCommitment.Compute(resetToParent)
+	c.LatestVerifiedCommitment.Compute(resetToParent)
 }
 
 type chainEngine struct {
