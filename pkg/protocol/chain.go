@@ -17,10 +17,10 @@ type Chain struct {
 	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
 
 	// latestCommitment is the latest Commitment object in this chain.
-	latestCommitment reactive.Variable[*Commitment]
+	LatestCommitment reactive.Variable[*Commitment]
 
 	// latestAttestedCommitment is the latest attested Commitment object in this chain.
-	latestAttestedCommitment reactive.Variable[*Commitment]
+	LatestAttestedCommitment reactive.Variable[*Commitment]
 
 	// latestVerifiedCommitment is the latest verified Commitment object in this chain.
 	latestVerifiedCommitment reactive.Variable[*Commitment]
@@ -60,8 +60,8 @@ func NewChain() *Chain {
 	c := &Chain{
 		ForkingPoint:             reactive.NewVariable[*Commitment](),
 		commitments:              shrinkingmap.New[iotago.SlotIndex, *Commitment](),
-		latestCommitment:         reactive.NewVariable[*Commitment](),
-		latestAttestedCommitment: reactive.NewVariable[*Commitment](),
+		LatestCommitment:         reactive.NewVariable[*Commitment](),
+		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
 		latestVerifiedCommitment: reactive.NewVariable[*Commitment](),
 		requestAttestations:      reactive.NewVariable[bool](),
 		evicted:                  reactive.NewEvent(),
@@ -69,8 +69,8 @@ func NewChain() *Chain {
 
 	c.engine = newChainEngine(c)
 
-	c.claimedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.latestCommitment)
-	c.attestedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.latestAttestedCommitment)
+	c.claimedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestCommitment)
+	c.attestedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestAttestedCommitment)
 	c.verifiedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.latestVerifiedCommitment)
 
 	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {
@@ -79,7 +79,7 @@ func NewChain() *Chain {
 		}
 
 		return latestCommitment.Index() - WarpSyncOffset
-	}, c.latestCommitment)
+	}, c.LatestCommitment)
 
 	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitment *Commitment) iotago.SlotIndex {
 		if latestVerifiedCommitment == nil {
@@ -113,22 +113,6 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 	}
 
 	return nil, false
-}
-
-// LatestCommitment returns the latest Commitment object in this chain.
-func (c *Chain) LatestCommitment() *Commitment {
-	return c.latestCommitment.Get()
-}
-
-// LatestCommitmentR returns a reactive variable that always contains the latest Commitment object in this chain.
-func (c *Chain) LatestCommitmentR() reactive.Variable[*Commitment] {
-	return c.latestCommitment
-}
-
-// LatestAttestedCommitment returns a reactive variable that always contains the latest attested Commitment object
-// in this chain.
-func (c *Chain) LatestAttestedCommitment() reactive.Variable[*Commitment] {
-	return c.latestAttestedCommitment
 }
 
 // LatestVerifiedCommitment returns a reactive variable that always contains the latest verified Commitment object
@@ -209,10 +193,10 @@ func (c *Chain) registerCommitment(commitment *Commitment) {
 		return commitment
 	}
 
-	c.latestCommitment.Compute(maxCommitment)
+	c.LatestCommitment.Compute(maxCommitment)
 
 	unsubscribe := lo.Batch(
-		commitment.IsAttested.OnTrigger(func() { c.latestAttestedCommitment.Compute(maxCommitment) }),
+		commitment.IsAttested.OnTrigger(func() { c.LatestAttestedCommitment.Compute(maxCommitment) }),
 		commitment.IsVerified.OnTrigger(func() { c.latestVerifiedCommitment.Compute(maxCommitment) }),
 	)
 
@@ -236,8 +220,8 @@ func (c *Chain) unregisterCommitment(commitment *Commitment) {
 		return commitment.Parent.Get()
 	}
 
-	c.latestCommitment.Compute(resetToParent)
-	c.latestAttestedCommitment.Compute(resetToParent)
+	c.LatestCommitment.Compute(resetToParent)
+	c.LatestAttestedCommitment.Compute(resetToParent)
 	c.latestVerifiedCommitment.Compute(resetToParent)
 }
 
