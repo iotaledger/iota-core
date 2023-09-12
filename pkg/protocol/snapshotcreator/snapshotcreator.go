@@ -176,9 +176,10 @@ func createOutput(address iotago.Address, tokenAmount iotago.BaseToken) (output 
 
 func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmount iotago.BaseToken, mana iotago.Mana, blockIssuerKey iotago.BlockIssuerKey, expirySlot iotago.SlotIndex, stakedAmount iotago.BaseToken, stakeEndEpoch iotago.EpochIndex, stakeFixedCost iotago.Mana) (output iotago.Output) {
 	accountOutput := &iotago.AccountOutput{
-		AccountID: accountID,
-		Amount:    tokenAmount,
-		Mana:      mana,
+		Amount:       tokenAmount,
+		Mana:         mana,
+		NativeTokens: iotago.NativeTokens{},
+		AccountID:    accountID,
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: address},
 			&iotago.GovernorAddressUnlockCondition{Address: address},
@@ -189,6 +190,7 @@ func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmou
 				ExpirySlot:      expirySlot,
 			},
 		},
+		ImmutableFeatures: iotago.AccountOutputImmFeatures{},
 	}
 
 	// The Staking feature is only added if both StakedAmount and StakeEndEpoch have non-zero values,
