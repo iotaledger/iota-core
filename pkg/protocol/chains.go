@@ -16,15 +16,16 @@ import (
 )
 
 type Chains struct {
-	protocol                  *Protocol
 	MainChain                 reactive.Variable[*Chain]
 	HeaviestClaimedCandidate  reactive.Variable[*Chain]
 	HeaviestAttestedCandidate reactive.Variable[*Chain]
 	HeaviestVerifiedCandidate reactive.Variable[*Chain]
-	commitments               *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
-	commitmentCreated         *event.Event1[*Commitment]
-	chainCreated              *event.Event1[*Chain]
-	engineManager             *enginemanager.EngineManager
+	CommitmentCreated         *event.Event1[*Commitment]
+	ChainCreated              *event.Event1[*Chain]
+
+	protocol      *Protocol
+	commitments   *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
+	engineManager *enginemanager.EngineManager
 
 	reactive.EvictionState[iotago.SlotIndex]
 }
@@ -38,8 +39,8 @@ func newChains(protocol *Protocol) *Chains {
 		HeaviestAttestedCandidate: reactive.NewVariable[*Chain](),
 		HeaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
 		commitments:               shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
-		commitmentCreated:         event.New1[*Commitment](),
-		chainCreated:              event.New1[*Chain](),
+		CommitmentCreated:         event.New1[*Commitment](),
+		ChainCreated:              event.New1[*Chain](),
 		engineManager: enginemanager.New(
 			protocol.Workers,
 			func(err error) { protocol.LogError(err) },
@@ -67,12 +68,12 @@ func newChains(protocol *Protocol) *Chains {
 		),
 	}
 
-	c.OnChainCreated(func(chain *Chain) {
+	c.ChainCreated.Hook(func(chain *Chain) {
 		c.provideEngineIfRequested(chain)
 		c.publishEngineCommitments(chain)
 	})
 
-	c.chainCreated.Trigger(c.MainChain.Get())
+	c.ChainCreated.Trigger(c.MainChain.Get())
 
 	protocol.HookConstructed(func() {
 		c.initMainChain()
@@ -116,14 +117,6 @@ func (c *Chains) Commitment(commitmentID iotago.CommitmentID, requestMissing ...
 	return commitmentRequest.Result(), nil
 }
 
-func (c *Chains) OnCommitmentCreated(callback func(commitment *Commitment)) (unsubscribe func()) {
-	return c.commitmentCreated.Hook(callback).Unhook
-}
-
-func (c *Chains) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
-	return c.chainCreated.Hook(callback).Unhook
-}
-
 func (c *Chains) MainEngineInstance() *engine.Engine {
 	return c.MainChain.Get().Engine.Get()
 }
@@ -146,11 +139,11 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 		commitment.IsEvicted.Trigger()
 	})
 
-	c.commitmentCreated.Trigger(commitment)
+	c.CommitmentCreated.Trigger(commitment)
 
 	commitment.SpawnedChain.OnUpdate(func(_, newChain *Chain) {
 		if newChain != nil {
-			c.chainCreated.Trigger(newChain)
+			c.ChainCreated.Trigger(newChain)
 		}
 	})
 }
@@ -172,7 +165,7 @@ func (c *Chains) initChainSwitching() {
 		newCandidate.instantiate.Set(true)
 	})
 
-	c.OnChainCreated(func(chain *Chain) {
+	c.ChainCreated.Hook(func(chain *Chain) {
 		c.trackHeaviestCandidate(c.HeaviestClaimedCandidate, func(chain *Chain) reactive.Variable[uint64] {
 			return chain.ClaimedWeight
 		}, chain)
@@ -254,11 +247,7 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 	chain.Engine.OnUpdateWithContext(func(_, engine *engine.Engine, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
 		if engine != nil {
 			withinContext(func() (unsubscribe func()) {
-				var (
-					latestPublishedIndex iotago.SlotIndex
-					rootPublished        bool
-				)
-
+				var latestPublishedIndex iotago.SlotIndex
 				publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment) {
 					publishedCommitment, err := c.PublishCommitment(commitment)
 					if err != nil {
@@ -273,16 +262,15 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 					return publishedCommitment
 				}
 
+				var rootPublished bool
 				return engine.LatestCommitment().OnUpdate(func(_, latestModelCommitment *model.Commitment) {
 					if !rootPublished {
-						publishedRoot := publishCommitment(engine.RootCommitment().Get())
-
 						chain.ForkingPoint.Compute(func(currentValue *Commitment) *Commitment {
 							if currentValue != nil {
 								return currentValue
 							}
 
-							return publishedRoot
+							return publishCommitment(engine.RootCommitment().Get())
 						})
 
 						rootPublished = true

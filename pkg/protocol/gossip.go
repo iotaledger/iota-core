@@ -249,7 +249,7 @@ func (r *Gossip) OnAttestationsRequested(callback func(commitmentID iotago.Commi
 
 func (r *Gossip) startAttestationsRequester() {
 	r.protocol.HookConstructed(func() {
-		r.protocol.OnChainCreated(func(chain *Chain) {
+		r.protocol.ChainCreated.Hook(func(chain *Chain) {
 			chain.RequestAttestations.OnUpdate(func(_, requestAttestations bool) {
 				if requestAttestations {
 					r.commitmentVerifiers.GetOrCreate(chain.ForkingPoint.Get().ID(), func() *CommitmentVerifier {
@@ -261,7 +261,7 @@ func (r *Gossip) startAttestationsRequester() {
 			})
 		})
 
-		r.protocol.OnCommitmentCreated(func(commitment *Commitment) {
+		r.protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
 			commitment.RequestAttestations.OnUpdate(func(_, requestAttestations bool) {
 				if requestAttestations {
 					r.attestationsRequester.StartTicker(commitment.ID())
@@ -296,7 +296,7 @@ func (r *Gossip) startBlockRequester() {
 		startBlockRequester(engine)
 	})
 
-	r.protocol.OnChainCreated(func(chain *Chain) {
+	r.protocol.ChainCreated.Hook(func(chain *Chain) {
 		chain.Engine.OnUpdate(func(_, engine *engine.Engine) { startBlockRequester(engine) })
 	})
 }
