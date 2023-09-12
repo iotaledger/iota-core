@@ -9,26 +9,26 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/app v0.0.0-20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/constraints v0.0.0-20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/ds v0.0.0-20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/lo v0.0.0-20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/logger v0.0.0-20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230912002851-de46b7eb1272
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230912002851-de46b7eb1272
+	github.com/iotaledger/hive.go/ads v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/app v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/ds v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/lo v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/logger v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230912172434-dc477e1f5140
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230912172434-dc477e1f5140
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230829161228-3f4eb50a4d14
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230829160617-69b96c7c9f9b
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230829160021-46cad51e89d1
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230912141328-810f7e83d265
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.30.0
-	github.com/libp2p/go-libp2p-kad-dht v0.25.0
+	github.com/libp2p/go-libp2p-kad-dht v0.25.1
 	github.com/multiformats/go-multiaddr v0.11.0
 	github.com/multiformats/go-varint v0.0.7
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
@@ -58,7 +58,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/ethereum/go-ethereum v1.12.2 // indirect
+	github.com/ethereum/go-ethereum v1.13.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/fjl/memsize v0.0.2 // indirect
@@ -83,7 +83,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
-	github.com/huin/goupnp v1.2.0 // indirect
+	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
 	github.com/ipfs/boxo v0.10.0 // indirect
@@ -106,6 +106,7 @@ require (
 	github.com/libp2p/go-libp2p-asn-util v0.3.0 // indirect
 	github.com/libp2p/go-libp2p-kbucket v0.6.3 // indirect
 	github.com/libp2p/go-libp2p-record v0.2.0 // indirect
+	github.com/libp2p/go-libp2p-routing-helpers v0.7.2 // indirect
 	github.com/libp2p/go-msgio v0.3.0 // indirect
 	github.com/libp2p/go-nat v0.2.0 // indirect
 	github.com/libp2p/go-netroute v0.2.1 // indirect

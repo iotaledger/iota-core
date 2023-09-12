@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/labstack/gommon/bytes"
@@ -58,11 +59,45 @@ type dependencies struct {
 	Protocol *protocol.Protocol
 }
 
+type jsonProtocolParameters struct {
+	ProtocolParameters []iotago.ProtocolParameters `serix:"0,mapKey=protocolParameters"`
+}
+
+func readProtocolParameters() []iotago.ProtocolParameters {
+	fileBytes, err := os.ReadFile(ParamsProtocol.ProtocolParametersPath)
+	if err != nil {
+		Component.LogInfof("No protocol parameters file (%s) found, skipping import: %s", ParamsProtocol.ProtocolParametersPath, err)
+		return nil
+	}
+
+	parsedParams := &jsonProtocolParameters{}
+	if err := iotago.CommonSerixAPI().JSONDecode(context.Background(), fileBytes, parsedParams); err != nil {
+		Component.LogWarnf("Error parsing protocol parameters file (%s): %s", ParamsProtocol.ProtocolParametersPath, err)
+		return nil
+	}
+
+	return parsedParams.ProtocolParameters
+}
+
+func resetProtocolParameters() {
+	bytesToWrite, err := iotago.CommonSerixAPI().JSONEncode(context.Background(), jsonProtocolParameters{})
+	if err != nil {
+		Component.LogInfof("Error writing protocol parameters file (%s): %s", ParamsProtocol.ProtocolParametersPath, err)
+		return
+	}
+
+	if err := os.WriteFile(ParamsProtocol.ProtocolParametersPath, bytesToWrite, 0600); err != nil {
+		Component.LogInfof("Error writing protocol parameters file (%s): %s", ParamsProtocol.ProtocolParametersPath, err)
+		return
+	}
+}
+
 func initConfigParams(c *dig.Container) error {
 	type cfgResult struct {
 		dig.Out
-		DatabaseEngine hivedb.Engine `name:"databaseEngine"`
-		BaseToken      *BaseToken
+		DatabaseEngine     hivedb.Engine `name:"databaseEngine"`
+		BaseToken          *BaseToken
+		ProtocolParameters []iotago.ProtocolParameters
 	}
 
 	if err := c.Provide(func() cfgResult {
@@ -72,8 +107,9 @@ func initConfigParams(c *dig.Container) error {
 		}
 
 		return cfgResult{
-			DatabaseEngine: dbEngine,
-			BaseToken:      &ParamsProtocol.BaseToken,
+			DatabaseEngine:     dbEngine,
+			BaseToken:          &ParamsProtocol.BaseToken,
+			ProtocolParameters: readProtocolParameters(),
 		}
 	}); err != nil {
 		Component.LogPanic(err)
@@ -86,8 +122,9 @@ func provide(c *dig.Container) error {
 	type protocolDeps struct {
 		dig.In
 
-		DatabaseEngine hivedb.Engine `name:"databaseEngine"`
-		P2PManager     *p2p.Manager
+		DatabaseEngine     hivedb.Engine `name:"databaseEngine"`
+		ProtocolParameters []iotago.ProtocolParameters
+		P2PManager         *p2p.Manager
 	}
 
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
@@ -132,8 +169,9 @@ func provide(c *dig.Container) error {
 					blockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
 				),
 			),
-			// TODO: here we should pass the protocol parameters from the config.
-			protocol.WithUpgradeOrchestratorProvider(signalingupgradeorchestrator.NewProvider()),
+			protocol.WithUpgradeOrchestratorProvider(
+				signalingupgradeorchestrator.NewProvider(signalingupgradeorchestrator.WithProtocolParameters(deps.ProtocolParameters...)),
+			),
 		)
 	})
 }
@@ -277,6 +315,10 @@ func run() error {
 				Component.LogErrorfAndExit("Error running the Protocol: %s", err.Error())
 			}
 		}
+
+		//nolint:contextcheck // context might be canceled
+		resetProtocolParameters()
+
 		Component.LogInfo("Gracefully shutting down the Protocol...")
 	}, daemon.PriorityProtocol)
 }

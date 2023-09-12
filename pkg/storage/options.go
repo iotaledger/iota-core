@@ -5,6 +5,7 @@ import (
 
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -54,5 +55,11 @@ func WithPruningSizeReductionPercentage(pruningSizeReductionPercentage float64) 
 func WithPruningSizeCooldownTime(cooldown time.Duration) options.Option[Storage] {
 	return func(p *Storage) {
 		p.optsPruningSizeCooldownTime = cooldown
+	}
+}
+
+func WithPermanentOptions(opts ...options.Option[permanent.Permanent]) options.Option[Storage] {
+	return func(s *Storage) {
+		s.optsPermanent = append(s.optsPermanent, opts...)
 	}
 }

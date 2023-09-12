@@ -169,6 +169,14 @@ func New(
 		(*Engine).acceptanceHandler,
 		(*Engine).TriggerConstructed,
 		func(e *Engine) {
+			// Make sure that we have the protocol parameters for the latest supported iota.go protocol version of the software.
+			// If not the user needs to update the protocol parameters file.
+			// This can only happen after a user updated the node version and the new protocol version is not yet active.
+			if _, err := e.APIForVersion(iotago.LatestProtocolVersion()); err != nil {
+				panic(ierrors.Wrap(err, "no protocol parameters for latest protocol version found"))
+			}
+		},
+		func(e *Engine) {
 			// Import the rest of the snapshot if needed.
 			if importSnapshot {
 				if err := e.ImportContents(file); err != nil {
