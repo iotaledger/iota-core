@@ -89,8 +89,15 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 		c.isParentVerified.InheritFrom(parent.IsVerified)
 		c.isParentAboveLatestVerifiedCommitment.InheritFrom(parent.isAboveLatestVerifiedCommitment)
 
-		c.triggerEventIfBelowThreshold(func(c *Commitment) reactive.Event { return c.isBelowSyncThreshold }, (*Chain).SyncThreshold)
-		c.triggerEventIfBelowThreshold(func(c *Commitment) reactive.Event { return c.isBelowWarpSyncThreshold }, (*Chain).WarpSyncThreshold)
+		c.triggerEventIfBelowThreshold(
+			func(c *Commitment) reactive.Event { return c.isBelowSyncThreshold },
+			func(c *Chain) reactive.Variable[iotago.SlotIndex] { return c.SyncThreshold },
+		)
+
+		c.triggerEventIfBelowThreshold(
+			func(c *Commitment) reactive.Event { return c.isBelowWarpSyncThreshold },
+			func(c *Chain) reactive.Variable[iotago.SlotIndex] { return c.WarpSyncThreshold },
+		)
 	})
 
 	c.Chain.OnUpdateWithContext(func(_, chain *Chain, withinContext func(subscriptionFactory func() (unsubscribe func()))) {

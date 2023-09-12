@@ -8,54 +8,23 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// Chain is a reactive component that manages the state of a chain.
 type Chain struct {
-	// forkingPoint contains the Commitment object that spawned this chain.
-	ForkingPoint reactive.Variable[*Commitment]
-
-	// latestCommitment is the latest Commitment object in this chain.
-	LatestCommitment reactive.Variable[*Commitment]
-
-	// latestAttestedCommitment is the latest attested Commitment object in this chain.
+	ForkingPoint             reactive.Variable[*Commitment]
+	LatestCommitment         reactive.Variable[*Commitment]
 	LatestAttestedCommitment reactive.Variable[*Commitment]
-
-	// latestVerifiedCommitment is the latest verified Commitment object in this chain.
 	LatestVerifiedCommitment reactive.Variable[*Commitment]
-
-	// ClaimedWeight contains the total cumulative weight of the chain that is claimed by the latest commitments.
-	ClaimedWeight reactive.Variable[uint64]
-
-	// AttestedWeight contains the total cumulative weight of the chain that we received attestations for.
-	AttestedWeight reactive.Variable[uint64]
-
-	// VerifiedWeight contains the total cumulative weight of the chain that we verified ourselves.
-	VerifiedWeight reactive.Variable[uint64]
-
-	// syncThreshold is the upper bound for slots that are being fed to the engine (to prevent memory exhaustion).
-	syncThreshold reactive.Variable[iotago.SlotIndex]
-
-	// warpSyncThreshold defines an offset from latest index where the warp sync process starts (we don't request slots
-	// that we are about to commit ourselves).
-	warpSyncThreshold reactive.Variable[iotago.SlotIndex]
-
-	// requestAttestations is a flag that indicates whether this chain wants to request attestations.
-	requestAttestations reactive.Variable[bool]
-
-	// engine is the engine that is used to process blocks of this chain.
-	engine *chainEngine
-
-	// isSolid is an event that gets triggered when the chain becomes solid (all blocks till the forking point of the
-	// main chain are available).
-	isSolid reactive.Event
-
-	// evicted is an event that gets triggered when the chain gets evicted.
-	evicted reactive.Event
-
-	// commitments is a map of Commitment objects that belong to the same chain.
-	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
+	ClaimedWeight            reactive.Variable[uint64]
+	AttestedWeight           reactive.Variable[uint64]
+	VerifiedWeight           reactive.Variable[uint64]
+	SyncThreshold            reactive.Variable[iotago.SlotIndex]
+	WarpSyncThreshold        reactive.Variable[iotago.SlotIndex]
+	requestAttestations      reactive.Variable[bool]
+	engine                   *chainEngine
+	isSolid                  reactive.Event
+	evicted                  reactive.Event
+	commitments              *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
 }
 
-// NewChain creates a new Chain instance.
 func NewChain() *Chain {
 	c := &Chain{
 		ForkingPoint:             reactive.NewVariable[*Commitment](),
@@ -73,7 +42,7 @@ func NewChain() *Chain {
 	c.AttestedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestAttestedCommitment)
 	c.VerifiedWeight = reactive.NewDerivedVariable(cumulativeWeight, c.LatestVerifiedCommitment)
 
-	c.warpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {
+	c.WarpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {
 		if latestCommitment == nil || latestCommitment.Index() < WarpSyncOffset {
 			return 0
 		}
@@ -81,7 +50,7 @@ func NewChain() *Chain {
 		return latestCommitment.Index() - WarpSyncOffset
 	}, c.LatestCommitment)
 
-	c.syncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitment *Commitment) iotago.SlotIndex {
+	c.SyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitment *Commitment) iotago.SlotIndex {
 		if latestVerifiedCommitment == nil {
 			return SyncWindow + 1
 		}
@@ -92,7 +61,6 @@ func NewChain() *Chain {
 	return c
 }
 
-// Commitment returns the Commitment object with the given index, if it exists.
 func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c; currentChain != nil; {
 		switch forkingPoint := currentChain.ForkingPoint.Get(); {
@@ -115,20 +83,6 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 	return nil, false
 }
 
-// SyncThreshold returns a reactive variable that contains the upper bound for slots that are being fed to the
-// engine (to prevent memory exhaustion).
-func (c *Chain) SyncThreshold() reactive.Variable[iotago.SlotIndex] {
-	return c.syncThreshold
-}
-
-// WarpSyncThreshold returns a reactive variable that contains an offset from latest index where the warp sync
-// process starts (we don't request slots that we are about to commit ourselves).
-func (c *Chain) WarpSyncThreshold() reactive.Variable[iotago.SlotIndex] {
-	return c.warpSyncThreshold
-}
-
-// RequestAttestations returns a reactive variable that contains a flag that indicates whether this chain shall request
-// attestations.
 func (c *Chain) RequestAttestations() reactive.Variable[bool] {
 	return c.requestAttestations
 }
@@ -137,26 +91,22 @@ func (c *Chain) Engine() *engine.Engine {
 	return c.engine.Get()
 }
 
-// EngineR returns a reactive variable that contains the engine that is used to process blocks of this chain.
 func (c *Chain) EngineR() reactive.Variable[*engine.Engine] {
 	return c.engine
 }
 
-// InSyncRange returns true if the given index is in the sync range of this chain.
 func (c *Chain) InSyncRange(index iotago.SlotIndex) bool {
 	if latestVerifiedCommitment := c.LatestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
-		return index > c.LatestVerifiedCommitment.Get().Index() && index < c.syncThreshold.Get()
+		return index > c.LatestVerifiedCommitment.Get().Index() && index < c.SyncThreshold.Get()
 	}
 
 	return false
 }
 
-// Evicted returns a reactive event that gets triggered when the chain is evicted.
 func (c *Chain) Evicted() reactive.Event {
 	return c.evicted
 }
 
-// registerCommitment adds a Commitment object to this collection.
 func (c *Chain) registerCommitment(commitment *Commitment) {
 	c.commitments.Set(commitment.Index(), commitment)
 
@@ -184,7 +134,6 @@ func (c *Chain) registerCommitment(commitment *Commitment) {
 	}, func(_, newChain *Chain) bool { return newChain != c })
 }
 
-// unregisterCommitment removes a Commitment object from this collection.
 func (c *Chain) unregisterCommitment(commitment *Commitment) {
 	c.commitments.Delete(commitment.Index())
 
