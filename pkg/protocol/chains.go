@@ -16,23 +16,15 @@ import (
 )
 
 type Chains struct {
-	protocol *Protocol
-
-	MainChain reactive.Variable[*Chain]
-
-	heaviestClaimedCandidate reactive.Variable[*Chain]
-
-	heaviestAttestedCandidate reactive.Variable[*Chain]
-
-	heaviestVerifiedCandidate reactive.Variable[*Chain]
-
-	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
-
-	commitmentCreated *event.Event1[*Commitment]
-
-	chainCreated *event.Event1[*Chain]
-
-	engineManager *enginemanager.EngineManager
+	protocol                  *Protocol
+	MainChain                 reactive.Variable[*Chain]
+	HeaviestClaimedCandidate  reactive.Variable[*Chain]
+	HeaviestAttestedCandidate reactive.Variable[*Chain]
+	HeaviestVerifiedCandidate reactive.Variable[*Chain]
+	commitments               *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
+	commitmentCreated         *event.Event1[*Commitment]
+	chainCreated              *event.Event1[*Chain]
+	engineManager             *enginemanager.EngineManager
 
 	reactive.EvictionState[iotago.SlotIndex]
 }
@@ -42,9 +34,9 @@ func newChains(protocol *Protocol) *Chains {
 		protocol:                  protocol,
 		EvictionState:             reactive.NewEvictionState[iotago.SlotIndex](),
 		MainChain:                 reactive.NewVariable[*Chain]().Init(NewChain()),
-		heaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
-		heaviestAttestedCandidate: reactive.NewVariable[*Chain](),
-		heaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
+		HeaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
+		HeaviestAttestedCandidate: reactive.NewVariable[*Chain](),
+		HeaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
 		commitments:               shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 		commitmentCreated:         event.New1[*Commitment](),
 		chainCreated:              event.New1[*Chain](),
@@ -92,38 +84,6 @@ func newChains(protocol *Protocol) *Chains {
 	return c
 }
 
-func (c *Chains) initMainChain() {
-	mainChain := c.MainChain.Get()
-	mainChain.instantiate.Set(true)
-	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) {
-		c.protocol.Events.Engine.LinkTo(newEngine.Events)
-	})
-	mainChain.ForkingPoint.Get().IsRoot.Trigger()
-}
-
-func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
-	return chain.instantiate.OnUpdate(func(_, instantiate bool) {
-		if !instantiate {
-			chain.spawnedEngine.Set(nil)
-
-			return
-		}
-
-		if currentEngine := chain.Engine.Get(); currentEngine == nil {
-			mainEngine, err := c.engineManager.LoadActiveEngine(c.protocol.options.SnapshotPath)
-			if err != nil {
-				panic(fmt.Sprintf("could not load active engine: %s", err))
-			}
-
-			chain.spawnedEngine.Set(mainEngine)
-
-			c.protocol.Network.HookStopped(mainEngine.Shutdown)
-		} else {
-			fmt.Println("WATT IS HIER LOS? EIN FORK?")
-		}
-	})
-}
-
 func (c *Chains) PublishCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment, err error) {
 	request, requestErr := c.requestCommitment(commitment.ID(), false)
 	if requestErr != nil {
@@ -168,48 +128,13 @@ func (c *Chains) MainEngineInstance() *engine.Engine {
 	return c.MainChain.Get().Engine.Get()
 }
 
-func (c *Chains) HeaviestClaimedCandidate() reactive.Variable[*Chain] {
-	return c.heaviestClaimedCandidate
-}
-
-func (c *Chains) HeaviestAttestedCandidate() reactive.Variable[*Chain] {
-	return c.heaviestAttestedCandidate
-}
-
-func (c *Chains) HeaviestVerifiedCandidate() reactive.Variable[*Chain] {
-	return c.heaviestVerifiedCandidate
-}
-
-func (c *Chains) initChainSwitching() {
-	c.heaviestClaimedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
-		if prevCandidate != nil {
-			prevCandidate.RequestAttestations.Set(false)
-		}
-
-		newCandidate.RequestAttestations.Set(true)
+func (c *Chains) initMainChain() {
+	mainChain := c.MainChain.Get()
+	mainChain.instantiate.Set(true)
+	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) {
+		c.protocol.Events.Engine.LinkTo(newEngine.Events)
 	})
-
-	c.heaviestAttestedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
-		if prevCandidate != nil {
-			prevCandidate.instantiate.Set(false)
-		}
-
-		newCandidate.instantiate.Set(true)
-	})
-
-	c.OnChainCreated(func(chain *Chain) {
-		c.trackHeaviestCandidate(c.heaviestClaimedCandidate, func(chain *Chain) reactive.Variable[uint64] {
-			return chain.ClaimedWeight
-		}, chain)
-
-		c.trackHeaviestCandidate(c.heaviestAttestedCandidate, func(chain *Chain) reactive.Variable[uint64] {
-			return chain.AttestedWeight
-		}, chain)
-
-		c.trackHeaviestCandidate(c.heaviestVerifiedCandidate, func(chain *Chain) reactive.Variable[uint64] {
-			return chain.VerifiedWeight
-		}, chain)
-	})
+	mainChain.ForkingPoint.Get().IsRoot.Trigger()
 }
 
 func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
@@ -226,6 +151,61 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 	commitment.SpawnedChain.OnUpdate(func(_, newChain *Chain) {
 		if newChain != nil {
 			c.chainCreated.Trigger(newChain)
+		}
+	})
+}
+
+func (c *Chains) initChainSwitching() {
+	c.HeaviestClaimedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
+		if prevCandidate != nil {
+			prevCandidate.RequestAttestations.Set(false)
+		}
+
+		newCandidate.RequestAttestations.Set(true)
+	})
+
+	c.HeaviestAttestedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
+		if prevCandidate != nil {
+			prevCandidate.instantiate.Set(false)
+		}
+
+		newCandidate.instantiate.Set(true)
+	})
+
+	c.OnChainCreated(func(chain *Chain) {
+		c.trackHeaviestCandidate(c.HeaviestClaimedCandidate, func(chain *Chain) reactive.Variable[uint64] {
+			return chain.ClaimedWeight
+		}, chain)
+
+		c.trackHeaviestCandidate(c.HeaviestAttestedCandidate, func(chain *Chain) reactive.Variable[uint64] {
+			return chain.AttestedWeight
+		}, chain)
+
+		c.trackHeaviestCandidate(c.HeaviestVerifiedCandidate, func(chain *Chain) reactive.Variable[uint64] {
+			return chain.VerifiedWeight
+		}, chain)
+	})
+}
+
+func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
+	return chain.instantiate.OnUpdate(func(_, instantiate bool) {
+		if !instantiate {
+			chain.spawnedEngine.Set(nil)
+
+			return
+		}
+
+		if currentEngine := chain.Engine.Get(); currentEngine == nil {
+			mainEngine, err := c.engineManager.LoadActiveEngine(c.protocol.options.SnapshotPath)
+			if err != nil {
+				panic(fmt.Sprintf("could not load active engine: %s", err))
+			}
+
+			chain.spawnedEngine.Set(mainEngine)
+
+			c.protocol.Network.HookStopped(mainEngine.Shutdown)
+		} else {
+			fmt.Println("WATT IS HIER LOS? EIN FORK?")
 		}
 	})
 }

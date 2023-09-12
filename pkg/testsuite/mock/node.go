@@ -144,15 +144,15 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 }
 
 func (n *Node) hookEvents() {
-	n.Protocol.HeaviestClaimedCandidate().OnUpdate(func(_, newChain *protocol.Chain) {
+	n.Protocol.HeaviestClaimedCandidate.OnUpdate(func(_, newChain *protocol.Chain) {
 		n.forkDetectedCount.Add(1)
 	})
 
-	n.Protocol.HeaviestAttestedCandidate().OnUpdate(func(_, newChain *protocol.Chain) {
+	n.Protocol.HeaviestAttestedCandidate.OnUpdate(func(_, newChain *protocol.Chain) {
 		n.candidateEngineActivatedCount.Add(1)
 	})
 
-	n.Protocol.HeaviestVerifiedCandidate().OnUpdate(func(_, newChain *protocol.Chain) {
+	n.Protocol.HeaviestVerifiedCandidate.OnUpdate(func(_, newChain *protocol.Chain) {
 		n.mainEngineSwitchedCount.Add(1)
 	})
 }
@@ -192,7 +192,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
 	})
 
-	n.Protocol.HeaviestAttestedCandidate().OnUpdate(func(_, newChain *protocol.Chain) {
+	n.Protocol.HeaviestAttestedCandidate.OnUpdate(func(_, newChain *protocol.Chain) {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, newChain.ForkingPoint.Get().ID())
 	})
 
