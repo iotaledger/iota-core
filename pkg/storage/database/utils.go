@@ -1,13 +1,9 @@
 package database
 
-import (
-	"github.com/iotaledger/hive.go/kvstore"
-)
-
-func FlushAndClose(store kvstore.KVStore) error {
-	if err := store.Flush(); err != nil {
+func FlushAndClose(store *syncedKVStore) error {
+	if err := store.FlushWithoutLocking(); err != nil {
 		return err
 	}
 
-	return store.Close()
+	return store.CloseWithoutLocking()
 }

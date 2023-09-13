@@ -78,6 +78,7 @@ func (b *BucketManager) Shutdown() {
 	defer b.openDBsMutex.Unlock()
 
 	b.openDBs.Each(func(index iotago.EpochIndex, db *database.DBInstance) {
+		// TODO: lock the database before closing so that no one can use it before we close it
 		db.Close()
 		b.openDBs.Remove(index)
 	})

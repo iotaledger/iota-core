@@ -50,26 +50,29 @@ func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(e
 }
 
 func Clone(source *Prunable, dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[BucketManager]) (*Prunable, error) {
-	// Lock semi pemanent DB and prunable slot store so that nobody can try to use or open them while cloning.
+	source.semiPermanentDB.MarkHealthy()
+	// TODO: mark healthy within the lock
+	// Lock semi-permanent DB and prunable slot store so that nobody can try to use or open them while cloning.
 	source.semiPermanentDB.Lock()
-	defer source.semiPermanentDB.Unlock()
 
 	source.prunableSlotStore.mutex.Lock()
 	defer source.prunableSlotStore.mutex.Unlock()
 
 	// Close forked prunable storage before copying its contents.
-	source.semiPermanentDB.Close()
+	source.semiPermanentDB.CloseWithoutLocking()
 	source.prunableSlotStore.Shutdown()
 
 	// Copy the storage on disk to new location.
 	if err := copydir.Copy(source.prunableSlotStore.dbConfig.Directory, dbConfig.Directory); err != nil {
 		return nil, ierrors.Wrap(err, "failed to copy prunable storage directory to new storage path")
 	}
-
-	// Create a newly opened instance of prunable database.
-	// `prunableSlotStore` will be opened automatically as the engine requests it, so no need to open it here.
+	// TODO: it's possible to copy prunable slot store separately bucket-after-bucket
+	//  to minimize time of locking of the most recent bucket that could be used and semi permanent storage.
 
 	source.semiPermanentDB.Open()
+	source.semiPermanentDB.Unlock()
+	source.semiPermanentDB.MarkCorrupted()
+	// TODO: mark healthy within the lock
 
 	return New(dbConfig, apiProvider, errorHandler, opts...), nil
 }
