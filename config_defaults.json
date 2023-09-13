@@ -108,6 +108,7 @@
     "filter": {
       "maxAllowedClockDrift": "5s"
     },
+    "protocolParametersPath": "testnet/protocol_parameters.json",
     "baseToken": {
       "name": "Shimmer",
       "tickerSymbol": "SMR",

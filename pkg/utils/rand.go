@@ -171,18 +171,21 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 	case iotago.OutputBasic:
 		//nolint:forcetypeassert // we already checked the type
 		iotaOutput = &iotago.BasicOutput{
-			Amount: amount,
+			Amount:       amount,
+			NativeTokens: iotago.NativeTokens{},
 			Conditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{
 					Address: address,
 				},
 			},
+			Features: iotago.BasicOutputFeatures{},
 		}
 	case iotago.OutputAccount:
 		//nolint:forcetypeassert // we already checked the type
 		iotaOutput = &iotago.AccountOutput{
-			Amount:    amount,
-			AccountID: RandAccountID(),
+			Amount:       amount,
+			NativeTokens: iotago.NativeTokens{},
+			AccountID:    RandAccountID(),
 			Conditions: iotago.AccountOutputUnlockConditions{
 				&iotago.StateControllerAddressUnlockCondition{
 					Address: address,
@@ -191,6 +194,8 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 					Address: address,
 				},
 			},
+			Features:          iotago.AccountOutputFeatures{},
+			ImmutableFeatures: iotago.AccountOutputImmFeatures{},
 		}
 	case iotago.OutputFoundry:
 		if address.Type() != iotago.AddressAccount {
@@ -201,6 +206,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 		//nolint:forcetypeassert // we already checked the type
 		iotaOutput = &iotago.FoundryOutput{
 			Amount:       amount,
+			NativeTokens: iotago.NativeTokens{},
 			SerialNumber: 0,
 			TokenScheme: &iotago.SimpleTokenScheme{
 				MintedTokens:  supply,
@@ -212,17 +218,22 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 					Address: address.(*iotago.AccountAddress),
 				},
 			},
+			Features:          iotago.FoundryOutputFeatures{},
+			ImmutableFeatures: iotago.FoundryOutputImmFeatures{},
 		}
 	case iotago.OutputNFT:
 		//nolint:forcetypeassert // we already checked the type
 		iotaOutput = &iotago.NFTOutput{
-			Amount: amount,
-			NFTID:  RandNFTID(),
+			Amount:       amount,
+			NativeTokens: iotago.NativeTokens{},
+			NFTID:        RandNFTID(),
 			Conditions: iotago.NFTOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{
 					Address: address,
 				},
 			},
+			Features:          iotago.NFTOutputFeatures{},
+			ImmutableFeatures: iotago.NFTOutputImmFeatures{},
 		}
 	default:
 		panic("unhandled output type")
