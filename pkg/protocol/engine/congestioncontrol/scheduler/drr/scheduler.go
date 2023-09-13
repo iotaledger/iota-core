@@ -11,14 +11,18 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Deficit int64
+
+type SubSlotIndex int
 
 type Scheduler struct {
 	events *scheduler.Events
@@ -29,17 +33,15 @@ type Scheduler struct {
 
 	apiProvider api.Provider
 
-	buffer      *BufferQueue
-	bufferMutex syncutils.RWMutex
+	seatManager seatmanager.SeatManager
+
+	basicBuffer     *BufferQueue
+	validatorBuffer *ValidatorBuffer
+	bufferMutex     syncutils.RWMutex
 
 	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, Deficit]
 
-	tokenBucket      float64
-	lastScheduleTime time.Time
-
 	shutdownSignal chan struct{}
-
-	blockChan chan *blocks.Block
 
 	blockCache *blocks.Blocks
 
@@ -52,11 +54,33 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 	return module.Provide(func(e *engine.Engine) scheduler.Scheduler {
 		s := New(e, opts...)
 		s.errorHandler = e.ErrorHandler("scheduler")
-		s.buffer = NewBufferQueue(int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize))
+		s.basicBuffer = NewBufferQueue()
 
 		e.HookConstructed(func() {
+			s.latestCommittedSlot = func() iotago.SlotIndex {
+				return e.Storage.Settings().LatestCommitment().Index()
+			}
 			s.blockCache = e.BlockCache
 			e.Events.Scheduler.LinkTo(s.events)
+			e.SybilProtection.HookInitialized(func() {
+				s.seatManager = e.SybilProtection.SeatManager()
+			})
+			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+				// when the last slot of an epoch is committed, remove the queues of validators that are no longer in the committee.
+				if e.CurrentAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Index()) == 0 {
+					s.bufferMutex.Lock()
+					defer s.bufferMutex.Unlock()
+
+					s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+						if !s.seatManager.Committee(commitment.Index() + 1).HasAccount(accountID) {
+							s.shutdownValidatorQueue(validatorQueue)
+							s.validatorBuffer.Delete(accountID)
+						}
+
+						return true
+					})
+				}
+			})
 			e.Ledger.HookInitialized(func() {
 				// quantum retrieve function gets the account's Mana and returns the quantum for that account
 				s.quantumFunc = func(accountID iotago.AccountID, manaSlot iotago.SlotIndex) (Deficit, error) {
@@ -72,24 +96,12 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 
 					return Deficit(mana / minMana), nil
 				}
-				s.latestCommittedSlot = func() iotago.SlotIndex {
-					return e.Storage.Settings().LatestCommitment().Index()
-				}
 			})
 			s.TriggerConstructed()
 			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
-				if _, isBasic := block.BasicBlock(); isBasic {
-					s.AddBlock(block)
-					s.selectBlockToScheduleWithLocking()
-				} else { // immediately schedule validator blocks for now. TODO: implement scheduling for validator blocks issue #236
-					block.SetEnqueued()
-					block.SetScheduled()
-					// check for another block ready to schedule
-					s.updateChildrenWithLocking(block)
-					s.selectBlockToScheduleWithLocking()
+				s.AddBlock(block)
+				s.selectBlockToScheduleWithLocking()
 
-					s.events.BlockScheduled.Trigger(block)
-				}
 			})
 			e.Events.Ledger.AccountCreated.Hook(func(accountID iotago.AccountID) {
 				s.bufferMutex.Lock()
@@ -114,15 +126,20 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 func New(apiProvider api.Provider, opts ...options.Option[Scheduler]) *Scheduler {
 	return options.Apply(
 		&Scheduler{
-			events:           scheduler.NewEvents(),
-			lastScheduleTime: time.Now(),
-			deficits:         shrinkingmap.New[iotago.AccountID, Deficit](),
-			apiProvider:      apiProvider,
+			events:          scheduler.NewEvents(),
+			deficits:        shrinkingmap.New[iotago.AccountID, Deficit](),
+			apiProvider:     apiProvider,
+			validatorBuffer: NewValidatorBuffer(),
 		}, opts,
 	)
 }
 
 func (s *Scheduler) Shutdown() {
+	s.validatorBuffer.buffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+		s.shutdownValidatorQueue(validatorQueue)
+
+		return true
+	})
 	close(s.shutdownSignal)
 	s.TriggerStopped()
 }
@@ -130,23 +147,17 @@ func (s *Scheduler) Shutdown() {
 // Start starts the scheduler.
 func (s *Scheduler) Start() {
 	s.shutdownSignal = make(chan struct{}, 1)
-	s.blockChan = make(chan *blocks.Block, 1)
-	go s.mainLoop()
+	go s.basicBlockLoop()
 
 	s.TriggerInitialized()
 }
 
-// Rate gets the rate of the scheduler in units of work per second.
-func (s *Scheduler) Rate() iotago.WorkScore {
-	return s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().SchedulerRate
-}
-
-// IssuerQueueSizeCount returns the queue size of the given issuer as block count.
+// IssuerQueueSizeCount returns the number of blocks in the queue of the given issuer.
 func (s *Scheduler) IssuerQueueBlockCount(issuerID iotago.AccountID) int {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
-	return s.buffer.IssuerQueue(issuerID).Size()
+	return s.basicBuffer.IssuerQueue(issuerID).Size()
 }
 
 // IssuerQueueWork returns the queue size of the given issuer in work units.
@@ -154,15 +165,35 @@ func (s *Scheduler) IssuerQueueWork(issuerID iotago.AccountID) iotago.WorkScore 
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
-	return s.buffer.IssuerQueue(issuerID).Work()
+	return s.basicBuffer.IssuerQueue(issuerID).Work()
 }
 
-// BufferSize returns the current buffer size of the Scheduler as block count.
-func (s *Scheduler) BufferSize() int {
+// ValidatorQueueBlockCount returns the number of validation blocks in the validator queue of the given issuer.
+func (s *Scheduler) ValidatorQueueBlockCount(issuerID iotago.AccountID) int {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
-	return s.buffer.Size()
+	validatorQueue, exists := s.validatorBuffer.Get(issuerID)
+	if !exists {
+		return 0
+	}
+
+	return validatorQueue.Size()
+}
+
+// BufferSize returns the current buffer size of the Scheduler as block count.
+func (s *Scheduler) BasicBufferSize() int {
+	s.bufferMutex.RLock()
+	defer s.bufferMutex.RUnlock()
+
+	return s.basicBuffer.Size()
+}
+
+func (s *Scheduler) ValidatorBufferSize() int {
+	s.bufferMutex.RLock()
+	defer s.bufferMutex.RUnlock()
+
+	return s.validatorBuffer.Size()
 }
 
 // MaxBufferSize returns the max buffer size of the Scheduler as block count.
@@ -175,7 +206,7 @@ func (s *Scheduler) ReadyBlocksCount() int {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
-	return s.buffer.ReadyBlocksCount()
+	return s.basicBuffer.ReadyBlocksCount()
 }
 
 func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*blocks.Block) bool {
@@ -183,7 +214,7 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 	defer s.bufferMutex.RUnlock()
 
 	// if the buffer is completely empty, any issuer can issue a block.
-	if s.buffer.Size() == 0 {
+	if s.basicBuffer.Size() == 0 {
 		return true
 	}
 	work := iotago.WorkScore(0)
@@ -200,17 +231,25 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 		return false
 	}
 
-	return deficit >= s.deficitFromWork(work+s.buffer.IssuerQueue(accountID).Work())
+	return deficit >= s.deficitFromWork(work+s.basicBuffer.IssuerQueue(accountID).Work())
 }
 
 func (s *Scheduler) AddBlock(block *blocks.Block) {
+	if _, isValidation := block.ValidationBlock(); isValidation {
+		s.enqueueValidationBlock(block)
+	} else if _, isBasic := block.BasicBlock(); isBasic {
+		s.enqueueBasicBlock(block)
+	}
+}
+
+func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
 	slotIndex := s.latestCommittedSlot()
 
 	issuerID := block.ProtocolBlock().IssuerID
-	issuerQueue, err := s.buffer.GetIssuerQueue(issuerID)
+	issuerQueue, err := s.basicBuffer.GetIssuerQueue(issuerID)
 	if err != nil {
 		// this should only ever happen if the issuer has been removed due to insufficient Mana.
 		// if Mana is now sufficient again, we can add the issuer again.
@@ -222,23 +261,28 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 		issuerQueue = s.createIssuer(issuerID)
 	}
 
-	droppedBlocks, err := s.buffer.Submit(block, issuerQueue, func(issuerID iotago.AccountID) Deficit {
-		quantum, quantumErr := s.quantumFunc(issuerID, slotIndex)
-		if quantumErr != nil {
-			s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve deficit for issuerID %d in slot %d when submitting a block", issuerID, slotIndex))
+	droppedBlocks, submitted := s.basicBuffer.Submit(
+		block,
+		issuerQueue,
+		func(issuerID iotago.AccountID) Deficit {
+			quantum, quantumErr := s.quantumFunc(issuerID, slotIndex)
+			if quantumErr != nil {
+				s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve deficit for issuerID %d in slot %d when submitting a block", issuerID, slotIndex))
 
-			return 0
-		}
+				return 0
+			}
 
-		return quantum
-	})
+			return quantum
+		},
+		int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize),
+	)
 	// error submitting indicates that the block was already submitted so we do nothing else.
-	if err != nil {
+	if !submitted {
 		return
 	}
 	for _, b := range droppedBlocks {
 		b.SetDropped()
-		s.events.BlockDropped.Trigger(b, ierrors.New("block dropped from buffer"))
+		s.events.BlockDropped.Trigger(b, ierrors.New("basic block dropped from buffer"))
 	}
 	if block.SetEnqueued() {
 		s.events.BlockEnqueued.Trigger(block)
@@ -246,7 +290,30 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	}
 }
 
-func (s *Scheduler) mainLoop() {
+func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
+	s.bufferMutex.Lock()
+	defer s.bufferMutex.Unlock()
+
+	_, exists := s.validatorBuffer.Get(block.ProtocolBlock().IssuerID)
+	if !exists {
+		s.addValidator(block.ProtocolBlock().IssuerID)
+	}
+	droppedBlock, submitted := s.validatorBuffer.Submit(block, int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize))
+	if !submitted {
+		return
+	}
+	if droppedBlock != nil {
+		droppedBlock.SetDropped()
+		s.events.BlockDropped.Trigger(droppedBlock, ierrors.New("validation block dropped from buffer"))
+	}
+
+	if block.SetEnqueued() {
+		s.events.BlockEnqueued.Trigger(block)
+		s.tryReadyValidationBlock(block)
+	}
+}
+
+func (s *Scheduler) basicBlockLoop() {
 	var blockToSchedule *blocks.Block
 loop:
 	for {
@@ -255,29 +322,62 @@ loop:
 		case <-s.shutdownSignal:
 			break loop
 		// when a block is pushed by the buffer
-		case blockToSchedule = <-s.blockChan:
+		case blockToSchedule = <-s.basicBuffer.blockChan:
 			currentAPI := s.apiProvider.CurrentAPI()
 			rate := currentAPI.ProtocolParameters().CongestionControlParameters().SchedulerRate
-			tokensRequired := float64(blockToSchedule.WorkScore()) - (s.tokenBucket + float64(rate)*time.Since(s.lastScheduleTime).Seconds())
-			if tokensRequired > 0 {
-				// wait until sufficient tokens in token bucket
-				timer := time.NewTimer(time.Duration(tokensRequired/float64(rate)) * time.Second)
+			if waitTime := s.basicBuffer.waitTime(float64(rate), blockToSchedule); waitTime > 0 {
+				timer := time.NewTimer(waitTime)
 				<-timer.C
 			}
-			s.tokenBucket = lo.Min(
-				float64(currentAPI.MaxBlockWork()),
-				s.tokenBucket+float64(rate)*time.Since(s.lastScheduleTime).Seconds(),
-			)
-			s.lastScheduleTime = time.Now()
-			s.scheduleBlock(blockToSchedule)
+			s.basicBuffer.updateTokenBucket(float64(rate), float64(currentAPI.MaxBlockWork()))
+
+			s.scheduleBasicBlock(blockToSchedule)
 		}
 	}
 }
 
-func (s *Scheduler) scheduleBlock(block *blocks.Block) {
+func (s *Scheduler) validatorLoop(validatorQueue *ValidatorQueue) {
+	var blockToSchedule *blocks.Block
+loop:
+	for {
+		select {
+		// on close, exit the loop
+		case <-validatorQueue.shutdownSignal:
+			break loop
+		// when a block is pushed by this validator queue.
+		case blockToSchedule = <-validatorQueue.blockChan:
+			currentAPI := s.apiProvider.CurrentAPI()
+			validationBlocksPerSlot := float64(currentAPI.ProtocolParameters().ValidationBlocksPerSlot())
+			rate := validationBlocksPerSlot / float64(currentAPI.TimeProvider().SlotDurationSeconds())
+			if waitTime := validatorQueue.waitTime(rate); waitTime > 0 {
+				timer := time.NewTimer(waitTime)
+				<-timer.C
+			}
+			// allow a maximum burst of validationBlocksPerSlot by setting this as max token bucket size.
+			validatorQueue.updateTokenBucket(rate, validationBlocksPerSlot)
+
+			s.scheduleValidationBlock(blockToSchedule, validatorQueue)
+		}
+	}
+}
+
+func (s *Scheduler) scheduleBasicBlock(block *blocks.Block) {
 	if block.SetScheduled() {
 		// deduct tokens from the token bucket according to the scheduled block's work.
-		s.tokenBucket -= float64(block.WorkScore())
+		s.basicBuffer.deductTokens(float64(block.WorkScore()))
+
+		// check for another block ready to schedule
+		s.updateChildrenWithLocking(block)
+		s.selectBlockToScheduleWithLocking()
+
+		s.events.BlockScheduled.Trigger(block)
+	}
+}
+
+func (s *Scheduler) scheduleValidationBlock(block *blocks.Block, validatorQueue *ValidatorQueue) {
+	if block.SetScheduled() {
+		// deduct 1 token from the token bucket of this validator's queue.
+		validatorQueue.deductTokens(1)
 
 		// check for another block ready to schedule
 		s.updateChildrenWithLocking(block)
@@ -291,13 +391,40 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
+	s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+		if s.selectValidationBlockWithoutLocking(validatorQueue) {
+			s.validatorBuffer.size--
+		}
+
+		return true
+	})
+	s.selectBasicBlockWithoutLocking()
+
+}
+
+func (s *Scheduler) selectValidationBlockWithoutLocking(validatorQueue *ValidatorQueue) bool {
+	// already a block selected to be scheduled.
+	if len(validatorQueue.blockChan) > 0 {
+		return false
+	}
+
+	if blockToSchedule := validatorQueue.PopFront(); blockToSchedule != nil {
+		validatorQueue.blockChan <- blockToSchedule
+
+		return true
+	}
+
+	return false
+}
+
+func (s *Scheduler) selectBasicBlockWithoutLocking() {
 	slotIndex := s.latestCommittedSlot()
 
 	// already a block selected to be scheduled.
-	if len(s.blockChan) > 0 {
+	if len(s.basicBuffer.blockChan) > 0 {
 		return
 	}
-	start := s.buffer.Current()
+	start := s.basicBuffer.Current()
 	// no blocks submitted
 	if start == nil {
 		return
@@ -318,9 +445,9 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 				s.errorHandler(ierrors.Wrapf(err, "failed to increment deficit for issuerID %s in slot %d", issuerID, slotIndex))
 				s.removeIssuer(issuerID, err)
 
-				q = s.buffer.Current()
+				q = s.basicBuffer.Current()
 			} else {
-				q = s.buffer.Next()
+				q = s.basicBuffer.Next()
 			}
 			if q == nil {
 				return
@@ -331,7 +458,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 		}
 	}
 	// increment the deficit for all issuers before schedulingIssuer one more time
-	for q := start; q != schedulingIssuer; q = s.buffer.Next() {
+	for q := start; q != schedulingIssuer; q = s.basicBuffer.Next() {
 		issuerID := q.IssuerID()
 		if err := s.incrementDeficit(issuerID, 1, slotIndex); err != nil {
 			s.errorHandler(ierrors.Wrapf(err, "failed to increment deficit for issuerID %s in slot %d", issuerID, slotIndex))
@@ -342,7 +469,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	}
 
 	// remove the block from the buffer and adjust issuer's deficit
-	block := s.buffer.PopFront()
+	block := s.basicBuffer.PopFront()
 	issuerID := block.ProtocolBlock().IssuerID
 	err := s.updateDeficit(issuerID, -s.deficitFromWork(block.WorkScore()))
 
@@ -353,7 +480,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 
 		return
 	}
-	s.blockChan <- block
+	s.basicBuffer.blockChan <- block
 }
 
 func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex) (Deficit, *IssuerQueue) {
@@ -372,7 +499,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex)
 					s.events.BlockSkipped.Trigger(block)
 				}
 
-				s.buffer.PopFront()
+				s.basicBuffer.PopFront()
 
 				block = q.Front()
 
@@ -419,9 +546,9 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex)
 		}
 
 		if issuerRemoved {
-			q = s.buffer.Current()
+			q = s.basicBuffer.Current()
 		} else {
-			q = s.buffer.Next()
+			q = s.basicBuffer.Next()
 		}
 		if q == start || q == nil {
 			break
@@ -432,7 +559,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex)
 }
 
 func (s *Scheduler) removeIssuer(issuerID iotago.AccountID, err error) {
-	q := s.buffer.IssuerQueue(issuerID)
+	q := s.basicBuffer.IssuerQueue(issuerID)
 	q.submitted.ForEach(func(id iotago.BlockID, block *blocks.Block) bool {
 		block.SetDropped()
 		s.events.BlockDropped.Trigger(block, err)
@@ -448,11 +575,11 @@ func (s *Scheduler) removeIssuer(issuerID iotago.AccountID, err error) {
 
 	s.deficits.Delete(issuerID)
 
-	s.buffer.RemoveIssuer(issuerID)
+	s.basicBuffer.RemoveIssuer(issuerID)
 }
 
 func (s *Scheduler) createIssuer(accountID iotago.AccountID) *IssuerQueue {
-	issuerQueue := s.buffer.CreateIssuerQueue(accountID)
+	issuerQueue := s.basicBuffer.CreateIssuerQueue(accountID)
 	s.deficits.Set(accountID, 0)
 
 	return issuerQueue
@@ -531,8 +658,21 @@ func (s *Scheduler) tryReady(block *blocks.Block) {
 	}
 }
 
+// tryReadyValidator tries to set the given validation block as ready.
+func (s *Scheduler) tryReadyValidationBlock(block *blocks.Block) {
+	if s.isReady(block) {
+		s.readyValidationBlock(block)
+	}
+}
+
 func (s *Scheduler) ready(block *blocks.Block) {
-	s.buffer.Ready(block)
+	s.basicBuffer.Ready(block)
+}
+
+func (s *Scheduler) readyValidationBlock(block *blocks.Block) {
+	if validatorQueue, exists := s.validatorBuffer.Get(block.ProtocolBlock().IssuerID); exists {
+		validatorQueue.Ready(block)
+	}
 }
 
 // updateChildrenWithLocking locks the buffer mutex and iterates over the direct children of the given blockID and
@@ -549,7 +689,13 @@ func (s *Scheduler) updateChildrenWithLocking(block *blocks.Block) {
 func (s *Scheduler) updateChildrenWithoutLocking(block *blocks.Block) {
 	for _, childBlock := range block.Children() {
 		if _, childBlockExists := s.blockCache.Block(childBlock.ID()); childBlockExists && childBlock.IsEnqueued() {
-			s.tryReady(childBlock)
+			if _, isBasic := childBlock.BasicBlock(); isBasic {
+				s.tryReady(childBlock)
+			} else if _, isValidation := childBlock.ValidationBlock(); isValidation {
+				s.tryReadyValidationBlock(childBlock)
+			} else {
+				panic("invalid block type")
+			}
 		}
 	}
 }
@@ -562,4 +708,16 @@ func (s *Scheduler) deficitFromWork(work iotago.WorkScore) Deficit {
 	// max workscore block should occupy the full range of the deficit
 	deficitScaleFactor := s.maxDeficit() / Deficit(s.apiProvider.CurrentAPI().MaxBlockWork())
 	return Deficit(work) * deficitScaleFactor
+}
+
+func (s *Scheduler) addValidator(accountID iotago.AccountID) *ValidatorQueue {
+	validatorQueue := NewValidatorQueue(accountID)
+	s.validatorBuffer.Set(accountID, validatorQueue)
+	go s.validatorLoop(validatorQueue)
+
+	return validatorQueue
+}
+
+func (s *Scheduler) shutdownValidatorQueue(validatorQueue *ValidatorQueue) {
+	validatorQueue.shutdownSignal <- struct{}{}
 }

@@ -13,18 +13,21 @@ import (
 const (
 	schedulerNamespace = "scheduler"
 
-	queueSizePerNodeWork     = "queue_size_per_node_work" //nolint:gosec
-	queueSizePerNodeCount    = "queue_size_per_node_count"
-	schedulerProcessedBlocks = "processed_blocks"
-	manaAmountPerNode        = "mana_per_node"
-	scheduledBlockLabel      = "scheduled"
-	skippedBlockLabel        = "skipped"
-	droppedBlockLabel        = "dropped"
-	enqueuedBlockLabel       = "enqueued"
-	bufferReadyBlockCount    = "buffer_ready_block_total" //nolint:gosec
-	bufferTotalSize          = "buffer_size_block_total"
-	bufferMaxSize            = "buffer_max_size"
-	rate                     = "rate"
+	queueSizePerNodeWork           = "queue_size_per_node_work" //nolint:gosec
+	queueSizePerNodeCount          = "queue_size_per_node_count"
+	validatorQueueSizePerNodeCount = "validator_queue_size_per_node_count"
+	schedulerProcessedBlocks       = "processed_blocks"
+	manaAmountPerNode              = "mana_per_node"
+	scheduledBlockLabel            = "scheduled"
+	skippedBlockLabel              = "skipped"
+	droppedBlockLabel              = "dropped"
+	enqueuedBlockLabel             = "enqueued"
+	basicBufferReadyBlockCount     = "buffer_ready_block_total" //nolint:gosec
+	basicBufferTotalSize           = "buffer_size_block_total"
+	basicBufferMaxSize             = "buffer_max_size"
+	rate                           = "rate"
+	validatorBufferTotalSize       = "validator_buffer_size_block_total"
+	validatorQueueMaxSize          = "validator_buffer_max_size"
 )
 
 var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
@@ -55,7 +58,6 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
-
 	collector.WithMetric(collector.NewMetric(queueSizePerNodeCount,
 		collector.WithType(collector.Gauge),
 		collector.WithLabels("issuer_id"),
@@ -63,23 +65,58 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 		collector.WithHelp("Current size of each node's queue (as block count)."),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
-				deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
-
+				if _, isBasic := block.BasicBlock(); isBasic {
+					deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
+				}
 			}, event.WithWorkerPool(Component.WorkerPool))
 
 			deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
-				deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
-
+				if _, isBasic := block.BasicBlock(); isBasic {
+					deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
+				}
 			}, event.WithWorkerPool(Component.WorkerPool))
 
 			deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
-				deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
-
+				if _, isBasic := block.BasicBlock(); isBasic {
+					deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
+				}
 			}, event.WithWorkerPool(Component.WorkerPool))
 
 			deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
+				if _, isBasic := block.BasicBlock(); isBasic {
+					deps.Collector.Update(schedulerNamespace, queueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.IssuerQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
+				}
+			}, event.WithWorkerPool(Component.WorkerPool))
+		}),
+	)),
+	collector.WithMetric(collector.NewMetric(validatorQueueSizePerNodeCount,
+		collector.WithType(collector.Gauge),
+		collector.WithLabels("issuer_id"),
+		collector.WithPruningDelay(10*time.Minute),
+		collector.WithHelp("Current number of validation blocks in each validator's queue."),
+		collector.WithInitFunc(func() {
+			deps.Protocol.Events.Engine.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
+				if _, isValidation := block.ValidationBlock(); isValidation {
+					deps.Collector.Update(schedulerNamespace, validatorQueueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.ValidatorQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
+				}
+			}, event.WithWorkerPool(Component.WorkerPool))
 
+			deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+				if _, isValidation := block.ValidationBlock(); isValidation {
+					deps.Collector.Update(schedulerNamespace, validatorQueueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.ValidatorQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
+				}
+			}, event.WithWorkerPool(Component.WorkerPool))
+
+			deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
+				if _, isValidation := block.ValidationBlock(); isValidation {
+					deps.Collector.Update(schedulerNamespace, validatorQueueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.ValidatorQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
+				}
+			}, event.WithWorkerPool(Component.WorkerPool))
+
+			deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+				if _, isValidation := block.ValidationBlock(); isValidation {
+					deps.Collector.Update(schedulerNamespace, validatorQueueSizePerNodeCount, float64(deps.Protocol.MainEngineInstance().Scheduler.ValidatorQueueBlockCount(block.ProtocolBlock().IssuerID)), block.ProtocolBlock().IssuerID.String())
+				}
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
@@ -127,32 +164,46 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
-	collector.WithMetric(collector.NewMetric(bufferMaxSize,
+	collector.WithMetric(collector.NewMetric(basicBufferMaxSize,
 		collector.WithType(collector.Gauge),
-		collector.WithHelp("Maximum number of blocks that can be stored in the buffer."),
+		collector.WithHelp("Maximum number of basic blocks that can be stored in the buffer."),
 		collector.WithCollectFunc(func() (float64, []string) {
-			return float64(deps.Protocol.MainEngineInstance().Scheduler.MaxBufferSize()), []string{}
+			return float64(deps.Protocol.MainEngineInstance().CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize), []string{}
 		}),
 	)),
-	collector.WithMetric(collector.NewMetric(bufferReadyBlockCount,
+	collector.WithMetric(collector.NewMetric(basicBufferReadyBlockCount,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Number of ready blocks in the scheduler buffer."),
 		collector.WithCollectFunc(func() (float64, []string) {
 			return float64(deps.Protocol.MainEngineInstance().Scheduler.ReadyBlocksCount()), []string{}
 		}),
 	)),
-	collector.WithMetric(collector.NewMetric(bufferTotalSize,
+	collector.WithMetric(collector.NewMetric(basicBufferTotalSize,
 		collector.WithType(collector.Gauge),
-		collector.WithHelp("Current size of the scheduler buffer (in bytes)."),
+		collector.WithHelp("Current number of basic blocks in the scheduler buffer."),
 		collector.WithCollectFunc(func() (float64, []string) {
-			return float64(deps.Protocol.MainEngineInstance().Scheduler.BufferSize()), []string{}
+			return float64(deps.Protocol.MainEngineInstance().Scheduler.BasicBufferSize()), []string{}
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(rate,
 		collector.WithType(collector.Gauge),
-		collector.WithHelp("Current rate of the scheduler."),
+		collector.WithHelp("Current scheduling rate of basic blocks."),
 		collector.WithCollectFunc(func() (float64, []string) {
-			return float64(deps.Protocol.MainEngineInstance().Scheduler.Rate()), []string{}
+			return float64(deps.Protocol.MainEngineInstance().CurrentAPI().ProtocolParameters().CongestionControlParameters().SchedulerRate), []string{}
+		}),
+	)),
+	collector.WithMetric(collector.NewMetric(validatorBufferTotalSize,
+		collector.WithType(collector.Gauge),
+		collector.WithHelp("Current number of validation blocks in the scheduling buffer."),
+		collector.WithCollectFunc(func() (float64, []string) {
+			return float64(deps.Protocol.MainEngineInstance().Scheduler.ValidatorBufferSize()), []string{}
+		}),
+	)),
+	collector.WithMetric(collector.NewMetric(validatorQueueMaxSize,
+		collector.WithType(collector.Gauge),
+		collector.WithHelp("Maximum number of validation blocks that can be stored in each validator queue."),
+		collector.WithCollectFunc(func() (float64, []string) {
+			return float64(deps.Protocol.MainEngineInstance().CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize), []string{}
 		}),
 	)),
 )

@@ -201,6 +201,11 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
+	return m.account(accountID, targetIndex)
+
+}
+
+func (m *Manager) account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
 	// if m.latestCommittedSlot < maxCommittableAge we should have all history
 	maxCommittableAge := m.apiProvider.APIForSlot(targetIndex).ProtocolParameters().MaxCommittableAge()
 	if m.latestCommittedSlot >= maxCommittableAge && targetIndex+maxCommittableAge < m.latestCommittedSlot {
@@ -456,8 +461,9 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 
 func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex, rmc iotago.Mana) (burns map[iotago.AccountID]iotago.Mana, err error) {
 	burns = make(map[iotago.AccountID]iotago.Mana)
+	validationBlockCount := make(map[iotago.AccountID]int)
+	apiForSlot := m.apiProvider.APIForSlot(slotIndex)
 	if set, exists := m.blockBurns.Get(slotIndex); exists {
-		// Get RMC for this slot
 		for it := set.Iterator(); it.HasNext(); {
 			blockID := it.Next()
 			block, blockLoaded := m.block(blockID)
@@ -466,6 +472,24 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex, rmc iotag
 			}
 			if _, isBasicBlock := block.BasicBlock(); isBasicBlock {
 				burns[block.ProtocolBlock().IssuerID] += iotago.Mana(block.WorkScore()) * rmc
+			} else if _, isValidationBlock := block.ValidationBlock(); isValidationBlock {
+				validationBlockCount[block.ProtocolBlock().IssuerID]++
+			}
+		}
+		validationBlocksPerSlot := int(apiForSlot.ProtocolParameters().ValidationBlocksPerSlot())
+		for accountID, count := range validationBlockCount {
+			if count > validationBlocksPerSlot {
+				// penalize over-issuance
+				accountData, exists, err := m.account(accountID, m.latestCommittedSlot)
+				if !exists {
+					return nil, ierrors.Wrapf(err, "cannot compute penalty for over-issuing validator, account %s could not be retrieved", accountID)
+				}
+				punishmentEpochs := apiForSlot.ProtocolParameters().PunishmentEpochs()
+				manaPunishment, err := apiForSlot.ManaDecayProvider().ManaGenerationWithDecay(accountData.ValidatorStake, slotIndex, slotIndex+apiForSlot.TimeProvider().EpochDurationSlots()*iotago.SlotIndex(punishmentEpochs))
+				if err != nil {
+					return nil, ierrors.Wrapf(err, "cannot compute penalty for over-issuing validator with account ID %s due to problem with mana generation", accountID)
+				}
+				burns[accountID] += iotago.Mana(count-validationBlocksPerSlot) * manaPunishment
 			}
 		}
 	}
