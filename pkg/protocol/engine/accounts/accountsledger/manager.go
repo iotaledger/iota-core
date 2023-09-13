@@ -200,6 +200,11 @@ func (m *Manager) Account(accountID iotago.AccountID, targetIndex iotago.SlotInd
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
+	return m.account(accountID, targetIndex)
+
+}
+
+func (m *Manager) account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error) {
 	// if m.latestCommittedSlot < maxCommittableAge we should have all history
 	maxCommittableAge := m.apiProvider.APIForSlot(targetIndex).ProtocolParameters().MaxCommittableAge()
 	if m.latestCommittedSlot >= maxCommittableAge && targetIndex+maxCommittableAge < m.latestCommittedSlot {
@@ -431,7 +436,7 @@ func (m *Manager) computeBlockBurnsForSlot(slotIndex iotago.SlotIndex, rmc iotag
 		for accountID, count := range validationBlockCount {
 			if count > validationBlocksPerSlot {
 				// penalize over-issuance
-				accountData, exists, err := m.Account(accountID, slotIndex)
+				accountData, exists, err := m.account(accountID, m.latestCommittedSlot)
 				if !exists {
 					return nil, ierrors.Wrapf(err, "cannot compute penalty for over-issuing validator, account %s could not be retrieved", accountID)
 				}
