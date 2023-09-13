@@ -1,6 +1,6 @@
 package database
 
-func FlushAndClose(store *syncedKVStore) error {
+func FlushAndClose(store *lockedKVStore) error {
 	if err := store.FlushWithoutLocking(); err != nil {
 		return err
 	}

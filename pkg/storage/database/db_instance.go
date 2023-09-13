@@ -8,7 +8,7 @@ import (
 )
 
 type DBInstance struct {
-	store         *syncedKVStore // KVStore that is used to access the DB instance
+	store         *lockedKVStore // KVStore that is used to access the DB instance
 	healthTracker *kvstore.StoreHealthTracker
 	dbConfig      Config
 }
@@ -19,14 +19,16 @@ func NewDBInstance(dbConfig Config) *DBInstance {
 		panic(err)
 	}
 
-	syncedStore := &syncedKVStore{
-		storeInstance: db,
-		parentStore:   nil,
-		dbPrefix:      kvstore.EmptyPrefix,
+	lockableKVStore := &lockedKVStore{
+		openableKVStore: &openableKVStore{
+			storeInstance: db,
+			parentStore:   nil,
+			dbPrefix:      kvstore.EmptyPrefix,
+		},
 		instanceMutex: new(syncutils.RWMutex),
 	}
 
-	storeHealthTracker, err := kvstore.NewStoreHealthTracker(syncedStore, dbConfig.PrefixHealth, dbConfig.Version, nil)
+	storeHealthTracker, err := kvstore.NewStoreHealthTracker(lockableKVStore.openableKVStore, dbConfig.PrefixHealth, dbConfig.Version, nil)
 	if err != nil {
 		panic(ierrors.Wrapf(err, "database in %s is corrupted, delete database and resync node", dbConfig.Directory))
 	}
@@ -35,36 +37,24 @@ func NewDBInstance(dbConfig Config) *DBInstance {
 	}
 
 	return &DBInstance{
-		store:         syncedStore,
+		store:         lockableKVStore,
 		healthTracker: storeHealthTracker,
 		dbConfig:      dbConfig,
 	}
 }
 
 func (d *DBInstance) Close() {
-	d.MarkHealthy()
-
 	d.store.Lock()
 	defer d.store.Unlock()
 
-	if err := FlushAndClose(d.store); err != nil {
-		panic(err)
-	}
+	d.CloseWithoutLocking()
 }
 
-func (d *DBInstance) MarkHealthy() {
+func (d *DBInstance) CloseWithoutLocking() {
 	if err := d.healthTracker.MarkHealthy(); err != nil {
 		panic(err)
 	}
-}
 
-// TODO: make markCorrupted and markHealthy not lock the kvstore so that we can first lock the kvstore and then mark as healthy and corrupted without causing a deadlock
-func (d *DBInstance) MarkCorrupted() {
-	if err := d.healthTracker.MarkCorrupted(); err != nil {
-		panic(err)
-	}
-}
-func (d *DBInstance) CloseWithoutLocking() {
 	if err := FlushAndClose(d.store); err != nil {
 		panic(err)
 	}
@@ -72,6 +62,10 @@ func (d *DBInstance) CloseWithoutLocking() {
 
 func (d *DBInstance) Open() {
 	d.store.Replace(lo.PanicOnErr(StoreWithDefaultSettings(d.dbConfig.Directory, false, d.dbConfig.Engine)))
+
+	if err := d.healthTracker.MarkCorrupted(); err != nil {
+		panic(err)
+	}
 }
 
 func (d *DBInstance) Lock() {

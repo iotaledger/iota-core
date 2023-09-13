@@ -50,10 +50,9 @@ func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(e
 }
 
 func Clone(source *Prunable, dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[BucketManager]) (*Prunable, error) {
-	source.semiPermanentDB.MarkHealthy()
-	// TODO: mark healthy within the lock
 	// Lock semi-permanent DB and prunable slot store so that nobody can try to use or open them while cloning.
 	source.semiPermanentDB.Lock()
+	defer source.semiPermanentDB.Unlock()
 
 	source.prunableSlotStore.mutex.Lock()
 	defer source.prunableSlotStore.mutex.Unlock()
@@ -70,9 +69,6 @@ func Clone(source *Prunable, dbConfig database.Config, apiProvider api.Provider,
 	//  to minimize time of locking of the most recent bucket that could be used and semi permanent storage.
 
 	source.semiPermanentDB.Open()
-	source.semiPermanentDB.Unlock()
-	source.semiPermanentDB.MarkCorrupted()
-	// TODO: mark healthy within the lock
 
 	return New(dbConfig, apiProvider, errorHandler, opts...), nil
 }

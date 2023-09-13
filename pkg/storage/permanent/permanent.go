@@ -53,9 +53,8 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 }
 
 func Clone(source *Permanent, dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) (*Permanent, error) {
-	source.store.MarkHealthy()
-	// TODO: mark healthy within the lock
 	source.store.Lock()
+	defer source.store.Unlock()
 
 	source.store.CloseWithoutLocking()
 
@@ -64,10 +63,6 @@ func Clone(source *Permanent, dbConfig database.Config, errorHandler func(error)
 	}
 
 	source.store.Open()
-
-	source.store.Unlock()
-	// TODO: mark corrupted within the lock
-	source.store.MarkCorrupted()
 
 	return New(dbConfig, errorHandler, opts...), nil
 }

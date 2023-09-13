@@ -1,236 +1,158 @@
 package database
 
 import (
-	"fmt"
-	"sync"
-
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/kvstore/utils"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 )
 
-type syncedKVStore struct {
-	storeInstance kvstore.KVStore // KVStore that is used to access the DB instance
-	parentStore   *syncedKVStore
-	dbPrefix      kvstore.KeyPrefix
+type lockedKVStore struct {
+	*openableKVStore
 
 	instanceMutex *syncutils.RWMutex
 }
 
-func (s *syncedKVStore) instance() kvstore.KVStore {
-	if s.storeInstance != nil {
-		return s.storeInstance
-	}
-
-	return s.parentStore.instance()
-}
-
-func (s *syncedKVStore) Lock() {
+func (s *lockedKVStore) Lock() {
 	s.instanceMutex.Lock()
 }
 
-func (s *syncedKVStore) Unlock() {
+func (s *lockedKVStore) Unlock() {
 	s.instanceMutex.Unlock()
 }
 
-func (s *syncedKVStore) Replace(newKVStore kvstore.KVStore) {
-	if s.storeInstance == nil {
-		s.parentStore.Replace(newKVStore)
-
-		return
-	}
-
-	s.storeInstance = newKVStore
-}
-
-func (s *syncedKVStore) WithRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
+func (s *lockedKVStore) WithRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
 	return s.withRealm(realm)
 }
-func (s *syncedKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
-	return &syncedKVStore{
-		storeInstance: nil,
-		parentStore:   s,
+func (s *lockedKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
+	return &lockedKVStore{
+		openableKVStore: &openableKVStore{
+			storeInstance: nil,
+			parentStore:   s.openableKVStore,
+			dbPrefix:      realm,
+		},
+
 		instanceMutex: s.instanceMutex,
-		dbPrefix:      realm,
 	}, nil
 }
-func (s *syncedKVStore) WithExtendedRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
+
+func (s *lockedKVStore) WithExtendedRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
 	return s.withRealm(s.buildKeyPrefix(realm))
 }
 
-func (s *syncedKVStore) Realm() kvstore.Realm {
-	return s.dbPrefix
-}
-
-func (s *syncedKVStore) Iterate(prefix kvstore.KeyPrefix, kvConsumerFunc kvstore.IteratorKeyValueConsumerFunc, direction ...kvstore.IterDirection) error {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
-	return s.instance().Iterate(s.buildKeyPrefix(prefix), func(key kvstore.Key, value kvstore.Value) bool {
-		fmt.Println("realm", s.dbPrefix, "prefix", prefix, "key", key, "value", value)
-
-		return kvConsumerFunc(utils.CopyBytes(key)[len(s.dbPrefix):], value)
-	}, direction...)
-}
-
-func (s *syncedKVStore) IterateKeys(prefix kvstore.KeyPrefix, consumerFunc kvstore.IteratorKeyConsumerFunc, direction ...kvstore.IterDirection) error {
+func (s *lockedKVStore) Iterate(prefix kvstore.KeyPrefix, kvConsumerFunc kvstore.IteratorKeyValueConsumerFunc, direction ...kvstore.IterDirection) error {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
-	return s.instance().IterateKeys(s.buildKeyPrefix(prefix), func(key kvstore.Key) bool {
-		return consumerFunc(utils.CopyBytes(key)[len(s.dbPrefix):])
-	}, direction...)
+	return s.openableKVStore.Iterate(prefix, kvConsumerFunc, direction...)
 }
 
-func (s *syncedKVStore) Clear() error {
+func (s *lockedKVStore) IterateKeys(prefix kvstore.KeyPrefix, consumerFunc kvstore.IteratorKeyConsumerFunc, direction ...kvstore.IterDirection) error {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
-	return s.instance().DeletePrefix(s.dbPrefix)
+	return s.openableKVStore.IterateKeys(prefix, consumerFunc, direction...)
 }
 
-func (s *syncedKVStore) Get(key kvstore.Key) (value kvstore.Value, err error) {
+func (s *lockedKVStore) Clear() error {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
-	return s.instance().Get(byteutils.ConcatBytes(s.dbPrefix, key))
+	return s.openableKVStore.Clear()
 }
 
-func (s *syncedKVStore) Set(key kvstore.Key, value kvstore.Value) error {
+func (s *lockedKVStore) Get(key kvstore.Key) (value kvstore.Value, err error) {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
-	return s.instance().Set(byteutils.ConcatBytes(s.dbPrefix, key), value)
+	return s.openableKVStore.Get(key)
 }
 
-func (s *syncedKVStore) Has(key kvstore.Key) (bool, error) {
+func (s *lockedKVStore) Set(key kvstore.Key, value kvstore.Value) error {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
-	return s.instance().Has(byteutils.ConcatBytes(s.dbPrefix, key))
+	return s.openableKVStore.Set(key, value)
 }
 
-func (s *syncedKVStore) Delete(key kvstore.Key) error {
+func (s *lockedKVStore) Has(key kvstore.Key) (bool, error) {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
-	return s.instance().Delete(byteutils.ConcatBytes(s.dbPrefix, key))
+	return s.openableKVStore.Has(key)
 }
 
-func (s *syncedKVStore) DeletePrefix(prefix kvstore.KeyPrefix) error {
+func (s *lockedKVStore) Delete(key kvstore.Key) error {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
-	return s.instance().DeletePrefix(s.buildKeyPrefix(prefix))
+	return s.openableKVStore.Delete(key)
 }
 
-func (s *syncedKVStore) Flush() error {
+func (s *lockedKVStore) DeletePrefix(prefix kvstore.KeyPrefix) error {
+	s.instanceMutex.RLock()
+	defer s.instanceMutex.RUnlock()
+
+	return s.openableKVStore.DeletePrefix(prefix)
+}
+
+func (s *lockedKVStore) Flush() error {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
 	return s.FlushWithoutLocking()
 }
 
-func (s *syncedKVStore) FlushWithoutLocking() error {
-	return s.instance().Flush()
+func (s *lockedKVStore) FlushWithoutLocking() error {
+	return s.openableKVStore.Flush()
 }
-func (s *syncedKVStore) Close() error {
+
+func (s *lockedKVStore) Close() error {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
 	return s.CloseWithoutLocking()
 }
-func (s *syncedKVStore) CloseWithoutLocking() error {
-	return s.instance().Close()
+func (s *lockedKVStore) CloseWithoutLocking() error {
+	return s.openableKVStore.Close()
 }
 
-func (s *syncedKVStore) Batched() (kvstore.BatchedMutations, error) {
+func (s *lockedKVStore) Batched() (kvstore.BatchedMutations, error) {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
 
-	return &syncedBachedMutations{
-		parentStore:      s,
-		dbPrefix:         s.dbPrefix,
-		setOperations:    make(map[string]kvstore.Value),
-		deleteOperations: make(map[string]types.Empty),
+	return &syncedBatchedMutations{
+		openableKVStoreBatchedMutations: &openableKVStoreBatchedMutations{
+			parentStore:      s.openableKVStore,
+			dbPrefix:         s.dbPrefix,
+			setOperations:    make(map[string]kvstore.Value),
+			deleteOperations: make(map[string]types.Empty),
+		},
+
+		parentStore: s,
 	}, nil
 }
 
 // builds a key usable using the realm and the given prefix.
-func (s *syncedKVStore) buildKeyPrefix(prefix kvstore.KeyPrefix) kvstore.KeyPrefix {
+func (s *lockedKVStore) buildKeyPrefix(prefix kvstore.KeyPrefix) kvstore.KeyPrefix {
 	return byteutils.ConcatBytes(s.dbPrefix, prefix)
 }
 
-type syncedBachedMutations struct {
-	parentStore      *syncedKVStore
-	dbPrefix         kvstore.KeyPrefix
-	setOperations    map[string]kvstore.Value
-	deleteOperations map[string]types.Empty
-	operationsMutex  sync.Mutex
+type syncedBatchedMutations struct {
+	*openableKVStoreBatchedMutations
+
+	parentStore *lockedKVStore
 }
 
-func (s *syncedBachedMutations) Set(key kvstore.Key, value kvstore.Value) error {
-	stringKey := byteutils.ConcatBytesToString(s.dbPrefix, key)
-
-	s.operationsMutex.Lock()
-	defer s.operationsMutex.Unlock()
-
-	delete(s.deleteOperations, stringKey)
-	s.setOperations[stringKey] = value
-
-	return nil
-}
-
-func (s *syncedBachedMutations) Delete(key kvstore.Key) error {
-	stringKey := byteutils.ConcatBytesToString(s.dbPrefix, key)
-
-	s.operationsMutex.Lock()
-	defer s.operationsMutex.Unlock()
-
-	delete(s.setOperations, stringKey)
-	s.deleteOperations[stringKey] = types.Void
-
-	return nil
-}
-
-func (s *syncedBachedMutations) Cancel() {
-	s.operationsMutex.Lock()
-	defer s.operationsMutex.Unlock()
-
-	s.setOperations = make(map[string]kvstore.Value)
-	s.deleteOperations = make(map[string]types.Empty)
-}
-
-func (s *syncedBachedMutations) Commit() error {
+func (s *syncedBatchedMutations) Commit() error {
 	s.parentStore.instanceMutex.RLock()
 	defer s.parentStore.instanceMutex.RUnlock()
 
-	batched, err := s.parentStore.instance().Batched()
-	if err != nil {
-		return err
-	}
-
-	s.operationsMutex.Lock()
-	defer s.operationsMutex.Unlock()
-
-	for key, value := range s.setOperations {
-		if err = batched.Set([]byte(key), value); err != nil {
-			return err
-		}
-	}
-
-	for key := range s.deleteOperations {
-		if err = batched.Delete([]byte(key)); err != nil {
-			return err
-		}
-	}
-
-	return batched.Commit()
+	return s.openableKVStoreBatchedMutations.Commit()
 }
