@@ -1,6 +1,8 @@
 package prunable
 
 import (
+	"fmt"
+
 	copydir "github.com/otiai10/copy"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -161,19 +163,22 @@ func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex) error {
 
 	// Removed entries that belong to the old fork and cannot be re-used.
 	for epochIdx := lastCommittedEpoch + 1; ; epochIdx++ {
+		fmt.Println("rollback before if", epochIdx, targetSlotEpoch)
 		if epochIdx > targetSlotEpoch {
-			if deleted := p.prunableSlotStore.DeleteBucket(epochIdx); !deleted {
-				break
-			}
-
-			shouldRollback, err := p.shouldRollbackCommittee(epochIdx+1, targetSlotIndex)
+			shouldRollback, err := p.shouldRollbackCommittee(epochIdx, targetSlotIndex)
 			if err != nil {
 				return ierrors.Wrapf(err, "error while checking if committee for epoch %d should be rolled back", epochIdx)
 			}
+
+			fmt.Println("rollback committee", shouldRollback, "epochIdx", epochIdx, "lastCommittedEpoch", lastCommittedEpoch, "targetSlotEpoch", targetSlotEpoch)
 			if shouldRollback {
-				if err := p.committee.DeleteEpoch(epochIdx + 1); err != nil {
+				if err := p.committee.DeleteEpoch(epochIdx); err != nil {
 					return ierrors.Wrapf(err, "error while deleting committee for epoch %d", epochIdx)
 				}
+			}
+
+			if deleted := p.prunableSlotStore.DeleteBucket(epochIdx); !deleted {
+				break
 			}
 		}
 
@@ -199,13 +204,17 @@ func (p *Prunable) shouldRollbackCommittee(epochIndex iotago.EpochIndex, targetS
 	targetSlotEpoch := timeProvider.EpochFromSlot(targetSlotIndex)
 	pointOfNoReturn := timeProvider.EpochEnd(targetSlotEpoch) - p.apiProvider.APIForSlot(targetSlotIndex).ProtocolParameters().MaxCommittableAge()
 
-	if epochIndex == targetSlotEpoch+1 && targetSlotIndex < pointOfNoReturn {
-		committee, err := p.committee.Load(targetSlotEpoch + 1)
-		if err != nil {
-			return false, err
+	if epochIndex >= targetSlotEpoch+1 {
+		if targetSlotIndex < pointOfNoReturn {
+			committee, err := p.committee.Load(targetSlotEpoch + 1)
+			if err != nil {
+				return false, err
+			}
+
+			return committee.IsReused(), nil
 		}
 
-		return committee.IsReused(), nil
+		return false, nil
 	}
 
 	return true, nil

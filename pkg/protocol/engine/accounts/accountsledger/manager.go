@@ -295,7 +295,6 @@ func (m *Manager) Rollback(targetIndex iotago.SlotIndex) error {
 				return false
 			}
 
-			// TODO: Saving accountData after each slot - would it be better to buffer them in memory and save them at the end?
 			if err := m.accountsTree.Set(accountID, accountData); err != nil {
 				internalErr = ierrors.Wrapf(err, "failed to save rolled back account %s to target slot index %d", accountID, targetIndex)
 
