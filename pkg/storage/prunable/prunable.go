@@ -65,8 +65,6 @@ func Clone(source *Prunable, dbConfig database.Config, apiProvider api.Provider,
 	if err := copydir.Copy(source.prunableSlotStore.dbConfig.Directory, dbConfig.Directory); err != nil {
 		return nil, ierrors.Wrap(err, "failed to copy prunable storage directory to new storage path")
 	}
-	// TODO: it's possible to copy prunable slot store separately bucket-after-bucket
-	//  to minimize time of locking of the most recent bucket that could be used and semi permanent storage.
 
 	source.semiPermanentDB.Open()
 

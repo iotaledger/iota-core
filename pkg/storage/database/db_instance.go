@@ -28,6 +28,8 @@ func NewDBInstance(dbConfig Config) *DBInstance {
 		instanceMutex: new(syncutils.RWMutex),
 	}
 
+	// HealthTracker state is only modified while holding the lock on the lockableKVStore;
+	//  that's why it needs to use openableKVStore (which does not lock) instead of lockableKVStore to avoid a deadlock.
 	storeHealthTracker, err := kvstore.NewStoreHealthTracker(lockableKVStore.openableKVStore, dbConfig.PrefixHealth, dbConfig.Version, nil)
 	if err != nil {
 		panic(ierrors.Wrapf(err, "database in %s is corrupted, delete database and resync node", dbConfig.Directory))
@@ -60,6 +62,8 @@ func (d *DBInstance) CloseWithoutLocking() {
 	}
 }
 
+// Open re-opens a closed DBInstance. It must only be called while holding a lock on DBInstance,
+// otherwise it might cause a race condition and corruption of node's state.
 func (d *DBInstance) Open() {
 	d.store.Replace(lo.PanicOnErr(StoreWithDefaultSettings(d.dbConfig.Directory, false, d.dbConfig.Engine)))
 

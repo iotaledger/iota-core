@@ -78,7 +78,6 @@ func (b *BucketManager) Shutdown() {
 	defer b.openDBsMutex.Unlock()
 
 	b.openDBs.Each(func(index iotago.EpochIndex, db *database.DBInstance) {
-		// TODO: lock the database before closing so that no one can use it before we close it
 		db.Close()
 		b.openDBs.Remove(index)
 	})
@@ -174,7 +173,7 @@ func (b *BucketManager) RestoreFromDisk() (lastPrunedEpoch iotago.EpochIndex) {
 //	epochIndex 1 -> db 1
 //	epochIndex 2 -> db 2
 func (b *BucketManager) getDBInstance(index iotago.EpochIndex) (db *database.DBInstance) {
-	// Lock global mutex
+	// Lock global mutex to prevent closing and copying storage data on disk during engine switching.
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
