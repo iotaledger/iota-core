@@ -220,6 +220,7 @@ func TestStorage_CopyFromForkedStorageEmpty(t *testing.T) {
 		tf1.GeneratePrunableData(iotago.EpochIndex(i), 500*KB)
 		tf1.GenerateSemiPermanentData(iotago.EpochIndex(i))
 	}
+	tf1.GeneratePermanentData(1 * MB)
 
 	clonedStorage, err := storage.CloneStorage(tf1.Instance, t.TempDir(), 0, func(err error) {
 		t.Log(err)
