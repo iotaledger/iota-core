@@ -1,8 +1,6 @@
 package accountsfilter
 
 import (
-	"crypto/ed25519"
-
 	"github.com/iotaledger/hive.go/core/safemath"
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -158,7 +156,15 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	case *iotago.Ed25519Signature:
 		if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(signature.PublicKey)) {
 			// if the block issuer does not have the public key in the slot commitment, check if it has an implicit account with the corresponding address
-			if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519AddressFromAddress(iotago.Ed25519AddressFromPubKey(ed25519.PublicKey(signature.PublicKey[:])))) {
+			var hasAddress = false
+			accountData.BlockIssuerKeys.Range(func(element iotago.BlockIssuerKey) {
+				if keyAddress, isAddress := element.(iotago.BlockIssuerKeyEd25519Address); isAddress {
+					if keyAddress.Address.Equal(iotago.Ed25519AddressFromPubKey(signature.PublicKey[:])) {
+						hasAddress = true
+					}
+				}
+			})
+			if !hasAddress {
 				c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 					Block:  block,
 					Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have block issuer key corresponding to public key %s in slot %d", block.ProtocolBlock().IssuerID, signature.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),

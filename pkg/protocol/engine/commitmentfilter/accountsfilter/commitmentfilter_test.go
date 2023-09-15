@@ -149,6 +149,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 
 	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
 		require.NotEqual(t, "withAccount", event.Block.ID().Alias())
+		require.NotEqual(t, "withImplicitAccount", event.Block.ID().Alias())
 	})
 
 	keyPair := ed25519.GenerateKeyPair()
@@ -165,7 +166,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
 	accountID := iotago.AccountID(addr[:])
 
-	// register the account in the proxy account manager
+	// register the accounts in the proxy account manager
 	tf.AddAccountData(
 		accountID,
 		accounts.NewAccountData(
@@ -174,13 +175,26 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
 		),
 	)
+	keyPairImplicitAccount := ed25519.GenerateKeyPair()
+	implicitAddress := iotago.Ed25519AddressFromPubKey(keyPairImplicitAccount.PublicKey[:])
+	implicitAccountID := iotago.AccountID(implicitAddress[:])
+	tf.AddAccountData(
+		implicitAccountID,
+		accounts.NewAccountData(
+			implicitAccountID,
+			accounts.WithExpirySlot(math.MaxUint64),
+			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519AddressFromAddress(implicitAddress)),
+		),
+	)
 
 	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
 
 	tf.IssueSignedBlockAtSlot("withAccount", currentSlot, commitmentID, keyPair)
 
-	otherKeyPair := ed25519.GenerateKeyPair()
-	tf.IssueSignedBlockAtSlot("noAccount", currentSlot, commitmentID, otherKeyPair)
+	keyPairNoAccount := ed25519.GenerateKeyPair()
+	tf.IssueSignedBlockAtSlot("noAccount", currentSlot, commitmentID, keyPairNoAccount)
+
+	tf.IssueSignedBlockAtSlot("withImplicitAccount", currentSlot, commitmentID, keyPairImplicitAccount)
 }
 
 func TestCommitmentFilter_BurnedMana(t *testing.T) {
