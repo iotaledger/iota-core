@@ -137,7 +137,7 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 	t.poolRewards[epochIndex] = make(map[string]*model.PoolRewards)
 
 	for alias, action := range actions {
-		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount
+		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount >> t.api.ProtocolParameters().SlotsPerEpochExponent()
 		poolRewards := t.calculatePoolReward(epochIndex, totalValidatorsStake, totalStake, action.PoolStake, action.ValidatorStake, uint64(action.FixedCost), epochPerformanceFactor)
 		t.poolRewards[epochIndex][alias] = &model.PoolRewards{
 			PoolStake:   action.PoolStake,
