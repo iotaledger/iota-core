@@ -8,13 +8,16 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
 var ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
+var ErrValidatorNotInCommittee = ierrors.New("validation block issuer is not in the committee")
 
 // Filter filters blocks.
 type Filter struct {
@@ -23,6 +26,8 @@ type Filter struct {
 	apiProvider api.Provider
 
 	optsMaxAllowedWallClockDrift time.Duration
+
+	committeeFunc func(iotago.SlotIndex) *account.SeatedAccounts
 
 	module.Module
 }
@@ -34,7 +39,9 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 
 		e.HookConstructed(func() {
 			e.Events.Filter.LinkTo(f.events)
-
+			e.SybilProtection.HookInitialized(func() {
+				f.committeeFunc = e.SybilProtection.SeatManager().Committee
+			})
 			f.TriggerInitialized()
 		})
 
@@ -67,6 +74,29 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 		})
 
 		return
+	}
+
+	if _, isValidation := block.ValidationBlock(); isValidation {
+		blockAPI, err := f.apiProvider.APIForVersion(block.ProtocolBlock().ProtocolVersion)
+		if err != nil {
+			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Wrapf(err, "could not get API for version %d", block.ProtocolBlock().ProtocolVersion),
+				Source: source,
+			})
+
+			return
+		}
+		blockSlot := blockAPI.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
+		if !f.committeeFunc(blockSlot).HasAccount(block.ProtocolBlock().IssuerID) {
+			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().IssuerID, blockSlot),
+				Source: source,
+			})
+
+			return
+		}
 	}
 
 	f.events.BlockPreAllowed.Trigger(block)

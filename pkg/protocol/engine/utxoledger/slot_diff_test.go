@@ -28,12 +28,14 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 	address := utils.RandAddress(iotago.AddressEd25519)
 	amount := iotago.BaseToken(832493)
 	iotaOutput := &iotago.BasicOutput{
-		Amount: amount,
+		Amount:       amount,
+		NativeTokens: iotago.NativeTokens{},
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
 			},
 		},
+		Features: iotago.BasicOutputFeatures{},
 	}
 	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput)
 
