@@ -1,6 +1,8 @@
 package accountsfilter
 
 import (
+	"crypto/ed25519"
+
 	"github.com/iotaledger/hive.go/core/safemath"
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -155,12 +157,15 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	switch signature := block.ProtocolBlock().Signature.(type) {
 	case *iotago.Ed25519Signature:
 		if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(signature.PublicKey)) {
-			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
-				Block:  block,
-				Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.ProtocolBlock().IssuerID, signature.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),
-			})
+			// if the block issuer does not have the public key in the slot commitment, check if it has an implicit account with the corresponding address
+			if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519AddressFromAddress(iotago.Ed25519AddressFromPubKey(ed25519.PublicKey(signature.PublicKey[:])))) {
+				c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+					Block:  block,
+					Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have block issuer key corresponding to public key %s in slot %d", block.ProtocolBlock().IssuerID, signature.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),
+				})
 
-			return
+				return
+			}
 		}
 		signingMessage, err := block.ProtocolBlock().SigningMessage(blockAPI)
 		if err != nil {

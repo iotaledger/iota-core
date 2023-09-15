@@ -439,7 +439,13 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		accountDiff.PreviousOutputID = iotago.EmptyOutputID
 		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 		accountDiff.PreviousExpirySlot = 0
-		accountDiff.BlockIssuerKeysAdded = createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
+		// if the account is an implicit account, we need to set block issuer keys differently
+		if createdOutput.Output().Type() == iotago.OutputAccount {
+			accountDiff.BlockIssuerKeysAdded = createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
+		} else {
+			ed25519Address, _ := createdOutput.Output().UnlockConditionSet().Address().Address.(*iotago.Ed25519Address)
+			accountDiff.BlockIssuerKeysAdded = iotago.BlockIssuerKeys{iotago.BlockIssuerKeyEd25519AddressFromAddress(ed25519Address)}
+		}
 
 		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
 			accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
@@ -485,6 +491,14 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			// the delegation output was created => determine later if we need to add the stake to the validator
 			delegation, _ := createdOutput.Output().(*iotago.DelegationOutput)
 			createdAccountDelegation[delegation.DelegationID] = delegation
+
+		case iotago.OutputBasic:
+			// if a basic output is sent to an implicit account creation address, we need to create the account
+			if createdOutput.Output().UnlockConditionSet().Address().Address.Type() == iotago.AddressImplicitAccountCreation {
+				accountID := iotago.AccountIDFromOutputID(outputID)
+				l.events.AccountCreated.Trigger(accountID)
+				createdAccounts[accountID] = createdOutput
+			}
 		}
 
 		return true
