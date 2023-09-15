@@ -42,15 +42,11 @@ func (s *Scheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...*blocks.Block) b
 	return true
 }
 
-func (s *Scheduler) Rate() iotago.WorkScore {
+func (s *Scheduler) BasicBufferSize() int {
 	return 0
 }
 
-func (s *Scheduler) BufferSize() int {
-	return 0
-}
-
-func (s *Scheduler) MaxBufferSize() int {
+func (s *Scheduler) ValidatorBufferSize() int {
 	return 0
 }
 
@@ -59,6 +55,10 @@ func (s *Scheduler) ReadyBlocksCount() int {
 }
 
 func (s *Scheduler) IssuerQueueBlockCount(_ iotago.AccountID) int {
+	return 0
+}
+
+func (s *Scheduler) ValidatorQueueBlockCount(_ iotago.AccountID) int {
 	return 0
 }
 

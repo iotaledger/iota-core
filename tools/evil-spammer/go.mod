@@ -17,7 +17,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230906114834-b50190b9f9c2
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230908073546-4fbdf7ebba1f
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230913143616-917572c7752d
 	github.com/mr-tron/base58 v1.2.0
 	go.uber.org/atomic v1.11.0
 )
@@ -28,7 +28,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
-	github.com/ethereum/go-ethereum v1.12.2 // indirect
+	github.com/ethereum/go-ethereum v1.13.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
@@ -41,7 +41,7 @@ require (
 	github.com/iotaledger/hive.go/constraints v0.0.0-20230906114834-b50190b9f9c2 // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230906114834-b50190b9f9c2 // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230906114834-b50190b9f9c2 // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230906114834-b50190b9f9c2 // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230912111751-d84fba02bb7c // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230906114834-b50190b9f9c2 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect

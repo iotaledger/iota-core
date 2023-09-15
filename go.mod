@@ -20,11 +20,11 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20230906114834-b50190b9f9c2
 	github.com/iotaledger/hive.go/logger v0.0.0-20230906114834-b50190b9f9c2
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230906114834-b50190b9f9c2
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230906114834-b50190b9f9c2
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230912111751-d84fba02bb7c
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230906114834-b50190b9f9c2
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230829161228-3f4eb50a4d14
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230829160617-69b96c7c9f9b
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230908073546-4fbdf7ebba1f
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230913143616-917572c7752d
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.30.0
@@ -58,7 +58,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/ethereum/go-ethereum v1.12.2 // indirect
+	github.com/ethereum/go-ethereum v1.13.0 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/fjl/memsize v0.0.2 // indirect
@@ -83,7 +83,7 @@ require (
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
-	github.com/huin/goupnp v1.2.0 // indirect
+	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
 	github.com/ipfs/boxo v0.10.0 // indirect

@@ -116,6 +116,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					10,
 					100,
 					100,
+					100,
 				),
 				iotago.WithTimeProviderOptions(
 					time.Now().Truncate(10*time.Second).Unix()-t.optsGenesisTimestampOffset,
@@ -138,8 +139,9 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsSchedulerRate,
 					t.optsMinMana,
 					t.optsMaxBufferSize,
+					t.optsMaxBufferSize,
 				),
-				iotago.WithStakingOptions(1),
+				iotago.WithStakingOptions(1, 100, 1),
 			),
 		)
 

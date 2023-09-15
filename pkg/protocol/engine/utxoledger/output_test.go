@@ -124,18 +124,19 @@ func TestExtendedOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.
 	slotCreated := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.BasicOutput{
-		Amount: amount,
+		Amount:       amount,
+		NativeTokens: iotago.NativeTokens{},
+		Conditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{
+				Address: address,
+			},
+		},
 		Features: iotago.BasicOutputFeatures{
 			&iotago.SenderFeature{
 				Address: senderAddress,
 			},
 			&iotago.TagFeature{
 				Tag: tag,
-			},
-		},
-		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{
-				Address: address,
 			},
 		},
 	}
@@ -158,18 +159,19 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 	timeLockUnlockSlot := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.BasicOutput{
-		Amount: amount,
-		Features: iotago.BasicOutputFeatures{
-			&iotago.SenderFeature{
-				Address: senderAddress,
-			},
-		},
+		Amount:       amount,
+		NativeTokens: iotago.NativeTokens{},
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
 			},
 			&iotago.TimelockUnlockCondition{
 				SlotIndex: timeLockUnlockSlot,
+			},
+		},
+		Features: iotago.BasicOutputFeatures{
+			&iotago.SenderFeature{
+				Address: senderAddress,
 			},
 		},
 	}
@@ -191,16 +193,18 @@ func TestNFTOutputSerialization(t *testing.T) {
 	slotCreated := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.NFTOutput{
-		Amount: amount,
-		NFTID:  nftID,
-		ImmutableFeatures: iotago.NFTOutputImmFeatures{
-			&iotago.MetadataFeature{
-				Data: utils.RandBytes(12),
-			},
-		},
+		Amount:       amount,
+		NativeTokens: iotago.NativeTokens{},
+		NFTID:        nftID,
 		Conditions: iotago.NFTOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
+			},
+		},
+		Features: iotago.NFTOutputFeatures{},
+		ImmutableFeatures: iotago.NFTOutputImmFeatures{
+			&iotago.MetadataFeature{
+				Data: utils.RandBytes(12),
 			},
 		},
 	}
@@ -224,16 +228,9 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 	expirationUnlockSlot := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.NFTOutput{
-		Amount: amount,
-		NFTID:  nftID,
-		ImmutableFeatures: iotago.NFTOutputImmFeatures{
-			&iotago.MetadataFeature{
-				Data: utils.RandBytes(12),
-			},
-			&iotago.IssuerFeature{
-				Address: issuerAddress,
-			},
-		},
+		Amount:       amount,
+		NativeTokens: iotago.NativeTokens{},
+		NFTID:        nftID,
 		Conditions: iotago.NFTOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address.ToAddress(),
@@ -241,6 +238,15 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 			&iotago.ExpirationUnlockCondition{
 				SlotIndex:     expirationUnlockSlot,
 				ReturnAddress: issuerAddress,
+			},
+		},
+		Features: iotago.NFTOutputFeatures{},
+		ImmutableFeatures: iotago.NFTOutputImmFeatures{
+			&iotago.MetadataFeature{
+				Data: utils.RandBytes(12),
+			},
+			&iotago.IssuerFeature{
+				Address: issuerAddress,
 			},
 		},
 	}
@@ -265,8 +271,17 @@ func TestAccountOutputSerialization(t *testing.T) {
 	slotCreated := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.AccountOutput{
-		Amount:    amount,
-		AccountID: aliasID,
+		Amount:       amount,
+		NativeTokens: iotago.NativeTokens{},
+		AccountID:    aliasID,
+		Conditions: iotago.AccountOutputUnlockConditions{
+			&iotago.StateControllerAddressUnlockCondition{
+				Address: stateController.ToAddress(),
+			},
+			&iotago.GovernorAddressUnlockCondition{
+				Address: governor,
+			},
+		},
 		Features: iotago.AccountOutputFeatures{
 			&iotago.SenderFeature{
 				Address: sender.ToAddress(),
@@ -275,14 +290,6 @@ func TestAccountOutputSerialization(t *testing.T) {
 		ImmutableFeatures: iotago.AccountOutputImmFeatures{
 			&iotago.IssuerFeature{
 				Address: issuer.ToAddress(),
-			},
-		},
-		Conditions: iotago.AccountOutputUnlockConditions{
-			&iotago.StateControllerAddressUnlockCondition{
-				Address: stateController.ToAddress(),
-			},
-			&iotago.GovernorAddressUnlockCondition{
-				Address: governor,
 			},
 		},
 	}
@@ -305,6 +312,7 @@ func TestFoundryOutputSerialization(t *testing.T) {
 
 	iotaOutput := &iotago.FoundryOutput{
 		Amount:       amount,
+		NativeTokens: iotago.NativeTokens{},
 		SerialNumber: utils.RandUint32(math.MaxUint32),
 		TokenScheme: &iotago.SimpleTokenScheme{
 			MintedTokens:  supply,
@@ -316,6 +324,8 @@ func TestFoundryOutputSerialization(t *testing.T) {
 				Address: aliasID.ToAddress().(*iotago.AccountAddress),
 			},
 		},
+		Features:          iotago.FoundryOutputFeatures{},
+		ImmutableFeatures: iotago.FoundryOutputImmFeatures{},
 	}
 
 	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
