@@ -439,19 +439,22 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		accountDiff.PreviousOutputID = iotago.EmptyOutputID
 		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 		accountDiff.PreviousExpirySlot = 0
-		// if the account is an implicit account, we need to set block issuer keys differently
-		if createdOutput.Output().Type() == iotago.OutputAccount {
+
+		switch createdOutput.Output().Type() {
+		// for account outputs, get block issuer keys from the block issuer feature, and check for staking info.
+		case iotago.OutputAccount:
 			accountDiff.BlockIssuerKeysAdded = createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
-		} else {
+			if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
+				accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
+				accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch)
+				accountDiff.FixedCostChange = int64(stakingFeature.FixedCost)
+			}
+		// for basic outputs (implicit accounts), get block issuer keys from the address in the unlock conditions.
+		case iotago.OutputBasic:
 			ed25519Address, _ := createdOutput.Output().UnlockConditionSet().Address().Address.(*iotago.Ed25519Address)
 			accountDiff.BlockIssuerKeysAdded = iotago.BlockIssuerKeys{iotago.BlockIssuerKeyEd25519AddressFromAddress(ed25519Address)}
 		}
 
-		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
-			accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
-			accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch)
-			accountDiff.FixedCostChange = int64(stakingFeature.FixedCost)
-		}
 	}
 }
 
@@ -519,7 +522,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 		switch spentOutput.OutputType() {
 		case iotago.OutputAccount:
 			consumedAccount, _ := spentOutput.Output().(*iotago.AccountOutput)
-			// if we transition / destroy an account that doesn't have a block issuer feature or staking, we don't need to track the changes.
+			// if we transition / destroy an account output that doesn't have a block issuer feature or staking, we don't need to track the changes.
 			if consumedAccount.FeatureSet().BlockIssuer() == nil && consumedAccount.FeatureSet().Staking() == nil {
 				return true
 			}
@@ -541,6 +544,13 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 				// the delegation output was destroyed => subtract the stake from the validator account
 				accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorID)
 				accountDiff.DelegationStakeChange -= int64(delegationOutput.DelegatedAmount)
+			}
+
+		case iotago.OutputBasic:
+			// if a basic output (implicit account) is consumed, get the accountID as hash of the output ID.
+			if spentOutput.Output().UnlockConditionSet().Address().Address.Type() == iotago.AddressImplicitAccountCreation {
+				accountID := iotago.AccountIDFromOutputID(outputID)
+				consumedAccounts[accountID] = spentOutput
 			}
 		}
 
