@@ -119,7 +119,9 @@ func (m *ManualPOA) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *a
 func (m *ManualPOA) SetCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
 }
 
-func (m *ManualPOA) ImportCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
+func (m *ManualPOA) ImportCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
+	m.accounts = validators
+	m.committee = m.accounts.SelectCommittee(validators.IDs()...)
 }
 
 func (m *ManualPOA) Shutdown() {}
