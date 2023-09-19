@@ -64,32 +64,30 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 		optsPruningSizeMaxTargetSizeBytes:  30 * 1024 * 1024 * 1024, // 30GB
 		optsPruningSizeReductionPercentage: 0.1,
 		optsPruningSizeCooldownTime:        5 * time.Minute,
-	}, opts,
-		func(s *Storage) {
-			dbConfig := database.Config{
-				Engine:       s.optsDBEngine,
-				Directory:    s.dir.PathWithCreate(permanentDirName),
-				Version:      dbVersion,
-				PrefixHealth: []byte{storePrefixHealth},
-			}
-
-			s.permanent = permanent.New(dbConfig, errorHandler, s.optsPermanent...)
-			s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.Settings().APIProvider(), s.errorHandler, s.optsBucketManagerOptions...)
-		})
+	}, opts)
 }
 
-func CloneStorage(source *Storage, directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) (*Storage, error) {
-	s := options.Apply(&Storage{
-		dir:                                utils.NewDirectory(directory, true),
-		errorHandler:                       errorHandler,
-		lastPrunedEpoch:                    model.NewEvictionIndex[iotago.EpochIndex](),
-		optsDBEngine:                       hivedb.EngineRocksDB,
-		optsPruningDelay:                   30,
-		optPruningSizeEnabled:              false,
-		optsPruningSizeMaxTargetSizeBytes:  30 * 1024 * 1024 * 1024, // 30GB
-		optsPruningSizeReductionPercentage: 0.1,
-		optsPruningSizeCooldownTime:        5 * time.Minute,
-	}, opts)
+// Create creates a new storage instance with the named database version in the given directory and initializes its permanent
+// and prunable counterparts.
+func Create(directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
+	s := New(directory, dbVersion, errorHandler, opts...)
+	dbConfig := database.Config{
+		Engine:       s.optsDBEngine,
+		Directory:    s.dir.PathWithCreate(permanentDirName),
+		Version:      dbVersion,
+		PrefixHealth: []byte{storePrefixHealth},
+	}
+
+	s.permanent = permanent.New(dbConfig, errorHandler, s.optsPermanent...)
+	s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.Settings().APIProvider(), s.errorHandler, s.optsBucketManagerOptions...)
+
+	return s
+}
+
+// Clone creates a new storage instance with the named database version in the given directory and cloning the permannent
+// and prunable counterparts from the given source storage.
+func Clone(source *Storage, directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) (*Storage, error) {
+	s := New(directory, dbVersion, errorHandler, opts...)
 
 	dbConfig := database.Config{
 		Engine:       s.optsDBEngine,

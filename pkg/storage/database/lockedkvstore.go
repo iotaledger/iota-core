@@ -14,6 +14,13 @@ type lockedKVStore struct {
 	instanceMutex *syncutils.RWMutex
 }
 
+func newLockedKVStore(storeInstance kvstore.KVStore) *lockedKVStore {
+	return &lockedKVStore{
+		openableKVStore: newOpenableKVStore(storeInstance),
+		instanceMutex: new(syncutils.RWMutex),
+	}
+}
+
 func (s *lockedKVStore) Lock() {
 	s.instanceMutex.Lock()
 }

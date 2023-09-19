@@ -197,32 +197,9 @@ func (e *EngineManager) loadEngineInstanceFromSnapshot(engineAlias string, snaps
 		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", engineAlias[0:8]))
 	}
 
-	newEngine := engine.New(e.workers.CreateGroup(engineAlias),
-		errorHandler,
-		storage.New(e.directory.Path(engineAlias), e.dbVersion, errorHandler, e.storageOptions...),
-		e.filterProvider,
-		e.commitmentFilterProvider,
-		e.blockDAGProvider,
-		e.bookerProvider,
-		e.clockProvider,
-		e.blockGadgetProvider,
-		e.slotGadgetProvider,
-		e.sybilProtectionProvider,
-		e.notarizationProvider,
-		e.attestationProvider,
-		e.ledgerProvider,
-		e.schedulerProvider,
-		e.tipManagerProvider,
-		e.tipSelectionProvider,
-		e.retainerProvider,
-		e.upgradeOrchestratorProvider,
-		e.syncManagerProvider,
-		append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))...,
-	)
+	e.engineOptions = append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))
 
-	e.engineCreated.Trigger(newEngine)
-
-	return newEngine
+	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.directory.Path(engineAlias), e.dbVersion, errorHandler, e.storageOptions...))
 }
 
 func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storage *storage.Storage) *engine.Engine {
@@ -265,7 +242,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	}
 
 	// Copy raw data on disk.
-	newStorage, err := storage.CloneStorage(e.activeInstance.Storage, e.directory.Path(engineAlias), e.dbVersion, errorHandler, e.storageOptions...)
+	newStorage, err := storage.Clone(e.activeInstance.Storage, e.directory.Path(engineAlias), e.dbVersion, errorHandler, e.storageOptions...)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to copy storage from active engine instance (%s) to new engine instance (%s)", e.activeInstance.Storage.Directory(), e.directory.Path(engineAlias))
 	}

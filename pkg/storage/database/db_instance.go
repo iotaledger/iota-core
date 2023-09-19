@@ -4,7 +4,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
 
 type DBInstance struct {
@@ -19,14 +18,7 @@ func NewDBInstance(dbConfig Config) *DBInstance {
 		panic(err)
 	}
 
-	lockableKVStore := &lockedKVStore{
-		openableKVStore: &openableKVStore{
-			storeInstance: db,
-			parentStore:   nil,
-			dbPrefix:      kvstore.EmptyPrefix,
-		},
-		instanceMutex: new(syncutils.RWMutex),
-	}
+	lockableKVStore := newLockedKVStore(db)
 
 	// HealthTracker state is only modified while holding the lock on the lockableKVStore;
 	//  that's why it needs to use openableKVStore (which does not lock) instead of lockableKVStore to avoid a deadlock.

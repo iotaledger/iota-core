@@ -48,7 +48,7 @@ func NewTestFramework(t *testing.T, baseDir string, storageOpts ...options.Optio
 	}
 
 	storageFactoryFunc := func() *storage.Storage {
-		instance := storage.New(baseDir, 0, errorHandler, storageOpts...)
+		instance := storage.Create(baseDir, 0, errorHandler, storageOpts...)
 		require.NoError(t, instance.Settings().StoreProtocolParametersForStartEpoch(iotago.NewV3ProtocolParameters(), 0))
 
 		return instance
@@ -210,8 +210,8 @@ func (t *TestFramework) AssertPrunedUntil(
 	expectedDecidedUpgrades *types.Tuple[int, bool],
 	expectedPoolStats *types.Tuple[int, bool],
 	expectedCommittee *types.Tuple[int, bool],
-	expectedRewards *types.Tuple[int, bool]) {
-
+	expectedRewards *types.Tuple[int, bool],
+) {
 	t.assertPrunedState(expectedPrunable, t.Instance.LastPrunedEpoch, "prunable")
 	t.assertPrunedState(expectedPoolStats, t.Instance.PoolStats().LastPrunedEpoch, "pool stats")
 	t.assertPrunedState(expectedDecidedUpgrades, t.Instance.DecidedUpgradeSignals().LastPrunedEpoch, "decided upgrades")

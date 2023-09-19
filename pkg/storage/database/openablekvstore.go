@@ -15,6 +15,14 @@ type openableKVStore struct {
 	dbPrefix      kvstore.KeyPrefix
 }
 
+func newOpenableKVStore(storeInstance kvstore.KVStore) *openableKVStore {
+	return &openableKVStore{
+		storeInstance: storeInstance,
+		parentStore:   nil,
+		dbPrefix:      kvstore.EmptyPrefix,
+	}
+}
+
 func (s *openableKVStore) instance() kvstore.KVStore {
 	if s.storeInstance != nil {
 		return s.storeInstance
