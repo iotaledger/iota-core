@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/binary"
 	"encoding/json"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -14,6 +15,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
@@ -73,16 +75,16 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...peer.ID) {
 }
 
 func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...peer.ID) {
-	var iotagoAPI iotago.API
-	if len(attestations) > 0 {
-		// TODO: there are multiple attestations potentially spanning multiple epochs/versions, we need to use the correct API for each one
-		iotagoAPI = lo.PanicOnErr(p.apiProvider.APIForVersion(attestations[0].ProtocolVersion))
-	} else {
-		iotagoAPI = p.apiProvider.APIForSlot(cm.Index()) // we need an api to serialize empty slices as well
+	encodedAttestations := marshalutil.New()
+	encodedAttestations.WriteUint32(uint32(len(attestations)))
+	for _, att := range attestations {
+		iotagoAPI := lo.PanicOnErr(p.apiProvider.APIForVersion(att.ProtocolVersion))
+		encodedAttestations.WriteBytes(lo.PanicOnErr(iotagoAPI.Encode(att)))
 	}
+
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
 		Commitment:   cm.Data(),
-		Attestations: lo.PanicOnErr(iotagoAPI.Encode(attestations)),
+		Attestations: encodedAttestations.Bytes(),
 		MerkleProof:  lo.PanicOnErr(json.Marshal(merkleProof)),
 	}}}, to...)
 }
@@ -200,10 +202,37 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 		return
 	}
 
-	var attestations []*iotago.Attestation
-	// TODO: there could be multiple versions of attestations in the same packet
-	if _, err := lo.PanicOnErr(p.apiProvider.APIForVersion(iotago.Version(commitmentBytes[0]))).Decode(attestationsBytes, &attestations, serix.WithValidation()); err != nil {
-		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
+	if len(attestationsBytes) < 4 {
+		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize attestations, invalid attestation count"), id)
+
+		return
+	}
+
+	attestationCount := binary.LittleEndian.Uint32(attestationsBytes[0:4])
+	readOffset := 4
+	attestations := make([]*iotago.Attestation, attestationCount)
+	for i := uint32(0); i < attestationCount; i++ {
+		version := iotago.Version(attestationsBytes[readOffset])
+		apiForVersion, err := p.apiProvider.APIForVersion(version)
+		if err != nil {
+			p.Events.Error.Trigger(ierrors.Wrapf(err, "failed to deserialize attestations for commitment %s", cm.ID()), id)
+
+			return
+		}
+
+		attestation := new(iotago.Attestation)
+		consumed, err := apiForVersion.Decode(attestationsBytes[readOffset:], attestation, serix.WithValidation())
+		if err != nil {
+			p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
+
+			return
+		}
+
+		readOffset += consumed
+		attestations[i] = attestation
+	}
+	if readOffset != len(attestationsBytes) {
+		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize attestations: %d bytes remaining", len(attestationsBytes)-readOffset), id)
 
 		return
 	}
