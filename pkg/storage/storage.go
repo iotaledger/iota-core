@@ -53,7 +53,7 @@ type Storage struct {
 }
 
 // New creates a new storage instance with the named database version in the given directory.
-func New(directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
+func New(directory string, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
 	return options.Apply(&Storage{
 		dir:                                utils.NewDirectory(directory, true),
 		errorHandler:                       errorHandler,
@@ -70,7 +70,7 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 // Create creates a new storage instance with the named database version in the given directory and initializes its permanent
 // and prunable counterparts.
 func Create(directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
-	s := New(directory, dbVersion, errorHandler, opts...)
+	s := New(directory, errorHandler, opts...)
 	dbConfig := database.Config{
 		Engine:       s.optsDBEngine,
 		Directory:    s.dir.PathWithCreate(permanentDirName),
@@ -87,7 +87,7 @@ func Create(directory string, dbVersion byte, errorHandler func(error), opts ...
 // Clone creates a new storage instance with the named database version in the given directory and cloning the permannent
 // and prunable counterparts from the given source storage.
 func Clone(source *Storage, directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) (*Storage, error) {
-	s := New(directory, dbVersion, errorHandler, opts...)
+	s := New(directory, errorHandler, opts...)
 
 	dbConfig := database.Config{
 		Engine:       s.optsDBEngine,

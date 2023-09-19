@@ -17,7 +17,7 @@ type lockedKVStore struct {
 func newLockedKVStore(storeInstance kvstore.KVStore) *lockedKVStore {
 	return &lockedKVStore{
 		openableKVStore: newOpenableKVStore(storeInstance),
-		instanceMutex: new(syncutils.RWMutex),
+		instanceMutex:   new(syncutils.RWMutex),
 	}
 }
 
@@ -35,6 +35,7 @@ func (s *lockedKVStore) WithRealm(realm kvstore.Realm) (kvstore.KVStore, error) 
 
 	return s.withRealm(realm)
 }
+
 func (s *lockedKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return &lockedKVStore{
 		openableKVStore: &openableKVStore{
@@ -131,6 +132,7 @@ func (s *lockedKVStore) Close() error {
 
 	return s.CloseWithoutLocking()
 }
+
 func (s *lockedKVStore) CloseWithoutLocking() error {
 	return s.openableKVStore.Close()
 }
