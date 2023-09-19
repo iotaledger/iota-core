@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	// TODO: should be addressed in issue #300
+	// TODO: should be addressed in issue #300.
 	daysInYear = 365
 )
 
