@@ -15,7 +15,9 @@ import (
 )
 
 func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
-	return &inx.LedgerOutput{
+	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+
+	l := &inx.LedgerOutput{
 		OutputId:    inx.NewOutputId(o.OutputID()),
 		BlockId:     inx.NewBlockId(o.BlockID()),
 		SlotBooked:  uint64(o.SlotBooked()),
@@ -23,7 +25,18 @@ func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
 		Output: &inx.RawOutput{
 			Data: o.Bytes(),
 		},
-	}, nil
+	}
+
+	includedSlotIndex := o.SlotBooked()
+	if includedSlotIndex <= latestCommitment.Index() {
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
+		}
+		l.CommitmentIdIncluded = inx.NewCommitmentId(includedCommitment.ID())
+	}
+
+	return l, nil
 }
 
 func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
@@ -36,6 +49,16 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 		Output:             output,
 		TransactionIdSpent: inx.NewTransactionId(s.TransactionIDSpent()),
 		SlotSpent:          uint64(s.SlotIndexSpent()),
+	}
+
+	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+	spentSlotIndex := s.SlotIndexSpent()
+	if spentSlotIndex <= latestCommitment.Index() {
+		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
+		}
+		l.CommitmentIdSpent = inx.NewCommitmentId(spentCommitment.ID())
 	}
 
 	return l, nil
@@ -163,21 +186,6 @@ func (s *Server) ReadUnspentOutputs(_ *inx.NoParams, srv inx.INX_ReadUnspentOutp
 	}
 
 	return err
-}
-
-func (s *Server) ReadOutputMetadata(_ context.Context, id *inx.OutputId) (*inx.OutputMetadata, error) {
-	outputID := id.Unwrap()
-
-	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
-	if err != nil {
-		return nil, err
-	}
-
-	if spent != nil {
-		return newSpentMetadataResponse(spent)
-	}
-
-	return newOutputMetadataResponse(output)
 }
 
 func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_ListenToLedgerUpdatesServer) error {
@@ -330,60 +338,4 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 	wp.ShutdownComplete.Wait()
 
 	return innerErr
-}
-
-func newOutputMetadataResponse(output *utxoledger.Output) (*inx.OutputMetadata, error) {
-	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
-
-	metadata := &inx.OutputMetadata{
-		BlockId:            inx.NewBlockId(output.BlockID()),
-		TransactionId:      inx.NewTransactionId(output.OutputID().TransactionID()),
-		OutputIndex:        uint32(output.OutputID().Index()),
-		IsSpent:            false,
-		LatestCommitmentId: inx.NewCommitmentId(latestCommitment.ID()),
-	}
-
-	includedSlotIndex := output.SlotBooked()
-	if includedSlotIndex <= latestCommitment.Index() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
-		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
-		}
-		metadata.CommitmentIdIncluded = inx.NewCommitmentId(includedCommitment.ID())
-	}
-
-	return metadata, nil
-}
-
-func newSpentMetadataResponse(spent *utxoledger.Spent) (*inx.OutputMetadata, error) {
-	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
-
-	metadata := &inx.OutputMetadata{
-		BlockId:            inx.NewBlockId(spent.BlockID()),
-		TransactionId:      inx.NewTransactionId(spent.OutputID().TransactionID()),
-		OutputIndex:        uint32(spent.OutputID().Index()),
-		IsSpent:            true,
-		TransactionIdSpent: inx.NewTransactionId(spent.TransactionIDSpent()),
-		LatestCommitmentId: inx.NewCommitmentId(latestCommitment.ID()),
-	}
-
-	includedSlotIndex := spent.Output().SlotBooked()
-	if includedSlotIndex <= latestCommitment.Index() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
-		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
-		}
-		metadata.CommitmentIdIncluded = inx.NewCommitmentId(includedCommitment.ID())
-	}
-
-	spentSlotIndex := spent.SlotIndexSpent()
-	if spentSlotIndex <= latestCommitment.Index() {
-		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
-		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
-		}
-		metadata.CommitmentIdSpent = inx.NewCommitmentId(spentCommitment.ID())
-	}
-
-	return metadata, nil
 }
