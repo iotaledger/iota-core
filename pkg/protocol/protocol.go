@@ -3,7 +3,7 @@ package protocol
 import (
 	"context"
 
-	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -22,18 +22,17 @@ type Protocol struct {
 	*Network
 	*Chains
 	*Gossip
-
-	*logger.WrappedLogger
+	log.Logger
 	module.Module
 }
 
-func New(loggerInstance *logger.Logger, workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
+func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
 	return options.Apply(&Protocol{
-		Events:        NewEvents(),
-		Workers:       workers,
-		WrappedLogger: logger.NewWrappedLogger(loggerInstance),
-		error:         event.New1[error](),
-		options:       newOptions(),
+		Events:  NewEvents(),
+		Workers: workers,
+		Logger:  logger,
+		error:   event.New1[error](),
+		options: newOptions(),
 	}, opts, func(p *Protocol) {
 		p.Network = newNetwork(p, dispatcher)
 		p.Chains = newChains(p)

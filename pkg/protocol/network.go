@@ -3,7 +3,6 @@ package protocol
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -31,7 +30,7 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 
 	protocol.HookInitialized(func() {
 		n.OnError(func(err error, src peer.ID) {
-			protocol.LogError(ierrors.Wrapf(err, "network error in connection to %s", src))
+			protocol.LogError("network error", "peer", src, "error", err)
 		})
 
 		unsubscribeFromNetworkEvents = lo.Batch(

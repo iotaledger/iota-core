@@ -34,7 +34,7 @@ func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
 		protocol:                  protocol,
 		EvictionState:             reactive.NewEvictionState[iotago.SlotIndex](),
-		MainChain:                 reactive.NewVariable[*Chain]().Init(NewChain()),
+		MainChain:                 reactive.NewVariable[*Chain]().Init(NewChain(protocol.Logger)),
 		HeaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
 		HeaviestAttestedCandidate: reactive.NewVariable[*Chain](),
 		HeaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
@@ -43,7 +43,7 @@ func newChains(protocol *Protocol) *Chains {
 		ChainCreated:              event.New1[*Chain](),
 		engineManager: enginemanager.New(
 			protocol.Workers,
-			func(err error) { protocol.LogError(err) },
+			func(err error) { protocol.LogError("engine error", "err", err) },
 			protocol.options.BaseDirectory,
 			3,
 			protocol.options.StorageOptions,
@@ -91,7 +91,7 @@ func (c *Chains) PublishCommitment(commitment *model.Commitment) (commitmentMeta
 		return nil, ierrors.Wrapf(requestErr, "failed to request commitment %s", commitment.ID())
 	}
 
-	request.Resolve(NewCommitment(commitment)).OnSuccess(func(resolvedMetadata *Commitment) {
+	request.Resolve(NewCommitment(commitment, c.protocol.Logger)).OnSuccess(func(resolvedMetadata *Commitment) {
 		commitmentMetadata = resolvedMetadata
 	})
 
@@ -132,7 +132,7 @@ func (c *Chains) initMainChain() {
 
 func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
 	if _, err := c.requestCommitment(commitment.PrevID(), true, lo.Void(commitment.Parent.Set)); err != nil {
-		c.protocol.LogDebug(ierrors.Wrapf(err, "failed to request parent commitment %s", commitment.PrevID()))
+		c.protocol.LogDebug("failed to request previous commitment", "prevId", commitment.PrevID(), "error", err)
 	}
 
 	slotEvictedEvent.OnTrigger(func() {
@@ -161,6 +161,8 @@ func (c *Chains) initChainSwitching() {
 		if prevCandidate != nil {
 			prevCandidate.instantiate.Set(false)
 		}
+
+		fmt.Println("NEW CANDIDATE", newCandidate.ForkingPoint.Get().ID(), newCandidate.ForkingPoint.Get().Index(), newCandidate.AttestedWeight.Get())
 
 		newCandidate.instantiate.Set(true)
 	})
@@ -194,11 +196,32 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 				panic(fmt.Sprintf("could not load active engine: %s", err))
 			}
 
+			c.protocol.LogDebug("engine started", "chain", chain.LogName(), "root", mainEngine.RootCommitment.Get().ID())
+
 			chain.spawnedEngine.Set(mainEngine)
 
 			c.protocol.Network.HookStopped(mainEngine.Shutdown)
 		} else {
-			fmt.Println("WATT IS HIER LOS? EIN FORK?")
+			snapshotTargetIndex := chain.ForkingPoint.Get().Index() - 1
+			candidateEngineInstance, err := c.engineManager.ForkEngineAtSlot(snapshotTargetIndex)
+			if err != nil {
+				panic(ierrors.Wrap(err, "error creating new candidate engine"))
+
+				return
+			}
+
+			c.protocol.LogDebug("engine started", "chain", chain.LogName(), "root", candidateEngineInstance.RootCommitment.Get().ID())
+
+			candidateEngineInstance.Ledger.HookInitialized(func() {
+				c.protocol.LogDebug("engine fully started", "chain", chain.LogName(), "root", candidateEngineInstance.RootCommitment.Get().ID())
+			})
+
+			chain.spawnedEngine.Set(candidateEngineInstance)
+
+			// Set the chain to the correct forking point
+			fmt.Println("WATT IS HIER LOS? EIN FORK? @", chain.ForkingPoint.Get().Index(), chain)
+
+			c.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
 		}
 	})
 }
@@ -244,10 +267,17 @@ func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFrom
 }
 
 func (c *Chains) publishEngineCommitments(chain *Chain) {
-	chain.Engine.OnUpdateWithContext(func(_, engine *engine.Engine, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
+	chain.spawnedEngine.OnUpdateWithContext(func(_, engine *engine.Engine, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
 		if engine != nil {
+			chain.LogDebug("spawned engine")
+
+			engine.Ledger.HookInitialized(func() {
+				chain.LogDebug("ENGINE INITIALIZED")
+			})
+
 			withinContext(func() (unsubscribe func()) {
 				var latestPublishedIndex iotago.SlotIndex
+
 				publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment) {
 					publishedCommitment, err := c.PublishCommitment(commitment)
 					if err != nil {
@@ -255,6 +285,7 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 					}
 
 					publishedCommitment.promote(chain)
+					publishedCommitment.IsAttested.Trigger()
 					publishedCommitment.IsVerified.Trigger()
 
 					latestPublishedIndex = commitment.Index()
@@ -262,18 +293,20 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 					return publishedCommitment
 				}
 
-				var rootPublished bool
+				chain.ForkingPoint.Compute(func(currentValue *Commitment) *Commitment {
+					if currentValue != nil {
+						latestPublishedIndex = currentValue.Index()
+
+						return currentValue
+					}
+
+					return publishCommitment(engine.RootCommitment.Get())
+				})
+
 				return engine.LatestCommitment.OnUpdate(func(_, latestModelCommitment *model.Commitment) {
-					if !rootPublished {
-						chain.ForkingPoint.Compute(func(currentValue *Commitment) *Commitment {
-							if currentValue != nil {
-								return currentValue
-							}
-
-							return publishCommitment(engine.RootCommitment.Get())
-						})
-
-						rootPublished = true
+					if latestModelCommitment == nil {
+						// TODO: CHECK IF NECESSARY
+						return
 					}
 
 					for latestPublishedIndex < latestModelCommitment.Index() {

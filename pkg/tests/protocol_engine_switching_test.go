@@ -9,6 +9,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -97,6 +98,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}
 
 	ts.Run(false, nodeOptions)
+
+	node6.Protocol.SetLogLevel(log.LevelTrace)
 
 	expectedCommittee := []iotago.AccountID{
 		node0.AccountID,

@@ -18,6 +18,7 @@ import (
 	"github.com/iotaledger/hive.go/app/configuration"
 	appLogger "github.com/iotaledger/hive.go/app/logger"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -115,14 +116,14 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[protocol.Protocol]) {
 	n.Protocol = protocol.New(
-		logger.NewLogger("Protocol"),
+		log.NewLogger(n.Name),
 		n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
 	)
 
 	n.hookEvents()
-	n.hookLogging(failOnBlockFiltered)
+	//n.hookLogging(failOnBlockFiltered)
 
 	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
@@ -149,6 +150,7 @@ func (n *Node) hookEvents() {
 	})
 
 	n.Protocol.HeaviestAttestedCandidate.OnUpdate(func(_, newChain *protocol.Chain) {
+		fmt.Printf("%s > HeaviestAttestedCandidate.OnUpdate\n", n.Name)
 		n.candidateEngineActivatedCount.Add(1)
 	})
 
@@ -509,7 +511,7 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 
 	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, alias)
 
-	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
+	// fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }
@@ -519,7 +521,7 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
 
-	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
+	//fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }

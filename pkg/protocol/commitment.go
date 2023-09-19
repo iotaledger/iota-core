@@ -1,9 +1,9 @@
 package protocol
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ds/reactive"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -12,82 +12,74 @@ import (
 type Commitment struct {
 	*model.Commitment
 
-	Parent              reactive.Variable[*Commitment]
-	Children            reactive.Set[*Commitment]
-	MainChild           reactive.Variable[*Commitment]
-	SpawnedChain        reactive.Variable[*Chain]
-	Chain               reactive.Variable[*Chain]
-	Engine              reactive.Variable[*engine.Engine]
-	InSyncRange         reactive.Variable[bool]
-	RequestBlocks       reactive.Variable[bool]
-	RequestAttestations reactive.Variable[bool]
-	IsSolid             reactive.Event
-	IsAttested          reactive.Event
-	IsVerified          reactive.Event
-	IsRoot              reactive.Event
-	IsEvicted           reactive.Event
+	Parent                   reactive.Variable[*Commitment]
+	Children                 reactive.Set[*Commitment]
+	MainChild                reactive.Variable[*Commitment]
+	SpawnedChain             reactive.Variable[*Chain]
+	Chain                    reactive.Variable[*Chain]
+	Engine                   reactive.Variable[*engine.Engine]
+	InSyncRange              reactive.Variable[bool]
+	WarpSyncBlocks           reactive.Variable[bool]
+	RequestAttestations      reactive.Variable[bool]
+	AttestedWeight           reactive.Variable[uint64]
+	CumulativeAttestedWeight reactive.Variable[uint64]
+	IsSolid                  reactive.Event
+	IsAttested               reactive.Event
+	IsVerified               reactive.Event
+	IsRoot                   reactive.Event
+	IsEvicted                reactive.Event
 
-	isParentAttested                        reactive.Event
-	isParentVerified                        reactive.Event
+	protocolLogger                          log.Logger
 	isDirectlyAboveLatestAttestedCommitment reactive.Variable[bool]
-	isDirectlyAboveLatestVerifiedCommitment reactive.Variable[bool]
+	isAboveLatestVerifiedCommitment         reactive.Variable[bool]
 	isBelowSyncThreshold                    reactive.Event
 	isBelowWarpSyncThreshold                reactive.Event
-	isParentAboveLatestVerifiedCommitment   reactive.Variable[bool]
-	isAboveLatestVerifiedCommitment         reactive.Variable[bool]
+
+	log.Logger
 }
 
-func NewCommitment(commitment *model.Commitment) *Commitment {
+func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment {
 	c := &Commitment{
 		Commitment: commitment,
 
-		Parent:              reactive.NewVariable[*Commitment](),
-		MainChild:           reactive.NewVariable[*Commitment](),
-		Children:            reactive.NewSet[*Commitment](),
-		SpawnedChain:        reactive.NewVariable[*Chain](),
-		Chain:               reactive.NewVariable[*Chain](),
-		Engine:              reactive.NewVariable[*engine.Engine](),
-		RequestAttestations: reactive.NewVariable[bool](),
-		IsSolid:             reactive.NewEvent(),
-		IsAttested:          reactive.NewEvent(),
-		IsVerified:          reactive.NewEvent(),
-		IsRoot:              reactive.NewEvent(),
-		IsEvicted:           reactive.NewEvent(),
+		Parent:                   reactive.NewVariable[*Commitment](),
+		MainChild:                reactive.NewVariable[*Commitment](),
+		Children:                 reactive.NewSet[*Commitment](),
+		SpawnedChain:             reactive.NewVariable[*Chain](),
+		Chain:                    reactive.NewVariable[*Chain](),
+		Engine:                   reactive.NewVariable[*engine.Engine](),
+		RequestAttestations:      reactive.NewVariable[bool](),
+		AttestedWeight:           reactive.NewVariable[uint64](func(current uint64, new uint64) uint64 { return max(current, new) }),
+		CumulativeAttestedWeight: reactive.NewVariable[uint64](),
+		IsSolid:                  reactive.NewEvent(),
+		IsAttested:               reactive.NewEvent(),
+		IsVerified:               reactive.NewEvent(),
+		IsRoot:                   reactive.NewEvent(),
+		IsEvicted:                reactive.NewEvent(),
 
-		isParentAttested:                      reactive.NewEvent(),
-		isParentVerified:                      reactive.NewEvent(),
-		isBelowSyncThreshold:                  reactive.NewEvent(),
-		isBelowWarpSyncThreshold:              reactive.NewEvent(),
-		isParentAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
+		protocolLogger:                          logger,
+		isDirectlyAboveLatestAttestedCommitment: reactive.NewVariable[bool](),
+		isAboveLatestVerifiedCommitment:         reactive.NewVariable[bool](),
+		isBelowSyncThreshold:                    reactive.NewEvent(),
+		isBelowWarpSyncThreshold:                reactive.NewEvent(),
 	}
-
-	c.isDirectlyAboveLatestAttestedCommitment = reactive.NewDerivedVariable2(func(isParentAttested, isAttested bool) bool {
-		return isParentAttested && !isAttested
-	}, c.isParentAttested, c.IsAttested)
-
-	c.isDirectlyAboveLatestVerifiedCommitment = reactive.NewDerivedVariable2(func(isParentVerified, isVerified bool) bool {
-		return isParentVerified && !isVerified
-	}, c.isParentVerified, c.IsVerified)
-
-	c.isAboveLatestVerifiedCommitment = reactive.NewDerivedVariable2(func(directlyAboveLatestVerifiedCommitment, parentAboveLatestVerifiedCommitment bool) bool {
-		return directlyAboveLatestVerifiedCommitment || parentAboveLatestVerifiedCommitment
-	}, c.isDirectlyAboveLatestVerifiedCommitment, c.isParentAboveLatestVerifiedCommitment)
-
-	c.InSyncRange = reactive.NewDerivedVariable2(func(aboveLatestVerifiedCommitment, belowSyncThreshold bool) bool {
-		return aboveLatestVerifiedCommitment && belowSyncThreshold
-	}, c.isAboveLatestVerifiedCommitment, c.isBelowSyncThreshold)
-
-	c.RequestBlocks = reactive.NewDerivedVariable2(func(inSyncWindow, belowWarpSyncThreshold bool) bool {
-		return inSyncWindow && belowWarpSyncThreshold
-	}, c.InSyncRange, c.isBelowWarpSyncThreshold)
 
 	c.Parent.OnUpdateOnce(func(_, parent *Commitment) {
 		parent.registerChild(c)
 
 		c.IsSolid.InheritFrom(parent.IsSolid)
-		c.isParentAttested.InheritFrom(parent.IsAttested)
-		c.isParentVerified.InheritFrom(parent.IsVerified)
-		c.isParentAboveLatestVerifiedCommitment.InheritFrom(parent.isAboveLatestVerifiedCommitment)
+
+		c.CumulativeAttestedWeight.InheritFrom(reactive.NewDerivedVariable2(func(parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
+			return parentCumulativeAttestedWeight + attestedWeight
+		}, parent.CumulativeAttestedWeight, c.AttestedWeight))
+
+		c.isDirectlyAboveLatestAttestedCommitment.InheritFrom(reactive.NewDerivedVariable2(func(parentIsAttested, isAttested bool) bool {
+			return parentIsAttested && !isAttested
+		}, parent.IsAttested, c.IsAttested))
+
+		c.isAboveLatestVerifiedCommitment.InheritFrom(reactive.NewDerivedVariable3(func(parentIsAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
+			return parentIsAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
+		}, parent.isAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified))
 
 		c.triggerEventIfBelowThreshold(
 			func(c *Commitment) reactive.Event { return c.isBelowSyncThreshold },
@@ -102,25 +94,31 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 
 	c.Chain.OnUpdateWithContext(func(_, chain *Chain, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
 		withinContext(func() (unsubscribe func()) {
-			return chain.registerCommitment(c)
-		})
-
-		withinContext(func() (unsubscribe func()) {
-			return chain.Engine.OnUpdate(func(_, chainEngine *engine.Engine) {
-				c.Engine.Set(chainEngine)
-			})
-		})
-
-		withinContext(func() (unsubscribe func()) {
 			requestAttestations := reactive.NewDerivedVariable2(func(requestAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
 				return requestAttestations && isDirectlyAboveLatestAttestedCommitment
 			}, chain.RequestAttestations, c.isDirectlyAboveLatestAttestedCommitment)
 
 			c.RequestAttestations.InheritFrom(requestAttestations)
 
-			return requestAttestations.Unsubscribe
+			return lo.Batch(
+				chain.registerCommitment(c),
+
+				chain.Engine.OnUpdate(func(_, chainEngine *engine.Engine) {
+					c.Engine.Set(chainEngine)
+				}),
+
+				requestAttestations.Unsubscribe,
+			)
 		})
 	})
+
+	c.InSyncRange = reactive.NewDerivedVariable2(func(aboveLatestVerifiedCommitment, belowSyncThreshold bool) bool {
+		return aboveLatestVerifiedCommitment && belowSyncThreshold
+	}, c.isAboveLatestVerifiedCommitment, c.isBelowSyncThreshold)
+
+	c.WarpSyncBlocks = reactive.NewDerivedVariable2(func(inSyncWindow, belowWarpSyncThreshold bool) bool {
+		return inSyncWindow && belowWarpSyncThreshold
+	}, c.InSyncRange, c.isBelowWarpSyncThreshold)
 
 	c.IsRoot.OnTrigger(func() {
 		c.IsSolid.Set(true)
@@ -128,6 +126,10 @@ func NewCommitment(commitment *model.Commitment) *Commitment {
 		c.IsVerified.Set(true)
 		c.isBelowWarpSyncThreshold.Set(true)
 		c.isBelowSyncThreshold.Set(true)
+	})
+
+	c.Logger = logger.NewEntityLogger("Commitment", c.IsEvicted, func(entityLogger log.Logger) {
+		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
 	})
 
 	return c
@@ -175,8 +177,10 @@ func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitm
 						unsubscribeFromParent()
 					}
 
-					spawnedChain = NewChain()
+					spawnedChain = NewChain(c.protocolLogger)
 					spawnedChain.ForkingPoint.Set(c)
+
+					c.Chain.Set(spawnedChain)
 				}
 
 				return spawnedChain
@@ -187,8 +191,8 @@ func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitm
 
 func (c *Commitment) promote(targetChain *Chain) {
 	c.Chain.Compute(func(currentChain *Chain) *Chain {
-		if currentChain != nil {
-			fmt.Println("SHOULD PROMOTE")
+		if currentChain != nil && currentChain != targetChain {
+			c.LogTrace("promoting commitment", "from", currentChain.LogName(), "to", targetChain.LogName())
 			//currentChain.Promote(targetChain)
 		}
 

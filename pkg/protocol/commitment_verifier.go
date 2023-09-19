@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -35,28 +37,12 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 	tree := ads.NewMap(mapdb.NewMapDB(),
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
-		func(attestation *iotago.Attestation) ([]byte, error) {
-			apiForVersion, err := c.engine.APIForVersion(attestation.ProtocolVersion)
-			if err != nil {
-				return nil, ierrors.Wrapf(err, "failed to get API for version %d", attestation.ProtocolVersion)
-			}
+		(*iotago.Attestation).Bytes,
+		func(bytes []byte) (attestation *iotago.Attestation, consumedBytes int, err error) {
+			attestation = new(iotago.Attestation)
+			consumedBytes, err = c.engine.Decode(bytes, attestation)
 
-			return apiForVersion.Encode(attestation)
-		},
-		func(bytes []byte) (*iotago.Attestation, int, error) {
-			version, _, err := iotago.VersionFromBytes(bytes)
-			if err != nil {
-				return nil, 0, ierrors.Wrap(err, "failed to determine version")
-			}
-
-			a := new(iotago.Attestation)
-			apiForVersion, err := c.engine.APIForVersion(version)
-			if err != nil {
-				return nil, 0, ierrors.Wrapf(err, "failed to get API for version %d", version)
-			}
-			n, err := apiForVersion.Decode(bytes, a)
-
-			return a, n, err
+			return
 		},
 	)
 
@@ -98,6 +84,9 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 	//    than it actually is. Nodes might consider to switch to this chain, even though it is invalid which will be discovered
 	//    before the candidate chain/engine is activated (it will never get heavier than the current chain).
 	c.cumulativeWeight += seatCount
+
+	fmt.Println("seat count", seatCount)
+
 	if c.cumulativeWeight > commitment.CumulativeWeight() {
 		return nil, 0, ierrors.Errorf("invalid cumulative weight for commitment %s: expected %d, got %d", commitment.ID(), commitment.CumulativeWeight(), c.cumulativeWeight)
 	}

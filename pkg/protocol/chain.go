@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -27,9 +28,11 @@ type Chain struct {
 	parentEngine  reactive.Variable[*engine.Engine]
 	spawnedEngine reactive.Variable[*engine.Engine]
 	instantiate   reactive.Variable[bool]
+
+	log.Logger
 }
 
-func NewChain() *Chain {
+func NewChain(logger log.Logger) *Chain {
 	c := &Chain{
 		ForkingPoint:             reactive.NewVariable[*Commitment](),
 		LatestCommitment:         reactive.NewVariable[*Commitment](),
@@ -79,6 +82,28 @@ func NewChain() *Chain {
 					return c.parentEngine.InheritFrom(parent.Engine)
 				})
 			})
+		})
+	})
+
+	c.Logger = logger.NewEntityLogger("Chain", c.IsEvicted, func(entityLogger log.Logger) {
+		logger.LogTrace("created new chain", "name", entityLogger.LogName())
+
+		c.ForkingPoint.LogUpdates(entityLogger, log.LevelDebug, "ForkingPoint", func(commitment *Commitment) string {
+			if commitment == nil {
+				return "nil"
+			}
+
+			return commitment.ID().String()
+		})
+		c.ClaimedWeight.LogUpdates(entityLogger, log.LevelDebug, "ClaimedWeight")
+		c.AttestedWeight.LogUpdates(entityLogger, log.LevelDebug, "AttestedWeight")
+		c.VerifiedWeight.LogUpdates(entityLogger, log.LevelDebug, "VerifiedWeight")
+		c.LatestCommitment.LogUpdates(entityLogger, log.LevelTrace, "LatestCommitment", func(commitment *Commitment) string {
+			if commitment == nil {
+				return "nil"
+			}
+
+			return commitment.ID().String()
 		})
 	})
 
