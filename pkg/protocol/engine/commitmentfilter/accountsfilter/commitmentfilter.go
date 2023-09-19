@@ -159,7 +159,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 			var hasAddress = false
 			accountData.BlockIssuerKeys.Range(func(element iotago.BlockIssuerKey) {
 				if keyAddress, isAddress := element.(iotago.BlockIssuerKeyEd25519Address); isAddress {
-					if keyAddress.Address.Equal(iotago.Ed25519AddressFromPubKey(signature.PublicKey[:])) {
+					if keyAddress.Address.Equal(iotago.ImplicitAccountCreationAddressFromPubKey(signature.PublicKey[:])) {
 						hasAddress = true
 					}
 				}
