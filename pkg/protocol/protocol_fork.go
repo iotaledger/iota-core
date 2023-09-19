@@ -250,7 +250,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 
 		result, err := p.requestAttestation(ctx, fork.ForkedChain.Commitment(i).ID(), fork.Source, ch)
 		if err != nil {
-			return nil, false, true, ierrors.Wrapf(err, "failed to verify commitment %s", result.commitment.ID())
+			return nil, false, true, ierrors.Wrapf(err, "failed to verify commitment %s", fork.ForkedChain.Commitment(i).ID())
 		}
 
 		// Count how many consecutive slots are heavier/lighter than the main chain.
