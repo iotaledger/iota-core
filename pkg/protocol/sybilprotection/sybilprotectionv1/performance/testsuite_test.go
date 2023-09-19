@@ -34,13 +34,6 @@ type TestSuite struct {
 }
 
 func NewTestSuite(t *testing.T) *TestSuite {
-	apiProvider := api.NewEpochBasedProvider()
-	params := iotago.NewV3ProtocolParameters()
-	// setup params for 8 epochs
-	for i := 0; i <= 8; i++ {
-		apiProvider.AddProtocolParametersAtEpoch(params, iotago.EpochIndex(i))
-	}
-
 	ts := &TestSuite{
 		T:           t,
 		accounts:    make(map[string]iotago.AccountID),
@@ -80,10 +73,8 @@ func (t *TestSuite) InitPerformanceTracker() {
 	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0)
 	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
-	latestPrunedFunc := func() (iotago.EpochIndex, bool) {
-		return 0, true
-	}
-	t.Instance = NewTracker(rewardsStore.GetEpoch, poolStatsStore, committeeStore, performanceFactorFunc, latestPrunedFunc, t.latestCommittedEpoch, api.SingleVersionProvider(t.api), func(err error) {})
+
+	t.Instance = NewTracker(rewardsStore.GetEpoch, poolStatsStore, committeeStore, performanceFactorFunc, t.latestCommittedEpoch, api.SingleVersionProvider(t.api), func(err error) {})
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {

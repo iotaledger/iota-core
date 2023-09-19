@@ -144,7 +144,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	}
 
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
-		validatorPerformances := make([]*model.ValidatorPerformance, 0, epochEndSlot+1-epochStartSlot)
+		validatorPerformances := make([]*model.ValidatorPerformance, timeProvider.EpochDurationSlots())
 		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
 			validatorSlotPerformances, err := t.validatorPerformancesFunc(slot)
 			if err != nil {
@@ -168,7 +168,15 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			return true
 		}
 
-		poolReward, err := t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, pf)
+		poolReward, err := t.poolReward(
+			epochEndSlot,
+			committee.TotalValidatorStake(),
+			committee.TotalStake(),
+			pool.PoolStake,
+			pool.ValidatorStake,
+			pool.FixedCost,
+			pf,
+		)
 		if err != nil {
 			panic(ierrors.Wrapf(err, "failed to calculate pool rewards for account %s", accountID))
 		}
@@ -244,37 +252,31 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	if validatorPerformance == nil {
 		validatorPerformance = model.NewValidatorPerformance()
 	}
-	updatedPerformance := t.updateSlotPerformanceBitMap(validatorPerformance, block.ID().Index(), block.ProtocolBlock().IssuingTime)
-	slotAPI := t.apiProvider.APIForSlot(block.ID().Index())
+
+	// set bit at subslotIndex to 1 to indicate activity in that subslot
+	validatorPerformance.SlotActivityVector = validatorPerformance.SlotActivityVector | (1 << t.subslotIndex(block.ID().Index(), block.ProtocolBlock().IssuingTime))
+
+	apiForSlot := t.apiProvider.APIForSlot(block.ID().Index())
 	// we restrict the number up to ValidatorBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
-	if updatedPerformance.BlockIssuedCount < slotAPI.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot+1 {
-		updatedPerformance.BlockIssuedCount++
+	// also it can fint into uint8
+	if validatorPerformance.BlockIssuedCount < apiForSlot.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot+1 {
+		validatorPerformance.BlockIssuedCount++
 	}
-	updatedPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{
+	validatorPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{
 		Version: validationBlock.HighestSupportedVersion,
 		Hash:    validationBlock.ProtocolParametersHash,
 	}
-	if err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, updatedPerformance); err != nil {
+	if err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, validatorPerformance); err != nil {
 		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 }
 
-func (t *Tracker) updateSlotPerformanceBitMap(pf *model.ValidatorPerformance, slotIndex iotago.SlotIndex, issuingTime time.Time) *model.ValidatorPerformance {
-	if pf == nil {
-		return pf
-	}
-
-	// set bit at subslotIndex to 1 to indicate activity in that subslot
-	pf.SlotActivityVector = pf.SlotActivityVector | (1 << t.subslotIndex(slotIndex, issuingTime))
-
-	return pf
-}
-
 // subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validatorBlocksPerSlot equal parts.
 func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int {
-	valBlocksNum := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
-	subslotDur := time.Duration(t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
-	slotStart := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotStartTime(slot)
+	epochAPI := t.apiProvider.APIForEpoch(t.latestAppliedEpoch)
+	valBlocksNum := epochAPI.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
+	subslotDur := time.Duration(epochAPI.TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
+	slotStart := epochAPI.TimeProvider().SlotStartTime(slot)
 
 	return int(issuingTime.Sub(slotStart) / subslotDur)
 }
