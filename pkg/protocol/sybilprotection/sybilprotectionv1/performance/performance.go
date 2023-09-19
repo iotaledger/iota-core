@@ -115,7 +115,7 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 }
 
 // ApplyEpoch calculates and stores pool stats and rewards for the given epoch.
-func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) {
+func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) error {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -125,7 +125,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 	profitMargin, err := t.calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake(), epoch)
 	if err != nil {
-		panic(ierrors.Wrapf(err, "failed to calculate profit margin for epoch %d", epoch))
+		return ierrors.Wrapf(err, "failed to calculate profit margin for epoch %d", epoch)
 	}
 
 	poolsStats := &model.PoolsStats{
@@ -196,6 +196,8 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	}
 
 	t.latestAppliedEpoch = epoch
+
+	return nil
 }
 
 // aggregatePerformanceFactors calculates epoch performance factor of a validator based on its performance in each slot by summing up all active subslots.

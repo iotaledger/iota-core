@@ -23,7 +23,7 @@ type SybilProtection interface {
 	// The actual used epoch range is returned, only until usedEnd the decay was applied.
 	DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, decayedStart, decayedEnd iotago.EpochIndex, err error)
 	SeatManager() seatmanager.SeatManager
-	CommitSlot(iotago.SlotIndex) (iotago.Identifier, iotago.Identifier)
+	CommitSlot(iotago.SlotIndex) (iotago.Identifier, iotago.Identifier, error)
 	Import(io.ReadSeeker) error
 	Export(io.WriteSeeker, iotago.SlotIndex) error
 

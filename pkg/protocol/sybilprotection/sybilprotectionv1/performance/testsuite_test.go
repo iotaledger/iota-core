@@ -110,7 +110,9 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 		t.applyPerformanceFactor(accID, epochIndex, action.ActiveSlotsCount, action.ValidationBlocksSentPerSlot, action.SlotPerformance)
 	}
 
-	t.Instance.ApplyEpoch(epochIndex, committee)
+	err = t.Instance.ApplyEpoch(epochIndex, committee)
+	require.NoError(t.T, err)
+
 	t.latestCommittedEpoch = epochIndex
 
 	totalStake := iotago.BaseToken(0)
