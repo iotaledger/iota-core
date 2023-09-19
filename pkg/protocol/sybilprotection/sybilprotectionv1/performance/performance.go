@@ -23,7 +23,6 @@ type Tracker struct {
 	committeeStore           *epochstore.Store[*account.Accounts]
 
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
-	latestPrunedEpoch         func() (iotago.EpochIndex, bool)
 	latestAppliedEpoch        iotago.EpochIndex
 
 	apiProvider api.Provider
@@ -39,7 +38,6 @@ func NewTracker(
 	poolStatsStore *epochstore.Store[*model.PoolsStats],
 	committeeStore *epochstore.Store[*account.Accounts],
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
-	latestPrunedEpoch func() (iotago.EpochIndex, bool),
 	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider api.Provider,
 	errHandler func(error),
@@ -49,7 +47,6 @@ func NewTracker(
 		poolStatsStore:            poolStatsStore,
 		committeeStore:            committeeStore,
 		validatorPerformancesFunc: validatorPerformancesFunc,
-		latestPrunedEpoch:         latestPrunedEpoch,
 		latestAppliedEpoch:        latestAppliedEpoch,
 		apiProvider:               apiProvider,
 		errHandler:                errHandler,
@@ -137,7 +134,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		ProfitMargin:        profitMargin,
 	}
 
-	if err := t.poolStatsStore.Store(epoch, poolsStats); err != nil {
+	if err = t.poolStatsStore.Store(epoch, poolsStats); err != nil {
 		panic(ierrors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
@@ -170,11 +167,12 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 			return true
 		}
+
 		poolReward, err := t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, pf)
 		if err != nil {
 			panic(ierrors.Wrapf(err, "failed to calculate pool rewards for account %s", accountID))
 		}
-		if err := rewardsMap.Set(accountID, &model.PoolRewards{
+		if err = rewardsMap.Set(accountID, &model.PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: poolReward,
 			FixedCost:   pool.FixedCost,
@@ -185,7 +183,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		return true
 	})
 
-	if err := rewardsMap.Commit(); err != nil {
+	if err = rewardsMap.Commit(); err != nil {
 		panic(ierrors.Wrapf(err, "failed to commit rewards for epoch %d", epoch))
 	}
 
@@ -213,6 +211,7 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.Valida
 
 			return 0
 		}
+
 		epochPerformanceFactor += uint64(slotPerformanceFactor)
 	}
 
@@ -233,8 +232,10 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	validatorPerformances, err := t.validatorPerformancesFunc(block.ID().Index())
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for slot %s", block.ID().Index()))
+
 		return
 	}
+
 	validatorPerformance, err := validatorPerformances.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
@@ -244,18 +245,16 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 		validatorPerformance = model.NewValidatorPerformance()
 	}
 	updatedPerformance := t.updateSlotPerformanceBitMap(validatorPerformance, block.ID().Index(), block.ProtocolBlock().IssuingTime)
-	if updatedPerformance.BlockIssuedCount == t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot {
-		// no need to store larger number and we can fit into uint8
-		updatedPerformance.BlockIssuedCount = t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot + 1
-	} else {
+	slotAPI := t.apiProvider.APIForSlot(block.ID().Index())
+	// we restrict the number up to ValidatorBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
+	if updatedPerformance.BlockIssuedCount < slotAPI.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot+1 {
 		updatedPerformance.BlockIssuedCount++
 	}
 	updatedPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{
 		Version: validationBlock.HighestSupportedVersion,
 		Hash:    validationBlock.ProtocolParametersHash,
 	}
-	err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, updatedPerformance)
-	if err != nil {
+	if err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, updatedPerformance); err != nil {
 		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 }
