@@ -1,8 +1,10 @@
 package tests
 
 import (
+	"math"
 	"testing"
 
+	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -276,7 +278,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	block4 := ts.IssueBlockAtSlotWithOptions("block4", slotIndexBlock4, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx4, blockfactory.WithStrongParents(latestParent.ID()))
 
-	_ = ts.CommitUntilSlot(slotIndexBlock4, activeNodes, block4)
+	latestParent = ts.CommitUntilSlot(slotIndexBlock4, activeNodes, block4)
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, slotIndexBlock4, &model.AccountDiff{
 		BICChange:              0,
@@ -302,6 +304,39 @@ func Test_TransitionAccount(t *testing.T) {
 		DelegationStake: iotago.BaseToken(delegatedAmount),
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
+
+	// CREATE IMPLICIT ACCOUNT FROM BASIC UTXO
+
+	keyPair := ed25519.GenerateKeyPair()
+	implicitAccountAddress := iotago.ImplicitAccountCreationAddressFromPubKey(keyPair.PublicKey[:])
+	inputForImplicitAccount, outputsForImplicitAccount, implicitWallet := ts.TransactionFramework.CreateImplicitAccountFromInput("TX1:3", implicitAccountAddress)
+
+	tx5 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX5", implicitWallet,
+		testsuite.WithInputs(inputForImplicitAccount),
+		testsuite.WithOutputs(outputsForImplicitAccount),
+	))
+
+	implicitAccountOutput := ts.TransactionFramework.Output("TX5:0")
+	implicitAccountOutputID := implicitAccountOutput.OutputID()
+	implicitAccountID := iotago.AccountIDFromOutputID(implicitAccountOutputID)
+
+	slotIndexBlock5 := latestParent.ID().Index()
+
+	block5 := ts.IssueBlockAtSlotWithOptions("block5", slotIndexBlock5, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx5, blockfactory.WithStrongParents(latestParent.ID()))
+
+	latestParent = ts.CommitUntilSlot(slotIndexBlock5, activeNodes, block5)
+
+	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.BlockIssuerKeyEd25519AddressFromAddress(implicitAccountAddress)
+
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:              implicitAccountID,
+		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock5),
+		ExpirySlot:      iotago.SlotIndex(math.MaxUint64),
+		OutputID:        implicitAccountOutputID,
+		BlockIssuerKeys: ds.NewSet(implicitBlockIssuerKey),
+	}, ts.Nodes()...)
+
+	// TRANSITION IMPLICIT ACCOUNT TO ACCOUNT OUTPUT
 
 	ts.Wait(ts.Nodes()...)
 }

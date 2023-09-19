@@ -209,6 +209,23 @@ func (t *TransactionFramework) CreateAccountFromInput(inputAlias string, opts ..
 	return utxoledger.Outputs{input}, outputStates, []*mock.HDWallet{t.wallet}
 }
 
+// CreateImplicitAccountFromInput
+func (t *TransactionFramework) CreateImplicitAccountFromInput(inputAlias string, address *iotago.ImplicitAccountCreationAddress) (utxoledger.Outputs, iotago.Outputs[iotago.Output], []*mock.HDWallet) {
+	input := t.Output(inputAlias)
+
+	basicOutput := &iotago.BasicOutput{
+		Amount:       input.BaseTokenAmount(),
+		Mana:         input.StoredMana(),
+		NativeTokens: iotago.NativeTokens{},
+		Conditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: address},
+		},
+		Features: iotago.BasicOutputFeatures{},
+	}
+
+	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{basicOutput}, []*mock.HDWallet{t.wallet}
+}
+
 // CreateDelegationFromInput creates a new DelegationOutput with given options from an input. If the remainder Output
 // is not created, then StoredMana from the input is not passed and can potentially be burned.
 // In order not to burn it, it needs to be assigned manually in another output in the transaction.

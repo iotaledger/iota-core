@@ -146,6 +146,14 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 			}
 			bytesConsumed += bytesRead
 			blockIssuerKeys[i] = iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519PublicKey)
+		case iotago.Ed25519BlockIssuerKeyAddress:
+			var implicitAccountCreationAddress iotago.ImplicitAccountCreationAddress
+			bytesRead, err = io.ReadFull(reader, implicitAccountCreationAddress[:])
+			if err != nil {
+				return bytesConsumed, ierrors.Wrapf(err, "unable to read address %d for accountID %s", i, a.ID)
+			}
+			bytesConsumed += bytesRead
+			blockIssuerKeys[i] = iotago.BlockIssuerKeyEd25519AddressFromAddress(&implicitAccountCreationAddress)
 		default:
 			return bytesConsumed, ierrors.Wrapf(err, "unsupported block issuer key type %d for accountID %s at offset %d", blockIssuerKeyType, a.ID, i)
 		}

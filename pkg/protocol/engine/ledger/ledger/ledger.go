@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"io"
+	"math"
 
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ds"
@@ -388,11 +389,19 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 			// case 1.
 			continue
 		}
-		accountDiff.NewOutputID = createdOutput.OutputID()
-		accountDiff.PreviousOutputID = consumedOutput.OutputID()
 
+		// case 2.
+		// created output can never be an implicit account as these can not be transitioned, but consumed output can be.
+		switch consumedOutput.Output().Type() {
+		case iotago.OutputAccount:
+			accountDiff.PreviousExpirySlot = consumedOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
+		case iotago.OutputBasic:
+			accountDiff.PreviousExpirySlot = iotago.SlotIndex(math.MaxUint64)
+		}
+
+		accountDiff.PreviousOutputID = consumedOutput.OutputID()
+		accountDiff.NewOutputID = createdOutput.OutputID()
 		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
-		accountDiff.PreviousExpirySlot = consumedOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 
 		oldPubKeysSet := accountData.BlockIssuerKeys
 		newPubKeysSet := ds.NewSet[iotago.BlockIssuerKey]()
@@ -437,13 +446,13 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		// have some values from the allotment, so no need to set them explicitly.
 		accountDiff.NewOutputID = createdOutput.OutputID()
 		accountDiff.PreviousOutputID = iotago.EmptyOutputID
-		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 		accountDiff.PreviousExpirySlot = 0
 
 		switch createdOutput.Output().Type() {
 		// for account outputs, get block issuer keys from the block issuer feature, and check for staking info.
 		case iotago.OutputAccount:
 			accountDiff.BlockIssuerKeysAdded = createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
+			accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 			if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
 				accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
 				accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch)
@@ -451,8 +460,9 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 			}
 		// for basic outputs (implicit accounts), get block issuer keys from the address in the unlock conditions.
 		case iotago.OutputBasic:
-			ed25519Address, _ := createdOutput.Output().UnlockConditionSet().Address().Address.(*iotago.Ed25519Address)
-			accountDiff.BlockIssuerKeysAdded = iotago.BlockIssuerKeys{iotago.BlockIssuerKeyEd25519AddressFromAddress(ed25519Address)}
+			address, _ := createdOutput.Output().UnlockConditionSet().Address().Address.(*iotago.ImplicitAccountCreationAddress)
+			accountDiff.BlockIssuerKeysAdded = iotago.BlockIssuerKeys{iotago.BlockIssuerKeyEd25519AddressFromAddress(address)}
+			accountDiff.NewExpirySlot = iotago.SlotIndex(math.MaxUint64)
 		}
 
 	}

@@ -42,7 +42,7 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 			}
 
 			if !cmp.Equal(accountData.BlockIssuerKeys.ToSlice(), actualAccountData.BlockIssuerKeys.ToSlice()) {
-				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.BlockIssuerKeys, actualAccountData.BlockIssuerKeys)
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.BlockIssuerKeys.ToSlice(), actualAccountData.BlockIssuerKeys.ToSlice())
 			}
 
 			if accountData.StakeEndEpoch != actualAccountData.StakeEndEpoch {

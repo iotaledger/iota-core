@@ -176,7 +176,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		),
 	)
 	keyPairImplicitAccount := ed25519.GenerateKeyPair()
-	implicitAddress := iotago.Ed25519AddressFromPubKey(keyPairImplicitAccount.PublicKey[:])
+	implicitAddress := iotago.ImplicitAccountCreationAddressFromPubKey(keyPairImplicitAccount.PublicKey[:])
 	implicitAccountID := iotago.AccountID(implicitAddress[:])
 	tf.AddAccountData(
 		implicitAccountID,
