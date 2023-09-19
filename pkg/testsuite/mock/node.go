@@ -20,6 +20,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
@@ -222,11 +223,11 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		defer n.mutex.Unlock()
 		n.attachedBlocks = append(n.attachedBlocks, block)
 	})
-	//
-	//events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-	//	fmt.Printf("%s > [%s] BlockDAG.BlockSolid: %s\n", n.Name, engineName, block.ID())
-	//})
-	//
+
+	events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] BlockDAG.BlockSolid: %s\n", n.Name, engineName, block.ID())
+	})
+
 	events.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
 		fmt.Printf("%s > [%s] BlockDAG.BlockInvalid: %s - %s\n", n.Name, engineName, block.ID(), err)
 	})
@@ -340,92 +341,92 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		fmt.Printf("%s > [%s] NotarizationManager.LatestCommitmentUpdated: %s\n", n.Name, engineName, commitment.ID())
 	})
 
-	//events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
-	//	fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
-	//})
-	//
-	//events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-	//	fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Index(), block.ProtocolBlock().SlotCommitmentID)
-	//})
-	//
-	//events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
-	//	fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
-	//})
-	//
-	//events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-	//	fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
-	//})
-	//
-	//events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
-	//	fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
-	//})
-	//
-	//events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
-	//	fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatAdded: %d - %s\n", n.Name, engineName, seat, accountID)
-	//})
-	//
-	//events.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
-	//	fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatRemoved: %d\n", n.Name, engineName, seat)
-	//})
-	//
-	//events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
-	//	fmt.Printf("%s > [%s] ConflictDAG.ConflictCreated: %s\n", n.Name, engineName, conflictID)
-	//})
-	//
-	//events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
-	//	fmt.Printf("%s > [%s] ConflictDAG.ConflictEvicted: %s\n", n.Name, engineName, conflictID)
-	//})
-	//events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
-	//	fmt.Printf("%s > [%s] ConflictDAG.ConflictRejected: %s\n", n.Name, engineName, conflictID)
-	//})
-	//
-	//events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
-	//	fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
-	//})
-	//
-	//instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
-	//	fmt.Printf("%s > [%s] Ledger.TransactionAttached: %s\n", n.Name, engineName, transactionMetadata.ID())
-	//
-	//	transactionMetadata.OnSolid(func() {
-	//		fmt.Printf("%s > [%s] MemPool.TransactionSolid: %s\n", n.Name, engineName, transactionMetadata.ID())
-	//	})
-	//
-	//	transactionMetadata.OnExecuted(func() {
-	//		fmt.Printf("%s > [%s] MemPool.TransactionExecuted: %s\n", n.Name, engineName, transactionMetadata.ID())
-	//	})
-	//
-	//	transactionMetadata.OnBooked(func() {
-	//		fmt.Printf("%s > [%s] MemPool.TransactionBooked: %s\n", n.Name, engineName, transactionMetadata.ID())
-	//	})
-	//
-	//	transactionMetadata.OnConflicting(func() {
-	//		fmt.Printf("%s > [%s] MemPool.TransactionConflicting: %s\n", n.Name, engineName, transactionMetadata.ID())
-	//	})
-	//
-	//	transactionMetadata.OnAccepted(func() {
-	//		fmt.Printf("%s > [%s] MemPool.TransactionAccepted: %s\n", n.Name, engineName, transactionMetadata.ID())
-	//	})
-	//
-	//	transactionMetadata.OnRejected(func() {
-	//		fmt.Printf("%s > [%s] MemPool.TransactionRejected: %s\n", n.Name, engineName, transactionMetadata.ID())
-	//	})
-	//
-	//	transactionMetadata.OnInvalid(func(err error) {
-	//		fmt.Printf("%s > [%s] MemPool.TransactionInvalid(%s): %s\n", n.Name, engineName, err, transactionMetadata.ID())
-	//	})
-	//
-	//	transactionMetadata.OnOrphaned(func() {
-	//		fmt.Printf("%s > [%s] MemPool.TransactionOrphaned: %s\n", n.Name, engineName, transactionMetadata.ID())
-	//	})
-	//
-	//	transactionMetadata.OnCommitted(func() {
-	//		fmt.Printf("%s > [%s] MemPool.TransactionCommitted: %s\n", n.Name, engineName, transactionMetadata.ID())
-	//	})
-	//
-	//	transactionMetadata.OnPending(func() {
-	//		fmt.Printf("%s > [%s] MemPool.TransactionPending: %s\n", n.Name, engineName, transactionMetadata.ID())
-	//	})
-	//})
+	events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
+	})
+	
+	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Index(), block.ProtocolBlock().SlotCommitmentID)
+	})
+	
+	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
+	})
+	
+	events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
+	})
+	
+	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
+		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
+	})
+	
+	events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatAdded: %d - %s\n", n.Name, engineName, seat, accountID)
+	})
+	
+	events.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
+		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatRemoved: %d\n", n.Name, engineName, seat)
+	})
+	
+	events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] ConflictDAG.ConflictCreated: %s\n", n.Name, engineName, conflictID)
+	})
+	
+	events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] ConflictDAG.ConflictEvicted: %s\n", n.Name, engineName, conflictID)
+	})
+	events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] ConflictDAG.ConflictRejected: %s\n", n.Name, engineName, conflictID)
+	})
+	
+	events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
+	})
+	
+	instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
+		fmt.Printf("%s > [%s] Ledger.TransactionAttached: %s\n", n.Name, engineName, transactionMetadata.ID())
+	
+		transactionMetadata.OnSolid(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionSolid: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+	
+		transactionMetadata.OnExecuted(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionExecuted: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+	
+		transactionMetadata.OnBooked(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionBooked: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+	
+		transactionMetadata.OnConflicting(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionConflicting: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+	
+		transactionMetadata.OnAccepted(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionAccepted: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+	
+		transactionMetadata.OnRejected(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionRejected: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+	
+		transactionMetadata.OnInvalid(func(err error) {
+			fmt.Printf("%s > [%s] MemPool.TransactionInvalid(%s): %s\n", n.Name, engineName, err, transactionMetadata.ID())
+		})
+	
+		transactionMetadata.OnOrphaned(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionOrphaned: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+	
+		transactionMetadata.OnCommitted(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionCommitted: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+	
+		transactionMetadata.OnPending(func() {
+			fmt.Printf("%s > [%s] MemPool.TransactionPending: %s\n", n.Name, engineName, transactionMetadata.ID())
+		})
+	})
 }
 
 func (n *Node) Wait() {

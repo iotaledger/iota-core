@@ -163,7 +163,6 @@ func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex) error {
 
 	// Removed entries that belong to the old fork and cannot be re-used.
 	for epochIdx := lastCommittedEpoch + 1; ; epochIdx++ {
-		fmt.Println("rollback before if", epochIdx, targetSlotEpoch)
 		if epochIdx > targetSlotEpoch {
 			shouldRollback, err := p.shouldRollbackCommittee(epochIdx, targetSlotIndex)
 			if err != nil {

@@ -45,8 +45,6 @@ type engineInfo struct {
 	Name string `json:"name"`
 }
 
-// region EngineManager ////////////////////////////////////////////////////////////////////////////////////////////////
-
 type EngineManager struct {
 	directory      *utils.Directory
 	dbVersion      byte
@@ -261,12 +259,11 @@ func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storag
 }
 
 func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine, error) {
-	engineAlias := lo.PanicOnErr(uuid.NewUUID()).String()
+	engineAlias := newEngineAlias()
 	errorHandler := func(err error) {
 		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", engineAlias[0:8]))
 	}
 
-	// TODO: lock active instance so it doesn't use storage when we clone it
 	// Copy raw data on disk.
 	newStorage, err := storage.CloneStorage(e.activeInstance.Storage, e.directory.Path(engineAlias), e.dbVersion, errorHandler, e.storageOptions...)
 	if err != nil {
@@ -324,4 +321,6 @@ func (e *EngineManager) OnEngineCreated(handler func(*engine.Engine)) (unsubscri
 	return e.engineCreated.Hook(handler).Unhook
 }
 
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+func newEngineAlias() string {
+	return lo.PanicOnErr(uuid.NewUUID()).String()
+}

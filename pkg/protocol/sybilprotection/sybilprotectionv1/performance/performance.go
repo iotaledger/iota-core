@@ -1,8 +1,6 @@
 package performance
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
@@ -94,7 +92,6 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	timeProvider := t.apiProvider.APIForEpoch(epoch).TimeProvider()
 	epochStartSlot := timeProvider.EpochStart(epoch)
 	epochEndSlot := timeProvider.EpochEnd(epoch)
-	fmt.Println("apply epoch", epoch, committee.TotalStake(), committee.TotalValidatorStake())
 	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
 	poolsStats := &model.PoolsStats{
 		TotalStake:          committee.TotalStake(),
@@ -105,7 +102,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	if err := t.poolStatsStore.Store(epoch, poolsStats); err != nil {
 		panic(ierrors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
-	fmt.Println("commit epoch", epoch)
+
 	rewardsMap, err := t.rewardsMap(epoch)
 	if err != nil {
 		panic(ierrors.Wrapf(err, "failed to create rewards tree for epoch %d", epoch))

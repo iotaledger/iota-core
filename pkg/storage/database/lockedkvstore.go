@@ -2,6 +2,7 @@ package database
 
 import (
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
@@ -116,6 +117,10 @@ func (s *lockedKVStore) FlushWithoutLocking() error {
 func (s *lockedKVStore) Close() error {
 	s.instanceMutex.RLock()
 	defer s.instanceMutex.RUnlock()
+
+	if err := s.FlushWithoutLocking(); err != nil {
+		return ierrors.Wrap(err, "failed to flush database")
+	}
 
 	return s.CloseWithoutLocking()
 }
