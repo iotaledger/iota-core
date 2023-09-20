@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -52,7 +53,7 @@ type Storage struct {
 }
 
 // New creates a new storage instance with the named database version in the given directory.
-func New(directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
+func New(directory string, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
 	return options.Apply(&Storage{
 		dir:                                utils.NewDirectory(directory, true),
 		errorHandler:                       errorHandler,
@@ -63,18 +64,51 @@ func New(directory string, dbVersion byte, errorHandler func(error), opts ...opt
 		optsPruningSizeMaxTargetSizeBytes:  30 * 1024 * 1024 * 1024, // 30GB
 		optsPruningSizeReductionPercentage: 0.1,
 		optsPruningSizeCooldownTime:        5 * time.Minute,
-	}, opts,
-		func(s *Storage) {
-			dbConfig := database.Config{
-				Engine:       s.optsDBEngine,
-				Directory:    s.dir.PathWithCreate(permanentDirName),
-				Version:      dbVersion,
-				PrefixHealth: []byte{storePrefixHealth},
-			}
+	}, opts)
+}
 
-			s.permanent = permanent.New(dbConfig, errorHandler, s.optsPermanent...)
-			s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.Settings().APIProvider(), s.errorHandler, s.optsBucketManagerOptions...)
-		})
+// Create creates a new storage instance with the named database version in the given directory and initializes its permanent
+// and prunable counterparts.
+func Create(directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
+	s := New(directory, errorHandler, opts...)
+	dbConfig := database.Config{
+		Engine:       s.optsDBEngine,
+		Directory:    s.dir.PathWithCreate(permanentDirName),
+		Version:      dbVersion,
+		PrefixHealth: []byte{storePrefixHealth},
+	}
+
+	s.permanent = permanent.New(dbConfig, errorHandler, s.optsPermanent...)
+	s.prunable = prunable.New(dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), s.Settings().APIProvider(), s.errorHandler, s.optsBucketManagerOptions...)
+
+	return s
+}
+
+// Clone creates a new storage instance with the named database version in the given directory and cloning the permannent
+// and prunable counterparts from the given source storage.
+func Clone(source *Storage, directory string, dbVersion byte, errorHandler func(error), opts ...options.Option[Storage]) (*Storage, error) {
+	s := New(directory, errorHandler, opts...)
+
+	dbConfig := database.Config{
+		Engine:       s.optsDBEngine,
+		Directory:    s.dir.PathWithCreate(permanentDirName),
+		Version:      dbVersion,
+		PrefixHealth: []byte{storePrefixHealth},
+	}
+
+	permanentClone, err := permanent.Clone(source.permanent, dbConfig, errorHandler)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "error while cloning permanent storage")
+	}
+	prunableClone, err := prunable.Clone(source.prunable, dbConfig.WithDirectory(s.dir.PathWithCreate(prunableDirName)), permanentClone.Settings().APIProvider(), s.errorHandler, s.optsBucketManagerOptions...)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "error while cloning prunable storage")
+	}
+
+	s.permanent = permanentClone
+	s.prunable = prunableClone
+
+	return s, nil
 }
 
 func (s *Storage) Directory() string {

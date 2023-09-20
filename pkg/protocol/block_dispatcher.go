@@ -101,7 +101,7 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
 func (b *BlockDispatcher) initEngineMonitoring() {
 	b.monitorLatestEngineCommitment(b.protocol.MainEngineInstance())
 
-	b.protocol.engineManager.OnEngineCreated(b.monitorLatestEngineCommitment)
+	b.protocol.EngineManager.OnEngineCreated(b.monitorLatestEngineCommitment)
 
 	b.protocol.Events.ChainManager.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
 		// as soon as a commitment is solid, it's chain is known and it can be dispatched

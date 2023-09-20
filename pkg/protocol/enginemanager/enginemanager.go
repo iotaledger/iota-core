@@ -1,7 +1,6 @@
 package enginemanager
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -15,14 +14,17 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -42,8 +44,6 @@ const engineInfoFile = "info"
 type engineInfo struct {
 	Name string `json:"name"`
 }
-
-// region EngineManager ////////////////////////////////////////////////////////////////////////////////////////////////
 
 type EngineManager struct {
 	directory      *utils.Directory
@@ -138,13 +138,14 @@ func (e *EngineManager) LoadActiveEngine(snapshotPath string) (*engine.Engine, e
 	if len(info.Name) > 0 {
 		if exists, isDirectory, err := ioutils.PathExists(e.directory.Path(info.Name)); err == nil && exists && isDirectory {
 			// Load previous engine as active
-			e.activeInstance = e.loadEngineInstance(info.Name, snapshotPath)
+			e.activeInstance = e.loadEngineInstanceFromSnapshot(info.Name, snapshotPath)
 		}
 	}
 
 	if e.activeInstance == nil {
 		// Start with a new instance and set to active
-		instance := e.newEngineInstance(snapshotPath)
+		instance := e.loadEngineInstanceFromSnapshot(lo.PanicOnErr(uuid.NewUUID()).String(), snapshotPath)
+
 		if err := e.SetActiveInstance(instance); err != nil {
 			return nil, err
 		}
@@ -191,14 +192,24 @@ func (e *EngineManager) SetActiveInstance(instance *engine.Engine) error {
 	return ioutils.WriteJSONToFile(e.infoFilePath(), info, 0o644)
 }
 
-func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) *engine.Engine {
+func (e *EngineManager) loadEngineInstanceFromSnapshot(engineAlias string, snapshotPath string) *engine.Engine {
 	errorHandler := func(err error) {
-		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", dirName[0:8]))
+		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", engineAlias[0:8]))
 	}
 
-	newEngine := engine.New(e.workers.CreateGroup(dirName),
+	e.engineOptions = append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))
+
+	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.directory.Path(engineAlias), e.dbVersion, errorHandler, e.storageOptions...))
+}
+
+func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storage *storage.Storage) *engine.Engine {
+	errorHandler := func(err error) {
+		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", engineAlias[0:8]))
+	}
+
+	newEngine := engine.New(e.workers.CreateGroup(engineAlias),
 		errorHandler,
-		storage.New(e.directory.Path(dirName), e.dbVersion, errorHandler, e.storageOptions...),
+		storage,
 		e.filterProvider,
 		e.commitmentFilterProvider,
 		e.blockDAGProvider,
@@ -216,7 +227,7 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 		e.retainerProvider,
 		e.upgradeOrchestratorProvider,
 		e.syncManagerProvider,
-		append(e.engineOptions, engine.WithSnapshotPath(snapshotPath))...,
+		e.engineOptions...,
 	)
 
 	e.engineCreated.Trigger(newEngine)
@@ -224,23 +235,69 @@ func (e *EngineManager) loadEngineInstance(dirName string, snapshotPath string) 
 	return newEngine
 }
 
-func (e *EngineManager) newEngineInstance(snapshotPath string) *engine.Engine {
-	dirName := lo.PanicOnErr(uuid.NewUUID()).String()
-	return e.loadEngineInstance(dirName, snapshotPath)
-}
-
 func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine, error) {
-	// Dump a snapshot at the target index
-	snapshotPath := filepath.Join(os.TempDir(), fmt.Sprintf("snapshot_%d_%s.bin", index, lo.PanicOnErr(uuid.NewUUID())))
-	if err := e.activeInstance.WriteSnapshot(snapshotPath, index); err != nil {
-		return nil, ierrors.Wrapf(err, "error exporting snapshot for index %s", index)
+	engineAlias := newEngineAlias()
+	errorHandler := func(err error) {
+		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", engineAlias[0:8]))
 	}
 
-	return e.newEngineInstance(snapshotPath), nil
+	// Copy raw data on disk.
+	newStorage, err := storage.Clone(e.activeInstance.Storage, e.directory.Path(engineAlias), e.dbVersion, errorHandler, e.storageOptions...)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to copy storage from active engine instance (%s) to new engine instance (%s)", e.activeInstance.Storage.Directory(), e.directory.Path(engineAlias))
+	}
+
+	// Remove commitments that after forking point.
+	latestCommitment := newStorage.Settings().LatestCommitment()
+	if err := newStorage.Commitments().Rollback(index, latestCommitment.Index()); err != nil {
+		return nil, ierrors.Wrap(err, "failed to rollback commitments")
+	}
+	// Create temporary components and rollback their permanent state, which will be reflected on disk.
+	evictionState := eviction.NewState(newStorage.LatestNonEmptySlot(), newStorage.RootBlocks)
+	evictionState.Initialize(latestCommitment.Index())
+
+	blockCache := blocks.New(evictionState, newStorage.Settings().APIProvider())
+	accountsManager := accountsledger.New(newStorage.Settings().APIProvider(), blockCache.Block, newStorage.AccountDiffs, newStorage.Accounts())
+
+	accountsManager.SetLatestCommittedSlot(latestCommitment.Index())
+	if err := accountsManager.Rollback(index); err != nil {
+		return nil, ierrors.Wrap(err, "failed to rollback accounts manager")
+	}
+
+	if err := evictionState.Rollback(newStorage.Settings().LatestFinalizedSlot(), index); err != nil {
+		return nil, ierrors.Wrap(err, "failed to rollback eviction state")
+	}
+	if err := newStorage.Ledger().Rollback(index); err != nil {
+		return nil, err
+	}
+
+	targetCommitment, err := newStorage.Commitments().Load(index)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "error while retrieving commitment for target index %d", index)
+	}
+
+	if err := newStorage.Settings().Rollback(targetCommitment); err != nil {
+		return nil, err
+	}
+
+	if err := newStorage.RollbackPrunable(index); err != nil {
+		return nil, err
+	}
+
+	candidateEngine := e.loadEngineInstanceWithStorage(engineAlias, newStorage)
+
+	// Rollback attestations already on created engine instance, because this action modifies the in-memory storage.
+	if err := candidateEngine.Attestations.Rollback(index); err != nil {
+		return nil, ierrors.Wrap(err, "error while rolling back attestations storage on candidate engine")
+	}
+
+	return candidateEngine, nil
 }
 
 func (e *EngineManager) OnEngineCreated(handler func(*engine.Engine)) (unsubscribe func()) {
 	return e.engineCreated.Hook(handler).Unhook
 }
 
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+func newEngineAlias() string {
+	return lo.PanicOnErr(uuid.NewUUID()).String()
+}

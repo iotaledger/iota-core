@@ -1,6 +1,8 @@
 package permanent
 
 import (
+	copydir "github.com/otiai10/copy"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -48,6 +50,21 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 		p.accounts = lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{accountsPrefix}))
 		p.latestNonEmptySlot = lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{latestNonEmptySlotPrefix}))
 	})
+}
+
+func Clone(source *Permanent, dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) (*Permanent, error) {
+	source.store.Lock()
+	defer source.store.Unlock()
+
+	source.store.CloseWithoutLocking()
+
+	if err := copydir.Copy(source.dbConfig.Directory, dbConfig.Directory); err != nil {
+		return nil, ierrors.Wrap(err, "failed to copy permanent storage directory to new storage path")
+	}
+
+	source.store.Open()
+
+	return New(dbConfig, errorHandler, opts...), nil
 }
 
 func (p *Permanent) Settings() *Settings {

@@ -88,3 +88,13 @@ func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
 
 	return nil
 }
+
+func (c *Commitments) Rollback(targetIndex iotago.SlotIndex, lastCommittedIndex iotago.SlotIndex) error {
+	for slotIndex := targetIndex + 1; slotIndex <= lastCommittedIndex; slotIndex++ {
+		if err := c.store.KVStore().Delete(lo.PanicOnErr(slotIndex.Bytes())); err != nil {
+			return ierrors.Wrapf(err, "failed to remove forked commitment for slot %d", slotIndex)
+		}
+	}
+
+	return nil
+}

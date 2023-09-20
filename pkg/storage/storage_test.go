@@ -6,13 +6,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestStorage_PruneByEpochIndex(t *testing.T) {
-	tf := NewTestFramework(t)
+	tf := NewTestFramework(t, t.TempDir())
 	defer tf.Shutdown()
 
 	totalEpochs := 10
@@ -52,7 +53,7 @@ func TestStorage_PruneByEpochIndex(t *testing.T) {
 }
 
 func TestStorage_PruneByDepth(t *testing.T) {
-	tf := NewTestFramework(t)
+	tf := NewTestFramework(t, t.TempDir())
 	defer tf.Shutdown()
 
 	totalEpochs := 20
@@ -125,7 +126,7 @@ func TestStorage_PruneByDepth(t *testing.T) {
 }
 
 func TestStorage_PruneBySize(t *testing.T) {
-	tf := NewTestFramework(t,
+	tf := NewTestFramework(t, t.TempDir(),
 		storage.WithPruningDelay(2),
 		storage.WithPruningSizeEnable(true),
 		storage.WithPruningSizeMaxTargetSizeBytes(15*MB),
@@ -166,7 +167,7 @@ func TestStorage_PruneBySize(t *testing.T) {
 }
 
 func TestStorage_RestoreFromDisk(t *testing.T) {
-	tf := NewTestFramework(t, storage.WithPruningDelay(1))
+	tf := NewTestFramework(t, t.TempDir(), storage.WithPruningDelay(1))
 
 	totalEpochs := 9
 	tf.GeneratePermanentData(5 * MB)
@@ -208,4 +209,113 @@ func TestStorage_RestoreFromDisk(t *testing.T) {
 		types.NewTuple(0, false),
 		types.NewTuple(0, false),
 	)
+}
+
+func TestStorage_CopyFromForkedStorageEmpty(t *testing.T) {
+	tf1 := NewTestFramework(t, t.TempDir())
+
+	totalEpochs := 14
+	// Generate data in the old storage (source). It contains data since the genesis and one epoch after the fork.
+	for i := 0; i <= totalEpochs; i++ {
+		tf1.GeneratePrunableData(iotago.EpochIndex(i), 500*KB)
+		tf1.GenerateSemiPermanentData(iotago.EpochIndex(i))
+	}
+	tf1.GeneratePermanentData(1 * MB)
+
+	clonedStorage, err := storage.Clone(tf1.Instance, t.TempDir(), 0, func(err error) {
+		t.Log(err)
+	})
+	require.NoError(t, err)
+
+	// Assert that permanent storage contains exactly the same data.
+	permanentKVStoreSource, err := tf1.Instance.Accounts().WithRealm(kvstore.EmptyPrefix)
+	require.NoError(t, err)
+	permanentKVStoreTarget, err := clonedStorage.Accounts().WithRealm(kvstore.EmptyPrefix)
+	require.NoError(t, err)
+
+	require.NoError(t, permanentKVStoreSource.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, sourceValue kvstore.Value) bool {
+		targetValue, getErr := permanentKVStoreTarget.Get(key)
+		require.NoError(t, getErr)
+
+		require.NotNil(t, targetValue)
+		require.EqualValues(t, sourceValue, targetValue)
+
+		return true
+	}))
+
+	require.NoError(t, permanentKVStoreTarget.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, sourceValue kvstore.Value) bool {
+		targetValue, getErr := permanentKVStoreSource.Get(key)
+		require.NoError(t, getErr)
+
+		require.NotNil(t, targetValue)
+		require.EqualValues(t, sourceValue, targetValue)
+
+		return true
+	}))
+
+	// Assert that semiPermanentStorage contains exactly the same data.
+	rewardsKVStoreSource, err := tf1.Instance.RewardsForEpoch(0)
+	require.NoError(t, err)
+	semiPermanentKVStoreSource, err := rewardsKVStoreSource.WithRealm(kvstore.EmptyPrefix)
+	require.NoError(t, err)
+	rewardsKVStoreTarget, err := clonedStorage.RewardsForEpoch(0)
+	require.NoError(t, err)
+	semiPermanentKVStoreTarget, err := rewardsKVStoreTarget.WithRealm(kvstore.EmptyPrefix)
+	require.NoError(t, err)
+
+	require.NoError(t, semiPermanentKVStoreSource.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, sourceValue kvstore.Value) bool {
+		targetValue, getErr := semiPermanentKVStoreTarget.Get(key)
+		require.NoError(t, getErr)
+
+		require.NotNil(t, targetValue)
+		require.EqualValues(t, sourceValue, targetValue)
+
+		return true
+	}))
+
+	require.NoError(t, semiPermanentKVStoreTarget.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, sourceValue kvstore.Value) bool {
+		targetValue, getErr := semiPermanentKVStoreSource.Get(key)
+		require.NoError(t, getErr)
+
+		require.NotNil(t, targetValue)
+		require.EqualValues(t, sourceValue, targetValue)
+
+		return true
+	}))
+
+	// Assert that prunableSlotStorage contains exactly the same data.
+	for epochIdx := 0; epochIdx <= totalEpochs; epochIdx++ {
+		// little hack to retrieve underlying prunableSlotStore KVStore without any realm
+		epochStartSlot := tf1.apiProvider.CurrentAPI().TimeProvider().EpochStart(iotago.EpochIndex(epochIdx))
+
+		attestationKVStoreSource, err := tf1.Instance.Attestations(epochStartSlot)
+		require.NoError(t, err)
+		prunableSlotKVStoreSource, err := attestationKVStoreSource.WithRealm(kvstore.EmptyPrefix)
+		require.NoError(t, err)
+
+		attestationKVStoreTarget, err := clonedStorage.Attestations(epochStartSlot)
+		require.NoError(t, err)
+		prunableSlotKVStoreTarget, err := attestationKVStoreTarget.WithRealm([]byte{})
+		require.NoError(t, err)
+
+		require.NoError(t, prunableSlotKVStoreSource.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, sourceValue kvstore.Value) bool {
+			targetValue, getErr := prunableSlotKVStoreTarget.Get(key)
+			require.NoError(t, getErr)
+
+			require.NotNil(t, targetValue)
+			require.EqualValues(t, sourceValue, targetValue)
+
+			return true
+		}))
+
+		require.NoError(t, prunableSlotKVStoreTarget.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, sourceValue kvstore.Value) bool {
+			targetValue, getErr := prunableSlotKVStoreSource.Get(key)
+			require.NoError(t, getErr)
+
+			require.NotNil(t, targetValue)
+			require.EqualValues(t, sourceValue, targetValue)
+
+			return true
+		}))
+	}
 }

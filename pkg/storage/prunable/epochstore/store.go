@@ -101,6 +101,10 @@ func (s *Store[V]) StreamBytes(consumer func([]byte, []byte) error) error {
 	return innerErr
 }
 
+func (s *Store[V]) DeleteEpoch(epoch iotago.EpochIndex) error {
+	return s.kv.DeletePrefix(epoch.MustBytes())
+}
+
 func (s *Store[V]) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) error {
 	// The epoch we're trying to prune already takes into account the defaultPruningDelay.
 	// Therefore, we don't need to do anything if it is greater equal s.pruningDelay and take the difference otherwise.

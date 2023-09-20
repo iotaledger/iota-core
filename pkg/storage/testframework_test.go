@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -41,14 +42,13 @@ type TestFramework struct {
 	storageFactoryFunc func() *storage.Storage
 }
 
-func NewTestFramework(t *testing.T, storageOpts ...options.Option[storage.Storage]) *TestFramework {
+func NewTestFramework(t *testing.T, baseDir string, storageOpts ...options.Option[storage.Storage]) *TestFramework {
 	errorHandler := func(err error) {
 		t.Log(err)
 	}
 
-	baseDir := t.TempDir()
 	storageFactoryFunc := func() *storage.Storage {
-		instance := storage.New(baseDir, 0, errorHandler, storageOpts...)
+		instance := storage.Create(baseDir, 0, errorHandler, storageOpts...)
 		require.NoError(t, instance.Settings().StoreProtocolParametersForStartEpoch(iotago.NewV3ProtocolParameters(), 0))
 
 		return instance
@@ -87,8 +87,8 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 	initialStorageSize := t.Instance.PrunableDatabaseSize()
 
 	apiForEpoch := t.apiProvider.APIForEpoch(epoch)
+	startSlot := apiForEpoch.TimeProvider().EpochStart(epoch)
 	endSlot := apiForEpoch.TimeProvider().EpochEnd(epoch)
-
 	var createdBytes int64
 	for createdBytes < size {
 		block := tpkg.RandProtocolBlock(&iotago.BasicBlock{
@@ -100,7 +100,9 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 		modelBlock, err := model.BlockFromBlock(block, apiForEpoch)
 		require.NoError(t.t, err)
 
-		blockStorageForSlot, err := t.Instance.Blocks(endSlot)
+		// block slot is randomly selected within the epoch
+		blockSlot := startSlot + iotago.SlotIndex(rand.Intn(int(endSlot-startSlot+1)))
+		blockStorageForSlot, err := t.Instance.Blocks(blockSlot)
 		require.NoError(t.t, err)
 		err = blockStorageForSlot.Store(modelBlock)
 		require.NoError(t.t, err)
@@ -110,6 +112,10 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 	}
 
 	t.Instance.Flush()
+
+	// Sleep to let RocksDB perform compaction.
+	time.Sleep(100 * time.Millisecond)
+
 	t.assertPrunableSizeGreater(initialStorageSize + size)
 
 	// fmt.Printf("> created %d MB of bucket prunable data\n\tPermanent: %dMB\n\tPrunable: %dMB\n", createdBytes/MB, t.Instance.PermanentDatabaseSize()/MB, t.Instance.PrunableDatabaseSize()/MB)
@@ -140,7 +146,7 @@ func (t *TestFramework) GenerateSemiPermanentData(epoch iotago.EpochIndex) {
 
 	versionAndHash := model.VersionAndHash{
 		Version: 1,
-		Hash:    iotago.Identifier{2},
+		Hash:    tpkg.Rand32ByteArray(),
 	}
 	err = decidedUpgradeSignalsStore.Store(epoch, versionAndHash)
 	require.NoError(t.t, err)
@@ -204,8 +210,8 @@ func (t *TestFramework) AssertPrunedUntil(
 	expectedDecidedUpgrades *types.Tuple[int, bool],
 	expectedPoolStats *types.Tuple[int, bool],
 	expectedCommittee *types.Tuple[int, bool],
-	expectedRewards *types.Tuple[int, bool]) {
-
+	expectedRewards *types.Tuple[int, bool],
+) {
 	t.assertPrunedState(expectedPrunable, t.Instance.LastPrunedEpoch, "prunable")
 	t.assertPrunedState(expectedPoolStats, t.Instance.PoolStats().LastPrunedEpoch, "pool stats")
 	t.assertPrunedState(expectedDecidedUpgrades, t.Instance.DecidedUpgradeSignals().LastPrunedEpoch, "decided upgrades")
