@@ -50,7 +50,7 @@ func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler 
 	}
 }
 
-func Clone(source *Prunable, dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[BucketManager]) (*Prunable, error) {
+func Clone(source *Prunable, dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[BucketManager]) (*Prunable, error) {
 	// Lock semi-permanent DB and prunable slot store so that nobody can try to use or open them while cloning.
 	source.semiPermanentDB.Lock()
 	defer source.semiPermanentDB.Unlock()
