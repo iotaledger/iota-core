@@ -54,7 +54,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 
 	workers := workerpool.NewGroup("CreateSnapshot")
 	defer workers.Shutdown()
-	s := storage.New(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, errorHandler)
+	s := storage.Create(lo.PanicOnErr(os.MkdirTemp(os.TempDir(), "*")), opt.DataBaseVersion, errorHandler)
 	defer s.Shutdown()
 
 	if err := s.Settings().StoreProtocolParametersForStartEpoch(opt.ProtocolParameters, 0); err != nil {

@@ -319,7 +319,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		manualPOA := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock2.ManualPOA)
 		manualPOA.SetOnline("node0", "node1", "node2", "node3", "node4", "node6", "node7")
 	}
-
 	// Merge the partitions
 	{
 		ts.MergePartitionsToMain()
@@ -361,6 +360,13 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ctxP1Cancel()
 		wg.Wait()
 	}
+
+	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
+	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
+	// This is to make sure that the storage was copied correctly during engine switching.
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 }

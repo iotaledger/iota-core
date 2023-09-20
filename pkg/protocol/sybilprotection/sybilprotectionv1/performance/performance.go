@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -83,8 +84,19 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	}
 }
 
-func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
-	// TODO: to be implemented for 1.1
+func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.AccountID] {
+	// TODO: to be implemented for 1.1, for now we just pick previous committee
+
+	eligible := ds.NewSet[iotago.AccountID]()
+
+	lo.PanicOnErr(t.committeeStore.Load(epoch-1)).ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
+		eligible.Add(accountID)
+
+		return true
+	})
+
+	return eligible
+
 	//epochStart := t.apiProvider.APIForEpoch(epoch).TimeProvider().EpochStart(epoch)
 	//registeredStore := t.registeredValidatorsFunc(epochStart)
 	//eligible := ds.NewSet[iotago.AccountID]()
@@ -94,8 +106,6 @@ func (t *Tracker) EligibleValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago
 	//	}
 	//	return true
 	//}
-
-	return nil
 }
 
 // ValidatorCandidates returns the registered validator candidates for the given epoch.
