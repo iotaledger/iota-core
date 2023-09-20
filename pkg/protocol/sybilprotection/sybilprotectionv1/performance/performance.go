@@ -24,7 +24,6 @@ type Tracker struct {
 	committeeStore           *epochstore.Store[*account.Accounts]
 
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
-	latestPrunedEpoch         func() (iotago.EpochIndex, bool)
 	latestAppliedEpoch        iotago.EpochIndex
 
 	apiProvider api.Provider
@@ -40,7 +39,6 @@ func NewTracker(
 	poolStatsStore *epochstore.Store[*model.PoolsStats],
 	committeeStore *epochstore.Store[*account.Accounts],
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
-	latestPrunedEpoch func() (iotago.EpochIndex, bool),
 	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider api.Provider,
 	errHandler func(error),
@@ -50,7 +48,6 @@ func NewTracker(
 		poolStatsStore:            poolStatsStore,
 		committeeStore:            committeeStore,
 		validatorPerformancesFunc: validatorPerformancesFunc,
-		latestPrunedEpoch:         latestPrunedEpoch,
 		latestAppliedEpoch:        latestAppliedEpoch,
 		apiProvider:               apiProvider,
 		errHandler:                errHandler,
@@ -128,7 +125,7 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 }
 
 // ApplyEpoch calculates and stores pool stats and rewards for the given epoch.
-func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) {
+func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) error {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -138,7 +135,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 	profitMargin, err := t.calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake(), epoch)
 	if err != nil {
-		panic(ierrors.Wrapf(err, "failed to calculate profit margin for epoch %d", epoch))
+		return ierrors.Wrapf(err, "failed to calculate profit margin for epoch %d", epoch)
 	}
 
 	poolsStats := &model.PoolsStats{
@@ -147,7 +144,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		ProfitMargin:        profitMargin,
 	}
 
-	if err := t.poolStatsStore.Store(epoch, poolsStats); err != nil {
+	if err = t.poolStatsStore.Store(epoch, poolsStats); err != nil {
 		panic(ierrors.Wrapf(err, "failed to store pool stats for epoch %d", epoch))
 	}
 
@@ -157,7 +154,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	}
 
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
-		validatorPerformances := make([]*model.ValidatorPerformance, 0, epochEndSlot+1-epochStartSlot)
+		validatorPerformances := make([]*model.ValidatorPerformance, timeProvider.EpochDurationSlots())
 		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
 			validatorSlotPerformances, err := t.validatorPerformancesFunc(slot)
 			if err != nil {
@@ -180,11 +177,20 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 			return true
 		}
-		poolReward, err := t.poolReward(epochEndSlot, committee.TotalValidatorStake(), committee.TotalStake(), pool.PoolStake, pool.ValidatorStake, pool.FixedCost, pf)
+
+		poolReward, err := t.poolReward(
+			epochEndSlot,
+			committee.TotalValidatorStake(),
+			committee.TotalStake(),
+			pool.PoolStake,
+			pool.ValidatorStake,
+			pool.FixedCost,
+			pf,
+		)
 		if err != nil {
 			panic(ierrors.Wrapf(err, "failed to calculate pool rewards for account %s", accountID))
 		}
-		if err := rewardsMap.Set(accountID, &model.PoolRewards{
+		if err = rewardsMap.Set(accountID, &model.PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: poolReward,
 			FixedCost:   pool.FixedCost,
@@ -195,11 +201,13 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		return true
 	})
 
-	if err := rewardsMap.Commit(); err != nil {
+	if err = rewardsMap.Commit(); err != nil {
 		panic(ierrors.Wrapf(err, "failed to commit rewards for epoch %d", epoch))
 	}
 
 	t.latestAppliedEpoch = epoch
+
+	return nil
 }
 
 // aggregatePerformanceFactors calculates epoch performance factor of a validator based on its performance in each slot by summing up all active subslots.
@@ -223,6 +231,7 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.Valida
 
 			return 0
 		}
+
 		epochPerformanceFactor += uint64(slotPerformanceFactor)
 	}
 
@@ -243,8 +252,10 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	validatorPerformances, err := t.validatorPerformancesFunc(block.ID().Index())
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for slot %s", block.ID().Index()))
+
 		return
 	}
+
 	validatorPerformance, err := validatorPerformances.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
@@ -253,39 +264,31 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	if validatorPerformance == nil {
 		validatorPerformance = model.NewValidatorPerformance()
 	}
-	updatedPerformance := t.updateSlotPerformanceBitMap(validatorPerformance, block.ID().Index(), block.ProtocolBlock().IssuingTime)
-	if updatedPerformance.BlockIssuedCount == t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot {
-		// no need to store larger number and we can fit into uint8
-		updatedPerformance.BlockIssuedCount = t.apiProvider.APIForSlot(block.ID().Index()).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot + 1
-	} else {
-		updatedPerformance.BlockIssuedCount++
+
+	// set bit at subslotIndex to 1 to indicate activity in that subslot
+	validatorPerformance.SlotActivityVector = validatorPerformance.SlotActivityVector | (1 << t.subslotIndex(block.ID().Index(), block.ProtocolBlock().IssuingTime))
+
+	apiForSlot := t.apiProvider.APIForSlot(block.ID().Index())
+	// we restrict the number up to ValidatorBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
+	// also it can fint into uint8
+	if validatorPerformance.BlockIssuedCount < apiForSlot.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot+1 {
+		validatorPerformance.BlockIssuedCount++
 	}
-	updatedPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{
+	validatorPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{
 		Version: validationBlock.HighestSupportedVersion,
 		Hash:    validationBlock.ProtocolParametersHash,
 	}
-	err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, updatedPerformance)
-	if err != nil {
+	if err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, validatorPerformance); err != nil {
 		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}
 }
 
-func (t *Tracker) updateSlotPerformanceBitMap(pf *model.ValidatorPerformance, slotIndex iotago.SlotIndex, issuingTime time.Time) *model.ValidatorPerformance {
-	if pf == nil {
-		return pf
-	}
-
-	// set bit at subslotIndex to 1 to indicate activity in that subslot
-	pf.SlotActivityVector = pf.SlotActivityVector | (1 << t.subslotIndex(slotIndex, issuingTime))
-
-	return pf
-}
-
 // subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validatorBlocksPerSlot equal parts.
 func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int {
-	valBlocksNum := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
-	subslotDur := time.Duration(t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
-	slotStart := t.apiProvider.APIForEpoch(t.latestAppliedEpoch).TimeProvider().SlotStartTime(slot)
+	epochAPI := t.apiProvider.APIForEpoch(t.latestAppliedEpoch)
+	valBlocksNum := epochAPI.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
+	subslotDur := time.Duration(epochAPI.TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
+	slotStart := epochAPI.TimeProvider().SlotStartTime(slot)
 
 	return int(issuingTime.Sub(slotStart) / subslotDur)
 }

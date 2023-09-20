@@ -204,9 +204,11 @@ func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epochIndex iotag
 }
 
 func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, fixedCost iotago.Mana, performanceFactor uint64) (iotago.Mana, error) {
-	epoch := t.apiProvider.APIForSlot(slotIndex).TimeProvider().EpochFromSlot(slotIndex)
-	params := t.apiProvider.APIForSlot(slotIndex).ProtocolParameters()
-	targetReward, err := params.RewardsParameters().TargetReward(epoch, t.apiProvider.APIForSlot(slotIndex))
+	apiForSlot := t.apiProvider.APIForSlot(slotIndex)
+	epoch := apiForSlot.TimeProvider().EpochFromSlot(slotIndex)
+	params := apiForSlot.ProtocolParameters()
+
+	targetReward, err := params.RewardsParameters().TargetReward(epoch, apiForSlot)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate target reward for slot %d", slotIndex)
 	}

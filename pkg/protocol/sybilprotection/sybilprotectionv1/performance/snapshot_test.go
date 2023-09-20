@@ -1,7 +1,6 @@
 package performance
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/orcaman/writerseeker"
@@ -51,8 +50,6 @@ func TestManager_Import_Export(t *testing.T) {
 		err = ts.Instance.Import(writer.BytesReader())
 		require.NoError(t, err)
 		delegatorRewardAfterImport, validatorRewardAfterImport := ts.calculateExpectedRewards(epochsCount, epochActions)
-		fmt.Println(delegatorRewardBeforeImport, delegatorRewardAfterImport)
-		fmt.Println(validatorRewardBeforeImport, validatorRewardAfterImport)
 		require.Equal(t, delegatorRewardBeforeImport, delegatorRewardAfterImport)
 		require.Equal(t, validatorRewardBeforeImport, validatorRewardAfterImport)
 	}
