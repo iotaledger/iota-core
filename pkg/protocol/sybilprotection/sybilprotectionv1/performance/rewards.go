@@ -55,7 +55,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			return 0, 0, 0, ierrors.Errorf("pool stats for epoch %d and validator accountID %s are nil", epochIndex, validatorID)
 		}
 
-		// if validator's fixed cost is greater than earned reward, all epoch reward goes for delegators
+		// if validator's fixed cost is greater than earned reward, all reward goes for delegators
 		if rewardsForAccountInEpoch.PoolRewards < rewardsForAccountInEpoch.FixedCost {
 			continue
 		}
@@ -236,8 +236,12 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate result reward due division by zero for slot %d", slotIndex)
 	}
-
 	poolRewardFixedCost := iotago.Mana(result >> (params.RewardsParameters().PoolCoefficientExponent + 1))
+
+	// poolReward with fixed cost included is saved, so we don't go negative and delegators can still calculate their reward, validator is punished in ValidatorReward func.
+	if poolRewardFixedCost < fixedCost {
+		return poolRewardFixedCost, nil
+	}
 
 	return poolRewardFixedCost - fixedCost, nil
 }
