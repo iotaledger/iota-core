@@ -73,3 +73,7 @@ func (s *Storage) RestoreFromDisk() {
 
 	s.lastPrunedEpoch.MarkEvicted(lastPrunedEpoch)
 }
+
+func (s *Storage) RollbackPrunable(targetIndex iotago.SlotIndex) error {
+	return s.prunable.Rollback(targetIndex)
+}
