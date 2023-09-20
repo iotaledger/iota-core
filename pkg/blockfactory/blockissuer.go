@@ -474,6 +474,10 @@ func (i *BlockIssuer) issueBlock(block *model.Block) error {
 		return err
 	}
 
+	if _, isValidationBlock := block.ValidationBlock(); isValidationBlock {
+		_ = i.protocol.MainEngineInstance().Storage.Settings().SetLatestIssuedValidationBlock(block)
+	}
+
 	i.events.BlockIssued.Trigger(block)
 
 	return nil

@@ -25,6 +25,7 @@ const (
 	protocolVersionEpochMappingKey
 	futureProtocolParametersKey
 	protocolParametersKey
+	latestIssuedValidationBlock
 )
 
 type Settings struct {
@@ -33,6 +34,7 @@ type Settings struct {
 	storeSnapshotImported            *kvstore.TypedValue[bool]
 	storeLatestCommitment            *kvstore.TypedValue[*model.Commitment]
 	storeLatestFinalizedSlot         *kvstore.TypedValue[iotago.SlotIndex]
+	storeLatestIssuedValidationBlock *kvstore.TypedValue[*model.Block]
 	storeProtocolVersionEpochMapping *kvstore.TypedStore[iotago.Version, iotago.EpochIndex]
 	storeFutureProtocolParameters    *kvstore.TypedStore[iotago.Version, *types.Tuple[iotago.EpochIndex, iotago.Identifier]]
 	storeProtocolParameters          *kvstore.TypedStore[iotago.Version, iotago.ProtocolParameters]
@@ -297,6 +299,32 @@ func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
 	}
 
 	return latestFinalizedSlot
+}
+
+func (s *Settings) LatestIssuedValidationBlock() *model.Block {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	return s.latestIssuedValidationBlock()
+}
+
+func (s *Settings) SetLatestIssuedValidationBlock(block *model.Block) (err error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	return s.storeLatestIssuedValidationBlock.Set(block)
+}
+
+func (s *Settings) latestIssuedValidationBlock() *model.Block {
+	block, err := s.storeLatestIssuedValidationBlock.Get()
+	if err != nil {
+		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			return nil
+		}
+		panic(err)
+	}
+
+	return block
 }
 
 func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commitment) error {
