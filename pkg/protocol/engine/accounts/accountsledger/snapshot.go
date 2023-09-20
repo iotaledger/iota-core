@@ -216,6 +216,7 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 	// write slot diffs until being able to reach targetIndex, where the exported tree is at
 	slotIndex := iotago.SlotIndex(1)
 	maxCommittableAge := m.apiProvider.APIForSlot(targetIndex).ProtocolParameters().MaxCommittableAge()
+
 	if targetIndex > maxCommittableAge {
 		slotIndex = targetIndex - maxCommittableAge
 	}

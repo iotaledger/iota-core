@@ -255,13 +255,13 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	// Get all UTXOs and sort them by outputID
 	outputIDs, err := m.UnspentOutputsIDs(ReadLockLedger(false))
 	if err != nil {
-		return err
+		return ierrors.Wrap(err, "error while retrieving unspent outputIDs")
 	}
 
 	for _, outputID := range outputIDs.RemoveDupsAndSort() {
 		output, err := m.ReadOutputByOutputIDWithoutLocking(outputID)
 		if err != nil {
-			return err
+			return ierrors.Wrapf(err, "error while retrieving output %s", outputID)
 		}
 
 		if err := utils.WriteBytesFunc(writer, output.SnapshotBytes(), &relativeCountersPosition); err != nil {
@@ -274,12 +274,12 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	for diffIndex := ledgerIndex; diffIndex > targetIndex; diffIndex-- {
 		slotDiff, err := m.SlotDiffWithoutLocking(diffIndex)
 		if err != nil {
-			return err
+			return ierrors.Wrapf(err, "error while retrieving slot diffs for slot %s", diffIndex)
 		}
 
 		written, err := WriteSlotDiffToSnapshotWriter(writer, slotDiff)
 		if err != nil {
-			return err
+			return ierrors.Wrapf(err, "error while writing slot diffs for slot %s", diffIndex)
 		}
 
 		relativeCountersPosition += written
@@ -308,6 +308,34 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	// seek back to the last write position
 	if _, err := writer.Seek(relativeCountersPosition-countersSize, io.SeekCurrent); err != nil {
 		return ierrors.Errorf("unable to seek to LS last written position: %w", err)
+	}
+
+	return nil
+}
+
+// Rollback rolls back ledger state to the given target slot.
+func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
+	m.WriteLockLedger()
+	defer m.WriteUnlockLedger()
+
+	ledgerIndex, err := m.ReadLedgerIndexWithoutLocking()
+	if err != nil {
+		return err
+	}
+
+	for diffIndex := ledgerIndex; diffIndex > targetSlot; diffIndex-- {
+		slotDiff, err := m.SlotDiffWithoutLocking(diffIndex)
+		if err != nil {
+			return err
+		}
+
+		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
+			return err
+		}
+	}
+
+	if err := m.stateTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "unable to commit state tree")
 	}
 
 	return nil

@@ -278,6 +278,35 @@ func (s *State) Import(reader io.ReadSeeker) error {
 	return nil
 }
 
+func (s *State) Rollback(lowerTarget, targetIndex iotago.SlotIndex) error {
+	s.evictionMutex.RLock()
+	defer s.evictionMutex.RUnlock()
+
+	start, _ := s.delayedBlockEvictionThreshold(lowerTarget)
+	latestNonEmptySlot := iotago.SlotIndex(0)
+
+	for currentSlot := start; currentSlot <= targetIndex; currentSlot++ {
+		_, err := s.rootBlockStorageFunc(currentSlot)
+		if err != nil {
+			continue
+		}
+
+		latestNonEmptySlot = currentSlot
+	}
+
+	if latestNonEmptySlot > s.optsRootBlocksEvictionDelay {
+		latestNonEmptySlot -= s.optsRootBlocksEvictionDelay
+	} else {
+		latestNonEmptySlot = 0
+	}
+
+	if err := s.latestNonEmptyStore.Set([]byte{latestNonEmptySlotKey}, latestNonEmptySlot.MustBytes()); err != nil {
+		return ierrors.Wrap(err, "failed to store latest non empty slot")
+	}
+
+	return nil
+}
+
 // PopulateFromStorage populates the root blocks from the storage.
 func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
 	for index := lo.Return1(s.delayedBlockEvictionThreshold(latestCommitmentIndex)); index <= latestCommitmentIndex; index++ {

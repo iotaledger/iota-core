@@ -92,7 +92,6 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	timeProvider := t.apiProvider.APIForEpoch(epoch).TimeProvider()
 	epochStartSlot := timeProvider.EpochStart(epoch)
 	epochEndSlot := timeProvider.EpochEnd(epoch)
-
 	profitMargin := calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake())
 	poolsStats := &model.PoolsStats{
 		TotalStake:          committee.TotalStake(),

@@ -87,8 +87,10 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 							panic("failed to load committee for last finalized slot to initialize sybil protection")
 						}
 						o.seatManager.ImportCommittee(currentEpoch, committee)
+						fmt.Println("committee import", committee.TotalStake(), currentEpoch)
 						if nextCommittee, nextCommitteeExists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
 							o.seatManager.ImportCommittee(currentEpoch+1, nextCommittee)
+							fmt.Println("next committee", nextCommittee.TotalStake(), currentEpoch+1)
 						}
 
 						o.TriggerInitialized()
@@ -134,7 +136,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 			}
 
 			committee.SetReused()
-
+			fmt.Println("reuse committee", currentEpoch, "stake", committee.TotalValidatorStake())
 			o.seatManager.SetCommittee(nextEpoch, committee)
 
 			o.events.CommitteeSelected.Trigger(committee, nextEpoch)
@@ -247,6 +249,7 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 	if slot+apiForSlot.ProtocolParameters().EpochNearingThreshold() == epochEndSlot &&
 		epochEndSlot > o.lastCommittedSlot+apiForSlot.ProtocolParameters().MaxCommittableAge() {
 		newCommittee := o.selectNewCommittee(slot)
+		fmt.Println("new committee selection finalization", epoch, newCommittee.TotalStake(), newCommittee.TotalValidatorStake())
 		o.events.CommitteeSelected.Trigger(newCommittee, epoch+1)
 	}
 }

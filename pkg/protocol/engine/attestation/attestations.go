@@ -22,6 +22,7 @@ type Attestations interface {
 
 	Import(reader io.ReadSeeker) (err error)
 	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error)
+	Rollback(index iotago.SlotIndex) (err error)
 
 	RestoreFromDisk() (err error)
 
