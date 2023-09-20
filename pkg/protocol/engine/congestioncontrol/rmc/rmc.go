@@ -76,7 +76,7 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to load commitment for slot %d", index-1)
 	}
-	lastRMC := latestCommitment.Commitment().RMC
+	lastRMC := latestCommitment.Commitment().ReferenceManaCost
 	// load the slotWork for the current slot
 	currentSlotWork, exists := m.slotWork.Get(index)
 	if !exists {
@@ -139,7 +139,7 @@ func (m *Manager) RMC(slot iotago.SlotIndex) (iotago.Mana, error) {
 		if err != nil {
 			return 0, ierrors.Wrapf(err, "failed to get RMC for slot %d", slot)
 		}
-		rmc = latestCommitment.Commitment().RMC
+		rmc = latestCommitment.Commitment().ReferenceManaCost
 	}
 
 	return rmc, nil

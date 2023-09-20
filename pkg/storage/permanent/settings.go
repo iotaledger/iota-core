@@ -304,7 +304,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 	var err error
 	if targetCommitment != nil {
 		// We always know the version of the target commitment, so there can be no error.
-		commitmentBytes, err = lo.PanicOnErr(s.apiProvider.APIForVersion(targetCommitment.Version)).Encode(targetCommitment)
+		commitmentBytes, err = lo.PanicOnErr(s.apiProvider.APIForVersion(targetCommitment.ProtocolVersion)).Encode(targetCommitment)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to encode target commitment")
 		}
