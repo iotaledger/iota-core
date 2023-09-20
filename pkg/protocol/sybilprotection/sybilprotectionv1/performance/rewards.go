@@ -55,9 +55,9 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			return 0, 0, 0, ierrors.Errorf("pool stats for epoch %d and validator accountID %s are nil", epochIndex, validatorID)
 		}
 
-		// all rewards go to delegators, as the fixed cost was too high
+		// if validator's fixed cost is greater than earned reward, all epoch reward goes for delegators
 		if rewardsForAccountInEpoch.PoolRewards < rewardsForAccountInEpoch.FixedCost {
-			return 0, 0, 0, nil
+			continue
 		}
 
 		profitMarginExponent := t.apiProvider.APIForEpoch(epochIndex).ProtocolParameters().RewardsParameters().ProfitMarginExponent
@@ -238,10 +238,6 @@ func (t *Tracker) poolReward(slotIndex iotago.SlotIndex, totalValidatorsStake, t
 	}
 
 	poolRewardFixedCost := iotago.Mana(result >> (params.RewardsParameters().PoolCoefficientExponent + 1))
-	// if validator's fixed cost is greater than earned reward, all reward goes for delegators
-	if poolRewardFixedCost < fixedCost {
-		return poolRewardFixedCost, nil
-	}
 
 	return poolRewardFixedCost - fixedCost, nil
 }
