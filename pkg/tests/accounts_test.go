@@ -4,7 +4,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -306,10 +305,7 @@ func Test_TransitionAccount(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// CREATE IMPLICIT ACCOUNT FROM BASIC UTXO
-
-	keyPair := ed25519.GenerateKeyPair()
-	implicitAccountAddress := iotago.ImplicitAccountCreationAddressFromPubKey(keyPair.PublicKey[:])
-	inputForImplicitAccount, outputsForImplicitAccount, implicitWallet := ts.TransactionFramework.CreateImplicitAccountFromInput("TX1:3", implicitAccountAddress)
+	inputForImplicitAccount, outputsForImplicitAccount, implicitAccountAddress, implicitWallet := ts.TransactionFramework.CreateImplicitAccountFromInput("TX1:3")
 
 	tx5 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX5", implicitWallet,
 		testsuite.WithInputs(inputForImplicitAccount),
