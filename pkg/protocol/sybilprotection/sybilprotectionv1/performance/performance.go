@@ -89,7 +89,7 @@ func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) ds.Set[io
 
 	eligible := ds.NewSet[iotago.AccountID]()
 
-	lo.PanicOnErr(t.committeeStore.Load(epoch-1)).ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
+	lo.PanicOnErr(t.committeeStore.Load(epoch - 1)).ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
 		eligible.Add(accountID)
 
 		return true
@@ -226,7 +226,7 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.Valida
 		epochPerformanceFactor += uint64(slotPerformanceFactor)
 	}
 
-	return epochPerformanceFactor >> uint64(t.apiProvider.CurrentAPI().ProtocolParameters().SlotsPerEpochExponent())
+	return epochPerformanceFactor >> uint64(t.apiProvider.CurrentAPI().ProtocolParameters().TimeProvider().SlotsPerEpochExponent())
 }
 
 func (t *Tracker) isCommitteeMember(slot iotago.SlotIndex, accountID iotago.AccountID) (bool, error) {
