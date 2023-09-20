@@ -347,6 +347,11 @@ func Test_TransitionAccount(t *testing.T) {
 	tx6 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX6", fullAccountWallet,
 		testsuite.WithInputs(inputForImplicitAccountTransition),
 		testsuite.WithOutputs(outputsForImplicitAccountTransition),
+		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
+			&iotago.CommitmentInput{
+				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			},
+		}),
 	))
 
 	slotIndexBlock6 := latestParent.ID().Index()
@@ -374,7 +379,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ID:              implicitAccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock6),
 		ExpirySlot:      iotago.SlotIndex(math.MaxUint64),
-		OutputID:        implicitAccountOutputID,
+		OutputID:        fullAccountOutputID,
 		BlockIssuerKeys: ds.NewSet(fullAccountBlockIssuerKey),
 	}, ts.Nodes()...)
 

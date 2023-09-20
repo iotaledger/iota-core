@@ -344,6 +344,7 @@ func (t *TransactionFramework) TransitionImplicitAccountToAccountOutput(alias st
 	accountOutput := options.Apply(&iotago.AccountOutput{
 		Amount:       input.BaseTokenAmount(),
 		Mana:         input.StoredMana(),
+		AccountID:    iotago.AccountIDFromOutputID(input.OutputID()),
 		NativeTokens: iotago.NativeTokens{},
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: t.DefaultAddress()},
