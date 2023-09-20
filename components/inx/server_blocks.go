@@ -30,18 +30,7 @@ func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlo
 }
 
 func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*inx.BlockMetadata, error) {
-	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID.Unwrap())
-	if err != nil {
-		return nil, err
-	}
-
-	return &inx.BlockMetadata{
-		BlockId:            blockID,
-		BlockState:         inx.WrapBlockState(blockMetadata.BlockState),
-		BlockFailureReason: inx.WrapBlockFailureReason(blockMetadata.BlockFailureReason),
-		TxState:            inx.WrapTransactionState(blockMetadata.TxState),
-		TxFailureReason:    inx.WrapTransactionFailureReason(blockMetadata.TxFailureReason),
-	}, nil
+	return getINXBlockMetadata(blockID.Unwrap())
 }
 
 func (s *Server) ListenToBlocks(_ *inx.NoParams, srv inx.INX_ListenToBlocksServer) error {
@@ -75,7 +64,12 @@ func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcc
 	wp := workerpool.New("ListenToAcceptedBlocks", workerCount).Start()
 
 	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
+		payload, err := getINXBlockMetadata(block.ID())
+		if err != nil {
+			Component.LogErrorf("get block metadata error: %v", err)
+			cancel()
+		}
+
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
 			cancel()
@@ -100,7 +94,12 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 	wp := workerpool.New("ListenToConfirmedBlocks", workerCount).Start()
 
 	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
+		payload, err := getINXBlockMetadata(block.ID())
+		if err != nil {
+			Component.LogErrorf("get block metadata error: %v", err)
+			cancel()
+		}
+
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
 			cancel()
@@ -174,4 +173,19 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (
 	}
 
 	return inx.NewBlockId(blockID), nil
+}
+
+func getINXBlockMetadata(blockID iotago.BlockID) (*inx.BlockMetadata, error) {
+	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	if err != nil {
+		return nil, ierrors.Errorf("failed to get BlockMetadata: %v", err)
+	}
+
+	return &inx.BlockMetadata{
+		BlockId:            inx.NewBlockId(blockID),
+		BlockState:         inx.WrapBlockState(blockMetadata.BlockState),
+		BlockFailureReason: inx.WrapBlockFailureReason(blockMetadata.BlockFailureReason),
+		TxState:            inx.WrapTransactionState(blockMetadata.TxState),
+		TxFailureReason:    inx.WrapTransactionFailureReason(blockMetadata.TxFailureReason),
+	}, nil
 }
