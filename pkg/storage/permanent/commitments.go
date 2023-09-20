@@ -9,15 +9,14 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Commitments struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 	store       *kvstore.TypedStore[iotago.SlotIndex, *model.Commitment]
 }
 
-func NewCommitments(store kvstore.KVStore, apiProvider api.Provider) *Commitments {
+func NewCommitments(store kvstore.KVStore, apiProvider iotago.APIProvider) *Commitments {
 	return &Commitments{
 		apiProvider: apiProvider,
 		store: kvstore.NewTypedStore(store,

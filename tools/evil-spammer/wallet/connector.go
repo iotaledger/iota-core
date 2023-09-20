@@ -177,7 +177,7 @@ type Client interface {
 	// GetBlockIssuance returns the latest commitment and data needed to create a new block.
 	GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error)
 
-	api.Provider
+	iotago.APIProvider
 }
 
 // WebClient contains a GoShimmer web API to interact with a node.

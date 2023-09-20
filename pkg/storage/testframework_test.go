@@ -33,7 +33,7 @@ const (
 type TestFramework struct {
 	t               *testing.T
 	Instance        *storage.Storage
-	apiProvider     api.Provider
+	apiProvider     iotago.APIProvider
 	baseDir         string
 	baseDirPrunable string
 

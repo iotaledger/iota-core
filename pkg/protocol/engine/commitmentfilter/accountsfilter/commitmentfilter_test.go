@@ -27,10 +27,10 @@ type TestFramework struct {
 	accountData map[iotago.AccountID]*accounts.AccountData
 	rmcData     map[iotago.SlotIndex]iotago.Mana
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 }
 
-func NewTestFramework(t *testing.T, apiProvider api.Provider, optsFilter ...options.Option[CommitmentFilter]) *TestFramework {
+func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter ...options.Option[CommitmentFilter]) *TestFramework {
 	tf := &TestFramework{
 		Test:        t,
 		apiProvider: apiProvider,

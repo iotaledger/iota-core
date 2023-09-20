@@ -18,7 +18,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Manager is the component that manages the slot commitments.
@@ -38,7 +37,7 @@ type Manager struct {
 
 	acceptedTimeFunc  func() time.Time
 	minCommittableAge iotago.SlotIndex
-	apiProvider       api.Provider
+	apiProvider       iotago.APIProvider
 
 	module.Module
 }

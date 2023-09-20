@@ -21,14 +21,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1/performance"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 type SybilProtection struct {
 	events *sybilprotection.Events
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	seatManager       seatmanager.SeatManager
 	ledger            ledger.Ledger // do we need the whole Ledger or just a callback to retrieve account data?

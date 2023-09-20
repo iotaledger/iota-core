@@ -10,14 +10,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Manager is used to access stored and potential mana of an account in order.
 // For stored Mana added to account, or stored/potential Mana spent, we will update on commitment.
 // For potential Mana updates and decay, we update on demand if the Mana vector is accessed (by the scheduler).
 type Manager struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	manaVectorCache *cache.Cache[iotago.AccountID, *accounts.Mana]
 
@@ -28,7 +27,7 @@ type Manager struct {
 	module.Module
 }
 
-func NewManager(apiProvider api.Provider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
+func NewManager(apiProvider iotago.APIProvider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
 	return &Manager{
 		apiProvider:              apiProvider,
 		accountOutputResolveFunc: accountOutputResolveFunc,

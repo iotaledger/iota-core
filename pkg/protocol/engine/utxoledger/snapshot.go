@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Helpers to serialize/deserialize into/from snapshots
@@ -26,7 +25,7 @@ func (o *Output) SnapshotBytes() []byte {
 	return m.Bytes()
 }
 
-func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider) (*Output, error) {
+func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider) (*Output, error) {
 	outputID := iotago.OutputID{}
 	if _, err := io.ReadFull(reader, outputID[:]); err != nil {
 		return nil, ierrors.Errorf("unable to read LS output ID: %w", err)
@@ -74,7 +73,7 @@ func (s *Spent) SnapshotBytes() []byte {
 	return m.Bytes()
 }
 
-func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider, indexSpent iotago.SlotIndex) (*Spent, error) {
+func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider, indexSpent iotago.SlotIndex) (*Spent, error) {
 	output, err := OutputFromSnapshotReader(reader, apiProvider)
 	if err != nil {
 		return nil, err
@@ -93,7 +92,7 @@ func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider, ind
 	return NewSpent(output, transactionIDSpent, indexSpent), nil
 }
 
-func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider) (*SlotDiff, error) {
+func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider) (*SlotDiff, error) {
 	slotDiff := &SlotDiff{}
 
 	var diffIndex uint64
