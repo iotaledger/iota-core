@@ -1,8 +1,6 @@
 package prunable
 
 import (
-	"fmt"
-
 	copydir "github.com/otiai10/copy"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -168,7 +166,7 @@ func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex) error {
 				return ierrors.Wrapf(err, "error while checking if committee for epoch %d should be rolled back", epochIdx)
 			}
 
-			fmt.Println("rollback committee", shouldRollback, "epochIdx", epochIdx, "lastCommittedEpoch", lastCommittedEpoch, "targetSlotEpoch", targetSlotEpoch)
+			// TODO: REPLACE WITH TRACE LOG fmt.Println("rollback committee", shouldRollback, "epochIdx", epochIdx, "lastCommittedEpoch", lastCommittedEpoch, "targetSlotEpoch", targetSlotEpoch)
 			if shouldRollback {
 				if err := p.committee.DeleteEpoch(epochIdx); err != nil {
 					return ierrors.Wrapf(err, "error while deleting committee for epoch %d", epochIdx)

@@ -301,29 +301,6 @@ func (e *Engine) APIForVersion(version iotago.Version) (iotago.API, error) {
 	return e.Storage.Settings().APIProvider().APIForVersion(version)
 }
 
-func (e *Engine) Encode(obj any, version iotago.Version) ([]byte, error) {
-	apiForVersion, err := e.APIForVersion(version)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get API for version %d", version)
-	}
-
-	return apiForVersion.Encode(obj)
-}
-
-func (e *Engine) Decode(bytes []byte, obj any) (int, error) {
-	version, _, err := iotago.VersionFromBytes(bytes)
-	if err != nil {
-		return 0, ierrors.Wrap(err, "failed to determine version")
-	}
-
-	apiForVersion, err := e.APIForVersion(version)
-	if err != nil {
-		return 0, ierrors.Wrapf(err, "failed to get API for version %d", version)
-	}
-
-	return apiForVersion.Decode(bytes, obj)
-}
-
 func (e *Engine) LatestAPI() iotago.API {
 	return e.Storage.Settings().APIProvider().LatestAPI()
 }

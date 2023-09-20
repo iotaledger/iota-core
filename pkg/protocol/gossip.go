@@ -120,7 +120,11 @@ func (r *Gossip) ProcessCommitment(commitmentModel *model.Commitment, src peer.I
 
 func (r *Gossip) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src peer.ID) {
 	if commitment, err := r.protocol.Commitment(commitmentID); err != nil {
-		r.LogDebug("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
+		if !ierrors.Is(err, ErrorCommitmentNotFound) {
+			r.LogDebug("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
+		} else {
+			r.LogTrace("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
+		}
 	} else {
 		r.protocol.SendSlotCommitment(commitment.Commitment, src)
 	}
@@ -145,14 +149,14 @@ func (r *Gossip) ProcessAttestations(commitmentModel *model.Commitment, attestat
 		return
 	}
 
-	_, actualCumulativeWeight, err := commitmentVerifier.verifyCommitment(commitmentModel, attestations, merkleProof)
+	_, actualWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 	if err != nil {
 		r.LogError("failed to verify commitment when processing attestations", "commitmentID", commitmentModel.ID(), "error", err)
 		return
 	}
 
+	commitment.AttestedWeight.Set(actualWeight)
 	commitment.IsAttested.Set(true)
-	commitment.AttestedWeight.Set(actualCumulativeWeight)
 }
 
 func (r *Gossip) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) {
@@ -177,7 +181,7 @@ func (r *Gossip) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, sr
 	}
 
 	if commitment.ID() != commitmentID {
-		r.LogDebug("requested commitment does not belong to main engine", "requestedCommitmentID", commitmentID, "mainEngineCommitmentID", commitment.ID())
+		r.LogTrace("requested commitment does not belong to main engine", "requestedCommitmentID", commitmentID, "mainEngineCommitmentID", commitment.ID())
 		return
 	}
 

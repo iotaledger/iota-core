@@ -21,6 +21,7 @@ type Commitment struct {
 	InSyncRange              reactive.Variable[bool]
 	WarpSyncBlocks           reactive.Variable[bool]
 	RequestAttestations      reactive.Variable[bool]
+	Weight                   reactive.Variable[uint64]
 	AttestedWeight           reactive.Variable[uint64]
 	CumulativeAttestedWeight reactive.Variable[uint64]
 	IsSolid                  reactive.Event
@@ -49,6 +50,7 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 		Chain:                    reactive.NewVariable[*Chain](),
 		Engine:                   reactive.NewVariable[*engine.Engine](),
 		RequestAttestations:      reactive.NewVariable[bool](),
+		Weight:                   reactive.NewVariable[uint64](),
 		AttestedWeight:           reactive.NewVariable[uint64](func(current uint64, new uint64) uint64 { return max(current, new) }),
 		CumulativeAttestedWeight: reactive.NewVariable[uint64](),
 		IsSolid:                  reactive.NewEvent(),
@@ -69,9 +71,15 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 
 		c.IsSolid.InheritFrom(parent.IsSolid)
 
-		c.CumulativeAttestedWeight.InheritFrom(reactive.NewDerivedVariable2(func(parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
-			return parentCumulativeAttestedWeight + attestedWeight
-		}, parent.CumulativeAttestedWeight, c.AttestedWeight))
+		c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
+
+		c.IsAttested.OnTrigger(func() {
+			parent.IsAttested.OnTrigger(func() {
+				c.CumulativeAttestedWeight.InheritFrom(reactive.NewDerivedVariable2(func(parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
+					return parentCumulativeAttestedWeight + attestedWeight
+				}, parent.CumulativeAttestedWeight, c.AttestedWeight))
+			})
+		})
 
 		c.isDirectlyAboveLatestAttestedCommitment.InheritFrom(reactive.NewDerivedVariable2(func(parentIsAttested, isAttested bool) bool {
 			return parentIsAttested && !isAttested
@@ -129,7 +137,9 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 	})
 
 	c.Logger = logger.NewEntityLogger("Commitment", c.IsEvicted, func(entityLogger log.Logger) {
+		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
+		c.CumulativeAttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "CumulativeAttestedWeight")
 	})
 
 	return c
@@ -223,4 +233,12 @@ func (c *Commitment) cumulativeWeight() uint64 {
 	}
 
 	return c.CumulativeWeight()
+}
+
+func (c *Commitment) cumulativeAttestedWeight() uint64 {
+	if c == nil {
+		return 0
+	}
+
+	return c.CumulativeAttestedWeight.Get()
 }

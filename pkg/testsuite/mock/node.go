@@ -15,11 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
-	"github.com/iotaledger/hive.go/app/configuration"
-	appLogger "github.com/iotaledger/hive.go/app/logger"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
-	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -572,12 +569,4 @@ func (n *Node) AttachedBlocks() []*blocks.Block {
 	defer n.mutex.RUnlock()
 
 	return n.attachedBlocks
-}
-
-func init() {
-	if err := appLogger.InitGlobalLogger(configuration.New()); err != nil {
-		panic(err)
-	}
-
-	logger.SetLevel(logger.LevelDebug)
 }

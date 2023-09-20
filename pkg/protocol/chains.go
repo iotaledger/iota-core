@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -82,6 +83,9 @@ func newChains(protocol *Protocol) *Chains {
 		// TODO: trigger initialized
 	})
 
+	c.HeaviestClaimedCandidate.LogUpdates(c.protocol, log.LevelInfo, "Unchecked Heavier Chain", (*Chain).LogName)
+	c.HeaviestAttestedCandidate.LogUpdates(c.protocol, log.LevelInfo, "Attested Heavier Chain", (*Chain).LogName)
+
 	return c
 }
 
@@ -123,7 +127,7 @@ func (c *Chains) MainEngineInstance() *engine.Engine {
 
 func (c *Chains) initMainChain() {
 	mainChain := c.MainChain.Get()
-	mainChain.instantiate.Set(true)
+	mainChain.InstantiateEngine.Set(true)
 	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) {
 		c.protocol.Events.Engine.LinkTo(newEngine.Events)
 	})
@@ -159,12 +163,10 @@ func (c *Chains) initChainSwitching() {
 
 	c.HeaviestAttestedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
 		if prevCandidate != nil {
-			prevCandidate.instantiate.Set(false)
+			prevCandidate.InstantiateEngine.Set(false)
 		}
 
-		fmt.Println("NEW CANDIDATE", newCandidate.ForkingPoint.Get().ID(), newCandidate.ForkingPoint.Get().Index(), newCandidate.AttestedWeight.Get())
-
-		newCandidate.instantiate.Set(true)
+		newCandidate.InstantiateEngine.Set(true)
 	})
 
 	c.ChainCreated.Hook(func(chain *Chain) {
@@ -183,7 +185,7 @@ func (c *Chains) initChainSwitching() {
 }
 
 func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
-	return chain.instantiate.OnUpdate(func(_, instantiate bool) {
+	return chain.InstantiateEngine.OnUpdate(func(_, instantiate bool) {
 		if !instantiate {
 			chain.spawnedEngine.Set(nil)
 
@@ -210,16 +212,7 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 				return
 			}
 
-			c.protocol.LogDebug("engine started", "chain", chain.LogName(), "root", candidateEngineInstance.RootCommitment.Get().ID())
-
-			candidateEngineInstance.Ledger.HookInitialized(func() {
-				c.protocol.LogDebug("engine fully started", "chain", chain.LogName(), "root", candidateEngineInstance.RootCommitment.Get().ID())
-			})
-
 			chain.spawnedEngine.Set(candidateEngineInstance)
-
-			// Set the chain to the correct forking point
-			fmt.Println("WATT IS HIER LOS? EIN FORK? @", chain.ForkingPoint.Get().Index(), chain)
 
 			c.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
 		}
@@ -285,6 +278,7 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 					}
 
 					publishedCommitment.promote(chain)
+					publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
 					publishedCommitment.IsAttested.Trigger()
 					publishedCommitment.IsVerified.Trigger()
 
