@@ -338,6 +338,50 @@ func Test_TransitionAccount(t *testing.T) {
 
 	// TRANSITION IMPLICIT ACCOUNT TO ACCOUNT OUTPUT
 
+	fullAccountBlockIssuerKey := utils.RandBlockIssuerKey()
+
+	inputForImplicitAccountTransition, outputsForImplicitAccountTransition, fullAccountWallet := ts.TransactionFramework.TransitionImplicitAccountToAccountOutput(
+		"TX5:0",
+		testsuite.WithBlockIssuerFeature(&iotago.BlockIssuerFeature{
+			BlockIssuerKeys: iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
+			ExpirySlot:      math.MaxUint64,
+		}),
+	)
+
+	tx6 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX6", fullAccountWallet,
+		testsuite.WithInputs(inputForImplicitAccountTransition),
+		testsuite.WithOutputs(outputsForImplicitAccountTransition),
+	))
+
+	slotIndexBlock6 := latestParent.ID().Index()
+
+	block6 := ts.IssueBlockAtSlotWithOptions("block6", slotIndexBlock6, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx6, blockfactory.WithStrongParents(latestParent.ID()))
+
+	latestParent = ts.CommitUntilSlot(slotIndexBlock6, activeNodes, block6)
+
+	fullAccountOutputID := ts.TransactionFramework.Output("TX6:0").OutputID()
+
+	ts.AssertAccountDiff(implicitAccountID, slotIndexBlock6, &model.AccountDiff{
+		BICChange:              0,
+		PreviousUpdatedTime:    0,
+		NewOutputID:            fullAccountOutputID,
+		PreviousOutputID:       implicitAccountOutputID,
+		BlockIssuerKeysAdded:   iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
+		BlockIssuerKeysRemoved: iotago.BlockIssuerKeys{implicitBlockIssuerKey},
+		ValidatorStakeChange:   0,
+		StakeEndEpochChange:    0,
+		FixedCostChange:        0,
+		DelegationStakeChange:  0,
+	}, false, ts.Nodes()...)
+
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:              implicitAccountID,
+		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock6),
+		ExpirySlot:      iotago.SlotIndex(math.MaxUint64),
+		OutputID:        implicitAccountOutputID,
+		BlockIssuerKeys: ds.NewSet(fullAccountBlockIssuerKey),
+	}, ts.Nodes()...)
+
 	ts.Wait(ts.Nodes()...)
 }
 

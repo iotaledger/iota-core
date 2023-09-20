@@ -320,6 +320,35 @@ func (t *TransactionFramework) TransitionAccount(alias string, opts ...options.O
 	return output, iotago.Outputs[iotago.Output]{accountOutput}, []*mock.HDWallet{t.wallet}
 }
 
+func (t *TransactionFramework) TransitionImplicitAccountToAccountOutput(alias string, opts ...options.Option[iotago.AccountOutput]) (consumedInput utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
+	input, exists := t.states[alias]
+	if !exists {
+		panic(fmt.Sprintf("account with alias %s does not exist", alias))
+	}
+
+	basicOutput, isBasic := input.Output().(*iotago.BasicOutput)
+	if !isBasic {
+		panic(fmt.Sprintf("output with alias %s is not *iotago.BasicOutput", alias))
+	}
+	if basicOutput.UnlockConditionSet().Address().Address.Type() != iotago.AddressImplicitAccountCreation {
+		panic(fmt.Sprintf("output with alias %s is not an implicit account", alias))
+	}
+
+	accountOutput := options.Apply(&iotago.AccountOutput{
+		Amount:       input.BaseTokenAmount(),
+		Mana:         input.StoredMana(),
+		NativeTokens: iotago.NativeTokens{},
+		Conditions: iotago.AccountOutputUnlockConditions{
+			&iotago.StateControllerAddressUnlockCondition{Address: t.DefaultAddress()},
+			&iotago.GovernorAddressUnlockCondition{Address: t.DefaultAddress()},
+		},
+		Features:          iotago.AccountOutputFeatures{},
+		ImmutableFeatures: iotago.AccountOutputImmFeatures{},
+	}, opts)
+
+	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{accountOutput}, []*mock.HDWallet{t.wallet}
+}
+
 func (t *TransactionFramework) Output(alias string) *utxoledger.Output {
 	output, exists := t.states[alias]
 	if !exists {
