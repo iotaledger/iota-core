@@ -24,7 +24,7 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230912172434-dc477e1f5140
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230919065227-618931c246c5
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230918132810-48814818bff9
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230913143616-917572c7752d
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230920081018-054aaef28ba2
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.30.0
@@ -32,6 +32,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.11.0
 	github.com/multiformats/go-varint v0.0.7
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
+	github.com/otiai10/copy v1.12.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/stretchr/testify v1.8.4
 	github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98
@@ -134,7 +135,6 @@ require (
 	github.com/multiformats/go-multistream v0.4.1 // indirect
 	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
 	github.com/opencontainers/runtime-spec v1.1.0 // indirect
-	github.com/otiai10/copy v1.12.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect

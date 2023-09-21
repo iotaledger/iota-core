@@ -63,7 +63,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 
 					latestCommittedSlot := e.Storage.Settings().LatestCommitment().Index()
 					latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
-					o.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.PerformanceFactors, latestCommittedEpoch, e, o.errHandler)
+					o.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.ValidatorPerformances, latestCommittedEpoch, e, o.errHandler)
 					o.lastCommittedSlot = latestCommittedSlot
 
 					if o.optsInitialCommittee != nil {
@@ -113,7 +113,7 @@ func (o *SybilProtection) TrackValidationBlock(block *blocks.Block) {
 	o.performanceTracker.TrackValidationBlock(block)
 }
 
-func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewardsRoot iotago.Identifier) {
+func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewardsRoot iotago.Identifier, err error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -132,6 +132,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 			// we promote the current committee to also serve in the next epoch.
 			committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 			if !exists {
+				// that should never happen as it is already the fallback strategy
 				panic(fmt.Sprintf("committee for current epoch %d not found", currentEpoch))
 			}
 
@@ -141,8 +142,8 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 
 			o.events.CommitteeSelected.Trigger(committee, nextEpoch)
 
-			if err := o.performanceTracker.RegisterCommittee(nextEpoch, committee); err != nil {
-				panic(ierrors.Wrapf(err, "failed to register committee for epoch %d", nextEpoch))
+			if err = o.performanceTracker.RegisterCommittee(nextEpoch, committee); err != nil {
+				return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to register committee for epoch %d", nextEpoch)
 			}
 		}
 	}
@@ -150,10 +151,13 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 	if timeProvider.EpochEnd(currentEpoch) == slot {
 		committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 		if !exists {
-			panic(fmt.Sprintf("committee for a finished epoch %d not found", currentEpoch))
+			return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "committee for a finished epoch %d not found", currentEpoch)
 		}
 
-		o.performanceTracker.ApplyEpoch(currentEpoch, committee)
+		err = o.performanceTracker.ApplyEpoch(currentEpoch, committee)
+		if err != nil {
+			return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to apply epoch %d", currentEpoch)
+		}
 	}
 
 	var targetCommitteeEpoch iotago.EpochIndex
@@ -164,9 +168,9 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 		targetCommitteeEpoch = nextEpoch
 	}
 
-	committeeRoot, err := o.committeeRoot(targetCommitteeEpoch)
+	committeeRoot, err = o.committeeRoot(targetCommitteeEpoch)
 	if err != nil {
-		panic(ierrors.Wrapf(err, "failed to calculate committee root for epoch %d", targetCommitteeEpoch))
+		return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to calculate committee root for epoch %d", targetCommitteeEpoch)
 	}
 
 	var targetRewardsEpoch iotago.EpochIndex
@@ -178,7 +182,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 
 	rewardsRoot, err = o.performanceTracker.RewardsRoot(targetRewardsEpoch)
 	if err != nil {
-		panic(ierrors.Wrapf(err, "failed to calculate rewards root for epoch %d", targetRewardsEpoch))
+		return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to calculate rewards root for epoch %d", targetRewardsEpoch)
 	}
 
 	o.lastCommittedSlot = slot
@@ -189,7 +193,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) (committeeRoot iotago.Identifier, err error) {
 	committee, exists := o.performanceTracker.LoadCommitteeForEpoch(targetCommitteeEpoch)
 	if !exists {
-		panic(fmt.Sprintf("committee for a finished epoch %d not found", targetCommitteeEpoch))
+		return iotago.Identifier{}, ierrors.Wrapf(err, "committee for a finished epoch %d not found", targetCommitteeEpoch)
 	}
 
 	comitteeTree := ads.NewSet(

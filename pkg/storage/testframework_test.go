@@ -297,7 +297,7 @@ func (t *TestFramework) assertPrunableSlotStoragesPruned(epoch iotago.EpochIndex
 	_, err = t.Instance.AccountDiffs(endSlot)
 	require.ErrorIsf(t.t, err, database.ErrEpochPruned, "expected epoch %d to be pruned", epoch)
 
-	_, err = t.Instance.PerformanceFactors(endSlot)
+	_, err = t.Instance.ValidatorPerformances(endSlot)
 	require.ErrorIsf(t.t, err, database.ErrEpochPruned, "expected epoch %d to be pruned", epoch)
 
 	_, err = t.Instance.UpgradeSignals(endSlot)

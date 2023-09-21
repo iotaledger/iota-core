@@ -164,7 +164,11 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	committeeRoot, rewardsRoot := m.sybilProtection.CommitSlot(index)
+	committeeRoot, rewardsRoot, err := m.sybilProtection.CommitSlot(index)
+	if err != nil {
+		m.errorHandler(ierrors.Wrap(err, "failed to commit sybil protection"))
+		return false
+	}
 	apiForSlot := m.apiProvider.APIForSlot(index)
 
 	protocolParametersAndVersionsHash, err := m.upgradeOrchestrator.Commit(index)

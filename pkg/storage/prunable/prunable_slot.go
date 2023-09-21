@@ -1,12 +1,8 @@
 package prunable
 
 import (
-	"bytes"
-	"encoding/binary"
-
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -50,8 +46,7 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.Bl
 	return slotstore.NewStore(slot, kv,
 		iotago.SlotIdentifier.Bytes,
 		iotago.SlotIdentifierFromBytes,
-		iotago.SlotIdentifier.Bytes,
-		iotago.SlotIdentifierFromBytes,
+		iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes,
 	), nil
 }
 
@@ -68,38 +63,24 @@ func (p *Prunable) AccountDiffs(slot iotago.SlotIndex) (*slotstore.AccountDiffs,
 	return slotstore.NewAccountDiffs(slot, kv, p.apiProvider.APIForSlot(slot)), nil
 }
 
-func (p *Prunable) PerformanceFactors(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, uint64], error) {
+func (p *Prunable) ValidatorPerformances(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error) {
 	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixPerformanceFactors})
 	if err != nil {
 		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get performance factors with slot %d", slot)
 	}
 
-	uint64Bytes := func(value uint64) ([]byte, error) {
-		buf := bytes.NewBuffer(make([]byte, 0, serializer.UInt64ByteSize))
-		if err := binary.Write(buf, binary.LittleEndian, value); err != nil {
-			return nil, err
-		}
-
-		return buf.Bytes(), nil
-	}
-
-	uint64FromBytes := func(b []byte) (uint64, int, error) {
-		buf := bytes.NewBuffer(b)
-		var value uint64
-		if err := binary.Read(buf, binary.LittleEndian, &value); err != nil {
-			return 0, 0, err
-		}
-
-		return value, serializer.UInt64ByteSize, nil
-	}
+	apiForSlot := p.apiProvider.APIForSlot(slot)
 
 	return slotstore.NewStore(slot, kv,
-		iotago.AccountID.Bytes,
+		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
-		uint64Bytes,
-		uint64FromBytes,
+		func(s *model.ValidatorPerformance) ([]byte, error) {
+			return s.Bytes(apiForSlot)
+		},
+		model.ValidatorPerformanceFromBytes(apiForSlot),
 	), nil
 }
+
 func (p *Prunable) UpgradeSignals(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error) {
 	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixUpgradeSignals})
 	if err != nil {
