@@ -10,8 +10,8 @@ import (
 const VersionAndHashSize = iotago.IdentifierLength + iotago.VersionLength
 
 type VersionAndHash struct {
-	Version iotago.Version
-	Hash    iotago.Identifier
+	Version iotago.Version    `serix:"0"`
+	Hash    iotago.Identifier `serix:"1"`
 }
 
 func (v VersionAndHash) Bytes() ([]byte, error) {

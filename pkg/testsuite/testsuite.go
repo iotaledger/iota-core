@@ -138,6 +138,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsMaxBufferSize,
 					t.optsMaxBufferSize,
 				),
+				iotago.WithRewardsOptions(10, 8, 8, 31, 1154, 2, 1),
 				iotago.WithStakingOptions(1, 100, 1),
 			),
 		)

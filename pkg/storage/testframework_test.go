@@ -20,7 +20,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -297,7 +296,7 @@ func (t *TestFramework) assertPrunableSlotStoragesPruned(epoch iotago.EpochIndex
 	_, err = t.Instance.AccountDiffs(endSlot)
 	require.ErrorIsf(t.t, err, database.ErrEpochPruned, "expected epoch %d to be pruned", epoch)
 
-	_, err = t.Instance.PerformanceFactors(endSlot)
+	_, err = t.Instance.ValidatorPerformances(endSlot)
 	require.ErrorIsf(t.t, err, database.ErrEpochPruned, "expected epoch %d to be pruned", epoch)
 
 	_, err = t.Instance.UpgradeSignals(endSlot)

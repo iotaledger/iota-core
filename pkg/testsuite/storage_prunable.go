@@ -178,9 +178,9 @@ func (t *TestSuite) assertPrunableSlotStoragesPruned(storageInstance *storage.St
 		return ierrors.Errorf("expected epoch %d to be pruned when calling AccountDiffs", epoch)
 	}
 
-	_, err = storageInstance.PerformanceFactors(endSlot)
+	_, err = storageInstance.ValidatorPerformances(endSlot)
 	if !ierrors.Is(err, database.ErrEpochPruned) {
-		return ierrors.Errorf("expected epoch %d to be pruned when calling PerformanceFactors", epoch)
+		return ierrors.Errorf("expected epoch %d to be pruned when calling ValidatorPerformances", epoch)
 	}
 
 	_, err = storageInstance.UpgradeSignals(endSlot)

@@ -92,7 +92,7 @@ func Test_TransitionAccount(t *testing.T) {
 	var slotIndexBlock1 iotago.SlotIndex = 1
 	activeNodes := []*mock.Node{node1}
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
-	genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
+	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 
 	block1 := ts.IssueBlockAtSlotWithOptions("block1", slotIndexBlock1, genesisCommitment, node1, tx1)
 

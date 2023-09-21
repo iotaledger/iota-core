@@ -30,7 +30,6 @@ func (t *TestSuite) AssertAttestationsForSlot(slotIndex iotago.SlotIndex, blocks
 
 			storedAttestations := make([]iotago.BlockID, 0)
 			err = attestationTree.Stream(func(key iotago.AccountID, att *iotago.Attestation) error {
-				att.API = t.API
 				blockID, err := att.BlockID()
 				require.NoError(t.Testing, err)
 				storedAttestations = append(storedAttestations, blockID)

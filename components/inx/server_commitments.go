@@ -21,6 +21,7 @@ func inxCommitment(commitment *model.Commitment) *inx.Commitment {
 		},
 	}
 }
+
 func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (*inx.Commitment, error) {
 	commitmentIndex := iotago.SlotIndex(req.GetCommitmentIndex())
 
