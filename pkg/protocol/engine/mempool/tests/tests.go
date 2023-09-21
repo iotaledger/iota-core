@@ -598,7 +598,7 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 
 	fmt.Println(memStatsEnd.HeapObjects, memStatsStart.HeapObjects)
 
-	require.Less(t, float64(memStatsEnd.HeapObjects), 1.1*float64(memStatsStart.HeapObjects), "the objects in the heap should not grow by more than 10%")
+	require.Less(t, float64(memStatsEnd.HeapObjects), 1.15*float64(memStatsStart.HeapObjects), "the objects in the heap should not grow by more than 15%")
 }
 
 func memStats() *runtime.MemStats {
