@@ -135,8 +135,8 @@ func (c *Chains) initMainChain() {
 }
 
 func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
-	c.requestCommitment(commitment.PrevID(), true, lo.Void(commitment.Parent.Set)).OnError(func(err error) {
-		c.protocol.LogDebug("failed to request previous commitment", "prevId", commitment.PrevID(), "error", err)
+	c.requestCommitment(commitment.PreviousCommitmentID(), true, lo.Void(commitment.Parent.Set)).OnError(func(err error) {
+		c.protocol.LogDebug("failed to request previous commitment", "prevId", commitment.PreviousCommitmentID(), "error", err)
 	})
 
 	slotEvictedEvent.OnTrigger(func() {
