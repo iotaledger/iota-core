@@ -36,6 +36,7 @@ type SyncManager struct {
 	latestFinalizedSlotLock syncutils.RWMutex
 
 	lastPrunedEpoch     iotago.EpochIndex
+	hasPruned           bool
 	lastPrunedEpochLock syncutils.RWMutex
 
 	isSynced     bool
@@ -88,7 +89,7 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 		}, asyncOpt)
 
 		e.Events.StoragePruned.Hook(func(index iotago.EpochIndex) {
-			if s.updatePrunedEpoch(index) {
+			if s.updatePrunedEpoch(index, true) {
 				s.triggerUpdate()
 			}
 		}, asyncOpt)
@@ -112,6 +113,8 @@ func New(e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iot
 
 		optsBootstrappedThreshold: 10 * time.Second,
 	}, opts, func(s *SyncManager) {
+		s.updatePrunedEpoch(s.engine.Storage.LastPrunedEpoch())
+
 		// set the default bootstrapped function
 		if s.optsIsBootstrappedFunc == nil {
 			s.optsIsBootstrappedFunc = func(e *engine.Engine) bool {
@@ -140,6 +143,7 @@ func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
 		LatestCommitment:       s.latestCommitment,
 		LatestFinalizedSlot:    s.latestFinalizedSlot,
 		LastPrunedEpoch:        s.lastPrunedEpoch,
+		HasPruned:              s.hasPruned,
 	}
 }
 
@@ -216,12 +220,14 @@ func (s *SyncManager) updateFinalizedSlot(index iotago.SlotIndex) (changed bool)
 	return false
 }
 
-func (s *SyncManager) updatePrunedEpoch(index iotago.EpochIndex) (changed bool) {
+func (s *SyncManager) updatePrunedEpoch(index iotago.EpochIndex, hasPruned bool) (changed bool) {
 	s.lastPrunedEpochLock.Lock()
 	defer s.lastPrunedEpochLock.Unlock()
 
 	if s.lastPrunedEpoch != index {
 		s.lastPrunedEpoch = index
+		s.hasPruned = hasPruned
+
 		return true
 	}
 
@@ -270,11 +276,11 @@ func (s *SyncManager) LatestFinalizedSlot() iotago.SlotIndex {
 	return s.latestFinalizedSlot
 }
 
-func (s *SyncManager) LastPrunedEpoch() iotago.EpochIndex {
+func (s *SyncManager) LastPrunedEpoch() (iotago.EpochIndex, bool) {
 	s.lastPrunedEpochLock.RLock()
 	defer s.lastPrunedEpochLock.RUnlock()
 
-	return s.lastPrunedEpoch
+	return s.lastPrunedEpoch, s.hasPruned
 }
 
 func (s *SyncManager) triggerUpdate() {
