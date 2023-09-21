@@ -13,15 +13,13 @@ import (
 )
 
 type Protocol struct {
-	Events *Events
-
+	Events  *Events
 	Workers *workerpool.Group
 	error   *event.Event1[error]
 	options *Options
 
 	*Network
 	*Chains
-	*Gossip
 	log.Logger
 	module.Module
 }
@@ -34,9 +32,8 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 		error:   event.New1[error](),
 		options: newOptions(),
 	}, opts, func(p *Protocol) {
-		p.Network = newNetwork(p, dispatcher)
 		p.Chains = newChains(p)
-		p.Gossip = NewGossip(p)
+		p.Network = newNetwork(p, dispatcher)
 	}, (*Protocol).TriggerConstructed)
 }
 
