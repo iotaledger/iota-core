@@ -292,7 +292,7 @@ func NewSlotDetails(commitment *model.Commitment, diffs *utxoledger.SlotDiff) *S
 
 	return &SlotDetailsResponse{
 		Index:            uint64(commitment.Index()),
-		PrevID:           commitment.PrevID().ToHex(),
+		PrevID:           commitment.PreviousCommitmentID().ToHex(),
 		RootsID:          commitment.RootsID().ToHex(),
 		CumulativeWeight: commitment.CumulativeWeight(),
 		CreatedOutputs:   createdOutputs,

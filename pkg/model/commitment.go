@@ -22,7 +22,7 @@ type Commitment struct {
 
 func NewEmptyCommitment(api iotago.API) *Commitment {
 	emptyCommitment := iotago.NewEmptyCommitment(api.ProtocolParameters().Version())
-	emptyCommitment.RMC = api.ProtocolParameters().CongestionControlParameters().RMCMin
+	emptyCommitment.ReferenceManaCost = api.ProtocolParameters().CongestionControlParameters().RMCMin
 
 	return lo.PanicOnErr(CommitmentFromCommitment(emptyCommitment, api))
 }
@@ -82,8 +82,8 @@ func (c *Commitment) Index() iotago.SlotIndex {
 	return c.Commitment().Index
 }
 
-func (c *Commitment) PrevID() iotago.CommitmentID {
-	return c.Commitment().PrevID
+func (c *Commitment) PreviousCommitmentID() iotago.CommitmentID {
+	return c.Commitment().PreviousCommitmentID
 }
 
 func (c *Commitment) RootsID() iotago.Identifier {
