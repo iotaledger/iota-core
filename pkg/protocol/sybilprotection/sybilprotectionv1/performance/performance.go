@@ -184,7 +184,6 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			committee.TotalStake(),
 			pool.PoolStake,
 			pool.ValidatorStake,
-			pool.FixedCost,
 			pf,
 		)
 		if err != nil {
