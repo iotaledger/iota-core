@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/hive.go/stringify"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Commitment struct {
@@ -23,7 +22,7 @@ type Commitment struct {
 
 func NewEmptyCommitment(api iotago.API) *Commitment {
 	emptyCommitment := iotago.NewEmptyCommitment(api.ProtocolParameters().Version())
-	emptyCommitment.ReferenceManaCost = api.ProtocolParameters().CongestionControlParameters().RMCMin
+	emptyCommitment.ReferenceManaCost = api.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 
 	return lo.PanicOnErr(CommitmentFromCommitment(emptyCommitment, api))
 }
@@ -51,7 +50,7 @@ func CommitmentFromCommitment(iotaCommitment *iotago.Commitment, api iotago.API,
 	return newCommitment(commitmentID, iotaCommitment, data, api)
 }
 
-func CommitmentFromBytes(data []byte, apiProvider api.Provider, opts ...serix.Option) (*Commitment, error) {
+func CommitmentFromBytes(data []byte, apiProvider iotago.APIProvider, opts ...serix.Option) (*Commitment, error) {
 	version, _, err := iotago.VersionFromBytes(data)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to determine version")

@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Tracker struct {
@@ -26,7 +25,7 @@ type Tracker struct {
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
 	latestAppliedEpoch        iotago.EpochIndex
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	errHandler func(error)
 
@@ -40,7 +39,7 @@ func NewTracker(
 	committeeStore *epochstore.Store[*account.Accounts],
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
 	latestAppliedEpoch iotago.EpochIndex,
-	apiProvider api.Provider,
+	apiProvider iotago.APIProvider,
 	errHandler func(error),
 ) *Tracker {
 	return &Tracker{

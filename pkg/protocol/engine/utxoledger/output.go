@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // LexicalOrderedOutputs are outputs ordered in lexical order by their outputID.
@@ -29,7 +28,7 @@ func (l LexicalOrderedOutputs) Swap(i, j int) {
 }
 
 type Output struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	outputID    iotago.OutputID
 	blockID     iotago.BlockID
@@ -114,7 +113,7 @@ func (o Outputs) ToOutputSet() iotago.OutputSet {
 	return outputSet
 }
 
-func CreateOutput(apiProvider api.Provider, outputID iotago.OutputID, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, output iotago.Output, outputBytes ...[]byte) *Output {
+func CreateOutput(apiProvider iotago.APIProvider, outputID iotago.OutputID, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, output iotago.Output, outputBytes ...[]byte) *Output {
 	var encodedOutput []byte
 	if len(outputBytes) == 0 {
 		var err error
@@ -142,7 +141,7 @@ func CreateOutput(apiProvider api.Provider, outputID iotago.OutputID, blockID io
 	return o
 }
 
-func NewOutput(apiProvider api.Provider, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
+func NewOutput(apiProvider iotago.APIProvider, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
 	txID, err := transaction.ID(apiProvider.APIForSlot(blockID.Index()))
 	if err != nil {
 		return nil, err

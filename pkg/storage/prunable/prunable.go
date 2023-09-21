@@ -15,11 +15,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Prunable struct {
-	apiProvider       api.Provider
+	apiProvider       iotago.APIProvider
 	prunableSlotStore *BucketManager
 	errorHandler      func(error)
 
@@ -32,7 +31,7 @@ type Prunable struct {
 	committee             *epochstore.Store[*account.Accounts]
 }
 
-func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[BucketManager]) *Prunable {
+func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[BucketManager]) *Prunable {
 	dir := utils.NewDirectory(dbConfig.Directory, true)
 	semiPermanentDBConfig := dbConfig.WithDirectory(dir.PathWithCreate("semipermanent"))
 	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig)
@@ -51,7 +50,7 @@ func New(dbConfig database.Config, apiProvider api.Provider, errorHandler func(e
 	}
 }
 
-func Clone(source *Prunable, dbConfig database.Config, apiProvider api.Provider, errorHandler func(error), opts ...options.Option[BucketManager]) (*Prunable, error) {
+func Clone(source *Prunable, dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[BucketManager]) (*Prunable, error) {
 	// Lock semi-permanent DB and prunable slot store so that nobody can try to use or open them while cloning.
 	source.semiPermanentDB.Lock()
 	defer source.semiPermanentDB.Unlock()

@@ -173,7 +173,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 
 	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
 		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
-			return lo.PanicOnErr(a.BlockID(lo.PanicOnErr(n.Protocol.APIForVersion(a.ProtocolVersion))))
+			return lo.PanicOnErr(a.BlockID())
 		}))
 	})
 
@@ -326,9 +326,8 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		attestationBlockIDs := make([]iotago.BlockID, 0)
 		tree, err := instance.Attestations.GetMap(details.Commitment.Index())
 		if err == nil {
-			a := instance.APIForSlot(details.Commitment.Index())
 			err = tree.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
-				attestationBlockIDs = append(attestationBlockIDs, lo.PanicOnErr(value.BlockID(a)))
+				attestationBlockIDs = append(attestationBlockIDs, lo.PanicOnErr(value.BlockID()))
 				return nil
 			})
 			require.NoError(n.Testing, err)

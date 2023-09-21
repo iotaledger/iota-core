@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // ErrOutputsSumNotEqualTotalSupply is returned if the sum of the output base token amounts is not equal the total supply of tokens.
@@ -22,10 +21,10 @@ type Manager struct {
 
 	stateTree ads.Map[iotago.OutputID, *stateTreeMetadata]
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 }
 
-func New(store kvstore.KVStore, apiProvider api.Provider) *Manager {
+func New(store kvstore.KVStore, apiProvider iotago.APIProvider) *Manager {
 	return &Manager{
 		store: store,
 		stateTree: ads.NewMap(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree})),
