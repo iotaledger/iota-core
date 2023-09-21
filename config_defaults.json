@@ -69,6 +69,8 @@
     "debugRequestLoggerEnabled": false,
     "allowIncompleteBlock": false,
     "maxPageSize": 100,
+    "requestsMemoryCacheGranularity": 10,
+    "maxRequestedSlotAge": 10,
     "jwtAuth": {
       "salt": "IOTA"
     },
