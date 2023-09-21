@@ -84,10 +84,10 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	// calculate the new RMC
 	var newRMC iotago.Mana
 	ccParameters := m.apiProvider.APIForSlot(index).ProtocolParameters().CongestionControlParameters()
-	if currentSlotWork < ccParameters.DecreaseThreshold && lastRMC > ccParameters.RMCMin {
+	if currentSlotWork < ccParameters.DecreaseThreshold && lastRMC > ccParameters.MinReferenceManaCost {
 		newRMC, err = safemath.SafeSub(lastRMC, ccParameters.Decrease)
 		if err == nil {
-			newRMC = lo.Max(newRMC, ccParameters.RMCMin)
+			newRMC = lo.Max(newRMC, ccParameters.MinReferenceManaCost)
 		}
 	} else if currentSlotWork > ccParameters.IncreaseThreshold {
 		newRMC, err = safemath.SafeAdd(lastRMC, ccParameters.Increase)
