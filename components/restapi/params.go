@@ -20,6 +20,10 @@ type ParametersRestAPI struct {
 	AllowIncompleteBlock bool `default:"false" usage:"whether the node allows to fill in incomplete block and issue it for user"`
 	// MaxPageSize defines the maximum number of results per page.
 	MaxPageSize uint32 `default:"100" usage:"the maximum number of results per page"`
+	// RequestsMemoryCacheGranularity defines per how many slots a cache is created for big API requests.
+	RequestsMemoryCacheGranularity uint32 `default:"10" usage:"defines per how many slots a cache is created for big API requests"`
+	// MaxRequestedSlotAge defines the maximum age of a request that will be processed.
+	MaxRequestedSlotAge uint32 `default:"10" usage:"the maximum age of a request that will be processed"`
 
 	JWTAuth struct {
 		// salt used inside the JWT tokens for the REST API. Change this to a different value to invalidate JWT tokens not matching this new value
