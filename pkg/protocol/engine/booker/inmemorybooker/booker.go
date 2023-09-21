@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
@@ -35,7 +34,7 @@ type Booker struct {
 	retainBlockFailure func(id iotago.BlockID, reason apimodels.BlockFailureReason)
 
 	errorHandler func(error)
-	apiProvider  api.Provider
+	apiProvider  iotago.APIProvider
 
 	module.Module
 }
@@ -72,7 +71,7 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, apiProvider api.Provider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:      booker.NewEvents(),
 		apiProvider: apiProvider,

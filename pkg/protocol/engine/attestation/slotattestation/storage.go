@@ -99,19 +99,10 @@ func (m *Manager) attestationsForSlot(index iotago.SlotIndex) (ads.Map[iotago.Ac
 		return nil, ierrors.Wrapf(err, "failed to get extended realm for attestations of slot %d", index)
 	}
 
-	api := m.apiProvider.APIForSlot(index)
-
 	return ads.NewMap(attestationsStorage,
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
-		func(v *iotago.Attestation) ([]byte, error) {
-			return api.Encode(v)
-		},
-		func(bytes []byte) (object *iotago.Attestation, consumed int, err error) {
-			attestation := new(iotago.Attestation)
-			consumed, err = api.Decode(bytes, attestation)
-
-			return attestation, consumed, err
-		},
+		(*iotago.Attestation).Bytes,
+		iotago.AttestationFromBytes(m.apiProvider),
 	), nil
 }

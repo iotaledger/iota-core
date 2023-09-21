@@ -21,14 +21,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	nwmodels "github.com/iotaledger/iota-core/pkg/network/protocols/core/models"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
 type Protocol struct {
 	Events *Events
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	network                   network.Endpoint
 	workerPool                *workerpool.WorkerPool
@@ -38,7 +37,7 @@ type Protocol struct {
 	requestedBlockHashesMutex syncutils.Mutex
 }
 
-func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, apiProvider api.Provider, opts ...options.Option[Protocol]) (protocol *Protocol) {
+func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, apiProvider iotago.APIProvider, opts ...options.Option[Protocol]) (protocol *Protocol) {
 	return options.Apply(&Protocol{
 		Events: NewEvents(),
 
@@ -212,16 +211,7 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 	readOffset := 4
 	attestations := make([]*iotago.Attestation, attestationCount)
 	for i := uint32(0); i < attestationCount; i++ {
-		version := iotago.Version(attestationsBytes[readOffset])
-		apiForVersion, err := p.apiProvider.APIForVersion(version)
-		if err != nil {
-			p.Events.Error.Trigger(ierrors.Wrapf(err, "failed to deserialize attestations for commitment %s", cm.ID()), id)
-
-			return
-		}
-
-		attestation := new(iotago.Attestation)
-		consumed, err := apiForVersion.Decode(attestationsBytes[readOffset:], attestation, serix.WithValidation())
+		attestation, consumed, err := iotago.AttestationFromBytes(p.apiProvider)(attestationsBytes[readOffset:])
 		if err != nil {
 			p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
 

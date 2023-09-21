@@ -142,7 +142,7 @@ func (t *TestFramework) SlotCommitmentRoot(alias string) iotago.Identifier {
 }
 
 func (t *TestFramework) PrevSlotCommitment(alias string) iotago.CommitmentID {
-	return t.commitment(alias).PrevID()
+	return t.commitment(alias).PreviousCommitmentID()
 }
 
 func (t *TestFramework) AssertChainIsAlias(chain *Chain, alias string) {

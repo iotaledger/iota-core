@@ -18,12 +18,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Manager is a Block Issuer Credits module responsible for tracking block issuance credit balances.
 type Manager struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 	// blockBurns keep tracks of the block issues up to the LatestCommittedSlot. They are used to deduct the burned
 	// amount from the account's credits upon slot commitment.
 	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.BlockID]]
@@ -51,7 +50,7 @@ type Manager struct {
 }
 
 func New(
-	apiProvider api.Provider,
+	apiProvider iotago.APIProvider,
 	blockFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) (*slotstore.AccountDiffs, error),
 	accountsStore kvstore.KVStore,

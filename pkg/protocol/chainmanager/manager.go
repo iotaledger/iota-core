@@ -200,7 +200,7 @@ func (m *Manager) Commitments(id iotago.CommitmentID, amount int) (commitments [
 
 		commitments[i] = currentCommitment
 
-		id = currentCommitment.Commitment().PrevID()
+		id = currentCommitment.Commitment().PreviousCommitmentID()
 	}
 
 	return
@@ -237,8 +237,8 @@ func (m *Manager) SwitchMainChain(head iotago.CommitmentID) error {
 func (m *Manager) processCommitment(commitment *model.Commitment) (wasForked bool, isSolid bool, chainCommitment *ChainCommitment) {
 	// Lock access to the parent commitment. We need to lock this first as we are trying to update children later within this function.
 	// Failure to do so, leads to a deadlock, where a child is locked and tries to lock its parent, which is locked by the parent which tries to lock the child.
-	m.commitmentEntityMutex.Lock(commitment.PrevID())
-	defer m.commitmentEntityMutex.Unlock(commitment.PrevID())
+	m.commitmentEntityMutex.Lock(commitment.PreviousCommitmentID())
+	defer m.commitmentEntityMutex.Unlock(commitment.PreviousCommitmentID())
 
 	// Lock access to the chainCommitment so no children are added while we are propagating solidity
 	m.commitmentEntityMutex.Lock(commitment.ID())
@@ -356,7 +356,7 @@ func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*Ch
 	for chain := commitment.Chain(); chain != m.rootCommitment.Chain(); chain = commitment.Chain() {
 		forkingCommitment = chain.ForkingPoint
 
-		if commitment, _ = m.Commitment(forkingCommitment.Commitment().PrevID()); commitment == nil {
+		if commitment, _ = m.Commitment(forkingCommitment.Commitment().PreviousCommitmentID()); commitment == nil {
 			return nil, ierrors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingCommitment.Commitment().ID())
 		}
 	}
@@ -365,7 +365,7 @@ func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*Ch
 }
 
 func (m *Manager) registerCommitment(commitment *model.Commitment) (isNew bool, isSolid bool, wasForked bool, chainCommitment *ChainCommitment) {
-	parentCommitment, commitmentCreated := m.getOrCreateCommitment(commitment.PrevID())
+	parentCommitment, commitmentCreated := m.getOrCreateCommitment(commitment.PreviousCommitmentID())
 	if commitmentCreated {
 		m.commitmentRequester.StartTicker(parentCommitment.ID())
 	}
@@ -398,7 +398,7 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 		return nil
 	}
 
-	parentCommitment, _ := m.Commitment(forkingPoint.Commitment().PrevID())
+	parentCommitment, _ := m.Commitment(forkingPoint.Commitment().PreviousCommitmentID())
 	if parentCommitment == nil {
 		return ierrors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingPoint.ID())
 	}
@@ -408,7 +408,7 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 
 	// For each forking point coming out of the main chain we need to reorg the children
 	for fp := commitment.Chain().ForkingPoint; ; {
-		fpParent, _ := m.Commitment(fp.Commitment().PrevID())
+		fpParent, _ := m.Commitment(fp.Commitment().PreviousCommitmentID())
 
 		mainChild := fpParent.mainChild()
 		newChildChain := NewChain(mainChild)

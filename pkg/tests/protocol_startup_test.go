@@ -66,7 +66,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	// Verify that nodes have the expected states.
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
-	genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
+	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),
 		testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),

@@ -12,7 +12,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 const (
@@ -61,7 +60,7 @@ type Manager struct {
 
 	commitmentMutex syncutils.RWMutex
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	module.Module
 }
@@ -85,7 +84,7 @@ func NewManager(
 	lastCumulativeWeight uint64,
 	bucketedStorage func(index iotago.SlotIndex) (kvstore.KVStore, error),
 	committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts,
-	apiProvider api.Provider,
+	apiProvider iotago.APIProvider,
 ) *Manager {
 	m := &Manager{
 		lastCommittedSlot:    lastCommittedSlot,

@@ -21,7 +21,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
-	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type issuer struct {
@@ -37,6 +36,8 @@ type TestFramework struct {
 
 	attestationsByAlias *shrinkingmap.ShrinkingMap[string, *iotago.Attestation]
 	issuerByAlias       *shrinkingmap.ShrinkingMap[string, *issuer]
+	testAPI             iotago.API
+	apiProvider         iotago.APIProvider
 
 	uniqueCounter atomic.Int64
 	mutex         syncutils.RWMutex
@@ -67,7 +68,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		return accounts.SelectCommittee(members...)
 	}
 
-	testAPI := iotago.V3API(
+	t.testAPI = iotago.V3API(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("TestJungle", "tgl"),
 			iotago.WithSupplyOptions(10000, 0, 0, 0, 0, 0, 0),
@@ -75,12 +76,14 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		),
 	)
 
+	t.apiProvider = api.SingleVersionProvider(t.testAPI)
+
 	t.Instance = slotattestation.NewManager(
 		0,
 		0,
 		bucketedStorage,
 		committeeFunc,
-		api.SingleVersionProvider(testAPI),
+		t.apiProvider,
 	)
 
 	return t
@@ -106,27 +109,27 @@ func (t *TestFramework) AddFutureAttestation(issuerAlias string, attestationAlia
 	defer t.mutex.Unlock()
 
 	issuer := t.issuer(issuerAlias)
-	issuingTime := tpkg.TestAPI.TimeProvider().SlotStartTime(blockSlot).Add(time.Duration(t.uniqueCounter.Add(1))).UTC()
+	issuingTime := t.testAPI.TimeProvider().SlotStartTime(blockSlot).Add(time.Duration(t.uniqueCounter.Add(1))).UTC()
 
-	block, err := builder.NewValidationBlockBuilder(tpkg.TestAPI).
+	block, err := builder.NewValidationBlockBuilder(t.testAPI).
 		IssuingTime(issuingTime).
-		SlotCommitmentID(iotago.NewCommitment(tpkg.TestAPI.Version(), attestedSlot, iotago.CommitmentID{}, iotago.Identifier{}, 0, 0).MustID()).
+		SlotCommitmentID(iotago.NewCommitment(t.testAPI.Version(), attestedSlot, iotago.CommitmentID{}, iotago.Identifier{}, 0, 0).MustID()).
 		Sign(issuer.accountID, issuer.priv).
 		Build()
 	require.NoError(t.test, err)
 
-	block.MustID(tpkg.TestAPI).RegisterAlias(attestationAlias)
-	att := iotago.NewAttestation(tpkg.TestAPI, block)
+	block.MustID(t.testAPI).RegisterAlias(attestationAlias)
+	att := iotago.NewAttestation(t.testAPI, block)
 	t.attestationsByAlias.Set(attestationAlias, att)
 
-	modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
+	modelBlock, err := model.BlockFromBlock(block, t.testAPI)
 	require.NoError(t.test, err)
 
 	t.Instance.AddAttestationFromValidationBlock(blocks.NewBlock(modelBlock))
 }
 
 func (t *TestFramework) blockIDFromAttestation(att *iotago.Attestation) iotago.BlockID {
-	return lo.PanicOnErr(att.BlockID(tpkg.TestAPI))
+	return lo.PanicOnErr(att.BlockID())
 }
 
 func (t *TestFramework) attestation(alias string) *iotago.Attestation {
@@ -148,15 +151,8 @@ func (t *TestFramework) AssertCommit(slot iotago.SlotIndex, expectedCW uint64, e
 	expectedTree := ads.NewMap(mapdb.NewMapDB(),
 		iotago.Identifier.Bytes,
 		iotago.IdentifierFromBytes,
-		func(attestation *iotago.Attestation) ([]byte, error) {
-			return tpkg.TestAPI.Encode(attestation)
-		},
-		func(bytes []byte) (*iotago.Attestation, int, error) {
-			att := new(iotago.Attestation)
-			n, err := tpkg.TestAPI.Decode(bytes, att)
-
-			return att, n, err
-		},
+		(*iotago.Attestation).Bytes,
+		iotago.AttestationFromBytes(t.apiProvider),
 	)
 	expectedAttestations := make([]*iotago.Attestation, 0)
 	for issuerAlias, attestationAlias := range expectedAttestationsAliases {

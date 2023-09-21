@@ -18,7 +18,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	"github.com/iotaledger/iota-core/pkg/votes"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Orchestrator is a component that is in charge of protocol upgrades by signaling the upgrade, gathering
@@ -65,7 +64,7 @@ type Orchestrator struct {
 	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error)
 	epochForVersionFunc                   func(iotago.Version) (iotago.EpochIndex, bool)
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 	seatManager seatmanager.SeatManager
 
 	optsProtocolParameters []iotago.ProtocolParameters
@@ -113,7 +112,7 @@ func NewProvider(opts ...options.Option[Orchestrator]) module.Provider[*engine.E
 func NewOrchestrator(errorHandler func(error),
 	decidedUpgradeSignals *epochstore.Store[model.VersionAndHash],
 	upgradeSignalsFunc func(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error),
-	apiProvider api.Provider,
+	apiProvider iotago.APIProvider,
 	setProtocolParametersEpochMappingFunc func(iotago.Version, iotago.Identifier, iotago.EpochIndex) error,
 	protocolParametersAndVersionsHashFunc func() (iotago.Identifier, error),
 	epochForVersionFunc func(iotago.Version) (iotago.EpochIndex, bool),

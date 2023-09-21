@@ -9,11 +9,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Manager struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	// accumulated work from accepted blocks per slot
 	slotWork *shrinkingmap.ShrinkingMap[iotago.SlotIndex, iotago.WorkScore]
@@ -30,7 +29,7 @@ type Manager struct {
 	mutex syncutils.RWMutex
 }
 
-func NewManager(apiProvider api.Provider, commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)) *Manager {
+func NewManager(apiProvider iotago.APIProvider, commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)) *Manager {
 	return &Manager{
 		apiProvider:      apiProvider,
 		slotWork:         shrinkingmap.New[iotago.SlotIndex, iotago.WorkScore](),
@@ -76,7 +75,7 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to load commitment for slot %d", index-1)
 	}
-	lastRMC := latestCommitment.Commitment().RMC
+	lastRMC := latestCommitment.Commitment().ReferenceManaCost
 	// load the slotWork for the current slot
 	currentSlotWork, exists := m.slotWork.Get(index)
 	if !exists {
@@ -85,10 +84,10 @@ func (m *Manager) CommitSlot(index iotago.SlotIndex) (iotago.Mana, error) {
 	// calculate the new RMC
 	var newRMC iotago.Mana
 	ccParameters := m.apiProvider.APIForSlot(index).ProtocolParameters().CongestionControlParameters()
-	if currentSlotWork < ccParameters.DecreaseThreshold && lastRMC > ccParameters.RMCMin {
+	if currentSlotWork < ccParameters.DecreaseThreshold && lastRMC > ccParameters.MinReferenceManaCost {
 		newRMC, err = safemath.SafeSub(lastRMC, ccParameters.Decrease)
 		if err == nil {
-			newRMC = lo.Max(newRMC, ccParameters.RMCMin)
+			newRMC = lo.Max(newRMC, ccParameters.MinReferenceManaCost)
 		}
 	} else if currentSlotWork > ccParameters.IncreaseThreshold {
 		newRMC, err = safemath.SafeAdd(lastRMC, ccParameters.Increase)
@@ -139,7 +138,7 @@ func (m *Manager) RMC(slot iotago.SlotIndex) (iotago.Mana, error) {
 		if err != nil {
 			return 0, ierrors.Wrapf(err, "failed to get RMC for slot %d", slot)
 		}
-		rmc = latestCommitment.Commitment().RMC
+		rmc = latestCommitment.Commitment().ReferenceManaCost
 	}
 
 	return rmc, nil

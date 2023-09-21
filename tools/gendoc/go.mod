@@ -72,7 +72,7 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230912172434-dc477e1f5140 // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230919065227-618931c246c5 // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230918132810-48814818bff9 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230913143616-917572c7752d // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230921110244-f4f25eb27e05 // indirect
 	github.com/ipfs/boxo v0.10.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
@@ -128,6 +128,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.12.0 // indirect
 	github.com/opencontainers/runtime-spec v1.1.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
+	github.com/otiai10/copy v1.12.0 // indirect
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect

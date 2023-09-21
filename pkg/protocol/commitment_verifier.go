@@ -134,13 +134,8 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 			return nil, 0, ierrors.Errorf("only ed25519 signatures supported, got %s", att.Signature.Type())
 		}
 
-		api, err := c.engine.APIForVersion(att.ProtocolVersion)
-		if err != nil {
-			return nil, 0, ierrors.Wrap(err, "error determining API for attestation")
-		}
-
 		// 2. Verify the signature of the attestation.
-		if valid, err := att.VerifySignature(api); !valid {
+		if valid, err := att.VerifySignature(); !valid {
 			if err != nil {
 				return nil, 0, ierrors.Wrap(err, "error validating attestation signature")
 			}
@@ -154,7 +149,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		}
 
 		// TODO: this might differ if we have a Accounts with changing weights depending on the SlotIndex/epoch
-		attestationBlockID, err := att.BlockID(api)
+		attestationBlockID, err := att.BlockID()
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")
 		}
@@ -164,7 +159,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 
 		visitedIdentities.Add(att.IssuerID)
 
-		blockID, err := att.BlockID(api)
+		blockID, err := att.BlockID()
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")
 		}

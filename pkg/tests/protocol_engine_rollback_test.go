@@ -109,7 +109,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 
 	{
 		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
-		genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
+		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -293,7 +293,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 
 	{
 		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
-		genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
+		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -484,7 +484,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 
 	{
 		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
-		genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
+		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -675,7 +675,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 
 	{
 		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
-		genesisCommitment.RMC = ts.API.ProtocolParameters().CongestionControlParameters().RMCMin
+		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
