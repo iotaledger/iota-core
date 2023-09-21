@@ -52,7 +52,6 @@ import (
 	retainer1 "github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Protocol struct {
@@ -311,4 +310,4 @@ func (p *Protocol) HandleError(err error) {
 	}
 }
 
-var _ api.Provider = &Protocol{}
+var _ iotago.APIProvider = &Protocol{}

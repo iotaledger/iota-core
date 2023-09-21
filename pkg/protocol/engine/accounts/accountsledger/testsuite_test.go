@@ -26,7 +26,7 @@ import (
 type TestSuite struct {
 	T *testing.T
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	accounts        map[string]iotago.AccountID
 	blockIssuerKeys map[string]iotago.BlockIssuerKey

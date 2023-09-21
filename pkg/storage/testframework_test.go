@@ -20,7 +20,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -34,7 +33,7 @@ const (
 type TestFramework struct {
 	t               *testing.T
 	Instance        *storage.Storage
-	apiProvider     api.Provider
+	apiProvider     iotago.APIProvider
 	baseDir         string
 	baseDirPrunable string
 

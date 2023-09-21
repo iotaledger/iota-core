@@ -17,7 +17,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Deficit int64
@@ -31,7 +30,7 @@ type Scheduler struct {
 
 	latestCommittedSlot func() iotago.SlotIndex
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	seatManager seatmanager.SeatManager
 
@@ -123,7 +122,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 	})
 }
 
-func New(apiProvider api.Provider, opts ...options.Option[Scheduler]) *Scheduler {
+func New(apiProvider iotago.APIProvider, opts ...options.Option[Scheduler]) *Scheduler {
 	return options.Apply(
 		&Scheduler{
 			events:          scheduler.NewEvents(),

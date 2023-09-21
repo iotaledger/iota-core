@@ -28,13 +28,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Ledger struct {
 	events *ledger.Events
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	utxoLedger               *utxoledger.Manager
 	accountsLedger           *accountsledger.Manager
@@ -98,7 +97,7 @@ func New(
 	commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error),
 	blocksFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) (*slotstore.AccountDiffs, error),
-	apiProvider api.Provider,
+	apiProvider iotago.APIProvider,
 	sybilProtection sybilprotection.SybilProtection,
 	errorHandler func(error),
 ) *Ledger {

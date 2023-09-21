@@ -9,11 +9,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Manager struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	// accumulated work from accepted blocks per slot
 	slotWork *shrinkingmap.ShrinkingMap[iotago.SlotIndex, iotago.WorkScore]
@@ -30,7 +29,7 @@ type Manager struct {
 	mutex syncutils.RWMutex
 }
 
-func NewManager(apiProvider api.Provider, commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)) *Manager {
+func NewManager(apiProvider iotago.APIProvider, commitmentLoader func(iotago.SlotIndex) (*model.Commitment, error)) *Manager {
 	return &Manager{
 		apiProvider:      apiProvider,
 		slotWork:         shrinkingmap.New[iotago.SlotIndex, iotago.WorkScore](),
