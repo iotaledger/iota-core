@@ -342,7 +342,7 @@ func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitOutput *Output, sp
 
 	balances := SplitBalanceEqually(splitNumber, input.Balance)
 	for _, bal := range balances {
-		outputs = append(outputs, &OutputOption{amount: bal, address: receiveWallet.Address()})
+		outputs = append(outputs, &OutputOption{amount: bal, address: receiveWallet.Address(), outputType: iotago.OutputBasic})
 	}
 
 	return
@@ -728,7 +728,7 @@ func (e *EvilWallet) prepareConflictSliceForScenario(scenario *EvilScenario) (co
 	genOutputOptions := func(aliases []string) []*OutputOption {
 		outputOptions := make([]*OutputOption, 0)
 		for _, o := range aliases {
-			outputOptions = append(outputOptions, &OutputOption{aliasName: o})
+			outputOptions = append(outputOptions, &OutputOption{aliasName: o, outputType: iotago.OutputBasic})
 		}
 
 		return outputOptions
