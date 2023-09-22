@@ -52,14 +52,13 @@ import (
 	retainer1 "github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Protocol struct {
 	context         context.Context
 	Events          *Events
 	BlockDispatcher *BlockDispatcher
-	engineManager   *enginemanager.EngineManager
+	EngineManager   *enginemanager.EngineManager
 	ChainManager    *chainmanager.Manager
 
 	Workers           *workerpool.Group
@@ -196,7 +195,7 @@ func (p *Protocol) shutdown() {
 }
 
 func (p *Protocol) initEngineManager() {
-	p.engineManager = enginemanager.New(
+	p.EngineManager = enginemanager.New(
 		p.Workers.CreateGroup("EngineManager"),
 		p.HandleError,
 		p.optsBaseDirectory,
@@ -222,7 +221,7 @@ func (p *Protocol) initEngineManager() {
 		p.optsSyncManagerProvider,
 	)
 
-	mainEngine, err := p.engineManager.LoadActiveEngine(p.optsSnapshotPath)
+	mainEngine, err := p.EngineManager.LoadActiveEngine(p.optsSnapshotPath)
 	if err != nil {
 		panic(fmt.Sprintf("could not load active engine: %s", err))
 	}
@@ -311,4 +310,4 @@ func (p *Protocol) HandleError(err error) {
 	}
 }
 
-var _ api.Provider = &Protocol{}
+var _ iotago.APIProvider = &Protocol{}

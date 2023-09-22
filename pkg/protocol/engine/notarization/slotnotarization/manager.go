@@ -18,7 +18,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Manager is the component that manages the slot commitments.
@@ -38,7 +37,7 @@ type Manager struct {
 
 	acceptedTimeFunc  func() time.Time
 	minCommittableAge iotago.SlotIndex
-	apiProvider       api.Provider
+	apiProvider       iotago.APIProvider
 
 	module.Module
 }
@@ -164,7 +163,11 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	committeeRoot, rewardsRoot := m.sybilProtection.CommitSlot(index)
+	committeeRoot, rewardsRoot, err := m.sybilProtection.CommitSlot(index)
+	if err != nil {
+		m.errorHandler(ierrors.Wrap(err, "failed to commit sybil protection"))
+		return false
+	}
 	apiForSlot := m.apiProvider.APIForSlot(index)
 
 	protocolParametersAndVersionsHash, err := m.upgradeOrchestrator.Commit(index)

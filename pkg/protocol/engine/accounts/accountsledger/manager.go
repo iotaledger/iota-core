@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -17,12 +18,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Manager is a Block Issuer Credits module responsible for tracking block issuance credit balances.
 type Manager struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 	// blockBurns keep tracks of the block issues up to the LatestCommittedSlot. They are used to deduct the burned
 	// amount from the account's credits upon slot commitment.
 	blockBurns *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.BlockID]]
@@ -50,7 +50,7 @@ type Manager struct {
 }
 
 func New(
-	apiProvider api.Provider,
+	apiProvider iotago.APIProvider,
 	blockFunc func(id iotago.BlockID) (*blocks.Block, bool),
 	slotDiffFunc func(iotago.SlotIndex) (*slotstore.AccountDiffs, error),
 	accountsStore kvstore.KVStore,
@@ -269,6 +269,48 @@ func (m *Manager) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.
 	}
 
 	return result, nil
+}
+
+func (m *Manager) Rollback(targetIndex iotago.SlotIndex) error {
+	for index := m.latestCommittedSlot; index > targetIndex; index-- {
+		slotDiff := lo.PanicOnErr(m.slotDiff(index))
+		var internalErr error
+
+		if err := slotDiff.Stream(func(accountID iotago.AccountID, accountDiff *model.AccountDiff, destroyed bool) bool {
+			accountData, exists, err := m.accountsTree.Get(accountID)
+			if err != nil {
+				internalErr = ierrors.Wrapf(err, "unable to retrieve account %s to rollback in slot %d", accountID, index)
+
+				return false
+			}
+
+			if !exists {
+				accountData = accounts.NewAccountData(accountID)
+			}
+
+			if _, err := m.rollbackAccountTo(accountData, targetIndex); err != nil {
+				internalErr = ierrors.Wrapf(err, "unable to rollback account %s to target slot index %d", accountID, targetIndex)
+
+				return false
+			}
+
+			if err := m.accountsTree.Set(accountID, accountData); err != nil {
+				internalErr = ierrors.Wrapf(err, "failed to save rolled back account %s to target slot index %d", accountID, targetIndex)
+
+				return false
+			}
+
+			return true
+		}); err != nil {
+			return ierrors.Wrapf(err, "error in streaming account diffs for slot %s", index)
+		}
+
+		if internalErr != nil {
+			return ierrors.Wrapf(internalErr, "error in rolling back account for slot %s", index)
+		}
+	}
+
+	return nil
 }
 
 // AddAccount adds a new account to the Account tree, allotting to it the balance on the given output.

@@ -304,7 +304,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 	var err error
 	if targetCommitment != nil {
 		// We always know the version of the target commitment, so there can be no error.
-		commitmentBytes, err = lo.PanicOnErr(s.apiProvider.APIForVersion(targetCommitment.Version)).Encode(targetCommitment)
+		commitmentBytes, err = lo.PanicOnErr(s.apiProvider.APIForVersion(targetCommitment.ProtocolVersion)).Encode(targetCommitment)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to encode target commitment")
 		}
@@ -355,6 +355,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		return ierrors.Wrap(err, "failed to stream write protocol version epoch mapping")
 	}
 
+	// TODO: rollback future protocol parameters if it was added after targetCommitment.Index()
 	// Export future protocol parameters
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
 		var count uint64
@@ -521,6 +522,16 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 	}
 
 	if err := s.SetLatestCommitment(commitment); err != nil {
+		return ierrors.Wrap(err, "failed to set latest commitment")
+	}
+
+	return nil
+}
+
+func (s *Settings) Rollback(targetCommitment *model.Commitment) error {
+	// TODO: rollback future protocol parameters if it was added after targetCommitment.Index()
+
+	if err := s.SetLatestCommitment(targetCommitment); err != nil {
 		return ierrors.Wrap(err, "failed to set latest commitment")
 	}
 

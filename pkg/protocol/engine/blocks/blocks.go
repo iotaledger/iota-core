@@ -7,18 +7,17 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Blocks struct {
 	Evict         *event.Event1[iotago.SlotIndex]
 	blocks        *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *Block]
 	evictionState *eviction.State
-	apiProvider   api.Provider
+	apiProvider   iotago.APIProvider
 	evictionMutex syncutils.RWMutex
 }
 
-func New(evictionState *eviction.State, apiProvider api.Provider) *Blocks {
+func New(evictionState *eviction.State, apiProvider iotago.APIProvider) *Blocks {
 	return &Blocks{
 		Evict:         event.New1[iotago.SlotIndex](),
 		blocks:        memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *Block](),

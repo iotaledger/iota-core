@@ -9,15 +9,14 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Commitments struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 	store       *kvstore.TypedStore[iotago.SlotIndex, *model.Commitment]
 }
 
-func NewCommitments(store kvstore.KVStore, apiProvider api.Provider) *Commitments {
+func NewCommitments(store kvstore.KVStore, apiProvider iotago.APIProvider) *Commitments {
 	return &Commitments{
 		apiProvider: apiProvider,
 		store: kvstore.NewTypedStore(store,
@@ -84,6 +83,16 @@ func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
 		return nil
 	}); err != nil {
 		return ierrors.Wrap(err, "failed to read commitments")
+	}
+
+	return nil
+}
+
+func (c *Commitments) Rollback(targetIndex iotago.SlotIndex, lastCommittedIndex iotago.SlotIndex) error {
+	for slotIndex := targetIndex + 1; slotIndex <= lastCommittedIndex; slotIndex++ {
+		if err := c.store.KVStore().Delete(lo.PanicOnErr(slotIndex.Bytes())); err != nil {
+			return ierrors.Wrapf(err, "failed to remove forked commitment for slot %d", slotIndex)
+		}
 	}
 
 	return nil

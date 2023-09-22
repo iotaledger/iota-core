@@ -12,13 +12,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TransactionFramework struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	wallet       *mock.HDWallet
 	states       map[string]*utxoledger.Output

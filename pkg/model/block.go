@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Block struct {
@@ -53,7 +52,7 @@ func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, op
 	return newBlock(blockID, protocolBlock, data, api)
 }
 
-func BlockFromBytes(data []byte, apiProvider api.Provider, opts ...serix.Option) (*Block, error) {
+func BlockFromBytes(data []byte, apiProvider iotago.APIProvider, opts ...serix.Option) (*Block, error) {
 	version, _, err := iotago.VersionFromBytes(data)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to determine version")

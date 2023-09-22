@@ -12,7 +12,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 var (
@@ -25,7 +24,7 @@ type CommitmentFilter struct {
 	// Events contains the Events of the CommitmentFilter
 	events *commitmentfilter.Events
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
 	commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error)
@@ -59,7 +58,7 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 	})
 }
 
-func New(apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
+func New(apiProvider iotago.APIProvider, opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
 	return options.Apply(&CommitmentFilter{
 		apiProvider: apiProvider,
 		events:      commitmentfilter.NewEvents(),

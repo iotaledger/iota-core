@@ -17,7 +17,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // MemPool is a component that manages the state of transactions that are not yet included in the ledger state.
@@ -58,11 +57,11 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 
 	optForkAllTransactions bool
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 }
 
 // New is the constructor of the MemPool.
-func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider api.Provider, errorHandler func(error), opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
+func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
 	return options.Apply(&MemPool[VoteRank]{
 		transactionAttached:    event.New1[mempool.TransactionMetadata](),
 		executeStateTransition: vm,

@@ -22,10 +22,10 @@ type TestFramework struct {
 	Test   *testing.T
 	Filter *Filter
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 }
 
-func NewTestFramework(t *testing.T, apiProvider api.Provider, optsFilter ...options.Option[Filter]) *TestFramework {
+func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter ...options.Option[Filter]) *TestFramework {
 	tf := &TestFramework{
 		Test:        t,
 		apiProvider: apiProvider,

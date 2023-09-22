@@ -85,7 +85,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	//   2. The candidate engine never becomes synced or its chain is not heavier than the main chain -> discard it after a timeout.
 	//   3. The candidate engine is not creating the same commitments as the chain we decided to switch to -> discard it immediately.
 	snapshotTargetIndex := fork.ForkingPoint.Index() - 1
-	candidateEngineInstance, err := p.engineManager.ForkEngineAtSlot(snapshotTargetIndex)
+	candidateEngineInstance, err := p.EngineManager.ForkEngineAtSlot(snapshotTargetIndex)
 	if err != nil {
 		p.HandleError(ierrors.Wrap(err, "error creating new candidate engine"))
 		return
@@ -250,7 +250,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 
 		result, err := p.requestAttestation(ctx, fork.ForkedChain.Commitment(i).ID(), fork.Source, ch)
 		if err != nil {
-			return nil, false, true, ierrors.Wrapf(err, "failed to verify commitment %s", result.commitment.ID())
+			return nil, false, true, ierrors.Wrapf(err, "failed to verify commitment %s", fork.ForkedChain.Commitment(i).ID())
 		}
 
 		// Count how many consecutive slots are heavier/lighter than the main chain.
@@ -310,7 +310,7 @@ func (p *Protocol) switchEngines() {
 			return false
 		}
 
-		if err := p.engineManager.SetActiveInstance(candidateEngineInstance); err != nil {
+		if err := p.EngineManager.SetActiveInstance(candidateEngineInstance); err != nil {
 			p.HandleError(ierrors.Wrap(err, "error switching engines"))
 
 			return false
@@ -330,8 +330,6 @@ func (p *Protocol) switchEngines() {
 
 	if success {
 		p.Events.MainEngineSwitched.Trigger(p.MainEngineInstance())
-
-		// TODO: copy over old slots from the old engine to the new one
 
 		// Cleanup filesystem
 		if err := oldEngine.RemoveFromFilesystem(); err != nil {

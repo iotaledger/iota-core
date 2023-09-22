@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Helpers to serialize/deserialize into/from snapshots
@@ -26,7 +25,7 @@ func (o *Output) SnapshotBytes() []byte {
 	return m.Bytes()
 }
 
-func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider) (*Output, error) {
+func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider) (*Output, error) {
 	outputID := iotago.OutputID{}
 	if _, err := io.ReadFull(reader, outputID[:]); err != nil {
 		return nil, ierrors.Errorf("unable to read LS output ID: %w", err)
@@ -74,7 +73,7 @@ func (s *Spent) SnapshotBytes() []byte {
 	return m.Bytes()
 }
 
-func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider, indexSpent iotago.SlotIndex) (*Spent, error) {
+func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider, indexSpent iotago.SlotIndex) (*Spent, error) {
 	output, err := OutputFromSnapshotReader(reader, apiProvider)
 	if err != nil {
 		return nil, err
@@ -93,7 +92,7 @@ func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider, ind
 	return NewSpent(output, transactionIDSpent, indexSpent), nil
 }
 
-func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider api.Provider) (*SlotDiff, error) {
+func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider) (*SlotDiff, error) {
 	slotDiff := &SlotDiff{}
 
 	var diffIndex uint64
@@ -255,13 +254,13 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	// Get all UTXOs and sort them by outputID
 	outputIDs, err := m.UnspentOutputsIDs(ReadLockLedger(false))
 	if err != nil {
-		return err
+		return ierrors.Wrap(err, "error while retrieving unspent outputIDs")
 	}
 
 	for _, outputID := range outputIDs.RemoveDupsAndSort() {
 		output, err := m.ReadOutputByOutputIDWithoutLocking(outputID)
 		if err != nil {
-			return err
+			return ierrors.Wrapf(err, "error while retrieving output %s", outputID)
 		}
 
 		if err := utils.WriteBytesFunc(writer, output.SnapshotBytes(), &relativeCountersPosition); err != nil {
@@ -274,12 +273,12 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	for diffIndex := ledgerIndex; diffIndex > targetIndex; diffIndex-- {
 		slotDiff, err := m.SlotDiffWithoutLocking(diffIndex)
 		if err != nil {
-			return err
+			return ierrors.Wrapf(err, "error while retrieving slot diffs for slot %s", diffIndex)
 		}
 
 		written, err := WriteSlotDiffToSnapshotWriter(writer, slotDiff)
 		if err != nil {
-			return err
+			return ierrors.Wrapf(err, "error while writing slot diffs for slot %s", diffIndex)
 		}
 
 		relativeCountersPosition += written
@@ -308,6 +307,34 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	// seek back to the last write position
 	if _, err := writer.Seek(relativeCountersPosition-countersSize, io.SeekCurrent); err != nil {
 		return ierrors.Errorf("unable to seek to LS last written position: %w", err)
+	}
+
+	return nil
+}
+
+// Rollback rolls back ledger state to the given target slot.
+func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
+	m.WriteLockLedger()
+	defer m.WriteUnlockLedger()
+
+	ledgerIndex, err := m.ReadLedgerIndexWithoutLocking()
+	if err != nil {
+		return err
+	}
+
+	for diffIndex := ledgerIndex; diffIndex > targetSlot; diffIndex-- {
+		slotDiff, err := m.SlotDiffWithoutLocking(diffIndex)
+		if err != nil {
+			return err
+		}
+
+		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
+			return err
+		}
+	}
+
+	if err := m.stateTree.Commit(); err != nil {
+		return ierrors.Wrap(err, "unable to commit state tree")
 	}
 
 	return nil

@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 var ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
@@ -23,7 +22,7 @@ var ErrValidatorNotInCommittee = ierrors.New("validation block issuer is not in 
 type Filter struct {
 	events *filter.Events
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	optsMaxAllowedWallClockDrift time.Duration
 
@@ -52,7 +51,7 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 var _ filter.Filter = new(Filter)
 
 // New creates a new Filter.
-func New(apiProvider api.Provider, opts ...options.Option[Filter]) *Filter {
+func New(apiProvider iotago.APIProvider, opts ...options.Option[Filter]) *Filter {
 	return options.Apply(&Filter{
 		events:      filter.NewEvents(),
 		apiProvider: apiProvider,

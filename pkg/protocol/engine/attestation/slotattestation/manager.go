@@ -12,7 +12,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 const (
@@ -61,7 +60,7 @@ type Manager struct {
 
 	commitmentMutex syncutils.RWMutex
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	module.Module
 }
@@ -85,7 +84,7 @@ func NewManager(
 	lastCumulativeWeight uint64,
 	bucketedStorage func(index iotago.SlotIndex) (kvstore.KVStore, error),
 	committeeFunc func(index iotago.SlotIndex) *account.SeatedAccounts,
-	apiProvider api.Provider,
+	apiProvider iotago.APIProvider,
 ) *Manager {
 	m := &Manager{
 		lastCommittedSlot:    lastCommittedSlot,
@@ -273,6 +272,40 @@ func (m *Manager) Commit(index iotago.SlotIndex) (newCW uint64, attestationsRoot
 	m.lastCommittedSlot = index
 
 	return m.lastCumulativeWeight, iotago.Identifier(tree.Root()), nil
+}
+
+// Rollback rolls back the component state as if the last committed slot was targetSlot.
+// It populates pendingAttestation store with previously committed attestations in order to create correct commitment in the future.
+// As it modifies in-memory storage, it should only be called on the target engine as calling it on a temporary component will have no effect.
+func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
+	m.commitmentMutex.RLock()
+	defer m.commitmentMutex.RUnlock()
+
+	if targetSlot > m.lastCommittedSlot {
+		return ierrors.Errorf("slot %d is newer than last committed slot %d", targetSlot, m.lastCommittedSlot)
+	}
+	attestationSlotIndex, isValid := m.computeAttestationCommitmentOffset(targetSlot)
+	if !isValid {
+		return nil
+	}
+
+	// We only need to export the committed attestations at targetSlot as these contain all the attestations for the
+	// slots of targetSlot - attestationCommitmentOffset to targetSlot. This is sufficient to reconstruct the pending attestations
+	// for targetSlot+1.
+	attestationsStorage, err := m.attestationsForSlot(targetSlot)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get attestations of slot %d", targetSlot)
+	}
+
+	if err = attestationsStorage.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
+		m.applyToPendingAttestations(value, attestationSlotIndex)
+
+		return nil
+	}); err != nil {
+		return ierrors.Wrapf(err, "failed to stream attestations of slot %d", targetSlot)
+	}
+
+	return nil
 }
 
 func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cutoffIndex iotago.SlotIndex, isValid bool) {
