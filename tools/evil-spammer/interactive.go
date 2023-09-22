@@ -36,6 +36,7 @@ const (
 	SpammerTypeDs          = "ds"
 	SpammerTypeCustom      = "custom"
 	SpammerTypeCommitments = "commitments"
+	SpammerTypeAccounts    = "accounts"
 )
 
 var (

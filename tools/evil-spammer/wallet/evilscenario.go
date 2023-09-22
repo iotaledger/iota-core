@@ -8,6 +8,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ds/types"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // The custom conflict in spammer can be provided like this:
@@ -41,6 +42,8 @@ type EvilScenario struct {
 	ConflictBatch EvilBatch
 	// determines whether outputs of the batch  should be reused during the spam to create deep UTXO tree structure.
 	Reuse bool
+	// specifies the output type of the spam, if not provided, defaults to BasicOutput
+	OutputType iotago.OutputType
 	// if provided, the outputs from the spam will be saved into this wallet, accepted types of wallet: Reuse, RestrictedReuse.
 	// if type == Reuse, then wallet is available for reuse spamming scenarios that did not provide RestrictedWallet.
 	OutputWallet *Wallet
@@ -56,6 +59,7 @@ func NewEvilScenario(options ...ScenarioOption) *EvilScenario {
 	scenario := &EvilScenario{
 		ConflictBatch:  SingleTransactionBatch(),
 		Reuse:          false,
+		OutputType:     iotago.OutputBasic,
 		OutputWallet:   NewWallet(),
 		BatchesCreated: atomic.NewUint64(0),
 	}

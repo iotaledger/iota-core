@@ -35,6 +35,7 @@ func CustomSpam(params *CustomSpamParams) {
 	w := wallet.NewEvilWallet(wallet.WithClients(params.ClientURLs...), wallet.WithFaucetOutputID(outputID))
 	wg := sync.WaitGroup{}
 
+	// funds are requested fro all spam types except SpammerTypeBlock
 	fundsNeeded := false
 	for _, st := range params.SpamTypes {
 		if st != SpammerTypeBlock {
@@ -91,6 +92,17 @@ func CustomSpam(params *CustomSpamParams) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+			}()
+		case SpammerTypeAccounts:
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				s := SpamAccounts(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.EnableRateSetter)
+				if s == nil {
+					return
+				}
+				s.Spam()
 			}()
 
 		default:
@@ -206,6 +218,29 @@ func SpamBlocks(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration
 		spammer.WithRateSetter(enableRateSetter),
 		spammer.WithEvilWallet(w),
 		spammer.WithSpammingFunc(spammer.DataSpammingFunction),
+	}
+
+	return spammer.NewSpammer(options...)
+}
+
+func SpamAccounts(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, enableRateSetter bool) *spammer.Spammer {
+	if w.NumOfClient() < 1 {
+		printer.NotEnoughClientsWarning(1)
+	}
+	scenarioOptions := []wallet.ScenarioOption{
+		wallet.WithScenarioCustomConflicts(wallet.SingleTransactionBatch()),
+		wallet.WithCreateAccounts(),
+	}
+
+	scenarioAccount := wallet.NewEvilScenario(scenarioOptions...)
+
+	options := []spammer.Options{
+		spammer.WithSpamRate(rate, timeUnit),
+		spammer.WithSpamDuration(duration),
+		spammer.WithRateSetter(enableRateSetter),
+		spammer.WithEvilWallet(w),
+		spammer.WithSpammingFunc(spammer.AccountSpammingFunction),
+		spammer.WithEvilScenario(scenarioAccount),
 	}
 
 	return spammer.NewSpammer(options...)

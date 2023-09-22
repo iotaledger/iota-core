@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 // region Options ///////////////////////////////////////////////////////////////////////////
@@ -22,21 +23,25 @@ type Options struct {
 	outputBatchAliases map[string]types.Empty
 	reuse              bool
 	issuingTime        time.Time
+	// maps input alias to desired output type, used to create account output types
+	specialOutputTypes map[string]iotago.OutputType
 }
 
 type OutputOption struct {
-	aliasName string
-	amount    iotago.BaseToken
-	address   *iotago.Ed25519Address
+	aliasName  string
+	amount     iotago.BaseToken
+	address    *iotago.Ed25519Address
+	outputType iotago.OutputType
 }
 
 // NewOptions is the constructor for the tx creation.
 func NewOptions(options ...Option) (option *Options, err error) {
 	option = &Options{
-		aliasInputs:  make(map[string]types.Empty),
-		inputs:       make([]*Output, 0),
-		aliasOutputs: make(map[string]iotago.Output),
-		outputs:      make([]iotago.Output, 0),
+		aliasInputs:        make(map[string]types.Empty),
+		inputs:             make([]*Output, 0),
+		aliasOutputs:       make(map[string]iotago.Output),
+		outputs:            make([]iotago.Output, 0),
+		specialOutputTypes: make(map[string]iotago.OutputType),
 	}
 
 	for _, opt := range options {
@@ -135,51 +140,29 @@ func WithInputs(inputs interface{}) Option {
 	}
 }
 
-// WithOutput returns an Option that is used to define a non-colored Output for the Transaction in the Block.
-func WithOutput(output *OutputOption) Option {
-	return func(options *Options) {
-		if output.amount == 0 || output.address == nil {
-			fmt.Println("output invalid")
-			return
-		}
-
-		if output.aliasName != "" {
-			fmt.Println(output.aliasName)
-			options.aliasOutputs[output.aliasName] = &iotago.BasicOutput{
-				Amount: output.amount,
-				Conditions: iotago.BasicOutputUnlockConditions{
-					&iotago.AddressUnlockCondition{Address: output.address},
-				},
-			}
-		} else {
-			options.outputs = append(options.outputs, &iotago.BasicOutput{
-				Amount: output.amount,
-				Conditions: iotago.BasicOutputUnlockConditions{
-					&iotago.AddressUnlockCondition{Address: output.address},
-				},
-			})
-		}
-	}
-}
-
 // WithOutputs returns an Option that is used to define a non-colored Outputs for the Transaction in the Block.
-func WithOutputs(outputs []*OutputOption) Option {
+func WithOutputs(outputsOptions []*OutputOption) Option {
 	return func(options *Options) {
-		for _, output := range outputs {
-			if output.aliasName != "" {
-				options.aliasOutputs[output.aliasName] = &iotago.BasicOutput{
-					Amount: output.amount,
-					Conditions: iotago.BasicOutputUnlockConditions{
-						&iotago.AddressUnlockCondition{Address: output.address},
-					},
-				}
+		for _, outputOptions := range outputsOptions {
+			if outputOptions.amount == 0 || outputOptions.address == nil {
+				fmt.Println("output invalid, amount or address not set")
+				return
+			}
+
+			var output iotago.Output
+			switch outputOptions.outputType {
+			case iotago.OutputBasic:
+				outputBuilder := builder.NewBasicOutputBuilder(outputOptions.address, outputOptions.amount)
+				output = outputBuilder.MustBuild()
+			case iotago.OutputAccount:
+				outputBuilder := builder.NewAccountOutputBuilder(outputOptions.address, outputOptions.address, outputOptions.amount)
+				output = outputBuilder.MustBuild()
+			}
+
+			if outputOptions.aliasName != "" {
+				options.aliasOutputs[outputOptions.aliasName] = output
 			} else {
-				options.outputs = append(options.outputs, &iotago.BasicOutput{
-					Amount: output.amount,
-					Conditions: iotago.BasicOutputUnlockConditions{
-						&iotago.AddressUnlockCondition{Address: output.address},
-					},
-				})
+				options.outputs = append(options.outputs, output)
 			}
 		}
 	}
@@ -296,6 +279,12 @@ func WithScenarioInputWalletForDeepSpam(wallet *Wallet) ScenarioOption {
 		if wallet.walletType == RestrictedReuse {
 			options.RestrictedInputWallet = wallet
 		}
+	}
+}
+
+func WithCreateAccounts() ScenarioOption {
+	return func(options *EvilScenario) {
+		options.OutputType = iotago.OutputAccount
 	}
 }
 

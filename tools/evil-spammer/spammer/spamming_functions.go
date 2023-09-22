@@ -69,6 +69,21 @@ func CustomConflictSpammingFunc(s *Spammer) {
 	s.CheckIfAllSent()
 }
 
+func AccountSpammingFunction(s *Spammer) {
+	clt := s.Clients.GetClient()
+	// update scenario
+	tx, aliases, err := s.EvilWallet.PrepareAccountSpam(s.EvilScenario)
+	if err != nil {
+		s.log.Debugf(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()).Error())
+		s.ErrCounter.CountError(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()))
+	}
+	s.PostTransaction(tx, clt)
+
+	s.State.batchPrepared.Add(1)
+	s.EvilWallet.ClearAliases(aliases)
+	s.CheckIfAllSent()
+}
+
 // func CommitmentsSpammingFunction(s *Spammer) {
 // 	clt := s.Clients.GetClient()
 // 	p := payload.NewGenericDataPayload([]byte("SPAM"))

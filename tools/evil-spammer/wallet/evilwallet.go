@@ -27,8 +27,6 @@ const (
 
 	awaitConfirmationSleep   = 3 * time.Second
 	awaitSolidificationSleep = time.Millisecond * 500
-
-	WaitForTxSolid = 150 * time.Second
 )
 
 var (
@@ -367,44 +365,14 @@ func (e *EvilWallet) ClearAllAliases() {
 func (e *EvilWallet) PrepareCustomConflicts(conflictsMaps []ConflictSlice) (conflictBatch [][]*iotago.Transaction, err error) {
 	for _, conflictMap := range conflictsMaps {
 		var txs []*iotago.Transaction
-		for _, options := range conflictMap {
-			tx, err2 := e.CreateTransaction(options...)
+		for _, opts := range conflictMap {
+			tx, err2 := e.CreateTransaction(opts...)
 			if err2 != nil {
 				return nil, err2
 			}
 			txs = append(txs, tx)
 		}
 		conflictBatch = append(conflictBatch, txs)
-	}
-
-	return
-}
-
-// SendCustomConflicts sends transactions with the given conflictsMaps.
-func (e *EvilWallet) SendCustomConflicts(conflictsMaps []ConflictSlice) (err error) {
-	conflictBatch, err := e.PrepareCustomConflicts(conflictsMaps)
-	if err != nil {
-		return err
-	}
-	for _, txs := range conflictBatch {
-		clients := e.connector.GetClients(len(txs))
-		if len(txs) > len(clients) {
-			return ierrors.New("insufficient clients to send conflicts")
-		}
-
-		// send transactions in parallel
-		wg := sync.WaitGroup{}
-		for i, tx := range txs {
-			wg.Add(1)
-			go func(clt Client, tx *iotago.Transaction) {
-				defer wg.Done()
-				_, _ = clt.PostTransaction(tx)
-			}(clients[i], tx)
-		}
-		wg.Wait()
-
-		// wait until transactions are solid
-		time.Sleep(WaitForTxSolid)
 	}
 
 	return
@@ -748,6 +716,14 @@ func (e *EvilWallet) PrepareCustomConflictsSpam(scenario *EvilScenario) (txs [][
 	return
 }
 
+func (e *EvilWallet) PrepareAccountSpam(scenario *EvilScenario) (*iotago.Transaction, ScenarioAlias, error) {
+	accountSpamOptions, allAliases := e.prepareFlatOptionsForAccountScenario(scenario)
+
+	tx, err := e.CreateTransaction(accountSpamOptions...)
+
+	return tx, allAliases, err
+}
+
 func (e *EvilWallet) prepareConflictSliceForScenario(scenario *EvilScenario) (conflictSlice []ConflictSlice, allAliases ScenarioAlias) {
 	genOutputOptions := func(aliases []string) []*OutputOption {
 		outputOptions := make([]*OutputOption, 0)
@@ -783,6 +759,34 @@ func (e *EvilWallet) prepareConflictSliceForScenario(scenario *EvilScenario) (co
 	return
 }
 
+func (e *EvilWallet) prepareFlatOptionsForAccountScenario(scenario *EvilScenario) ([]Option, ScenarioAlias) {
+	// we do not care about batchedOutputs, because we do not support saving account spam result in evil wallet for now
+	prefixedBatch, allAliases, _ := scenario.ConflictBatchWithPrefix()
+	if len(prefixedBatch) != 1 {
+		panic("invalid scenario, cannot prepare flat option structure with deep scenario, EvilBatch should have only one element")
+	}
+	evilBatch := prefixedBatch[0]
+	if len(evilBatch) != 1 {
+		panic("invalid scenario, cannot prepare flat option structure with deep scenario, EvilBatch should have only one element")
+	}
+
+	genOutputOptions := func(aliases []string) []*OutputOption {
+		outputOptions := make([]*OutputOption, 0)
+		for _, o := range aliases {
+			outputOptions = append(outputOptions, &OutputOption{
+				aliasName:  o,
+				outputType: iotago.OutputAccount,
+			})
+		}
+
+		return outputOptions
+	}
+	scenarioAlias := evilBatch[0]
+	outs := genOutputOptions(scenarioAlias.Outputs)
+
+	return []Option{WithInputs(scenarioAlias.Inputs), WithOutputs(outs)}, allAliases
+}
+
 // AwaitInputsSolidity waits for all inputs to be solid for client clt.
 // func (e *EvilWallet) AwaitInputsSolidity(inputs devnetvm.Inputs, clt Client) (allSolid bool) {
 // 	awaitSolid := make([]string, 0)
@@ -812,12 +816,6 @@ func (e *EvilWallet) SetTxOutputsSolid(outputs iotago.OutputIDs, clientID string
 // }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func WithFaucetSeed(seed []byte) options.Option[EvilWallet] {
-	return func(opts *EvilWallet) {
-		copy(opts.optFaucetSeed[:], seed[:])
-	}
-}
 
 func WithFaucetOutputID(id iotago.OutputID) options.Option[EvilWallet] {
 	return func(opts *EvilWallet) {
