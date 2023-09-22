@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds/types"
@@ -144,11 +143,6 @@ func WithInputs(inputs interface{}) Option {
 func WithOutputs(outputsOptions []*OutputOption) Option {
 	return func(options *Options) {
 		for _, outputOptions := range outputsOptions {
-			if outputOptions.amount == 0 || outputOptions.address == nil {
-				fmt.Println("output invalid, amount or address not set")
-				return
-			}
-
 			var output iotago.Output
 			switch outputOptions.outputType {
 			case iotago.OutputBasic:
