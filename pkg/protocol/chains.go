@@ -206,8 +206,6 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 			forkingPoint := chain.ForkingPoint.Get()
 			snapshotTargetIndex := forkingPoint.Index() - 1
 
-			fmt.Println("snapshotTargetIndex", snapshotTargetIndex)
-
 			candidateEngineInstance, err := c.engineManager.ForkEngineAtSlot(snapshotTargetIndex)
 			if err != nil {
 				panic(ierrors.Wrap(err, "error creating new candidate engine"))
@@ -264,46 +262,57 @@ func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFrom
 
 func (c *Chains) publishEngineCommitments(chain *Chain) {
 	chain.SpawnedEngine.OnUpdateWithContext(func(_, engine *engine.Engine, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
-		if engine != nil {
-			withinContext(func() (unsubscribe func()) {
-				var latestPublishedIndex iotago.SlotIndex
+		if engine == nil {
+			return
+		}
 
-				publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment, published bool) {
-					publishedCommitment, published, err := c.PublishCommitment(commitment)
-					if err != nil {
-						panic(err) // this can never happen, but we panic to get a stack trace if it ever does
-					}
+		withinContext(func() (unsubscribe func()) {
+			return engine.Ledger.HookInitialized(func() {
+				withinContext(func() (unsubscribe func()) {
+					var latestPublishedIndex iotago.SlotIndex
 
-					publishedCommitment.promote(chain)
-					publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
-					publishedCommitment.IsAttested.Trigger()
-					publishedCommitment.IsVerified.Trigger()
-
-					latestPublishedIndex = commitment.Index()
-
-					return publishedCommitment, published
-				}
-
-				if rootCommitment, published := publishCommitment(engine.RootCommitment.Get()); published {
-					chain.ForkingPoint.Set(rootCommitment)
-				}
-
-				return engine.LatestCommitment.OnUpdate(func(_, latestModelCommitment *model.Commitment) {
-					if latestModelCommitment == nil {
-						// TODO: CHECK IF NECESSARY
-						return
-					}
-
-					for latestPublishedIndex < latestModelCommitment.Index() {
-						if commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedIndex + 1); err != nil {
-							panic(err) // this should never happen, but we panic to get a stack trace if it does
-						} else {
-							publishCommitment(commitmentToPublish)
+					publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment, published bool) {
+						publishedCommitment, published, err := c.PublishCommitment(commitment)
+						if err != nil {
+							panic(err) // this can never happen, but we panic to get a stack trace if it ever does
 						}
+
+						publishedCommitment.promote(chain)
+						publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
+						publishedCommitment.IsAttested.Trigger()
+						publishedCommitment.IsVerified.Trigger()
+
+						latestPublishedIndex = commitment.Index()
+
+						return publishedCommitment, published
 					}
+
+					if forkingPoint := chain.ForkingPoint.Get(); forkingPoint == nil {
+						if rootCommitment, published := publishCommitment(engine.RootCommitment.Get()); published {
+							chain.ForkingPoint.Set(rootCommitment)
+						}
+					} else {
+						latestPublishedIndex = forkingPoint.Index() - 1
+					}
+
+					return engine.LatestCommitment.OnUpdate(func(_, latestModelCommitment *model.Commitment) {
+						if latestModelCommitment == nil {
+							// TODO: CHECK IF NECESSARY
+							return
+						}
+
+						for latestPublishedIndex < latestModelCommitment.Index() {
+							if commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedIndex + 1); err != nil {
+								panic(err) // this should never happen, but we panic to get a stack trace if it does
+							} else {
+								publishCommitment(commitmentToPublish)
+							}
+						}
+					})
 				})
 			})
-		}
+
+		})
 	})
 }
 

@@ -148,7 +148,7 @@ func (n *Node) hookEvents() {
 		n.candidateEngineActivatedCount.Add(1)
 	})
 
-	n.Protocol.HeaviestVerifiedCandidate.OnUpdate(func(_, newChain *protocol.Chain) {
+	n.Protocol.MainChain.Get().SpawnedEngine.OnUpdate(func(_, newEngine *engine.Engine) {
 		n.mainEngineSwitchedCount.Add(1)
 	})
 }
@@ -220,8 +220,6 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
 	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
 	events := instance.Events
-
-	fmt.Println("ATTACHING TO", engineName)
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] BlockDAG.BlockAttached: %s\n", n.Name, engineName, block.ID())

@@ -172,7 +172,7 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (err error) {
 
 func (c *Chain) InSyncRange(index iotago.SlotIndex) bool {
 	if latestVerifiedCommitment := c.LatestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
-		return index > c.LatestVerifiedCommitment.Get().Index() && index < c.SyncThreshold.Get()
+		return index > latestVerifiedCommitment.Index() && index < c.SyncThreshold.Get()
 	}
 
 	forkingPoint := c.ForkingPoint.Get()

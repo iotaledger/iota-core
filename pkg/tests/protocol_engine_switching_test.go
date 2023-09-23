@@ -99,15 +99,15 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	ts.Run(false, nodeOptions)
 
-	node0.Protocol.SetLogLevel(log.LevelError)
-	node1.Protocol.SetLogLevel(log.LevelError)
-	node2.Protocol.SetLogLevel(log.LevelError)
-	node3.Protocol.SetLogLevel(log.LevelError)
-	node4.Protocol.SetLogLevel(log.LevelError)
-	node5.Protocol.SetLogLevel(log.LevelError)
+	node0.Protocol.SetLogLevel(log.LevelInfo)
+	node1.Protocol.SetLogLevel(log.LevelInfo)
+	node2.Protocol.SetLogLevel(log.LevelInfo)
+	node3.Protocol.SetLogLevel(log.LevelInfo)
+	node4.Protocol.SetLogLevel(log.LevelInfo)
+	node5.Protocol.SetLogLevel(log.LevelInfo)
 	node6.Protocol.SetLogLevel(log.LevelDebug)
-	node7.Protocol.SetLogLevel(log.LevelError)
-	node8.Protocol.SetLogLevel(log.LevelError)
+	node7.Protocol.SetLogLevel(log.LevelInfo)
+	node8.Protocol.SetLogLevel(log.LevelInfo)
 
 	expectedCommittee := []iotago.AccountID{
 		node0.AccountID,
@@ -359,7 +359,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertCandidateEngineActivatedCount(1, nodesP2...)
 
 		// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
-		ts.AssertMainEngineSwitchedCount(1, nodesP2...)
+		ts.AssertMainEngineSwitchedCount(2, nodesP2...)
 
 		ctxP1Cancel()
 		wg.Wait()

@@ -209,7 +209,7 @@ func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitm
 func (c *Commitment) promote(targetChain *Chain) {
 	c.Chain.Compute(func(currentChain *Chain) *Chain {
 		if currentChain != nil && currentChain != targetChain {
-			c.LogTrace("promoting commitment", "from", currentChain.LogName(), "to", targetChain.LogName())
+			c.LogDebug("promoting commitment", "from", currentChain.LogName(), "to", targetChain.LogName())
 			//currentChain.Promote(targetChain)
 		}
 

@@ -254,7 +254,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	}
 	// Create temporary components and rollback their permanent state, which will be reflected on disk.
 	evictionState := eviction.NewState(newStorage.LatestNonEmptySlot(), newStorage.RootBlocks)
-	evictionState.Initialize(latestCommitment.Index())
+	evictionState.Initialize(index)
 
 	blockCache := blocks.New(evictionState, newStorage.Settings().APIProvider())
 	accountsManager := accountsledger.New(newStorage.Settings().APIProvider(), blockCache.Block, newStorage.AccountDiffs, newStorage.Accounts())
