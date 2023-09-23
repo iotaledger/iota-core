@@ -36,8 +36,6 @@ type Network struct {
 	blockRequested        *event.Event2[iotago.BlockID, *engine.Engine]
 	commitmentVerifiers   *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *CommitmentVerifier]
 
-	log.Logger
-
 	module.Module
 }
 
@@ -54,14 +52,6 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 		blockRequested:        event.New2[iotago.BlockID, *engine.Engine](),
 		commitmentVerifiers:   shrinkingmap.New[iotago.CommitmentID, *CommitmentVerifier](),
 	}
-
-	n.Logger = func() log.Logger {
-		logger, shutdownLogger := protocol.Logger.NewChildLogger("Gossip")
-
-		protocol.HookShutdown(shutdownLogger)
-
-		return logger
-	}()
 
 	n.TriggerConstructed()
 
@@ -81,7 +71,7 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 
 	protocol.HookInitialized(func() {
 		n.OnError(func(err error, peer peer.ID) {
-			n.LogError("network error", "peer", peer, "error", err)
+			n.protocol.LogError("network error", "peer", peer, "error", err)
 		})
 
 		unsubscribeFromNetworkEvents = lo.Batch(
@@ -94,15 +84,15 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 			n.OnWarpSyncResponseReceived(n.ProcessWarpSyncResponse),
 			n.OnWarpSyncRequestReceived(n.ProcessWarpSyncRequest),
 
-			n.warpSyncRequester.Events.Tick.Hook(func(id iotago.CommitmentID) {
-				n.LogDebug("request warp sync", "commitmentID", id)
-
-				n.SendWarpSyncRequest(id)
-			}).Unhook,
+			n.warpSyncRequester.Events.Tick.Hook(n.SendWarpSyncRequest).Unhook,
 			n.OnSendBlock(func(block *model.Block) { n.SendBlock(block) }),
-			n.OnBlockRequested(func(blockID iotago.BlockID, engine *engine.Engine) { n.RequestBlock(blockID) }),
+			n.OnBlockRequested(func(blockID iotago.BlockID, engine *engine.Engine) {
+				n.protocol.LogDebug("block requested", "blockID", blockID, "engine", engine.Name())
+
+				n.RequestBlock(blockID)
+			}),
 			n.OnCommitmentRequested(func(id iotago.CommitmentID) {
-				n.LogInfo("commitment requested", "commitmentID", id)
+				n.protocol.LogInfo("commitment requested", "commitmentID", id)
 
 				n.RequestSlotCommitment(id)
 			}),
@@ -125,6 +115,12 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 	return n
 }
 
+func (n *Network) SendWarpSyncRequest(id iotago.CommitmentID) {
+	n.protocol.LogDebug("request warp sync", "commitmentID", id)
+
+	n.Protocol.SendWarpSyncRequest(id)
+}
+
 func (n *Network) IssueBlock(block *model.Block) error {
 	n.protocol.MainEngineInstance().ProcessBlockFromPeer(block, "self")
 
@@ -132,92 +128,102 @@ func (n *Network) IssueBlock(block *model.Block) error {
 }
 
 func (n *Network) ProcessReceivedBlock(block *model.Block, src peer.ID) {
-	n.processTask("received block", func() (err error, logLevel log.Level) {
+	n.processTask("received block", func() (logLevel log.Level, err error) {
+		logLevel = log.LevelTrace
+
 		commitmentRequest := n.protocol.requestCommitment(block.ProtocolBlock().SlotCommitmentID, true)
 		if !commitmentRequest.WasCompleted() {
-			return ierrors.Errorf("UNSOLID COMMITMENT WITH %s", block.ProtocolBlock().SlotCommitmentID), log.LevelDebug
+			return logLevel, ierrors.Errorf("referenced commitment %s unknown", block.ProtocolBlock().SlotCommitmentID)
 		}
 
 		if commitmentRequest.WasRejected() {
-			return commitmentRequest.Err(), log.LevelDebug
+			return logLevel, commitmentRequest.Err()
 		}
 
-		commitment := commitmentRequest.Result()
-		chain := commitment.Chain.Get()
-
-		if chain == nil {
-			return ierrors.Errorf("UNSOLID CHAIN FOR %s", block.ProtocolBlock().SlotCommitmentID), log.LevelDebug
+		referencedCommitment := commitmentRequest.Result()
+		dispatchBlockToChain := func(chain *Chain) {
+			if err = chain.DispatchBlock(block, src); err != nil {
+				chain.Log("failed to dispatch block", logLevel, "blockID", block.ID(), "referencedCommitment", referencedCommitment.LogName(), "peer", src, "error", err)
+			} else {
+				chain.Log("dispatched block", logLevel, "blockID", block.ID(), "referencedCommitment", referencedCommitment.LogName(), "peer", src)
+			}
 		}
 
-		if !chain.InSyncRange(block.ID().Index()) {
-			return ierrors.Errorf("NOT IN SYNC RANGE %s", block.ProtocolBlock().SlotCommitmentID), log.LevelDebug
+		if chain := referencedCommitment.Chain.Get(); chain != nil {
+			dispatchBlockToChain(chain)
+			chain.ChildChains.Range(dispatchBlockToChain)
 		}
 
-		engine := commitment.Engine.Get()
-		if engine == nil {
-			return ierrors.Errorf("ENGINE NOT KNOWN FOR %s", block.ProtocolBlock().SlotCommitmentID), log.LevelDebug
-		}
-
-		engine.ProcessBlockFromPeer(block, src)
-
-		return nil, log.LevelTrace
-	})
+		return logLevel, nil
+	}, "blockID", block.ID(), "peer", src)
 }
 
 func (n *Network) ProcessBlockRequest(blockID iotago.BlockID, src peer.ID) {
-	if block, exists := n.protocol.MainEngineInstance().Block(blockID); !exists {
-		n.LogDebug("failed to load requested block", "blockID", blockID, "peer", src)
-	} else {
+	n.processTask("block request", func() (logLevel log.Level, err error) {
+		block, exists := n.protocol.MainEngineInstance().Block(blockID)
+		if !exists {
+			return log.LevelTrace, ierrors.Errorf("requested block %s not found", blockID)
+		}
+
 		n.protocol.SendBlock(block, src)
-	}
+
+		return log.LevelTrace, nil
+	}, "blockID", blockID, "peer", src)
 }
 
-func (n *Network) ProcessCommitment(commitmentModel *model.Commitment, src peer.ID) {
-	if _, err := n.protocol.PublishCommitment(commitmentModel); err != nil {
-		n.LogDebug("failed to publish commitment", "commitmentID", commitmentModel.ID(), "peer", src)
-	} else {
-		n.LogDebug("successfully published commitment", "commitmentID", commitmentModel.ID(), "peer", src)
-	}
+func (n *Network) ProcessCommitment(commitmentModel *model.Commitment, peer peer.ID) {
+	n.processTask("commitment", func() (logLevel log.Level, err error) {
+		_, published, err := n.protocol.PublishCommitment(commitmentModel)
+		if err != nil {
+			return log.LevelError, ierrors.Wrapf(err, "failed to publish commitment")
+		}
+
+		if !published {
+			return log.LevelTrace, ierrors.New("commitment published previously")
+		}
+
+		return log.LevelDebug, nil
+	}, "commitmentID", commitmentModel.ID(), "peer", peer)
 }
 
 func (n *Network) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src peer.ID) {
-	n.LogTrace("commitment request received", "commitmentID", commitmentID, "peer", src)
+	n.protocol.LogTrace("commitment request received", "commitmentID", commitmentID, "peer", src)
 
 	if commitment, err := n.protocol.Commitment(commitmentID); err != nil {
 		if !ierrors.Is(err, ErrorCommitmentNotFound) {
-			n.LogDebug("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
+			n.protocol.LogDebug("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
 		} else {
-			n.LogTrace("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
+			n.protocol.LogTrace("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
 		}
 	} else {
-		n.LogDebug("sending commitment", "commitmentID", commitmentID, "peer", src)
+		n.protocol.LogTrace("sending commitment", "commitmentID", commitmentID, "peer", src)
 
 		n.protocol.SendSlotCommitment(commitment.Commitment, src)
 	}
 }
 
 func (n *Network) ProcessAttestations(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
-	commitment, err := n.protocol.PublishCommitment(commitmentModel)
+	commitment, _, err := n.protocol.PublishCommitment(commitmentModel)
 	if err != nil {
-		n.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitmentModel.ID(), "peer", source, "error", err)
+		n.protocol.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitmentModel.ID(), "peer", source, "error", err)
 		return
 	}
 
 	chain := commitment.Chain.Get()
 	if chain == nil {
-		n.LogDebug("failed to find chain for commitment when processing attestations", "commitmentID", commitmentModel.ID())
+		n.protocol.LogDebug("failed to find chain for commitment when processing attestations", "commitmentID", commitmentModel.ID())
 		return
 	}
 
 	commitmentVerifier, exists := n.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
 	if !exists {
-		n.LogDebug("failed to find commitment verifier for commitment %s when processing attestations", "commitmentID", commitmentModel.ID())
+		n.protocol.LogDebug("failed to find commitment verifier for commitment %s when processing attestations", "commitmentID", commitmentModel.ID())
 		return
 	}
 
 	_, actualWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 	if err != nil {
-		n.LogError("failed to verify commitment when processing attestations", "commitmentID", commitmentModel.ID(), "error", err)
+		n.protocol.LogError("failed to verify commitment when processing attestations", "commitmentID", commitmentModel.ID(), "error", err)
 		return
 	}
 
@@ -226,129 +232,139 @@ func (n *Network) ProcessAttestations(commitmentModel *model.Commitment, attesta
 }
 
 func (n *Network) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) {
-	mainEngine := n.protocol.MainEngineInstance()
+	n.processTask("attestations request", func() (logLevel log.Level, err error) {
+		mainEngine := n.protocol.MainEngineInstance()
 
-	if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
-		n.LogDebug("requested commitment is not verified, yet", "commitmentID", commitmentID)
-
-		return
-	}
-
-	commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Index())
-	if err != nil {
-		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			n.LogDebug("failed to load commitment", "commitmentID", commitmentID)
-		} else {
-			n.LogError("failed to load commitment", "commitmentID", commitmentID)
-			panic("here4")
+		if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
+			return log.LevelTrace, ierrors.New("requested commitment is not verified, yet")
 		}
 
-		return
-	}
+		commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Index())
+		if err != nil {
+			return lo.Cond(ierrors.Is(err, kvstore.ErrKeyNotFound), log.LevelTrace, log.LevelError), ierrors.Wrapf(err, "failed to load commitment")
+		}
 
-	if commitment.ID() != commitmentID {
-		n.LogTrace("requested commitment does not belong to main engine", "requestedCommitmentID", commitmentID, "mainEngineCommitmentID", commitment.ID())
-		return
-	}
+		if commitment.ID() != commitmentID {
+			return log.LevelTrace, ierrors.Errorf("requested commitment %s does not match main engine commitment %s", commitmentID, commitment.ID())
+		}
 
-	attestations, err := mainEngine.Attestations.Get(commitmentID.Index())
-	if err != nil {
-		n.LogError("failed to load attestations", "commitmentID", commitmentID, "error", err)
-		panic("here")
-		return
-	}
+		attestations, err := mainEngine.Attestations.Get(commitmentID.Index())
+		if err != nil {
+			return log.LevelError, ierrors.Wrapf(err, "failed to load attestations")
+		}
 
-	rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Index())
-	if err != nil {
-		n.LogError("failed to load roots", "commitmentID", commitmentID, "error", err)
-		panic("here1")
-		return
-	}
+		rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Index())
+		if err != nil {
+			return log.LevelError, ierrors.Wrapf(err, "failed to load roots")
+		}
 
-	roots, err := rootsStorage.Load(commitmentID)
-	if err != nil {
-		n.LogError("failed to load roots", "commitmentID", commitmentID, "error", err)
-		panic("here2")
-		return
-	}
+		roots, err := rootsStorage.Load(commitmentID)
+		if err != nil {
+			return log.LevelError, ierrors.Wrapf(err, "failed to load roots")
+		}
 
-	n.protocol.SendAttestations(commitment, attestations, roots.AttestationsProof(), src)
+		return log.LevelDebug, n.protocol.SendAttestations(commitment, attestations, roots.AttestationsProof(), src)
+	}, "commitmentID", commitmentID, "peer", src)
 }
 
 func (n *Network) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], peer peer.ID) {
-	n.processTask("warp sync response", func() (err error, logLevel log.Level) {
+	n.processTask("warp sync response", func() (logLevel log.Level, err error) {
+		logLevel = log.LevelTrace
+
 		chainCommitment, err := n.protocol.Commitment(commitmentID)
 		if err != nil {
 			if !ierrors.Is(err, ErrorCommitmentNotFound) {
-				return ierrors.Wrapf(err, "unexpected error when loading commitment"), log.LevelError
+				logLevel = log.LevelError
 			}
 
-			return ierrors.Wrapf(err, "warp sync response for unknown commitment"), log.LevelDebug
-		}
-
-		if !chainCommitment.WarpSyncBlocks.Get() {
-			return ierrors.New("warp sync not requested"), log.LevelDebug
+			return logLevel, ierrors.Wrapf(err, "failed to get commitment")
 		}
 
 		targetEngine := chainCommitment.Engine.Get()
 		if targetEngine == nil {
-			return ierrors.New("failed to get engine"), log.LevelDebug
+			return log.LevelDebug, ierrors.New("failed to get target engine")
 		}
 
-		acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
-		for _, blockID := range blockIDs {
-			_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
-		}
+		chainCommitment.RequestedBlocksReceived.Compute(func(requestedBlocksReceived bool) bool {
+			if requestedBlocksReceived || !chainCommitment.RequestBlocks.Get() {
+				err = ierrors.New("warp sync not requested")
+				return requestedBlocksReceived
+			}
 
-		if !iotago.VerifyProof(proof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.RootsID()) {
-			return ierrors.New("failed to verify merkle proof"), log.LevelError
-		}
+			acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
+			for _, blockID := range blockIDs {
+				_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
+			}
 
-		n.warpSyncRequester.StopTicker(commitmentID)
+			if !iotago.VerifyProof(proof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.RootsID()) {
+				logLevel, err = log.LevelError, ierrors.New("failed to verify merkle proof")
+				return false
+			}
 
-		for _, blockID := range blockIDs {
-			targetEngine.BlockDAG.GetOrRequestBlock(blockID)
-		}
+			n.warpSyncRequester.StopTicker(commitmentID)
 
-		return nil, log.LevelDebug
+			for _, blockID := range blockIDs {
+				targetEngine.BlockDAG.GetOrRequestBlock(blockID)
+			}
+
+			logLevel = log.LevelDebug
+
+			return true
+		})
+
+		return logLevel, err
 	}, "commitmentID", commitmentID, "blockIDs", blockIDs, "proof", proof, "peer", peer)
 }
 
-func (n *Network) processTask(taskName string, task func() (err error, logLevel log.Level), args ...any) {
-	if err, logLevel := task(); err != nil {
-		n.Log("failed to process "+taskName, logLevel, append(args, "error", err)...)
+func (n *Network) processTask(taskName string, task func() (logLevel log.Level, err error), args ...any) {
+	if logLevel, err := task(); err != nil {
+		n.protocol.Log("failed to process "+taskName, logLevel, append(args, "error", err)...)
 	} else {
-		n.Log("successfully processed "+taskName, logLevel, args...)
+		n.protocol.Log("successfully processed "+taskName, logLevel, args...)
 	}
 }
 
 func (n *Network) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID, src peer.ID) {
-	n.processTask("warp sync request", func() (err error, logLevel log.Level) {
-		committedSlot, err := n.protocol.MainEngineInstance().CommittedSlot(commitmentID)
+	n.processTask("warp sync request", func() (logLevel log.Level, err error) {
+		logLevel = log.LevelTrace
+
+		commitment, err := n.protocol.Commitment(commitmentID)
 		if err != nil {
-			return ierrors.Wrap(err, "failed to get slot for commitment"), log.LevelDebug
+			if !ierrors.Is(err, ErrorCommitmentNotFound) {
+				logLevel = log.LevelError
+			}
+
+			return logLevel, ierrors.Wrap(err, "failed to load commitment")
 		}
 
-		commitment, err := committedSlot.Commitment()
+		chain := commitment.Chain.Get()
+		if chain == nil {
+			return logLevel, ierrors.New("requested commitment is not solid")
+		}
+
+		engine := commitment.Engine.Get()
+		if engine == nil {
+			return logLevel, ierrors.New("requested commitment does not have an engine, yet")
+		}
+
+		committedSlot, err := engine.CommittedSlot(commitmentID)
 		if err != nil {
-			return ierrors.Wrap(err, "failed to get commitment from slot"), log.LevelDebug
-		} else if commitment.ID() != commitmentID {
-			return ierrors.Errorf("commitment ID mismatch: %s != %s", commitment.ID(), commitmentID), log.LevelDebug
+			return logLevel, ierrors.Wrap(err, "failed to get slot for commitment")
 		}
 
 		blockIDs, err := committedSlot.BlockIDs()
 		if err != nil {
-			return ierrors.Wrap(err, "failed to get block IDs from slot"), log.LevelDebug
+			return log.LevelError, ierrors.Wrap(err, "failed to get block IDs from slot")
 		}
 
 		roots, err := committedSlot.Roots()
 		if err != nil {
-			return ierrors.Wrap(err, "failed to get roots from slot"), log.LevelDebug
+			return logLevel, ierrors.Wrap(err, "failed to get roots from slot")
 		}
 
 		n.protocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), src)
 
-		return
+		return logLevel, nil
 	}, "commitmentID", commitmentID, "peer", src)
 }
 
@@ -426,7 +442,7 @@ func (n *Network) startAttestationsRequester() {
 
 func (n *Network) startWarpSyncRequester() {
 	n.protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-		commitment.WarpSyncBlocks.OnUpdate(func(_, warpSyncBlocks bool) {
+		commitment.RequestBlocks.OnUpdate(func(_, warpSyncBlocks bool) {
 			if warpSyncBlocks {
 				n.warpSyncRequester.StartTicker(commitment.ID())
 			} else {

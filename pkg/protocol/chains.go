@@ -89,17 +89,18 @@ func newChains(protocol *Protocol) *Chains {
 	return c
 }
 
-func (c *Chains) PublishCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment, err error) {
+func (c *Chains) PublishCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment, published bool, err error) {
 	request := c.requestCommitment(commitment.ID(), false)
 	if request.WasRejected() {
-		return nil, ierrors.Wrapf(request.Err(), "failed to request commitment %s", commitment.ID())
+		return nil, false, ierrors.Wrapf(request.Err(), "failed to request commitment %s", commitment.ID())
 	}
 
-	request.Resolve(NewCommitment(commitment, c.protocol.Logger)).OnSuccess(func(resolvedMetadata *Commitment) {
+	publishedCommitmentMetadata := NewCommitment(commitment, c.protocol.Logger)
+	request.Resolve(publishedCommitmentMetadata).OnSuccess(func(resolvedMetadata *Commitment) {
 		commitmentMetadata = resolvedMetadata
 	})
 
-	return commitmentMetadata, nil
+	return commitmentMetadata, commitmentMetadata == publishedCommitmentMetadata, nil
 }
 
 func (c *Chains) Commitment(commitmentID iotago.CommitmentID, requestMissing ...bool) (commitment *Commitment, err error) {
@@ -143,13 +144,13 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 		commitment.IsEvicted.Trigger()
 	})
 
-	c.CommitmentCreated.Trigger(commitment)
-
 	commitment.SpawnedChain.OnUpdate(func(_, newChain *Chain) {
 		if newChain != nil {
 			c.ChainCreated.Trigger(newChain)
 		}
 	})
+
+	c.CommitmentCreated.Trigger(commitment)
 }
 
 func (c *Chains) initChainSwitching() {
@@ -166,7 +167,7 @@ func (c *Chains) initChainSwitching() {
 			prevCandidate.InstantiateEngine.Set(false)
 		}
 
-		newCandidate.InstantiateEngine.Set(true)
+		go newCandidate.InstantiateEngine.Set(true)
 	})
 
 	c.ChainCreated.Hook(func(chain *Chain) {
@@ -187,7 +188,7 @@ func (c *Chains) initChainSwitching() {
 func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 	return chain.InstantiateEngine.OnUpdate(func(_, instantiate bool) {
 		if !instantiate {
-			chain.spawnedEngine.Set(nil)
+			chain.SpawnedEngine.Set(nil)
 
 			return
 		}
@@ -198,13 +199,15 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 				panic(fmt.Sprintf("could not load active engine: %s", err))
 			}
 
-			c.protocol.LogDebug("engine started", "chain", chain.LogName(), "root", mainEngine.RootCommitment.Get().ID())
-
-			chain.spawnedEngine.Set(mainEngine)
+			chain.SpawnedEngine.Set(mainEngine)
 
 			c.protocol.Network.HookStopped(mainEngine.Shutdown)
 		} else {
-			snapshotTargetIndex := chain.ForkingPoint.Get().Index() - 1
+			forkingPoint := chain.ForkingPoint.Get()
+			snapshotTargetIndex := forkingPoint.Index() - 1
+
+			fmt.Println("snapshotTargetIndex", snapshotTargetIndex)
+
 			candidateEngineInstance, err := c.engineManager.ForkEngineAtSlot(snapshotTargetIndex)
 			if err != nil {
 				panic(ierrors.Wrap(err, "error creating new candidate engine"))
@@ -212,7 +215,7 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 				return
 			}
 
-			chain.spawnedEngine.Set(candidateEngineInstance)
+			chain.SpawnedEngine.Set(candidateEngineInstance)
 
 			c.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
 		}
@@ -260,13 +263,13 @@ func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFrom
 }
 
 func (c *Chains) publishEngineCommitments(chain *Chain) {
-	chain.spawnedEngine.OnUpdateWithContext(func(_, engine *engine.Engine, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
+	chain.SpawnedEngine.OnUpdateWithContext(func(_, engine *engine.Engine, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
 		if engine != nil {
 			withinContext(func() (unsubscribe func()) {
 				var latestPublishedIndex iotago.SlotIndex
 
-				publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment) {
-					publishedCommitment, err := c.PublishCommitment(commitment)
+				publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment, published bool) {
+					publishedCommitment, published, err := c.PublishCommitment(commitment)
 					if err != nil {
 						panic(err) // this can never happen, but we panic to get a stack trace if it ever does
 					}
@@ -278,18 +281,12 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 
 					latestPublishedIndex = commitment.Index()
 
-					return publishedCommitment
+					return publishedCommitment, published
 				}
 
-				chain.ForkingPoint.Compute(func(currentValue *Commitment) *Commitment {
-					if currentValue != nil {
-						latestPublishedIndex = currentValue.Index()
-
-						return currentValue
-					}
-
-					return publishCommitment(engine.RootCommitment.Get())
-				})
+				if rootCommitment, published := publishCommitment(engine.RootCommitment.Get()); published {
+					chain.ForkingPoint.Set(rootCommitment)
+				}
 
 				return engine.LatestCommitment.OnUpdate(func(_, latestModelCommitment *model.Commitment) {
 					if latestModelCommitment == nil {

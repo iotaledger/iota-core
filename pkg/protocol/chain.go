@@ -1,16 +1,27 @@
 package protocol
 
 import (
+	"fmt"
+	"time"
+
+	"github.com/libp2p/go-libp2p/core/peer"
+	"go.uber.org/atomic"
+
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/debug"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Chain struct {
 	ForkingPoint             reactive.Variable[*Commitment]
+	ParentChain              reactive.Variable[*Chain]
+	ChildChains              reactive.Set[*Chain]
 	LatestCommitment         reactive.Variable[*Commitment]
 	LatestAttestedCommitment reactive.Variable[*Commitment]
 	LatestVerifiedCommitment reactive.Variable[*Commitment]
@@ -27,7 +38,7 @@ type Chain struct {
 
 	commitments   *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
 	parentEngine  reactive.Variable[*engine.Engine]
-	spawnedEngine reactive.Variable[*engine.Engine]
+	SpawnedEngine reactive.Variable[*engine.Engine]
 
 	log.Logger
 }
@@ -35,6 +46,8 @@ type Chain struct {
 func NewChain(logger log.Logger) *Chain {
 	c := &Chain{
 		ForkingPoint:             reactive.NewVariable[*Commitment](),
+		ParentChain:              reactive.NewVariable[*Chain](),
+		ChildChains:              reactive.NewSet[*Chain](),
 		LatestCommitment:         reactive.NewVariable[*Commitment](),
 		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
 		LatestVerifiedCommitment: reactive.NewVariable[*Commitment](),
@@ -44,7 +57,7 @@ func NewChain(logger log.Logger) *Chain {
 		commitments:       shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 		parentEngine:      reactive.NewVariable[*engine.Engine](),
 		InstantiateEngine: reactive.NewVariable[bool](),
-		spawnedEngine:     reactive.NewVariable[*engine.Engine](),
+		SpawnedEngine:     reactive.NewVariable[*engine.Engine](),
 	}
 
 	c.ClaimedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.LatestCommitment)
@@ -59,13 +72,17 @@ func NewChain(logger log.Logger) *Chain {
 		return latestCommitment.Index() - WarpSyncOffset
 	}, c.LatestCommitment)
 
-	c.SyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestVerifiedCommitment *Commitment) iotago.SlotIndex {
-		if latestVerifiedCommitment == nil {
+	c.SyncThreshold = reactive.NewDerivedVariable2[iotago.SlotIndex](func(forkingPoint, latestVerifiedCommitment *Commitment) iotago.SlotIndex {
+		if forkingPoint == nil {
 			return SyncWindow + 1
 		}
 
+		if latestVerifiedCommitment == nil {
+			return forkingPoint.Index() + SyncWindow + 1
+		}
+
 		return latestVerifiedCommitment.Index() + SyncWindow + 1
-	}, c.LatestVerifiedCommitment)
+	}, c.ForkingPoint, c.LatestVerifiedCommitment)
 
 	c.Engine = reactive.NewDerivedVariable2(func(spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
 		if spawnedEngine != nil {
@@ -73,13 +90,26 @@ func NewChain(logger log.Logger) *Chain {
 		}
 
 		return parentEngine
-	}, c.spawnedEngine, c.parentEngine)
+	}, c.SpawnedEngine, c.parentEngine)
 
-	c.ForkingPoint.OnUpdateWithContext(func(_, forkingPoint *Commitment, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
-		withinContext(func() func() {
+	c.ParentChain.OnUpdate(func(prevParent, newParent *Chain) {
+		if prevParent != nil {
+			prevParent.ChildChains.Delete(c)
+		}
+
+		if newParent != nil {
+			newParent.ChildChains.Add(c)
+		}
+	})
+
+	c.ForkingPoint.OnUpdateWithContext(func(_, forkingPoint *Commitment, forkingPointContext func(subscriptionFactory func() (unsubscribe func()))) {
+		forkingPointContext(func() func() {
 			return forkingPoint.Parent.OnUpdate(func(_, parent *Commitment) {
-				withinContext(func() func() {
-					return c.parentEngine.InheritFrom(parent.Engine)
+				forkingPointContext(func() func() {
+					return lo.Batch(
+						c.ParentChain.InheritFrom(parent.Chain),
+						c.parentEngine.InheritFrom(parent.Engine),
+					)
 				})
 			})
 		})
@@ -93,6 +123,7 @@ func NewChain(logger log.Logger) *Chain {
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
 		c.VerifiedWeight.LogUpdates(entityLogger, log.LevelTrace, "VerifiedWeight")
 		c.LatestCommitment.LogUpdates(entityLogger, log.LevelDebug, "LatestCommitment", (*Commitment).LogName)
+		c.LatestVerifiedCommitment.LogUpdates(entityLogger, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
 		c.RequestAttestations.LogUpdates(entityLogger, log.LevelDebug, "RequestAttestations")
 		c.InstantiateEngine.LogUpdates(entityLogger, log.LevelDebug, "InstantiateEngine")
 	})
@@ -122,12 +153,31 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 	return nil, false
 }
 
+func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (err error) {
+	if !c.InSyncRange(block.ID().Index()) {
+		return ierrors.Errorf("received block is not in sync range of %s", c.LogName())
+	}
+
+	engine := c.SpawnedEngine.Get()
+	if engine == nil {
+		return ierrors.Errorf("received block for %s without engine", c.LogName())
+	}
+
+	engine.ProcessBlockFromPeer(block, src)
+
+	c.LogTrace("dispatched block", "block", block.ID(), "src", src)
+
+	return nil
+}
+
 func (c *Chain) InSyncRange(index iotago.SlotIndex) bool {
 	if latestVerifiedCommitment := c.LatestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
 		return index > c.LatestVerifiedCommitment.Get().Index() && index < c.SyncThreshold.Get()
 	}
 
-	return false
+	forkingPoint := c.ForkingPoint.Get()
+
+	return forkingPoint != nil && (index > forkingPoint.Index()-1 && index < c.SyncThreshold.Get())
 }
 
 func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
@@ -144,10 +194,28 @@ func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
 
 	c.LatestCommitment.Compute(maxCommitment)
 
+	var triggered atomic.Int64
+
+	stackTrace := debug.StackTrace(false, 0)
+
+	go func() {
+		time.Sleep(5 * time.Second)
+
+		if triggered.Load() == 0 {
+			c.LogError("commitment not triggered after 2 seconds", "index", commitment.Index())
+
+			fmt.Println(stackTrace)
+		}
+	}()
+
 	unsubscribe := lo.Batch(
-		commitment.IsAttested.OnTrigger(func() { c.LatestAttestedCommitment.Compute(maxCommitment) }),
+		commitment.IsAttested.OnTrigger(func() {
+			c.LatestAttestedCommitment.Compute(maxCommitment)
+		}),
 		commitment.IsVerified.OnTrigger(func() { c.LatestVerifiedCommitment.Compute(maxCommitment) }),
 	)
+
+	triggered.Store(1)
 
 	return func() {
 		unsubscribe()

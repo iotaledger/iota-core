@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
@@ -19,8 +21,9 @@ type Commitment struct {
 	Chain                    reactive.Variable[*Chain]
 	Engine                   reactive.Variable[*engine.Engine]
 	InSyncRange              reactive.Variable[bool]
-	WarpSyncBlocks           reactive.Variable[bool]
 	RequestAttestations      reactive.Variable[bool]
+	RequestBlocks            reactive.Variable[bool]
+	RequestedBlocksReceived  reactive.Variable[bool]
 	Weight                   reactive.Variable[uint64]
 	AttestedWeight           reactive.Variable[uint64]
 	CumulativeAttestedWeight reactive.Variable[uint64]
@@ -50,6 +53,8 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 		Chain:                    reactive.NewVariable[*Chain](),
 		Engine:                   reactive.NewVariable[*engine.Engine](),
 		RequestAttestations:      reactive.NewVariable[bool](),
+		RequestBlocks:            reactive.NewVariable[bool](),
+		RequestedBlocksReceived:  reactive.NewVariable[bool](),
 		Weight:                   reactive.NewVariable[uint64](),
 		AttestedWeight:           reactive.NewVariable[uint64](func(current uint64, new uint64) uint64 { return max(current, new) }),
 		CumulativeAttestedWeight: reactive.NewVariable[uint64](),
@@ -101,6 +106,10 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 	})
 
 	c.Chain.OnUpdateWithContext(func(_, chain *Chain, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
+		if chain == nil {
+			return
+		}
+
 		withinContext(func() (unsubscribe func()) {
 			requestAttestations := reactive.NewDerivedVariable2(func(requestAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
 				return requestAttestations && isDirectlyAboveLatestAttestedCommitment
@@ -111,9 +120,11 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 			return lo.Batch(
 				chain.registerCommitment(c),
 
-				chain.Engine.OnUpdate(func(_, chainEngine *engine.Engine) {
-					c.Engine.Set(chainEngine)
-				}),
+				c.Engine.InheritFrom(chain.Engine),
+
+				c.RequestBlocks.InheritFrom(reactive.NewDerivedVariable3(func(spawnedEngine *engine.Engine, inSyncWindow, belowWarpSyncThreshold bool) bool {
+					return spawnedEngine != nil && inSyncWindow && belowWarpSyncThreshold
+				}, chain.SpawnedEngine, c.InSyncRange, c.isBelowWarpSyncThreshold)),
 
 				requestAttestations.Unsubscribe,
 			)
@@ -124,10 +135,6 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 		return aboveLatestVerifiedCommitment && belowSyncThreshold
 	}, c.isAboveLatestVerifiedCommitment, c.isBelowSyncThreshold)
 
-	c.WarpSyncBlocks = reactive.NewDerivedVariable2(func(inSyncWindow, belowWarpSyncThreshold bool) bool {
-		return inSyncWindow && belowWarpSyncThreshold
-	}, c.InSyncRange, c.isBelowWarpSyncThreshold)
-
 	c.IsRoot.OnTrigger(func() {
 		c.IsSolid.Set(true)
 		c.IsAttested.Set(true)
@@ -136,7 +143,7 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 		c.isBelowSyncThreshold.Set(true)
 	})
 
-	c.Logger = logger.NewEntityLogger("Commitment", c.IsEvicted, func(entityLogger log.Logger) {
+	c.Logger = logger.NewEntityLogger(fmt.Sprintf("Slot%d.Commitment", commitment.Index()), c.IsEvicted, func(entityLogger log.Logger) {
 		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
 		c.CumulativeAttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "CumulativeAttestedWeight")
