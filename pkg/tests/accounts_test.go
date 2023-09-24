@@ -209,9 +209,10 @@ func Test_TransitionAccount(t *testing.T) {
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
+	accountAddress := iotago.AccountAddress(newAccountOutput.AccountID)
 	// create a delegation output delegating to the newly created account
 	inputForNewDelegation, newDelegationOutputs, newDelegationWallets := ts.TransactionFramework.CreateDelegationFromInput("TX1:2",
-		testsuite.WithDelegatedValidatorID(newAccountOutput.AccountID),
+		testsuite.WithDelegatedValidatorAddress(&accountAddress),
 		testsuite.WithDelegationStartEpoch(1),
 	)
 
