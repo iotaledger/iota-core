@@ -403,7 +403,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 			}
 
 			if accountDetails.AccountID.Empty() {
-				blockIssuerKeyEd25519, ok := accountDetails.IssuerKey.(iotago.Ed25519PublicKeyBlockIssuerKey)
+				blockIssuerKeyEd25519, ok := accountDetails.IssuerKey.(*iotago.Ed25519PublicKeyBlockIssuerKey)
 				if !ok {
 					panic("block issuer key must be of type ed25519")
 				}

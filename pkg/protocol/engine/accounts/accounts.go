@@ -49,13 +49,15 @@ func NewAccountData(id iotago.AccountID, opts ...options.Option[AccountData]) *A
 
 func (a *AccountData) AddBlockIssuerKeys(blockIssuerKeys ...iotago.BlockIssuerKey) {
 	for _, blockIssuerKey := range blockIssuerKeys {
-		a.BlockIssuerKeys.Add(blockIssuerKey)
+		k := blockIssuerKey
+		a.BlockIssuerKeys.Add(k)
 	}
 }
 
 func (a *AccountData) RemoveBlockIssuerKey(blockIssuerKeys ...iotago.BlockIssuerKey) {
 	for _, blockIssuerKey := range blockIssuerKeys {
-		_ = a.BlockIssuerKeys.Delete(blockIssuerKey)
+		k := blockIssuerKey
+		_ = a.BlockIssuerKeys.Delete(k)
 	}
 }
 
@@ -121,7 +123,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	if err := binary.Read(reader, binary.LittleEndian, &a.OutputID); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read outputID for accountID %s", a.ID)
 	}
-	bytesConsumed += len(a.OutputID)
+	bytesConsumed += iotago.OutputIDLength
 
 	var blockIssuerKeyCount uint8
 	if err := binary.Read(reader, binary.LittleEndian, &blockIssuerKeyCount); err != nil {
@@ -198,7 +200,7 @@ func (a AccountData) Bytes() ([]byte, error) {
 	m.WriteBytes(lo.PanicOnErr(a.OutputID.Bytes()))
 	m.WriteByte(byte(a.BlockIssuerKeys.Size()))
 	a.BlockIssuerKeys.Range(func(blockIssuerKey iotago.BlockIssuerKey) {
-		m.WriteBytes(blockIssuerKey.BlockIssuerKeyBytes())
+		m.WriteBytes(blockIssuerKey.Bytes())
 	})
 
 	m.WriteUint64(uint64(a.ValidatorStake))
@@ -231,7 +233,8 @@ func WithOutputID(outputID iotago.OutputID) options.Option[AccountData] {
 func WithBlockIssuerKeys(blockIssuerKeys ...iotago.BlockIssuerKey) options.Option[AccountData] {
 	return func(a *AccountData) {
 		for _, blockIssuerKey := range blockIssuerKeys {
-			a.BlockIssuerKeys.Add(blockIssuerKey)
+			k := blockIssuerKey
+			a.BlockIssuerKeys.Add(k)
 		}
 	}
 }

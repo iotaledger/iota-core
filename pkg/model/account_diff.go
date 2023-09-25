@@ -69,11 +69,11 @@ func (d AccountDiff) Bytes() ([]byte, error) {
 	m.WriteBytes(lo.PanicOnErr(d.PreviousOutputID.Bytes()))
 	m.WriteUint8(uint8(len(d.BlockIssuerKeysAdded)))
 	for _, blockIssuerKey := range d.BlockIssuerKeysAdded {
-		m.WriteBytes(blockIssuerKey.BlockIssuerKeyBytes())
+		m.WriteBytes(blockIssuerKey.Bytes())
 	}
 	m.WriteUint8(uint8(len(d.BlockIssuerKeysRemoved)))
 	for _, blockIssuerKey := range d.BlockIssuerKeysRemoved {
-		m.WriteBytes(blockIssuerKey.BlockIssuerKeyBytes())
+		m.WriteBytes(blockIssuerKey.Bytes())
 	}
 
 	m.WriteInt64(d.ValidatorStakeChange)

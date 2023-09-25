@@ -74,7 +74,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	for _, accountData := range opt.Accounts {
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
-			blockIssuerKeyEd25519, ok := accountData.IssuerKey.(iotago.Ed25519PublicKeyBlockIssuerKey)
+			blockIssuerKeyEd25519, ok := accountData.IssuerKey.(*iotago.Ed25519PublicKeyBlockIssuerKey)
 			if !ok {
 				panic("block issuer key must be of type ed25519")
 			}
