@@ -427,6 +427,11 @@ func (e *EvilWallet) CreateTransaction(options ...Option) (tx *iotago.Transactio
 // addOutputsToOutputManager adds output to the OutputManager if.
 func (e *EvilWallet) addOutputsToOutputManager(tx *iotago.Transaction, outWallet, tmpWallet *Wallet, tempAddresses map[string]types.Empty) {
 	for idx, o := range tx.Essence.Outputs {
+		if o.UnlockConditionSet().Address() == nil {
+			continue
+		}
+
+		// register UnlockConditionAddress only (skip account outputs)
 		addr := o.UnlockConditionSet().Address().Address
 		out := &Output{
 			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID(e.Connector().GetClient().CurrentAPI())), uint16(idx)),
@@ -474,6 +479,9 @@ func (e *EvilWallet) registerOutputAliases(tx *iotago.Transaction, addrAliasMap 
 	for idx := range tx.Essence.Outputs {
 		id := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID(e.Connector().GetClient().CurrentAPI())), uint16(idx))
 		out := e.outputManager.GetOutput(id)
+		if out == nil {
+			continue
+		}
 
 		// register output alias
 		e.aliasManager.AddOutputAlias(out, addrAliasMap[out.Address.String()])
@@ -584,12 +592,16 @@ func (e *EvilWallet) matchOutputsWithAliases(buildOptions *Options, tempWallet *
 			tempAddresses[addr.String()] = types.Void
 		}
 
-		outputs = append(outputs, &iotago.BasicOutput{
-			Amount: output.BaseTokenAmount(),
-			Conditions: iotago.BasicOutputUnlockConditions{
-				&iotago.AddressUnlockCondition{Address: addr},
-			},
-		})
+		switch output.Type() {
+		case iotago.OutputBasic:
+			outputBuilder := builder.NewBasicOutputBuilder(addr, output.BaseTokenAmount())
+			outputs = append(outputs, outputBuilder.MustBuild())
+		case iotago.OutputAccount:
+			outputBuilder := builder.NewAccountOutputBuilder(addr, addr, output.BaseTokenAmount())
+			outputs = append(outputs, outputBuilder.MustBuild())
+			fmt.Println("having accout output", outputBuilder.MustBuild())
+		}
+
 		addrAliasMap[addr.String()] = alias
 	}
 
@@ -664,9 +676,16 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 		}
 		balances := SplitBalanceEqually(len(buildOptions.outputs)+len(buildOptions.aliasOutputs), totalBalance)
 		i := 0
-		for out := range buildOptions.aliasOutputs {
-			buildOptions.aliasOutputs[out] = &iotago.BasicOutput{
-				Amount: balances[i],
+		for out, output := range buildOptions.aliasOutputs {
+			switch output.Type() {
+			case iotago.OutputBasic:
+				buildOptions.aliasOutputs[out] = &iotago.BasicOutput{
+					Amount: balances[i],
+				}
+			case iotago.OutputAccount:
+				buildOptions.aliasOutputs[out] = &iotago.AccountOutput{
+					Amount: balances[i],
+				}
 			}
 			i++
 		}
