@@ -239,18 +239,18 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 	input := t.Output(inputAlias)
 
 	delegationOutput := options.Apply(&iotago.DelegationOutput{
-		Amount:          input.BaseTokenAmount(),
-		DelegatedAmount: input.BaseTokenAmount(),
-		DelegationID:    iotago.DelegationID{},
-		ValidatorID:     iotago.AccountID{},
-		StartEpoch:      0,
-		EndEpoch:        0,
+		Amount:           input.BaseTokenAmount(),
+		DelegatedAmount:  input.BaseTokenAmount(),
+		DelegationID:     iotago.DelegationID{},
+		ValidatorAddress: &iotago.AccountAddress{},
+		StartEpoch:       0,
+		EndEpoch:         0,
 		Conditions: iotago.DelegationOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 		},
 	}, opts)
 
-	if delegationOutput.ValidatorID == iotago.EmptyAccountID() ||
+	if delegationOutput.ValidatorAddress.AccountID() == iotago.EmptyAccountID() ||
 		delegationOutput.DelegatedAmount == 0 ||
 		delegationOutput.StartEpoch == 0 {
 		panic(fmt.Sprintf("delegation output created incorrectly %+v", delegationOutput))
@@ -402,9 +402,9 @@ func WithDelegatedAmount(delegatedAmount iotago.BaseToken) options.Option[iotago
 	}
 }
 
-func WithDelegatedValidatorID(validatorID iotago.AccountID) options.Option[iotago.DelegationOutput] {
+func WithDelegatedValidatorAddress(validatorAddress *iotago.AccountAddress) options.Option[iotago.DelegationOutput] {
 	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.ValidatorID = validatorID
+		delegationOutput.ValidatorAddress = validatorAddress
 	}
 }
 

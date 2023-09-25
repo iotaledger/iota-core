@@ -70,7 +70,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.AddBlockIssuerKey(newGenesisOutputKey),
 		testsuite.WithBlockIssuerExpirySlot(1),
 	)
-	consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(5, "Genesis:0")
+	consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(2, "Genesis:0")
 
 	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
 		testsuite.WithAccountInput(accountInput, true),
@@ -210,9 +210,10 @@ func Test_TransitionAccount(t *testing.T) {
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
+	accountAddress := iotago.AccountAddress(newAccountOutput.AccountID)
 	// create a delegation output delegating to the newly created account
 	inputForNewDelegation, newDelegationOutputs, newDelegationWallets := ts.TransactionFramework.CreateDelegationFromInput("TX1:2",
-		testsuite.WithDelegatedValidatorID(newAccountOutput.AccountID),
+		testsuite.WithDelegatedValidatorAddress(&accountAddress),
 		testsuite.WithDelegationStartEpoch(1),
 	)
 

@@ -551,7 +551,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 				delete(createdAccountDelegation, delegationOutput.DelegationID)
 			} else {
 				// the delegation output was destroyed => subtract the stake from the validator account
-				accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorID)
+				accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorAddress.AccountID())
 				accountDiff.DelegationStakeChange -= int64(delegationOutput.DelegatedAmount)
 			}
 
@@ -568,7 +568,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 
 	for _, delegationOutput := range createdAccountDelegation {
 		// the delegation output was newly created and not transitioned/destroyed => add the stake to the validator account
-		accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorID)
+		accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorAddress.AccountID())
 		accountDiff.DelegationStakeChange += int64(delegationOutput.DelegatedAmount)
 	}
 
