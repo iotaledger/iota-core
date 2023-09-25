@@ -95,7 +95,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 				delegationEnd = l.apiProvider.APIForSlot(commitmentInput.Index).TimeProvider().EpochFromSlot(commitmentInput.Index) - iotago.EpochIndex(1)
 			}
 
-			reward, _, _, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
+			reward, _, _, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimDelegationReward, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}
