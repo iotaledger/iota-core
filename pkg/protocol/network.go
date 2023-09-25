@@ -92,7 +92,7 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 				n.RequestBlock(blockID)
 			}),
 			n.OnCommitmentRequested(func(id iotago.CommitmentID) {
-				n.protocol.LogInfo("commitment requested", "commitmentID", id)
+				n.protocol.LogDebug("commitment requested", "commitmentID", id)
 
 				n.RequestSlotCommitment(id)
 			}),

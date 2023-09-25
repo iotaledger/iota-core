@@ -122,7 +122,7 @@ func NewChain(logger log.Logger) *Chain {
 		c.ClaimedWeight.LogUpdates(entityLogger, log.LevelTrace, "ClaimedWeight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
 		c.VerifiedWeight.LogUpdates(entityLogger, log.LevelTrace, "VerifiedWeight")
-		c.LatestCommitment.LogUpdates(entityLogger, log.LevelDebug, "LatestCommitment", (*Commitment).LogName)
+		c.LatestCommitment.LogUpdates(entityLogger, log.LevelTrace, "LatestCommitment", (*Commitment).LogName)
 		c.LatestVerifiedCommitment.LogUpdates(entityLogger, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
 		c.RequestAttestations.LogUpdates(entityLogger, log.LevelDebug, "RequestAttestations")
 		c.InstantiateEngine.LogUpdates(entityLogger, log.LevelDebug, "InstantiateEngine")
@@ -234,4 +234,16 @@ func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
 		c.LatestAttestedCommitment.Compute(resetToParent)
 		c.LatestVerifiedCommitment.Compute(resetToParent)
 	}
+}
+
+func (c *Chain) claimedWeight() reactive.Variable[uint64] {
+	return c.ClaimedWeight
+}
+
+func (c *Chain) attestedWeight() reactive.Variable[uint64] {
+	return c.AttestedWeight
+}
+
+func (c *Chain) verifiedWeight() reactive.Variable[uint64] {
+	return c.VerifiedWeight
 }

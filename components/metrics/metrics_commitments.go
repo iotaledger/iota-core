@@ -47,7 +47,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Number of forks seen by the node."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.HeaviestVerifiedCandidate.OnUpdate(func(oldChain, _ *protocol.Chain) {
+			deps.Protocol.HeaviestVerifiedChain.OnUpdate(func(oldChain, _ *protocol.Chain) {
 				if oldChain != nil {
 					Component.WorkerPool.Submit(func() { deps.Collector.Increment(commitmentsNamespace, forksCount) })
 				}

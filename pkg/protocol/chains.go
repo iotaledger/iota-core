@@ -17,12 +17,12 @@ import (
 )
 
 type Chains struct {
-	MainChain                 reactive.Variable[*Chain]
-	HeaviestClaimedCandidate  reactive.Variable[*Chain]
-	HeaviestAttestedCandidate reactive.Variable[*Chain]
-	HeaviestVerifiedCandidate reactive.Variable[*Chain]
-	CommitmentCreated         *event.Event1[*Commitment]
-	ChainCreated              *event.Event1[*Chain]
+	MainChain             reactive.Variable[*Chain]
+	HeaviestChain         reactive.Variable[*Chain]
+	HeaviestAttestedChain reactive.Variable[*Chain]
+	HeaviestVerifiedChain reactive.Variable[*Chain]
+	CommitmentCreated     *event.Event1[*Commitment]
+	ChainCreated          *event.Event1[*Chain]
 
 	protocol      *Protocol
 	commitments   *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
@@ -33,15 +33,15 @@ type Chains struct {
 
 func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
-		protocol:                  protocol,
-		EvictionState:             reactive.NewEvictionState[iotago.SlotIndex](),
-		MainChain:                 reactive.NewVariable[*Chain]().Init(NewChain(protocol.Logger)),
-		HeaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
-		HeaviestAttestedCandidate: reactive.NewVariable[*Chain](),
-		HeaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
-		commitments:               shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
-		CommitmentCreated:         event.New1[*Commitment](),
-		ChainCreated:              event.New1[*Chain](),
+		protocol:              protocol,
+		EvictionState:         reactive.NewEvictionState[iotago.SlotIndex](),
+		MainChain:             reactive.NewVariable[*Chain]().Init(NewChain(protocol.Logger)),
+		HeaviestChain:         reactive.NewVariable[*Chain](),
+		HeaviestAttestedChain: reactive.NewVariable[*Chain](),
+		HeaviestVerifiedChain: reactive.NewVariable[*Chain](),
+		commitments:           shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
+		CommitmentCreated:     event.New1[*Commitment](),
+		ChainCreated:          event.New1[*Chain](),
 		engineManager: enginemanager.New(
 			protocol.Workers,
 			func(err error) { protocol.LogError("engine error", "err", err) },
@@ -78,13 +78,14 @@ func newChains(protocol *Protocol) *Chains {
 
 	protocol.HookConstructed(func() {
 		c.initMainChain()
+		c.initWeightTracking()
 		c.initChainSwitching()
 
 		// TODO: trigger initialized
 	})
 
-	c.HeaviestClaimedCandidate.LogUpdates(c.protocol, log.LevelInfo, "Unchecked Heavier Chain", (*Chain).LogName)
-	c.HeaviestAttestedCandidate.LogUpdates(c.protocol, log.LevelInfo, "Attested Heavier Chain", (*Chain).LogName)
+	c.HeaviestChain.LogUpdates(c.protocol, log.LevelInfo, "Unchecked Heavier Chain", (*Chain).LogName)
+	c.HeaviestAttestedChain.LogUpdates(c.protocol, log.LevelInfo, "Attested Heavier Chain", (*Chain).LogName)
 
 	return c
 }
@@ -153,35 +154,59 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 	c.CommitmentCreated.Trigger(commitment)
 }
 
+func (c *Chains) initWeightTracking() {
+	trackHeaviestChain := func(chainVariable reactive.Variable[*Chain], getWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
+		return getWeightVariable(candidate).OnUpdate(func(_, newChainWeight uint64) {
+			if heaviestChain := c.HeaviestChain.Get(); heaviestChain != nil && newChainWeight < heaviestChain.VerifiedWeight.Get() {
+				return
+			}
+
+			chainVariable.Compute(func(currentCandidate *Chain) *Chain {
+				if currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newChainWeight > getWeightVariable(currentCandidate).Get() {
+					return candidate
+				}
+
+				return currentCandidate
+			})
+		})
+	}
+
+	c.ChainCreated.Hook(func(chain *Chain) {
+		trackHeaviestChain(c.HeaviestVerifiedChain, (*Chain).verifiedWeight, chain)
+		trackHeaviestChain(c.HeaviestAttestedChain, (*Chain).attestedWeight, chain)
+		trackHeaviestChain(c.HeaviestChain, (*Chain).claimedWeight, chain)
+	})
+}
+
 func (c *Chains) initChainSwitching() {
-	c.HeaviestClaimedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
+	c.HeaviestChain.OnUpdate(func(prevCandidate, newCandidate *Chain) {
 		if prevCandidate != nil {
 			prevCandidate.RequestAttestations.Set(false)
 		}
 
-		newCandidate.RequestAttestations.Set(true)
+		if newCandidate != nil {
+			newCandidate.RequestAttestations.Set(true)
+		}
 	})
 
-	c.HeaviestAttestedCandidate.OnUpdate(func(prevCandidate, newCandidate *Chain) {
+	c.HeaviestAttestedChain.OnUpdate(func(prevCandidate, newCandidate *Chain) {
 		if prevCandidate != nil {
 			prevCandidate.InstantiateEngine.Set(false)
 		}
 
-		go newCandidate.InstantiateEngine.Set(true)
+		if newCandidate != nil {
+			newCandidate.InstantiateEngine.Set(true)
+		}
 	})
 
-	c.ChainCreated.Hook(func(chain *Chain) {
-		c.trackHeaviestCandidate(c.HeaviestClaimedCandidate, func(chain *Chain) reactive.Variable[uint64] {
-			return chain.ClaimedWeight
-		}, chain)
+	c.HeaviestVerifiedChain.OnUpdate(func(prevCandidate, newCandidate *Chain) {
+		if prevCandidate != nil {
+			//prevCandidate.InstantiateEngine.Set(false)
+		}
 
-		c.trackHeaviestCandidate(c.HeaviestAttestedCandidate, func(chain *Chain) reactive.Variable[uint64] {
-			return chain.AttestedWeight
-		}, chain)
+		c.protocol.LogError("SWITCHED MAIN CHAIN")
 
-		c.trackHeaviestCandidate(c.HeaviestVerifiedCandidate, func(chain *Chain) reactive.Variable[uint64] {
-			return chain.VerifiedWeight
-		}, chain)
+		//go newCandidate.InstantiateEngine.Set(true)
 	})
 }
 
@@ -312,22 +337,6 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 				})
 			})
 
-		})
-	})
-}
-
-func (c *Chains) trackHeaviestCandidate(candidateVariable reactive.Variable[*Chain], chainWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) {
-	chainWeightVariable(candidate).OnUpdate(func(_, newChainWeight uint64) {
-		if newChainWeight <= c.MainChain.Get().VerifiedWeight.Get() {
-			return
-		}
-
-		candidateVariable.Compute(func(currentCandidate *Chain) *Chain {
-			if currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newChainWeight > chainWeightVariable(currentCandidate).Get() {
-				return candidate
-			}
-
-			return currentCandidate
 		})
 	})
 }
