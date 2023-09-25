@@ -34,7 +34,7 @@ func ParseBlockID(ms *marshalutil.MarshalUtil) (iotago.BlockID, error) {
 }
 
 func parseSlotIndex(ms *marshalutil.MarshalUtil) (iotago.SlotIndex, error) {
-	bytes, err := ms.ReadBytes(marshalutil.Uint32Size)
+	bytes, err := ms.ReadBytes(iotago.SlotIndexLength)
 	if err != nil {
 		return 0, err
 	}
