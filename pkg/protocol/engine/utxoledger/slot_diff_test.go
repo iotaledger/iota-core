@@ -56,7 +56,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 	value := diff.KVStorableValue()
 	require.Equal(t, len(value), 76)
 	require.Equal(t, uint32(1), binary.LittleEndian.Uint32(value[:4]))
-	require.Equal(t, outputID[:], value[4:38])
+	require.Equal(t, outputID[:], value[4:$+])
 	require.Equal(t, uint32(1), binary.LittleEndian.Uint32(value[38:42]))
 	require.Equal(t, outputID[:], value[42:76])
 }

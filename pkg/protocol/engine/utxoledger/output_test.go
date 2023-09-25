@@ -86,10 +86,10 @@ func CreateOutputAndAssertSerialization(t *testing.T, blockID iotago.BlockID, in
 	require.Equal(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutput}, outputID[:]), output.KVStorableKey())
 
 	value := output.KVStorableValue()
-	require.Equal(t, blockID[:], value[:40])
-	require.Equal(t, indexBooked, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[40:48]))))
-	require.Equal(t, slotCreated, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[48:56]))))
-	require.Equal(t, outputBytes, value[56:])
+	require.Equal(t, blockID[:], value[:iotago.SlotIdentifierLength])
+	require.Equal(t, indexBooked, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[iotago.SlotIdentifierLength:iotago.SlotIdentifierLength+iotago.SlotIndexLength]))))
+	require.Equal(t, slotCreated, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[iotago.SlotIdentifierLength+iotago.SlotIndexLength:iotago.SlotIdentifierLength+iotago.SlotIndexLength*2]))))
+	require.Equal(t, outputBytes, value[iotago.SlotIdentifierLength+iotago.SlotIndexLength*2:])
 
 	return output
 }
@@ -107,8 +107,8 @@ func CreateSpentAndAssertSerialization(t *testing.T, output *utxoledger.Output) 
 	require.Equal(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputSpent}, outputID[:]), spent.KVStorableKey())
 
 	value := spent.KVStorableValue()
-	require.Equal(t, transactionID[:], value[:32])
-	require.Equal(t, indexSpent, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[32:40]))))
+	require.Equal(t, transactionID[:], value[:iotago.TransactionIDLength])
+	require.Equal(t, indexSpent, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[iotago.TransactionIDLength:iotago.TransactionIDLength+iotago.SlotIndexLength]))))
 
 	return spent
 }

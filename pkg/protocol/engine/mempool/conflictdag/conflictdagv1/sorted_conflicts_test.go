@@ -42,41 +42,41 @@ func TestSortedConflict(t *testing.T) {
 
 	sortedConflicts := NewSortedConflictSet(conflict1, pendingTasks)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict1")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict1:0")
 
 	sortedConflicts.Add(conflict2)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict2", "conflict1")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict2:0", "conflict1:0")
 
 	sortedConflicts.Add(conflict3)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict3", "conflict2", "conflict1")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict3:0", "conflict2:0", "conflict1:0")
 
 	sortedConflicts.Add(conflict4)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict3", "conflict2", "conflict1", "conflict4")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict3:0", "conflict2:0", "conflict1:0", "conflict4:0")
 
 	sortedConflicts.Add(conflict5)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict3", "conflict5", "conflict2", "conflict1", "conflict4")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict3:0", "conflict5:0", "conflict2:0", "conflict1:0", "conflict4:0")
 
 	sortedConflicts.Add(conflict6)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict6", "conflict3", "conflict5", "conflict2", "conflict1", "conflict4")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict6:0", "conflict3:0", "conflict5:0", "conflict2:0", "conflict1:0", "conflict4:0")
 
 	conflict2.Weight.AddCumulativeWeight(3)
 	require.Equal(t, int64(13), conflict2.Weight.Value().CumulativeWeight())
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict6", "conflict3", "conflict2", "conflict5", "conflict1", "conflict4")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict6:0", "conflict3:0", "conflict2:0", "conflict5:0", "conflict1:0", "conflict4:0")
 
 	conflict2.Weight.RemoveCumulativeWeight(3)
 	require.Equal(t, int64(10), conflict2.Weight.Value().CumulativeWeight())
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict6", "conflict3", "conflict5", "conflict2", "conflict1", "conflict4")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict6:0", "conflict3:0", "conflict5:0", "conflict2:0", "conflict1:0", "conflict4:0")
 
 	conflict5.Weight.SetAcceptanceState(acceptance.Accepted)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict5", "conflict6", "conflict3", "conflict2", "conflict1", "conflict4")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict5:0", "conflict6:0", "conflict3:0", "conflict2:0", "conflict1:0", "conflict4:0")
 }
 
 func TestSortedDecreaseHeaviest(t *testing.T) {
@@ -95,15 +95,15 @@ func TestSortedDecreaseHeaviest(t *testing.T) {
 
 	sortedConflicts.Add(conflict1)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict1")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict1:0")
 
 	sortedConflicts.Add(conflict2)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict1", "conflict2")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict1:0", "conflict2:0")
 
 	conflict1.Weight.SetAcceptanceState(acceptance.Pending)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict2", "conflict1")
+	assertSortedConflictsOrder(t, sortedConflicts, "conflict2:0", "conflict1:0")
 }
 
 func TestSortedConflictParallel(t *testing.T) {
