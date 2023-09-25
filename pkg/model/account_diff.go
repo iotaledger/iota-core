@@ -62,9 +62,9 @@ func (d AccountDiff) Bytes() ([]byte, error) {
 	m := marshalutil.New()
 
 	m.WriteInt64(int64(d.BICChange))
-	m.WriteUint64(uint64(d.PreviousUpdatedTime))
-	m.WriteUint64(uint64(d.NewExpirySlot))
-	m.WriteUint64(uint64(d.PreviousExpirySlot))
+	m.WriteUint32(uint32(d.PreviousUpdatedTime))
+	m.WriteUint32(uint32(d.NewExpirySlot))
+	m.WriteUint32(uint32(d.PreviousExpirySlot))
 	m.WriteBytes(lo.PanicOnErr(d.NewOutputID.Bytes()))
 	m.WriteBytes(lo.PanicOnErr(d.PreviousOutputID.Bytes()))
 	m.WriteUint8(uint8(len(d.BlockIssuerKeysAdded)))
@@ -122,25 +122,27 @@ func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousUpdatedTime); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read previous updated time in the diff")
 	}
-	offset += 8
+	offset += iotago.SlotIndexLength
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.NewExpirySlot); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read new expiry slot in the diff")
 	}
-	offset += 8
+	offset += iotago.SlotIndexLength
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousExpirySlot); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read previous expiry slot in the diff")
 	}
-	offset += 8
+	offset += iotago.SlotIndexLength
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.NewOutputID); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read new outputID in the diff")
 	}
+	offset += iotago.OutputIDLength
 
 	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousOutputID); err != nil {
 		return offset, ierrors.Wrap(err, "unable to read previous outputID in the diff")
 	}
+	offset += iotago.OutputIDLength
 
 	keysAdded, bytesRead, err := readBlockIssuerKeys(reader)
 	if err != nil {
@@ -233,7 +235,7 @@ func readBlockIssuerKey(reader io.ReadSeeker) (iotago.BlockIssuerKey, int, error
 	bytesConsumed++
 
 	switch blockIssuerKeyType {
-	case iotago.Ed25519BlockIssuerKey:
+	case iotago.BlockIssuerKeyEd25519PublicKey:
 		var ed25519PublicKey ed25519.PublicKey
 		var bytesRead, err = io.ReadFull(reader, ed25519PublicKey[:])
 		bytesConsumed += bytesRead
@@ -241,7 +243,19 @@ func readBlockIssuerKey(reader io.ReadSeeker) (iotago.BlockIssuerKey, int, error
 			return nil, bytesConsumed, ierrors.Errorf("unable to read ed25519 public key in account diff: %w", err)
 		}
 
-		return iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519PublicKey), bytesConsumed, nil
+		return iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519PublicKey), bytesConsumed, nil
+
+	// TODO: we need to add this case
+	//case iotago.BlockIssuerKeyEd25519Address:
+	//	var ed25519Address *iotago.ImplicitAccountCreationAddress
+	//	var bytesRead, err = io.ReadFull(reader, ed25519Address[:])
+	//	bytesConsumed += bytesRead
+	//	if err != nil {
+	//		return nil, bytesConsumed, ierrors.Errorf("unable to read ed25519 address key in account diff: %w", err)
+	//	}
+	//
+	//	return iotago.Ed25519AddressBlockIssuerKeyFromAddress(ed25519Address), bytesConsumed, nil
+
 	default:
 		return nil, bytesConsumed, ierrors.Errorf("unsupported block issuer key type %d in account diff", blockIssuerKeyType)
 	}

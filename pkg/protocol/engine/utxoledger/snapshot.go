@@ -17,8 +17,8 @@ func (o *Output) SnapshotBytes() []byte {
 	m := marshalutil.New()
 	m.WriteBytes(o.outputID[:])
 	m.WriteBytes(o.blockID[:])
-	m.WriteUint64(uint64(o.slotBooked))
-	m.WriteUint64(uint64(o.slotCreated))
+	m.WriteUint32(uint32(o.slotBooked))
+	m.WriteUint32(uint32(o.slotCreated))
 	m.WriteUint32(uint32(len(o.encodedOutput)))
 	m.WriteBytes(o.encodedOutput)
 

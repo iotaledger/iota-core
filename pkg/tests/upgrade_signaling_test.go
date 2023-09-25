@@ -97,22 +97,22 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeA").AccountID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-		ExpirySlot:                            math.MaxUint64,
+		ExpirySlot:                            math.MaxUint32,
 		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
-		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
+		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
 		ValidatorStake:                        testsuite.MinValidatorAccountAmount,
 		DelegationStake:                       0,
 		FixedCost:                             0,
-		StakeEndEpoch:                         math.MaxUint64,
+		StakeEndEpoch:                         math.MaxUint32,
 		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{},
 	}, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeF").AccountID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-		ExpirySlot:                            math.MaxUint64,
+		ExpirySlot:                            math.MaxUint32,
 		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 6),
-		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeF").PubKey))),
+		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeF").PubKey))),
 		ValidatorStake:                        0,
 		DelegationStake:                       0,
 		FixedCost:                             0,
@@ -134,26 +134,26 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeA").AccountID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-		ExpirySlot:                            math.MaxUint64,
+		ExpirySlot:                            math.MaxUint32,
 		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
-		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
+		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
 		ValidatorStake:                        testsuite.MinValidatorAccountAmount,
 		DelegationStake:                       0,
 		FixedCost:                             0,
-		StakeEndEpoch:                         math.MaxUint64,
+		StakeEndEpoch:                         math.MaxUint32,
 		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 4, Hash: hash2},
 	}, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeD").AccountID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-		ExpirySlot:                            math.MaxUint64,
+		ExpirySlot:                            math.MaxUint32,
 		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 4),
-		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeD").PubKey))),
+		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeD").PubKey))),
 		ValidatorStake:                        testsuite.MinValidatorAccountAmount,
 		DelegationStake:                       0,
 		FixedCost:                             0,
-		StakeEndEpoch:                         math.MaxUint64,
+		StakeEndEpoch:                         math.MaxUint32,
 		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 3, Hash: hash2},
 	}, ts.Nodes()...)
 
@@ -168,13 +168,13 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeA").AccountID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-		ExpirySlot:                            math.MaxUint64,
+		ExpirySlot:                            math.MaxUint32,
 		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
-		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
+		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
 		ValidatorStake:                        testsuite.MinValidatorAccountAmount,
 		DelegationStake:                       0,
 		FixedCost:                             0,
-		StakeEndEpoch:                         math.MaxUint64,
+		StakeEndEpoch:                         math.MaxUint32,
 		LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash1},
 	}, ts.Nodes()...)
 
@@ -341,26 +341,26 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		ts.AssertAccountData(&accounts.AccountData{
 			ID:                                    ts.Node("nodeA").AccountID,
 			Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-			ExpirySlot:                            math.MaxUint64,
+			ExpirySlot:                            math.MaxUint32,
 			OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
-			BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
+			BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
 			ValidatorStake:                        testsuite.MinValidatorAccountAmount,
 			DelegationStake:                       0,
 			FixedCost:                             0,
-			StakeEndEpoch:                         math.MaxUint64,
+			StakeEndEpoch:                         math.MaxUint32,
 			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash1},
 		}, ts.Nodes()...)
 
 		ts.AssertAccountData(&accounts.AccountData{
 			ID:                                    ts.Node("nodeD").AccountID,
 			Credits:                               &accounts.BlockIssuanceCredits{Value: math.MaxInt64, UpdateTime: 0},
-			ExpirySlot:                            math.MaxUint64,
+			ExpirySlot:                            math.MaxUint32,
 			OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 4),
-			BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(ts.Node("nodeD").PubKey))),
+			BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeD").PubKey))),
 			ValidatorStake:                        testsuite.MinValidatorAccountAmount,
 			DelegationStake:                       0,
 			FixedCost:                             0,
-			StakeEndEpoch:                         math.MaxUint64,
+			StakeEndEpoch:                         math.MaxUint32,
 			LatestSupportedProtocolVersionAndHash: model.VersionAndHash{Version: 5, Hash: hash2},
 		}, ts.Nodes()...)
 	}

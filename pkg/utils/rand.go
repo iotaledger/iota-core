@@ -79,12 +79,12 @@ func RandOutputID(index ...uint16) iotago.OutputID {
 	}
 
 	var outputID iotago.OutputID
-	_, err := RandomRead(outputID[:iotago.TransactionIDLength])
+	_, err := RandomRead(outputID[:iotago.SlotIdentifierLength])
 	if err != nil {
 		panic(err)
 	}
 
-	binary.LittleEndian.PutUint16(outputID[iotago.TransactionIDLength:], idx)
+	binary.LittleEndian.PutUint16(outputID[iotago.SlotIdentifierLength:], idx)
 
 	return outputID
 }
@@ -98,7 +98,7 @@ func RandBlockID() iotago.BlockID {
 
 func RandTransactionID() iotago.TransactionID {
 	transactionID := iotago.TransactionID{}
-	copy(transactionID[:], RandBytes(iotago.TransactionIDLength))
+	copy(transactionID[:], RandBytes(iotago.SlotIdentifierLength))
 
 	return transactionID
 }
@@ -243,7 +243,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 }
 
 func RandBlockIssuerKey() iotago.BlockIssuerKey {
-	return iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(RandBytes(32)))
+	return iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(RandBytes(32)))
 }
 
 func RandBlockIssuerKeys() iotago.BlockIssuerKeys {

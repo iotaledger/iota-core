@@ -8,13 +8,16 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
+)
+
+const (
+	TestTransactionCreationSlot = 0
 )
 
 // TestConflictDAG runs the generic tests for the ConflictDAG.
@@ -37,14 +40,7 @@ func newTestFramework(t *testing.T) *tests.Framework {
 
 // transactionID creates a (made up) TransactionID from the given alias.
 func transactionID(alias string) iotago.TransactionID {
-	hashedAlias := blake2b.Sum256([]byte(alias))
-
-	var result iotago.TransactionID
-	result, _, err := iotago.IdentifierFromBytes(hashedAlias[:])
-	if err != nil {
-		panic(err)
-	}
-
+	result := iotago.TransactionIDFromData(TestTransactionCreationSlot, []byte(alias))
 	result.RegisterAlias(alias)
 
 	return result
@@ -52,9 +48,7 @@ func transactionID(alias string) iotago.TransactionID {
 
 // outputID creates a (made up) OutputID from the given alias.
 func outputID(alias string) iotago.OutputID {
-	hashedAlias := blake2b.Sum256([]byte(alias))
-
-	return iotago.OutputIDFromTransactionIDAndIndex(iotago.IdentifierFromData(hashedAlias[:]), 1)
+	return iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionIDFromData(TestTransactionCreationSlot, []byte(alias)), 1)
 }
 
 func TestMemoryRelease(t *testing.T) {

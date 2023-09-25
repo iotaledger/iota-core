@@ -111,7 +111,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.UpdateTime); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read updatedTime for account balance for accountID %s", a.ID)
 	}
-	bytesConsumed += 8
+	bytesConsumed += iotago.SlotIndexLength
 
 	if err := binary.Read(reader, binary.LittleEndian, &a.ExpirySlot); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read expiry slot for accountID %s", a.ID)
@@ -138,14 +138,14 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 		bytesConsumed++
 
 		switch blockIssuerKeyType {
-		case iotago.Ed25519BlockIssuerKey:
+		case iotago.BlockIssuerKeyEd25519PublicKey:
 			var ed25519PublicKey ed25519.PublicKey
 			bytesRead, err = io.ReadFull(reader, ed25519PublicKey[:])
 			if err != nil {
 				return bytesConsumed, ierrors.Wrapf(err, "unable to read public key index %d for accountID %s", i, a.ID)
 			}
 			bytesConsumed += bytesRead
-			blockIssuerKeys[i] = iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519PublicKey)
+			blockIssuerKeys[i] = iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519PublicKey)
 		default:
 			return bytesConsumed, ierrors.Wrapf(err, "unsupported block issuer key type %d for accountID %s at offset %d", blockIssuerKeyType, a.ID, i)
 		}
@@ -155,22 +155,22 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	if err := binary.Read(reader, binary.LittleEndian, &(a.ValidatorStake)); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read validator stake for accountID %s", a.ID)
 	}
-	bytesConsumed += 8
+	bytesConsumed += iotago.BaseTokenSize
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.DelegationStake)); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read delegation stake for accountID %s", a.ID)
 	}
-	bytesConsumed += 8
+	bytesConsumed += iotago.BaseTokenSize
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.FixedCost)); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read fixed cost for accountID %s", a.ID)
 	}
-	bytesConsumed += 8
+	bytesConsumed += iotago.ManaSize
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.StakeEndEpoch)); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read stake end epoch for accountID %s", a.ID)
 	}
-	bytesConsumed += 8
+	bytesConsumed += iotago.EpochIndexLength
 
 	versionAndHashBytes := make([]byte, model.VersionAndHashSize)
 	if err := binary.Read(reader, binary.LittleEndian, versionAndHashBytes); err != nil {
@@ -194,7 +194,7 @@ func (a AccountData) Bytes() ([]byte, error) {
 	m := marshalutil.New()
 	m.WriteBytes(idBytes)
 	m.WriteBytes(lo.PanicOnErr(a.Credits.Bytes()))
-	m.WriteUint64(uint64(a.ExpirySlot))
+	m.WriteUint32(uint32(a.ExpirySlot))
 	m.WriteBytes(lo.PanicOnErr(a.OutputID.Bytes()))
 	m.WriteByte(byte(a.BlockIssuerKeys.Size()))
 	a.BlockIssuerKeys.Range(func(blockIssuerKey iotago.BlockIssuerKey) {
@@ -204,7 +204,7 @@ func (a AccountData) Bytes() ([]byte, error) {
 	m.WriteUint64(uint64(a.ValidatorStake))
 	m.WriteUint64(uint64(a.DelegationStake))
 	m.WriteUint64(uint64(a.FixedCost))
-	m.WriteUint64(uint64(a.StakeEndEpoch))
+	m.WriteUint32(uint32(a.StakeEndEpoch))
 	m.WriteBytes(lo.PanicOnErr(a.LatestSupportedProtocolVersionAndHash.Bytes()))
 
 	return m.Bytes(), nil

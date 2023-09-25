@@ -160,9 +160,9 @@ func NewOutput(apiProvider iotago.APIProvider, blockID iotago.BlockID, slotIndex
 // - kvStorable
 
 func outputStorageKeyForOutputID(outputID iotago.OutputID) []byte {
-	ms := marshalutil.New(35)
+	ms := marshalutil.New(iotago.OutputIDLength + 1)
 	ms.WriteByte(StoreKeyPrefixOutput) // 1 byte
-	ms.WriteBytes(outputID[:])         // 34 bytes
+	ms.WriteBytes(outputID[:])         // iotago.OutputIDLength bytes
 
 	return ms.Bytes()
 }
@@ -173,9 +173,9 @@ func (o *Output) KVStorableKey() (key []byte) {
 
 func (o *Output) KVStorableValue() (value []byte) {
 	ms := marshalutil.New()
-	ms.WriteBytes(o.blockID[:])              // 40 bytes
-	ms.WriteBytes(o.slotBooked.MustBytes())  // 8 bytes
-	ms.WriteBytes(o.slotCreated.MustBytes()) // 8 bytes
+	ms.WriteBytes(o.blockID[:])              // SlotIdentifierLength bytes
+	ms.WriteBytes(o.slotBooked.MustBytes())  // 4 bytes
+	ms.WriteBytes(o.slotCreated.MustBytes()) // 4 bytes
 	ms.WriteBytes(o.encodedOutput)
 
 	return ms.Bytes()

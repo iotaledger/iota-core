@@ -43,7 +43,11 @@ import (
 // | node1       | node1       |
 // | node2       | node2       |.
 
-var GenesisTransactionID = iotago.IdentifierFromData([]byte("genesis"))
+const (
+	GenesisTransactionCreationSlot = 0
+)
+
+var GenesisTransactionID = iotago.TransactionIDFromData(GenesisTransactionCreationSlot, []byte("genesis"))
 
 func CreateSnapshot(opts ...options.Option[Options]) error {
 	opt := NewOptions(opts...)
@@ -70,7 +74,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	for _, accountData := range opt.Accounts {
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
-			blockIssuerKeyEd25519, ok := accountData.IssuerKey.(iotago.BlockIssuerKeyEd25519)
+			blockIssuerKeyEd25519, ok := accountData.IssuerKey.(iotago.Ed25519PublicKeyBlockIssuerKey)
 			if !ok {
 				panic("block issuer key must be of type ed25519")
 			}

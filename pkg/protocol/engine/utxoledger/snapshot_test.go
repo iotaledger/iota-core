@@ -78,8 +78,8 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 	snapshotBytes := spent.SnapshotBytes()
 
 	require.Equal(t, outputSnapshotBytes, snapshotBytes[:len(outputSnapshotBytes)], "output bytes not equal")
-	require.Equal(t, transactionID[:], snapshotBytes[len(outputSnapshotBytes):len(outputSnapshotBytes)+iotago.TransactionIDLength], "transactionID not equal")
-	require.Equal(t, indexSpent, iotago.SlotIndex(binary.LittleEndian.Uint64(snapshotBytes[len(outputSnapshotBytes)+iotago.TransactionIDLength:])), "timestamp spent not equal")
+	require.Equal(t, transactionID[:], snapshotBytes[len(outputSnapshotBytes):len(outputSnapshotBytes)+iotago.SlotIdentifierLength], "transactionID not equal")
+	require.Equal(t, indexSpent, iotago.SlotIndex(binary.LittleEndian.Uint64(snapshotBytes[len(outputSnapshotBytes)+iotago.SlotIdentifierLength:])), "timestamp spent not equal")
 }
 
 func TestSpentFromSnapshotReader(t *testing.T) {

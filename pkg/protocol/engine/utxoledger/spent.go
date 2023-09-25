@@ -84,9 +84,9 @@ func NewSpent(output *Output, transactionIDSpent iotago.TransactionID, slotIndex
 }
 
 func spentStorageKeyForOutputID(outputID iotago.OutputID) []byte {
-	ms := marshalutil.New(35)
+	ms := marshalutil.New(iotago.OutputIDLength + 1)
 	ms.WriteByte(StoreKeyPrefixOutputSpent) // 1 byte
-	ms.WriteBytes(outputID[:])              // 34 bytes
+	ms.WriteBytes(outputID[:])              // iotago.OutputIDLength bytes
 
 	return ms.Bytes()
 }
@@ -96,9 +96,9 @@ func (s *Spent) KVStorableKey() (key []byte) {
 }
 
 func (s *Spent) KVStorableValue() (value []byte) {
-	ms := marshalutil.New(48)
-	ms.WriteBytes(s.transactionIDSpent[:])      // 32 bytes
-	ms.WriteBytes(s.slotIndexSpent.MustBytes()) // 8 bytes
+	ms := marshalutil.New(iotago.SlotIdentifierLength + iotago.SlotIndexLength)
+	ms.WriteBytes(s.transactionIDSpent[:])      // iotago.SlotIdentifierLength bytes
+	ms.WriteBytes(s.slotIndexSpent.MustBytes()) // iotago.SlotIndexLength bytes
 
 	return ms.Bytes()
 }
@@ -126,7 +126,7 @@ func (s *Spent) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
 		return err
 	}
 
-	// Read milestone index
+	// Read slot index spent index
 	s.slotIndexSpent, err = parseSlotIndex(valueUtil)
 	if err != nil {
 		return err
