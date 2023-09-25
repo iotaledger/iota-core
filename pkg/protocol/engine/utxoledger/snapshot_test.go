@@ -78,8 +78,7 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 	snapshotBytes := spent.SnapshotBytes()
 
 	require.Equal(t, outputSnapshotBytes, snapshotBytes[:len(outputSnapshotBytes)], "output bytes not equal")
-	require.Equal(t, transactionID[:], snapshotBytes[len(outputSnapshotBytes):len(outputSnapshotBytes)+iotago.SlotIdentifierLength], "transactionID not equal")
-	require.Equal(t, indexSpent, lo.Return1(iotago.SlotIndexFromBytes(snapshotBytes[len(outputSnapshotBytes)+iotago.SlotIdentifierLength:])), "timestamp spent not equal")
+	require.Equal(t, transactionID[:], snapshotBytes[len(outputSnapshotBytes):len(outputSnapshotBytes)+iotago.TransactionIDLength], "transactionID not equal")
 }
 
 func TestSpentFromSnapshotReader(t *testing.T) {
@@ -159,9 +158,9 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 
 	reader := writer.BytesReader()
 
-	var readSlotIndex uint64
+	var readSlotIndex iotago.SlotIndex
 	require.NoError(t, binary.Read(reader, binary.LittleEndian, &readSlotIndex))
-	require.Equal(t, uint64(index), readSlotIndex)
+	require.Equal(t, iotago.SlotIndex(index), readSlotIndex)
 
 	var createdCount uint64
 	require.NoError(t, binary.Read(reader, binary.LittleEndian, &createdCount))
@@ -333,9 +332,9 @@ func TestManager_Export(t *testing.T) {
 
 		reader := writer.BytesReader()
 
-		var snapshotLedgerIndex uint64
+		var snapshotLedgerIndex iotago.SlotIndex
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex))
-		require.Equal(t, uint64(2), snapshotLedgerIndex)
+		require.Equal(t, iotago.SlotIndex(2), snapshotLedgerIndex)
 
 		var outputCount uint64
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &outputCount))
@@ -366,9 +365,9 @@ func TestManager_Export(t *testing.T) {
 
 		reader := writer.BytesReader()
 
-		var snapshotLedgerIndex uint64
+		var snapshotLedgerIndex iotago.SlotIndex
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex))
-		require.Equal(t, uint64(2), snapshotLedgerIndex)
+		require.Equal(t, iotago.SlotIndex(2), snapshotLedgerIndex)
 
 		var outputCount uint64
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &outputCount))
@@ -393,7 +392,7 @@ func TestManager_Export(t *testing.T) {
 		for i := uint64(0); i < slotDiffCount; i++ {
 			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
-			require.Equal(t, snapshotLedgerIndex-i, uint64(diff.Index))
+			require.Equal(t, snapshotLedgerIndex-iotago.SlotIndex(i), diff.Index)
 		}
 	}
 
@@ -404,9 +403,9 @@ func TestManager_Export(t *testing.T) {
 
 		reader := writer.BytesReader()
 
-		var snapshotLedgerIndex uint64
+		var snapshotLedgerIndex iotago.SlotIndex
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex))
-		require.Equal(t, uint64(2), snapshotLedgerIndex)
+		require.Equal(t, iotago.SlotIndex(2), snapshotLedgerIndex)
 
 		var outputCount uint64
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &outputCount))
@@ -431,7 +430,7 @@ func TestManager_Export(t *testing.T) {
 		for i := uint64(0); i < slotDiffCount; i++ {
 			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
-			require.Equal(t, snapshotLedgerIndex-i, uint64(diff.Index))
+			require.Equal(t, snapshotLedgerIndex-iotago.SlotIndex(i), diff.Index)
 		}
 	}
 }

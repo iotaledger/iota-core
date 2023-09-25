@@ -90,11 +90,11 @@ func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvide
 func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider) (*SlotDiff, error) {
 	slotDiff := &SlotDiff{}
 
-	var diffIndex uint64
+	var diffIndex iotago.SlotIndex
 	if err := binary.Read(reader, binary.LittleEndian, &diffIndex); err != nil {
 		return nil, ierrors.Errorf("unable to read slot diff index: %w", err)
 	}
-	slotDiff.Index = iotago.SlotIndex(diffIndex)
+	slotDiff.Index = diffIndex
 
 	var createdCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &createdCount); err != nil {
@@ -132,7 +132,7 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIPr
 func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *SlotDiff) (written int64, err error) {
 	var totalBytesWritten int64
 
-	if err := utils.WriteValueFunc(writer, uint64(diff.Index), &totalBytesWritten); err != nil {
+	if err := utils.WriteValueFunc(writer, diff.Index.MustBytes(), &totalBytesWritten); err != nil {
 		return 0, ierrors.Wrap(err, "unable to write slot diff index")
 	}
 
@@ -164,7 +164,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
-	var snapshotLedgerIndex uint64
+	var snapshotLedgerIndex iotago.SlotIndex
 	if err := binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex); err != nil {
 		return ierrors.Errorf("unable to read LS ledger index: %w", err)
 	}
@@ -200,8 +200,8 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 			return err
 		}
 
-		if slotDiff.Index != iotago.SlotIndex(snapshotLedgerIndex-i) {
-			return ierrors.Errorf("invalid LS slot index. %d vs %d", slotDiff.Index, snapshotLedgerIndex-i)
+		if slotDiff.Index != snapshotLedgerIndex-iotago.SlotIndex(i) {
+			return ierrors.Errorf("invalid LS slot index. %d vs %d", slotDiff.Index, snapshotLedgerIndex-iotago.SlotIndex(i))
 		}
 
 		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
