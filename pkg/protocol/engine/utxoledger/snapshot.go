@@ -68,7 +68,7 @@ func (s *Spent) SnapshotBytes() []byte {
 	m := marshalutil.New()
 	m.WriteBytes(s.Output().SnapshotBytes())
 	m.WriteBytes(s.transactionIDSpent[:])
-	m.WriteBytes(s.slotIndexSpent.MustBytes())
+
 	// we don't need to write indexSpent because this info is available in the milestoneDiff that consumes the output
 	return m.Bytes()
 }
@@ -82,11 +82,6 @@ func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvide
 	transactionIDSpent := iotago.TransactionID{}
 	if _, err := io.ReadFull(reader, transactionIDSpent[:]); err != nil {
 		return nil, ierrors.Errorf("unable to read LS transaction ID spent: %w", err)
-	}
-
-	var timestampSpent int64
-	if err := binary.Read(reader, binary.LittleEndian, &timestampSpent); err != nil {
-		return nil, ierrors.Errorf("unable to read LS output milestone timestamp booked: %w", err)
 	}
 
 	return NewSpent(output, transactionIDSpent, indexSpent), nil
