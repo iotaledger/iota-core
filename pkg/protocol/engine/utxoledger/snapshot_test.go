@@ -33,11 +33,11 @@ func TestOutput_SnapshotBytes(t *testing.T) {
 	snapshotBytes := output.SnapshotBytes()
 
 	require.Equal(t, outputID[:], snapshotBytes[:iotago.OutputIDLength], "outputID not equal")
-	require.Equal(t, blockID[:], snapshotBytes[iotago.OutputIDLength:iotago.OutputIDLength+iotago.BlockIDLength], "blockID not equal")
-	require.Equal(t, uint64(indexBooked), binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength:iotago.OutputIDLength+iotago.BlockIDLength+8]), "indexBooked not equal")
-	require.Equal(t, uint64(slotCreated), binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8:iotago.OutputIDLength+iotago.BlockIDLength+8+8]), "slotCreated not equal")
-	require.Equal(t, uint32(len(iotaOutputBytes)), binary.LittleEndian.Uint32(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8+8:iotago.OutputIDLength+iotago.BlockIDLength+8+8+4]), "output bytes length")
-	require.Equal(t, iotaOutputBytes, snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8+8+4:], "output bytes not equal")
+	require.Equal(t, blockID[:], snapshotBytes[iotago.OutputIDLength:iotago.OutputIDLength+iotago.SlotIdentifierLength], "blockID not equal")
+	require.Equal(t, iotago.SlotIndex(indexBooked), lo.Return1(iotago.SlotIndexFromBytes(snapshotBytes[iotago.OutputIDLength+iotago.SlotIdentifierLength:iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength])), "indexBooked not equal")
+	require.Equal(t, iotago.SlotIndex(slotCreated), lo.Return1(iotago.SlotIndexFromBytes(snapshotBytes[iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength:iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength*2])), "slotCreated not equal")
+	require.Equal(t, uint32(len(iotaOutputBytes)), binary.LittleEndian.Uint32(snapshotBytes[iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength*2:iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength*2+4]), "output bytes length")
+	require.Equal(t, iotaOutputBytes, snapshotBytes[iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength*2+4:], "output bytes not equal")
 }
 
 func TestOutputFromSnapshotReader(t *testing.T) {
@@ -79,7 +79,7 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 
 	require.Equal(t, outputSnapshotBytes, snapshotBytes[:len(outputSnapshotBytes)], "output bytes not equal")
 	require.Equal(t, transactionID[:], snapshotBytes[len(outputSnapshotBytes):len(outputSnapshotBytes)+iotago.SlotIdentifierLength], "transactionID not equal")
-	require.Equal(t, indexSpent, iotago.SlotIndex(binary.LittleEndian.Uint64(snapshotBytes[len(outputSnapshotBytes)+iotago.SlotIdentifierLength:])), "timestamp spent not equal")
+	require.Equal(t, indexSpent, lo.Return1(iotago.SlotIndexFromBytes(snapshotBytes[len(outputSnapshotBytes)+iotago.SlotIdentifierLength:])), "timestamp spent not equal")
 }
 
 func TestSpentFromSnapshotReader(t *testing.T) {
