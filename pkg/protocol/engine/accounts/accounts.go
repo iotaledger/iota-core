@@ -190,7 +190,7 @@ func (a AccountData) Bytes() ([]byte, error) {
 	m.WriteBytes(lo.PanicOnErr(a.Credits.Bytes()))
 	m.WriteUint32(uint32(a.ExpirySlot))
 	m.WriteBytes(lo.PanicOnErr(a.OutputID.Bytes()))
-	m.WriteByte(byte(a.BlockIssuerKeys.Size()))
+	m.WriteByte(byte(len(a.BlockIssuerKeys)))
 	for _, key := range a.BlockIssuerKeys {
 		m.WriteBytes(key.Bytes())
 	}
