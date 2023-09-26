@@ -17,9 +17,9 @@ type OutputConsumer func(output *Output) bool
 type LookupKey []byte
 
 func lookupKeyUnspentOutput(outputID iotago.OutputID) LookupKey {
-	ms := marshalutil.New(35)
+	ms := marshalutil.New(iotago.OutputIDLength + 1)
 	ms.WriteByte(StoreKeyPrefixOutputUnspent) // 1 byte
-	ms.WriteBytes(outputID[:])                // 34 bytes
+	ms.WriteBytes(outputID[:])                // iotago.OutputIDLength bytes
 
 	return ms.Bytes()
 }

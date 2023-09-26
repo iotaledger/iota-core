@@ -3,7 +3,6 @@ package tests
 import (
 	"testing"
 
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
@@ -55,7 +54,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
 		OutputID:        genesisAccount.OutputID(),
 		ExpirySlot:      1,
-		BlockIssuerKeys: ds.NewSet(oldGenesisOutputKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(oldGenesisOutputKey),
 	}, ts.Nodes()...)
 
 	// MODIFY EXISTING GENESIS ACCOUNT AND PREPARE SOME BASIC OUTPUTS
@@ -105,15 +104,15 @@ func Test_TransitionAccount(t *testing.T) {
 		NewExpirySlot:          1,
 		NewOutputID:            iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
 		PreviousOutputID:       genesisAccount.OutputID(),
-		BlockIssuerKeysRemoved: iotago.BlockIssuerKeys{},
-		BlockIssuerKeysAdded:   iotago.BlockIssuerKeys{newGenesisOutputKey},
+		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
+		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newGenesisOutputKey),
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              genesisAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
 		OutputID:        iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
-		BlockIssuerKeys: ds.NewSet(oldGenesisOutputKey, newGenesisOutputKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ExpirySlot:      1,
 	}, ts.Nodes()...)
 
@@ -129,7 +128,7 @@ func Test_TransitionAccount(t *testing.T) {
 			&iotago.GovernorAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
 		}),
 		testsuite.WithBlockIssuerFeature(&iotago.BlockIssuerFeature{
-			BlockIssuerKeys: iotago.BlockIssuerKeys{newAccountBlockIssuerKey},
+			BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 			ExpirySlot:      newAccountExpirySlot,
 		}),
 		testsuite.WithStakingFeature(&iotago.StakingFeature{
@@ -156,7 +155,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithInputs(inputForNewAccount),
 		testsuite.WithAccountInput(destroyedAccountInput, true),
 		testsuite.WithOutputs(append(newAccountOutputs, destructionOutputs...)),
-		testsuite.WithCreationSlot(slotIndexBlock2),
+		testsuite.WithSlotCreated(slotIndexBlock2),
 	))
 
 	block2 := ts.IssueBlockAtSlotWithOptions("block2", slotIndexBlock2, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx2, blockfactory.WithStrongParents(latestParent.ID()))
@@ -171,8 +170,8 @@ func Test_TransitionAccount(t *testing.T) {
 		PreviousExpirySlot:     1,
 		NewOutputID:            iotago.EmptyOutputID,
 		PreviousOutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
-		BlockIssuerKeysAdded:   iotago.BlockIssuerKeys{},
-		BlockIssuerKeysRemoved: iotago.BlockIssuerKeys{oldGenesisOutputKey, newGenesisOutputKey},
+		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
+		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ValidatorStakeChange:   0,
 		StakeEndEpochChange:    0,
 		FixedCostChange:        0,
@@ -189,8 +188,8 @@ func Test_TransitionAccount(t *testing.T) {
 		PreviousExpirySlot:     0,
 		NewOutputID:            newAccount.OutputID(),
 		PreviousOutputID:       iotago.EmptyOutputID,
-		BlockIssuerKeysAdded:   iotago.BlockIssuerKeys{newAccountBlockIssuerKey},
-		BlockIssuerKeysRemoved: iotago.BlockIssuerKeys{},
+		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
+		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
 		ValidatorStakeChange:   10000,
 		StakeEndEpochChange:    10,
 		FixedCostChange:        421,
@@ -202,7 +201,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock2),
 		ExpirySlot:      newAccountExpirySlot,
 		OutputID:        newAccount.OutputID(),
-		BlockIssuerKeys: ds.NewSet(newAccountBlockIssuerKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: 0,
@@ -226,7 +225,7 @@ func Test_TransitionAccount(t *testing.T) {
 		}),
 		testsuite.WithInputs(inputForNewDelegation),
 		testsuite.WithOutputs(newDelegationOutputs),
-		testsuite.WithCreationSlot(slotIndexBlock3),
+		testsuite.WithSlotCreated(slotIndexBlock3),
 	))
 
 	block3 := ts.IssueBlockAtSlotWithOptions("block3", slotIndexBlock3, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx3, blockfactory.WithStrongParents(latestParent.ID()))
@@ -239,8 +238,8 @@ func Test_TransitionAccount(t *testing.T) {
 		PreviousUpdatedTime:    0,
 		NewOutputID:            iotago.EmptyOutputID,
 		PreviousOutputID:       iotago.EmptyOutputID,
-		BlockIssuerKeysAdded:   iotago.BlockIssuerKeys{},
-		BlockIssuerKeysRemoved: iotago.BlockIssuerKeys{},
+		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
+		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
 		ValidatorStakeChange:   0,
 		StakeEndEpochChange:    0,
 		FixedCostChange:        0,
@@ -252,7 +251,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock2),
 		ExpirySlot:      newAccountExpirySlot,
 		OutputID:        newAccount.OutputID(),
-		BlockIssuerKeys: ds.NewSet(newAccountBlockIssuerKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(delegatedAmount),
@@ -270,7 +269,7 @@ func Test_TransitionAccount(t *testing.T) {
 		}),
 		testsuite.WithInputs(inputForDelegationTransition),
 		testsuite.WithOutputs(delegationTransitionOutputs),
-		testsuite.WithCreationSlot(slotIndexBlock3),
+		testsuite.WithSlotCreated(slotIndexBlock3),
 	))
 
 	slotIndexBlock4 := latestParent.ID().Index()
@@ -284,8 +283,8 @@ func Test_TransitionAccount(t *testing.T) {
 		PreviousUpdatedTime:    0,
 		NewOutputID:            iotago.EmptyOutputID,
 		PreviousOutputID:       iotago.EmptyOutputID,
-		BlockIssuerKeysAdded:   iotago.BlockIssuerKeys{},
-		BlockIssuerKeysRemoved: iotago.BlockIssuerKeys{},
+		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
+		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
 		ValidatorStakeChange:   0,
 		StakeEndEpochChange:    0,
 		FixedCostChange:        0,
@@ -297,7 +296,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock2),
 		ExpirySlot:      newAccountExpirySlot,
 		OutputID:        newAccount.OutputID(),
-		BlockIssuerKeys: ds.NewSet(newAccountBlockIssuerKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(delegatedAmount),

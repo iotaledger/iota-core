@@ -2,7 +2,6 @@ package testsuite
 
 import (
 	"fmt"
-	"math"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -353,13 +352,13 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			Address:              iotago.Ed25519AddressFromPubKey(node.PubKey),
 			Amount:               amount,
 			Mana:                 iotago.Mana(amount),
-			IssuerKey:            iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(node.PubKey)),
-			ExpirySlot:           math.MaxUint64,
-			BlockIssuanceCredits: iotago.BlockIssuanceCredits(math.MaxInt64),
+			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.PubKey)),
+			ExpirySlot:           iotago.MaxSlotIndex,
+			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits,
 		}
 		if validator {
 			accountDetails.StakedAmount = accountDetails.Amount
-			accountDetails.StakingEpochEnd = math.MaxUint64
+			accountDetails.StakingEpochEnd = iotago.MaxEpochIndex
 			accountDetails.FixedCost = iotago.Mana(0)
 		}
 
@@ -403,7 +402,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 			}
 
 			if accountDetails.AccountID.Empty() {
-				blockIssuerKeyEd25519, ok := accountDetails.IssuerKey.(iotago.BlockIssuerKeyEd25519)
+				blockIssuerKeyEd25519, ok := accountDetails.IssuerKey.(*iotago.Ed25519PublicKeyBlockIssuerKey)
 				if !ok {
 					panic("block issuer key must be of type ed25519")
 				}

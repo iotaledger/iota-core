@@ -225,7 +225,7 @@ func (t *TestSuite) AssertAccountLedgerUntil(slotIndex iotago.SlotIndex, account
 }
 
 func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
-	expectedBlockIssuerKeys := ds.NewSet(t.BlockIssuerKeys(expectedState.BlockIssuerKeys, false)...)
+	expectedBlockIssuerKeys := t.BlockIssuerKeys(expectedState.BlockIssuerKeys, false)
 	expectedCredits := accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(expectedState.BICAmount), expectedState.BICUpdatedTime)
 
 	actualState, exists, err := t.Instance.Account(accountID, slotIndex)
@@ -241,7 +241,7 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 
 	require.Equal(t.T, accountID, actualState.ID)
 	require.Equal(t.T, expectedCredits, actualState.Credits, "slotIndex: %d, accountID %s: expected: %v, actual: %v", slotIndex, accountID, expectedCredits, actualState.Credits)
-	require.Truef(t.T, expectedBlockIssuerKeys.Equals(actualState.BlockIssuerKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedBlockIssuerKeys, actualState.BlockIssuerKeys)
+	require.True(t.T, expectedBlockIssuerKeys.Equal(actualState.BlockIssuerKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedBlockIssuerKeys, actualState.BlockIssuerKeys)
 
 	require.Equal(t.T, t.OutputID(expectedState.OutputID, false), actualState.OutputID)
 	require.Equal(t.T, expectedState.StakeEndEpoch, actualState.StakeEndEpoch, "slotIndex: %d, accountID %s: expected StakeEndEpoch: %d, actual: %d", slotIndex, accountID, expectedState.StakeEndEpoch, actualState.StakeEndEpoch)
@@ -277,7 +277,7 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 			previousAccountState, exists := t.accountsStatePerSlot.Get(slotIndex - 1)
 			require.True(t.T, exists)
 
-			require.Equal(t.T, t.BlockIssuerKeys(previousAccountState[accountID].BlockIssuerKeys, false), actualDiff.BlockIssuerKeysRemoved)
+			require.True(t.T, t.BlockIssuerKeys(previousAccountState[accountID].BlockIssuerKeys, false).Equal(actualDiff.BlockIssuerKeysRemoved))
 			require.Equal(t.T, -iotago.BlockIssuanceCredits(previousAccountState[accountID].BICAmount), actualDiff.BICChange)
 			require.Equal(t.T, iotago.EmptyOutputID, actualDiff.NewOutputID)
 			require.Equal(t.T, iotago.SlotIndex(0), actualDiff.NewExpirySlot)
@@ -333,9 +333,9 @@ func (t *TestSuite) BlockIssuerKey(alias string, createIfNotExists bool) iotago.
 }
 
 func (t *TestSuite) BlockIssuerKeys(blockIssuerKeys []string, createIfNotExists bool) iotago.BlockIssuerKeys {
-	keys := make(iotago.BlockIssuerKeys, len(blockIssuerKeys))
-	for i, blockIssuerKey := range blockIssuerKeys {
-		keys[i] = t.BlockIssuerKey(blockIssuerKey, createIfNotExists)
+	keys := iotago.NewBlockIssuerKeys()
+	for _, blockIssuerKey := range blockIssuerKeys {
+		keys.Add(t.BlockIssuerKey(blockIssuerKey, createIfNotExists))
 	}
 
 	return keys
