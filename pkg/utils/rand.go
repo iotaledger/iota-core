@@ -118,7 +118,7 @@ func RandAccountID() iotago.AccountID {
 }
 
 func RandSlotIndex() iotago.SlotIndex {
-	return iotago.SlotIndex(RandUint64(math.MaxUint64))
+	return iotago.SlotIndex(RandUint32(uint32(iotago.MaxSlotIndex)))
 }
 
 func RandTimestamp() time.Time {
@@ -161,7 +161,7 @@ func RandOutput(outputType iotago.OutputType) iotago.Output {
 }
 
 func RandOutputOnAddress(outputType iotago.OutputType, address iotago.Address) iotago.Output {
-	return RandOutputOnAddressWithAmount(outputType, address, tpkg.RandBaseToken(math.MaxUint64))
+	return RandOutputOnAddressWithAmount(outputType, address, tpkg.RandBaseToken(iotago.MaxBaseToken))
 }
 
 func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.Address, amount iotago.BaseToken) iotago.Output {

@@ -2,7 +2,6 @@ package testsuite
 
 import (
 	"fmt"
-	"math"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -354,12 +353,12 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			Amount:               amount,
 			Mana:                 iotago.Mana(amount),
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.PubKey)),
-			ExpirySlot:           math.MaxUint32,
-			BlockIssuanceCredits: iotago.BlockIssuanceCredits(math.MaxInt64),
+			ExpirySlot:           iotago.MaxSlotIndex,
+			BlockIssuanceCredits: iotago.BlockIssuanceCredits(iotago.MaxBlockIssuanceCredits),
 		}
 		if validator {
 			accountDetails.StakedAmount = accountDetails.Amount
-			accountDetails.StakingEpochEnd = math.MaxUint32
+			accountDetails.StakingEpochEnd = iotago.MaxEpochIndex
 			accountDetails.FixedCost = iotago.Mana(0)
 		}
 

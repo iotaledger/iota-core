@@ -1,7 +1,6 @@
 package accountsfilter
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -170,7 +169,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		accountID,
 		accounts.NewAccountData(
 			accountID,
-			accounts.WithExpirySlot(math.MaxUint32),
+			accounts.WithExpirySlot(iotago.MaxSlotIndex),
 			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
@@ -217,7 +216,7 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 		accountID,
 		accounts.NewAccountData(
 			accountID,
-			accounts.WithExpirySlot(math.MaxUint32),
+			accounts.WithExpirySlot(iotago.MaxSlotIndex),
 			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)

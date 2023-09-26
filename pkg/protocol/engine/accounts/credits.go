@@ -6,9 +6,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// BlockIssuanceCreditsLength is the length of a serialized BlockIssuanceCredits.
-const BlockIssuanceCreditsLength = 8 + 8
-
 // BlockIssuanceCredits is a weight annotated with the slot it was last updated in.
 type BlockIssuanceCredits struct {
 	Value      iotago.BlockIssuanceCredits
