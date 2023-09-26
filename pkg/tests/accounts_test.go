@@ -3,7 +3,6 @@ package tests
 import (
 	"testing"
 
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
@@ -55,7 +54,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
 		OutputID:        genesisAccount.OutputID(),
 		ExpirySlot:      1,
-		BlockIssuerKeys: ds.NewSet(oldGenesisOutputKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(oldGenesisOutputKey),
 	}, ts.Nodes()...)
 
 	// MODIFY EXISTING GENESIS ACCOUNT AND PREPARE SOME BASIC OUTPUTS
@@ -113,7 +112,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ID:              genesisAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
 		OutputID:        iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
-		BlockIssuerKeys: ds.NewSet(oldGenesisOutputKey, newGenesisOutputKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ExpirySlot:      1,
 	}, ts.Nodes()...)
 
@@ -202,7 +201,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock2),
 		ExpirySlot:      newAccountExpirySlot,
 		OutputID:        newAccount.OutputID(),
-		BlockIssuerKeys: ds.NewSet(newAccountBlockIssuerKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: 0,
@@ -252,7 +251,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock2),
 		ExpirySlot:      newAccountExpirySlot,
 		OutputID:        newAccount.OutputID(),
-		BlockIssuerKeys: ds.NewSet(newAccountBlockIssuerKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(delegatedAmount),
@@ -297,7 +296,7 @@ func Test_TransitionAccount(t *testing.T) {
 		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock2),
 		ExpirySlot:      newAccountExpirySlot,
 		OutputID:        newAccount.OutputID(),
-		BlockIssuerKeys: ds.NewSet(newAccountBlockIssuerKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(delegatedAmount),

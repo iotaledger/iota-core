@@ -4,6 +4,10 @@ import iotago "github.com/iotaledger/iota.go/v4"
 
 type MockedOutput struct{}
 
+func (m *MockedOutput) Equal(_ iotago.Output) bool {
+	panic("implement me")
+}
+
 func (m *MockedOutput) Size() int {
 	panic("implement me")
 }

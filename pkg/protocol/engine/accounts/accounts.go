@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -23,7 +22,7 @@ type AccountData struct {
 	Credits         *BlockIssuanceCredits
 	ExpirySlot      iotago.SlotIndex
 	OutputID        iotago.OutputID
-	BlockIssuerKeys ds.Set[iotago.BlockIssuerKey]
+	BlockIssuerKeys iotago.BlockIssuerKeys
 
 	ValidatorStake                        iotago.BaseToken
 	DelegationStake                       iotago.BaseToken
@@ -38,7 +37,7 @@ func NewAccountData(id iotago.AccountID, opts ...options.Option[AccountData]) *A
 		Credits:                               &BlockIssuanceCredits{},
 		ExpirySlot:                            0,
 		OutputID:                              iotago.EmptyOutputID,
-		BlockIssuerKeys:                       ds.NewSet[iotago.BlockIssuerKey](),
+		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(),
 		ValidatorStake:                        0,
 		DelegationStake:                       0,
 		FixedCost:                             0,
@@ -56,17 +55,11 @@ func (a *AccountData) AddBlockIssuerKeys(blockIssuerKeys ...iotago.BlockIssuerKe
 
 func (a *AccountData) RemoveBlockIssuerKey(blockIssuerKeys ...iotago.BlockIssuerKey) {
 	for _, blockIssuerKey := range blockIssuerKeys {
-		k := blockIssuerKey
-		_ = a.BlockIssuerKeys.Delete(k)
+		a.BlockIssuerKeys.Remove(blockIssuerKey)
 	}
 }
 
 func (a *AccountData) Clone() *AccountData {
-	keyCopy := ds.NewSet[iotago.BlockIssuerKey]()
-	a.BlockIssuerKeys.Range(func(key iotago.BlockIssuerKey) {
-		keyCopy.Add(key)
-	})
-
 	return &AccountData{
 		ID: a.ID,
 		Credits: &BlockIssuanceCredits{
@@ -75,7 +68,7 @@ func (a *AccountData) Clone() *AccountData {
 		},
 		ExpirySlot:      a.ExpirySlot,
 		OutputID:        a.OutputID,
-		BlockIssuerKeys: keyCopy,
+		BlockIssuerKeys: a.BlockIssuerKeys.Clone(),
 
 		ValidatorStake:                        a.ValidatorStake,
 		DelegationStake:                       a.DelegationStake,
@@ -131,7 +124,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	}
 	bytesConsumed++
 
-	blockIssuerKeys := make([]iotago.BlockIssuerKey, blockIssuerKeyCount)
+	a.BlockIssuerKeys = iotago.NewBlockIssuerKeys()
 	for i := uint8(0); i < blockIssuerKeyCount; i++ {
 		var blockIssuerKeyType iotago.BlockIssuerKeyType
 		if err := binary.Read(reader, binary.LittleEndian, &blockIssuerKeyType); err != nil {
@@ -147,12 +140,11 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 				return bytesConsumed, ierrors.Wrapf(err, "unable to read public key index %d for accountID %s", i, a.ID)
 			}
 			bytesConsumed += bytesRead
-			blockIssuerKeys[i] = iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519PublicKey)
+			a.BlockIssuerKeys.Add(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519PublicKey))
 		default:
 			return bytesConsumed, ierrors.Wrapf(err, "unsupported block issuer key type %d for accountID %s at offset %d", blockIssuerKeyType, a.ID, i)
 		}
 	}
-	a.BlockIssuerKeys = ds.NewSet(blockIssuerKeys...)
 
 	if err := binary.Read(reader, binary.LittleEndian, &(a.ValidatorStake)); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read validator stake for accountID %s", a.ID)
@@ -199,9 +191,9 @@ func (a AccountData) Bytes() ([]byte, error) {
 	m.WriteUint32(uint32(a.ExpirySlot))
 	m.WriteBytes(lo.PanicOnErr(a.OutputID.Bytes()))
 	m.WriteByte(byte(a.BlockIssuerKeys.Size()))
-	a.BlockIssuerKeys.Range(func(blockIssuerKey iotago.BlockIssuerKey) {
-		m.WriteBytes(blockIssuerKey.Bytes())
-	})
+	for _, key := range a.BlockIssuerKeys {
+		m.WriteBytes(key.Bytes())
+	}
 
 	m.WriteUint64(uint64(a.ValidatorStake))
 	m.WriteUint64(uint64(a.DelegationStake))

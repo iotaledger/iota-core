@@ -225,7 +225,7 @@ func (t *TestSuite) AssertAccountLedgerUntil(slotIndex iotago.SlotIndex, account
 }
 
 func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
-	expectedBlockIssuerKeys := ds.NewSet(t.BlockIssuerKeys(expectedState.BlockIssuerKeys, false)...)
+	expectedBlockIssuerKeys := t.BlockIssuerKeys(expectedState.BlockIssuerKeys, false)
 	expectedCredits := accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(expectedState.BICAmount), expectedState.BICUpdatedTime)
 
 	actualState, exists, err := t.Instance.Account(accountID, slotIndex)
@@ -241,7 +241,7 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 
 	require.Equal(t.T, accountID, actualState.ID)
 	require.Equal(t.T, expectedCredits, actualState.Credits, "slotIndex: %d, accountID %s: expected: %v, actual: %v", slotIndex, accountID, expectedCredits, actualState.Credits)
-	require.Truef(t.T, expectedBlockIssuerKeys.Equals(actualState.BlockIssuerKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedBlockIssuerKeys, actualState.BlockIssuerKeys)
+	require.Equal(t.T, expectedBlockIssuerKeys, actualState.BlockIssuerKeys, "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedBlockIssuerKeys, actualState.BlockIssuerKeys)
 
 	require.Equal(t.T, t.OutputID(expectedState.OutputID, false), actualState.OutputID)
 	require.Equal(t.T, expectedState.StakeEndEpoch, actualState.StakeEndEpoch, "slotIndex: %d, accountID %s: expected StakeEndEpoch: %d, actual: %d", slotIndex, accountID, expectedState.StakeEndEpoch, actualState.StakeEndEpoch)
