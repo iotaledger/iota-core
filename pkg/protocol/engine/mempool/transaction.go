@@ -8,6 +8,9 @@ type Transaction interface {
 	// ID returns the identifier of the Transaction.
 	ID(iotago.API) (iotago.TransactionID, error)
 
+	// EssenceID returns the essence identifier of the Transaction.
+	//	EssenceID(iotago.API) (iotago.TransactionEssenceID, error)
+
 	// Inputs returns the inputs of the Transaction.
 	Inputs() ([]*iotago.UTXOInput, error)
 
