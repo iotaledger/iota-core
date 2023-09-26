@@ -170,7 +170,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		return ierrors.Errorf("unable to read LS ledger index: %w", err)
 	}
 
-	if err := m.StoreLedgerIndexWithoutLocking(iotago.SlotIndex(snapshotLedgerIndex)); err != nil {
+	if err := m.StoreLedgerIndexWithoutLocking(snapshotLedgerIndex); err != nil {
 		return err
 	}
 
