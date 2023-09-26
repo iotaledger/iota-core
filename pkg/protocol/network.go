@@ -434,7 +434,7 @@ func (n *Network) startAttestationsRequester() {
 			commitment.RequestAttestations.OnUpdate(func(_, requestAttestations bool) {
 				if requestAttestations {
 					if commitment.CumulativeWeight() == 0 {
-						go commitment.IsAttested.Set(true)
+						commitment.IsAttested.Set(true)
 					} else {
 						n.attestationsRequester.StartTicker(commitment.ID())
 					}

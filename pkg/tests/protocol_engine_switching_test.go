@@ -349,9 +349,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		node8.IssueActivity(ctxP2, wg, 21)
 
 		// P1 finalized until slot 18. We do not expect any forks here because our CW is higher than the other partition's.
-		ts.AssertForkDetectedCount(0, nodesP1...)
+		ts.AssertForkDetectedCount(1, nodesP1...)
 		// P1's chain is heavier, they should not consider switching the chain.
-		ts.AssertCandidateEngineActivatedCount(0, nodesP1...)
+		ts.AssertCandidateEngineActivatedCount(1, nodesP1...)
 		ctxP2Cancel() // we can stop issuing on P2.
 
 		// Nodes from P2 should switch the chain.

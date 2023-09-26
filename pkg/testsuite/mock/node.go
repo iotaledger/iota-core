@@ -140,14 +140,15 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 }
 
 func (n *Node) hookEvents() {
-	n.Protocol.HeaviestAttestedChain.OnUpdate(func(_, newChain *protocol.Chain) {
+	n.Protocol.HeaviestAttestedChain.OnUpdate(func(_, heaviestAttestedChain *protocol.Chain) {
 		n.forkDetectedCount.Add(1)
-		newChain.Engine.OnUpdate(func(oldValue, newValue *engine.Engine) {
+
+		heaviestAttestedChain.Engine.OnUpdate(func(_, _ *engine.Engine) {
 			n.candidateEngineActivatedCount.Add(1)
 		})
 	})
 
-	n.Protocol.MainChain.Get().SpawnedEngine.OnUpdate(func(_, newEngine *engine.Engine) {
+	n.Protocol.MainChain.Get().Engine.OnUpdate(func(_, newEngine *engine.Engine) {
 		n.mainEngineSwitchedCount.Add(1)
 	})
 }
@@ -155,67 +156,13 @@ func (n *Node) hookEvents() {
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	n.Protocol.Chains.Chains.OnUpdate(func(mutations ds.SetMutations[*protocol.Chain]) {
 		mutations.AddedElements().Range(func(chain *protocol.Chain) {
-			chain.SpawnedEngine.OnUpdate(func(oldValue, newValue *engine.Engine) {
-				if newValue != nil && n.Name == "node6" {
-					n.attachEngineLogs(failOnBlockFiltered, newValue)
+			chain.SpawnedEngine.OnUpdate(func(_, newEngine *engine.Engine) {
+				if newEngine != nil && n.Name == "node6" && newEngine != n.Protocol.MainEngineInstance() {
+					//n.attachEngineLogs(failOnBlockFiltered, newEngine)
 				}
 			})
 		})
 	})
-
-	//
-	//n.Protocol.OnBlockReceived(func(block *model.Block, source peer.ID) {
-	//	fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
-	//})
-	//
-	//n.Protocol.OnBlockRequestReceived(func(blockID iotago.BlockID, source peer.ID) {
-	//	fmt.Printf("%s > Network.BlockRequestReceived: from %s %s\n", n.Name, source, blockID)
-	//})
-	//
-	//n.Protocol.OnCommitmentReceived(func(commitment *model.Commitment, source peer.ID) {
-	//	fmt.Printf("%s > Network.SlotCommitmentReceived: from %s %s\n", n.Name, source, commitment.ID())
-	//})
-	//
-	//n.Protocol.OnCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, source peer.ID) {
-	//	fmt.Printf("%s > Network.SlotCommitmentRequestReceived: from %s %s\n", n.Name, source, commitmentID)
-	//})
-	//
-	//n.Protocol.OnAttestationsReceived(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
-	//	fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
-	//		return lo.PanicOnErr(a.BlockID())
-	//	}))
-	//})
-	//
-	//n.Protocol.OnAttestationsRequestReceived(func(id iotago.CommitmentID, source peer.ID) {
-	//	fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
-	//})
-	//
-	//n.Protocol.OnCommitmentRequestStarted(func(commitmentID iotago.CommitmentID) {
-	//	fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
-	//})
-	//
-	//n.Protocol.HeaviestAttestedChain.OnUpdate(func(_, newChain *protocol.Chain) {
-	//	fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, newChain.ForkingPoint.Get().ID())
-	//})
-	//
-	//n.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
-	//	fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
-	//})
-
-	// TODO: FIX
-	//n.Protocol.CandidateEngineR().OnUpdate(func(_, engine *engine.Engine) {
-	//	fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, engine.Name(), engine.ChainID(), engine.ChainID().Index())
-
-	//	n.attachEngineLogs(failOnBlockFiltered, engine)
-	//})
-
-	//n.Protocol.MainChain.Get().Engine.OnUpdate(func(_, engine *engine.Engine) {
-	//	fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, engine.Name(), engine.ChainID(), engine.ChainID().Index())
-	//})
-	//
-	//n.Protocol.OnError(func(err error) {
-	//	fmt.Printf("%s > Protocol.Error: %s\n", n.Name, err.Error())
-	//})
 }
 
 func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {

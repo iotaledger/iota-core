@@ -1,18 +1,13 @@
 package protocol
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/libp2p/go-libp2p/core/peer"
-	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
-	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -194,28 +189,12 @@ func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
 
 	c.LatestCommitment.Compute(maxCommitment)
 
-	var triggered atomic.Int64
-
-	stackTrace := debug.StackTrace(false, 0)
-
-	go func() {
-		time.Sleep(5 * time.Second)
-
-		if triggered.Load() == 0 {
-			c.LogError("commitment not triggered after 2 seconds", "index", commitment.Index())
-
-			fmt.Println(stackTrace)
-		}
-	}()
-
 	unsubscribe := lo.Batch(
 		commitment.IsAttested.OnTrigger(func() {
 			c.LatestAttestedCommitment.Compute(maxCommitment)
 		}),
 		commitment.IsVerified.OnTrigger(func() { c.LatestVerifiedCommitment.Compute(maxCommitment) }),
 	)
-
-	triggered.Store(1)
 
 	return func() {
 		unsubscribe()
@@ -246,14 +225,4 @@ func (c *Chain) attestedWeight() reactive.Variable[uint64] {
 
 func (c *Chain) verifiedWeight() reactive.Variable[uint64] {
 	return c.VerifiedWeight
-}
-
-func (c *Chain) promote() {
-	c.LogError("PROMOTED TO MAIN CHAIN")
-
-	parentChain := c.ParentChain.Get()
-	if parentChain != nil {
-		parentChain.Engine.Set(c.Engine.Get())
-		c.ForkingPoint.Get().promote(parentChain)
-	}
 }

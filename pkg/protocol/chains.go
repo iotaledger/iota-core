@@ -70,8 +70,8 @@ func newChains(protocol *Protocol) *Chains {
 		),
 	}
 
-	c.HeaviestChain.LogUpdates(c.protocol, log.LevelInfo, "Unchecked Heavier Chain", (*Chain).LogName)
-	c.HeaviestAttestedChain.LogUpdates(c.protocol, log.LevelInfo, "Attested Heavier Chain", (*Chain).LogName)
+	c.HeaviestChain.LogUpdates(c.protocol, log.LevelTrace, "Unchecked Heavier Chain", (*Chain).LogName)
+	c.HeaviestAttestedChain.LogUpdates(c.protocol, log.LevelTrace, "Attested Heavier Chain", (*Chain).LogName)
 
 	protocol.HookConstructed(func() {
 		trackHeaviestChain := func(chainVariable reactive.Variable[*Chain], getWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
@@ -102,7 +102,7 @@ func newChains(protocol *Protocol) *Chains {
 		c.initChainSwitching()
 	})
 
-	c.initMainChain(NewChain(protocol.Logger))
+	c.initMainChain()
 
 	return c
 }
@@ -150,12 +150,12 @@ func (c *Chains) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()
 	})
 }
 
-func (c *Chains) initMainChain(mainChain *Chain) {
+func (c *Chains) initMainChain() {
+	mainChain := NewChain(c.protocol.Logger)
 	mainChain.InstantiateEngine.Set(true)
-	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) {
-		c.protocol.Events.Engine.LinkTo(newEngine.Events)
-	})
+	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
+	c.MainChain.Set(mainChain)
 	c.Chains.Add(mainChain)
 }
 
@@ -178,31 +178,29 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 }
 
 func (c *Chains) initChainSwitching() {
-	c.HeaviestChain.OnUpdate(func(prevCandidate, newCandidate *Chain) {
-		if prevCandidate != nil {
-			prevCandidate.RequestAttestations.Set(false)
+	c.HeaviestChain.OnUpdate(func(prevHeaviestChain, heaviestChain *Chain) {
+		if prevHeaviestChain != nil {
+			prevHeaviestChain.RequestAttestations.Set(false)
 		}
 
-		if newCandidate != nil {
-			newCandidate.RequestAttestations.Set(true)
+		if !heaviestChain.InstantiateEngine.Get() {
+			heaviestChain.RequestAttestations.Set(true)
 		}
 	})
 
-	c.HeaviestAttestedChain.OnUpdate(func(prevCandidate, newCandidate *Chain) {
-		if prevCandidate != nil {
-			prevCandidate.InstantiateEngine.Set(false)
-		}
-
-		if newCandidate != nil {
-			newCandidate.LogDebug("switching to heaviest attested chain", "name", newCandidate.LogName())
-			newCandidate.InstantiateEngine.Set(true)
-		}
+	c.HeaviestAttestedChain.OnUpdate(func(_, heaviestAttestedChain *Chain) {
+		heaviestAttestedChain.InstantiateEngine.Set(true)
 	})
 
-	c.HeaviestVerifiedChain.OnUpdate(func(prevCandidateChain, newCandidateChain *Chain) {
-		if newCandidateChain != nil {
-			newCandidateChain.promote()
-		}
+	c.HeaviestVerifiedChain.OnUpdate(func(_, heaviestVerifiedChain *Chain) {
+		heaviestVerifiedChain.LogDebug("PROMOTED TO MAIN CHAIN")
+
+		//
+		//parentChain := c.ParentChain.Get()
+		//if parentChain != nil {
+		//	parentChain.Engine.Set(c.Engine.Get())
+		//	c.ForkingPoint.Get().promote(parentChain)
+		//}
 	})
 }
 
@@ -220,11 +218,9 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 				panic(fmt.Sprintf("could not load active engine: %s", err))
 			}
 
-			mainEngine.Ledger.HookInitialized(func() {
-				chain.SpawnedEngine.Set(mainEngine)
+			chain.SpawnedEngine.Set(mainEngine)
 
-				c.protocol.Network.HookStopped(mainEngine.Shutdown)
-			})
+			c.protocol.Network.HookStopped(mainEngine.Shutdown)
 		} else {
 			forkingPoint := chain.ForkingPoint.Get()
 			snapshotTargetIndex := forkingPoint.Index() - 1
@@ -236,11 +232,9 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 				return
 			}
 
-			candidateEngineInstance.Ledger.HookInitialized(func() {
-				chain.SpawnedEngine.Set(candidateEngineInstance)
+			chain.SpawnedEngine.Set(candidateEngineInstance)
 
-				c.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
-			})
+			c.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
 		}
 	})
 }
