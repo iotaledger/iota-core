@@ -21,7 +21,7 @@ func NewTransaction(outputCount uint16, inputs ...*iotago.UTXOInput) *Transactio
 	}
 }
 
-func (t *Transaction) ID(_ iotago.API) (iotago.TransactionID, error) {
+func (t *Transaction) ID() (iotago.TransactionID, error) {
 	return t.id, nil
 }
 

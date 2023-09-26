@@ -130,7 +130,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount A
 	}
 
 	// Make sure we only create syntactically valid blocks.
-	modelBlock, err := model.BlockFromBlock(block, api, serix.WithValidation())
+	modelBlock, err := model.BlockFromBlock(block, serix.WithValidation())
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error serializing block to model block")
 	}
@@ -210,7 +210,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, issuerAccount Account, op
 	}
 
 	// Make sure we only create syntactically valid blocks.
-	modelBlock, err := model.BlockFromBlock(block, api, serix.WithValidation())
+	modelBlock, err := model.BlockFromBlock(block, serix.WithValidation())
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error serializing block to model block")
 	}
@@ -353,7 +353,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 			issuerAccount := optIssuerAccount[0]
 			iotaBlock.IssuerID = issuerAccount.ID()
 
-			signature, signatureErr := iotaBlock.Sign(apiForVesion, iotago.NewAddressKeysForEd25519Address(issuerAccount.Address().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
+			signature, signatureErr := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(issuerAccount.Address().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
 			if signatureErr != nil {
 				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
 			}
@@ -369,7 +369,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		}
 	}
 
-	modelBlock, err := model.BlockFromBlock(iotaBlock, apiForVesion)
+	modelBlock, err := model.BlockFromBlock(iotaBlock)
 	if err != nil {
 		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error serializing block to model block")
 	}

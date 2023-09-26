@@ -130,7 +130,7 @@ type Transaction struct {
 
 // NewTransaction returns a Transaction from the given ledgerstate.Transaction.
 func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
-	txID, err := iotaTx.ID(deps.Protocol.CurrentAPI())
+	txID, err := iotaTx.ID()
 	if err != nil {
 		return nil
 	}

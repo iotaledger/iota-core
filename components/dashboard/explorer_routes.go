@@ -145,7 +145,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 		TransactionID: func() string {
 			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
 				tx, _ := basicBlock.Payload.(*iotago.Transaction)
-				id, _ := tx.ID(lo.PanicOnErr(deps.Protocol.APIForVersion(iotaBlk.ProtocolVersion)))
+				id, _ := tx.ID()
 
 				return id.ToHex()
 			}

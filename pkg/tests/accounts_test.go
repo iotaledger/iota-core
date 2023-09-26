@@ -102,7 +102,7 @@ func Test_TransitionAccount(t *testing.T) {
 		PreviousUpdatedTime:    0,
 		PreviousExpirySlot:     1,
 		NewExpirySlot:          1,
-		NewOutputID:            iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
+		NewOutputID:            iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
 		PreviousOutputID:       genesisAccount.OutputID(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newGenesisOutputKey),
@@ -111,7 +111,7 @@ func Test_TransitionAccount(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              genesisAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
-		OutputID:        iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
+		OutputID:        iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ExpirySlot:      1,
 	}, ts.Nodes()...)
@@ -169,7 +169,7 @@ func Test_TransitionAccount(t *testing.T) {
 		NewExpirySlot:          0,
 		PreviousExpirySlot:     1,
 		NewOutputID:            iotago.EmptyOutputID,
-		PreviousOutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID(ts.API)), 0),
+		PreviousOutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ValidatorStakeChange:   0,
