@@ -58,9 +58,9 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 						c.advanceConfirmed(block.IssuingTime())
 					}, asyncOpt).Unhook,
 
-					e.Events.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-						timeProvider := e.APIForSlot(index).TimeProvider()
-						slotEndTime := timeProvider.SlotEndTime(index)
+					e.Events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+						timeProvider := e.APIForSlot(slot).TimeProvider()
+						slotEndTime := timeProvider.SlotEndTime(slot)
 
 						c.onSlotFinalized(slotEndTime)
 					}, asyncOpt).Unhook,

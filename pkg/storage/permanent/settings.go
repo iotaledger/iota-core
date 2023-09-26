@@ -280,11 +280,11 @@ func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 	return s.latestFinalizedSlot()
 }
 
-func (s *Settings) SetLatestFinalizedSlot(index iotago.SlotIndex) (err error) {
+func (s *Settings) SetLatestFinalizedSlot(slot iotago.SlotIndex) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	return s.storeLatestFinalizedSlot.Set(index)
+	return s.storeLatestFinalizedSlot.Set(slot)
 }
 
 func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {

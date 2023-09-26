@@ -174,11 +174,11 @@ func (b *BlockDAG) setRetainBlockFailureFunc(retainBlockFailure func(blockID iot
 }
 
 // evictSlot is used to evict Blocks from committed slots from the BlockDAG.
-func (b *BlockDAG) evictSlot(index iotago.SlotIndex) {
+func (b *BlockDAG) evictSlot(slot iotago.SlotIndex) {
 	b.solidifierMutex.Lock()
 	defer b.solidifierMutex.Unlock()
 
-	b.solidifier.EvictUntil(index)
+	b.solidifier.EvictUntil(slot)
 }
 
 func (b *BlockDAG) markSolid(block *blocks.Block) (err error) {

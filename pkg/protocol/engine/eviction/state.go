@@ -48,11 +48,11 @@ func (s *State) Initialize(lastCommittedSlot iotago.SlotIndex) {
 	s.lastEvictedSlot = lastCommittedSlot
 }
 
-func (s *State) AdvanceActiveWindowToIndex(index iotago.SlotIndex) {
+func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 	s.evictionMutex.Lock()
-	s.lastEvictedSlot = index
+	s.lastEvictedSlot = slot
 
-	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(index); shouldEvictRootBlocks {
+	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(slot); shouldEvictRootBlocks {
 		// Remember the last slot outside our cache window that has root blocks.
 		if evictedSlot := s.rootBlocks.Evict(delayedIndex); evictedSlot != nil && evictedSlot.Size() > 0 {
 			s.setLatestNonEmptySlot(delayedIndex)
@@ -61,7 +61,7 @@ func (s *State) AdvanceActiveWindowToIndex(index iotago.SlotIndex) {
 
 	s.evictionMutex.Unlock()
 
-	s.Events.SlotEvicted.Trigger(index)
+	s.Events.SlotEvicted.Trigger(slot)
 }
 
 func (s *State) LastEvictedSlot() iotago.SlotIndex {
@@ -84,9 +84,9 @@ func (s *State) ActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
 	defer s.evictionMutex.RUnlock()
 
 	activeRootBlocks := make(map[iotago.BlockID]iotago.CommitmentID)
-	start, end := s.activeIndexRange()
-	for index := start; index <= end; index++ {
-		storage := s.rootBlocks.Get(index)
+	startSlot, endSlot := s.activeIndexRange()
+	for slot := startSlot; slot <= endSlot; slot++ {
+		storage := s.rootBlocks.Get(slot)
 		if storage == nil {
 			continue
 		}
@@ -308,9 +308,9 @@ func (s *State) Rollback(lowerTarget, targetIndex iotago.SlotIndex) error {
 }
 
 // PopulateFromStorage populates the root blocks from the storage.
-func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
-	for index := lo.Return1(s.delayedBlockEvictionThreshold(latestCommitmentIndex)); index <= latestCommitmentIndex; index++ {
-		storedRootBlocks, err := s.rootBlockStorageFunc(index)
+func (s *State) PopulateFromStorage(latestCommitmentSlot iotago.SlotIndex) {
+	for slot := lo.Return1(s.delayedBlockEvictionThreshold(latestCommitmentSlot)); slot <= latestCommitmentSlot; slot++ {
+		storedRootBlocks, err := s.rootBlockStorageFunc(slot)
 		if err != nil {
 			continue
 		}
@@ -348,29 +348,29 @@ func (s *State) setLatestNonEmptySlot(slot iotago.SlotIndex) {
 	}
 }
 
-func (s *State) activeIndexRange() (start, end iotago.SlotIndex) {
-	lastCommitted := s.lastEvictedSlot
-	delayedIndex, valid := s.delayedBlockEvictionThreshold(lastCommitted)
+func (s *State) activeIndexRange() (startSlot, endSlot iotago.SlotIndex) {
+	lastCommittedSlot := s.lastEvictedSlot
+	delayedSlot, valid := s.delayedBlockEvictionThreshold(lastCommittedSlot)
 
 	if !valid {
-		return 0, lastCommitted
+		return 0, lastCommittedSlot
 	}
 
-	if delayedIndex+1 > lastCommitted {
-		return delayedIndex, lastCommitted
+	if delayedSlot+1 > lastCommittedSlot {
+		return delayedSlot, lastCommittedSlot
 	}
 
-	return delayedIndex + 1, lastCommitted
+	return delayedSlot + 1, lastCommittedSlot
 }
 
-func (s *State) withinActiveIndexRange(index iotago.SlotIndex) bool {
-	start, end := s.activeIndexRange()
+func (s *State) withinActiveIndexRange(slot iotago.SlotIndex) bool {
+	startSlot, endSlot := s.activeIndexRange()
 
-	return index >= start && index <= end
+	return slot >= startSlot && slot <= endSlot
 }
 
 // delayedBlockEvictionThreshold returns the slot index that is the threshold for delayed rootblocks eviction.
-func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (threshold iotago.SlotIndex, shouldEvict bool) {
+func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (thresholdSlot iotago.SlotIndex, shouldEvict bool) {
 	if slot < s.optsRootBlocksEvictionDelay {
 		return 0, false
 	}
@@ -397,8 +397,8 @@ func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (threshold 
 }
 
 // WithRootBlocksEvictionDelay sets the time since confirmation threshold.
-func WithRootBlocksEvictionDelay(delay iotago.SlotIndex) options.Option[State] {
+func WithRootBlocksEvictionDelay(evictionDelay iotago.SlotIndex) options.Option[State] {
 	return func(s *State) {
-		s.optsRootBlocksEvictionDelay = delay
+		s.optsRootBlocksEvictionDelay = evictionDelay
 	}
 }

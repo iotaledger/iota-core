@@ -53,12 +53,12 @@ func NewTestSuite(t *testing.T) *TestSuite {
 
 func (t *TestSuite) InitPerformanceTracker() {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
-	performanceFactorFunc := func(index iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error) {
-		if _, exists := prunableStores[index]; !exists {
-			prunableStores[index] = mapdb.NewMapDB()
+	performanceFactorFunc := func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error) {
+		if _, exists := prunableStores[slot]; !exists {
+			prunableStores[slot] = mapdb.NewMapDB()
 		}
 
-		p := slotstore.NewStore(index, prunableStores[index],
+		p := slotstore.NewStore(slot, prunableStores[slot],
 			iotago.Identifier.Bytes,
 			iotago.IdentifierFromBytes,
 			func(s *model.ValidatorPerformance) ([]byte, error) {
@@ -90,7 +90,7 @@ func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.Account
 	return t.accounts[alias]
 }
 
-func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
+func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[string]*EpochActions) {
 	committee := account.NewAccounts()
 	for alias, action := range actions {
 		action.validate(t.T, t.api)
@@ -103,17 +103,17 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 		})
 	}
 
-	err := t.Instance.RegisterCommittee(epochIndex, committee)
+	err := t.Instance.RegisterCommittee(epoch, committee)
 	require.NoError(t.T, err)
 	for accIDAlias, action := range actions {
 		accID := t.Account(accIDAlias, false)
-		t.applyPerformanceFactor(accID, epochIndex, action.ActiveSlotsCount, action.ValidationBlocksSentPerSlot, action.SlotPerformance)
+		t.applyPerformanceFactor(accID, epoch, action.ActiveSlotsCount, action.ValidationBlocksSentPerSlot, action.SlotPerformance)
 	}
 
-	err = t.Instance.ApplyEpoch(epochIndex, committee)
+	err = t.Instance.ApplyEpoch(epoch, committee)
 	require.NoError(t.T, err)
 
-	t.latestCommittedEpoch = epochIndex
+	t.latestCommittedEpoch = epoch
 
 	totalStake := iotago.BaseToken(0)
 	totalValidatorsStake := iotago.BaseToken(0)
@@ -122,17 +122,17 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 		totalValidatorsStake += action.ValidatorStake
 	}
 	profitMarging := t.calculateProfitMargin(totalValidatorsStake, totalStake)
-	t.epochStats[epochIndex] = &model.PoolsStats{
+	t.epochStats[epoch] = &model.PoolsStats{
 		TotalStake:          totalStake,
 		TotalValidatorStake: totalValidatorsStake,
 		ProfitMargin:        profitMarging,
 	}
-	t.poolRewards[epochIndex] = make(map[string]*model.PoolRewards)
+	t.poolRewards[epoch] = make(map[string]*model.PoolRewards)
 
 	for alias, action := range actions {
 		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount >> t.api.ProtocolParameters().TimeProvider().SlotsPerEpochExponent()
-		poolRewards := t.calculatePoolReward(epochIndex, totalValidatorsStake, totalStake, action.PoolStake, action.ValidatorStake, epochPerformanceFactor)
-		t.poolRewards[epochIndex][alias] = &model.PoolRewards{
+		poolRewards := t.calculatePoolReward(epoch, totalValidatorsStake, totalStake, action.PoolStake, action.ValidatorStake, epochPerformanceFactor)
+		t.poolRewards[epoch][alias] = &model.PoolRewards{
 			PoolStake:   action.PoolStake,
 			PoolRewards: iotago.Mana(poolRewards),
 			FixedCost:   action.FixedCost,
@@ -140,19 +140,19 @@ func (t *TestSuite) ApplyEpochActions(epochIndex iotago.EpochIndex, actions map[
 	}
 }
 
-func (t *TestSuite) AssertEpochRewards(epochIndex iotago.EpochIndex, actions map[string]*EpochActions) {
+func (t *TestSuite) AssertEpochRewards(epoch iotago.EpochIndex, actions map[string]*EpochActions) {
 	for alias, action := range actions {
-		poolRewards := t.poolRewards[epochIndex][alias].PoolRewards
-		expectedValidatorReward := t.validatorReward(alias, epochIndex, t.epochStats[epochIndex].ProfitMargin, uint64(poolRewards), uint64(action.ValidatorStake), uint64(action.PoolStake), uint64(action.FixedCost), action)
+		poolRewards := t.poolRewards[epoch][alias].PoolRewards
+		expectedValidatorReward := t.validatorReward(alias, epoch, t.epochStats[epoch].ProfitMargin, uint64(poolRewards), uint64(action.ValidatorStake), uint64(action.PoolStake), uint64(action.FixedCost), action)
 
 		accountID := t.Account(alias, true)
-		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID, actions[alias].ValidatorStake, epochIndex, epochIndex)
+		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID, actions[alias].ValidatorStake, epoch, epoch)
 		require.NoError(t.T, err)
 		require.Equal(t.T, expectedValidatorReward, actualValidatorReward)
 
 		for delegatedAmount := range action.Delegators {
-			expectedDelegatorReward := t.delegatorReward(epochIndex, t.epochStats[epochIndex].ProfitMargin, uint64(poolRewards), uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost), action)
-			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epochIndex, epochIndex)
+			expectedDelegatorReward := t.delegatorReward(epoch, t.epochStats[epoch].ProfitMargin, uint64(poolRewards), uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost), action)
+			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epoch, epoch)
 			require.NoError(t.T, err)
 			require.Equal(t.T, expectedDelegatorReward, actualDelegatorReward)
 		}
@@ -191,12 +191,12 @@ func (t *TestSuite) AssertRewardForDelegatorsOnly(alias string, epoch iotago.Epo
 	}
 }
 
-func (t *TestSuite) validatorReward(alias string, epochIndex iotago.EpochIndex, profitMargin, poolRewards, stakeAmount, poolStake, fixedCost uint64, action *EpochActions) iotago.Mana {
+func (t *TestSuite) validatorReward(alias string, epoch iotago.EpochIndex, profitMargin, poolRewards, stakeAmount, poolStake, fixedCost uint64, action *EpochActions) iotago.Mana {
 	if action.ValidationBlocksSentPerSlot > uint64(t.api.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot) {
 		return iotago.Mana(0)
 	}
-	if action.FixedCost > t.poolRewards[epochIndex][alias].PoolRewards {
-		fmt.Println("No rewards for validator: ", alias, " epoch: ", epochIndex)
+	if action.FixedCost > t.poolRewards[epoch][alias].PoolRewards {
+		fmt.Println("No rewards for validator: ", alias, " epoch: ", epoch)
 		return iotago.Mana(0)
 	}
 	// punishment for too high fixed cost
@@ -211,13 +211,13 @@ func (t *TestSuite) validatorReward(alias string, epochIndex iotago.EpochIndex, 
 	residualValidatorFactor := ((profitMarginComplement * poolRewardsNoFixedCost) >> profitMarginExponent) * stakeAmount / poolStake
 	unDecayedEpochRewards := fixedCost + profitMarginFactor + residualValidatorFactor
 	decayProvider := t.api.ManaDecayProvider()
-	decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochIndex)
+	decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epoch, epoch)
 	require.NoError(t.T, err)
 
 	return decayedEpochRewards
 }
 
-func (t *TestSuite) delegatorReward(epochIndex iotago.EpochIndex, profitMargin, poolRewardWithFixedCost, delegatedAmount, poolStake, fixedCost uint64, action *EpochActions) iotago.Mana {
+func (t *TestSuite) delegatorReward(epoch iotago.EpochIndex, profitMargin, poolRewardWithFixedCost, delegatedAmount, poolStake, fixedCost uint64, action *EpochActions) iotago.Mana {
 	if action.ValidationBlocksSentPerSlot > uint64(t.api.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot) {
 		return iotago.Mana(0)
 	}
@@ -232,7 +232,7 @@ func (t *TestSuite) delegatorReward(epochIndex iotago.EpochIndex, profitMargin, 
 	unDecayedEpochRewards := (((profitMarginComplement * poolRewards) >> profitMarginExponent) * delegatedAmount) / poolStake
 
 	decayProvider := t.api.ManaDecayProvider()
-	decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epochIndex, epochIndex)
+	decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epoch, epoch)
 	require.NoError(t.T, err)
 
 	return decayedEpochRewards
@@ -263,9 +263,9 @@ func (t *TestSuite) calculateProfitMargin(totalValidatorsStake, totalPoolStake i
 	return uint64((totalValidatorsStake << t.api.ProtocolParameters().RewardsParameters().ProfitMarginExponent) / (totalValidatorsStake + totalPoolStake))
 }
 
-func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochIndex iotago.EpochIndex, activeSlotsCount, validationBlocksSentPerSlot, slotPerformanceFactor uint64) {
-	startSlot := t.api.TimeProvider().EpochStart(epochIndex)
-	endSlot := t.api.TimeProvider().EpochEnd(epochIndex)
+func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epoch iotago.EpochIndex, activeSlotsCount, validationBlocksSentPerSlot, slotPerformanceFactor uint64) {
+	startSlot := t.api.TimeProvider().EpochStart(epoch)
+	endSlot := t.api.TimeProvider().EpochEnd(epoch)
 	valBlocksNum := t.api.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
 	subslotDur := time.Duration(t.api.TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
 
@@ -297,18 +297,18 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epochInde
 func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[string]*EpochActions) (map[iotago.EpochIndex]map[string]iotago.Mana, map[iotago.EpochIndex]map[string]iotago.Mana) {
 	delegatorRewardPerAccount := make(map[iotago.EpochIndex]map[string]iotago.Mana)
 	validatorRewardPerAccount := make(map[iotago.EpochIndex]map[string]iotago.Mana)
-	for epochIndex := iotago.EpochIndex(1); epochIndex <= iotago.EpochIndex(epochsCount); epochIndex++ {
-		delegatorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
-		validatorRewardPerAccount[epochIndex] = make(map[string]iotago.Mana)
+	for epoch := iotago.EpochIndex(1); epoch <= iotago.EpochIndex(epochsCount); epoch++ {
+		delegatorRewardPerAccount[epoch] = make(map[string]iotago.Mana)
+		validatorRewardPerAccount[epoch] = make(map[string]iotago.Mana)
 		for aliasAccount := range epochActions {
-			reward, _, _, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epochIndex, epochIndex)
+			reward, _, _, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epoch, epoch)
 			require.NoError(t.T, err)
-			delegatorRewardPerAccount[epochIndex][aliasAccount] = reward
+			delegatorRewardPerAccount[epoch][aliasAccount] = reward
 		}
 		for aliasAccount := range epochActions {
-			reward, _, _, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true), 1, epochIndex, epochIndex)
+			reward, _, _, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true), 1, epoch, epoch)
 			require.NoError(t.T, err)
-			validatorRewardPerAccount[epochIndex][aliasAccount] = reward
+			validatorRewardPerAccount[epoch][aliasAccount] = reward
 		}
 	}
 	return delegatorRewardPerAccount, validatorRewardPerAccount

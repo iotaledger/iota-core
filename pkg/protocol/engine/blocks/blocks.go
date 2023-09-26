@@ -26,13 +26,13 @@ func New(evictionState *eviction.State, apiProvider iotago.APIProvider) *Blocks 
 	}
 }
 
-func (b *Blocks) EvictUntil(index iotago.SlotIndex) {
-	b.Evict.Trigger(index)
+func (b *Blocks) EvictUntil(slot iotago.SlotIndex) {
+	b.Evict.Trigger(slot)
 
 	b.evictionMutex.Lock()
 	defer b.evictionMutex.Unlock()
 
-	b.blocks.Evict(index)
+	b.blocks.Evict(slot)
 }
 
 func (b *Blocks) Block(id iotago.BlockID) (block *Block, exists bool) {

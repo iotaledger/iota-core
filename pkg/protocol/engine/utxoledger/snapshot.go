@@ -35,8 +35,8 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvid
 		return nil, ierrors.Errorf("unable to read LS block ID: %w", err)
 	}
 
-	var indexBooked iotago.SlotIndex
-	if err := binary.Read(reader, binary.LittleEndian, &indexBooked); err != nil {
+	var slotBooked iotago.SlotIndex
+	if err := binary.Read(reader, binary.LittleEndian, &slotBooked); err != nil {
 		return nil, ierrors.Errorf("unable to read LS output milestone index booked: %w", err)
 	}
 
@@ -55,7 +55,7 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvid
 		return nil, ierrors.Errorf("invalid LS output address: %w", err)
 	}
 
-	return CreateOutput(apiProvider, outputID, blockID, indexBooked, output, outputBytes), nil
+	return CreateOutput(apiProvider, outputID, blockID, slotBooked, output, outputBytes), nil
 }
 
 func (s *Spent) SnapshotBytes() []byte {

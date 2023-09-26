@@ -27,14 +27,14 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputFoundry),
 	}
 
-	index := iotago.SlotIndex(756)
+	slot := iotago.SlotIndex(756)
 
 	spents := utxoledger.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[3], slot),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[2], slot),
 	}
 
-	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.ApplyDiffWithoutLocking(slot, outputs, spents))
 
 	require.NotEqual(t, manager.StateTreeRoot(), iotago.Identifier{})
 	require.True(t, manager.CheckStateTree())
@@ -63,7 +63,7 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 	}))
 	require.Equal(t, 2, spentCount)
 
-	require.NoError(t, manager.RollbackDiffWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.RollbackDiffWithoutLocking(slot, outputs, spents))
 
 	require.NoError(t, manager.ForEachOutput(func(_ *utxoledger.Output) bool {
 		require.Fail(t, "should not be called")

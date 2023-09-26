@@ -207,12 +207,12 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteCommitmentByIndexBlockIDs, func(c echo.Context) error {
-		slotIndex, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
+		slot, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getSlotBlockIDs(slotIndex)
+		resp, err := getSlotBlockIDs(slot)
 		if err != nil {
 			return err
 		}
@@ -221,12 +221,12 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteCommitmentByIndexTransactionIDs, func(c echo.Context) error {
-		slotIndex, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
+		slot, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getSlotTransactionIDs(slotIndex)
+		resp, err := getSlotTransactionIDs(slot)
 		if err != nil {
 			return err
 		}

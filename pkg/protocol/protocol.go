@@ -238,8 +238,8 @@ func (p *Protocol) initChainManager() {
 		p.ChainManager.ProcessCommitment(details.Commitment)
 	})
 
-	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		rootCommitment := p.MainEngineInstance().EarliestRootCommitment(index)
+	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+		rootCommitment := p.MainEngineInstance().EarliestRootCommitment(slot)
 
 		// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
 		// we first specify the chain's cut-off point, and only then evict the state. It is also important to

@@ -39,25 +39,25 @@ func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter .
 	}
 	tf.CommitmentFilter = New(apiProvider, optsFilter...)
 
-	tf.CommitmentFilter.commitmentFunc = func(slotIndex iotago.SlotIndex) (*model.Commitment, error) {
-		if commitment, ok := tf.commitments[slotIndex]; ok {
+	tf.CommitmentFilter.commitmentFunc = func(slot iotago.SlotIndex) (*model.Commitment, error) {
+		if commitment, ok := tf.commitments[slot]; ok {
 			return commitment, nil
 		}
-		return nil, ierrors.Errorf("no commitment available for slot index %d", slotIndex)
+		return nil, ierrors.Errorf("no commitment available for slot index %d", slot)
 	}
 
-	tf.CommitmentFilter.accountRetrieveFunc = func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (*accounts.AccountData, bool, error) {
+	tf.CommitmentFilter.accountRetrieveFunc = func(accountID iotago.AccountID, targetSlot iotago.SlotIndex) (*accounts.AccountData, bool, error) {
 		if accountData, ok := tf.accountData[accountID]; ok {
 			return accountData, true, nil
 		}
 		return nil, false, ierrors.Errorf("no account data available for account id %s", accountID)
 	}
 
-	tf.CommitmentFilter.rmcRetrieveFunc = func(slotIndex iotago.SlotIndex) (iotago.Mana, error) {
-		if rmc, ok := tf.rmcData[slotIndex]; ok {
+	tf.CommitmentFilter.rmcRetrieveFunc = func(slot iotago.SlotIndex) (iotago.Mana, error) {
+		if rmc, ok := tf.rmcData[slot]; ok {
 			return rmc, nil
 		}
-		return iotago.Mana(0), ierrors.Errorf("no rmc available for slot index %d", slotIndex)
+		return iotago.Mana(0), ierrors.Errorf("no rmc available for slot index %d", slot)
 	}
 
 	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
@@ -71,16 +71,16 @@ func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter .
 	return tf
 }
 
-func (t *TestFramework) AddCommitment(slotIndex iotago.SlotIndex, commitment *model.Commitment) {
-	t.commitments[slotIndex] = commitment
+func (t *TestFramework) AddCommitment(slot iotago.SlotIndex, commitment *model.Commitment) {
+	t.commitments[slot] = commitment
 }
 
 func (t *TestFramework) AddAccountData(accountID iotago.AccountID, accountData *accounts.AccountData) {
 	t.accountData[accountID] = accountData
 }
 
-func (t *TestFramework) AddRMCData(slotIndex iotago.SlotIndex, rmcData iotago.Mana) {
-	t.rmcData[slotIndex] = rmcData
+func (t *TestFramework) AddRMCData(slot iotago.SlotIndex, rmcData iotago.Mana) {
+	t.rmcData[slot] = rmcData
 }
 
 // q: how to get an engine block.Block from protocol block

@@ -19,14 +19,14 @@ const (
 /*
    LedgerState Database
 
-   SlotIndex:
+   Slot:
    ===============
    Key:
        StoreKeyPrefixLedgerSlotIndex
                 1 byte
 
    Value:
-       iotago.SlotIndex
+       iotago.Slot
           8 bytes
 
    Output:
@@ -36,7 +36,7 @@ const (
              1 byte         +     34 bytes
 
    Value:
-       BlockID   +   SlotIndex  + TransactionCreationSlot (time.Time) + iotago.Output.Serialized()
+       BlockID   +   Slot  + TransactionCreationSlot (time.Time) + iotago.Output.Serialized()
        40 bytes  +    8 bytes   +                  8 byte      s           +   1 byte type + X bytes
 
    Spent Output:
@@ -46,7 +46,7 @@ const (
             1 byte         +     34 bytes
 
    Value:
-       TargetTransactionID (iotago.TransactionID) + TransactionAcceptedSlotIndex (iotago.SlotIndex) + TransactionCreationSlot (time.Time)
+       TargetTransactionID (iotago.TransactionID) + TransactionAcceptedSlotIndex (iotago.Slot) + TransactionCreationSlot (time.Time)
                   32 bytes                        +                    8 bytes                      +       8 bytes
 
    Unspent Output:
@@ -62,7 +62,7 @@ const (
    Slot diffs:
    ================
    Key:
-       StoreKeyPrefixSlotDiffs + iotago.SlotIndex
+       StoreKeyPrefixSlotDiffs + iotago.Slot
                  1 byte        +     8 bytes
 
    Value:

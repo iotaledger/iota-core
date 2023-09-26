@@ -28,7 +28,7 @@ type Gadget struct {
 	seatManager  seatmanager.SeatManager
 
 	lastFinalizedSlot          iotago.SlotIndex
-	storeLastFinalizedSlotFunc func(index iotago.SlotIndex)
+	storeLastFinalizedSlotFunc func(slot iotago.SlotIndex)
 
 	mutex        syncutils.RWMutex
 	errorHandler func(error)
@@ -58,8 +58,8 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes, event.WithWorkerPool(g.workers.CreatePool("TrackAndRefresh", 1))) // Using just 1 worker to avoid contention
 			})
 
-			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
-				if err := e.Storage.Settings().SetLatestFinalizedSlot(index); err != nil {
+			g.storeLastFinalizedSlotFunc = func(slot iotago.SlotIndex) {
+				if err := e.Storage.Settings().SetLatestFinalizedSlot(slot); err != nil {
 					g.errorHandler(ierrors.Wrap(err, "failed to set latest finalized slot"))
 				}
 			}

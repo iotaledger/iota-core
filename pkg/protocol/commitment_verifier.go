@@ -148,7 +148,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 			return nil, 0, ierrors.Errorf("issuerID %s contained in multiple attestations", att.IssuerID)
 		}
 
-		// TODO: this might differ if we have a Accounts with changing weights depending on the SlotIndex/epoch
+		// TODO: this might differ if we have a Accounts with changing weights depending on the Slot/epoch
 		attestationBlockID, err := att.BlockID()
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")

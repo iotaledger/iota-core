@@ -33,7 +33,7 @@ type Spent struct {
 	// the ID of the transaction that spent the output
 	transactionIDSpent iotago.TransactionID
 	// the index of the slot that spent the output
-	slotIndexSpent iotago.SlotIndex
+	slotSpent iotago.SlotIndex
 
 	output *Output
 }
@@ -69,17 +69,17 @@ func (s *Spent) TransactionIDSpent() iotago.TransactionID {
 
 // SlotIndexSpent returns the index of the slot that spent the output.
 func (s *Spent) SlotIndexSpent() iotago.SlotIndex {
-	return s.slotIndexSpent
+	return s.slotSpent
 }
 
 type Spents []*Spent
 
-func NewSpent(output *Output, transactionIDSpent iotago.TransactionID, slotIndexSpent iotago.SlotIndex) *Spent {
+func NewSpent(output *Output, transactionIDSpent iotago.TransactionID, slotSpent iotago.SlotIndex) *Spent {
 	return &Spent{
 		outputID:           output.outputID,
 		output:             output,
 		transactionIDSpent: transactionIDSpent,
-		slotIndexSpent:     slotIndexSpent,
+		slotSpent:          slotSpent,
 	}
 }
 
@@ -97,8 +97,8 @@ func (s *Spent) KVStorableKey() (key []byte) {
 
 func (s *Spent) KVStorableValue() (value []byte) {
 	ms := marshalutil.New(iotago.SlotIdentifierLength + iotago.SlotIndexLength)
-	ms.WriteBytes(s.transactionIDSpent[:])      // iotago.SlotIdentifierLength bytes
-	ms.WriteBytes(s.slotIndexSpent.MustBytes()) // iotago.SlotIndexLength bytes
+	ms.WriteBytes(s.transactionIDSpent[:]) // iotago.SlotIdentifierLength bytes
+	ms.WriteBytes(s.slotSpent.MustBytes()) // iotago.SlotIndexLength bytes
 
 	return ms.Bytes()
 }
@@ -127,7 +127,7 @@ func (s *Spent) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
 	}
 
 	// Read slot index spent index
-	s.slotIndexSpent, err = parseSlotIndex(valueUtil)
+	s.slotSpent, err = parseSlotIndex(valueUtil)
 	if err != nil {
 		return err
 	}

@@ -310,9 +310,9 @@ func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.E
 
 // evict evicts all elements from the unsolid commitment blocks buffer and the pending warp sync requests that are older
 // than the given index.
-func (b *BlockDispatcher) evict(index iotago.SlotIndex) {
-	b.pendingWarpSyncRequests.EvictUntil(index)
-	b.unsolidCommitmentBlocks.EvictUntil(index)
+func (b *BlockDispatcher) evict(slot iotago.SlotIndex) {
+	b.pendingWarpSyncRequests.EvictUntil(slot)
+	b.unsolidCommitmentBlocks.EvictUntil(slot)
 }
 
 // shutdown shuts down the BlockDispatcher instance.
@@ -341,9 +341,9 @@ func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
 }
 
 // WithWarpSyncWindowSize is an option for the BlockDispatcher that allows to set the warp sync window size.
-func WithWarpSyncWindowSize(size iotago.SlotIndex) options.Option[BlockDispatcher] {
+func WithWarpSyncWindowSize(windowSize iotago.SlotIndex) options.Option[BlockDispatcher] {
 	return func(b *BlockDispatcher) {
-		b.optWarpSyncWindowSize = size
+		b.optWarpSyncWindowSize = windowSize
 	}
 }
 

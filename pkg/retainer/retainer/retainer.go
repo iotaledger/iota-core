@@ -102,7 +102,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 
 				transactionMetadata.OnAccepted(func() {
 					attachmentID := transactionMetadata.EarliestIncludedAttachment()
-					if slotIndex := attachmentID.Index(); slotIndex > 0 {
+					if slot := attachmentID.Index(); slot > 0 {
 						if err := r.onTransactionAccepted(attachmentID); err != nil {
 							r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAccepted in retainer"))
 						}

@@ -85,12 +85,12 @@ func (t *TipManager) WeakTips(optAmount ...int) []tipmanager.TipMetadata {
 }
 
 // Evict evicts a slot from the TipManager.
-func (t *TipManager) Evict(slotIndex iotago.SlotIndex) {
-	if !t.markSlotAsEvicted(slotIndex) {
+func (t *TipManager) Evict(slot iotago.SlotIndex) {
+	if !t.markSlotAsEvicted(slot) {
 		return
 	}
 
-	if evictedObjects, deleted := t.tipMetadataStorage.DeleteAndReturn(slotIndex); deleted {
+	if evictedObjects, deleted := t.tipMetadataStorage.DeleteAndReturn(slot); deleted {
 		evictedObjects.ForEach(func(_ iotago.BlockID, tipMetadata *TipMetadata) bool {
 			tipMetadata.evicted.Trigger()
 
@@ -151,24 +151,24 @@ func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(pare
 }
 
 // metadataStorage returns the TipMetadata storage for the given slotIndex.
-func (t *TipManager) metadataStorage(slotIndex iotago.SlotIndex) (storage *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]) {
+func (t *TipManager) metadataStorage(slot iotago.SlotIndex) (storage *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]) {
 	t.evictionMutex.RLock()
 	defer t.evictionMutex.RUnlock()
 
-	if t.lastEvictedSlot >= slotIndex {
+	if t.lastEvictedSlot >= slot {
 		return nil
 	}
 
-	return lo.Return1(t.tipMetadataStorage.GetOrCreate(slotIndex, lo.NoVariadic(shrinkingmap.New[iotago.BlockID, *TipMetadata])))
+	return lo.Return1(t.tipMetadataStorage.GetOrCreate(slot, lo.NoVariadic(shrinkingmap.New[iotago.BlockID, *TipMetadata])))
 }
 
 // markSlotAsEvicted marks the given slotIndex as evicted.
-func (t *TipManager) markSlotAsEvicted(slotIndex iotago.SlotIndex) (success bool) {
+func (t *TipManager) markSlotAsEvicted(slot iotago.SlotIndex) (success bool) {
 	t.evictionMutex.Lock()
 	defer t.evictionMutex.Unlock()
 
-	if success = t.lastEvictedSlot < slotIndex; success {
-		t.lastEvictedSlot = slotIndex
+	if success = t.lastEvictedSlot < slot; success {
+		t.lastEvictedSlot = slot
 	}
 
 	return success

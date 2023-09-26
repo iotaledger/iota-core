@@ -138,24 +138,24 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 	return nil, false
 }
 
-func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, accountRoot iotago.Identifier, err error) {
+func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, accountRoot iotago.Identifier, err error) {
 	ledgerIndex, err := l.utxoLedger.ReadLedgerIndex()
 	if err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
 	}
 
-	if index != ledgerIndex+1 {
-		panic(ierrors.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex+1, index))
+	if slot != ledgerIndex+1 {
+		panic(ierrors.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex+1, slot))
 	}
 
-	stateDiff := l.memPool.StateDiff(index)
+	stateDiff := l.memPool.StateDiff(slot)
 
 	// collect outputs and allotments from the "uncompacted" stateDiff
 	// outputs need to be processed in the "uncompacted" version of the state diff, as we need to be able to store
 	// and retrieve intermediate outputs to show to the user
 	spends, outputs, accountDiffs, err := l.processStateDiffTransactions(stateDiff)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to process state diff transactions in slot %d: %w", index, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to process state diff transactions in slot %d: %w", slot, err)
 	}
 
 	// Now we process the collected account changes, for that we consume the "compacted" state diff to get the overall
@@ -164,30 +164,30 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 	// output side
 	createdAccounts, consumedAccounts, destroyedAccounts, err := l.processCreatedAndConsumedAccountOutputs(stateDiff, accountDiffs)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to process outputs consumed and created in slot %d: %w", index, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to process outputs consumed and created in slot %d: %w", slot, err)
 	}
 
-	l.prepareAccountDiffs(accountDiffs, index, consumedAccounts, createdAccounts)
+	l.prepareAccountDiffs(accountDiffs, slot, consumedAccounts, createdAccounts)
 
 	// Commit the changes
 	// Update the mana manager's cache
-	l.manaManager.ApplyDiff(index, destroyedAccounts, createdAccounts)
+	l.manaManager.ApplyDiff(slot, destroyedAccounts, createdAccounts)
 
 	// Update the UTXO ledger
-	if err = l.utxoLedger.ApplyDiff(index, outputs, spends); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to UTXO ledger for index %d: %w", index, err)
+	if err = l.utxoLedger.ApplyDiff(slot, outputs, spends); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to UTXO ledger for slot %d: %w", slot, err)
 	}
 
 	// Update the Accounts ledger
 	// first, get the RMC corresponding to this slot
-	maxCommittableAge := l.apiProvider.APIForSlot(index).ProtocolParameters().MaxCommittableAge()
-	rmcIndex, _ := safemath.SafeSub(index, maxCommittableAge)
+	maxCommittableAge := l.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge()
+	rmcIndex, _ := safemath.SafeSub(slot, maxCommittableAge)
 	rmcForSlot, err := l.rmcManager.RMC(rmcIndex)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to get RMC for index %d: %w", index, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to get RMC for slot %d: %w", slot, err)
 	}
-	if err = l.accountsLedger.ApplyDiff(index, rmcForSlot, accountDiffs, destroyedAccounts); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for index %d: %w", index, err)
+	if err = l.accountsLedger.ApplyDiff(slot, rmcForSlot, accountDiffs, destroyedAccounts); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for slot %d: %w", slot, err)
 	}
 
 	// Mark each transaction as committed so the mempool can evict it
@@ -196,7 +196,7 @@ func (l *Ledger) CommitSlot(index iotago.SlotIndex) (stateRoot iotago.Identifier
 		return true
 	})
 
-	l.events.StateDiffApplied.Trigger(index, outputs, spends)
+	l.events.StateDiffApplied.Trigger(slot, outputs, spends)
 
 	return l.utxoLedger.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), l.accountsLedger.AccountsTreeRoot(), nil
 }
@@ -294,8 +294,8 @@ func (l *Ledger) ForEachUnspentOutput(consumer func(output *utxoledger.Output) b
 	return l.utxoLedger.ForEachUnspentOutput(consumer)
 }
 
-func (l *Ledger) SlotDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error) {
-	return l.utxoLedger.SlotDiffWithoutLocking(index)
+func (l *Ledger) SlotDiffs(slot iotago.SlotIndex) (*utxoledger.SlotDiff, error) {
+	return l.utxoLedger.SlotDiffWithoutLocking(slot)
 }
 
 func (l *Ledger) TransactionMetadata(transactionID iotago.TransactionID) (mempool.TransactionMetadata, bool) {
@@ -359,18 +359,18 @@ func (l *Ledger) Shutdown() {
 // 2. The account was consumed and created in the same slot, the account was transitioned, and we have to store the
 // changes in the diff.
 // 3. The account was only created in this slot, in this case we need to track the output's values as the diff.
-func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.AccountDiff, index iotago.SlotIndex, consumedAccounts map[iotago.AccountID]*utxoledger.Output, createdAccounts map[iotago.AccountID]*utxoledger.Output) {
+func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.AccountDiff, slot iotago.SlotIndex, consumedAccounts map[iotago.AccountID]*utxoledger.Output, createdAccounts map[iotago.AccountID]*utxoledger.Output) {
 	for consumedAccountID, consumedOutput := range consumedAccounts {
 		// We might have had an allotment on this account, and the diff already exists
 		accountDiff := getAccountDiff(accountDiffs, consumedAccountID)
 
-		// Obtain account state at the current latest committed slot, which is index-1
-		accountData, exists, err := l.accountsLedger.Account(consumedAccountID, index-1)
+		// Obtain account state at the current latest committed slot, which is slot-1
+		accountData, exists, err := l.accountsLedger.Account(consumedAccountID, slot-1)
 		if err != nil {
-			panic(ierrors.Errorf("error loading account %s in slot %d: %w", consumedAccountID, index-1, err))
+			panic(ierrors.Errorf("error loading account %s in slot %d: %w", consumedAccountID, slot-1, err))
 		}
 		if !exists {
-			panic(ierrors.Errorf("could not find destroyed account %s in slot %d", consumedAccountID, index-1))
+			panic(ierrors.Errorf("could not find destroyed account %s in slot %d", consumedAccountID, slot-1))
 		}
 
 		// case 1. the account was destroyed, the diff will be created inside accountLedger on account deletion
@@ -620,13 +620,13 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 	return spends, outputs, accountDiffs, nil
 }
 
-func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slotIndex iotago.SlotIndex) (*utxoledger.Output, error) {
-	accountMetadata, exists, err := l.accountsLedger.Account(accountID, slotIndex)
+func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slot iotago.SlotIndex) (*utxoledger.Output, error) {
+	accountMetadata, exists, err := l.accountsLedger.Account(accountID, slot)
 	if err != nil {
-		return nil, ierrors.Errorf("could not get account information for account %s in slot %d: %w", accountID, slotIndex, err)
+		return nil, ierrors.Errorf("could not get account information for account %s in slot %d: %w", accountID, slot, err)
 	}
 	if !exists {
-		return nil, ierrors.Errorf("account %s does not exist in slot %d: %w", accountID, slotIndex, mempool.ErrStateNotFound)
+		return nil, ierrors.Errorf("account %s does not exist in slot %d: %w", accountID, slot, mempool.ErrStateNotFound)
 	}
 
 	l.utxoLedger.ReadLockLedger()

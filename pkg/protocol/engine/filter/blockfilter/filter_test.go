@@ -88,7 +88,7 @@ func mockedCommitteeFunc(validatorAccountID iotago.AccountID) func(iotago.SlotIn
 	seatedAccounts := account.NewSeatedAccounts(mockedAccounts)
 	seatedAccounts.Set(account.SeatIndex(0), validatorAccountID)
 
-	return func(slotIndex iotago.SlotIndex) *account.SeatedAccounts {
+	return func(slot iotago.SlotIndex) *account.SeatedAccounts {
 		return seatedAccounts
 	}
 }
