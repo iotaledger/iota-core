@@ -65,7 +65,7 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 			}
 		}
 
-		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID(), 0, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
+		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID(), currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
 	}
 }
 
@@ -556,7 +556,7 @@ func WithAllotments(allotments iotago.Allotments) options.Option[builder.Transac
 	}
 }
 
-func WithCreationSlot(creationSlot iotago.SlotIndex) options.Option[builder.TransactionBuilder] {
+func WithSlotCreated(creationSlot iotago.SlotIndex) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		txBuilder.SetCreationSlot(creationSlot)
 	}

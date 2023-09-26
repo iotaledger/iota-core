@@ -77,9 +77,9 @@ func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Out
 	require.True(t, has)
 }
 
-func CreateOutputAndAssertSerialization(t *testing.T, blockID iotago.BlockID, indexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, outputID iotago.OutputID, iotaOutput iotago.Output) *utxoledger.Output {
+func CreateOutputAndAssertSerialization(t *testing.T, blockID iotago.BlockID, indexBooked iotago.SlotIndex, outputID iotago.OutputID, iotaOutput iotago.Output) *utxoledger.Output {
 	iotagoAPI := iotago_tpkg.TestAPI
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotagoAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotagoAPI), outputID, blockID, indexBooked, iotaOutput)
 	outputBytes, err := iotagoAPI.Encode(output.Output())
 	require.NoError(t, err)
 
@@ -88,8 +88,7 @@ func CreateOutputAndAssertSerialization(t *testing.T, blockID iotago.BlockID, in
 	value := output.KVStorableValue()
 	require.Equal(t, blockID[:], value[:iotago.SlotIdentifierLength])
 	require.Equal(t, indexBooked, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[iotago.SlotIdentifierLength:iotago.SlotIdentifierLength+iotago.SlotIndexLength]))))
-	require.Equal(t, slotCreated, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[iotago.SlotIdentifierLength+iotago.SlotIndexLength:iotago.SlotIdentifierLength+iotago.SlotIndexLength*2]))))
-	require.Equal(t, outputBytes, value[iotago.SlotIdentifierLength+iotago.SlotIndexLength*2:])
+	require.Equal(t, outputBytes, value[iotago.SlotIdentifierLength+iotago.SlotIndexLength:])
 
 	return output
 }
@@ -121,7 +120,6 @@ func TestExtendedOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.
 	tag := utils.RandBytes(23)
 	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
-	slotCreated := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.BasicOutput{
 		Amount:       amount,
@@ -141,7 +139,7 @@ func TestExtendedOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
@@ -155,7 +153,6 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 	senderAddress := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
-	slotCreated := utils.RandSlotIndex()
 	timeLockUnlockSlot := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.BasicOutput{
@@ -176,7 +173,7 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
@@ -190,7 +187,6 @@ func TestNFTOutputSerialization(t *testing.T) {
 	nftID := utils.RandNFTID()
 	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
-	slotCreated := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.NFTOutput{
 		Amount:       amount,
@@ -209,7 +205,7 @@ func TestNFTOutputSerialization(t *testing.T) {
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
@@ -224,7 +220,6 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 	nftID := utils.RandNFTID()
 	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
-	slotCreated := utils.RandSlotIndex()
 	expirationUnlockSlot := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.NFTOutput{
@@ -251,7 +246,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
@@ -268,7 +263,6 @@ func TestAccountOutputSerialization(t *testing.T) {
 	sender := utils.RandAccountID()
 	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
-	slotCreated := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.AccountOutput{
 		Amount:       amount,
@@ -294,7 +288,7 @@ func TestAccountOutputSerialization(t *testing.T) {
 		},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
@@ -307,7 +301,6 @@ func TestFoundryOutputSerialization(t *testing.T) {
 	aliasID := utils.RandAccountID()
 	amount := iotago_tpkg.RandBaseToken(math.MaxUint64)
 	index := utils.RandSlotIndex()
-	slotCreated := utils.RandSlotIndex()
 	supply := new(big.Int).SetUint64(iotago_tpkg.RandUint64(math.MaxUint64))
 
 	iotaOutput := &iotago.FoundryOutput{
@@ -328,7 +321,7 @@ func TestFoundryOutputSerialization(t *testing.T) {
 		ImmutableFeatures: iotago.FoundryOutputImmFeatures{},
 	}
 
-	output := CreateOutputAndAssertSerialization(t, blockID, index, slotCreated, outputID, iotaOutput)
+	output := CreateOutputAndAssertSerialization(t, blockID, index, outputID, iotaOutput)
 	spent := CreateSpentAndAssertSerialization(t, output)
 
 	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())

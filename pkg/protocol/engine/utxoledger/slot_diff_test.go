@@ -21,7 +21,6 @@ import (
 
 func TestSimpleSlotDiffSerialization(t *testing.T) {
 	indexBooked := iotago.SlotIndex(255975)
-	slotCreated := utils.RandSlotIndex()
 
 	outputID := utils.RandOutputID()
 	blockID := utils.RandBlockID()
@@ -37,7 +36,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 		},
 		Features: iotago.BasicOutputFeatures{},
 	}
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, iotaOutput)
 
 	transactionIDSpent := utils.RandTransactionID()
 

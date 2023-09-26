@@ -18,8 +18,6 @@ func (o *Output) SnapshotBytes() []byte {
 	m.WriteBytes(o.outputID[:])
 	m.WriteBytes(o.blockID[:])
 	m.WriteUint32(uint32(o.slotBooked))
-	// TODO: remove slot created from all the API as well
-	m.WriteUint32(uint32(o.slotCreated))
 	m.WriteUint32(uint32(len(o.encodedOutput)))
 	m.WriteBytes(o.encodedOutput)
 
@@ -42,11 +40,6 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvid
 		return nil, ierrors.Errorf("unable to read LS output milestone index booked: %w", err)
 	}
 
-	var indexCreated iotago.SlotIndex
-	if err := binary.Read(reader, binary.LittleEndian, &indexCreated); err != nil {
-		return nil, ierrors.Errorf("unable to read LS output index created: %w", err)
-	}
-
 	var outputLength uint32
 	if err := binary.Read(reader, binary.LittleEndian, &outputLength); err != nil {
 		return nil, ierrors.Errorf("unable to read LS output length: %w", err)
@@ -62,7 +55,7 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvid
 		return nil, ierrors.Errorf("invalid LS output address: %w", err)
 	}
 
-	return CreateOutput(apiProvider, outputID, blockID, indexBooked, indexCreated, output, outputBytes), nil
+	return CreateOutput(apiProvider, outputID, blockID, indexBooked, output, outputBytes), nil
 }
 
 func (s *Spent) SnapshotBytes() []byte {
