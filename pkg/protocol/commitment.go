@@ -74,6 +74,14 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 	c.Parent.OnUpdateOnce(func(_, parent *Commitment) {
 		parent.registerChild(c)
 
+		c.Chain.InheritFrom(reactive.NewDerivedVariable2(func(parentChain, spawnedChain *Chain) *Chain {
+			if spawnedChain != nil {
+				return spawnedChain
+			}
+
+			return parentChain
+		}, parent.Chain, c.SpawnedChain))
+
 		c.IsSolid.InheritFrom(parent.IsSolid)
 
 		c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
@@ -196,8 +204,6 @@ func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitm
 
 					spawnedChain = NewChain(c.protocolLogger)
 					spawnedChain.ForkingPoint.Set(c)
-
-					c.Chain.Set(spawnedChain)
 				}
 
 				return spawnedChain
@@ -207,14 +213,16 @@ func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitm
 }
 
 func (c *Commitment) promote(targetChain *Chain) {
-	c.Chain.Compute(func(currentChain *Chain) *Chain {
-		if currentChain != nil && currentChain != targetChain {
-			c.LogDebug("promoting commitment", "from", currentChain.LogName(), "to", targetChain.LogName())
-			//currentChain.Promote(targetChain)
+	if currentChain := c.Chain.Get(); currentChain != targetChain {
+		if currentChain == nil {
+			// since we only promote commitments that come from an engine, this can only happen if the commitment is the
+			// root commitment of the main chain that is the first commitment ever published (which means that we can just
+			// set the chain that we want it to have)
+			c.Chain.Set(targetChain)
+		} else if parent := c.Parent.Get(); parent.Chain.Get() == targetChain {
+			parent.MainChild.Set(c)
 		}
-
-		return targetChain
-	})
+	}
 }
 
 func (c *Commitment) triggerEventIfBelowThreshold(event func(*Commitment) reactive.Event, chainThreshold func(*Chain) reactive.Variable[iotago.SlotIndex]) {

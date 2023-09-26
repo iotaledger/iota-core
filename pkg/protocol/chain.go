@@ -247,3 +247,13 @@ func (c *Chain) attestedWeight() reactive.Variable[uint64] {
 func (c *Chain) verifiedWeight() reactive.Variable[uint64] {
 	return c.VerifiedWeight
 }
+
+func (c *Chain) promote() {
+	c.LogError("PROMOTED TO MAIN CHAIN")
+
+	parentChain := c.ParentChain.Get()
+	if parentChain != nil {
+		parentChain.Engine.Set(c.Engine.Get())
+		c.ForkingPoint.Get().promote(parentChain)
+	}
+}

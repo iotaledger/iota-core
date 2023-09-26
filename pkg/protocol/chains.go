@@ -3,6 +3,7 @@ package protocol
 import (
 	"fmt"
 
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -18,11 +19,11 @@ import (
 
 type Chains struct {
 	MainChain             reactive.Variable[*Chain]
+	Chains                reactive.Set[*Chain]
 	HeaviestChain         reactive.Variable[*Chain]
 	HeaviestAttestedChain reactive.Variable[*Chain]
 	HeaviestVerifiedChain reactive.Variable[*Chain]
 	CommitmentCreated     *event.Event1[*Commitment]
-	ChainCreated          *event.Event1[*Chain]
 
 	protocol      *Protocol
 	commitments   *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
@@ -35,13 +36,13 @@ func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
 		protocol:              protocol,
 		EvictionState:         reactive.NewEvictionState[iotago.SlotIndex](),
-		MainChain:             reactive.NewVariable[*Chain]().Init(NewChain(protocol.Logger)),
+		MainChain:             reactive.NewVariable[*Chain](),
+		Chains:                reactive.NewSet[*Chain](),
 		HeaviestChain:         reactive.NewVariable[*Chain](),
 		HeaviestAttestedChain: reactive.NewVariable[*Chain](),
 		HeaviestVerifiedChain: reactive.NewVariable[*Chain](),
 		commitments:           shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 		CommitmentCreated:     event.New1[*Commitment](),
-		ChainCreated:          event.New1[*Chain](),
 		engineManager: enginemanager.New(
 			protocol.Workers,
 			func(err error) { protocol.LogError("engine error", "err", err) },
@@ -69,23 +70,39 @@ func newChains(protocol *Protocol) *Chains {
 		),
 	}
 
-	c.ChainCreated.Hook(func(chain *Chain) {
-		c.provideEngineIfRequested(chain)
-		c.publishEngineCommitments(chain)
-	})
-
-	c.ChainCreated.Trigger(c.MainChain.Get())
-
-	protocol.HookConstructed(func() {
-		c.initMainChain()
-		c.initWeightTracking()
-		c.initChainSwitching()
-
-		// TODO: trigger initialized
-	})
-
 	c.HeaviestChain.LogUpdates(c.protocol, log.LevelInfo, "Unchecked Heavier Chain", (*Chain).LogName)
 	c.HeaviestAttestedChain.LogUpdates(c.protocol, log.LevelInfo, "Attested Heavier Chain", (*Chain).LogName)
+
+	protocol.HookConstructed(func() {
+		trackHeaviestChain := func(chainVariable reactive.Variable[*Chain], getWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
+			return getWeightVariable(candidate).OnUpdate(func(_, newChainWeight uint64) {
+				if heaviestChain := c.HeaviestVerifiedChain.Get(); heaviestChain != nil && newChainWeight < heaviestChain.VerifiedWeight.Get() {
+					return
+				}
+
+				chainVariable.Compute(func(currentCandidate *Chain) *Chain {
+					if currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newChainWeight > getWeightVariable(currentCandidate).Get() {
+						return candidate
+					}
+
+					return currentCandidate
+				})
+			}, true)
+		}
+
+		c.OnChainCreated(func(chain *Chain) {
+			c.provideEngineIfRequested(chain)
+			c.publishEngineCommitments(chain)
+
+			trackHeaviestChain(c.HeaviestVerifiedChain, (*Chain).verifiedWeight, chain)
+			trackHeaviestChain(c.HeaviestAttestedChain, (*Chain).attestedWeight, chain)
+			trackHeaviestChain(c.HeaviestChain, (*Chain).claimedWeight, chain)
+		})
+
+		c.initChainSwitching()
+	})
+
+	c.initMainChain(NewChain(protocol.Logger))
 
 	return c
 }
@@ -127,13 +144,19 @@ func (c *Chains) MainEngineInstance() *engine.Engine {
 	return c.MainChain.Get().Engine.Get()
 }
 
-func (c *Chains) initMainChain() {
-	mainChain := c.MainChain.Get()
+func (c *Chains) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
+	return c.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
+		mutations.AddedElements().Range(callback)
+	})
+}
+
+func (c *Chains) initMainChain(mainChain *Chain) {
 	mainChain.InstantiateEngine.Set(true)
 	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) {
 		c.protocol.Events.Engine.LinkTo(newEngine.Events)
 	})
-	mainChain.ForkingPoint.Get().IsRoot.Trigger()
+
+	c.Chains.Add(mainChain)
 }
 
 func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
@@ -147,35 +170,11 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 
 	commitment.SpawnedChain.OnUpdate(func(_, newChain *Chain) {
 		if newChain != nil {
-			c.ChainCreated.Trigger(newChain)
+			c.Chains.Add(newChain)
 		}
 	})
 
 	c.CommitmentCreated.Trigger(commitment)
-}
-
-func (c *Chains) initWeightTracking() {
-	trackHeaviestChain := func(chainVariable reactive.Variable[*Chain], getWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
-		return getWeightVariable(candidate).OnUpdate(func(_, newChainWeight uint64) {
-			if heaviestChain := c.HeaviestChain.Get(); heaviestChain != nil && newChainWeight < heaviestChain.VerifiedWeight.Get() {
-				return
-			}
-
-			chainVariable.Compute(func(currentCandidate *Chain) *Chain {
-				if currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newChainWeight > getWeightVariable(currentCandidate).Get() {
-					return candidate
-				}
-
-				return currentCandidate
-			})
-		})
-	}
-
-	c.ChainCreated.Hook(func(chain *Chain) {
-		trackHeaviestChain(c.HeaviestVerifiedChain, (*Chain).verifiedWeight, chain)
-		trackHeaviestChain(c.HeaviestAttestedChain, (*Chain).attestedWeight, chain)
-		trackHeaviestChain(c.HeaviestChain, (*Chain).claimedWeight, chain)
-	})
 }
 
 func (c *Chains) initChainSwitching() {
@@ -195,18 +194,15 @@ func (c *Chains) initChainSwitching() {
 		}
 
 		if newCandidate != nil {
+			newCandidate.LogDebug("switching to heaviest attested chain", "name", newCandidate.LogName())
 			newCandidate.InstantiateEngine.Set(true)
 		}
 	})
 
-	c.HeaviestVerifiedChain.OnUpdate(func(prevCandidate, newCandidate *Chain) {
-		if prevCandidate != nil {
-			//prevCandidate.InstantiateEngine.Set(false)
+	c.HeaviestVerifiedChain.OnUpdate(func(prevCandidateChain, newCandidateChain *Chain) {
+		if newCandidateChain != nil {
+			newCandidateChain.promote()
 		}
-
-		c.protocol.LogError("SWITCHED MAIN CHAIN")
-
-		//go newCandidate.InstantiateEngine.Set(true)
 	})
 }
 
@@ -224,9 +220,11 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 				panic(fmt.Sprintf("could not load active engine: %s", err))
 			}
 
-			chain.SpawnedEngine.Set(mainEngine)
+			mainEngine.Ledger.HookInitialized(func() {
+				chain.SpawnedEngine.Set(mainEngine)
 
-			c.protocol.Network.HookStopped(mainEngine.Shutdown)
+				c.protocol.Network.HookStopped(mainEngine.Shutdown)
+			})
 		} else {
 			forkingPoint := chain.ForkingPoint.Get()
 			snapshotTargetIndex := forkingPoint.Index() - 1
@@ -238,9 +236,11 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 				return
 			}
 
-			chain.SpawnedEngine.Set(candidateEngineInstance)
+			candidateEngineInstance.Ledger.HookInitialized(func() {
+				chain.SpawnedEngine.Set(candidateEngineInstance)
 
-			c.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
+				c.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
+			})
 		}
 	})
 }
@@ -315,6 +315,8 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 					if forkingPoint := chain.ForkingPoint.Get(); forkingPoint == nil {
 						if rootCommitment, published := publishCommitment(engine.RootCommitment.Get()); published {
 							chain.ForkingPoint.Set(rootCommitment)
+
+							rootCommitment.IsRoot.Trigger()
 						}
 					} else {
 						latestPublishedIndex = forkingPoint.Index() - 1

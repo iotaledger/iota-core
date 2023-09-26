@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -139,13 +140,11 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 }
 
 func (n *Node) hookEvents() {
-	n.Protocol.HeaviestChain.OnUpdate(func(_, newChain *protocol.Chain) {
-		n.forkDetectedCount.Add(1)
-	})
-
 	n.Protocol.HeaviestAttestedChain.OnUpdate(func(_, newChain *protocol.Chain) {
-		fmt.Printf("%s > HeaviestAttestedChain.OnUpdate\n", n.Name)
-		n.candidateEngineActivatedCount.Add(1)
+		n.forkDetectedCount.Add(1)
+		newChain.Engine.OnUpdate(func(oldValue, newValue *engine.Engine) {
+			n.candidateEngineActivatedCount.Add(1)
+		})
 	})
 
 	n.Protocol.MainChain.Get().SpawnedEngine.OnUpdate(func(_, newEngine *engine.Engine) {
@@ -154,11 +153,13 @@ func (n *Node) hookEvents() {
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
-	n.Protocol.ChainCreated.Hook(func(chain *protocol.Chain) {
-		chain.SpawnedEngine.OnUpdate(func(oldValue, newValue *engine.Engine) {
-			if newValue != nil && n.Name == "node6" {
-				n.attachEngineLogs(failOnBlockFiltered, newValue)
-			}
+	n.Protocol.Chains.Chains.OnUpdate(func(mutations ds.SetMutations[*protocol.Chain]) {
+		mutations.AddedElements().Range(func(chain *protocol.Chain) {
+			chain.SpawnedEngine.OnUpdate(func(oldValue, newValue *engine.Engine) {
+				if newValue != nil && n.Name == "node6" {
+					n.attachEngineLogs(failOnBlockFiltered, newValue)
+				}
+			})
 		})
 	})
 

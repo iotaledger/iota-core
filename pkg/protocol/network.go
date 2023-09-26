@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
@@ -411,15 +412,20 @@ func (n *Network) OnAttestationsRequested(callback func(commitmentID iotago.Comm
 func (n *Network) Shutdown() {}
 
 func (n *Network) startAttestationsRequester() {
+
 	n.protocol.HookConstructed(func() {
-		n.protocol.ChainCreated.Hook(func(chain *Chain) {
+		n.protocol.OnChainCreated(func(chain *Chain) {
 			chain.RequestAttestations.OnUpdate(func(_, requestAttestations bool) {
+				forkingPoint := chain.ForkingPoint.Get()
+
 				if requestAttestations {
-					n.commitmentVerifiers.GetOrCreate(chain.ForkingPoint.Get().ID(), func() *CommitmentVerifier {
-						return NewCommitmentVerifier(chain.Engine.Get(), chain.ForkingPoint.Get().Parent.Get().Commitment)
-					})
+					if commitmentBeforeForkingPoint := forkingPoint.Parent.Get(); commitmentBeforeForkingPoint != nil {
+						n.commitmentVerifiers.GetOrCreate(forkingPoint.ID(), func() *CommitmentVerifier {
+							return NewCommitmentVerifier(chain.Engine.Get(), commitmentBeforeForkingPoint.Commitment)
+						})
+					}
 				} else {
-					n.commitmentVerifiers.Delete(chain.ForkingPoint.Get().ID())
+					n.commitmentVerifiers.Delete(forkingPoint.ID())
 				}
 			})
 		})
@@ -428,7 +434,7 @@ func (n *Network) startAttestationsRequester() {
 			commitment.RequestAttestations.OnUpdate(func(_, requestAttestations bool) {
 				if requestAttestations {
 					if commitment.CumulativeWeight() == 0 {
-						commitment.IsAttested.Set(true)
+						go commitment.IsAttested.Set(true)
 					} else {
 						n.attestationsRequester.StartTicker(commitment.ID())
 					}
@@ -453,29 +459,25 @@ func (n *Network) startWarpSyncRequester() {
 }
 
 func (n *Network) startBlockRequester() {
-	startBlockRequester := func(engine *engine.Engine) {
-		unsubscribe := lo.Batch(
-			engine.Events.BlockRequester.Tick.Hook(func(id iotago.BlockID) {
-				n.blockRequested.Trigger(id, engine)
-			}).Unhook,
+	n.protocol.Chains.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
+		mutations.AddedElements().Range(func(chain *Chain) {
+			chain.Engine.OnUpdate(func(_, engine *engine.Engine) {
+				unsubscribe := lo.Batch(
+					engine.Events.BlockRequester.Tick.Hook(func(id iotago.BlockID) {
+						n.blockRequested.Trigger(id, engine)
+					}).Unhook,
 
-			engine.Events.BlockRequester.TickerStarted.Hook(func(id iotago.BlockID) {
-				n.blockRequestStarted.Trigger(id, engine)
-			}).Unhook,
+					engine.Events.BlockRequester.TickerStarted.Hook(func(id iotago.BlockID) {
+						n.blockRequestStarted.Trigger(id, engine)
+					}).Unhook,
 
-			engine.Events.BlockRequester.TickerStopped.Hook(func(id iotago.BlockID) {
-				n.blockRequestStopped.Trigger(id, engine)
-			}).Unhook,
-		)
+					engine.Events.BlockRequester.TickerStopped.Hook(func(id iotago.BlockID) {
+						n.blockRequestStopped.Trigger(id, engine)
+					}).Unhook,
+				)
 
-		engine.HookShutdown(unsubscribe)
-	}
-
-	n.protocol.MainChain.Get().Engine.OnUpdate(func(_, engine *engine.Engine) {
-		startBlockRequester(engine)
-	})
-
-	n.protocol.ChainCreated.Hook(func(chain *Chain) {
-		chain.Engine.OnUpdate(func(_, engine *engine.Engine) { startBlockRequester(engine) })
+				engine.HookShutdown(unsubscribe)
+			})
+		})
 	})
 }
