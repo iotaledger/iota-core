@@ -40,7 +40,7 @@ func transactionID(alias string) iotago.TransactionID {
 	hashedAlias := blake2b.Sum256([]byte(alias))
 
 	var result iotago.TransactionID
-	result, _, err := iotago.IdentifierFromBytes(hashedAlias[:])
+	result, _, err := iotago.SlotIdentifierFromBytes(hashedAlias[:])
 	if err != nil {
 		panic(err)
 	}

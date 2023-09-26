@@ -153,11 +153,11 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 
 	switch signature := block.ProtocolBlock().Signature.(type) {
 	case *iotago.Ed25519Signature:
-		if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(signature.PublicKey)) {
+		if !accountData.BlockIssuerKeys.Has(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(signature.PublicKey)) {
 			// if the block issuer does not have the public key in the slot commitment, check if it has an implicit account with the corresponding address
 			var hasAddress = false
 			accountData.BlockIssuerKeys.Range(func(element iotago.BlockIssuerKey) {
-				if keyAddress, isAddress := element.(iotago.BlockIssuerKeyEd25519Address); isAddress {
+				if keyAddress, isAddress := element.(iotago.Ed25519AddressBlockIssuerKey); isAddress {
 					if keyAddress.Address.Equal(iotago.ImplicitAccountCreationAddressFromPubKey(signature.PublicKey[:])) {
 						hasAddress = true
 					}

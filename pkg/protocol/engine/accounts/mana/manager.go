@@ -45,7 +45,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		if err != nil {
 			return 0, ierrors.Errorf("failed to resolve AccountOutput for %s in slot %s: %w", accountID, currentSlot, err)
 		}
-		minDeposit := m.apiProvider.CurrentAPI().ProtocolParameters().RentStructure().MinDeposit(output.Output())
+		minDeposit := m.apiProvider.CurrentAPI().RentStructure().MinDeposit(output.Output())
 		if output.BaseTokenAmount() <= minDeposit {
 			mana = accounts.NewMana(output.StoredMana(), 0, output.CreationSlot())
 		} else {
@@ -92,7 +92,7 @@ func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts ds.Set
 	for accountID, output := range accountOutputs {
 		mana, exists := m.manaVectorCache.Get(accountID)
 		if exists {
-			minDeposit := m.apiProvider.CurrentAPI().ProtocolParameters().RentStructure().MinDeposit(output.Output())
+			minDeposit := m.apiProvider.CurrentAPI().RentStructure().MinDeposit(output.Output())
 			if output.BaseTokenAmount() <= minDeposit {
 				mana.Update(output.StoredMana(), 0, slotIndex)
 			} else {

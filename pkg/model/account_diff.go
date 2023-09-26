@@ -233,7 +233,7 @@ func readBlockIssuerKey(reader io.ReadSeeker) (iotago.BlockIssuerKey, int, error
 	bytesConsumed++
 
 	switch blockIssuerKeyType {
-	case iotago.Ed25519BlockIssuerKey:
+	case iotago.BlockIssuerKeyEd25519PublicKey:
 		var ed25519PublicKey ed25519.PublicKey
 		var bytesRead, err = io.ReadFull(reader, ed25519PublicKey[:])
 		bytesConsumed += bytesRead
@@ -241,7 +241,7 @@ func readBlockIssuerKey(reader io.ReadSeeker) (iotago.BlockIssuerKey, int, error
 			return nil, bytesConsumed, ierrors.Errorf("unable to read ed25519 public key in account diff: %w", err)
 		}
 
-		return iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519PublicKey), bytesConsumed, nil
+		return iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519PublicKey), bytesConsumed, nil
 	default:
 		return nil, bytesConsumed, ierrors.Errorf("unsupported block issuer key type %d in account diff", blockIssuerKeyType)
 	}
