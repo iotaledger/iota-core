@@ -18,6 +18,7 @@ func (o *Output) SnapshotBytes() []byte {
 	m.WriteBytes(o.outputID[:])
 	m.WriteBytes(o.blockID[:])
 	m.WriteUint32(uint32(o.slotBooked))
+	// TODO: remove slot created from all the API as well
 	m.WriteUint32(uint32(o.slotCreated))
 	m.WriteUint32(uint32(len(o.encodedOutput)))
 	m.WriteBytes(o.encodedOutput)
