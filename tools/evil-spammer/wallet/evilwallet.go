@@ -736,7 +736,7 @@ func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[io
 		inputPrivateKey, _ := wallet.KeyPair(index)
 		walletKeys[i] = iotago.AddressKeys{Address: addr, Keys: inputPrivateKey}
 	}
-	txBuilder.SetSlotCreated(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
+	txBuilder.SetCreationSlot(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
 
 	return txBuilder.Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 }
