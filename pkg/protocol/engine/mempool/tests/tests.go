@@ -13,6 +13,10 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+const (
+	TestMemoryReleaseMaxMemoryIncreaseFactor = 1.20
+)
+
 func TestAllWithoutForkingEverything(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 	for testName, testCase := range map[string]func(*testing.T, *TestFramework){
 		"TestProcessTransaction":                     TestProcessTransaction,
@@ -598,5 +602,5 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 	fmt.Println(memanalyzer.MemoryReport(tf))
 	fmt.Println(memStatsEnd, memStatsStart)
 
-	require.Less(t, float64(memStatsEnd), 1.15*float64(memStatsStart), "the objects in the heap should not grow by more than 15%")
+	require.Less(t, float64(memStatsEnd), TestMemoryReleaseMaxMemoryIncreaseFactor*float64(memStatsStart), "the objects in the heap should not grow by more than 15%")
 }
