@@ -10,8 +10,8 @@ fi
 HIVE_MODULES=$(grep -E "^\sgithub.com/iotaledger/hive.go" "go.mod" | awk '{print $1}')
 for dependency in $HIVE_MODULES
 do
-    echo "go get -u $dependency@$COMMIT..."
-    go get -u "$dependency@$COMMIT" >/dev/null
+    echo "go get $dependency@$COMMIT..."
+    go get "$dependency@$COMMIT" >/dev/null
 done
 
 # Run go mod tidy
