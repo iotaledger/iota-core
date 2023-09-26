@@ -47,8 +47,8 @@ func NewAccountDiff() *AccountDiff {
 		PreviousExpirySlot:                0,
 		NewOutputID:                       iotago.EmptyOutputID,
 		PreviousOutputID:                  iotago.EmptyOutputID,
-		BlockIssuerKeysAdded:              make(iotago.BlockIssuerKeys, 0),
-		BlockIssuerKeysRemoved:            make(iotago.BlockIssuerKeys, 0),
+		BlockIssuerKeysAdded:              iotago.NewBlockIssuerKeys(),
+		BlockIssuerKeysRemoved:            iotago.NewBlockIssuerKeys(),
 		ValidatorStakeChange:              0,
 		DelegationStakeChange:             0,
 		StakeEndEpochChange:               0,
@@ -212,7 +212,7 @@ func readBlockIssuerKeys(reader io.ReadSeeker) (iotago.BlockIssuerKeys, int, err
 	}
 	bytesConsumed++
 
-	blockIssuerKeys := make(iotago.BlockIssuerKeys, 0, blockIssuerKeysCount)
+	blockIssuerKeys := iotago.NewBlockIssuerKeys()
 	for k := uint8(0); k < blockIssuerKeysCount; k++ {
 		blockIssuerKey, bytesRead, err := readBlockIssuerKey(reader)
 		if err != nil {
@@ -220,7 +220,7 @@ func readBlockIssuerKeys(reader io.ReadSeeker) (iotago.BlockIssuerKeys, int, err
 		}
 		bytesConsumed += bytesRead
 
-		blockIssuerKeys = append(blockIssuerKeys, blockIssuerKey)
+		blockIssuerKeys.Add(blockIssuerKey)
 	}
 
 	return blockIssuerKeys, bytesConsumed, nil

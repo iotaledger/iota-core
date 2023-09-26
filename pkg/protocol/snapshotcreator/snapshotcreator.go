@@ -190,7 +190,7 @@ func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmou
 		},
 		Features: iotago.AccountOutputFeatures{
 			&iotago.BlockIssuerFeature{
-				BlockIssuerKeys: iotago.BlockIssuerKeys{blockIssuerKey},
+				BlockIssuerKeys: iotago.NewBlockIssuerKeys(blockIssuerKey),
 				ExpirySlot:      expirySlot,
 			},
 		},

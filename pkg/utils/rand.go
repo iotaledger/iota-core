@@ -249,9 +249,10 @@ func RandBlockIssuerKey() iotago.BlockIssuerKey {
 func RandBlockIssuerKeys() iotago.BlockIssuerKeys {
 	// We always generate at least one key.
 	length := RandomIntn(10) + 1
-	blockIssuerKeys := make(iotago.BlockIssuerKeys, length)
+
+	blockIssuerKeys := iotago.NewBlockIssuerKeys()
 	for i := 0; i < length; i++ {
-		blockIssuerKeys[i] = RandBlockIssuerKey()
+		blockIssuerKeys.Add(RandBlockIssuerKey())
 	}
 
 	return blockIssuerKeys
