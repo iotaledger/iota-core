@@ -2,7 +2,6 @@ package performance
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -84,7 +83,6 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 		if err := binary.Read(reader, binary.LittleEndian, &slot); err != nil {
 			return ierrors.Wrap(err, "unable to read slot index")
 		}
-		fmt.Println("slot pf", slot)
 
 		var accountsCount uint64
 		if err := binary.Read(reader, binary.LittleEndian, &accountsCount); err != nil {
@@ -127,7 +125,6 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 		if err := binary.Read(reader, binary.LittleEndian, &epoch); err != nil {
 			return ierrors.Wrap(err, "unable to read epoch index")
 		}
-		fmt.Println("epoch rewards", epoch)
 
 		rewardsTree, err := t.rewardsMap(epoch)
 		if err != nil {
@@ -174,14 +171,11 @@ func (t *Tracker) importPoolsStats(reader io.ReadSeeker) error {
 		if err := binary.Read(reader, binary.LittleEndian, &epoch); err != nil {
 			return ierrors.Wrap(err, "unable to read epoch index")
 		}
-		fmt.Println("epoch pool stats", epoch)
 
 		var poolStats model.PoolsStats
-		//model.PoolsStatsFromBytes(value)
 		if err := binary.Read(reader, binary.LittleEndian, &poolStats); err != nil {
 			return ierrors.Wrapf(err, "unable to read pool stats for epoch index %d", epoch)
 		}
-		fmt.Println(poolStats)
 
 		if err := t.poolStatsStore.Store(epoch, &poolStats); err != nil {
 			return ierrors.Wrapf(err, "unable to store pool stats for the epoch index %d", epoch)
@@ -201,7 +195,6 @@ func (t *Tracker) importCommittees(reader io.ReadSeeker) error {
 		if err := binary.Read(reader, binary.LittleEndian, &epoch); err != nil {
 			return ierrors.Wrap(err, "unable to read epoch index")
 		}
-		fmt.Println("epoch epochs", epoch)
 
 		committee, _, err := account.AccountsFromReader(reader)
 		if err != nil {
@@ -288,7 +281,6 @@ func (t *Tracker) exportPoolRewards(pWriter *utils.PositionedWriter, targetEpoch
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to get rewards tree for epoch index %d", epoch)
 		}
-		fmt.Println("expott poool rewards epoch", epoch)
 		// if the map was not present in storage we can skip this epoch and the previous ones, as we never stored any rewards
 		if !rewardsMap.WasRestoredFromStorage() {
 			break
@@ -348,8 +340,6 @@ func (t *Tracker) exportPoolsStats(pWriter *utils.PositionedWriter, targetEpoch 
 			return innerErr
 		}
 
-		fmt.Println("expott poool stats epoch", epoch)
-		fmt.Println(model.PoolsStatsFromBytes(value))
 		if epoch > targetEpoch {
 			// continue
 			return nil
@@ -400,7 +390,6 @@ func (t *Tracker) exportCommittees(pWriter *utils.PositionedWriter, targetSlot i
 
 			return innerErr
 		}
-		fmt.Println("expott committees epoch", epoch)
 
 		// We have a committee for an epoch higher than the targetSlot
 		// 1. we trust the point of no return, we export the committee for the next epoch

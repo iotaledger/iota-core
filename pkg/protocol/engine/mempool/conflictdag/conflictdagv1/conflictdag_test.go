@@ -2,8 +2,6 @@ package conflictdagv1
 
 import (
 	"fmt"
-	"runtime"
-	memleakdebug "runtime/debug"
 	"testing"
 	"time"
 
@@ -87,7 +85,7 @@ func TestMemoryRelease(t *testing.T) {
 
 	fmt.Println("Memory report before:")
 	fmt.Println(memanalyzer.MemoryReport(tf))
-	memStatsStart := memStats()
+	memStatsStart := memanalyzer.MemSize(tf)
 	_, alias := createConflictSets(0, 30000, 1, 2, "")
 
 	tf.Instance.EvictConflict(tf.ConflictID(alias + ":0"))
@@ -102,22 +100,12 @@ func TestMemoryRelease(t *testing.T) {
 	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictSetsByID.Size())
 	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictsByID.Size())
 	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictUnhooks.Size())
-	memStatsEnd := memStats()
+	memStatsEnd := memanalyzer.MemSize(tf)
 
 	fmt.Println("\n\nMemory report after:")
 	fmt.Println(memanalyzer.MemoryReport(tf))
 
-	fmt.Println(memStatsEnd.HeapObjects, memStatsStart.HeapObjects)
+	fmt.Println(memStatsEnd, memStatsStart)
 
-	require.Less(t, float64(memStatsEnd.HeapObjects), 1.1*float64(memStatsStart.HeapObjects), "the objects in the heap should not grow by more than 10%")
-}
-
-func memStats() *runtime.MemStats {
-	runtime.GC()
-	memleakdebug.FreeOSMemory()
-
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-
-	return &memStats
+	require.Less(t, float64(memStatsEnd), 1.1*float64(memStatsStart), "the objects in the heap should not grow by more than 10%")
 }
