@@ -243,7 +243,7 @@ type TransactionMetadata struct {
 }
 
 // NewTransactionMetadata returns the TransactionMetadata from the given mempool.TransactionMetadata.
-func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata, conflicts ds.Set[iotago.Identifier]) *TransactionMetadata {
+func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata, conflicts ds.Set[iotago.TransactionID]) *TransactionMetadata {
 	var confirmationState string
 	if transactionMetadata.IsAccepted() {
 		confirmationState = "accepted"

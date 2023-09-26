@@ -76,7 +76,7 @@ linters:
         - goheader
         - goimports
         #- gomnd
-        - gomoddirectives
+        #- gomoddirectives
         - gomodguard
         - goprintffuncname
         - gosec

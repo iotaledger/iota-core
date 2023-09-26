@@ -79,12 +79,12 @@ func RandOutputID(index ...uint16) iotago.OutputID {
 	}
 
 	var outputID iotago.OutputID
-	_, err := RandomRead(outputID[:iotago.TransactionIDLength])
+	_, err := RandomRead(outputID[:iotago.SlotIdentifierLength])
 	if err != nil {
 		panic(err)
 	}
 
-	binary.LittleEndian.PutUint16(outputID[iotago.TransactionIDLength:], idx)
+	binary.LittleEndian.PutUint16(outputID[iotago.SlotIdentifierLength:], idx)
 
 	return outputID
 }
@@ -98,7 +98,7 @@ func RandBlockID() iotago.BlockID {
 
 func RandTransactionID() iotago.TransactionID {
 	transactionID := iotago.TransactionID{}
-	copy(transactionID[:], RandBytes(iotago.TransactionIDLength))
+	copy(transactionID[:], RandBytes(iotago.SlotIdentifierLength))
 
 	return transactionID
 }
@@ -118,7 +118,7 @@ func RandAccountID() iotago.AccountID {
 }
 
 func RandSlotIndex() iotago.SlotIndex {
-	return iotago.SlotIndex(RandUint64(math.MaxUint64))
+	return iotago.SlotIndex(RandUint32(uint32(iotago.MaxSlotIndex)))
 }
 
 func RandTimestamp() time.Time {
@@ -161,7 +161,7 @@ func RandOutput(outputType iotago.OutputType) iotago.Output {
 }
 
 func RandOutputOnAddress(outputType iotago.OutputType, address iotago.Address) iotago.Output {
-	return RandOutputOnAddressWithAmount(outputType, address, tpkg.RandBaseToken(math.MaxUint64))
+	return RandOutputOnAddressWithAmount(outputType, address, tpkg.RandBaseToken(iotago.MaxBaseToken))
 }
 
 func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.Address, amount iotago.BaseToken) iotago.Output {
@@ -243,15 +243,16 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 }
 
 func RandBlockIssuerKey() iotago.BlockIssuerKey {
-	return iotago.BlockIssuerKeyEd25519FromPublicKey(ed25519.PublicKey(RandBytes(32)))
+	return iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(RandBytes(32)))
 }
 
 func RandBlockIssuerKeys() iotago.BlockIssuerKeys {
 	// We always generate at least one key.
 	length := RandomIntn(10) + 1
-	blockIssuerKeys := make(iotago.BlockIssuerKeys, length)
+
+	blockIssuerKeys := iotago.NewBlockIssuerKeys()
 	for i := 0; i < length; i++ {
-		blockIssuerKeys[i] = RandBlockIssuerKey()
+		blockIssuerKeys.Add(RandBlockIssuerKey())
 	}
 
 	return blockIssuerKeys

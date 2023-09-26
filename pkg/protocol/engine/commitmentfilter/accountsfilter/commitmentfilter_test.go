@@ -1,7 +1,6 @@
 package accountsfilter
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -171,8 +170,8 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		accountID,
 		accounts.NewAccountData(
 			accountID,
-			accounts.WithExpirySlot(math.MaxUint64),
-			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
+			accounts.WithExpirySlot(iotago.MaxSlotIndex),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 	keyPairImplicitAccount := ed25519.GenerateKeyPair()
@@ -231,8 +230,8 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 		accountID,
 		accounts.NewAccountData(
 			accountID,
-			accounts.WithExpirySlot(math.MaxUint64),
-			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
+			accounts.WithExpirySlot(iotago.MaxSlotIndex),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 
@@ -269,7 +268,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 		accounts.NewAccountData(
 			accountID,
 			accounts.WithExpirySlot(100),
-			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 

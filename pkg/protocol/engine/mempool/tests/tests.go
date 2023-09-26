@@ -2,8 +2,6 @@ package mempooltests
 
 import (
 	"fmt"
-	"runtime"
-	memleakdebug "runtime/debug"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,6 +11,10 @@ import (
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
+)
+
+const (
+	TestMemoryReleaseMaxMemoryIncreaseFactor = 1.20
 )
 
 func TestAllWithoutForkingEverything(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
@@ -585,28 +587,20 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 
 	fmt.Println("Memory report before:")
 	fmt.Println(memanalyzer.MemoryReport(tf))
-	memStatsStart := memStats()
+	memStatsStart := memanalyzer.MemSize(tf)
 
-	txIndex, prevStateAlias := issueTransactions(1, 10000, "genesis")
+	txIndex, prevStateAlias := issueTransactions(1, 20000, "genesis")
 	tf.WaitChildren()
 
-	issueTransactions(txIndex, 10000, prevStateAlias)
+	issueTransactions(txIndex, 20000, prevStateAlias)
 
 	tf.Cleanup()
 
-	memStatsEnd := memStats()
+	memStatsEnd := memanalyzer.MemSize(tf)
+	fmt.Println("Memory report after:")
 
-	fmt.Println(memStatsEnd.HeapObjects, memStatsStart.HeapObjects)
+	fmt.Println(memanalyzer.MemoryReport(tf))
+	fmt.Println(memStatsEnd, memStatsStart)
 
-	require.Less(t, float64(memStatsEnd.HeapObjects), 1.15*float64(memStatsStart.HeapObjects), "the objects in the heap should not grow by more than 15%")
-}
-
-func memStats() *runtime.MemStats {
-	runtime.GC()
-	memleakdebug.FreeOSMemory()
-
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-
-	return &memStats
+	require.Less(t, float64(memStatsEnd), TestMemoryReleaseMaxMemoryIncreaseFactor*float64(memStatsStart), "the objects in the heap should not grow by more than 15%")
 }

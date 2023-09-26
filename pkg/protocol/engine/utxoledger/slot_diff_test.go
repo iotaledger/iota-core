@@ -21,7 +21,6 @@ import (
 
 func TestSimpleSlotDiffSerialization(t *testing.T) {
 	indexBooked := iotago.SlotIndex(255975)
-	slotCreated := utils.RandSlotIndex()
 
 	outputID := utils.RandOutputID()
 	blockID := utils.RandBlockID()
@@ -37,7 +36,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 		},
 		Features: iotago.BasicOutputFeatures{},
 	}
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, iotaOutput)
 
 	transactionIDSpent := utils.RandTransactionID()
 
@@ -54,11 +53,11 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 	require.Equal(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixSlotDiffs}, lo.PanicOnErr(indexSpent.Bytes())), diff.KVStorableKey())
 
 	value := diff.KVStorableValue()
-	require.Equal(t, len(value), 76)
+	require.Equal(t, len(value), iotago.OutputIDLength*2+8)
 	require.Equal(t, uint32(1), binary.LittleEndian.Uint32(value[:4]))
-	require.Equal(t, outputID[:], value[4:38])
-	require.Equal(t, uint32(1), binary.LittleEndian.Uint32(value[38:42]))
-	require.Equal(t, outputID[:], value[42:76])
+	require.Equal(t, outputID[:], value[4:4+iotago.OutputIDLength])
+	require.Equal(t, uint32(1), binary.LittleEndian.Uint32(value[4+iotago.OutputIDLength:iotago.OutputIDLength+8]))
+	require.Equal(t, outputID[:], value[iotago.OutputIDLength+8:iotago.OutputIDLength*2+8])
 }
 
 func TestSlotDiffSerialization(t *testing.T) {
