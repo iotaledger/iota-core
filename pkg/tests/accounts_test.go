@@ -351,6 +351,7 @@ func Test_TransitionAccount(t *testing.T) {
 				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
 			},
 		}),
+		testsuite.WithSlotCreated(slotIndexBlock5),
 	))
 
 	slotIndexBlock6 := latestParent.ID().Index()
