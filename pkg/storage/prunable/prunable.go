@@ -142,16 +142,16 @@ func (p *Prunable) Flush() {
 	}
 }
 
-func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex) error {
-	timeProvider := p.apiProvider.APIForSlot(targetSlotIndex).TimeProvider()
-	targetSlotEpoch := timeProvider.EpochFromSlot(targetSlotIndex)
+func (p *Prunable) Rollback(targetSlot iotago.SlotIndex) error {
+	timeProvider := p.apiProvider.APIForSlot(targetSlot).TimeProvider()
+	targetSlotEpoch := timeProvider.EpochFromSlot(targetSlot)
 	lastCommittedEpoch := targetSlotEpoch
 	// if the target index is the last slot of the epoch, the epoch was committed
-	if timeProvider.EpochEnd(targetSlotEpoch) != targetSlotIndex {
+	if timeProvider.EpochEnd(targetSlotEpoch) != targetSlot {
 		lastCommittedEpoch--
 	}
 
-	if err := p.prunableSlotStore.RollbackBucket(targetSlotEpoch, targetSlotIndex, timeProvider.EpochEnd(targetSlotEpoch)); err != nil {
+	if err := p.prunableSlotStore.RollbackBucket(targetSlotEpoch, targetSlot, timeProvider.EpochEnd(targetSlotEpoch)); err != nil {
 		return ierrors.Wrapf(err, "error while rolling back slots in a bucket for epoch %d", targetSlotEpoch)
 	}
 
@@ -159,34 +159,34 @@ func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex) error {
 	p.prunableSlotStore.Shutdown()
 
 	// Removed entries that belong to the old fork and cannot be re-used.
-	for epochIdx := lastCommittedEpoch + 1; ; epochIdx++ {
-		if epochIdx > targetSlotEpoch {
-			shouldRollback, err := p.shouldRollbackCommittee(epochIdx, targetSlotIndex)
+	for epoch := lastCommittedEpoch + 1; ; epoch++ {
+		if epoch > targetSlotEpoch {
+			shouldRollback, err := p.shouldRollbackCommittee(epoch, targetSlot)
 			if err != nil {
-				return ierrors.Wrapf(err, "error while checking if committee for epoch %d should be rolled back", epochIdx)
+				return ierrors.Wrapf(err, "error while checking if committee for epoch %d should be rolled back", epoch)
 			}
 
-			// TODO: REPLACE WITH TRACE LOG fmt.Println("rollback committee", shouldRollback, "epochIdx", epochIdx, "lastCommittedEpoch", lastCommittedEpoch, "targetSlotEpoch", targetSlotEpoch)
+			// TODO: REPLACE WITH TRACE LOG fmt.Println("rollback committee", shouldRollback, "epoch", epoch, "lastCommittedEpoch", lastCommittedEpoch, "targetSlotEpoch", targetSlotEpoch)
 			if shouldRollback {
-				if err := p.committee.DeleteEpoch(epochIdx); err != nil {
-					return ierrors.Wrapf(err, "error while deleting committee for epoch %d", epochIdx)
+				if err := p.committee.DeleteEpoch(epoch); err != nil {
+					return ierrors.Wrapf(err, "error while deleting committee for epoch %d", epoch)
 				}
 			}
 
-			if deleted := p.prunableSlotStore.DeleteBucket(epochIdx); !deleted {
+			if deleted := p.prunableSlotStore.DeleteBucket(epoch); !deleted {
 				break
 			}
 		}
 
-		if err := p.poolRewards.DeleteEpoch(epochIdx); err != nil {
-			return ierrors.Wrapf(err, "error while deleting pool rewards for epoch %d", epochIdx)
+		if err := p.poolRewards.DeleteEpoch(epoch); err != nil {
+			return ierrors.Wrapf(err, "error while deleting pool rewards for epoch %d", epoch)
 		}
-		if err := p.poolStats.DeleteEpoch(epochIdx); err != nil {
-			return ierrors.Wrapf(err, "error while deleting pool stats for epoch %d", epochIdx)
+		if err := p.poolStats.DeleteEpoch(epoch); err != nil {
+			return ierrors.Wrapf(err, "error while deleting pool stats for epoch %d", epoch)
 		}
 
-		if err := p.decidedUpgradeSignals.DeleteEpoch(epochIdx); err != nil {
-			return ierrors.Wrapf(err, "error while deleting decided upgrade signals for epoch %d", epochIdx)
+		if err := p.decidedUpgradeSignals.DeleteEpoch(epoch); err != nil {
+			return ierrors.Wrapf(err, "error while deleting decided upgrade signals for epoch %d", epoch)
 		}
 	}
 
@@ -195,13 +195,13 @@ func (p *Prunable) Rollback(targetSlotIndex iotago.SlotIndex) error {
 
 // Remove committee for the next epoch only if forking point is before point of no return and committee is reused.
 // Always remove committees for epochs that are newer than targetSlotEpoch+1.
-func (p *Prunable) shouldRollbackCommittee(epochIndex iotago.EpochIndex, targetSlotIndex iotago.SlotIndex) (bool, error) {
-	timeProvider := p.apiProvider.APIForSlot(targetSlotIndex).TimeProvider()
-	targetSlotEpoch := timeProvider.EpochFromSlot(targetSlotIndex)
-	pointOfNoReturn := timeProvider.EpochEnd(targetSlotEpoch) - p.apiProvider.APIForSlot(targetSlotIndex).ProtocolParameters().MaxCommittableAge()
+func (p *Prunable) shouldRollbackCommittee(epoch iotago.EpochIndex, targetSlot iotago.SlotIndex) (bool, error) {
+	timeProvider := p.apiProvider.APIForSlot(targetSlot).TimeProvider()
+	targetSlotEpoch := timeProvider.EpochFromSlot(targetSlot)
+	pointOfNoReturn := timeProvider.EpochEnd(targetSlotEpoch) - p.apiProvider.APIForSlot(targetSlot).ProtocolParameters().MaxCommittableAge()
 
-	if epochIndex >= targetSlotEpoch+1 {
-		if targetSlotIndex < pointOfNoReturn {
+	if epoch >= targetSlotEpoch+1 {
+		if targetSlot < pointOfNoReturn {
 			committee, err := p.committee.Load(targetSlotEpoch + 1)
 			if err != nil {
 				return false, err

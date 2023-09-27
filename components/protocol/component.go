@@ -251,7 +251,7 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		Component.LogInfof("SlotCommitted: %s - %d", details.Commitment.ID(), details.Commitment.Index())
+		Component.LogInfof("SlotCommitted: %s - %d", details.Commitment.ID(), details.Commitment.Slot())
 	})
 
 	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {

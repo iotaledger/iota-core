@@ -25,7 +25,7 @@ func NewCommittedSlotAPI(engine *Engine, commitmentID iotago.CommitmentID) *Comm
 
 // Commitment returns the commitment of the slot.
 func (c *CommittedSlotAPI) Commitment() (commitment *model.Commitment, err error) {
-	if commitment, err = c.engine.Storage.Commitments().Load(c.CommitmentID.Index()); err != nil {
+	if commitment, err = c.engine.Storage.Commitments().Load(c.CommitmentID.Slot()); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to load commitment for slot %d", c.CommitmentID)
 	}
 
@@ -34,11 +34,11 @@ func (c *CommittedSlotAPI) Commitment() (commitment *model.Commitment, err error
 
 // Roots returns the roots of the slot.
 func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
-	if c.engine.Storage.Settings().LatestCommitment().Index() < c.CommitmentID.Index() {
+	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
 		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
 
-	rootsStorage, err := c.engine.Storage.Roots(c.CommitmentID.Index())
+	rootsStorage, err := c.engine.Storage.Roots(c.CommitmentID.Slot())
 	if err != nil {
 		return nil, ierrors.Errorf("no roots storage for slot %d", c.CommitmentID)
 	}
@@ -55,20 +55,20 @@ func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
 
 // BlockIDs returns the accepted block IDs of the slot.
 func (c *CommittedSlotAPI) BlockIDs() (blockIDs iotago.BlockIDs, err error) {
-	if c.engine.Storage.Settings().LatestCommitment().Index() < c.CommitmentID.Index() {
+	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
 		return blockIDs, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
 
-	store, err := c.engine.Storage.Blocks(c.CommitmentID.Index())
+	store, err := c.engine.Storage.Blocks(c.CommitmentID.Slot())
 	if err != nil {
-		return nil, ierrors.Errorf("failed to get block store of slot index %d", c.CommitmentID.Index())
+		return nil, ierrors.Errorf("failed to get block store of slot index %d", c.CommitmentID.Slot())
 	}
 
 	if err := store.ForEachBlockInSlot(func(block *model.Block) error {
 		blockIDs = append(blockIDs, block.ID())
 		return nil
 	}); err != nil {
-		return nil, ierrors.Wrapf(err, "failed to iterate over blocks of slot %d", c.CommitmentID.Index())
+		return nil, ierrors.Wrapf(err, "failed to iterate over blocks of slot %d", c.CommitmentID.Slot())
 	}
 
 	return blockIDs, nil

@@ -127,9 +127,9 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 		collector.WithHelp("Current amount of mana of each issuer in the queue."),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
-				mana, err := deps.Protocol.MainEngineInstance().Ledger.ManaManager().GetManaOnAccount(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Index())
+				mana, err := deps.Protocol.MainEngineInstance().Ledger.ManaManager().GetManaOnAccount(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Slot())
 				if err != nil {
-					deps.Protocol.MainEngineInstance().ErrorHandler("metrics")(ierrors.Wrapf(err, "failed to retrieve mana on account %s for slot %d", block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Index()))
+					deps.Protocol.MainEngineInstance().ErrorHandler("metrics")(ierrors.Wrapf(err, "failed to retrieve mana on account %s for slot %d", block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Slot()))
 
 					return
 				}

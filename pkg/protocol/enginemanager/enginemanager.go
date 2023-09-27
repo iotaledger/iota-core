@@ -249,17 +249,17 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 
 	// Remove commitments that after forking point.
 	latestCommitment := newStorage.Settings().LatestCommitment()
-	if err := newStorage.Commitments().Rollback(index, latestCommitment.Index()); err != nil {
+	if err := newStorage.Commitments().Rollback(index, latestCommitment.Slot()); err != nil {
 		return nil, ierrors.Wrap(err, "failed to rollback commitments")
 	}
 	// Create temporary components and rollback their permanent state, which will be reflected on disk.
 	evictionState := eviction.NewState(newStorage.LatestNonEmptySlot(), newStorage.RootBlocks)
-	evictionState.Initialize(latestCommitment.Index())
+	evictionState.Initialize(latestCommitment.Slot())
 
 	blockCache := blocks.New(evictionState, newStorage.Settings().APIProvider())
 	accountsManager := accountsledger.New(newStorage.Settings().APIProvider(), blockCache.Block, newStorage.AccountDiffs, newStorage.Accounts())
 
-	accountsManager.SetLatestCommittedSlot(latestCommitment.Index())
+	accountsManager.SetLatestCommittedSlot(latestCommitment.Slot())
 	if err := accountsManager.Rollback(index); err != nil {
 		return nil, ierrors.Wrap(err, "failed to rollback accounts manager")
 	}

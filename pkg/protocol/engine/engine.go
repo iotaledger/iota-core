@@ -206,18 +206,18 @@ func New(
 			} else {
 				// Restore from Disk
 				e.Storage.RestoreFromDisk()
-				e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Index())
+				e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Slot())
 
 				if err := e.Attestations.RestoreFromDisk(); err != nil {
 					panic(ierrors.Wrap(err, "failed to restore attestations from disk"))
 				}
-				if err := e.UpgradeOrchestrator.RestoreFromDisk(e.Storage.Settings().LatestCommitment().Index()); err != nil {
+				if err := e.UpgradeOrchestrator.RestoreFromDisk(e.Storage.Settings().LatestCommitment().Slot()); err != nil {
 					panic(ierrors.Wrap(err, "failed to restore upgrade orchestrator from disk"))
 				}
 
 				// When we start from disk we potentially have previously accepted blocks in window (latestCommitment, latestCommitment + maxCommittableAge]
 				// on disk. We store this information that we can load blocks instead of requesting them again.
-				e.startupAvailableBlocksWindow = e.Storage.Settings().LatestCommitment().Index() + e.CurrentAPI().ProtocolParameters().MaxCommittableAge()
+				e.startupAvailableBlocksWindow = e.Storage.Settings().LatestCommitment().Slot() + e.CurrentAPI().ProtocolParameters().MaxCommittableAge()
 			}
 		},
 		(*Engine).TriggerInitialized,
@@ -268,11 +268,11 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	}
 
 	// The block should've been in the block cache, so there's no need to check the storage.
-	if !exists && id.Index() > e.startupAvailableBlocksWindow && id.Index() > e.Storage.Settings().LatestCommitment().Index() {
+	if !exists && id.Slot() > e.startupAvailableBlocksWindow && id.Slot() > e.Storage.Settings().LatestCommitment().Slot() {
 		return nil, false
 	}
 
-	s, err := e.Storage.Blocks(id.Index())
+	s, err := e.Storage.Blocks(id.Slot())
 	if err != nil {
 		e.errorHandler(ierrors.Wrap(err, "failed to get block storage"))
 
@@ -311,8 +311,8 @@ func (e *Engine) CurrentAPI() iotago.API {
 
 // CommittedSlot returns the committed slot for the given slot index.
 func (e *Engine) CommittedSlot(commitmentID iotago.CommitmentID) (*CommittedSlotAPI, error) {
-	if e.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
-		return nil, ierrors.Errorf("slot %d is not committed yet", commitmentID.Index())
+	if e.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
+		return nil, ierrors.Errorf("slot %d is not committed yet", commitmentID.Slot())
 	}
 
 	return NewCommittedSlotAPI(e, commitmentID), nil
@@ -320,7 +320,7 @@ func (e *Engine) CommittedSlot(commitmentID iotago.CommitmentID) (*CommittedSlot
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
 	if len(targetSlot) == 0 {
-		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Index())
+		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Slot())
 	} else if lastPrunedEpoch, hasPruned := e.Storage.LastPrunedEpoch(); hasPruned && e.CurrentAPI().TimeProvider().EpochFromSlot(targetSlot[0]) <= lastPrunedEpoch {
 		return ierrors.Errorf("impossible to create a snapshot for slot %d because it is pruned (last pruned slot %d)", targetSlot[0], lo.Return1(e.Storage.LastPrunedEpoch()))
 	}
@@ -427,7 +427,7 @@ func (e *Engine) setupBlockStorage() {
 	wp := e.Workers.CreatePool("BlockStorage", 1) // Using just 1 worker to avoid contention
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		store, err := e.Storage.Blocks(block.ID().Index())
+		store, err := e.Storage.Blocks(block.ID().Slot())
 		if err != nil {
 			e.errorHandler(ierrors.Errorf("failed to store block with %s, storage with given index does not exist", block.ID()))
 			return
@@ -446,7 +446,7 @@ func (e *Engine) setupEvictionState() {
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		block.ForEachParent(func(parent iotago.Parent) {
-			if parent.ID.Index() < block.ID().Index() && !e.EvictionState.IsRootBlock(parent.ID) {
+			if parent.ID.Slot() < block.ID().Slot() && !e.EvictionState.IsRootBlock(parent.ID) {
 				parentBlock, exists := e.Block(parent.ID)
 				if !exists {
 					e.errorHandler(ierrors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
@@ -458,12 +458,12 @@ func (e *Engine) setupEvictionState() {
 	}, event.WithWorkerPool(wp))
 
 	e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-		e.EvictionState.AdvanceActiveWindowToIndex(commitment.Index())
+		e.EvictionState.AdvanceActiveWindowToIndex(commitment.Slot())
 	}, event.WithWorkerPool(wp))
 
 	e.Events.EvictionState.SlotEvicted.Hook(e.BlockCache.EvictUntil)
 
-	e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Index())
+	e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Slot())
 }
 
 func (e *Engine) setupBlockRequester() {
@@ -475,10 +475,10 @@ func (e *Engine) setupBlockRequester() {
 	// We need to hook to make sure that the request is created before the block arrives to avoid a race condition
 	// where we try to delete the request again before it is created. Thus, continuing to request forever.
 	e.Events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
-		if block.ID().Index() < e.startupAvailableBlocksWindow {
+		if block.ID().Slot() < e.startupAvailableBlocksWindow {
 			// We shortcut requesting blocks that are in the storage in case we did shut down and restart.
 			// We can safely ignore all errors.
-			if blockStorage, err := e.Storage.Blocks(block.ID().Index()); err == nil {
+			if blockStorage, err := e.Storage.Blocks(block.ID().Slot()); err == nil {
 				if storedBlock, _ := blockStorage.Load(block.ID()); storedBlock != nil {
 					// We need to attach the block to the DAG in a separate worker pool to avoid a deadlock with the block cache
 					// as the BlockMissing event is triggered within a GetOrCreate call.

@@ -16,7 +16,7 @@ func init() {
 }
 
 func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) error {
-	slot := scd.Commitment.Index()
+	slot := scd.Commitment.Slot()
 	stateDiff := deps.Protocol.MainEngineInstance().Ledger.MemPool().StateDiff(slot)
 	mutationsTree := ads.NewSet(mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.SlotIdentifierFromBytes)
 	tcs := &TransactionsChangesResponse{

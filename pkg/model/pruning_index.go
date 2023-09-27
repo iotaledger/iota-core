@@ -23,16 +23,16 @@ func NewPruningIndex(kv kvstore.KVStore, key kvstore.Realm) *PruningIndex {
 	}
 }
 
-func (e *PruningIndex) MarkEvicted(index iotago.EpochIndex) error {
+func (e *PruningIndex) MarkEvicted(epoch iotago.EpochIndex) error {
 	e.lastPrunedMutex.Lock()
 	defer e.lastPrunedMutex.Unlock()
 
-	e.memLastPrunedEpoch.MarkEvicted(index)
+	e.memLastPrunedEpoch.MarkEvicted(epoch)
 
-	return e.kv.Set(e.key, index.MustBytes())
+	return e.kv.Set(e.key, epoch.MustBytes())
 }
 
-func (e *PruningIndex) Index() (current iotago.EpochIndex, valid bool) {
+func (e *PruningIndex) Index() (currentEpoch iotago.EpochIndex, valid bool) {
 	e.lastPrunedMutex.RLock()
 	defer e.lastPrunedMutex.RUnlock()
 

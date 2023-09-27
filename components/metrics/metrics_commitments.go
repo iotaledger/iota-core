@@ -30,7 +30,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				deps.Collector.Update(commitmentsNamespace, latestCommitment, float64(details.Commitment.ID().Index()), details.Commitment.ID().String())
+				deps.Collector.Update(commitmentsNamespace, latestCommitment, float64(details.Commitment.ID().Slot()), details.Commitment.ID().String())
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
@@ -62,7 +62,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				deps.Collector.Update(commitmentsNamespace, acceptedBlocks, float64(details.AcceptedBlocks.Size()), strconv.Itoa(int(details.Commitment.Index())))
+				deps.Collector.Update(commitmentsNamespace, acceptedBlocks, float64(details.AcceptedBlocks.Size()), strconv.Itoa(int(details.Commitment.Slot())))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),
@@ -74,7 +74,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				deps.Collector.Update(commitmentsNamespace, validators, float64(details.ActiveValidatorsCount), strconv.Itoa(int(details.Commitment.Index())))
+				deps.Collector.Update(commitmentsNamespace, validators, float64(details.ActiveValidatorsCount), strconv.Itoa(int(details.Commitment.Slot())))
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),

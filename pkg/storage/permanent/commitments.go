@@ -34,23 +34,23 @@ func NewCommitments(store kvstore.KVStore, apiProvider iotago.APIProvider) *Comm
 }
 
 func (c *Commitments) Store(commitment *model.Commitment) error {
-	return c.store.Set(commitment.Commitment().Index, commitment)
+	return c.store.Set(commitment.Commitment().Slot, commitment)
 }
 
-func (c *Commitments) Load(index iotago.SlotIndex) (commitment *model.Commitment, err error) {
-	return c.store.Get(index)
+func (c *Commitments) Load(slot iotago.SlotIndex) (commitment *model.Commitment, err error) {
+	return c.store.Get(slot)
 }
 
 func (c *Commitments) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
 	if err := stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		var count uint64
-		for slotIndex := iotago.SlotIndex(0); slotIndex <= targetSlot; slotIndex++ {
-			commitmentBytes, err := c.store.KVStore().Get(lo.PanicOnErr(slotIndex.Bytes()))
+		for slot := iotago.SlotIndex(0); slot <= targetSlot; slot++ {
+			commitmentBytes, err := c.store.KVStore().Get(lo.PanicOnErr(slot.Bytes()))
 			if err != nil {
-				return 0, ierrors.Wrapf(err, "failed to load commitment for slot %d", slotIndex)
+				return 0, ierrors.Wrapf(err, "failed to load commitment for slot %d", slot)
 			}
 			if err := stream.WriteBlob(writer, commitmentBytes); err != nil {
-				return 0, ierrors.Wrapf(err, "failed to write commitment for slot %d", slotIndex)
+				return 0, ierrors.Wrapf(err, "failed to write commitment for slot %d", slot)
 			}
 
 			count++
@@ -88,10 +88,10 @@ func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
 	return nil
 }
 
-func (c *Commitments) Rollback(targetIndex iotago.SlotIndex, lastCommittedIndex iotago.SlotIndex) error {
-	for slotIndex := targetIndex + 1; slotIndex <= lastCommittedIndex; slotIndex++ {
-		if err := c.store.KVStore().Delete(lo.PanicOnErr(slotIndex.Bytes())); err != nil {
-			return ierrors.Wrapf(err, "failed to remove forked commitment for slot %d", slotIndex)
+func (c *Commitments) Rollback(targetSlot iotago.SlotIndex, lastCommittedSlot iotago.SlotIndex) error {
+	for slot := targetSlot + 1; slot <= lastCommittedSlot; slot++ {
+		if err := c.store.KVStore().Delete(lo.PanicOnErr(slot.Bytes())); err != nil {
+			return ierrors.Wrapf(err, "failed to remove forked commitment for slot %d", slot)
 		}
 	}
 

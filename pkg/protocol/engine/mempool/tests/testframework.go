@@ -94,11 +94,11 @@ func (t *TestFramework) AttachTransactions(transactionAlias ...string) error {
 	return nil
 }
 
-func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, slotIndex iotago.SlotIndex) error {
+func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, slot iotago.SlotIndex) error {
 	transaction, transactionExists := t.transactionByAlias[transactionAlias]
 	require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", transactionAlias)
 
-	t.blockIDsByAlias[blockAlias] = iotago.SlotIdentifierRepresentingData(slotIndex, []byte(blockAlias))
+	t.blockIDsByAlias[blockAlias] = iotago.SlotIdentifierRepresentingData(slot, []byte(blockAlias))
 
 	if _, err := t.Instance.AttachTransaction(transaction, t.blockIDsByAlias[blockAlias]); err != nil {
 		return err
@@ -107,8 +107,8 @@ func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, s
 	return nil
 }
 
-func (t *TestFramework) CommitSlot(slotIndex iotago.SlotIndex) {
-	stateDiff := t.Instance.StateDiff(slotIndex)
+func (t *TestFramework) CommitSlot(slot iotago.SlotIndex) {
+	stateDiff := t.Instance.StateDiff(slot)
 
 	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.OutputStateMetadata) bool {
 		t.ledgerState.AddOutputState(state.State())
@@ -322,8 +322,8 @@ func (t *TestFramework) requireMarkedBooked(transactionAliases ...string) {
 	}
 }
 
-func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAliases, createdOutputAliases, transactionAliases []string) {
-	stateDiff := t.Instance.StateDiff(index)
+func (t *TestFramework) AssertStateDiff(slot iotago.SlotIndex, spentOutputAliases, createdOutputAliases, transactionAliases []string) {
+	stateDiff := t.Instance.StateDiff(slot)
 
 	require.Equal(t.test, len(spentOutputAliases), stateDiff.DestroyedStates().Size())
 	require.Equal(t.test, len(createdOutputAliases), stateDiff.CreatedStates().Size())

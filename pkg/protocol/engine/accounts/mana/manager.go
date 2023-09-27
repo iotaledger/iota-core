@@ -81,7 +81,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	return mana.Value(), nil
 }
 
-func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts ds.Set[iotago.AccountID], accountOutputs map[iotago.AccountID]*utxoledger.Output) {
+func (m *Manager) ApplyDiff(slot iotago.SlotIndex, destroyedAccounts ds.Set[iotago.AccountID], accountOutputs map[iotago.AccountID]*utxoledger.Output) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -94,9 +94,9 @@ func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts ds.Set
 		if exists {
 			minDeposit := m.apiProvider.CurrentAPI().ProtocolParameters().RentStructure().MinDeposit(output.Output())
 			if output.BaseTokenAmount() <= minDeposit {
-				mana.Update(output.StoredMana(), 0, slotIndex)
+				mana.Update(output.StoredMana(), 0, slot)
 			} else {
-				mana.Update(output.StoredMana(), output.BaseTokenAmount()-minDeposit, slotIndex)
+				mana.Update(output.StoredMana(), output.BaseTokenAmount()-minDeposit, slot)
 			}
 		}
 	}

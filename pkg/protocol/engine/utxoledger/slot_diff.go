@@ -14,7 +14,7 @@ import (
 // SlotDiff represents the generated and spent outputs by a slot's confirmation.
 type SlotDiff struct {
 	// The index of the slot.
-	Index iotago.SlotIndex
+	Slot iotago.SlotIndex
 	// The outputs newly generated with this diff.
 	Outputs Outputs
 	// The outputs spent with this diff.
@@ -30,7 +30,7 @@ func slotDiffKeyForIndex(index iotago.SlotIndex) []byte {
 }
 
 func (sd *SlotDiff) KVStorableKey() []byte {
-	return slotDiffKeyForIndex(sd.Index)
+	return slotDiffKeyForIndex(sd.Slot)
 }
 
 func (sd *SlotDiff) KVStorableValue() []byte {
@@ -51,7 +51,7 @@ func (sd *SlotDiff) KVStorableValue() []byte {
 
 // note that this method relies on the data being available within other "tables".
 func (sd *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) error {
-	index, _, err := iotago.SlotIndexFromBytes(key[1:])
+	slot, _, err := iotago.SlotIndexFromBytes(key[1:])
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func (sd *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) e
 		spents[i] = spent
 	}
 
-	sd.Index = index
+	sd.Slot = slot
 	sd.Outputs = outputs
 	sd.Spents = spents
 

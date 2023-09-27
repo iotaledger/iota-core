@@ -197,18 +197,18 @@ func TestSetAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
-	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedAttachment().Slot())
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.2"))
 	require.True(t, tx1Metadata.IsAccepted())
-	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedAttachment().Slot())
 	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
 	tf.AssertStateDiff(2, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.1"))
 
 	require.True(t, tx1Metadata.IsAccepted())
-	require.EqualValues(t, 1, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 1, tx1Metadata.EarliestIncludedAttachment().Slot())
 	tf.AssertStateDiff(1, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
 
@@ -216,7 +216,7 @@ func TestSetAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 
 	require.True(t, tx1Metadata.IsAccepted())
 	require.False(t, tx1Metadata.IsOrphaned())
-	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedAttachment().Slot())
 	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
 	tf.AssertStateDiff(2, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
@@ -224,7 +224,7 @@ func TestSetAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 
 	require.True(t, tx1Metadata.IsOrphaned())
 	require.False(t, tx1Metadata.IsAccepted())
-	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedAttachment().Slot())
 
 	tf.AssertStateDiff(1, []string{}, []string{}, []string{})
 	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
@@ -311,7 +311,7 @@ func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
-	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedAttachment().Slot())
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.2"))
 
@@ -319,21 +319,21 @@ func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 
 	require.True(t, tx1Metadata.IsAccepted())
 	require.False(t, tx1Metadata.IsOrphaned())
-	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 2, tx1Metadata.EarliestIncludedAttachment().Slot())
 	tf.AssertStateDiff(2, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
 	require.True(t, tf.MarkAttachmentOrphaned("block1.2"))
 
 	require.False(t, tx1Metadata.IsAccepted())
 	require.False(t, tx1Metadata.IsOrphaned())
-	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 0, tx1Metadata.EarliestIncludedAttachment().Slot())
 	tf.AssertStateDiff(2, []string{}, []string{}, []string{})
 
 	require.True(t, tf.MarkAttachmentIncluded("block1.4"))
 
 	require.True(t, tx1Metadata.IsAccepted())
 	require.False(t, tx1Metadata.IsOrphaned())
-	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedAttachment().Slot())
 	tf.AssertStateDiff(4, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
 	tf.Instance.Evict(2)
@@ -341,7 +341,7 @@ func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 
 	require.True(t, tx1Metadata.IsAccepted())
 	require.False(t, tx1Metadata.IsOrphaned())
-	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedAttachment().Slot())
 	tf.AssertStateDiff(4, []string{"genesis"}, []string{"tx1:0"}, []string{"tx1"})
 
 	tf.Instance.Evict(4)
@@ -350,7 +350,7 @@ func TestSetNotAllAttachmentsOrphaned(t *testing.T, tf *TestFramework) {
 
 	require.True(t, tx1Metadata.IsAccepted())
 	require.False(t, tx1Metadata.IsOrphaned())
-	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedAttachment().Index())
+	require.EqualValues(t, 4, tx1Metadata.EarliestIncludedAttachment().Slot())
 	tf.AssertStateDiff(4, []string{}, []string{}, []string{})
 	tf.AssertStateDiff(5, []string{}, []string{}, []string{})
 }

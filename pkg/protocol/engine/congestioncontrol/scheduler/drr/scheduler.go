@@ -57,7 +57,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 
 		e.HookConstructed(func() {
 			s.latestCommittedSlot = func() iotago.SlotIndex {
-				return e.Storage.Settings().LatestCommitment().Index()
+				return e.Storage.Settings().LatestCommitment().Slot()
 			}
 			s.blockCache = e.BlockCache
 			e.Events.Scheduler.LinkTo(s.events)
@@ -66,12 +66,12 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			})
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 				// when the last slot of an epoch is committed, remove the queues of validators that are no longer in the committee.
-				if e.CurrentAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Index()) == 0 {
+				if e.CurrentAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
 					s.bufferMutex.Lock()
 					defer s.bufferMutex.Unlock()
 
 					s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
-						if !s.seatManager.Committee(commitment.Index() + 1).HasAccount(accountID) {
+						if !s.seatManager.Committee(commitment.Slot() + 1).HasAccount(accountID) {
 							s.shutdownValidatorQueue(validatorQueue)
 							s.validatorBuffer.Delete(accountID)
 						}
@@ -245,16 +245,16 @@ func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	slotIndex := s.latestCommittedSlot()
+	slot := s.latestCommittedSlot()
 
 	issuerID := block.ProtocolBlock().IssuerID
 	issuerQueue, err := s.basicBuffer.GetIssuerQueue(issuerID)
 	if err != nil {
 		// this should only ever happen if the issuer has been removed due to insufficient Mana.
 		// if Mana is now sufficient again, we can add the issuer again.
-		_, quantumErr := s.quantumFunc(issuerID, slotIndex)
+		_, quantumErr := s.quantumFunc(issuerID, slot)
 		if quantumErr != nil {
-			s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve quantum for issuerID %s in slot %d when adding a block", issuerID, slotIndex))
+			s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve quantum for issuerID %s in slot %d when adding a block", issuerID, slot))
 		}
 
 		issuerQueue = s.createIssuer(issuerID)
@@ -264,9 +264,9 @@ func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
 		block,
 		issuerQueue,
 		func(issuerID iotago.AccountID) Deficit {
-			quantum, quantumErr := s.quantumFunc(issuerID, slotIndex)
+			quantum, quantumErr := s.quantumFunc(issuerID, slot)
 			if quantumErr != nil {
-				s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve deficit for issuerID %d in slot %d when submitting a block", issuerID, slotIndex))
+				s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve deficit for issuerID %d in slot %d when submitting a block", issuerID, slot))
 
 				return 0
 			}
@@ -417,7 +417,7 @@ func (s *Scheduler) selectValidationBlockWithoutLocking(validatorQueue *Validato
 }
 
 func (s *Scheduler) selectBasicBlockWithoutLocking() {
-	slotIndex := s.latestCommittedSlot()
+	slot := s.latestCommittedSlot()
 
 	// already a block selected to be scheduled.
 	if len(s.basicBuffer.blockChan) > 0 {
@@ -429,7 +429,7 @@ func (s *Scheduler) selectBasicBlockWithoutLocking() {
 		return
 	}
 
-	rounds, schedulingIssuer := s.selectIssuer(start, slotIndex)
+	rounds, schedulingIssuer := s.selectIssuer(start, slot)
 
 	// if there is no issuer with a ready block, we cannot schedule anything
 	if schedulingIssuer == nil {
@@ -440,8 +440,8 @@ func (s *Scheduler) selectBasicBlockWithoutLocking() {
 		// increment every issuer's deficit for the required number of rounds
 		for q := start; ; {
 			issuerID := q.IssuerID()
-			if err := s.incrementDeficit(issuerID, rounds, slotIndex); err != nil {
-				s.errorHandler(ierrors.Wrapf(err, "failed to increment deficit for issuerID %s in slot %d", issuerID, slotIndex))
+			if err := s.incrementDeficit(issuerID, rounds, slot); err != nil {
+				s.errorHandler(ierrors.Wrapf(err, "failed to increment deficit for issuerID %s in slot %d", issuerID, slot))
 				s.removeIssuer(issuerID, err)
 
 				q = s.basicBuffer.Current()
@@ -459,8 +459,8 @@ func (s *Scheduler) selectBasicBlockWithoutLocking() {
 	// increment the deficit for all issuers before schedulingIssuer one more time
 	for q := start; q != schedulingIssuer; q = s.basicBuffer.Next() {
 		issuerID := q.IssuerID()
-		if err := s.incrementDeficit(issuerID, 1, slotIndex); err != nil {
-			s.errorHandler(ierrors.Wrapf(err, "failed to increment deficit for issuerID %s in slot %d", issuerID, slotIndex))
+		if err := s.incrementDeficit(issuerID, 1, slot); err != nil {
+			s.errorHandler(ierrors.Wrapf(err, "failed to increment deficit for issuerID %s in slot %d", issuerID, slot))
 			s.removeIssuer(issuerID, err)
 
 			return
@@ -482,7 +482,7 @@ func (s *Scheduler) selectBasicBlockWithoutLocking() {
 	s.basicBuffer.blockChan <- block
 }
 
-func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex) (Deficit, *IssuerQueue) {
+func (s *Scheduler) selectIssuer(start *IssuerQueue, slot iotago.SlotIndex) (Deficit, *IssuerQueue) {
 	rounds := Deficit(math.MaxInt64)
 	var schedulingIssuer *IssuerQueue
 
@@ -515,9 +515,9 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slotIndex iotago.SlotIndex)
 
 			remainingDeficit := s.deficitFromWork(block.WorkScore()) - deficit
 			// calculate how many rounds we need to skip to accumulate enough deficit.
-			quantum, err := s.quantumFunc(issuerID, slotIndex)
+			quantum, err := s.quantumFunc(issuerID, slot)
 			if err != nil {
-				s.errorHandler(ierrors.Wrapf(err, "failed to retrieve quantum for issuerID %s in slot %d during issuer selection", issuerID, slotIndex))
+				s.errorHandler(ierrors.Wrapf(err, "failed to retrieve quantum for issuerID %s in slot %d during issuer selection", issuerID, slot))
 				// if quantum, can't be retrieved, we need to remove this issuer.
 				s.removeIssuer(issuerID, err)
 				issuerRemoved = true
@@ -615,8 +615,8 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) err
 	return nil
 }
 
-func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds Deficit, slotIndex iotago.SlotIndex) error {
-	quantum, err := s.quantumFunc(issuerID, slotIndex)
+func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds Deficit, slot iotago.SlotIndex) error {
+	quantum, err := s.quantumFunc(issuerID, slot)
 	if err != nil {
 		return err
 	}

@@ -53,7 +53,7 @@ func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, nodes
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().ID().Index() < slot {
+			if node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().ID().Slot() < slot {
 				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment with at least %v not found in settings.LatestCommitment()", node.Name, slot)
 			}
 
@@ -67,7 +67,7 @@ func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, nodes
 			}
 
 			// Make sure the commitment is also available in the ChainManager.
-			if node.Protocol.MainChain.Get().LatestCommitment.Get().ID().Index() < slot {
+			if node.Protocol.MainChain.Get().LatestCommitment.Get().ID().Slot() < slot {
 				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found in ChainManager", node.Name, slot)
 			}
 
@@ -81,8 +81,8 @@ func (t *TestSuite) AssertLatestCommitmentSlotIndex(slot iotago.SlotIndex, nodes
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if slot != node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index() {
-				return ierrors.Errorf("AssertLatestCommitmentSlotIndex: %s: expected %v, got %v", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index())
+			if slot != node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() {
+				return ierrors.Errorf("AssertLatestCommitmentSlotIndex: %s: expected %v, got %v", node.Name, slot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot())
 			}
 
 			return nil
@@ -125,7 +125,7 @@ func (t *TestSuite) AssertChainID(expectedChainID iotago.CommitmentID, nodes ...
 		t.Eventually(func() error {
 			actualChainID := node.Protocol.MainChain.Get().ForkingPoint.Get().ID()
 			if expectedChainID != actualChainID {
-				return ierrors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID, expectedChainID.Index(), actualChainID, actualChainID.Index())
+				return ierrors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID, expectedChainID.Slot(), actualChainID, actualChainID.Slot())
 			}
 
 			return nil
