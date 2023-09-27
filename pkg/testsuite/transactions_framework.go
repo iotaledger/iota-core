@@ -206,20 +206,12 @@ func (t *TransactionFramework) CreateAccountFromInput(inputAlias string, opts ..
 // CreateDelegationFromInput creates a new DelegationOutput with given options from an input. If the remainder Output
 // is not created, then StoredMana from the input is not passed and can potentially be burned.
 // In order not to burn it, it needs to be assigned manually in another output in the transaction.
-func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts ...options.Option[iotago.DelegationOutput]) (utxoledger.Outputs, iotago.Outputs[iotago.Output], []*mock.HDWallet) {
+func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts ...options.Option[builder.DelegationOutputBuilder]) (utxoledger.Outputs, iotago.Outputs[iotago.Output], []*mock.HDWallet) {
 	input := t.Output(inputAlias)
 
-	delegationOutput := options.Apply(&iotago.DelegationOutput{
-		Amount:           input.BaseTokenAmount(),
-		DelegatedAmount:  input.BaseTokenAmount(),
-		DelegationID:     iotago.DelegationID{},
-		ValidatorAddress: &iotago.AccountAddress{},
-		StartEpoch:       0,
-		EndEpoch:         0,
-		Conditions: iotago.DelegationOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
-		},
-	}, opts)
+	delegationOutput := options.Apply(builder.NewDelegationOutputBuilder(&iotago.AccountAddress{}, t.DefaultAddress(), input.BaseTokenAmount()).
+		DelegatedAmount(input.BaseTokenAmount()),
+		opts).MustBuild()
 
 	if delegationOutput.ValidatorAddress.AccountID() == iotago.EmptyAccountID() ||
 		delegationOutput.DelegatedAmount == 0 ||
@@ -252,17 +244,17 @@ func (t *TransactionFramework) DelayedClaimingTransition(inputAlias string, dele
 		panic(ierrors.Errorf("%s is not a delegation output, cannot transition to delayed claiming state", inputAlias))
 	}
 
-	delegationOutput, ok := input.Output().Clone().(*iotago.DelegationOutput)
+	prevOutput, ok := input.Output().Clone().(*iotago.DelegationOutput)
 	if !ok {
 		panic(ierrors.Errorf("cloned output %s is not a delegation output, cannot transition to delayed claiming state", inputAlias))
 	}
 
-	if delegationOutput.DelegationID == iotago.EmptyDelegationID() {
-		delegationOutput.DelegationID = iotago.DelegationIDFromOutputID(input.OutputID())
+	delegationBuilder := builder.NewDelegationOutputBuilderFromPrevious(prevOutput).EndEpoch(delegationEndEpoch)
+	if prevOutput.DelegationID == iotago.EmptyDelegationID() {
+		delegationBuilder.DelegationID(iotago.DelegationIDFromOutputID(input.OutputID()))
 	}
-	delegationOutput.EndEpoch = delegationEndEpoch
 
-	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{delegationOutput}, []*mock.HDWallet{t.wallet}
+	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{delegationBuilder.MustBuild()}, []*mock.HDWallet{t.wallet}
 }
 
 func (t *TransactionFramework) DestroyAccount(alias string) (consumedInputs *utxoledger.Output, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
@@ -338,39 +330,39 @@ func (t *TransactionFramework) DefaultAddress() iotago.Address {
 
 // DelegationOutput options
 
-func WithDelegatedAmount(delegatedAmount iotago.BaseToken) options.Option[iotago.DelegationOutput] {
-	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.DelegatedAmount = delegatedAmount
+func WithDelegatedAmount(delegatedAmount iotago.BaseToken) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.DelegatedAmount(delegatedAmount)
 	}
 }
 
-func WithDelegatedValidatorAddress(validatorAddress *iotago.AccountAddress) options.Option[iotago.DelegationOutput] {
-	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.ValidatorAddress = validatorAddress
+func WithDelegatedValidatorAddress(validatorAddress *iotago.AccountAddress) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.ValidatorAddress(validatorAddress)
 	}
 }
 
-func WithDelegationStartEpoch(startEpoch iotago.EpochIndex) options.Option[iotago.DelegationOutput] {
-	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.StartEpoch = startEpoch
+func WithDelegationStartEpoch(startEpoch iotago.EpochIndex) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.StartEpoch(startEpoch)
 	}
 }
 
-func WithDelegationEndEpoch(endEpoch iotago.EpochIndex) options.Option[iotago.DelegationOutput] {
-	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.EndEpoch = endEpoch
+func WithDelegationEndEpoch(endEpoch iotago.EpochIndex) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.EndEpoch(endEpoch)
 	}
 }
 
-func WithDelegationConditions(delegationConditions iotago.DelegationOutputUnlockConditions) options.Option[iotago.DelegationOutput] {
-	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.Conditions = delegationConditions
+func WithDelegationConditions(delegationConditions iotago.DelegationOutputUnlockConditions) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.Address(delegationConditions.MustSet().Address().Address)
 	}
 }
 
-func WithDelegationAmount(amount iotago.BaseToken) options.Option[iotago.DelegationOutput] {
-	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.Amount = amount
+func WithDelegationAmount(amount iotago.BaseToken) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.Amount(amount)
 	}
 }
 
