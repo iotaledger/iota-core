@@ -227,10 +227,17 @@ func (c *Commitment) promote(targetChain *Chain) {
 
 func (c *Commitment) triggerEventIfBelowThreshold(event func(*Commitment) reactive.Event, chainThreshold func(*Chain) reactive.Variable[iotago.SlotIndex]) {
 	c.Chain.OnUpdateWithContext(func(_, chain *Chain, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
+		if chain == nil {
+			return
+		}
 
 		// only monitor the threshold after the parent event was triggered (minimize listeners to same threshold)
 		withinContext(func() (unsubscribe func()) {
 			return event(c.Parent.Get()).OnTrigger(func() {
+				if chain == nil {
+					c.LogError("chain is nil IN HERE")
+				}
+
 				// since events only trigger once, we unsubscribe from the threshold after the trigger condition is met
 				chainThreshold(chain).OnUpdateOnce(func(_, _ iotago.SlotIndex) {
 					event(c).Trigger()

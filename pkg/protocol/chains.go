@@ -189,12 +189,14 @@ func (c *Chains) initChainSwitching() {
 	})
 
 	c.HeaviestAttestedChain.OnUpdate(func(_, heaviestAttestedChain *Chain) {
+		heaviestAttestedChain.RequestAttestations.Set(false)
 		heaviestAttestedChain.InstantiateEngine.Set(true)
 	})
 
 	c.HeaviestVerifiedChain.OnUpdate(func(_, heaviestVerifiedChain *Chain) {
-		heaviestVerifiedChain.ForkingPoint.Get().IsRoot.Trigger()
 		c.MainChain.Set(heaviestVerifiedChain)
+
+		heaviestVerifiedChain.ForkingPoint.Get().IsRoot.Trigger()
 	})
 }
 

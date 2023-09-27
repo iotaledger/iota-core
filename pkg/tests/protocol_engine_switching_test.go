@@ -361,16 +361,17 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
 		ts.AssertMainEngineSwitchedCount(2, nodesP2...)
 
-		ctxP1Cancel()
+		// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
+		// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
+		// This is to make sure that the storage was copied correctly during engine switching.
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
+
+		ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
+
 		wg.Wait()
+		ctxP1Cancel()
 	}
 
-	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
-	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
-	// This is to make sure that the storage was copied correctly during engine switching.
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
-
-	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 }
