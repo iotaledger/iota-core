@@ -35,7 +35,7 @@ func (m *MockedState) Output() iotago.Output {
 	return m.output
 }
 
-func (m *MockedState) CreationSlot() iotago.SlotIndex {
+func (m *MockedState) SlotCreated() iotago.SlotIndex {
 	return m.creationSlot
 }
 

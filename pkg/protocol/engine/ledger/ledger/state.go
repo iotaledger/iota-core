@@ -27,6 +27,6 @@ func (o *ExecutionOutput) Output() iotago.Output {
 	return o.output
 }
 
-func (o *ExecutionOutput) CreationSlot() iotago.SlotIndex {
+func (o *ExecutionOutput) SlotCreated() iotago.SlotIndex {
 	return o.creationSlot
 }

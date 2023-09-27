@@ -22,7 +22,7 @@ type SlotDiff struct {
 }
 
 func slotDiffKeyForIndex(index iotago.SlotIndex) []byte {
-	m := marshalutil.New(9)
+	m := marshalutil.New(iotago.SlotIndexLength + 1)
 	m.WriteByte(StoreKeyPrefixSlotDiffs)
 	m.WriteBytes(index.MustBytes())
 
@@ -34,7 +34,7 @@ func (sd *SlotDiff) KVStorableKey() []byte {
 }
 
 func (sd *SlotDiff) KVStorableValue() []byte {
-	m := marshalutil.New(9)
+	m := marshalutil.New()
 
 	m.WriteUint32(uint32(len(sd.Outputs)))
 	for _, output := range sd.sortedOutputs() {

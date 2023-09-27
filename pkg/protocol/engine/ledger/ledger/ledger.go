@@ -260,12 +260,7 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 
 		earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
 
-		tx, ok := txWithMetadata.Transaction().(*iotago.Transaction)
-		if !ok {
-			return nil, iotago.ErrTxTypeInvalid
-		}
-
-		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), tx.Essence.CreationSlot, stateWithMetadata.State().Output()), nil
+		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), stateWithMetadata.State().Output()), nil
 	default:
 		panic("unexpected State type")
 	}
@@ -394,20 +389,27 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		accountDiff.PreviousExpirySlot = consumedOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 
 		oldPubKeysSet := accountData.BlockIssuerKeys
-		newPubKeysSet := ds.NewSet[iotago.BlockIssuerKey]()
-		for _, pubKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
-			newPubKeysSet.Add(pubKey)
+		newPubKeysSet := iotago.NewBlockIssuerKeys()
+		for _, blockIssuerKey := range createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys {
+			k := blockIssuerKey
+			newPubKeysSet.Add(k)
 		}
 
 		// Add public keys that are not in the old set
-		accountDiff.BlockIssuerKeysAdded = newPubKeysSet.Filter(func(key iotago.BlockIssuerKey) bool {
-			return !oldPubKeysSet.Has(key)
-		}).ToSlice()
+		accountDiff.BlockIssuerKeysAdded = iotago.NewBlockIssuerKeys()
+		for _, newKey := range newPubKeysSet {
+			if !oldPubKeysSet.Has(newKey) {
+				accountDiff.BlockIssuerKeysAdded.Add(newKey)
+			}
+		}
 
 		// Remove the keys that are not in the new set
-		accountDiff.BlockIssuerKeysRemoved = oldPubKeysSet.Filter(func(key iotago.BlockIssuerKey) bool {
-			return !newPubKeysSet.Has(key)
-		}).ToSlice()
+		accountDiff.BlockIssuerKeysRemoved = iotago.NewBlockIssuerKeys()
+		for _, oldKey := range oldPubKeysSet {
+			if !newPubKeysSet.Has(oldKey) {
+				accountDiff.BlockIssuerKeysRemoved.Add(oldKey)
+			}
+		}
 
 		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
 			// staking feature is created or updated - create the diff between the account data and new account
@@ -554,7 +556,6 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 			err = iotago.ErrTxTypeInvalid
 			return false
 		}
-		txCreationSlot := tx.Essence.CreationSlot
 
 		inputRefs, errInput := tx.Inputs()
 		if errInput != nil {
@@ -578,7 +579,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 			// output side
 			txWithMeta.Outputs().Range(func(stateMetadata mempool.OutputStateMetadata) {
-				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), txCreationSlot, stateMetadata.State().Output())
+				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), stateMetadata.State().Output())
 				outputs = append(outputs, output)
 			})
 		}

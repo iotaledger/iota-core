@@ -6,9 +6,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// BlockIssuanceCreditsLength is the length of a serialized BlockIssuanceCredits.
-const BlockIssuanceCreditsLength = 8 + 8
-
 // BlockIssuanceCredits is a weight annotated with the slot it was last updated in.
 type BlockIssuanceCredits struct {
 	Value      iotago.BlockIssuanceCredits
@@ -28,7 +25,7 @@ func (c BlockIssuanceCredits) Bytes() ([]byte, error) {
 	m := marshalutil.New()
 
 	m.WriteInt64(int64(c.Value))
-	m.WriteUint64(uint64(c.UpdateTime))
+	m.WriteUint32(uint32(c.UpdateTime))
 
 	return m.Bytes(), nil
 }
@@ -38,7 +35,7 @@ func (c *BlockIssuanceCredits) FromBytes(bytes []byte) (int, error) {
 	m := marshalutil.New(bytes)
 
 	c.Value = iotago.BlockIssuanceCredits(lo.PanicOnErr(m.ReadInt64()))
-	c.UpdateTime = iotago.SlotIndex(lo.PanicOnErr(m.ReadUint64()))
+	c.UpdateTime = iotago.SlotIndex(lo.PanicOnErr(m.ReadUint32()))
 
 	return m.ReadOffset(), nil
 }

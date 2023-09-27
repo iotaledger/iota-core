@@ -445,7 +445,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 	slotDiff.NewOutputID = iotago.EmptyOutputID
 	slotDiff.PreviousOutputID = accountData.OutputID
 	slotDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
-	slotDiff.BlockIssuerKeysRemoved = accountData.BlockIssuerKeys.ToSlice()
+	slotDiff.BlockIssuerKeysRemoved = accountData.BlockIssuerKeys.Clone()
 
 	slotDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
 	slotDiff.DelegationStakeChange = -int64(accountData.DelegationStake)

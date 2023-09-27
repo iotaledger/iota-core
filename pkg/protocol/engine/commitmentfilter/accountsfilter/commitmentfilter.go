@@ -153,7 +153,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 
 	switch signature := block.ProtocolBlock().Signature.(type) {
 	case *iotago.Ed25519Signature:
-		if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(signature.PublicKey)) {
+		if !accountData.BlockIssuerKeys.Has(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(signature.PublicKey)) {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,
 				Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.ProtocolBlock().IssuerID, signature.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),
