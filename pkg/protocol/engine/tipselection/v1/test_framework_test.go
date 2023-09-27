@@ -60,13 +60,13 @@ func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) *T
 func (t *TestFramework) LowerLivenessThreshold(alias string) time.Time {
 	block := t.TipManager.Block(alias)
 
-	return block.IssuingTime().Add(block.API().ProtocolParameters().LivenessThresholdLowerBound())
+	return block.IssuingTime().Add(block.ProtocolBlock().API.ProtocolParameters().LivenessThresholdLowerBound())
 }
 
 func (t *TestFramework) UpperLivenessThreshold(alias string) time.Time {
 	block := t.TipManager.Block(alias)
 
-	return block.IssuingTime().Add(block.API().ProtocolParameters().LivenessThresholdUpperBound())
+	return block.IssuingTime().Add(block.ProtocolBlock().API.ProtocolParameters().LivenessThresholdUpperBound())
 }
 
 func (t *TestFramework) ExpectedLivenessThreshold(alias string) time.Time {

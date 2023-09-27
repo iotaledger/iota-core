@@ -42,7 +42,7 @@ func DynamicLivenessThreshold(committeeSizeProvider func() int) func(tip tipmana
 		//  <=1/3: scale linearly
 		//  >1/3: approval modifier is 1 -> LivenessThresholdUpperBound
 		var (
-			params                      = tip.Block().API().ProtocolParameters()
+			params                      = tip.Block().ModelBlock().ProtocolBlock().API.ProtocolParameters()
 			livenessThresholdLowerBound = params.LivenessThresholdLowerBound()
 			livenessWindow              = float64(params.LivenessThresholdUpperBound() - livenessThresholdLowerBound)
 			expectedWitnessCount        = math.Ceil(float64(committeeSizeProvider()) / 3.0)

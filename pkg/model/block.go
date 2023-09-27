@@ -131,7 +131,3 @@ func (blk *Block) WorkScore() iotago.WorkScore {
 	// TODO: deal with validator blocks with issue #236
 	return iotago.WorkScore(0)
 }
-
-func (blk *Block) API() iotago.API {
-	return blk.api
-}
