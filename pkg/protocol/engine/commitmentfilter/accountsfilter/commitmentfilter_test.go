@@ -1,7 +1,6 @@
 package accountsfilter
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -87,18 +86,7 @@ func (t *TestFramework) AddRMCData(slotIndex iotago.SlotIndex, rmcData iotago.Ma
 // q: how to get an engine block.Block from protocol block
 
 func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) {
-	apiForVersion, err := t.apiProvider.APIForVersion(block.ProtocolVersion)
-	require.NoError(t.Test, err)
-
-	modelBlock, err := model.BlockFromBlock(block, apiForVersion)
-	require.NoError(t.Test, err)
-
-	modelBlock.ID().RegisterAlias(alias)
-	t.CommitmentFilter.ProcessPreFilteredBlock(blocks.NewBlock(modelBlock))
-}
-
-func (t *TestFramework) processBlockWithAPI(alias string, block *iotago.ProtocolBlock, api iotago.API) {
-	modelBlock, err := model.BlockFromBlock(block, api)
+	modelBlock, err := model.BlockFromBlock(block)
 	require.NoError(t.Test, err)
 
 	modelBlock.ID().RegisterAlias(alias)
@@ -170,8 +158,8 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		accountID,
 		accounts.NewAccountData(
 			accountID,
-			accounts.WithExpirySlot(math.MaxUint64),
-			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
+			accounts.WithExpirySlot(iotago.MaxSlotIndex),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 
@@ -217,8 +205,8 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 		accountID,
 		accounts.NewAccountData(
 			accountID,
-			accounts.WithExpirySlot(math.MaxUint64),
-			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
+			accounts.WithExpirySlot(iotago.MaxSlotIndex),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 
@@ -255,7 +243,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 		accounts.NewAccountData(
 			accountID,
 			accounts.WithExpirySlot(100),
-			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 

@@ -153,7 +153,7 @@ func (p *Protocol) onBlock(blockData []byte, id peer.ID) {
 		return
 	}
 
-	block, err := model.BlockFromBytes(blockData, p.apiProvider, serix.WithValidation())
+	block, err := model.BlockFromBytes(blockData, p.apiProvider)
 	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize block"), id)
 		return

@@ -20,7 +20,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	for _, inputState := range inputStates {
 		inputSet[inputState.OutputID()] = iotagovm.OutputWithCreationSlot{
 			Output:       inputState.Output(),
-			CreationSlot: inputState.CreationSlot(),
+			CreationSlot: inputState.SlotCreated(),
 		}
 	}
 	resolvedInputs := iotagovm.ResolvedInputs{
@@ -105,16 +105,14 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 	resolvedInputs.RewardsInputSet = rewardInputSet
 
-	api := l.apiProvider.APIForSlot(tx.Essence.CreationSlot)
-
 	vmParams := &iotagovm.Params{
-		API: api,
+		API: tx.API,
 	}
 	if err = stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
 		return nil, err
 	}
 
-	outputSet, err := tx.OutputsSet(api)
+	outputSet, err := tx.OutputsSet()
 	if err != nil {
 		return nil, err
 	}

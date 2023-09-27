@@ -16,7 +16,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TestFramework struct {
@@ -60,7 +59,7 @@ func (t *TestFramework) CreateTransaction(alias string, referencedStates []strin
 	t.transactionByAlias[alias] = transaction
 
 	// register the transaction ID alias
-	transactionID, transactionIDErr := transaction.ID(tpkg.TestAPI)
+	transactionID, transactionIDErr := transaction.ID()
 	require.NoError(t.test, transactionIDErr, "failed to retrieve transaction ID of transaction with alias '%s'", alias)
 	transactionID.RegisterAlias(alias)
 
@@ -157,7 +156,7 @@ func (t *TestFramework) TransactionID(alias string) iotago.TransactionID {
 	transaction, transactionExists := t.transactionByAlias[alias]
 	require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", alias)
 
-	transactionID, transactionIDErr := transaction.ID(tpkg.TestAPI)
+	transactionID, transactionIDErr := transaction.ID()
 	require.NoError(t.test, transactionIDErr, "failed to retrieve transaction ID of transaction with alias '%s'", alias)
 
 	return transactionID
