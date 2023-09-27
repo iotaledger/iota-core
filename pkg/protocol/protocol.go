@@ -153,7 +153,7 @@ func (p *Protocol) Run(ctx context.Context) error {
 	p.ChainManager.Initialize(rootCommitment)
 
 	// Fill the chain manager with all our known commitments so that the chain is solid
-	for i := rootCommitment.Index(); i <= p.mainEngine.Storage.Settings().LatestCommitment().Index(); i++ {
+	for i := rootCommitment.Slot(); i <= p.mainEngine.Storage.Settings().LatestCommitment().Slot(); i++ {
 		if cm, err := p.mainEngine.Storage.Commitments().Load(i); err == nil {
 			p.ChainManager.ProcessCommitment(cm)
 		}
@@ -238,8 +238,8 @@ func (p *Protocol) initChainManager() {
 		p.ChainManager.ProcessCommitment(details.Commitment)
 	})
 
-	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
-		rootCommitment := p.MainEngineInstance().EarliestRootCommitment(index)
+	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+		rootCommitment := p.MainEngineInstance().EarliestRootCommitment(slot)
 
 		// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
 		// we first specify the chain's cut-off point, and only then evict the state. It is also important to
@@ -249,8 +249,8 @@ func (p *Protocol) initChainManager() {
 
 		// We want to evict just below the height of our new root commitment (so that the slot of the root commitment
 		// stays in memory storage and with it the root commitment itself as well).
-		if rootCommitment.ID().Index() > 0 {
-			p.ChainManager.EvictUntil(rootCommitment.ID().Index() - 1)
+		if rootCommitment.ID().Slot() > 0 {
+			p.ChainManager.EvictUntil(rootCommitment.ID().Slot() - 1)
 		}
 	})
 

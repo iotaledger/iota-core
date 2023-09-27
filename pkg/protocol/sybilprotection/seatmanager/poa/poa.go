@@ -68,7 +68,7 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 					// recover if no node was part of the online committee anymore.
 					e.Events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 						// Only track identities that are part of the committee.
-						seat, exists := s.Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
+						seat, exists := s.Committee(block.ID().Slot()).GetSeat(block.ProtocolBlock().IssuerID)
 						if exists {
 							s.markSeatActive(seat, block.ProtocolBlock().IssuerID, block.IssuingTime())
 						}

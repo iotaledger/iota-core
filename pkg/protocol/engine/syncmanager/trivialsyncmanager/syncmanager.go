@@ -106,8 +106,8 @@ func New(e *engine.Engine, latestCommitment *model.Commitment, finalizedSlot iot
 		events:                 syncmanager.NewEvents(),
 		engine:                 e,
 		syncThreshold:          10 * time.Second,
-		lastAcceptedBlockSlot:  latestCommitment.Index(),
-		lastConfirmedBlockSlot: latestCommitment.Index(),
+		lastAcceptedBlockSlot:  latestCommitment.Slot(),
+		lastConfirmedBlockSlot: latestCommitment.Slot(),
 		latestCommitment:       latestCommitment,
 		latestFinalizedSlot:    finalizedSlot,
 
@@ -155,8 +155,8 @@ func (s *SyncManager) updateLastAcceptedBlock(id iotago.BlockID) (changed bool) 
 	s.lastAcceptedBlockSlotLock.Lock()
 	defer s.lastAcceptedBlockSlotLock.Unlock()
 
-	if id.Index() > s.lastAcceptedBlockSlot {
-		s.lastAcceptedBlockSlot = id.Index()
+	if id.Slot() > s.lastAcceptedBlockSlot {
+		s.lastAcceptedBlockSlot = id.Slot()
 		return true
 	}
 
@@ -167,8 +167,8 @@ func (s *SyncManager) updateLastConfirmedBlock(id iotago.BlockID) (changed bool)
 	s.lastConfirmedBlockSlotLock.Lock()
 	defer s.lastConfirmedBlockSlotLock.Unlock()
 
-	if id.Index() > s.lastConfirmedBlockSlot {
-		s.lastConfirmedBlockSlot = id.Index()
+	if id.Slot() > s.lastConfirmedBlockSlot {
+		s.lastConfirmedBlockSlot = id.Slot()
 		return true
 	}
 

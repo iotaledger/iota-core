@@ -16,7 +16,7 @@ func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
 		return iotago.SlotIndex(0), ierrors.Wrapf(err, "failed to parse commitment ID: %s", c.Param(restapipkg.ParameterCommitmentID))
 	}
 
-	return commitmentID.Index(), nil
+	return commitmentID.Slot(), nil
 }
 
 func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {

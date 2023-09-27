@@ -22,7 +22,7 @@ func (t *TestSuite) assertParentsCommitmentExistFromBlockOptions(blockOpts []opt
 	parents = append(parents, params.References[iotago.ShallowLikeParentType]...)
 
 	for _, block := range t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...) {
-		t.AssertCommitmentSlotIndexExists(block.SlotCommitmentID().Index(), node)
+		t.AssertCommitmentSlotIndexExists(block.SlotCommitmentID().Slot(), node)
 	}
 }
 
@@ -275,7 +275,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, activeNodes []*mock.N
 	// first issue a chain of blocks with step size minCA up until slot + minCA + 1
 	// then issue one more block to accept the last in the chain which will trigger commitment of the second last in the chain
 
-	latestCommittedSlot := activeNodes[0].Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index()
+	latestCommittedSlot := activeNodes[0].Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot()
 	if latestCommittedSlot >= slot {
 		return parent
 	}

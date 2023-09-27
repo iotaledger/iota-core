@@ -12,7 +12,7 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 		return
 	}
 
-	ratifierBlockIndex := votingBlock.ID().Index()
+	ratifierBlockIndex := votingBlock.ID().Slot()
 
 	var toConfirm []*blocks.Block
 
@@ -20,7 +20,7 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 		// Do not propagate further than g.optsConfirmationRatificationThreshold slots.
 		// This means that confirmations need to be achieved within g.optsConfirmationRatificationThreshold slots.
 		if ratifierBlockIndex >= g.optsConfirmationRatificationThreshold &&
-			block.ID().Index() <= ratifierBlockIndex-g.optsConfirmationRatificationThreshold {
+			block.ID().Slot() <= ratifierBlockIndex-g.optsConfirmationRatificationThreshold {
 			return false
 		}
 

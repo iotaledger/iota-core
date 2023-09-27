@@ -48,11 +48,11 @@ func (s *State) Initialize(lastCommittedSlot iotago.SlotIndex) {
 	s.lastEvictedSlot = lastCommittedSlot
 }
 
-func (s *State) AdvanceActiveWindowToIndex(index iotago.SlotIndex) {
+func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 	s.evictionMutex.Lock()
-	s.lastEvictedSlot = index
+	s.lastEvictedSlot = slot
 
-	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(index); shouldEvictRootBlocks {
+	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(slot); shouldEvictRootBlocks {
 		// Remember the last slot outside our cache window that has root blocks.
 		if evictedSlot := s.rootBlocks.Evict(delayedIndex); evictedSlot != nil && evictedSlot.Size() > 0 {
 			s.setLatestNonEmptySlot(delayedIndex)
@@ -61,7 +61,7 @@ func (s *State) AdvanceActiveWindowToIndex(index iotago.SlotIndex) {
 
 	s.evictionMutex.Unlock()
 
-	s.Events.SlotEvicted.Trigger(index)
+	s.Events.SlotEvicted.Trigger(slot)
 }
 
 func (s *State) LastEvictedSlot() iotago.SlotIndex {
@@ -76,7 +76,7 @@ func (s *State) InRootBlockSlot(id iotago.BlockID) bool {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	return s.withinActiveIndexRange(id.Index())
+	return s.withinActiveIndexRange(id.Slot())
 }
 
 func (s *State) ActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
@@ -84,9 +84,9 @@ func (s *State) ActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
 	defer s.evictionMutex.RUnlock()
 
 	activeRootBlocks := make(map[iotago.BlockID]iotago.CommitmentID)
-	start, end := s.activeIndexRange()
-	for index := start; index <= end; index++ {
-		storage := s.rootBlocks.Get(index)
+	startSlot, endSlot := s.activeIndexRange()
+	for slot := startSlot; slot <= endSlot; slot++ {
+		storage := s.rootBlocks.Get(slot)
 		if storage == nil {
 			continue
 		}
@@ -107,12 +107,12 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	defer s.evictionMutex.RUnlock()
 
 	// The rootblock is too old, ignore it.
-	if id.Index() < lo.Return1(s.activeIndexRange()) {
+	if id.Slot() < lo.Return1(s.activeIndexRange()) {
 		return
 	}
 
-	if s.rootBlocks.Get(id.Index(), true).Set(id, commitmentID) {
-		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Index())).Store(id, commitmentID); err != nil {
+	if s.rootBlocks.Get(id.Slot(), true).Set(id, commitmentID) {
+		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Store(id, commitmentID); err != nil {
 			panic(ierrors.Wrapf(err, "failed to store root block %s", id))
 		}
 	}
@@ -125,8 +125,8 @@ func (s *State) RemoveRootBlock(id iotago.BlockID) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if rootBlocks := s.rootBlocks.Get(id.Index()); rootBlocks != nil && rootBlocks.Delete(id) {
-		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Index())).Delete(id); err != nil {
+	if rootBlocks := s.rootBlocks.Get(id.Slot()); rootBlocks != nil && rootBlocks.Delete(id) {
+		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Delete(id); err != nil {
 			panic(err)
 		}
 	}
@@ -137,11 +137,11 @@ func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if !s.withinActiveIndexRange(id.Index()) {
+	if !s.withinActiveIndexRange(id.Slot()) {
 		return false
 	}
 
-	slotBlocks := s.rootBlocks.Get(id.Index(), false)
+	slotBlocks := s.rootBlocks.Get(id.Slot(), false)
 
 	return slotBlocks != nil && slotBlocks.Has(id)
 }
@@ -151,11 +151,11 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if !s.withinActiveIndexRange(id.Index()) {
+	if !s.withinActiveIndexRange(id.Slot()) {
 		return iotago.CommitmentID{}, false
 	}
 
-	slotBlocks := s.rootBlocks.Get(id.Index(), false)
+	slotBlocks := s.rootBlocks.Get(id.Slot(), false)
 	if slotBlocks == nil {
 		return iotago.CommitmentID{}, false
 	}
@@ -252,8 +252,8 @@ func (s *State) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "failed to parse root block's %s commitment id", rootBlockID)
 		}
 
-		if s.rootBlocks.Get(rootBlockID.Index(), true).Set(rootBlockID, commitmentID) {
-			if err := lo.PanicOnErr(s.rootBlockStorageFunc(rootBlockID.Index())).Store(rootBlockID, commitmentID); err != nil {
+		if s.rootBlocks.Get(rootBlockID.Slot(), true).Set(rootBlockID, commitmentID) {
+			if err := lo.PanicOnErr(s.rootBlockStorageFunc(rootBlockID.Slot())).Store(rootBlockID, commitmentID); err != nil {
 				panic(ierrors.Wrapf(err, "failed to store root block %s", rootBlockID))
 			}
 		}
@@ -308,9 +308,9 @@ func (s *State) Rollback(lowerTarget, targetIndex iotago.SlotIndex) error {
 }
 
 // PopulateFromStorage populates the root blocks from the storage.
-func (s *State) PopulateFromStorage(latestCommitmentIndex iotago.SlotIndex) {
-	for index := lo.Return1(s.delayedBlockEvictionThreshold(latestCommitmentIndex)); index <= latestCommitmentIndex; index++ {
-		storedRootBlocks, err := s.rootBlockStorageFunc(index)
+func (s *State) PopulateFromStorage(latestCommitmentSlot iotago.SlotIndex) {
+	for slot := lo.Return1(s.delayedBlockEvictionThreshold(latestCommitmentSlot)); slot <= latestCommitmentSlot; slot++ {
+		storedRootBlocks, err := s.rootBlockStorageFunc(slot)
 		if err != nil {
 			continue
 		}
@@ -348,29 +348,29 @@ func (s *State) setLatestNonEmptySlot(slot iotago.SlotIndex) {
 	}
 }
 
-func (s *State) activeIndexRange() (start, end iotago.SlotIndex) {
-	lastCommitted := s.lastEvictedSlot
-	delayedIndex, valid := s.delayedBlockEvictionThreshold(lastCommitted)
+func (s *State) activeIndexRange() (startSlot, endSlot iotago.SlotIndex) {
+	lastCommittedSlot := s.lastEvictedSlot
+	delayedSlot, valid := s.delayedBlockEvictionThreshold(lastCommittedSlot)
 
 	if !valid {
-		return 0, lastCommitted
+		return 0, lastCommittedSlot
 	}
 
-	if delayedIndex+1 > lastCommitted {
-		return delayedIndex, lastCommitted
+	if delayedSlot+1 > lastCommittedSlot {
+		return delayedSlot, lastCommittedSlot
 	}
 
-	return delayedIndex + 1, lastCommitted
+	return delayedSlot + 1, lastCommittedSlot
 }
 
-func (s *State) withinActiveIndexRange(index iotago.SlotIndex) bool {
-	start, end := s.activeIndexRange()
+func (s *State) withinActiveIndexRange(slot iotago.SlotIndex) bool {
+	startSlot, endSlot := s.activeIndexRange()
 
-	return index >= start && index <= end
+	return slot >= startSlot && slot <= endSlot
 }
 
 // delayedBlockEvictionThreshold returns the slot index that is the threshold for delayed rootblocks eviction.
-func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (threshold iotago.SlotIndex, shouldEvict bool) {
+func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (thresholdSlot iotago.SlotIndex, shouldEvict bool) {
 	if slot < s.optsRootBlocksEvictionDelay {
 		return 0, false
 	}
@@ -397,8 +397,8 @@ func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (threshold 
 }
 
 // WithRootBlocksEvictionDelay sets the time since confirmation threshold.
-func WithRootBlocksEvictionDelay(delay iotago.SlotIndex) options.Option[State] {
+func WithRootBlocksEvictionDelay(evictionDelay iotago.SlotIndex) options.Option[State] {
 	return func(s *State) {
-		s.optsRootBlocksEvictionDelay = delay
+		s.optsRootBlocksEvictionDelay = evictionDelay
 	}
 }
