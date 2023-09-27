@@ -140,7 +140,7 @@ func (m *Manager) ReadLedgerIndexWithoutLocking() (iotago.SlotIndex, error) {
 	return lo.DropCount(iotago.SlotIndexFromBytes(value))
 }
 
-func (m *Manager) ReadLedgerIndex() (iotago.SlotIndex, error) {
+func (m *Manager) ReadLedgerSlot() (iotago.SlotIndex, error) {
 	m.ReadLockLedger()
 	defer m.ReadUnlockLedger()
 
@@ -175,7 +175,7 @@ func (m *Manager) ApplyDiffWithoutLocking(slot iotago.SlotIndex, newOutputs Outp
 	}
 
 	slotDiff := &SlotDiff{
-		Index:   slot,
+		Slot:    slot,
 		Outputs: newOutputs,
 		Spents:  newSpents,
 	}

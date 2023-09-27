@@ -25,13 +25,13 @@ package spammer
 // type CommitmentManager struct {
 // 	Params *CommitmentManagerParams
 // 	// we store here only the valid commitments to not request them again through API
-// 	validChain map[slot.Slot]*iotago.Commitment
+// 	validChain map[slot.Index]*iotago.Commitment
 // 	// commitments used to spam
-// 	commitmentChain map[slot.Slot]*iotago.Commitment
+// 	commitmentChain map[slot.Index]*iotago.Commitment
 
-// 	initiationSlot  slot.Slot
-// 	forkIndex       slot.Slot
-// 	latestCommitted slot.Slot
+// 	initiationSlot  slot.Index
+// 	forkIndex       slot.Index
+// 	latestCommitted slot.Index
 
 // 	clockSync   *ClockSync
 // 	validClient wallet.Client
@@ -47,8 +47,8 @@ package spammer
 // 			GenesisTime:     time.Now(),
 // 			SlotDuration:    5 * time.Second,
 // 		},
-// 		validChain:      make(map[slot.Slot]*iotago.Commitment),
-// 		commitmentChain: make(map[slot.Slot]*iotago.Commitment),
+// 		validChain:      make(map[slot.Index]*iotago.Commitment),
+// 		commitmentChain: make(map[slot.Index]*iotago.Commitment),
 // 	}
 // }
 
@@ -97,7 +97,7 @@ package spammer
 
 // // SetupForkingPoint sets the forking point for the commitment manager. It uses ForkAfter parameter so need to be called after params are read.
 // func (c *CommitmentManager) setupForkingPoint() {
-// 	c.forkIndex = c.clockSync.LatestCommittedSlotClock.Get() + slot.Slot(c.Params.OptionalForkAfter)
+// 	c.forkIndex = c.clockSync.LatestCommittedSlotClock.Get() + slot.Index(c.Params.OptionalForkAfter)
 // }
 
 // func (c *CommitmentManager) Shutdown() {
@@ -119,7 +119,7 @@ package spammer
 // }
 
 // // GenerateCommitment generates a commitment based on the commitment type provided in spam details.
-// func (c *CommitmentManager) GenerateCommitment(clt wallet.Client) (*iotago.Commitment, slot.Slot, error) {
+// func (c *CommitmentManager) GenerateCommitment(clt wallet.Client) (*iotago.Commitment, slot.Index, error) {
 // 	switch c.Params.CommitmentType {
 // 	// todo refactor this to work with chainsA
 // 	case "latest":
@@ -164,12 +164,12 @@ package spammer
 // 	return nil, 0, nil
 // }
 
-// func (c *CommitmentManager) isAfterForkPoint(slot slot.Slot) bool {
+// func (c *CommitmentManager) isAfterForkPoint(slot slot.Index) bool {
 // 	return c.forkIndex != 0 && slot > c.forkIndex
 // }
 
 // // updateChainWithValidCommitment commits the chain up to the given slot with the valid commitments.
-// func (c *CommitmentManager) updateChainWithValidCommitment(s slot.Slot) error {
+// func (c *CommitmentManager) updateChainWithValidCommitment(s slot.Index) error {
 // 	for i := c.latestCommitted + 1; i <= s; i++ {
 // 		comm, err := c.getValidCommitment(i)
 // 		if err != nil {
@@ -180,7 +180,7 @@ package spammer
 // 	return nil
 // }
 
-// func (c *CommitmentManager) updateForkedChain(slot slot.Slot) {
+// func (c *CommitmentManager) updateForkedChain(slot slot.Index) {
 // 	for i := c.latestCommitted + 1; i <= slot; i++ {
 // 		comm, err := c.getForkedCommitment(i)
 // 		if err != nil {
@@ -191,7 +191,7 @@ package spammer
 // }
 
 // // getValidCommitment returns the valid commitment for the given slot if not exists it requests it from the node and update the validChain.
-// func (c *CommitmentManager) getValidCommitment(slot slot.Slot) (*commitment.Commitment, error) {
+// func (c *CommitmentManager) getValidCommitment(slot slot.Index) (*commitment.Commitment, error) {
 // 	if comm, ok := c.validChain[slot]; ok {
 // 		return comm, nil
 // 	}
@@ -205,7 +205,7 @@ package spammer
 // 	return comm, nil
 // }
 
-// func (c *CommitmentManager) getForkedCommitment(slot slot.Slot) (*commitment.Commitment, error) {
+// func (c *CommitmentManager) getForkedCommitment(slot slot.Index) (*commitment.Commitment, error) {
 // 	validComm, err := c.getValidCommitment(slot)
 // 	if err != nil {
 // 		return nil, errors.Wrapf(err, "failed to get valid commitment for slot %d", slot)
@@ -220,10 +220,10 @@ package spammer
 // 	return forkedComm, nil
 // }
 
-// func randomCommitmentChain(currSlot slot.Slot) *commitment.Commitment {
+// func randomCommitmentChain(currSlot slot.Index) *commitment.Commitment {
 // 	chain := make([]*commitment.Commitment, currSlot+1)
 // 	chain[0] = commitment.NewEmptyCommitment()
-// 	for i := slot.Slot(0); i < currSlot-1; i++ {
+// 	for i := slot.Index(0); i < currSlot-1; i++ {
 // 		prevComm := chain[i]
 // 		newCommitment := commitment.New(
 // 			i,

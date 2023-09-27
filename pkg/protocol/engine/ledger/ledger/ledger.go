@@ -139,7 +139,7 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 }
 
 func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, accountRoot iotago.Identifier, err error) {
-	ledgerIndex, err := l.utxoLedger.ReadLedgerIndex()
+	ledgerIndex, err := l.utxoLedger.ReadLedgerSlot()
 	if err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
 	}

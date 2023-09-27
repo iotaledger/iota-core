@@ -88,7 +88,7 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIPr
 	if err := binary.Read(reader, binary.LittleEndian, &diffIndex); err != nil {
 		return nil, ierrors.Errorf("unable to read slot diff index: %w", err)
 	}
-	slotDiff.Index = diffIndex
+	slotDiff.Slot = diffIndex
 
 	var createdCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &createdCount); err != nil {
@@ -114,7 +114,7 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIPr
 
 	for i := uint64(0); i < consumedCount; i++ {
 		var err error
-		slotDiff.Spents[i], err = SpentFromSnapshotReader(reader, apiProvider, slotDiff.Index)
+		slotDiff.Spents[i], err = SpentFromSnapshotReader(reader, apiProvider, slotDiff.Slot)
 		if err != nil {
 			return nil, ierrors.Errorf("unable to read slot diff spent: %w", err)
 		}
@@ -126,7 +126,7 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIPr
 func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *SlotDiff) (written int64, err error) {
 	var totalBytesWritten int64
 
-	if err := utils.WriteValueFunc(writer, diff.Index.MustBytes(), &totalBytesWritten); err != nil {
+	if err := utils.WriteValueFunc(writer, diff.Slot.MustBytes(), &totalBytesWritten); err != nil {
 		return 0, ierrors.Wrap(err, "unable to write slot diff index")
 	}
 
@@ -194,11 +194,11 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 			return err
 		}
 
-		if slotDiff.Index != snapshotLedgerIndex-iotago.SlotIndex(i) {
-			return ierrors.Errorf("invalid LS slot index. %d vs %d", slotDiff.Index, snapshotLedgerIndex-iotago.SlotIndex(i))
+		if slotDiff.Slot != snapshotLedgerIndex-iotago.SlotIndex(i) {
+			return ierrors.Errorf("invalid LS slot index. %d vs %d", slotDiff.Slot, snapshotLedgerIndex-iotago.SlotIndex(i))
 		}
 
-		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
+		if err := m.RollbackDiffWithoutLocking(slotDiff.Slot, slotDiff.Outputs, slotDiff.Spents); err != nil {
 			return err
 		}
 	}
@@ -317,7 +317,7 @@ func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 			return err
 		}
 
-		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {
+		if err := m.RollbackDiffWithoutLocking(slotDiff.Slot, slotDiff.Outputs, slotDiff.Spents); err != nil {
 			return err
 		}
 	}

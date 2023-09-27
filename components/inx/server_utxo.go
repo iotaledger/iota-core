@@ -234,7 +234,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 				return status.Errorf(codes.NotFound, "ledger update for milestoneIndex %d not found", currentIndex)
 			}
 
-			if err := createLedgerUpdatePayloadAndSend(stateDiff.Index, stateDiff.Outputs, stateDiff.Spents); err != nil {
+			if err := createLedgerUpdatePayloadAndSend(stateDiff.Slot, stateDiff.Outputs, stateDiff.Spents); err != nil {
 				return err
 			}
 		}

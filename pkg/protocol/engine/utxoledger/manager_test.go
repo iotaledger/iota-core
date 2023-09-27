@@ -104,7 +104,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 
 	require.True(t, manager.CheckStateTree())
 
-	ledgerIndex, err := manager.ReadLedgerIndex()
+	ledgerIndex, err := manager.ReadLedgerSlot()
 	require.NoError(t, err)
 	require.Equal(t, previousMsIndex, ledgerIndex)
 
@@ -125,7 +125,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 
 	require.True(t, manager.CheckStateTree())
 
-	ledgerIndex, err = manager.ReadLedgerIndex()
+	ledgerIndex, err = manager.ReadLedgerSlot()
 	require.NoError(t, err)
 	require.Equal(t, index, ledgerIndex)
 
@@ -191,7 +191,7 @@ func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
 
 	require.True(t, manager.CheckStateTree())
 
-	ledgerIndex, err = manager.ReadLedgerIndex()
+	ledgerIndex, err = manager.ReadLedgerSlot()
 	require.NoError(t, err)
 	require.Equal(t, previousMsIndex, ledgerIndex)
 
