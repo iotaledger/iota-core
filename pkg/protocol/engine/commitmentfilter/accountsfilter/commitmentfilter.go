@@ -155,8 +155,9 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	case *iotago.Ed25519Signature:
 		if !accountData.BlockIssuerKeys.Has(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(signature.PublicKey)) {
 			// if the block issuer does not have the public key in the slot commitment, check if it has an implicit account with the corresponding address
-			if keyAddress, isAddress := accountData.BlockIssuerKeys[0].(*iotago.Ed25519AddressBlockIssuerKey); isAddress {
-				if !keyAddress.Address.Equal(iotago.ImplicitAccountCreationAddressFromPubKey(signature.PublicKey[:])) {
+			if keyAddress, isAddress := accountData.BlockIssuerKeys[0].(*iotago.Ed25519PublicKeyHashBlockIssuerKey); isAddress {
+
+				if keyAddress.PublicKeyHash != iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(signature.PublicKey[:]).PublicKeyHash {
 					c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 						Block:  block,
 						Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have block issuer key corresponding to public key %s in slot %d", block.ProtocolBlock().IssuerID, signature.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),

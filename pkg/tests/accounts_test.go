@@ -321,7 +321,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	latestParent = ts.CommitUntilSlot(slotIndexBlock5, activeNodes, block5)
 
-	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519AddressBlockIssuerKeyFromAddress(implicitAccountAddress)
+	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(implicitAccountAddress)
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              implicitAccountID,

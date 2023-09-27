@@ -254,7 +254,7 @@ func readBlockIssuerKey(reader io.ReadSeeker) (iotago.BlockIssuerKey, int, error
 	//		return nil, bytesConsumed, ierrors.Errorf("unable to read ed25519 address key in account diff: %w", err)
 	//	}
 	//
-	//	return iotago.Ed25519AddressBlockIssuerKeyFromAddress(ed25519Address), bytesConsumed, nil
+	//	return iotago.Ed25519PublicKeyHashBlockIssuerKeyFromAddress(ed25519Address), bytesConsumed, nil
 
 	default:
 		return nil, bytesConsumed, ierrors.Errorf("unsupported block issuer key type %d in account diff", blockIssuerKeyType)
