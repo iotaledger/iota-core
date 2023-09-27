@@ -277,7 +277,7 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epoch iot
 		}
 
 		for i := uint64(0); i < validationBlocksSentPerSlot; i++ {
-			valBlock := tpkg.ValidationBlock()
+			valBlock := tpkg.RandValidationBlock(t.api)
 			block := tpkg.RandProtocolBlock(valBlock, t.api, 10)
 			block.IssuerID = accountID
 			subslotIndex := i
@@ -286,7 +286,7 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epoch iot
 				subslotIndex = 0
 			}
 			block.IssuingTime = t.api.TimeProvider().SlotStartTime(slot).Add(time.Duration(subslotIndex)*subslotDur + 1*time.Nanosecond)
-			modelBlock, err := model.BlockFromBlock(block, t.api)
+			modelBlock, err := model.BlockFromBlock(block)
 			t.Instance.TrackValidationBlock(blocks.NewBlock(modelBlock))
 			require.NoError(t.T, err)
 		}

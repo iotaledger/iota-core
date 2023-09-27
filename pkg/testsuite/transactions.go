@@ -14,7 +14,7 @@ import (
 
 func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *mock.Node) mempool.Transaction {
 	var loadedTransaction mempool.TransactionMetadata
-	transactionID, err := transaction.ID(t.API)
+	transactionID, err := transaction.ID()
 	require.NoError(t.Testing, err)
 
 	t.Eventually(func() error {
@@ -28,7 +28,8 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransaction.ID())
 		}
 
-		if !cmp.Equal(transaction, loadedTransaction.Transaction()) {
+		//nolint: forcetypeassert // we are in a test and want to assert it anyway
+		if !cmp.Equal(transaction.Essence, loadedTransaction.Transaction().(*iotago.Transaction).Essence) {
 			return ierrors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, transaction, loadedTransaction.Transaction())
 		}
 
@@ -43,7 +44,7 @@ func (t *TestSuite) AssertTransactionsExist(transactions []*iotago.Transaction, 
 
 	for _, node := range nodes {
 		for _, transaction := range transactions {
-			transactionID, err := transaction.ID(t.API)
+			transactionID, err := transaction.ID()
 			require.NoError(t.Testing, err)
 
 			t.Eventually(func() error {
@@ -70,7 +71,7 @@ func (t *TestSuite) assertTransactionsInCacheWithFunc(expectedTransactions []*io
 
 	for _, node := range nodes {
 		for _, transaction := range expectedTransactions {
-			transactionID, err := transaction.ID(t.API)
+			transactionID, err := transaction.ID()
 			require.NoError(t.Testing, err)
 
 			t.Eventually(func() error {
@@ -118,7 +119,7 @@ func (t *TestSuite) AssertTransactionsInCachePending(expectedTransactions []*iot
 func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*iotago.Transaction][]string, nodes ...*mock.Node) {
 	for _, node := range nodes {
 		for transaction, conflictAliases := range transactionConflicts {
-			transactionID, err := transaction.ID(t.API)
+			transactionID, err := transaction.ID()
 			require.NoError(t.Testing, err)
 
 			t.Eventually(func() error {

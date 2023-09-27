@@ -6,7 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func VM(_ context.Context, inputTransaction mempool.Transaction, _ []mempool.OutputState, _ mempool.ContextState) (outputs []mempool.OutputState, err error) {
@@ -20,7 +19,7 @@ func VM(_ context.Context, inputTransaction mempool.Transaction, _ []mempool.Out
 	}
 
 	for i := uint16(0); i < transaction.outputCount; i++ {
-		id, err := transaction.ID(tpkg.TestAPI)
+		id, err := transaction.ID()
 		if err != nil {
 			return nil, err
 		}

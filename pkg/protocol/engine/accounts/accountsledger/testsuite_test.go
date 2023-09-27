@@ -189,9 +189,9 @@ func (t *TestSuite) ApplySlotActions(slot iotago.SlotIndex, rmc iotago.Mana, act
 }
 
 func (t *TestSuite) createBlockWithRMC(accountID iotago.AccountID, slot iotago.SlotIndex, rmc iotago.Mana) *blocks.Block {
-	innerBlock := tpkg.RandBasicBlockWithIssuerAndRMC(accountID, rmc)
+	innerBlock := tpkg.RandBasicBlockWithIssuerAndRMC(tpkg.TestAPI, accountID, rmc)
 	innerBlock.IssuingTime = tpkg.TestAPI.TimeProvider().SlotStartTime(slot)
-	modelBlock, err := model.BlockFromBlock(innerBlock, tpkg.TestAPI)
+	modelBlock, err := model.BlockFromBlock(innerBlock)
 
 	require.NoError(t.T, err)
 

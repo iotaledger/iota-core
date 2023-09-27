@@ -190,7 +190,7 @@ func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, bl
 		return nil, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
 	}
 
-	newTransaction, err := NewTransactionWithMetadata(m.apiProvider.APIForSlot(blockID.Index()), transaction)
+	newTransaction, err := NewTransactionWithMetadata(transaction)
 	if err != nil {
 		return nil, false, ierrors.Errorf("failed to create transaction metadata: %w", err)
 	}
