@@ -128,16 +128,8 @@ func Test_TransitionAccount(t *testing.T) {
 			&iotago.StateControllerAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
 			&iotago.GovernorAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
 		}),
-		testsuite.WithBlockIssuerFeature(&iotago.BlockIssuerFeature{
-			BlockIssuerKeys: iotago.BlockIssuerKeys{newAccountBlockIssuerKey},
-			ExpirySlot:      newAccountExpirySlot,
-		}),
-		testsuite.WithStakingFeature(&iotago.StakingFeature{
-			StakedAmount: 10000,
-			FixedCost:    421,
-			StartEpoch:   0,
-			EndEpoch:     10,
-		}),
+		testsuite.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
+		testsuite.WithStakingFeature(10000, 421, 0, 10),
 	)
 
 	destroyedAccountInput, destructionOutputs, destroyWallets := ts.TransactionFramework.DestroyAccount("TX1:0")
