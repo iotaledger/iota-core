@@ -193,14 +193,8 @@ func (c *Chains) initChainSwitching() {
 	})
 
 	c.HeaviestVerifiedChain.OnUpdate(func(_, heaviestVerifiedChain *Chain) {
-		parentChain := heaviestVerifiedChain.ParentChain.Get()
-		if parentChain != nil {
-			parentChain.Engine.Set(heaviestVerifiedChain.Engine.Get())
-			c.protocol.LogDebug("PROMOTED TO MAIN CHAIN")
-			go heaviestVerifiedChain.ForkingPoint.Get().promote(parentChain)
-			c.protocol.LogDebug("PROMOTED TO MAIN CHAIN STUCK")
-
-		}
+		heaviestVerifiedChain.ForkingPoint.Get().IsRoot.Trigger()
+		c.MainChain.Set(heaviestVerifiedChain)
 	})
 }
 

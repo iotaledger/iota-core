@@ -355,8 +355,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ctxP2Cancel() // we can stop issuing on P2.
 
 		// Nodes from P2 should switch the chain.
-		ts.AssertForkDetectedCount(1, nodesP2...)
-		ts.AssertCandidateEngineActivatedCount(1, nodesP2...)
+		ts.AssertForkDetectedCount(2, nodesP2...)
+		ts.AssertCandidateEngineActivatedCount(2, nodesP2...)
 
 		// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
 		ts.AssertMainEngineSwitchedCount(2, nodesP2...)
@@ -372,5 +372,5 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
 
-	// TODO: ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
+	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 }
