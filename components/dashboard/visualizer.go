@@ -42,7 +42,7 @@ type tipinfo struct {
 // }
 
 func sendVertex(blk *blocks.Block, confirmed bool) {
-	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock(), deps.Protocol.APIForSlot(blk.ID().Index()))
+	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock())
 	tx, isTx := modelBlk.Transaction()
 
 	broadcastWsBlock(&wsblk{MsgTypeVertex, &vertex{
@@ -54,8 +54,7 @@ func sendVertex(blk *blocks.Block, confirmed bool) {
 		IsTx:                isTx,
 		IsTxAccepted: func() bool {
 			if isTx {
-				api := lo.PanicOnErr(deps.Protocol.APIForVersion(blk.ProtocolBlock().ProtocolVersion))
-				txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID(api)))
+				txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID()))
 				if exists {
 					return txMetadata.IsAccepted()
 				}
@@ -88,8 +87,7 @@ func runVisualizer(component *app.Component) {
 
 				tx, hasTx := block.Transaction()
 				if hasTx {
-					api := lo.PanicOnErr(deps.Protocol.APIForVersion(block.ProtocolBlock().ProtocolVersion))
-					txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID(api)))
+					txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID()))
 					if exists {
 						txMetadata.OnAccepted(func() {
 							sendTxAccepted(block.ID(), true)

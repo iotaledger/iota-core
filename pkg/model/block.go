@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -18,9 +17,8 @@ type Block struct {
 	protocolBlock *iotago.ProtocolBlock
 }
 
-func newBlock(blockID iotago.BlockID, iotaBlock *iotago.ProtocolBlock, data []byte, api iotago.API) (*Block, error) {
+func newBlock(blockID iotago.BlockID, iotaBlock *iotago.ProtocolBlock, data []byte) (*Block, error) {
 	block := &Block{
-		api:           api,
 		blockID:       blockID,
 		data:          data,
 		protocolBlock: iotaBlock,
@@ -29,18 +27,18 @@ func newBlock(blockID iotago.BlockID, iotaBlock *iotago.ProtocolBlock, data []by
 	return block, nil
 }
 
-func BlockFromBlock(protocolBlock *iotago.ProtocolBlock, api iotago.API, opts ...serix.Option) (*Block, error) {
-	data, err := api.Encode(protocolBlock, opts...)
+func BlockFromBlock(protocolBlock *iotago.ProtocolBlock, opts ...serix.Option) (*Block, error) {
+	data, err := protocolBlock.API.Encode(protocolBlock, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	blockID, err := protocolBlock.ID(api)
+	blockID, err := protocolBlock.ID()
 	if err != nil {
 		return nil, err
 	}
 
-	return newBlock(blockID, protocolBlock, data, api)
+	return newBlock(blockID, protocolBlock, data)
 }
 
 func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
@@ -49,31 +47,21 @@ func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, op
 		return nil, err
 	}
 
-	return newBlock(blockID, protocolBlock, data, api)
+	return newBlock(blockID, protocolBlock, data)
 }
 
-func BlockFromBytes(data []byte, apiProvider iotago.APIProvider, opts ...serix.Option) (*Block, error) {
-	version, _, err := iotago.VersionFromBytes(data)
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to determine version")
-	}
-
-	apiForVersion, err := apiProvider.APIForVersion(version)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get API for version %d", version)
-	}
-
-	iotaBlock := new(iotago.ProtocolBlock)
-	if _, err := apiForVersion.Decode(data, iotaBlock, opts...); err != nil {
-		return nil, err
-	}
-
-	blockID, err := iotaBlock.ID(apiForVersion)
+func BlockFromBytes(data []byte, apiProvider iotago.APIProvider) (*Block, error) {
+	iotaBlock, _, err := iotago.ProtocolBlockFromBytes(apiProvider)(data)
 	if err != nil {
 		return nil, err
 	}
 
-	return newBlock(blockID, iotaBlock, data, apiForVersion)
+	blockID, err := iotaBlock.ID()
+	if err != nil {
+		return nil, err
+	}
+
+	return newBlock(blockID, iotaBlock, data)
 }
 
 func (blk *Block) ID() iotago.BlockID {
@@ -133,7 +121,7 @@ func (blk *Block) String() string {
 
 func (blk *Block) WorkScore() iotago.WorkScore {
 	if _, isBasic := blk.BasicBlock(); isBasic {
-		workScore, err := blk.ProtocolBlock().WorkScore(blk.api.ProtocolParameters().WorkScoreStructure())
+		workScore, err := blk.ProtocolBlock().WorkScore()
 		if err != nil {
 			panic(err)
 		}
@@ -144,5 +132,4 @@ func (blk *Block) WorkScore() iotago.WorkScore {
 	// else this is a validator block and should have workScore Zero
 	// TODO: deal with validator blocks with issue #236
 	return iotago.WorkScore(0)
-
 }

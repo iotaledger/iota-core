@@ -295,11 +295,7 @@ func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.Transa
 		return
 	}
 
-	apiForVersion, err := c.client.APIForVersion(resp.ProtocolVersion)
-	if err != nil {
-		return nil, err
-	}
-	modelBlk, err := model.BlockFromBlock(resp, apiForVersion)
+	modelBlk, err := model.BlockFromBlock(resp)
 	if err != nil {
 		return
 	}

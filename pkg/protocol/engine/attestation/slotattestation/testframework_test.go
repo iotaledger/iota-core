@@ -118,11 +118,11 @@ func (t *TestFramework) AddFutureAttestation(issuerAlias string, attestationAlia
 		Build()
 	require.NoError(t.test, err)
 
-	block.MustID(t.testAPI).RegisterAlias(attestationAlias)
+	block.MustID().RegisterAlias(attestationAlias)
 	att := iotago.NewAttestation(t.testAPI, block)
 	t.attestationsByAlias.Set(attestationAlias, att)
 
-	modelBlock, err := model.BlockFromBlock(block, t.testAPI)
+	modelBlock, err := model.BlockFromBlock(block)
 	require.NoError(t.test, err)
 
 	t.Instance.AddAttestationFromValidationBlock(blocks.NewBlock(modelBlock))

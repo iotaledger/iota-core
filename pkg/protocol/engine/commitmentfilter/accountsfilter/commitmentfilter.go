@@ -167,7 +167,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 			}
 
 		}
-		signingMessage, err := block.ProtocolBlock().SigningMessage(blockAPI)
+		signingMessage, err := block.ProtocolBlock().SigningMessage()
 		if err != nil {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,
