@@ -1,8 +1,6 @@
 package core
 
 import (
-	"encoding/json"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -28,7 +26,7 @@ func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.
 		WarpSyncResponse: &nwmodels.WarpSyncResponse{
 			CommitmentId: lo.PanicOnErr(id.Bytes()),
 			BlockIds:     lo.PanicOnErr(serializer.Encode(blockIDs)),
-			MerkleProof:  lo.PanicOnErr(json.Marshal(merkleProof)),
+			MerkleProof:  lo.PanicOnErr(merkleProof.Bytes()),
 		},
 	}}, to...)
 }
@@ -62,8 +60,8 @@ func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsByte
 			return
 		}
 
-		merkleProof := new(merklehasher.Proof[iotago.Identifier])
-		if err = json.Unmarshal(merkleProofBytes, merkleProof); err != nil {
+		merkleProof, _, err := merklehasher.ProofFromBytes[iotago.Identifier](merkleProofBytes)
+		if err != nil {
 			p.Events.Error.Trigger(ierrors.Wrapf(err, "failed to deserialize merkle proof when receiving waprsync response for commitment %s", commitmentID), id)
 
 			return
