@@ -25,7 +25,7 @@ func TestAttachments(t *testing.T) {
 	var earliestInclusionIndex, earliestInclusionIndex1, earliestInclusionIndex2 iotago.SlotIndex
 
 	attachments.OnEarliestIncludedAttachmentUpdated(func(_, includedBlock iotago.BlockID) {
-		earliestInclusionIndex = includedBlock.Index()
+		earliestInclusionIndex = includedBlock.Slot()
 	})
 	require.Equal(t, iotago.SlotIndex(0), earliestInclusionIndex)
 
@@ -35,7 +35,7 @@ func TestAttachments(t *testing.T) {
 	require.Equal(t, iotago.SlotIndex(1), earliestInclusionIndex)
 
 	attachments.OnEarliestIncludedAttachmentUpdated(func(_, includedBlock iotago.BlockID) {
-		earliestInclusionIndex1 = includedBlock.Index()
+		earliestInclusionIndex1 = includedBlock.Slot()
 	})
 
 	require.True(t, attachments.markAttachmentOrphaned(blockIDs["1"]))
@@ -51,7 +51,7 @@ func TestAttachments(t *testing.T) {
 	require.Equal(t, iotago.SlotIndex(0), earliestInclusionIndex1)
 
 	attachments.OnEarliestIncludedAttachmentUpdated(func(_, includedBlock iotago.BlockID) {
-		earliestInclusionIndex2 = includedBlock.Index()
+		earliestInclusionIndex2 = includedBlock.Slot()
 	})
 	require.Equal(t, iotago.SlotIndex(0), earliestInclusionIndex2)
 }

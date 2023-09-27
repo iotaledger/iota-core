@@ -39,7 +39,7 @@ func NewUnsolidCommitmentBuffer[V comparable](commitmentBufferMaxSize int, block
 	}
 
 	u.commitmentBuffer.SetEvictCallback(func(commitmentID iotago.CommitmentID, _ types.Empty) {
-		if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Index(), false); blockBufferForCommitments != nil {
+		if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Slot(), false); blockBufferForCommitments != nil {
 			blockBufferForCommitments.Delete(commitmentID)
 		}
 	})
@@ -51,7 +51,7 @@ func (u *UnsolidCommitmentBuffer[V]) Add(commitmentID iotago.CommitmentID, value
 	u.mutex.RLock()
 	defer u.mutex.RUnlock()
 
-	if commitmentID.Index() <= u.lastEvictedSlot {
+	if commitmentID.Slot() <= u.lastEvictedSlot {
 		return false
 	}
 
@@ -61,7 +61,7 @@ func (u *UnsolidCommitmentBuffer[V]) Add(commitmentID iotago.CommitmentID, value
 }
 
 func (u *UnsolidCommitmentBuffer[V]) add(commitmentID iotago.CommitmentID, value V) {
-	buffer, _ := u.blockBuffers.Get(commitmentID.Index(), true).GetOrCreate(commitmentID, func() optionalSizedBuffer[V] {
+	buffer, _ := u.blockBuffers.Get(commitmentID.Slot(), true).GetOrCreate(commitmentID, func() optionalSizedBuffer[V] {
 		if u.blockBufferMaxSize > 0 {
 			return ringbuffer.NewRingBuffer[V](u.blockBufferMaxSize)
 		}
@@ -80,7 +80,7 @@ func (u *UnsolidCommitmentBuffer[V]) AddWithFunc(commitmentID iotago.CommitmentI
 	u.mutex.RLock()
 	defer u.mutex.RUnlock()
 
-	if commitmentID.Index() <= u.lastEvictedSlot {
+	if commitmentID.Slot() <= u.lastEvictedSlot {
 		return false
 	}
 
@@ -112,7 +112,7 @@ func (u *UnsolidCommitmentBuffer[V]) GetValues(commitmentID iotago.CommitmentID)
 	u.mutex.RLock()
 	defer u.mutex.RUnlock()
 
-	if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Index()); blockBufferForCommitments != nil {
+	if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Slot()); blockBufferForCommitments != nil {
 		if buffer, exists := blockBufferForCommitments.Get(commitmentID); exists {
 			return buffer.ToSlice()
 		}
@@ -126,13 +126,13 @@ func (u *UnsolidCommitmentBuffer[V]) GetValuesAndEvict(commitmentID iotago.Commi
 	defer u.mutex.Unlock()
 
 	var values []V
-	if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Index()); blockBufferForCommitments != nil {
+	if blockBufferForCommitments := u.blockBuffers.Get(commitmentID.Slot()); blockBufferForCommitments != nil {
 		if buffer, exists := blockBufferForCommitments.Get(commitmentID); exists {
 			values = buffer.ToSlice()
 		}
 	}
 
-	u.evictUntil(commitmentID.Index())
+	u.evictUntil(commitmentID.Slot())
 
 	return values
 }

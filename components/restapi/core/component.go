@@ -79,13 +79,13 @@ const (
 	// GET returns the output IDs of all UTXO changes.
 	RouteCommitmentByIDUTXOChanges = "/commitments/:" + restapipkg.ParameterCommitmentID + "/utxo-changes"
 
-	// RouteCommitmentByIndex is the route for getting a commitment by its SlotIndex.
+	// RouteCommitmentByIndex is the route for getting a commitment by its Slot.
 	// GET returns the commitment.
 	// MIMEApplicationJSON => json.
 	// MIMEVendorIOTASerializer => bytes.
 	RouteCommitmentByIndex = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex
 
-	// RouteCommitmentByIndexUTXOChanges is the route for getting all UTXO changes of a commitment by its SlotIndex.
+	// RouteCommitmentByIndexUTXOChanges is the route for getting all UTXO changes of a commitment by its Slot.
 	// GET returns the output IDs of all UTXO changes.
 	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 

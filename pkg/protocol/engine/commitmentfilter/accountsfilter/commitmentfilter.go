@@ -72,7 +72,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *blocks.Block) {
 
 func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	// check if the account exists in the specified slot.
-	accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Index())
+	accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Slot())
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
@@ -84,7 +84,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	if !exists {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: ierrors.Errorf("block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Index()),
+			Reason: ierrors.Errorf("block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Slot()),
 		})
 
 		return
@@ -142,10 +142,10 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	}
 
 	// Check that the account is not expired
-	if accountData.ExpirySlot < block.ProtocolBlock().SlotCommitmentID.Index() {
+	if accountData.ExpirySlot < block.ProtocolBlock().SlotCommitmentID.Slot() {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: ierrors.Wrapf(ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().IssuerID, accountData.ExpirySlot, block.ProtocolBlock().SlotCommitmentID.Index()),
+			Reason: ierrors.Wrapf(ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().IssuerID, accountData.ExpirySlot, block.ProtocolBlock().SlotCommitmentID.Slot()),
 		})
 
 		return

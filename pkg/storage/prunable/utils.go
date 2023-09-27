@@ -11,12 +11,12 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func dbPathFromIndex(base string, index iotago.EpochIndex) string {
-	return filepath.Join(base, strconv.FormatInt(int64(index), 10))
+func dbPathFromIndex(base string, epoch iotago.EpochIndex) string {
+	return filepath.Join(base, strconv.FormatInt(int64(epoch), 10))
 }
 
 type dbInstanceFileInfo struct {
-	baseIndex iotago.EpochIndex
+	baseEpoch iotago.EpochIndex
 	path      string
 }
 
@@ -35,19 +35,19 @@ func getSortedDBInstancesFromDisk(baseDir string) (dbInfos []*dbInstanceFileInfo
 		}
 
 		return &dbInstanceFileInfo{
-			baseIndex: iotago.EpochIndex(atoi),
+			baseEpoch: iotago.EpochIndex(atoi),
 			path:      filepath.Join(baseDir, e.Name()),
 		}
 	})
 	dbInfos = lo.Filter(dbInfos, func(info *dbInstanceFileInfo) bool { return info != nil })
 
 	sort.Slice(dbInfos, func(i, j int) bool {
-		return dbInfos[i].baseIndex < dbInfos[j].baseIndex
+		return dbInfos[i].baseEpoch < dbInfos[j].baseEpoch
 	})
 
 	return dbInfos
 }
 
-func dbPrunableDirectorySize(base string, index iotago.EpochIndex) (int64, error) {
-	return ioutils.FolderSize(dbPathFromIndex(base, index))
+func dbPrunableDirectorySize(base string, epoch iotago.EpochIndex) (int64, error) {
+	return ioutils.FolderSize(dbPathFromIndex(base, epoch))
 }

@@ -19,7 +19,7 @@ type Chain struct {
 }
 
 func NewChain(forkingPoint *ChainCommitment) (fork *Chain) {
-	forkingPointIndex := forkingPoint.Commitment().Index()
+	forkingPointIndex := forkingPoint.Commitment().Slot()
 
 	c := &Chain{
 		ForkingPoint:          forkingPoint,
@@ -61,7 +61,7 @@ func (c *Chain) addCommitment(commitment *ChainCommitment) {
 	c.Lock()
 	defer c.Unlock()
 
-	commitmentIndex := commitment.Commitment().Index()
+	commitmentIndex := commitment.Commitment().Slot()
 	if commitmentIndex > c.latestCommitmentIndex {
 		c.latestCommitmentIndex = commitmentIndex
 	}

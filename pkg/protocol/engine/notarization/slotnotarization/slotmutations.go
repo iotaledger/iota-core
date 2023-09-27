@@ -36,11 +36,11 @@ func (m *SlotMutations) AddAcceptedBlock(block *blocks.Block) (err error) {
 	defer m.evictionMutex.RUnlock()
 
 	blockID := block.ID()
-	if blockID.Index() <= m.latestCommittedIndex {
-		return ierrors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
+	if blockID.Slot() <= m.latestCommittedIndex {
+		return ierrors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Slot())
 	}
 
-	if err := m.AcceptedBlocks(blockID.Index(), true).Add(blockID); err != nil {
+	if err := m.AcceptedBlocks(blockID.Slot(), true).Add(blockID); err != nil {
 		return ierrors.Wrapf(err, "failed to add block to accepted blocks, blockID: %s", blockID.ToHex())
 	}
 

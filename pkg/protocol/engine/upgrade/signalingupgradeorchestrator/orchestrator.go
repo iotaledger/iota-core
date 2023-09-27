@@ -146,7 +146,7 @@ func (o *Orchestrator) TrackValidationBlock(block *blocks.Block) {
 	}
 	newSignaledBlock := model.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
 
-	committee := o.seatManager.Committee(block.ID().Index())
+	committee := o.seatManager.Committee(block.ID().Slot())
 	seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return
@@ -161,7 +161,7 @@ func (o *Orchestrator) TrackValidationBlock(block *blocks.Block) {
 	o.evictionMutex.RLock()
 	defer o.evictionMutex.RUnlock()
 
-	latestSignalsForEpoch := o.latestSignals.Get(block.ID().Index(), true)
+	latestSignalsForEpoch := o.latestSignals.Get(block.ID().Slot(), true)
 	o.addNewSignaledBlock(latestSignalsForEpoch, seat, newSignaledBlock)
 }
 

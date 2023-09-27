@@ -50,11 +50,11 @@ func (m *Manager) BlockAccepted(block *blocks.Block) error {
 	defer m.mutex.Unlock()
 
 	blockID := block.ID()
-	if blockID.Index() <= m.latestCommittedSlot {
-		return ierrors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Index())
+	if blockID.Slot() <= m.latestCommittedSlot {
+		return ierrors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Slot())
 	}
 
-	m.slotWork.Compute(blockID.Index(), func(currentValue iotago.WorkScore, _ bool) iotago.WorkScore {
+	m.slotWork.Compute(blockID.Slot(), func(currentValue iotago.WorkScore, _ bool) iotago.WorkScore {
 		return currentValue + block.WorkScore()
 	})
 

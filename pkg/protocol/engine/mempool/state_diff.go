@@ -9,8 +9,8 @@ import (
 
 // StateDiff is a collection of changes that happened in a certain slot and that can be applied to the ledger state.
 type StateDiff interface {
-	// Index returns the slot index of the state diff.
-	Index() iotago.SlotIndex
+	// Slot returns the slot index of the state diff.
+	Slot() iotago.SlotIndex
 
 	// DestroyedStates returns a compacted list of all the states that were destroyed in the slot.
 	DestroyedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, OutputStateMetadata]

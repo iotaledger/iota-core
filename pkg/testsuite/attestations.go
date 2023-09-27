@@ -10,7 +10,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertAttestationsForSlot(slotIndex iotago.SlotIndex, blocks []*blocks.Block, nodes ...*mock.Node) {
+func (t *TestSuite) AssertAttestationsForSlot(slot iotago.SlotIndex, blocks []*blocks.Block, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	expectedAttestations := make([]iotago.BlockID, len(blocks))
@@ -23,9 +23,9 @@ func (t *TestSuite) AssertAttestationsForSlot(slotIndex iotago.SlotIndex, blocks
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			attestationTree, err := node.Protocol.MainEngineInstance().Attestations.GetMap(slotIndex)
+			attestationTree, err := node.Protocol.MainEngineInstance().Attestations.GetMap(slot)
 			if err != nil {
-				return ierrors.Wrapf(err, "AssertAttestationsForSlot: %s: error loading attestation tree for slot %d", node.Name, slotIndex)
+				return ierrors.Wrapf(err, "AssertAttestationsForSlot: %s: error loading attestation tree for slot %d", node.Name, slot)
 			}
 
 			storedAttestations := make([]iotago.BlockID, 0)

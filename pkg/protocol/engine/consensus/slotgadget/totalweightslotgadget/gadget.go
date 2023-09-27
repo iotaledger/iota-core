@@ -28,7 +28,7 @@ type Gadget struct {
 	seatManager  seatmanager.SeatManager
 
 	lastFinalizedSlot          iotago.SlotIndex
-	storeLastFinalizedSlotFunc func(index iotago.SlotIndex)
+	storeLastFinalizedSlotFunc func(slot iotago.SlotIndex)
 
 	mutex        syncutils.RWMutex
 	errorHandler func(error)
@@ -58,8 +58,8 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes, event.WithWorkerPool(g.workers.CreatePool("TrackAndRefresh", 1))) // Using just 1 worker to avoid contention
 			})
 
-			g.storeLastFinalizedSlotFunc = func(index iotago.SlotIndex) {
-				if err := e.Storage.Settings().SetLatestFinalizedSlot(index); err != nil {
+			g.storeLastFinalizedSlotFunc = func(slot iotago.SlotIndex) {
+				if err := e.Storage.Settings().SetLatestFinalizedSlot(slot); err != nil {
 					g.errorHandler(ierrors.Wrap(err, "failed to set latest finalized slot"))
 				}
 			}
@@ -95,11 +95,11 @@ func (g *Gadget) trackVotes(block *blocks.Block) {
 		g.mutex.Lock()
 		defer g.mutex.Unlock()
 
-		tracker, _ := g.slotTrackers.GetOrCreate(block.ID().Index(), func() *slottracker.SlotTracker {
+		tracker, _ := g.slotTrackers.GetOrCreate(block.ID().Slot(), func() *slottracker.SlotTracker {
 			return slottracker.NewSlotTracker()
 		})
 
-		prevLatestSlot, latestSlot, updated := tracker.TrackVotes(block.SlotCommitmentID().Index(), block.ProtocolBlock().IssuerID, g.lastFinalizedSlot)
+		prevLatestSlot, latestSlot, updated := tracker.TrackVotes(block.SlotCommitmentID().Slot(), block.ProtocolBlock().IssuerID, g.lastFinalizedSlot)
 		if !updated {
 			return nil
 		}
