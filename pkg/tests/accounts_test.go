@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/iotaledger/hive.go/lo"
@@ -343,14 +344,18 @@ func Test_TransitionAccount(t *testing.T) {
 		}),
 	)
 
+	fmt.Printf("inputForImplicitAccountTransition: %+v\n", inputForImplicitAccountTransition.ToOutputSet())
 	tx6 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX6", fullAccountWallet,
-		testsuite.WithInputs(inputForImplicitAccountTransition),
-		testsuite.WithOutputs(outputsForImplicitAccountTransition),
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
+			&iotago.BlockIssuanceCreditInput{
+				AccountID: implicitAccountID,
+			},
 			&iotago.CommitmentInput{
 				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
 			},
 		}),
+		testsuite.WithInputs(inputForImplicitAccountTransition),
+		testsuite.WithOutputs(outputsForImplicitAccountTransition),
 		testsuite.WithSlotCreated(slotIndexBlock5),
 	))
 
@@ -367,6 +372,8 @@ func Test_TransitionAccount(t *testing.T) {
 		PreviousUpdatedTime:    0,
 		NewOutputID:            fullAccountOutputID,
 		PreviousOutputID:       implicitAccountOutputID,
+		PreviousExpirySlot:     iotago.MaxSlotIndex,
+		NewExpirySlot:          iotago.MaxSlotIndex,
 		BlockIssuerKeysAdded:   iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
 		BlockIssuerKeysRemoved: iotago.BlockIssuerKeys{implicitBlockIssuerKey},
 		ValidatorStakeChange:   0,
@@ -377,7 +384,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              implicitAccountID,
-		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock6),
+		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock5),
 		ExpirySlot:      iotago.MaxSlotIndex,
 		OutputID:        fullAccountOutputID,
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(fullAccountBlockIssuerKey),
