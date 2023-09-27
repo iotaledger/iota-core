@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/binary"
-	"encoding/json"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/protobuf/proto"
@@ -84,7 +83,7 @@ func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
 		Commitment:   cm.Data(),
 		Attestations: encodedAttestations.Bytes(),
-		MerkleProof:  lo.PanicOnErr(json.Marshal(merkleProof)),
+		MerkleProof:  lo.PanicOnErr(merkleProof.Bytes()),
 	}}}, to...)
 }
 
@@ -227,8 +226,8 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 		return
 	}
 
-	proof := new(merklehasher.Proof[iotago.Identifier])
-	if err := json.Unmarshal(merkleProof, proof); err != nil {
+	proof, _, err := merklehasher.ProofFromBytes[iotago.Identifier](merkleProof)
+	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrapf(err, "failed to deserialize merkle proof when receiving attestations for commitment %s", cm.ID()), id)
 
 		return

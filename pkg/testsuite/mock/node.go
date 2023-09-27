@@ -3,7 +3,6 @@ package mock
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -172,7 +171,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	})
 
 	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
-		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
+		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(merkleProof.JSONEncode()), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
 			return lo.PanicOnErr(a.BlockID())
 		}))
 	})
