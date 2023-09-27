@@ -235,10 +235,10 @@ func (b *BlockDispatcher) inSyncWindow(engine *engine.Engine, block *model.Block
 	}
 
 	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
-	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Slot()
+	latestCommitmentSlot := engine.Storage.Settings().LatestCommitment().Slot()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Slot()).ProtocolParameters().MaxCommittableAge()
 
-	return block.ID().Slot() <= latestCommitmentIndex+maxCommittableAge
+	return block.ID().Slot() <= latestCommitmentSlot+maxCommittableAge
 }
 
 // warpSyncIfNecessary triggers a warp sync if necessary.
@@ -248,16 +248,16 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	}
 
 	chain := chainCommitment.Chain()
-	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Slot()
+	latestCommitmentSlot := e.Storage.Settings().LatestCommitment().Slot()
 
-	if latestCommitmentIndex+1 >= chain.LatestCommitment().Commitment().Slot() {
+	if latestCommitmentSlot+1 >= chain.LatestCommitment().Commitment().Slot() {
 		return
 	}
 
 	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Slot()).ProtocolParameters().MaxCommittableAge()
 	warpSyncWindowSize := lo.Max(maxCommittableAge, b.optWarpSyncWindowSize)
 
-	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+warpSyncWindowSize; slotToWarpSync++ {
+	for slotToWarpSync := latestCommitmentSlot + 1; slotToWarpSync <= latestCommitmentSlot+warpSyncWindowSize; slotToWarpSync++ {
 		commitmentToSync := chain.Commitment(slotToWarpSync)
 		if commitmentToSync == nil {
 			break
