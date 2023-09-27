@@ -289,13 +289,13 @@ func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 			}
 
 			if _, err := m.rollbackAccountTo(accountData, targetSlot); err != nil {
-				internalErr = ierrors.Wrapf(err, "unable to rollback account %s to target slot slot %d", accountID, targetSlot)
+				internalErr = ierrors.Wrapf(err, "unable to rollback account %s to target slot %d", accountID, targetSlot)
 
 				return false
 			}
 
 			if err := m.accountsTree.Set(accountID, accountData); err != nil {
-				internalErr = ierrors.Wrapf(err, "failed to save rolled back account %s to target slot slot %d", accountID, targetSlot)
+				internalErr = ierrors.Wrapf(err, "failed to save rolled back account %s to target slot %d", accountID, targetSlot)
 
 				return false
 			}
@@ -496,7 +496,7 @@ func (m *Manager) computeBlockBurnsForSlot(slot iotago.SlotIndex, rmc iotago.Man
 }
 
 func (m *Manager) commitAccountTree(slot iotago.SlotIndex, accountDiffChanges map[iotago.AccountID]*model.AccountDiff, destroyedAccounts ds.Set[iotago.AccountID]) error {
-	// update the account tree to latestCommitted slot slot
+	// update the account tree to latestCommitted slot
 	for accountID, diffChange := range accountDiffChanges {
 		// remove a destroyed account, no need to update with diffs
 		if destroyedAccounts.Has(accountID) {

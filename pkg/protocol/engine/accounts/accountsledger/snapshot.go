@@ -138,7 +138,7 @@ func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 
 	for accountID, accountData := range destroyedAccounts {
 		if wasDestroyed, err := m.rollbackAccountTo(accountData, targetSlot); err != nil {
-			return 0, ierrors.Wrapf(err, "unable to rollback account %s to target slot slot %d", accountID, targetSlot)
+			return 0, ierrors.Wrapf(err, "unable to rollback account %s to target slot %d", accountID, targetSlot)
 		} else if !wasDestroyed {
 			return 0, ierrors.Errorf("account %s was not destroyed", accountID)
 		}

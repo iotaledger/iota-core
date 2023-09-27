@@ -38,7 +38,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	// cachedStateRequests holds the requests for states that are required to execute transactions.
 	cachedStateRequests *shrinkingmap.ShrinkingMap[iotago.Identifier, *promise.Promise[mempool.State]]
 
-	// stateDiffs holds aggregated state mutations for each slot slot.
+	// stateDiffs holds aggregated state mutations for each slot.
 	stateDiffs *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *StateDiff]
 
 	// conflictDAG is the DAG that is used to keep track of the conflicts between transactions.
@@ -49,7 +49,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	// executionWorkers is the worker pool that is used to execute the state transitions of transactions.
 	executionWorkers *workerpool.WorkerPool
 
-	// lastEvictedSlot is the last slot slot that was evicted from the MemPool.
+	// lastEvictedSlot is the last slot that was evicted from the MemPool.
 	lastEvictedSlot iotago.SlotIndex
 
 	// evictionMutex is used to synchronize the eviction of slots.
@@ -152,7 +152,7 @@ func (m *MemPool[VoteRank]) TransactionMetadataByAttachment(blockID iotago.Block
 	return m.transactionByAttachment(blockID)
 }
 
-// StateDiff returns the state diff for the given slot slot.
+// StateDiff returns the state diff for the given slot.
 func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) mempool.StateDiff {
 	if stateDiff, exists := m.stateDiffs.Get(slot); exists {
 		return stateDiff
