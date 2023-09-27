@@ -1,8 +1,8 @@
 package ledger
 
 import (
+	"fmt"
 	"io"
-	"math"
 
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ds"
@@ -390,7 +390,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		case iotago.OutputAccount:
 			accountDiff.PreviousExpirySlot = consumedOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 		case iotago.OutputBasic:
-			accountDiff.PreviousExpirySlot = iotago.SlotIndex(math.MaxUint64)
+			accountDiff.PreviousExpirySlot = iotago.MaxSlotIndex
 		}
 
 		accountDiff.PreviousOutputID = consumedOutput.OutputID()
@@ -462,10 +462,10 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		// for basic outputs (implicit accounts), get block issuer keys from the address in the unlock conditions.
 		case iotago.OutputBasic:
 			address, _ := createdOutput.Output().UnlockConditionSet().Address().Address.(*iotago.ImplicitAccountCreationAddress)
-			accountDiff.BlockIssuerKeysAdded = iotago.BlockIssuerKeys{iotago.BlockIssuerKeyEd25519AddressFromAddress(address)}
+			accountDiff.BlockIssuerKeysAdded = iotago.BlockIssuerKeys{iotago.Ed25519AddressBlockIssuerKeyFromAddress(address)}
 			accountDiff.NewExpirySlot = iotago.MaxSlotIndex
 		}
-
+		fmt.Printf("account diff for %s: %+v\n", createdAccountID, accountDiff)
 	}
 }
 

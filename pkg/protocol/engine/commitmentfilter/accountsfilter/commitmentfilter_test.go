@@ -181,8 +181,8 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		implicitAccountID,
 		accounts.NewAccountData(
 			implicitAccountID,
-			accounts.WithExpirySlot(math.MaxUint64),
-			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519AddressFromAddress(implicitAddress)),
+			accounts.WithExpirySlot(iotago.MaxSlotIndex),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519AddressBlockIssuerKeyFromAddress(implicitAddress)),
 		),
 	)
 

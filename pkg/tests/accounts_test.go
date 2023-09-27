@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"math"
 	"testing"
 
 	"github.com/iotaledger/hive.go/lo"
@@ -69,7 +68,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.AddBlockIssuerKey(newGenesisOutputKey),
 		testsuite.WithBlockIssuerExpirySlot(1),
 	)
-	consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(2, "Genesis:0")
+	consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(4, "Genesis:0")
 
 	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
 		testsuite.WithAccountInput(accountInput, true),
@@ -322,14 +321,14 @@ func Test_TransitionAccount(t *testing.T) {
 
 	latestParent = ts.CommitUntilSlot(slotIndexBlock5, activeNodes, block5)
 
-	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.BlockIssuerKeyEd25519AddressFromAddress(implicitAccountAddress)
+	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519AddressBlockIssuerKeyFromAddress(implicitAccountAddress)
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              implicitAccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock5),
-		ExpirySlot:      iotago.SlotIndex(math.MaxUint64),
+		ExpirySlot:      iotago.MaxSlotIndex,
 		OutputID:        implicitAccountOutputID,
-		BlockIssuerKeys: ds.NewSet(implicitBlockIssuerKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(implicitBlockIssuerKey),
 	}, ts.Nodes()...)
 
 	// TRANSITION IMPLICIT ACCOUNT TO ACCOUNT OUTPUT
@@ -340,7 +339,7 @@ func Test_TransitionAccount(t *testing.T) {
 		"TX5:0",
 		testsuite.WithBlockIssuerFeature(&iotago.BlockIssuerFeature{
 			BlockIssuerKeys: iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
-			ExpirySlot:      math.MaxUint64,
+			ExpirySlot:      iotago.MaxSlotIndex,
 		}),
 	)
 
@@ -378,9 +377,9 @@ func Test_TransitionAccount(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              implicitAccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock6),
-		ExpirySlot:      iotago.SlotIndex(math.MaxUint64),
+		ExpirySlot:      iotago.MaxSlotIndex,
 		OutputID:        fullAccountOutputID,
-		BlockIssuerKeys: ds.NewSet(fullAccountBlockIssuerKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(fullAccountBlockIssuerKey),
 	}, ts.Nodes()...)
 
 	ts.Wait(ts.Nodes()...)
