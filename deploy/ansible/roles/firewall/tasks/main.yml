@@ -7,6 +7,13 @@
   ufw:
     state: reset
 
+- name: Ensure content from source file is at the end of the config file
+  blockinfile:
+    path: /etc/ufw/after.rules
+    marker: "# {mark} ANSIBLE MANAGED BLOCK FOR CONFIG END"
+    block: "{{ lookup('file', 'after.rules') }}"
+    insertafter: EOF
+
 - name: Allow ssh
   ufw:
     rule: allow

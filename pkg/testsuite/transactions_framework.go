@@ -52,20 +52,20 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 
 func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.Transaction) {
 	currentAPI := t.apiProvider.CurrentAPI()
-	(lo.PanicOnErr(transaction.ID(currentAPI))).RegisterAlias(alias)
+	(lo.PanicOnErr(transaction.ID())).RegisterAlias(alias)
 
 	t.transactions[alias] = transaction
 
-	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet(currentAPI)) {
+	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
 		clonedOutput := output.Clone()
-		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID(currentAPI)), outputID.Index())
+		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
 		if clonedOutput.Type() == iotago.OutputAccount {
 			if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID() {
 				accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
 			}
 		}
 
-		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID(), 0, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
+		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID(), currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
 	}
 }
 
@@ -215,18 +215,18 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 	input := t.Output(inputAlias)
 
 	delegationOutput := options.Apply(&iotago.DelegationOutput{
-		Amount:          input.BaseTokenAmount(),
-		DelegatedAmount: input.BaseTokenAmount(),
-		DelegationID:    iotago.DelegationID{},
-		ValidatorID:     iotago.AccountID{},
-		StartEpoch:      0,
-		EndEpoch:        0,
+		Amount:           input.BaseTokenAmount(),
+		DelegatedAmount:  input.BaseTokenAmount(),
+		DelegationID:     iotago.DelegationID{},
+		ValidatorAddress: &iotago.AccountAddress{},
+		StartEpoch:       0,
+		EndEpoch:         0,
 		Conditions: iotago.DelegationOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 		},
 	}, opts)
 
-	if delegationOutput.ValidatorID == iotago.EmptyAccountID() ||
+	if delegationOutput.ValidatorAddress.AccountID() == iotago.EmptyAccountID() ||
 		delegationOutput.DelegatedAmount == 0 ||
 		delegationOutput.StartEpoch == 0 {
 		panic(fmt.Sprintf("delegation output created incorrectly %+v", delegationOutput))
@@ -325,7 +325,7 @@ func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
 }
 
 func (t *TransactionFramework) TransactionID(alias string) iotago.TransactionID {
-	return lo.PanicOnErr(t.Transaction(alias).ID(t.apiProvider.CurrentAPI()))
+	return lo.PanicOnErr(t.Transaction(alias).ID())
 }
 
 func (t *TransactionFramework) Transactions(aliases ...string) []*iotago.Transaction {
@@ -348,9 +348,9 @@ func WithDelegatedAmount(delegatedAmount iotago.BaseToken) options.Option[iotago
 	}
 }
 
-func WithDelegatedValidatorID(validatorID iotago.AccountID) options.Option[iotago.DelegationOutput] {
+func WithDelegatedValidatorAddress(validatorAddress *iotago.AccountAddress) options.Option[iotago.DelegationOutput] {
 	return func(delegationOutput *iotago.DelegationOutput) {
-		delegationOutput.ValidatorID = validatorID
+		delegationOutput.ValidatorAddress = validatorAddress
 	}
 }
 
@@ -556,7 +556,7 @@ func WithAllotments(allotments iotago.Allotments) options.Option[builder.Transac
 	}
 }
 
-func WithCreationSlot(creationSlot iotago.SlotIndex) options.Option[builder.TransactionBuilder] {
+func WithSlotCreated(creationSlot iotago.SlotIndex) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		txBuilder.SetCreationSlot(creationSlot)
 	}

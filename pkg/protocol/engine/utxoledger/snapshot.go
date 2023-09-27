@@ -17,8 +17,7 @@ func (o *Output) SnapshotBytes() []byte {
 	m := marshalutil.New()
 	m.WriteBytes(o.outputID[:])
 	m.WriteBytes(o.blockID[:])
-	m.WriteUint64(uint64(o.slotBooked))
-	m.WriteUint64(uint64(o.slotCreated))
+	m.WriteUint32(uint32(o.slotBooked))
 	m.WriteUint32(uint32(len(o.encodedOutput)))
 	m.WriteBytes(o.encodedOutput)
 
@@ -41,11 +40,6 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvid
 		return nil, ierrors.Errorf("unable to read LS output milestone index booked: %w", err)
 	}
 
-	var indexCreated iotago.SlotIndex
-	if err := binary.Read(reader, binary.LittleEndian, &indexCreated); err != nil {
-		return nil, ierrors.Errorf("unable to read LS output index created: %w", err)
-	}
-
 	var outputLength uint32
 	if err := binary.Read(reader, binary.LittleEndian, &outputLength); err != nil {
 		return nil, ierrors.Errorf("unable to read LS output length: %w", err)
@@ -61,14 +55,14 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvid
 		return nil, ierrors.Errorf("invalid LS output address: %w", err)
 	}
 
-	return CreateOutput(apiProvider, outputID, blockID, indexBooked, indexCreated, output, outputBytes), nil
+	return CreateOutput(apiProvider, outputID, blockID, indexBooked, output, outputBytes), nil
 }
 
 func (s *Spent) SnapshotBytes() []byte {
 	m := marshalutil.New()
 	m.WriteBytes(s.Output().SnapshotBytes())
 	m.WriteBytes(s.transactionIDSpent[:])
-	m.WriteBytes(s.slotIndexSpent.MustBytes())
+
 	// we don't need to write indexSpent because this info is available in the milestoneDiff that consumes the output
 	return m.Bytes()
 }
@@ -84,22 +78,17 @@ func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvide
 		return nil, ierrors.Errorf("unable to read LS transaction ID spent: %w", err)
 	}
 
-	var timestampSpent int64
-	if err := binary.Read(reader, binary.LittleEndian, &timestampSpent); err != nil {
-		return nil, ierrors.Errorf("unable to read LS output milestone timestamp booked: %w", err)
-	}
-
 	return NewSpent(output, transactionIDSpent, indexSpent), nil
 }
 
 func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider) (*SlotDiff, error) {
 	slotDiff := &SlotDiff{}
 
-	var diffIndex uint64
+	var diffIndex iotago.SlotIndex
 	if err := binary.Read(reader, binary.LittleEndian, &diffIndex); err != nil {
 		return nil, ierrors.Errorf("unable to read slot diff index: %w", err)
 	}
-	slotDiff.Index = iotago.SlotIndex(diffIndex)
+	slotDiff.Index = diffIndex
 
 	var createdCount uint64
 	if err := binary.Read(reader, binary.LittleEndian, &createdCount); err != nil {
@@ -137,7 +126,7 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIPr
 func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *SlotDiff) (written int64, err error) {
 	var totalBytesWritten int64
 
-	if err := utils.WriteValueFunc(writer, uint64(diff.Index), &totalBytesWritten); err != nil {
+	if err := utils.WriteValueFunc(writer, diff.Index.MustBytes(), &totalBytesWritten); err != nil {
 		return 0, ierrors.Wrap(err, "unable to write slot diff index")
 	}
 
@@ -169,12 +158,12 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
-	var snapshotLedgerIndex uint64
+	var snapshotLedgerIndex iotago.SlotIndex
 	if err := binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex); err != nil {
 		return ierrors.Errorf("unable to read LS ledger index: %w", err)
 	}
 
-	if err := m.StoreLedgerIndexWithoutLocking(iotago.SlotIndex(snapshotLedgerIndex)); err != nil {
+	if err := m.StoreLedgerIndexWithoutLocking(snapshotLedgerIndex); err != nil {
 		return err
 	}
 
@@ -205,8 +194,8 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 			return err
 		}
 
-		if slotDiff.Index != iotago.SlotIndex(snapshotLedgerIndex-i) {
-			return ierrors.Errorf("invalid LS slot index. %d vs %d", slotDiff.Index, snapshotLedgerIndex-i)
+		if slotDiff.Index != snapshotLedgerIndex-iotago.SlotIndex(i) {
+			return ierrors.Errorf("invalid LS slot index. %d vs %d", slotDiff.Index, snapshotLedgerIndex-iotago.SlotIndex(i))
 		}
 
 		if err := m.RollbackDiffWithoutLocking(slotDiff.Index, slotDiff.Outputs, slotDiff.Spents); err != nil {

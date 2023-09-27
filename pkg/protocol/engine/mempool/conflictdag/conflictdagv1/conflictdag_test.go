@@ -2,19 +2,20 @@ package conflictdagv1
 
 import (
 	"fmt"
-	"runtime"
-	memleakdebug "runtime/debug"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
+)
+
+const (
+	TestTransactionCreationSlot = 0
 )
 
 // TestConflictDAG runs the generic tests for the ConflictDAG.
@@ -37,14 +38,7 @@ func newTestFramework(t *testing.T) *tests.Framework {
 
 // transactionID creates a (made up) TransactionID from the given alias.
 func transactionID(alias string) iotago.TransactionID {
-	hashedAlias := blake2b.Sum256([]byte(alias))
-
-	var result iotago.TransactionID
-	result, _, err := iotago.IdentifierFromBytes(hashedAlias[:])
-	if err != nil {
-		panic(err)
-	}
-
+	result := iotago.TransactionIDFromData(TestTransactionCreationSlot, []byte(alias))
 	result.RegisterAlias(alias)
 
 	return result
@@ -52,9 +46,7 @@ func transactionID(alias string) iotago.TransactionID {
 
 // outputID creates a (made up) OutputID from the given alias.
 func outputID(alias string) iotago.OutputID {
-	hashedAlias := blake2b.Sum256([]byte(alias))
-
-	return iotago.OutputIDFromTransactionIDAndIndex(iotago.IdentifierFromData(hashedAlias[:]), 1)
+	return iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionIDFromData(TestTransactionCreationSlot, []byte(alias)), 1)
 }
 
 func TestMemoryRelease(t *testing.T) {
@@ -93,7 +85,7 @@ func TestMemoryRelease(t *testing.T) {
 
 	fmt.Println("Memory report before:")
 	fmt.Println(memanalyzer.MemoryReport(tf))
-	memStatsStart := memStats()
+	memStatsStart := memanalyzer.MemSize(tf)
 	_, alias := createConflictSets(0, 30000, 1, 2, "")
 
 	tf.Instance.EvictConflict(tf.ConflictID(alias + ":0"))
@@ -108,22 +100,12 @@ func TestMemoryRelease(t *testing.T) {
 	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictSetsByID.Size())
 	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictsByID.Size())
 	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictUnhooks.Size())
-	memStatsEnd := memStats()
+	memStatsEnd := memanalyzer.MemSize(tf)
 
 	fmt.Println("\n\nMemory report after:")
 	fmt.Println(memanalyzer.MemoryReport(tf))
 
-	fmt.Println(memStatsEnd.HeapObjects, memStatsStart.HeapObjects)
+	fmt.Println(memStatsEnd, memStatsStart)
 
-	require.Less(t, float64(memStatsEnd.HeapObjects), 1.1*float64(memStatsStart.HeapObjects), "the objects in the heap should not grow by more than 10%")
-}
-
-func memStats() *runtime.MemStats {
-	runtime.GC()
-	memleakdebug.FreeOSMemory()
-
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-
-	return &memStats
+	require.Less(t, float64(memStatsEnd), 1.1*float64(memStatsStart), "the objects in the heap should not grow by more than 10%")
 }

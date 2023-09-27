@@ -47,9 +47,9 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		}
 		minDeposit := m.apiProvider.CurrentAPI().ProtocolParameters().RentStructure().MinDeposit(output.Output())
 		if output.BaseTokenAmount() <= minDeposit {
-			mana = accounts.NewMana(output.StoredMana(), 0, output.CreationSlot())
+			mana = accounts.NewMana(output.StoredMana(), 0, output.SlotCreated())
 		} else {
-			mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.CreationSlot())
+			mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.SlotCreated())
 		}
 
 		if !exists {

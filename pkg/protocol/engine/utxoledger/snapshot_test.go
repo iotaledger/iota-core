@@ -23,33 +23,30 @@ func TestOutput_SnapshotBytes(t *testing.T) {
 	outputID := utils.RandOutputID(2)
 	blockID := utils.RandBlockID()
 	indexBooked := utils.RandSlotIndex()
-	slotCreated := utils.RandSlotIndex()
 	iotaOutput := utils.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, iotaOutput, iotaOutputBytes)
 
 	snapshotBytes := output.SnapshotBytes()
 
 	require.Equal(t, outputID[:], snapshotBytes[:iotago.OutputIDLength], "outputID not equal")
-	require.Equal(t, blockID[:], snapshotBytes[iotago.OutputIDLength:iotago.OutputIDLength+iotago.BlockIDLength], "blockID not equal")
-	require.Equal(t, uint64(indexBooked), binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength:iotago.OutputIDLength+iotago.BlockIDLength+8]), "indexBooked not equal")
-	require.Equal(t, uint64(slotCreated), binary.LittleEndian.Uint64(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8:iotago.OutputIDLength+iotago.BlockIDLength+8+8]), "slotCreated not equal")
-	require.Equal(t, uint32(len(iotaOutputBytes)), binary.LittleEndian.Uint32(snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8+8:iotago.OutputIDLength+iotago.BlockIDLength+8+8+4]), "output bytes length")
-	require.Equal(t, iotaOutputBytes, snapshotBytes[iotago.OutputIDLength+iotago.BlockIDLength+8+8+4:], "output bytes not equal")
+	require.Equal(t, blockID[:], snapshotBytes[iotago.OutputIDLength:iotago.OutputIDLength+iotago.SlotIdentifierLength], "blockID not equal")
+	require.Equal(t, iotago.SlotIndex(indexBooked), lo.Return1(iotago.SlotIndexFromBytes(snapshotBytes[iotago.OutputIDLength+iotago.SlotIdentifierLength:iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength])), "indexBooked not equal")
+	require.Equal(t, uint32(len(iotaOutputBytes)), binary.LittleEndian.Uint32(snapshotBytes[iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength:iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength+4]), "output bytes length")
+	require.Equal(t, iotaOutputBytes, snapshotBytes[iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength+4:], "output bytes not equal")
 }
 
 func TestOutputFromSnapshotReader(t *testing.T) {
 	outputID := utils.RandOutputID(2)
 	blockID := utils.RandBlockID()
 	indexBooked := utils.RandSlotIndex()
-	slotCreated := utils.RandSlotIndex()
 	iotaOutput := utils.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, iotaOutput, iotaOutputBytes)
 	snapshotBytes := output.SnapshotBytes()
 
 	buf := bytes.NewReader(snapshotBytes)
@@ -63,12 +60,11 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 	outputID := utils.RandOutputID(2)
 	blockID := utils.RandBlockID()
 	indexBooked := utils.RandSlotIndex()
-	slotCreated := utils.RandSlotIndex()
 	iotaOutput := utils.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, iotaOutput, iotaOutputBytes)
 	outputSnapshotBytes := output.SnapshotBytes()
 
 	transactionID := utils.RandTransactionID()
@@ -79,19 +75,17 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 
 	require.Equal(t, outputSnapshotBytes, snapshotBytes[:len(outputSnapshotBytes)], "output bytes not equal")
 	require.Equal(t, transactionID[:], snapshotBytes[len(outputSnapshotBytes):len(outputSnapshotBytes)+iotago.TransactionIDLength], "transactionID not equal")
-	require.Equal(t, indexSpent, iotago.SlotIndex(binary.LittleEndian.Uint64(snapshotBytes[len(outputSnapshotBytes)+iotago.TransactionIDLength:])), "timestamp spent not equal")
 }
 
 func TestSpentFromSnapshotReader(t *testing.T) {
 	outputID := utils.RandOutputID(2)
 	blockID := utils.RandBlockID()
 	indexBooked := utils.RandSlotIndex()
-	slotCreated := utils.RandSlotIndex()
 	iotaOutput := utils.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, slotCreated, iotaOutput, iotaOutputBytes)
+	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, iotaOutput, iotaOutputBytes)
 
 	transactionID := utils.RandTransactionID()
 	indexSpent := utils.RandSlotIndex()
@@ -159,9 +153,9 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 
 	reader := writer.BytesReader()
 
-	var readSlotIndex uint64
+	var readSlotIndex iotago.SlotIndex
 	require.NoError(t, binary.Read(reader, binary.LittleEndian, &readSlotIndex))
-	require.Equal(t, uint64(index), readSlotIndex)
+	require.Equal(t, iotago.SlotIndex(index), readSlotIndex)
 
 	var createdCount uint64
 	require.NoError(t, binary.Read(reader, binary.LittleEndian, &createdCount))
@@ -333,9 +327,9 @@ func TestManager_Export(t *testing.T) {
 
 		reader := writer.BytesReader()
 
-		var snapshotLedgerIndex uint64
+		var snapshotLedgerIndex iotago.SlotIndex
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex))
-		require.Equal(t, uint64(2), snapshotLedgerIndex)
+		require.Equal(t, iotago.SlotIndex(2), snapshotLedgerIndex)
 
 		var outputCount uint64
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &outputCount))
@@ -366,9 +360,9 @@ func TestManager_Export(t *testing.T) {
 
 		reader := writer.BytesReader()
 
-		var snapshotLedgerIndex uint64
+		var snapshotLedgerIndex iotago.SlotIndex
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex))
-		require.Equal(t, uint64(2), snapshotLedgerIndex)
+		require.Equal(t, iotago.SlotIndex(2), snapshotLedgerIndex)
 
 		var outputCount uint64
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &outputCount))
@@ -393,7 +387,7 @@ func TestManager_Export(t *testing.T) {
 		for i := uint64(0); i < slotDiffCount; i++ {
 			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
-			require.Equal(t, snapshotLedgerIndex-i, uint64(diff.Index))
+			require.Equal(t, snapshotLedgerIndex-iotago.SlotIndex(i), diff.Index)
 		}
 	}
 
@@ -404,9 +398,9 @@ func TestManager_Export(t *testing.T) {
 
 		reader := writer.BytesReader()
 
-		var snapshotLedgerIndex uint64
+		var snapshotLedgerIndex iotago.SlotIndex
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex))
-		require.Equal(t, uint64(2), snapshotLedgerIndex)
+		require.Equal(t, iotago.SlotIndex(2), snapshotLedgerIndex)
 
 		var outputCount uint64
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &outputCount))
@@ -431,7 +425,7 @@ func TestManager_Export(t *testing.T) {
 		for i := uint64(0); i < slotDiffCount; i++ {
 			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
-			require.Equal(t, snapshotLedgerIndex-i, uint64(diff.Index))
+			require.Equal(t, snapshotLedgerIndex-iotago.SlotIndex(i), diff.Index)
 		}
 	}
 }

@@ -74,7 +74,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		switch signature := att.Signature.(type) {
 		case *iotago.Ed25519Signature:
 			// We found the accountData, but we don't know the public key used to sign this block/attestation. Ignore.
-			if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(signature.PublicKey)) {
+			if !accountData.BlockIssuerKeys.Has(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(signature.PublicKey)) {
 				continue
 			}
 
