@@ -52,13 +52,13 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 
 func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.Transaction) {
 	currentAPI := t.apiProvider.CurrentAPI()
-	(lo.PanicOnErr(transaction.ID(currentAPI))).RegisterAlias(alias)
+	(lo.PanicOnErr(transaction.ID())).RegisterAlias(alias)
 
 	t.transactions[alias] = transaction
 
-	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet(currentAPI)) {
+	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
 		clonedOutput := output.Clone()
-		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID(currentAPI)), outputID.Index())
+		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
 		if clonedOutput.Type() == iotago.OutputAccount {
 			if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID() {
 				accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
@@ -312,7 +312,7 @@ func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
 }
 
 func (t *TransactionFramework) TransactionID(alias string) iotago.TransactionID {
-	return lo.PanicOnErr(t.Transaction(alias).ID(t.apiProvider.CurrentAPI()))
+	return lo.PanicOnErr(t.Transaction(alias).ID())
 }
 
 func (t *TransactionFramework) Transactions(aliases ...string) []*iotago.Transaction {

@@ -96,7 +96,7 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 			BurnedMana:    1000,
 		}, apiForEpoch, 0)
 
-		modelBlock, err := model.BlockFromBlock(block, apiForEpoch)
+		modelBlock, err := model.BlockFromBlock(block)
 		require.NoError(t.t, err)
 
 		// block slot is randomly selected within the epoch

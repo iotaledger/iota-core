@@ -10,7 +10,7 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20230926122307-d671b36a4a65
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230926122307-d671b36a4a65
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230927100454-2c0310088757
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230927120336-ea2ee8c85df7
 	github.com/mr-tron/base58 v1.2.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.13.0
