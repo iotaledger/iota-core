@@ -137,23 +137,6 @@ func (s *Server) SubmitBlock(ctx context.Context, rawBlock *inx.RawBlock) (*inx.
 	return s.attachBlock(ctx, block)
 }
 
-func (s *Server) SubmitPayload(ctx context.Context, rawPayload *inx.RawPayload) (*inx.BlockId, error) {
-	payload, err := rawPayload.Unwrap(deps.Protocol.CurrentAPI(), serix.WithValidation())
-	if err != nil {
-		return nil, err
-	}
-
-	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
-	defer mergedCtxCancel()
-
-	block, err := deps.BlockIssuer.CreateBlock(mergedCtx, blockIssuerAccount, blockfactory.WithPayload(payload))
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to create block: %s", err.Error())
-	}
-
-	return s.attachBlock(ctx, block.ProtocolBlock())
-}
-
 func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (*inx.BlockId, error) {
 	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
 	defer mergedCtxCancel()
