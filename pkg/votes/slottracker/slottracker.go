@@ -19,47 +19,47 @@ func NewSlotTracker() *SlotTracker {
 	}
 }
 
-func (s *SlotTracker) slotVoters(slotIndex iotago.SlotIndex) ds.Set[iotago.AccountID] {
-	slotVoters, _ := s.votersPerSlot.GetOrCreate(slotIndex, func() ds.Set[iotago.AccountID] {
+func (s *SlotTracker) slotVoters(slot iotago.SlotIndex) ds.Set[iotago.AccountID] {
+	slotVoters, _ := s.votersPerSlot.GetOrCreate(slot, func() ds.Set[iotago.AccountID] {
 		return ds.NewSet[iotago.AccountID]()
 	})
 
 	return slotVoters
 }
 
-func (s *SlotTracker) TrackVotes(slotIndex iotago.SlotIndex, voterID iotago.AccountID, cutoffIndex iotago.SlotIndex) (prevLatestSlot iotago.SlotIndex, latestSlot iotago.SlotIndex, updated bool) {
-	slotVoters := s.slotVoters(slotIndex)
+func (s *SlotTracker) TrackVotes(slot iotago.SlotIndex, voterID iotago.AccountID, cutoffIndex iotago.SlotIndex) (prevLatestSlot iotago.SlotIndex, latestSlot iotago.SlotIndex, updated bool) {
+	slotVoters := s.slotVoters(slot)
 	// We tracked a vote for this voter on this slot already.
 	if slotVoters.Has(voterID) {
 		// We already tracked the voter for this slot, so no need to update anything
 		return
 	}
 
-	var previousIndex iotago.SlotIndex
-	updatedIndex := s.votesPerIdentity.Compute(voterID, func(currentValue iotago.SlotIndex, exists bool) iotago.SlotIndex {
-		previousIndex = currentValue
-		if slotIndex > previousIndex {
+	var previousSlot iotago.SlotIndex
+	updatedSlot := s.votesPerIdentity.Compute(voterID, func(currentSlot iotago.SlotIndex, exists bool) iotago.SlotIndex {
+		previousSlot = currentSlot
+		if slot > previousSlot {
 			updated = true
-			return slotIndex
+			return slot
 		}
 
-		return previousIndex
+		return previousSlot
 	})
 
-	// The new slotIndex is smaller or equal the previousIndex. There's no need to update votersPerSlot.
+	// The new slot is smaller or equal the previousSlot. There's no need to update votersPerSlot.
 	if !updated {
-		return previousIndex, previousIndex, false
+		return previousSlot, previousSlot, false
 	}
 
-	for i := lo.Max(cutoffIndex, previousIndex) + 1; i <= updatedIndex; i++ {
+	for i := lo.Max(cutoffIndex, previousSlot) + 1; i <= updatedSlot; i++ {
 		s.slotVoters(i).Add(voterID)
 	}
 
-	return previousIndex, updatedIndex, true
+	return previousSlot, updatedSlot, true
 }
 
-func (s *SlotTracker) Voters(slotIndex iotago.SlotIndex) []iotago.AccountID {
-	slotVoters, exists := s.votersPerSlot.Get(slotIndex)
+func (s *SlotTracker) Voters(slot iotago.SlotIndex) []iotago.AccountID {
+	slotVoters, exists := s.votersPerSlot.Get(slot)
 	if !exists {
 		return nil
 	}
@@ -67,8 +67,8 @@ func (s *SlotTracker) Voters(slotIndex iotago.SlotIndex) []iotago.AccountID {
 	return slotVoters.ToSlice()
 }
 
-func (s *SlotTracker) EvictSlot(indexToEvict iotago.SlotIndex) {
-	identities, exists := s.votersPerSlot.Get(indexToEvict)
+func (s *SlotTracker) EvictSlot(slotToEvict iotago.SlotIndex) {
+	identities, exists := s.votersPerSlot.Get(slotToEvict)
 	if !exists {
 		return
 	}
@@ -79,7 +79,7 @@ func (s *SlotTracker) EvictSlot(indexToEvict iotago.SlotIndex) {
 		if !has {
 			return nil
 		}
-		if latestVoteIndex <= indexToEvict {
+		if latestVoteIndex <= slotToEvict {
 			identitiesToPrune = append(identitiesToPrune, identity)
 		}
 
@@ -90,5 +90,5 @@ func (s *SlotTracker) EvictSlot(indexToEvict iotago.SlotIndex) {
 		s.votesPerIdentity.Delete(id)
 	}
 
-	s.votersPerSlot.Delete(indexToEvict)
+	s.votersPerSlot.Delete(slotToEvict)
 }

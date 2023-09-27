@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
@@ -35,7 +34,7 @@ type Booker struct {
 	retainBlockFailure func(id iotago.BlockID, reason apimodels.BlockFailureReason)
 
 	errorHandler func(error)
-	apiProvider  api.Provider
+	apiProvider  iotago.APIProvider
 
 	module.Module
 }
@@ -72,7 +71,7 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, apiProvider api.Provider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(workers *workerpool.Group, apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:      booker.NewEvents(),
 		apiProvider: apiProvider,
@@ -130,8 +129,8 @@ func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockI
 	b.retainBlockFailure = retainBlockFailure
 }
 
-func (b *Booker) evict(slotIndex iotago.SlotIndex) {
-	b.bookingOrder.EvictUntil(slotIndex)
+func (b *Booker) evict(slot iotago.SlotIndex) {
+	b.bookingOrder.EvictUntil(slot)
 }
 
 func (b *Booker) book(block *blocks.Block) error {
@@ -172,7 +171,7 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 		case iotago.ShallowLikeParentType:
 			// Check whether the parent contains a conflicting TX,
 			// otherwise reference is invalid and the block should be marked as invalid as well.
-			if tx, hasTx := parentBlock.Transaction(); !hasTx || !parentBlock.PayloadConflictIDs().Has(lo.PanicOnErr(tx.ID(b.apiProvider.APIForSlot(parentBlock.ID().Index())))) {
+			if tx, hasTx := parentBlock.Transaction(); !hasTx || !parentBlock.PayloadConflictIDs().Has(lo.PanicOnErr(tx.ID())) {
 				return nil, ierrors.Wrapf(err, "shallow like parent %s does not contain a conflicting transaction", parent.ID.String())
 			}
 

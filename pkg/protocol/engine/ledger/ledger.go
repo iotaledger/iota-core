@@ -21,8 +21,8 @@ type Ledger interface {
 	TransactionMetadata(id iotago.TransactionID) (transactionMetadata mempool.TransactionMetadata, exists bool)
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transactionMetadata mempool.TransactionMetadata, exists bool)
 
-	Account(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error)
-	PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.SlotIndex) (pastAccountsData map[iotago.AccountID]*accounts.AccountData, err error)
+	Account(accountID iotago.AccountID, targetSlot iotago.SlotIndex) (accountData *accounts.AccountData, exists bool, err error)
+	PastAccounts(accountIDs iotago.AccountIDs, targetSlot iotago.SlotIndex) (pastAccountsData map[iotago.AccountID]*accounts.AccountData, err error)
 	AddAccount(account *utxoledger.Output, credits iotago.BlockIssuanceCredits) error
 
 	Output(id iotago.OutputID) (*utxoledger.Output, error)
@@ -32,15 +32,15 @@ type Ledger interface {
 
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, BlockVoteRank]
 	MemPool() mempool.MemPool[BlockVoteRank]
-	SlotDiffs(index iotago.SlotIndex) (*utxoledger.SlotDiff, error)
+	SlotDiffs(slot iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 
 	ManaManager() *mana.Manager
 	RMCManager() *rmc.Manager
 
-	CommitSlot(index iotago.SlotIndex) (stateRoot, mutationRoot, accountRoot iotago.Identifier, err error)
+	CommitSlot(slot iotago.SlotIndex) (stateRoot, mutationRoot, accountRoot iotago.Identifier, err error)
 
 	Import(reader io.ReadSeeker) error
-	Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) error
+	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error
 	TrackBlock(block *blocks.Block)
 
 	module.Interface

@@ -20,7 +20,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	for _, inputState := range inputStates {
 		inputSet[inputState.OutputID()] = iotagovm.OutputWithCreationSlot{
 			Output:       inputState.Output(),
-			CreationSlot: inputState.CreationSlot(),
+			CreationSlot: inputState.SlotCreated(),
 		}
 	}
 	resolvedInputs := iotagovm.ResolvedInputs{
@@ -50,12 +50,12 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 	bicInputSet := make(iotagovm.BlockIssuanceCreditInputSet)
 	for _, inp := range bicInputs {
-		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, commitmentInput.Index)
+		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, commitmentInput.Slot)
 		if accountErr != nil {
-			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, commitmentInput.Index))
+			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, commitmentInput.Slot))
 		}
 		if !exists {
-			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, commitmentInput.Index))
+			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, commitmentInput.Slot))
 		}
 
 		bicInputSet[inp.AccountID] = accountData.Credits.Value
@@ -92,10 +92,10 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 			delegationEnd := castOutput.EndEpoch
 			if delegationEnd == 0 {
-				delegationEnd = l.apiProvider.APIForSlot(commitmentInput.Index).TimeProvider().EpochFromSlot(commitmentInput.Index) - iotago.EpochIndex(1)
+				delegationEnd = l.apiProvider.APIForSlot(commitmentInput.Slot).TimeProvider().EpochFromSlot(commitmentInput.Slot) - iotago.EpochIndex(1)
 			}
 
-			reward, _, _, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorID, castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
+			reward, _, _, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimDelegationReward, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}
@@ -105,16 +105,14 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 	resolvedInputs.RewardsInputSet = rewardInputSet
 
-	api := l.apiProvider.APIForSlot(tx.Essence.CreationSlot)
-
 	vmParams := &iotagovm.Params{
-		API: api,
+		API: tx.API,
 	}
 	if err = stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
 		return nil, err
 	}
 
-	outputSet, err := tx.OutputsSet(api)
+	outputSet, err := tx.OutputsSet()
 	if err != nil {
 		return nil, err
 	}

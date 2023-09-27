@@ -145,7 +145,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 		TransactionID: func() string {
 			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
 				tx, _ := basicBlock.Payload.(*iotago.Transaction)
-				id, _ := tx.ID(lo.PanicOnErr(deps.Protocol.APIForVersion(iotaBlk.ProtocolVersion)))
+				id, _ := tx.ID()
 
 				return id.ToHex()
 			}
@@ -258,12 +258,12 @@ func getSlotDetailsByID(c echo.Context) error {
 		return err
 	}
 
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentID.Index())
+	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentID.Slot())
 	if err != nil {
 		return err
 	}
 
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(commitmentID.Index())
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
 		return err
 	}

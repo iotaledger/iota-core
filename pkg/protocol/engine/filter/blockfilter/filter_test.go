@@ -22,10 +22,10 @@ type TestFramework struct {
 	Test   *testing.T
 	Filter *Filter
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 }
 
-func NewTestFramework(t *testing.T, apiProvider api.Provider, optsFilter ...options.Option[Filter]) *TestFramework {
+func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter ...options.Option[Filter]) *TestFramework {
 	tf := &TestFramework{
 		Test:        t,
 		apiProvider: apiProvider,
@@ -44,10 +44,7 @@ func NewTestFramework(t *testing.T, apiProvider api.Provider, optsFilter ...opti
 }
 
 func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) error {
-	apiForVersion, err := t.apiProvider.APIForVersion(block.ProtocolVersion)
-	require.NoError(t.Test, err)
-
-	modelBlock, err := model.BlockFromBlock(block, apiForVersion, serix.WithValidation())
+	modelBlock, err := model.BlockFromBlock(block, serix.WithValidation())
 	if err != nil {
 		return err
 	}
@@ -88,7 +85,7 @@ func mockedCommitteeFunc(validatorAccountID iotago.AccountID) func(iotago.SlotIn
 	seatedAccounts := account.NewSeatedAccounts(mockedAccounts)
 	seatedAccounts.Set(account.SeatIndex(0), validatorAccountID)
 
-	return func(slotIndex iotago.SlotIndex) *account.SeatedAccounts {
+	return func(slot iotago.SlotIndex) *account.SeatedAccounts {
 		return seatedAccounts
 	}
 }

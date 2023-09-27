@@ -1,7 +1,6 @@
 package accountsfilter
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,10 +26,10 @@ type TestFramework struct {
 	accountData map[iotago.AccountID]*accounts.AccountData
 	rmcData     map[iotago.SlotIndex]iotago.Mana
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 }
 
-func NewTestFramework(t *testing.T, apiProvider api.Provider, optsFilter ...options.Option[CommitmentFilter]) *TestFramework {
+func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter ...options.Option[CommitmentFilter]) *TestFramework {
 	tf := &TestFramework{
 		Test:        t,
 		apiProvider: apiProvider,
@@ -40,25 +39,25 @@ func NewTestFramework(t *testing.T, apiProvider api.Provider, optsFilter ...opti
 	}
 	tf.CommitmentFilter = New(apiProvider, optsFilter...)
 
-	tf.CommitmentFilter.commitmentFunc = func(slotIndex iotago.SlotIndex) (*model.Commitment, error) {
-		if commitment, ok := tf.commitments[slotIndex]; ok {
+	tf.CommitmentFilter.commitmentFunc = func(slot iotago.SlotIndex) (*model.Commitment, error) {
+		if commitment, ok := tf.commitments[slot]; ok {
 			return commitment, nil
 		}
-		return nil, ierrors.Errorf("no commitment available for slot index %d", slotIndex)
+		return nil, ierrors.Errorf("no commitment available for slot index %d", slot)
 	}
 
-	tf.CommitmentFilter.accountRetrieveFunc = func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (*accounts.AccountData, bool, error) {
+	tf.CommitmentFilter.accountRetrieveFunc = func(accountID iotago.AccountID, targetSlot iotago.SlotIndex) (*accounts.AccountData, bool, error) {
 		if accountData, ok := tf.accountData[accountID]; ok {
 			return accountData, true, nil
 		}
 		return nil, false, ierrors.Errorf("no account data available for account id %s", accountID)
 	}
 
-	tf.CommitmentFilter.rmcRetrieveFunc = func(slotIndex iotago.SlotIndex) (iotago.Mana, error) {
-		if rmc, ok := tf.rmcData[slotIndex]; ok {
+	tf.CommitmentFilter.rmcRetrieveFunc = func(slot iotago.SlotIndex) (iotago.Mana, error) {
+		if rmc, ok := tf.rmcData[slot]; ok {
 			return rmc, nil
 		}
-		return iotago.Mana(0), ierrors.Errorf("no rmc available for slot index %d", slotIndex)
+		return iotago.Mana(0), ierrors.Errorf("no rmc available for slot index %d", slot)
 	}
 
 	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
@@ -72,33 +71,22 @@ func NewTestFramework(t *testing.T, apiProvider api.Provider, optsFilter ...opti
 	return tf
 }
 
-func (t *TestFramework) AddCommitment(slotIndex iotago.SlotIndex, commitment *model.Commitment) {
-	t.commitments[slotIndex] = commitment
+func (t *TestFramework) AddCommitment(slot iotago.SlotIndex, commitment *model.Commitment) {
+	t.commitments[slot] = commitment
 }
 
 func (t *TestFramework) AddAccountData(accountID iotago.AccountID, accountData *accounts.AccountData) {
 	t.accountData[accountID] = accountData
 }
 
-func (t *TestFramework) AddRMCData(slotIndex iotago.SlotIndex, rmcData iotago.Mana) {
-	t.rmcData[slotIndex] = rmcData
+func (t *TestFramework) AddRMCData(slot iotago.SlotIndex, rmcData iotago.Mana) {
+	t.rmcData[slot] = rmcData
 }
 
 // q: how to get an engine block.Block from protocol block
 
 func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) {
-	apiForVersion, err := t.apiProvider.APIForVersion(block.ProtocolVersion)
-	require.NoError(t.Test, err)
-
-	modelBlock, err := model.BlockFromBlock(block, apiForVersion)
-	require.NoError(t.Test, err)
-
-	modelBlock.ID().RegisterAlias(alias)
-	t.CommitmentFilter.ProcessPreFilteredBlock(blocks.NewBlock(modelBlock))
-}
-
-func (t *TestFramework) processBlockWithAPI(alias string, block *iotago.ProtocolBlock, api iotago.API) {
-	modelBlock, err := model.BlockFromBlock(block, api)
+	modelBlock, err := model.BlockFromBlock(block)
 	require.NoError(t.Test, err)
 
 	modelBlock.ID().RegisterAlias(alias)
@@ -160,7 +148,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 	commitmentID := commitment.MustID()
 
 	require.NoError(t, err)
-	tf.AddCommitment(commitment.Index, modelCommitment)
+	tf.AddCommitment(commitment.Slot, modelCommitment)
 
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
 	accountID := iotago.AccountID(addr[:])
@@ -170,8 +158,8 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		accountID,
 		accounts.NewAccountData(
 			accountID,
-			accounts.WithExpirySlot(math.MaxUint64),
-			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
+			accounts.WithExpirySlot(iotago.MaxSlotIndex),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 
@@ -207,7 +195,7 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 	commitmentID := commitment.MustID()
 
 	require.NoError(t, err)
-	tf.AddCommitment(commitment.Index, modelCommitment)
+	tf.AddCommitment(commitment.Slot, modelCommitment)
 
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
 	accountID := iotago.AccountID(addr[:])
@@ -217,8 +205,8 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 		accountID,
 		accounts.NewAccountData(
 			accountID,
-			accounts.WithExpirySlot(math.MaxUint64),
-			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
+			accounts.WithExpirySlot(iotago.MaxSlotIndex),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 
@@ -255,7 +243,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 		accounts.NewAccountData(
 			accountID,
 			accounts.WithExpirySlot(100),
-			accounts.WithBlockIssuerKeys(iotago.BlockIssuerKeyEd25519FromPublicKey(keyPair.PublicKey)),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 
@@ -268,7 +256,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	commitmentID := commitment.MustID()
 	require.NoError(t, err)
 	// add the commitment and 0 RMC to the proxy state
-	tf.AddCommitment(commitment.Index, modelCommitment)
+	tf.AddCommitment(commitment.Slot, modelCommitment)
 	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
 
 	tf.IssueSignedBlockAtSlot("correct", currentSlot, commitmentID, keyPair)
@@ -281,7 +269,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	commitmentID = commitment.MustID()
 	require.NoError(t, err)
 	// add the commitment and 0 RMC to the proxy state
-	tf.AddCommitment(commitment.Index, modelCommitment)
+	tf.AddCommitment(commitment.Slot, modelCommitment)
 	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
 
 	tf.IssueSignedBlockAtSlot("almostExpired", currentSlot, commitmentID, keyPair)
@@ -294,7 +282,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	commitmentID = commitment.MustID()
 	require.NoError(t, err)
 	// add the commitment and 0 RMC to the proxy state
-	tf.AddCommitment(commitment.Index, modelCommitment)
+	tf.AddCommitment(commitment.Slot, modelCommitment)
 	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
 
 	tf.IssueSignedBlockAtSlot("expired", currentSlot, commitmentID, keyPair)

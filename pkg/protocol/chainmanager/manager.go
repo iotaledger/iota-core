@@ -137,7 +137,7 @@ func (m *Manager) SetRootCommitment(commitment *model.Commitment) {
 	m.evictionMutex.Lock()
 	defer m.evictionMutex.Unlock()
 
-	storage := m.commitmentsByID.Get(commitment.Index())
+	storage := m.commitmentsByID.Get(commitment.Slot())
 	if storage == nil {
 		panic(fmt.Sprintf("we should always have commitment storage for confirmed index %s", commitment))
 	}
@@ -147,7 +147,7 @@ func (m *Manager) SetRootCommitment(commitment *model.Commitment) {
 		panic(fmt.Sprint("we should always have the latest commitment ID we confirmed with", commitment))
 	}
 
-	if commitment.Index() <= m.rootCommitment.Commitment().Index() && commitment.ID() != m.rootCommitment.Commitment().ID() {
+	if commitment.Slot() <= m.rootCommitment.Commitment().Slot() && commitment.ID() != m.rootCommitment.Commitment().ID() {
 		panic(fmt.Sprintf("we should never set the root commitment to a commitment that is below the current root commitment %s - root: %s", commitment, m.rootCommitment.Commitment()))
 	}
 
@@ -166,7 +166,7 @@ func (m *Manager) Chain(ec iotago.CommitmentID) (chain *Chain) {
 }
 
 func (m *Manager) Commitment(id iotago.CommitmentID) (commitment *ChainCommitment, exists bool) {
-	storage := m.commitmentsByID.Get(id.Index())
+	storage := m.commitmentsByID.Get(id.Slot())
 	if storage == nil {
 		return nil, false
 	}
@@ -200,7 +200,7 @@ func (m *Manager) Commitments(id iotago.CommitmentID, amount int) (commitments [
 
 		commitments[i] = currentCommitment
 
-		id = currentCommitment.Commitment().PrevID()
+		id = currentCommitment.Commitment().PreviousCommitmentID()
 	}
 
 	return
@@ -215,7 +215,7 @@ func (m *Manager) ForkByForkingPoint(forkingPoint iotago.CommitmentID) (fork *Fo
 }
 
 func (m *Manager) forkByForkingPoint(forkingPoint iotago.CommitmentID) (fork *Fork, exists bool) {
-	if indexStore := m.forksByForkingPoint.Get(forkingPoint.Index()); indexStore != nil {
+	if indexStore := m.forksByForkingPoint.Get(forkingPoint.Slot()); indexStore != nil {
 		return indexStore.Get(forkingPoint)
 	}
 
@@ -237,8 +237,8 @@ func (m *Manager) SwitchMainChain(head iotago.CommitmentID) error {
 func (m *Manager) processCommitment(commitment *model.Commitment) (wasForked bool, isSolid bool, chainCommitment *ChainCommitment) {
 	// Lock access to the parent commitment. We need to lock this first as we are trying to update children later within this function.
 	// Failure to do so, leads to a deadlock, where a child is locked and tries to lock its parent, which is locked by the parent which tries to lock the child.
-	m.commitmentEntityMutex.Lock(commitment.PrevID())
-	defer m.commitmentEntityMutex.Unlock(commitment.PrevID())
+	m.commitmentEntityMutex.Lock(commitment.PreviousCommitmentID())
+	defer m.commitmentEntityMutex.Unlock(commitment.PreviousCommitmentID())
 
 	// Lock access to the chainCommitment so no children are added while we are propagating solidity
 	m.commitmentEntityMutex.Lock(commitment.ID())
@@ -282,13 +282,13 @@ func (m *Manager) evict(index iotago.SlotIndex) {
 }
 
 func (m *Manager) getOrCreateCommitment(id iotago.CommitmentID) (commitment *ChainCommitment, created bool) {
-	return m.commitmentsByID.Get(id.Index(), true).GetOrCreate(id, func() *ChainCommitment {
+	return m.commitmentsByID.Get(id.Slot(), true).GetOrCreate(id, func() *ChainCommitment {
 		return NewChainCommitment(id)
 	})
 }
 
 func (m *Manager) evaluateAgainstRootCommitment(commitment *iotago.Commitment) (isBelow, isRootCommitment bool) {
-	isBelow = commitment.Index <= m.rootCommitment.Commitment().Index()
+	isBelow = commitment.Slot <= m.rootCommitment.Commitment().Slot()
 	isRootCommitment = commitment.Equals(m.rootCommitment.Commitment().Commitment())
 
 	return
@@ -315,9 +315,9 @@ func (m *Manager) detectForks(commitment *ChainCommitment, source peer.ID) {
 	}
 
 	var doNotTrigger bool
-	fork := m.forksByForkingPoint.Get(forkingPoint.ID().Index(), true).Compute(forkingPoint.ID(), func(currentValue *Fork, exists bool) *Fork {
+	fork := m.forksByForkingPoint.Get(forkingPoint.ID().Slot(), true).Compute(forkingPoint.ID(), func(currentValue *Fork, exists bool) *Fork {
 		if exists {
-			if forkedChainLatestCommitment.Index() <= currentValue.ForkLatestCommitment.Index() {
+			if forkedChainLatestCommitment.Slot() <= currentValue.ForkLatestCommitment.Slot() {
 				// Do not trigger another event for the same forking point if the latest fork commitment did not change
 				doNotTrigger = true
 				return currentValue
@@ -356,7 +356,7 @@ func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*Ch
 	for chain := commitment.Chain(); chain != m.rootCommitment.Chain(); chain = commitment.Chain() {
 		forkingCommitment = chain.ForkingPoint
 
-		if commitment, _ = m.Commitment(forkingCommitment.Commitment().PrevID()); commitment == nil {
+		if commitment, _ = m.Commitment(forkingCommitment.Commitment().PreviousCommitmentID()); commitment == nil {
 			return nil, ierrors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingCommitment.Commitment().ID())
 		}
 	}
@@ -365,7 +365,7 @@ func (m *Manager) forkingPointAgainstMainChain(commitment *ChainCommitment) (*Ch
 }
 
 func (m *Manager) registerCommitment(commitment *model.Commitment) (isNew bool, isSolid bool, wasForked bool, chainCommitment *ChainCommitment) {
-	parentCommitment, commitmentCreated := m.getOrCreateCommitment(commitment.PrevID())
+	parentCommitment, commitmentCreated := m.getOrCreateCommitment(commitment.PreviousCommitmentID())
 	if commitmentCreated {
 		m.commitmentRequester.StartTicker(parentCommitment.ID())
 	}
@@ -398,7 +398,7 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 		return nil
 	}
 
-	parentCommitment, _ := m.Commitment(forkingPoint.Commitment().PrevID())
+	parentCommitment, _ := m.Commitment(forkingPoint.Commitment().PreviousCommitmentID())
 	if parentCommitment == nil {
 		return ierrors.Wrapf(ErrCommitmentUnknown, "unknown parent of solid commitment %s", forkingPoint.ID())
 	}
@@ -408,7 +408,7 @@ func (m *Manager) switchMainChainToCommitment(commitment *ChainCommitment) error
 
 	// For each forking point coming out of the main chain we need to reorg the children
 	for fp := commitment.Chain().ForkingPoint; ; {
-		fpParent, _ := m.Commitment(fp.Commitment().PrevID())
+		fpParent, _ := m.Commitment(fp.Commitment().PreviousCommitmentID())
 
 		mainChild := fpParent.mainChild()
 		newChildChain := NewChain(mainChild)

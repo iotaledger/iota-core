@@ -13,12 +13,12 @@ import (
 func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes ...*mock.Node) {
 	t.Eventually(func() error {
 		for _, node := range nodes {
-			actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountData.ID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index())
+			actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountData.ID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
 			if err != nil {
 				return ierrors.Wrap(err, "AssertAccountData: failed to load account data")
 			}
 			if !exists {
-				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index())
+				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
 			}
 
 			if accountData.ID != actualAccountData.ID {
@@ -41,7 +41,7 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected expiry slot %s, got %s", node.Name, accountData.ID, accountData.ExpirySlot, actualAccountData.ExpirySlot)
 			}
 
-			if !cmp.Equal(accountData.BlockIssuerKeys.ToSlice(), actualAccountData.BlockIssuerKeys.ToSlice()) {
+			if !cmp.Equal(accountData.BlockIssuerKeys, actualAccountData.BlockIssuerKeys) {
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.BlockIssuerKeys, actualAccountData.BlockIssuerKeys)
 			}
 

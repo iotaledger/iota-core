@@ -17,7 +17,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // MemPool is a component that manages the state of transactions that are not yet included in the ledger state.
@@ -39,7 +38,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	// cachedStateRequests holds the requests for states that are required to execute transactions.
 	cachedStateRequests *shrinkingmap.ShrinkingMap[iotago.Identifier, *promise.Promise[mempool.State]]
 
-	// stateDiffs holds aggregated state mutations for each slot index.
+	// stateDiffs holds aggregated state mutations for each slot.
 	stateDiffs *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *StateDiff]
 
 	// conflictDAG is the DAG that is used to keep track of the conflicts between transactions.
@@ -50,7 +49,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	// executionWorkers is the worker pool that is used to execute the state transitions of transactions.
 	executionWorkers *workerpool.WorkerPool
 
-	// lastEvictedSlot is the last slot index that was evicted from the MemPool.
+	// lastEvictedSlot is the last slot that was evicted from the MemPool.
 	lastEvictedSlot iotago.SlotIndex
 
 	// evictionMutex is used to synchronize the eviction of slots.
@@ -58,11 +57,11 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 
 	optForkAllTransactions bool
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 }
 
 // New is the constructor of the MemPool.
-func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider api.Provider, errorHandler func(error), opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
+func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
 	return options.Apply(&MemPool[VoteRank]{
 		transactionAttached:    event.New1[mempool.TransactionMetadata](),
 		executeStateTransition: vm,
@@ -100,7 +99,7 @@ func (m *MemPool[VoteRank]) OnTransactionAttached(handler func(transaction mempo
 
 // MarkAttachmentOrphaned marks the attachment of the given block as orphaned.
 func (m *MemPool[VoteRank]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool {
-	if attachmentSlot := m.attachments.Get(blockID.Index(), false); attachmentSlot != nil {
+	if attachmentSlot := m.attachments.Get(blockID.Slot(), false); attachmentSlot != nil {
 		defer attachmentSlot.Delete(blockID)
 	}
 
@@ -153,26 +152,26 @@ func (m *MemPool[VoteRank]) TransactionMetadataByAttachment(blockID iotago.Block
 	return m.transactionByAttachment(blockID)
 }
 
-// StateDiff returns the state diff for the given slot index.
-func (m *MemPool[VoteRank]) StateDiff(index iotago.SlotIndex) mempool.StateDiff {
-	if stateDiff, exists := m.stateDiffs.Get(index); exists {
+// StateDiff returns the state diff for the given slot.
+func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) mempool.StateDiff {
+	if stateDiff, exists := m.stateDiffs.Get(slot); exists {
 		return stateDiff
 	}
 
-	return NewStateDiff(index)
+	return NewStateDiff(slot)
 }
 
-// Evict evicts the slot with the given index from the MemPool.
-func (m *MemPool[VoteRank]) Evict(slotIndex iotago.SlotIndex) {
+// Evict evicts the slot with the given slot from the MemPool.
+func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 	if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *TransactionMetadata] {
 		m.evictionMutex.Lock()
 		defer m.evictionMutex.Unlock()
 
-		m.lastEvictedSlot = slotIndex
+		m.lastEvictedSlot = slot
 
-		m.stateDiffs.Delete(slotIndex)
+		m.stateDiffs.Delete(slot)
 
-		return m.attachments.Evict(slotIndex)
+		return m.attachments.Evict(slot)
 	}(); evictedAttachments != nil {
 		evictedAttachments.ForEach(func(blockID iotago.BlockID, transaction *TransactionMetadata) bool {
 			transaction.evictAttachment(blockID)
@@ -186,12 +185,12 @@ func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, bl
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	if m.lastEvictedSlot >= blockID.Index() {
+	if m.lastEvictedSlot >= blockID.Slot() {
 		// block will be retained as invalid, we do not store tx failure as it was block's fault
-		return nil, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
+		return nil, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastEvictedSlot)
 	}
 
-	newTransaction, err := NewTransactionWithMetadata(m.apiProvider.APIForSlot(blockID.Index()), transaction)
+	newTransaction, err := NewTransactionWithMetadata(transaction)
 	if err != nil {
 		return nil, false, ierrors.Errorf("failed to create transaction metadata: %w", err)
 	}
@@ -202,14 +201,14 @@ func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, bl
 	}
 
 	storedTransaction.addAttachment(blockID)
-	m.attachments.Get(blockID.Index(), true).Set(blockID, storedTransaction)
+	m.attachments.Get(blockID.Slot(), true).Set(blockID, storedTransaction)
 
 	return storedTransaction, isNew, nil
 }
 
 func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 	for i, inputReference := range transaction.inputReferences {
-		stateReference, index := inputReference, i
+		stateReference, outputIndex := inputReference, i
 
 		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[mempool.State] {
 			return m.requestState(stateReference, true)
@@ -221,7 +220,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 				//nolint:forcetypeassert // we can safely assume that this is an OutputStateMetadata
 				outputStateMetadata := state.(*OutputStateMetadata)
 
-				transaction.publishInput(index, outputStateMetadata)
+				transaction.publishInput(outputIndex, outputStateMetadata)
 
 				if created {
 					m.setupOutputState(outputStateMetadata)
@@ -344,7 +343,7 @@ func (m *MemPool[VoteRank]) updateAttachment(blockID iotago.BlockID, updateFunc 
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	if m.lastEvictedSlot < blockID.Index() {
+	if m.lastEvictedSlot < blockID.Slot() {
 		if transaction, exists := m.transactionByAttachment(blockID); exists {
 			return updateFunc(transaction, blockID)
 		}
@@ -354,7 +353,7 @@ func (m *MemPool[VoteRank]) updateAttachment(blockID iotago.BlockID, updateFunc 
 }
 
 func (m *MemPool[VoteRank]) transactionByAttachment(blockID iotago.BlockID) (*TransactionMetadata, bool) {
-	if attachmentsInSlot := m.attachments.Get(blockID.Index()); attachmentsInSlot != nil {
+	if attachmentsInSlot := m.attachments.Get(blockID.Slot()); attachmentsInSlot != nil {
 		return attachmentsInSlot.Get(blockID)
 	}
 
@@ -393,18 +392,18 @@ func (m *MemPool[VoteRank]) setup() {
 	})
 }
 
-func (m *MemPool[VoteRank]) stateDiff(slotIndex iotago.SlotIndex) (stateDiff *StateDiff, evicted bool) {
-	if m.lastEvictedSlot >= slotIndex {
+func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (stateDiff *StateDiff, evicted bool) {
+	if m.lastEvictedSlot >= slot {
 		return nil, true
 	}
 
-	return lo.Return1(m.stateDiffs.GetOrCreate(slotIndex, func() *StateDiff { return NewStateDiff(slotIndex) })), false
+	return lo.Return1(m.stateDiffs.GetOrCreate(slot, func() *StateDiff { return NewStateDiff(slot) })), false
 }
 
 func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
-		if slotIndex := transaction.EarliestIncludedAttachment().Index(); slotIndex > 0 {
-			if stateDiff, evicted := m.stateDiff(slotIndex); !evicted {
+		if slot := transaction.EarliestIncludedAttachment().Slot(); slot > 0 {
+			if stateDiff, evicted := m.stateDiff(slot); !evicted {
 				if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
 					m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
 				}
@@ -429,7 +428,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	})
 
 	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
-		if err := m.updateStateDiffs(transaction, prevBlock.Index(), newBlock.Index()); err != nil {
+		if err := m.updateStateDiffs(transaction, prevBlock.Slot(), newBlock.Slot()); err != nil {
 			m.errorHandler(ierrors.Wrap(err, "failed to update state diffs"))
 		}
 	})
@@ -437,7 +436,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnEvicted(func() {
 		if m.cachedTransactions.Delete(transaction.ID()) {
 			transaction.attachments.ForEach(func(blockID iotago.BlockID, _ bool) bool {
-				if slotAttachments := m.attachments.Get(blockID.Index(), false); slotAttachments != nil {
+				if slotAttachments := m.attachments.Get(blockID.Slot(), false); slotAttachments != nil {
 					slotAttachments.Delete(blockID)
 				}
 

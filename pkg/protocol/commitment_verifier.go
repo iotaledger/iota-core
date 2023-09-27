@@ -20,12 +20,12 @@ type CommitmentVerifier struct {
 }
 
 func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) *CommitmentVerifier {
-	committeeAtForkingPoint := mainEngine.SybilProtection.SeatManager().Committee(lastCommonCommitmentBeforeFork.Index()).Accounts().IDs()
+	committeeAtForkingPoint := mainEngine.SybilProtection.SeatManager().Committee(lastCommonCommitmentBeforeFork.Slot()).Accounts().IDs()
 
 	return &CommitmentVerifier{
 		engine:                  mainEngine,
 		cumulativeWeight:        lastCommonCommitmentBeforeFork.CumulativeWeight(),
-		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, lastCommonCommitmentBeforeFork.Index())),
+		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, lastCommonCommitmentBeforeFork.Slot())),
 		// TODO: what happens if the committee rotated after the fork?
 	}
 }
@@ -126,7 +126,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		switch signature := att.Signature.(type) {
 		case *iotago.Ed25519Signature:
 			// We found the accountData, but we don't know the public key used to sign this block/attestation. Ignore.
-			if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(signature.PublicKey)) {
+			if !accountData.BlockIssuerKeys.Has(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(signature.PublicKey)) {
 				continue
 			}
 
@@ -134,13 +134,8 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 			return nil, 0, ierrors.Errorf("only ed25519 signatures supported, got %s", att.Signature.Type())
 		}
 
-		api, err := c.engine.APIForVersion(att.ProtocolVersion)
-		if err != nil {
-			return nil, 0, ierrors.Wrap(err, "error determining API for attestation")
-		}
-
 		// 2. Verify the signature of the attestation.
-		if valid, err := att.VerifySignature(api); !valid {
+		if valid, err := att.VerifySignature(); !valid {
 			if err != nil {
 				return nil, 0, ierrors.Wrap(err, "error validating attestation signature")
 			}
@@ -153,18 +148,18 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 			return nil, 0, ierrors.Errorf("issuerID %s contained in multiple attestations", att.IssuerID)
 		}
 
-		// TODO: this might differ if we have a Accounts with changing weights depending on the SlotIndex/epoch
-		attestationBlockID, err := att.BlockID(api)
+		// TODO: this might differ if we have a Accounts with changing weights depending on the Slot/epoch
+		attestationBlockID, err := att.BlockID()
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")
 		}
-		if _, seatExists := c.engine.SybilProtection.SeatManager().Committee(attestationBlockID.Index()).GetSeat(att.IssuerID); seatExists {
+		if _, seatExists := c.engine.SybilProtection.SeatManager().Committee(attestationBlockID.Slot()).GetSeat(att.IssuerID); seatExists {
 			seatCount++
 		}
 
 		visitedIdentities.Add(att.IssuerID)
 
-		blockID, err := att.BlockID(api)
+		blockID, err := att.BlockID()
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")
 		}

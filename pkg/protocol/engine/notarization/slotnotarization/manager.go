@@ -18,7 +18,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Manager is the component that manages the slot commitments.
@@ -38,7 +37,7 @@ type Manager struct {
 
 	acceptedTimeFunc  func() time.Time
 	minCommittableAge iotago.SlotIndex
-	apiProvider       api.Provider
+	apiProvider       iotago.APIProvider
 
 	module.Module
 }
@@ -70,7 +69,7 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 			e.Events.Notarization.LinkTo(m.events)
 
 			m.TriggerInitialized()
-			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Index())
+			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Slot())
 			m.TriggerConstructed()
 		})
 
@@ -94,7 +93,7 @@ func (m *Manager) Shutdown() {
 
 // tryCommitUntil tries to create slot commitments until the new provided acceptance time.
 func (m *Manager) tryCommitUntil(block *blocks.Block) {
-	if index := block.ID().Index(); index > m.storage.Settings().LatestCommitment().Index() {
+	if index := block.ID().Slot(); index > m.storage.Settings().LatestCommitment().Slot() {
 		m.tryCommitSlotUntil(index)
 	}
 }
@@ -104,7 +103,7 @@ func (m *Manager) IsBootstrapped() bool {
 	// If acceptance time is somewhere in the middle of slot 10, then the latest committable index is 4 (with minCommittableAge=6),
 	// because there are 5 full slots and 1 that is still not finished between slot 10 and slot 4.
 	// All slots smaller or equal to 4 are committable.
-	latestIndex := m.storage.Settings().LatestCommitment().Index()
+	latestIndex := m.storage.Settings().LatestCommitment().Slot()
 	return latestIndex+m.minCommittableAge >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())
 }
 
@@ -119,7 +118,7 @@ func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 }
 
 func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
-	for i := m.storage.Settings().LatestCommitment().Index() + 1; i <= acceptedBlockIndex; i++ {
+	for i := m.storage.Settings().LatestCommitment().Slot() + 1; i <= acceptedBlockIndex; i++ {
 		if m.WasStopped() {
 			break
 		}
@@ -140,8 +139,8 @@ func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool
 
 func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 	latestCommitment := m.storage.Settings().LatestCommitment()
-	if index != latestCommitment.Index()+1 {
-		m.errorHandler(ierrors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Index()))
+	if index != latestCommitment.Slot()+1 {
+		m.errorHandler(ierrors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", index, latestCommitment.Slot()))
 		return false
 	}
 
@@ -164,7 +163,11 @@ func (m *Manager) createCommitment(index iotago.SlotIndex) (success bool) {
 		return false
 	}
 
-	committeeRoot, rewardsRoot := m.sybilProtection.CommitSlot(index)
+	committeeRoot, rewardsRoot, err := m.sybilProtection.CommitSlot(index)
+	if err != nil {
+		m.errorHandler(ierrors.Wrap(err, "failed to commit sybil protection"))
+		return false
+	}
 	apiForSlot := m.apiProvider.APIForSlot(index)
 
 	protocolParametersAndVersionsHash, err := m.upgradeOrchestrator.Commit(index)

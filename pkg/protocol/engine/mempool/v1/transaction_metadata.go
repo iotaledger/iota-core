@@ -51,8 +51,8 @@ type TransactionMetadata struct {
 	*inclusionFlags
 }
 
-func NewTransactionWithMetadata(api iotago.API, transaction mempool.Transaction) (*TransactionMetadata, error) {
-	transactionID, transactionIDErr := transaction.ID(api)
+func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMetadata, error) {
+	transactionID, transactionIDErr := transaction.ID()
 	if transactionIDErr != nil {
 		return nil, ierrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
 	}
@@ -266,7 +266,7 @@ func (t *TransactionMetadata) setConflicting() {
 
 func (t *TransactionMetadata) setConflictAccepted() {
 	if t.conflictAccepted.Trigger() {
-		if t.AllInputsAccepted() && t.EarliestIncludedAttachment().Index() != 0 {
+		if t.AllInputsAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
 			t.setAccepted()
 		}
 	}
@@ -281,7 +281,7 @@ func (t *TransactionMetadata) setupInput(input *OutputStateMetadata) {
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
-				if t.IsConflictAccepted() && t.EarliestIncludedAttachment().Index() != 0 {
+				if t.IsConflictAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
 					t.setAccepted()
 				}
 			}
@@ -323,7 +323,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	})
 
 	t.OnEarliestIncludedAttachmentUpdated(func(previousIndex, newIndex iotago.BlockID) {
-		if isIncluded, wasIncluded := newIndex.Index() != 0, previousIndex.Index() != 0; isIncluded != wasIncluded {
+		if isIncluded, wasIncluded := newIndex.Slot() != 0, previousIndex.Slot() != 0; isIncluded != wasIncluded {
 			if !isIncluded {
 				t.setPending()
 			} else if t.AllInputsAccepted() && t.IsConflictAccepted() {
@@ -351,7 +351,7 @@ func (t *TransactionMetadata) markAttachmentIncluded(blockID iotago.BlockID) (in
 
 	t.attachments.Set(blockID, true)
 
-	if lowestSlotIndex := t.earliestIncludedAttachment.Get().Index(); lowestSlotIndex == 0 || blockID.Index() < lowestSlotIndex {
+	if lowestSlotIndex := t.earliestIncludedAttachment.Get().Slot(); lowestSlotIndex == 0 || blockID.Slot() < lowestSlotIndex {
 		t.earliestIncludedAttachment.Set(blockID)
 	}
 
@@ -398,7 +398,7 @@ func (t *TransactionMetadata) findLowestIncludedAttachment() iotago.BlockID {
 	var lowestIncludedBlock iotago.BlockID
 
 	t.attachments.ForEach(func(blockID iotago.BlockID, included bool) bool {
-		if included && (lowestIncludedBlock.Index() == 0 || blockID.Index() < lowestIncludedBlock.Index()) {
+		if included && (lowestIncludedBlock.Slot() == 0 || blockID.Slot() < lowestIncludedBlock.Slot()) {
 			lowestIncludedBlock = blockID
 		}
 

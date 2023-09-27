@@ -29,6 +29,8 @@ type BucketManager struct {
 	dbSizes *shrinkingmap.ShrinkingMap[iotago.EpochIndex, int64]
 
 	optsMaxOpenDBs int
+
+	mutex syncutils.RWMutex
 }
 
 func NewBucketManager(dbConfig database.Config, errorHandler func(error), opts ...options.Option[BucketManager]) *BucketManager {
@@ -54,19 +56,19 @@ func NewBucketManager(dbConfig database.Config, errorHandler func(error), opts .
 }
 
 // IsTooOld checks if the index is in a pruned epoch.
-func (b *BucketManager) IsTooOld(index iotago.EpochIndex) (isTooOld bool) {
+func (b *BucketManager) IsTooOld(epoch iotago.EpochIndex) (isTooOld bool) {
 	b.lastPrunedMutex.RLock()
 	defer b.lastPrunedMutex.RUnlock()
 
-	return index < b.lastPrunedEpoch.NextIndex()
+	return epoch < b.lastPrunedEpoch.NextIndex()
 }
 
-func (b *BucketManager) Get(index iotago.EpochIndex, realm kvstore.Realm) (kvstore.KVStore, error) {
-	if b.IsTooOld(index) {
-		return nil, ierrors.Wrapf(database.ErrEpochPruned, "epoch %d", index)
+func (b *BucketManager) Get(epoch iotago.EpochIndex, realm kvstore.Realm) (kvstore.KVStore, error) {
+	if b.IsTooOld(epoch) {
+		return nil, ierrors.Wrapf(database.ErrEpochPruned, "epoch %d", epoch)
 	}
 
-	kv := b.getDBInstance(index).KVStore()
+	kv := b.getDBInstance(epoch).KVStore()
 
 	return lo.PanicOnErr(kv.WithExtendedRealm(realm)), nil
 }
@@ -75,8 +77,9 @@ func (b *BucketManager) Shutdown() {
 	b.openDBsMutex.Lock()
 	defer b.openDBsMutex.Unlock()
 
-	b.openDBs.Each(func(index iotago.EpochIndex, db *database.DBInstance) {
+	b.openDBs.Each(func(epoch iotago.EpochIndex, db *database.DBInstance) {
 		db.Close()
+		b.openDBs.Remove(epoch)
 	})
 }
 
@@ -84,7 +87,7 @@ func (b *BucketManager) Shutdown() {
 func (b *BucketManager) TotalSize() int64 {
 	// Sum up all the evicted databases
 	var sum int64
-	b.dbSizes.ForEach(func(index iotago.EpochIndex, i int64) bool {
+	b.dbSizes.ForEach(func(epoch iotago.EpochIndex, i int64) bool {
 		sum += i
 		return true
 	})
@@ -96,7 +99,8 @@ func (b *BucketManager) TotalSize() int64 {
 	b.openDBs.Each(func(key iotago.EpochIndex, val *database.DBInstance) {
 		size, err := dbPrunableDirectorySize(b.dbConfig.Directory, key)
 		if err != nil {
-			b.errorHandler(ierrors.Wrapf(err, "dbPrunableDirectorySize failed for %s: %s", b.dbConfig.Directory, key))
+			b.errorHandler(ierrors.Wrapf(err, "dbPrunableDirectorySize failed for key %s: %s", b.dbConfig.Directory, key))
+
 			return
 		}
 		sum += size
@@ -123,13 +127,13 @@ func (b *BucketManager) BucketSize(epoch iotago.EpochIndex) (int64, error) {
 
 	size, err := dbPrunableDirectorySize(b.dbConfig.Directory, epoch)
 	if err != nil {
-		return 0, ierrors.Wrapf(err, "dbPrunableDirectorySize failed for %s: %s", b.dbConfig.Directory, epoch)
+		return 0, ierrors.Wrapf(err, "dbPrunableDirectorySize failed for epoch %s: %s", b.dbConfig.Directory, epoch)
 	}
 
 	return size, nil
 }
 
-func (b *BucketManager) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
+func (b *BucketManager) LastPrunedEpoch() (epoch iotago.EpochIndex, hasPruned bool) {
 	b.lastPrunedMutex.RLock()
 	defer b.lastPrunedMutex.RUnlock()
 
@@ -147,16 +151,16 @@ func (b *BucketManager) RestoreFromDisk() (lastPrunedEpoch iotago.EpochIndex) {
 		return
 	}
 
-	// Set the maxPruned epoch to the baseIndex-1 of the oldest dbInstance.
-	// Leave the lastPrunedEpoch at the default value if the oldest dbInstance is at baseIndex 0, which is not pruned yet.
-	if dbInfos[0].baseIndex > 0 {
-		lastPrunedEpoch = dbInfos[0].baseIndex - 1
+	// Set the maxPruned epoch to the baseEpoch-1 of the oldest dbInstance.
+	// Leave the lastPrunedEpoch at the default value if the oldest dbInstance is at baseEpoch 0, which is not pruned yet.
+	if dbInfos[0].baseEpoch > 0 {
+		lastPrunedEpoch = dbInfos[0].baseEpoch - 1
 		b.lastPrunedEpoch.MarkEvicted(lastPrunedEpoch)
 	}
 
 	// Open all the dbInstances (perform health checks) and add them to the openDBs cache. Also fills the dbSizes map (when evicted from the cache).
 	for _, dbInfo := range dbInfos {
-		b.getDBInstance(dbInfo.baseIndex)
+		b.getDBInstance(dbInfo.baseEpoch)
 	}
 
 	return
@@ -168,18 +172,22 @@ func (b *BucketManager) RestoreFromDisk() (lastPrunedEpoch iotago.EpochIndex) {
 //	epochIndex 0 -> db 0
 //	epochIndex 1 -> db 1
 //	epochIndex 2 -> db 2
-func (b *BucketManager) getDBInstance(index iotago.EpochIndex) (db *database.DBInstance) {
+func (b *BucketManager) getDBInstance(epoch iotago.EpochIndex) (db *database.DBInstance) {
+	// Lock global mutex to prevent closing and copying storage data on disk during engine switching.
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
 	b.openDBsMutex.Lock()
 	defer b.openDBsMutex.Unlock()
 
 	// check if exists again, as other goroutine might have created it in parallel
-	db, exists := b.openDBs.Get(index)
+	db, exists := b.openDBs.Get(epoch)
 	if !exists {
-		db = database.NewDBInstance(b.dbConfig.WithDirectory(dbPathFromIndex(b.dbConfig.Directory, index)))
+		db = database.NewDBInstance(b.dbConfig.WithDirectory(dbPathFromIndex(b.dbConfig.Directory, epoch)))
 
 		// Remove the cached db size since we will open the db
-		b.dbSizes.Delete(index)
-		b.openDBs.Put(index, db)
+		b.dbSizes.Delete(epoch)
+		b.openDBs.Put(epoch, db)
 	}
 
 	return db
@@ -193,13 +201,28 @@ func (b *BucketManager) Prune(epoch iotago.EpochIndex) error {
 		return ierrors.Wrapf(database.ErrNoPruningNeeded, "epoch %d is already pruned", epoch)
 	}
 
+	b.DeleteBucket(epoch)
+
+	b.lastPrunedEpoch.MarkEvicted(epoch)
+
+	return nil
+}
+
+// DeleteBucket deletes directory that stores the data for the given bucket and returns boolean
+// flag indicating whether a directory for that bucket existed.
+func (b *BucketManager) DeleteBucket(epoch iotago.EpochIndex) (deleted bool) {
 	b.openDBsMutex.Lock()
 	defer b.openDBsMutex.Unlock()
+
+	if exists, err := PathExists(dbPathFromIndex(b.dbConfig.Directory, epoch)); err != nil {
+		panic(err)
+	} else if !exists {
+		return false
+	}
 
 	db, exists := b.openDBs.Get(epoch)
 	if exists {
 		db.Close()
-
 		b.openDBs.Remove(epoch)
 	}
 
@@ -209,11 +232,22 @@ func (b *BucketManager) Prune(epoch iotago.EpochIndex) error {
 
 	// Delete the db size since we pruned the whole directory
 	b.dbSizes.Delete(epoch)
-	b.lastPrunedEpoch.MarkEvicted(epoch)
+
+	return true
+}
+
+// RollbackBucket removes data in the bucket in slots [targetSlotIndex+1; epochEndSlot].
+func (b *BucketManager) RollbackBucket(epoch iotago.EpochIndex, targetSlot, epochEndSlot iotago.SlotIndex) error {
+	oldBucketKvStore := b.getDBInstance(epoch).KVStore()
+	for clearSlot := targetSlot + 1; clearSlot <= epochEndSlot; clearSlot++ {
+		// delete slot prefix from forkedPrunable storage that will be eventually copied into the new engine
+		if err := oldBucketKvStore.DeletePrefix(clearSlot.MustBytes()); err != nil {
+			return ierrors.Wrapf(err, "error while clearing slot %d in bucket for epoch %d", clearSlot, epoch)
+		}
+	}
 
 	return nil
 }
-
 func (b *BucketManager) Flush() error {
 	b.openDBsMutex.RLock()
 	defer b.openDBsMutex.RUnlock()
@@ -226,4 +260,16 @@ func (b *BucketManager) Flush() error {
 	})
 
 	return err
+}
+
+func PathExists(path string) (bool, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return true, nil
 }

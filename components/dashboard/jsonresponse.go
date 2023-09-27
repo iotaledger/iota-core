@@ -130,7 +130,7 @@ type Transaction struct {
 
 // NewTransaction returns a Transaction from the given ledgerstate.Transaction.
 func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
-	txID, err := iotaTx.ID(deps.Protocol.CurrentAPI())
+	txID, err := iotaTx.ID()
 	if err != nil {
 		return nil
 	}
@@ -243,7 +243,7 @@ type TransactionMetadata struct {
 }
 
 // NewTransactionMetadata returns the TransactionMetadata from the given mempool.TransactionMetadata.
-func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata, conflicts ds.Set[iotago.Identifier]) *TransactionMetadata {
+func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata, conflicts ds.Set[iotago.TransactionID]) *TransactionMetadata {
 	var confirmationState string
 	if transactionMetadata.IsAccepted() {
 		confirmationState = "accepted"
@@ -291,8 +291,8 @@ func NewSlotDetails(commitment *model.Commitment, diffs *utxoledger.SlotDiff) *S
 	}
 
 	return &SlotDetailsResponse{
-		Index:            uint64(commitment.Index()),
-		PrevID:           commitment.PrevID().ToHex(),
+		Index:            uint64(commitment.Slot()),
+		PrevID:           commitment.PreviousCommitmentID().ToHex(),
 		RootsID:          commitment.RootsID().ToHex(),
 		CumulativeWeight: commitment.CumulativeWeight(),
 		CreatedOutputs:   createdOutputs,

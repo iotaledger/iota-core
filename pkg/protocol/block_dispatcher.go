@@ -101,7 +101,7 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
 func (b *BlockDispatcher) initEngineMonitoring() {
 	b.monitorLatestEngineCommitment(b.protocol.MainEngineInstance())
 
-	b.protocol.engineManager.OnEngineCreated(b.monitorLatestEngineCommitment)
+	b.protocol.EngineManager.OnEngineCreated(b.monitorLatestEngineCommitment)
 
 	b.protocol.Events.ChainManager.CommitmentPublished.Hook(func(chainCommitment *chainmanager.ChainCommitment) {
 		// as soon as a commitment is solid, it's chain is known and it can be dispatched
@@ -164,24 +164,24 @@ func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentI
 
 	committedSlot, err := b.protocol.MainEngineInstance().CommittedSlot(commitmentID)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get slot %d (not committed yet)", commitmentID.Index())
+		return ierrors.Wrapf(err, "failed to get slot %d (not committed yet)", commitmentID.Slot())
 	}
 
 	commitment, err := committedSlot.Commitment()
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get commitment from slot %d", commitmentID.Index())
+		return ierrors.Wrapf(err, "failed to get commitment from slot %d", commitmentID.Slot())
 	} else if commitment.ID() != commitmentID {
 		return ierrors.Wrapf(err, "commitment ID mismatch: %s != %s", commitment.ID(), commitmentID)
 	}
 
 	blockIDs, err := committedSlot.BlockIDs()
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get block IDs from slot %d", commitmentID.Index())
+		return ierrors.Wrapf(err, "failed to get block IDs from slot %d", commitmentID.Slot())
 	}
 
 	roots, err := committedSlot.Roots()
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get roots from slot %d", commitmentID.Index())
+		return ierrors.Wrapf(err, "failed to get roots from slot %d", commitmentID.Slot())
 	}
 
 	b.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), src)
@@ -235,10 +235,10 @@ func (b *BlockDispatcher) inSyncWindow(engine *engine.Engine, block *model.Block
 	}
 
 	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
-	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
-	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
+	latestCommitmentSlot := engine.Storage.Settings().LatestCommitment().Slot()
+	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Slot()).ProtocolParameters().MaxCommittableAge()
 
-	return block.ID().Index() <= latestCommitmentIndex+maxCommittableAge
+	return block.ID().Slot() <= latestCommitmentSlot+maxCommittableAge
 }
 
 // warpSyncIfNecessary triggers a warp sync if necessary.
@@ -248,16 +248,16 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	}
 
 	chain := chainCommitment.Chain()
-	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
+	latestCommitmentSlot := e.Storage.Settings().LatestCommitment().Slot()
 
-	if latestCommitmentIndex+1 >= chain.LatestCommitment().Commitment().Index() {
+	if latestCommitmentSlot+1 >= chain.LatestCommitment().Commitment().Slot() {
 		return
 	}
 
-	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
+	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Slot()).ProtocolParameters().MaxCommittableAge()
 	warpSyncWindowSize := lo.Max(maxCommittableAge, b.optWarpSyncWindowSize)
 
-	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+warpSyncWindowSize; slotToWarpSync++ {
+	for slotToWarpSync := latestCommitmentSlot + 1; slotToWarpSync <= latestCommitmentSlot+warpSyncWindowSize; slotToWarpSync++ {
 		commitmentToSync := chain.Commitment(slotToWarpSync)
 		if commitmentToSync == nil {
 			break
@@ -310,9 +310,9 @@ func (b *BlockDispatcher) monitorLatestEngineCommitment(engineInstance *engine.E
 
 // evict evicts all elements from the unsolid commitment blocks buffer and the pending warp sync requests that are older
 // than the given index.
-func (b *BlockDispatcher) evict(index iotago.SlotIndex) {
-	b.pendingWarpSyncRequests.EvictUntil(index)
-	b.unsolidCommitmentBlocks.EvictUntil(index)
+func (b *BlockDispatcher) evict(slot iotago.SlotIndex) {
+	b.pendingWarpSyncRequests.EvictUntil(slot)
+	b.unsolidCommitmentBlocks.EvictUntil(slot)
 }
 
 // shutdown shuts down the BlockDispatcher instance.
@@ -341,9 +341,9 @@ func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
 }
 
 // WithWarpSyncWindowSize is an option for the BlockDispatcher that allows to set the warp sync window size.
-func WithWarpSyncWindowSize(size iotago.SlotIndex) options.Option[BlockDispatcher] {
+func WithWarpSyncWindowSize(windowSize iotago.SlotIndex) options.Option[BlockDispatcher] {
 	return func(b *BlockDispatcher) {
-		b.optWarpSyncWindowSize = size
+		b.optWarpSyncWindowSize = windowSize
 	}
 }
 

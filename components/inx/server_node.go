@@ -8,16 +8,28 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
+	finalizedCommitmentID := iotago.EmptyCommitmentID
+	// HasPruned is false when a node just started from a snapshot and keeps data of the LastPrunedEpoch, thus still need
+	// to send finalized commitment.
+	if !status.HasPruned || status.LatestFinalizedSlot > deps.Protocol.CurrentAPI().TimeProvider().EpochEnd(status.LastPrunedEpoch) {
+		finalizedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(status.LatestFinalizedSlot)
+		if err != nil {
+			return nil
+		}
+		finalizedCommitmentID = finalizedCommitment.ID()
+	}
+
 	return &inx.NodeStatus{
-		IsHealthy:              status.NodeSynced,
-		LastAcceptedBlockSlot:  uint64(status.LastAcceptedBlockSlot),
-		LastConfirmedBlockSlot: uint64(status.LastConfirmedBlockSlot),
-		LatestCommitment:       inxCommitment(status.LatestCommitment),
-		LatestFinalizedSlot:    uint64(status.LatestFinalizedSlot),
-		PruningSlot:            uint64(status.LastPrunedEpoch), // TODO: change name to PruningEpoch
+		IsHealthy:                   status.NodeSynced,
+		LastAcceptedBlockSlot:       uint64(status.LastAcceptedBlockSlot),
+		LastConfirmedBlockSlot:      uint64(status.LastConfirmedBlockSlot),
+		LatestCommitment:            inxCommitment(status.LatestCommitment),
+		LatestFinalizedCommitmentId: inx.NewCommitmentId(finalizedCommitmentID),
+		PruningEpoch:                uint64(status.LastPrunedEpoch),
 	}
 }
 

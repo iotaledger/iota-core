@@ -17,28 +17,22 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-const (
-	DefaultPageSize                = 50
-	RequestsMemoryCacheGranularity = 10
-	MaxRequestedSlotAge            = 10
-)
-
 func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
 		return nil, err
 	}
 
-	slotIndex := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index()
+	slot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
-	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slotIndex)
+	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slot)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get account: %s form the Ledger", accountID.ToHex())
 	}
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
 	}
-	rmcSlot, err := safemath.SafeSub(slotIndex, deps.Protocol.APIForSlot(slotIndex).ProtocolParameters().MaxCommittableAge())
+	rmcSlot, err := safemath.SafeSub(slot, deps.Protocol.APIForSlot(slot).ProtocolParameters().MaxCommittableAge())
 	if err != nil {
 		rmcSlot = 0
 	}
@@ -48,7 +42,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	}
 
 	return &apimodels.CongestionResponse{
-		SlotIndex:            slotIndex,
+		SlotIndex:            slot,
 		Ready:                deps.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(accountID),
 		ReferenceManaCost:    rmc,
 		BlockIssuanceCredits: acc.Credits.Value,
@@ -67,25 +61,25 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 			pageSize = restapi.ParamsRestAPI.MaxPageSize
 		}
 	}
-	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index()
+	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 	// no cursor provided will be the first request
-	requestedSlotIndex := latestCommittedSlot
+	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
 	if len(c.QueryParam(restapipkg.QueryParameterCursor)) != 0 {
-		requestedSlotIndex, cursorIndex, err = httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
+		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.QueryParameterCursor)
 		}
 	}
 
 	// do not respond to really old requests
-	if requestedSlotIndex+MaxRequestedSlotAge < latestCommittedSlot {
-		return nil, ierrors.Errorf("request is too old, request started at %d, latest committed slot index is %d", requestedSlotIndex, latestCommittedSlot)
+	if requestedSlot+iotago.SlotIndex(restapi.ParamsRestAPI.MaxRequestedSlotAge) < latestCommittedSlot {
+		return nil, ierrors.Errorf("request is too old, request started at %d, latest committed slot index is %d", requestedSlot, latestCommittedSlot)
 	}
 
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
-	slotRange := uint32(requestedSlotIndex / RequestsMemoryCacheGranularity)
+	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 	registeredValidators, exists := deps.Protocol.MainEngineInstance().Retainer.RegisteredValidatorsCache(slotRange)
 	if !exists {
 		registeredValidators, err = deps.Protocol.MainEngineInstance().SybilProtection.OrderedRegisteredCandidateValidatorsList(nextEpoch)
@@ -115,7 +109,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterAccountID)
 	}
-	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index()
+	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
 	accountData, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
@@ -175,11 +169,17 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	case iotago.OutputDelegation:
 		//nolint:forcetypeassert
 		delegationOutput := utxoOutput.Output().(*iotago.DelegationOutput)
+		latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
+		stakingEnd := delegationOutput.EndEpoch
+		// the output is in delayed calaiming state if endEpoch is set, otherwise we use latest possible epoch
+		if delegationOutput.EndEpoch == 0 {
+			stakingEnd = deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
+		}
 		reward, actualStart, actualEnd, err = deps.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
-			delegationOutput.ValidatorID,
+			delegationOutput.ValidatorAddress.AccountID(),
 			delegationOutput.DelegatedAmount,
 			delegationOutput.StartEpoch,
-			delegationOutput.EndEpoch,
+			stakingEnd,
 		)
 	}
 	if err != nil {
@@ -196,18 +196,18 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
 	timeProvider := deps.Protocol.CurrentAPI().TimeProvider()
 
-	var slotIndex iotago.SlotIndex
+	var slot iotago.SlotIndex
 
-	epochIndex, err := httpserver.ParseEpochQueryParam(c, restapipkg.ParameterEpochIndex)
+	epoch, err := httpserver.ParseEpochQueryParam(c, restapipkg.ParameterEpochIndex)
 	if err != nil {
 		// by default we return current epoch
-		slotIndex = timeProvider.SlotFromTime(time.Now())
-		epochIndex = timeProvider.EpochFromSlot(slotIndex)
+		slot = timeProvider.SlotFromTime(time.Now())
+		epoch = timeProvider.EpochFromSlot(slot)
 	} else {
-		slotIndex = timeProvider.EpochEnd(epochIndex)
+		slot = timeProvider.EpochEnd(epoch)
 	}
 
-	seatedAccounts := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(slotIndex)
+	seatedAccounts := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(slot)
 	committee := make([]*apimodels.CommitteeMemberResponse, 0, seatedAccounts.Accounts().Size())
 	seatedAccounts.Accounts().ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
 		committee = append(committee, &apimodels.CommitteeMemberResponse{
@@ -221,7 +221,7 @@ func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
 	})
 
 	return &apimodels.CommitteeResponse{
-		EpochIndex:          epochIndex,
+		EpochIndex:          epoch,
 		Committee:           committee,
 		TotalStake:          seatedAccounts.Accounts().TotalStake(),
 		TotalValidatorStake: seatedAccounts.Accounts().TotalValidatorStake(),

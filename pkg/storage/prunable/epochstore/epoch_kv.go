@@ -49,6 +49,10 @@ func (e *EpochKVStore) GetEpoch(epoch iotago.EpochIndex) (kvstore.KVStore, error
 	return lo.PanicOnErr(e.kv.WithExtendedRealm(epoch.MustBytes())), nil
 }
 
+func (e *EpochKVStore) DeleteEpoch(epoch iotago.EpochIndex) error {
+	return e.kv.DeletePrefix(epoch.MustBytes())
+}
+
 func (e *EpochKVStore) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) error {
 	// The epoch we're trying to prune already takes into account the defaultPruningDelay.
 	// Therefore, we don't need to do anything if it is greater equal e.pruningDelay and take the difference otherwise.

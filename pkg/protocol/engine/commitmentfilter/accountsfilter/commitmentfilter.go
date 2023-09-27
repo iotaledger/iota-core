@@ -12,7 +12,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 var (
@@ -25,7 +24,7 @@ type CommitmentFilter struct {
 	// Events contains the Events of the CommitmentFilter
 	events *commitmentfilter.Events
 
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
 	commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error)
@@ -59,7 +58,7 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 	})
 }
 
-func New(apiProvider api.Provider, opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
+func New(apiProvider iotago.APIProvider, opts ...options.Option[CommitmentFilter]) *CommitmentFilter {
 	return options.Apply(&CommitmentFilter{
 		apiProvider: apiProvider,
 		events:      commitmentfilter.NewEvents(),
@@ -73,7 +72,7 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *blocks.Block) {
 
 func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	// check if the account exists in the specified slot.
-	accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Index())
+	accountData, exists, err := c.accountRetrieveFunc(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Slot())
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
@@ -85,7 +84,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	if !exists {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: ierrors.Errorf("block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Index()),
+			Reason: ierrors.Errorf("block issuer account %s does not exist in slot commitment %s", block.ProtocolBlock().IssuerID, block.ProtocolBlock().SlotCommitmentID.Slot()),
 		})
 
 		return
@@ -143,10 +142,10 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	}
 
 	// Check that the account is not expired
-	if accountData.ExpirySlot < block.ProtocolBlock().SlotCommitmentID.Index() {
+	if accountData.ExpirySlot < block.ProtocolBlock().SlotCommitmentID.Slot() {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 			Block:  block,
-			Reason: ierrors.Wrapf(ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().IssuerID, accountData.ExpirySlot, block.ProtocolBlock().SlotCommitmentID.Index()),
+			Reason: ierrors.Wrapf(ErrAccountExpired, "block issuer account %s is expired, expiry slot %d in commitment %d", block.ProtocolBlock().IssuerID, accountData.ExpirySlot, block.ProtocolBlock().SlotCommitmentID.Slot()),
 		})
 
 		return
@@ -154,15 +153,15 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 
 	switch signature := block.ProtocolBlock().Signature.(type) {
 	case *iotago.Ed25519Signature:
-		if !accountData.BlockIssuerKeys.Has(iotago.BlockIssuerKeyEd25519FromPublicKey(signature.PublicKey)) {
+		if !accountData.BlockIssuerKeys.Has(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(signature.PublicKey)) {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.ProtocolBlock().IssuerID, signature.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),
+				Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.ProtocolBlock().IssuerID, signature.PublicKey, block.ProtocolBlock().SlotCommitmentID.Slot()),
 			})
 
 			return
 		}
-		signingMessage, err := block.ProtocolBlock().SigningMessage(blockAPI)
+		signingMessage, err := block.ProtocolBlock().SigningMessage()
 		if err != nil {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,

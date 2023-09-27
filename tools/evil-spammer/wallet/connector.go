@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
@@ -177,7 +176,7 @@ type Client interface {
 	// GetBlockIssuance returns the latest commitment and data needed to create a new block.
 	GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error)
 
-	api.Provider
+	iotago.APIProvider
 }
 
 // WebClient contains a GoShimmer web API to interact with a node.
@@ -296,11 +295,7 @@ func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.Transa
 		return
 	}
 
-	apiForVersion, err := c.client.APIForVersion(resp.ProtocolVersion)
-	if err != nil {
-		return nil, err
-	}
-	modelBlk, err := model.BlockFromBlock(resp, apiForVersion)
+	modelBlk, err := model.BlockFromBlock(resp)
 	if err != nil {
 		return
 	}

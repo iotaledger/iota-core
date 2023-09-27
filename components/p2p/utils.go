@@ -1,9 +1,7 @@
 package p2p
 
 import (
-	"net"
 	"path/filepath"
-	"strings"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
@@ -11,20 +9,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 )
-
-func readPeerIP() (net.IP, error) {
-	if strings.ToLower(ParamsP2P.ExternalAddress) == "auto" {
-		// let the autopeering discover the IP
-		return net.IPv4zero, nil
-	}
-
-	peeringIP := net.ParseIP(ParamsP2P.ExternalAddress)
-	if peeringIP == nil {
-		return nil, ierrors.Errorf("invalid IP address: %s", ParamsP2P.ExternalAddress)
-	}
-
-	return peeringIP, nil
-}
 
 // inits the peer database.
 func initPeerDB() (peerDB *network.DB, peerDBKVStore kvstore.KVStore, err error) {

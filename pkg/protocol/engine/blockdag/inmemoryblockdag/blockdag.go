@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
@@ -43,7 +42,7 @@ type BlockDAG struct {
 	workerPool *workerpool.WorkerPool
 
 	errorHandler func(error)
-	apiProvider  api.Provider
+	apiProvider  iotago.APIProvider
 
 	module.Module
 }
@@ -85,7 +84,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, apiProvider api.Provider, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, apiProvider iotago.APIProvider, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
 		apiProvider:           apiProvider,
 		events:                blockdag.NewEvents(),
@@ -130,7 +129,7 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 		// This limited size buffer has a nice side effect: In normal behavior (e.g. no attack of a neighbor that sends you
 		// unsolidifiable blocks in your committed slots) it will prevent the node from storing too many blocks in memory.
 		if b.uncommittedSlotBlocks.AddWithFunc(block.SlotCommitmentID(), block, func() bool {
-			return block.SlotCommitmentID().Index() > b.latestCommitmentFunc().Commitment().Index
+			return block.SlotCommitmentID().Slot() > b.latestCommitmentFunc().Commitment().Slot
 		}) {
 			return
 		}
@@ -175,11 +174,11 @@ func (b *BlockDAG) setRetainBlockFailureFunc(retainBlockFailure func(blockID iot
 }
 
 // evictSlot is used to evict Blocks from committed slots from the BlockDAG.
-func (b *BlockDAG) evictSlot(index iotago.SlotIndex) {
+func (b *BlockDAG) evictSlot(slot iotago.SlotIndex) {
 	b.solidifierMutex.Lock()
 	defer b.solidifierMutex.Unlock()
 
-	b.solidifier.EvictUntil(index)
+	b.solidifier.EvictUntil(slot)
 }
 
 func (b *BlockDAG) markSolid(block *blocks.Block) (err error) {

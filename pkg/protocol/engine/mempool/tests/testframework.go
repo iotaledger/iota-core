@@ -16,7 +16,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type TestFramework struct {
@@ -60,7 +59,7 @@ func (t *TestFramework) CreateTransaction(alias string, referencedStates []strin
 	t.transactionByAlias[alias] = transaction
 
 	// register the transaction ID alias
-	transactionID, transactionIDErr := transaction.ID(tpkg.TestAPI)
+	transactionID, transactionIDErr := transaction.ID()
 	require.NoError(t.test, transactionIDErr, "failed to retrieve transaction ID of transaction with alias '%s'", alias)
 	transactionID.RegisterAlias(alias)
 
@@ -95,11 +94,11 @@ func (t *TestFramework) AttachTransactions(transactionAlias ...string) error {
 	return nil
 }
 
-func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, slotIndex iotago.SlotIndex) error {
+func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, slot iotago.SlotIndex) error {
 	transaction, transactionExists := t.transactionByAlias[transactionAlias]
 	require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", transactionAlias)
 
-	t.blockIDsByAlias[blockAlias] = iotago.SlotIdentifierRepresentingData(slotIndex, []byte(blockAlias))
+	t.blockIDsByAlias[blockAlias] = iotago.SlotIdentifierRepresentingData(slot, []byte(blockAlias))
 
 	if _, err := t.Instance.AttachTransaction(transaction, t.blockIDsByAlias[blockAlias]); err != nil {
 		return err
@@ -108,8 +107,8 @@ func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, s
 	return nil
 }
 
-func (t *TestFramework) CommitSlot(slotIndex iotago.SlotIndex) {
-	stateDiff := t.Instance.StateDiff(slotIndex)
+func (t *TestFramework) CommitSlot(slot iotago.SlotIndex) {
+	stateDiff := t.Instance.StateDiff(slot)
 
 	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.OutputStateMetadata) bool {
 		t.ledgerState.AddOutputState(state.State())
@@ -157,7 +156,7 @@ func (t *TestFramework) TransactionID(alias string) iotago.TransactionID {
 	transaction, transactionExists := t.transactionByAlias[alias]
 	require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", alias)
 
-	transactionID, transactionIDErr := transaction.ID(tpkg.TestAPI)
+	transactionID, transactionIDErr := transaction.ID()
 	require.NoError(t.test, transactionIDErr, "failed to retrieve transaction ID of transaction with alias '%s'", alias)
 
 	return transactionID
@@ -323,8 +322,8 @@ func (t *TestFramework) requireMarkedBooked(transactionAliases ...string) {
 	}
 }
 
-func (t *TestFramework) AssertStateDiff(index iotago.SlotIndex, spentOutputAliases, createdOutputAliases, transactionAliases []string) {
-	stateDiff := t.Instance.StateDiff(index)
+func (t *TestFramework) AssertStateDiff(slot iotago.SlotIndex, spentOutputAliases, createdOutputAliases, transactionAliases []string) {
+	stateDiff := t.Instance.StateDiff(slot)
 
 	require.Equal(t.test, len(spentOutputAliases), stateDiff.DestroyedStates().Size())
 	require.Equal(t.test, len(createdOutputAliases), stateDiff.CreatedStates().Size())

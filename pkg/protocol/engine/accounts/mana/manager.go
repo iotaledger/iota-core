@@ -10,14 +10,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // Manager is used to access stored and potential mana of an account in order.
 // For stored Mana added to account, or stored/potential Mana spent, we will update on commitment.
 // For potential Mana updates and decay, we update on demand if the Mana vector is accessed (by the scheduler).
 type Manager struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
 	manaVectorCache *cache.Cache[iotago.AccountID, *accounts.Mana]
 
@@ -28,7 +27,7 @@ type Manager struct {
 	module.Module
 }
 
-func NewManager(apiProvider api.Provider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
+func NewManager(apiProvider iotago.APIProvider, accountOutputResolveFunc func(iotago.AccountID, iotago.SlotIndex) (*utxoledger.Output, error)) *Manager {
 	return &Manager{
 		apiProvider:              apiProvider,
 		accountOutputResolveFunc: accountOutputResolveFunc,
@@ -48,9 +47,9 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		}
 		minDeposit := m.apiProvider.CurrentAPI().ProtocolParameters().RentStructure().MinDeposit(output.Output())
 		if output.BaseTokenAmount() <= minDeposit {
-			mana = accounts.NewMana(output.StoredMana(), 0, output.CreationSlot())
+			mana = accounts.NewMana(output.StoredMana(), 0, output.SlotCreated())
 		} else {
-			mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.CreationSlot())
+			mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.SlotCreated())
 		}
 
 		if !exists {
@@ -82,7 +81,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	return mana.Value(), nil
 }
 
-func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts ds.Set[iotago.AccountID], accountOutputs map[iotago.AccountID]*utxoledger.Output) {
+func (m *Manager) ApplyDiff(slot iotago.SlotIndex, destroyedAccounts ds.Set[iotago.AccountID], accountOutputs map[iotago.AccountID]*utxoledger.Output) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -95,9 +94,9 @@ func (m *Manager) ApplyDiff(slotIndex iotago.SlotIndex, destroyedAccounts ds.Set
 		if exists {
 			minDeposit := m.apiProvider.CurrentAPI().ProtocolParameters().RentStructure().MinDeposit(output.Output())
 			if output.BaseTokenAmount() <= minDeposit {
-				mana.Update(output.StoredMana(), 0, slotIndex)
+				mana.Update(output.StoredMana(), 0, slot)
 			} else {
-				mana.Update(output.StoredMana(), output.BaseTokenAmount()-minDeposit, slotIndex)
+				mana.Update(output.StoredMana(), output.BaseTokenAmount()-minDeposit, slot)
 			}
 		}
 	}

@@ -30,5 +30,5 @@ func runSlotsLiveFeed(component *app.Component) {
 }
 
 func onSlotCommitted(details *notarization.SlotCommittedDetails) {
-	broadcastWsBlock(&wsblk{MsgTypeSlotInfo, &SlotInfo{Index: details.Commitment.Index(), ID: details.Commitment.ID().ToHex()}})
+	broadcastWsBlock(&wsblk{MsgTypeSlotInfo, &SlotInfo{Index: details.Commitment.Slot(), ID: details.Commitment.ID().ToHex()}})
 }

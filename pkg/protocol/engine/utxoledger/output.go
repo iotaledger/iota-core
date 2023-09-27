@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 // LexicalOrderedOutputs are outputs ordered in lexical order by their outputID.
@@ -29,12 +28,11 @@ func (l LexicalOrderedOutputs) Swap(i, j int) {
 }
 
 type Output struct {
-	apiProvider api.Provider
+	apiProvider iotago.APIProvider
 
-	outputID    iotago.OutputID
-	blockID     iotago.BlockID
-	slotBooked  iotago.SlotIndex
-	slotCreated iotago.SlotIndex
+	outputID   iotago.OutputID
+	blockID    iotago.BlockID
+	slotBooked iotago.SlotIndex
 
 	encodedOutput []byte
 	outputOnce    sync.Once
@@ -53,10 +51,6 @@ func (o *Output) OutputID() iotago.OutputID {
 	return o.outputID
 }
 
-func (o *Output) CreationSlot() iotago.SlotIndex {
-	return o.slotCreated
-}
-
 func (o *Output) MapKey() string {
 	return string(o.outputID[:])
 }
@@ -70,7 +64,7 @@ func (o *Output) SlotBooked() iotago.SlotIndex {
 }
 
 func (o *Output) SlotCreated() iotago.SlotIndex {
-	return o.slotCreated
+	return o.outputID.CreationSlotIndex()
 }
 
 func (o *Output) OutputType() iotago.OutputType {
@@ -81,7 +75,7 @@ func (o *Output) Output() iotago.Output {
 	o.outputOnce.Do(func() {
 		if o.output == nil {
 			var decoded iotago.TxEssenceOutput
-			if _, err := o.apiProvider.APIForSlot(o.blockID.Index()).Decode(o.encodedOutput, &decoded); err != nil {
+			if _, err := o.apiProvider.APIForSlot(o.blockID.Slot()).Decode(o.encodedOutput, &decoded); err != nil {
 				panic(err)
 			}
 			o.output = decoded
@@ -114,11 +108,11 @@ func (o Outputs) ToOutputSet() iotago.OutputSet {
 	return outputSet
 }
 
-func CreateOutput(apiProvider api.Provider, outputID iotago.OutputID, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, output iotago.Output, outputBytes ...[]byte) *Output {
+func CreateOutput(apiProvider iotago.APIProvider, outputID iotago.OutputID, blockID iotago.BlockID, slotBooked iotago.SlotIndex, output iotago.Output, outputBytes ...[]byte) *Output {
 	var encodedOutput []byte
 	if len(outputBytes) == 0 {
 		var err error
-		encodedOutput, err = apiProvider.APIForSlot(blockID.Index()).Encode(output)
+		encodedOutput, err = apiProvider.APIForSlot(blockID.Slot()).Encode(output)
 		if err != nil {
 			panic(err)
 		}
@@ -130,8 +124,7 @@ func CreateOutput(apiProvider api.Provider, outputID iotago.OutputID, blockID io
 		apiProvider:   apiProvider,
 		outputID:      outputID,
 		blockID:       blockID,
-		slotBooked:    slotIndexBooked,
-		slotCreated:   slotCreated,
+		slotBooked:    slotBooked,
 		encodedOutput: encodedOutput,
 	}
 
@@ -142,8 +135,8 @@ func CreateOutput(apiProvider api.Provider, outputID iotago.OutputID, blockID io
 	return o
 }
 
-func NewOutput(apiProvider api.Provider, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, slotCreated iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
-	txID, err := transaction.ID(apiProvider.APIForSlot(blockID.Index()))
+func NewOutput(apiProvider iotago.APIProvider, blockID iotago.BlockID, slotBooked iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
+	txID, err := transaction.ID()
 	if err != nil {
 		return nil, err
 	}
@@ -155,15 +148,15 @@ func NewOutput(apiProvider api.Provider, blockID iotago.BlockID, slotIndexBooked
 	output = transaction.Essence.Outputs[int(index)]
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(txID, index)
 
-	return CreateOutput(apiProvider, outputID, blockID, slotIndexBooked, slotCreated, output), nil
+	return CreateOutput(apiProvider, outputID, blockID, slotBooked, output), nil
 }
 
 // - kvStorable
 
 func outputStorageKeyForOutputID(outputID iotago.OutputID) []byte {
-	ms := marshalutil.New(35)
+	ms := marshalutil.New(iotago.OutputIDLength + 1)
 	ms.WriteByte(StoreKeyPrefixOutput) // 1 byte
-	ms.WriteBytes(outputID[:])         // 34 bytes
+	ms.WriteBytes(outputID[:])         // iotago.OutputIDLength bytes
 
 	return ms.Bytes()
 }
@@ -174,9 +167,8 @@ func (o *Output) KVStorableKey() (key []byte) {
 
 func (o *Output) KVStorableValue() (value []byte) {
 	ms := marshalutil.New()
-	ms.WriteBytes(o.blockID[:])              // 40 bytes
-	ms.WriteBytes(o.slotBooked.MustBytes())  // 8 bytes
-	ms.WriteBytes(o.slotCreated.MustBytes()) // 8 bytes
+	ms.WriteBytes(o.blockID[:])             // SlotIdentifierLength bytes
+	ms.WriteBytes(o.slotBooked.MustBytes()) // 4 bytes
 	ms.WriteBytes(o.encodedOutput)
 
 	return ms.Bytes()
@@ -205,13 +197,9 @@ func (o *Output) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
 		return err
 	}
 
-	// Read SlotIndex
+	// Read Slot
 	o.slotBooked, err = parseSlotIndex(valueUtil)
 	if err != nil {
-		return err
-	}
-
-	if o.slotCreated, err = parseSlotIndex(valueUtil); err != nil {
 		return err
 	}
 

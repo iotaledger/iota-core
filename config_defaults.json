@@ -32,9 +32,7 @@
       "highWatermark": 10,
       "lowWatermark": 5
     },
-    "seed": "",
-    "overwriteStoredSeed": false,
-    "externalAddress": "auto",
+    "externalMultiAddresses": [],
     "identityPrivateKey": "",
     "db": {
       "path": "testnet/p2pstore"
@@ -60,7 +58,8 @@
       "/api/core/v3/rewards*",
       "/api/core/v3/committee",
       "/api/debug/v2/*",
-      "/api/indexer/v2/*"
+      "/api/indexer/v2/*",
+      "/api/mqtt/v2"
     ],
     "protectedRoutes": [
       "/api/*"
@@ -68,6 +67,8 @@
     "debugRequestLoggerEnabled": false,
     "allowIncompleteBlock": false,
     "maxPageSize": 100,
+    "requestsMemoryCacheGranularity": 10,
+    "maxRequestedSlotAge": 10,
     "jwtAuth": {
       "salt": "IOTA"
     },

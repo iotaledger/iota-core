@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -14,7 +15,9 @@ import (
 )
 
 func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
-	return &inx.LedgerOutput{
+	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+
+	l := &inx.LedgerOutput{
 		OutputId:    inx.NewOutputId(o.OutputID()),
 		BlockId:     inx.NewBlockId(o.BlockID()),
 		SlotBooked:  uint64(o.SlotBooked()),
@@ -22,7 +25,18 @@ func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
 		Output: &inx.RawOutput{
 			Data: o.Bytes(),
 		},
-	}, nil
+	}
+
+	includedSlotIndex := o.SlotBooked()
+	if includedSlotIndex <= latestCommitment.Slot() {
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
+		}
+		l.CommitmentIdIncluded = inx.NewCommitmentId(includedCommitment.ID())
+	}
+
+	return l, nil
 }
 
 func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
@@ -35,6 +49,16 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 		Output:             output,
 		TransactionIdSpent: inx.NewTransactionId(s.TransactionIDSpent()),
 		SlotSpent:          uint64(s.SlotIndexSpent()),
+	}
+
+	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+	spentSlotIndex := s.SlotIndexSpent()
+	if spentSlotIndex <= latestCommitment.Slot() {
+		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
+		}
+		l.CommitmentIdSpent = inx.NewCommitmentId(spentCommitment.ID())
 	}
 
 	return l, nil
@@ -210,7 +234,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 				return status.Errorf(codes.NotFound, "ledger update for milestoneIndex %d not found", currentIndex)
 			}
 
-			if err := createLedgerUpdatePayloadAndSend(stateDiff.Index, stateDiff.Outputs, stateDiff.Spents); err != nil {
+			if err := createLedgerUpdatePayloadAndSend(stateDiff.Slot, stateDiff.Outputs, stateDiff.Spents); err != nil {
 				return err
 			}
 		}
@@ -229,7 +253,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 		latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
-		if startIndex > latestCommitment.Index() {
+		if startIndex > latestCommitment.Slot() {
 			// no need to send previous milestone diffs
 			return 0, nil
 		}
@@ -240,8 +264,8 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 			return 0, status.Errorf(codes.InvalidArgument, "given startMilestoneIndex %d is older than the current pruningIndex %d", startIndex, pruningIndex)
 		}
 
-		if endIndex == 0 || endIndex > latestCommitment.Index() {
-			endIndex = latestCommitment.Index()
+		if endIndex == 0 || endIndex > latestCommitment.Slot() {
+			endIndex = latestCommitment.Slot()
 		}
 
 		if err := sendStateDiffsRange(startIndex, endIndex); err != nil {

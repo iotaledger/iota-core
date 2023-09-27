@@ -134,7 +134,7 @@ func (t *TestFramework) SlotCommitment(alias string) iotago.CommitmentID {
 }
 
 func (t *TestFramework) SlotIndex(alias string) iotago.SlotIndex {
-	return t.commitment(alias).Index()
+	return t.commitment(alias).Slot()
 }
 
 func (t *TestFramework) SlotCommitmentRoot(alias string) iotago.Identifier {
@@ -142,7 +142,7 @@ func (t *TestFramework) SlotCommitmentRoot(alias string) iotago.Identifier {
 }
 
 func (t *TestFramework) PrevSlotCommitment(alias string) iotago.CommitmentID {
-	return t.commitment(alias).PrevID()
+	return t.commitment(alias).PreviousCommitmentID()
 }
 
 func (t *TestFramework) AssertChainIsAlias(chain *Chain, alias string) {
@@ -186,5 +186,5 @@ func (t *TestFramework) previousCommitmentID(alias string) (previousCommitmentID
 		panic("the previous commitment does not exist")
 	}
 
-	return previousCommitment.ID(), previousCommitment.Index()
+	return previousCommitment.ID(), previousCommitment.Slot()
 }

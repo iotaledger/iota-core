@@ -74,7 +74,7 @@ func (t *TestFramework) CreateBlock(alias string, parents map[iotago.ParentsType
 	block, err := blockBuilder.Build()
 	require.NoError(t.test, err)
 
-	modelBlock, err := model.BlockFromBlock(block, t.API)
+	modelBlock, err := model.BlockFromBlock(block)
 	require.NoError(t.test, err)
 
 	t.blocksByID[modelBlock.ID()] = blocks.NewBlock(modelBlock)

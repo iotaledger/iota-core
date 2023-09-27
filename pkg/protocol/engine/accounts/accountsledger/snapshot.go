@@ -117,12 +117,12 @@ func (m *Manager) exportAccountTree(pWriter *utils.PositionedWriter, targetIndex
 	return accountCount + recreatedAccountsCount, err
 }
 
-func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (recreatedAccountsCount uint64, err error) {
+func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, targetSlot iotago.SlotIndex) (recreatedAccountsCount uint64, err error) {
 	destroyedAccounts := make(map[iotago.AccountID]*accounts.AccountData)
 
-	for index := m.latestCommittedSlot; index > targetIndex; index-- {
-		// it should be impossible that `m.slotDiff(index)` returns an error, because it is impossible to export a pruned slot
-		err = lo.PanicOnErr(m.slotDiff(index)).StreamDestroyed(func(accountID iotago.AccountID) bool {
+	for slot := m.latestCommittedSlot; slot > targetSlot; slot-- {
+		// it should be impossible that `m.slotDiff(slot)` returns an error, because it is impossible to export a pruned slot
+		err = lo.PanicOnErr(m.slotDiff(slot)).StreamDestroyed(func(accountID iotago.AccountID) bool {
 			// actual data will be filled in by rollbackAccountTo
 			accountData := accounts.NewAccountData(accountID)
 
@@ -137,8 +137,8 @@ func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 	}
 
 	for accountID, accountData := range destroyedAccounts {
-		if wasDestroyed, err := m.rollbackAccountTo(accountData, targetIndex); err != nil {
-			return 0, ierrors.Wrapf(err, "unable to rollback account %s to target slot index %d", accountID, targetIndex)
+		if wasDestroyed, err := m.rollbackAccountTo(accountData, targetSlot); err != nil {
+			return 0, ierrors.Wrapf(err, "unable to rollback account %s to target slot %d", accountID, targetSlot)
 		} else if !wasDestroyed {
 			return 0, ierrors.Errorf("account %s was not destroyed", accountID)
 		}
@@ -166,10 +166,10 @@ func writeAccountData(writer *utils.PositionedWriter, accountData *accounts.Acco
 
 func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) error {
 	for i := uint64(0); i < slotDiffCount; i++ {
-		var slotIndex iotago.SlotIndex
+		var slot iotago.SlotIndex
 		var accountsInDiffCount uint64
 
-		if err := binary.Read(reader, binary.LittleEndian, &slotIndex); err != nil {
+		if err := binary.Read(reader, binary.LittleEndian, &slot); err != nil {
 			return ierrors.Wrap(err, "unable to read slot index")
 		}
 
@@ -180,9 +180,9 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 			continue
 		}
 
-		diffStore, err := m.slotDiff(slotIndex)
+		diffStore, err := m.slotDiff(slot)
 		if err != nil {
-			return ierrors.Errorf("unable to import account slot diffs for slot %d", slotIndex)
+			return ierrors.Errorf("unable to import account slot diffs for slot %d", slot)
 		}
 
 		for j := uint64(0); j < accountsInDiffCount; j++ {
@@ -212,19 +212,20 @@ func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) erro
 	return nil
 }
 
-func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (slotDiffsCount uint64, err error) {
-	// write slot diffs until being able to reach targetIndex, where the exported tree is at
-	slotIndex := iotago.SlotIndex(1)
-	maxCommittableAge := m.apiProvider.APIForSlot(targetIndex).ProtocolParameters().MaxCommittableAge()
-	if targetIndex > maxCommittableAge {
-		slotIndex = targetIndex - maxCommittableAge
+func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetSlot iotago.SlotIndex) (slotDiffsCount uint64, err error) {
+	// write slot diffs until being able to reach targetSlot, where the exported tree is at
+	slot := iotago.SlotIndex(1)
+	maxCommittableAge := m.apiProvider.APIForSlot(targetSlot).ProtocolParameters().MaxCommittableAge()
+
+	if targetSlot > maxCommittableAge {
+		slot = targetSlot - maxCommittableAge
 	}
 
-	for ; slotIndex <= targetIndex; slotIndex++ {
+	for ; slot <= targetSlot; slot++ {
 		var accountsInDiffCount uint64
 
 		// The index of the slot diffs.
-		if err = pWriter.WriteValue("slot index", slotIndex); err != nil {
+		if err = pWriter.WriteValue("slot index", slot); err != nil {
 			return 0, err
 		}
 
@@ -236,9 +237,9 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 		slotDiffsCount++
 
 		var innerErr error
-		slotDiffs, err := m.slotDiff(slotIndex)
+		slotDiffs, err := m.slotDiff(slot)
 		if err != nil {
-			// if slotIndex is already pruned, then don't write anything
+			// if slot is already pruned, then don't write anything
 			continue
 		}
 
@@ -261,11 +262,11 @@ func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetIndex io
 
 			return true
 		}); err != nil {
-			return 0, ierrors.Wrapf(err, "unable to stream slot diff for index %d", slotIndex)
+			return 0, ierrors.Wrapf(err, "unable to stream slot diff for index %d", slot)
 		}
 
 		if innerErr != nil {
-			return 0, ierrors.Wrapf(innerErr, "unable to write slot diff for index %d", slotIndex)
+			return 0, ierrors.Wrapf(innerErr, "unable to write slot diff for index %d", slot)
 		}
 
 		// The number of diffs contained within this slot.

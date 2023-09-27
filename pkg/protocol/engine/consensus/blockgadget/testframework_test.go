@@ -43,8 +43,8 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		SeatManager: mock.NewManualPOA(),
 	}
 
-	evictionState := eviction.NewState(mapdb.NewMapDB(), func(index iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
-		return slotstore.NewStore(index, mapdb.NewMapDB(),
+	evictionState := eviction.NewState(mapdb.NewMapDB(), func(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
+		return slotstore.NewStore(slot, mapdb.NewMapDB(),
 			iotago.SlotIdentifier.Bytes,
 			iotago.SlotIdentifierFromBytes,
 			iotago.SlotIdentifier.Bytes,
@@ -57,7 +57,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t.Events = instance.Events()
 	t.Instance = instance
 
-	genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID(), time.Unix(int64(tpkg.TestAPI.ProtocolParameters().TimeProvider().GenesisUnixTime()), 0))
+	genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID(), time.Unix(tpkg.TestAPI.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
 	t.blocks.Set("Genesis", genesisBlock)
 	genesisBlock.ID().RegisterAlias("Genesis")
 	evictionState.AddRootBlock(genesisBlock.ID(), genesisBlock.SlotCommitmentID())
@@ -106,7 +106,7 @@ func (t *TestFramework) CreateBlock(alias string, issuerAlias string, parents ..
 		Build()
 	require.NoError(t, err)
 
-	modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
+	modelBlock, err := model.BlockFromBlock(block)
 	require.NoError(t, err)
 
 	blocksBlock := blocks.NewBlock(modelBlock)

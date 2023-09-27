@@ -11,7 +11,7 @@ import (
 )
 
 type StateDiff struct {
-	index iotago.SlotIndex
+	slot iotago.SlotIndex
 
 	spentOutputs *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.OutputStateMetadata]
 
@@ -24,19 +24,19 @@ type StateDiff struct {
 	mutations ads.Set[iotago.TransactionID]
 }
 
-func NewStateDiff(index iotago.SlotIndex) *StateDiff {
+func NewStateDiff(slot iotago.SlotIndex) *StateDiff {
 	return &StateDiff{
-		index:                index,
+		slot:                 slot,
 		spentOutputs:         shrinkingmap.New[iotago.OutputID, mempool.OutputStateMetadata](),
 		createdOutputs:       shrinkingmap.New[iotago.OutputID, mempool.OutputStateMetadata](),
 		executedTransactions: orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata](),
 		stateUsageCounters:   shrinkingmap.New[iotago.OutputID, int](),
-		mutations:            ads.NewSet(mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes),
+		mutations:            ads.NewSet(mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.SlotIdentifierFromBytes),
 	}
 }
 
-func (s *StateDiff) Index() iotago.SlotIndex {
-	return s.index
+func (s *StateDiff) Slot() iotago.SlotIndex {
+	return s.slot
 }
 
 func (s *StateDiff) DestroyedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.OutputStateMetadata] {

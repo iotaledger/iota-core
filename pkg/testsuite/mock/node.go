@@ -3,7 +3,6 @@ package mock
 import (
 	"context"
 	"crypto/ed25519"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -30,7 +29,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -157,7 +155,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngineInstance())
 
 	events.Network.BlockReceived.Hook(func(block *model.Block, source peer.ID) {
-		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
+		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Slot())
 	})
 
 	events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source peer.ID) {
@@ -173,8 +171,8 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	})
 
 	events.Network.AttestationsReceived.Hook(func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
-		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(json.Marshal(merkleProof)), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
-			return lo.PanicOnErr(a.BlockID(lo.PanicOnErr(n.Protocol.APIForVersion(a.ProtocolVersion))))
+		fmt.Printf("%s > Network.AttestationsReceived: from %s %s number of attestations: %d with merkleProof: %s - %s\n", n.Name, source, commitment.ID(), len(attestations), lo.PanicOnErr(merkleProof.JSONEncode()), lo.Map(attestations, func(a *iotago.Attestation) iotago.BlockID {
+			return lo.PanicOnErr(a.BlockID())
 		}))
 	})
 
@@ -182,30 +180,26 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
-	events.ChainManager.RequestCommitment.Hook(func(commitmentID iotago.CommitmentID) {
-		fmt.Printf("%s > ChainManager.RequestCommitment: %s\n", n.Name, commitmentID)
-	})
-
-	events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
-		fmt.Printf("%s > ChainManager.CommitmentBelowRoot: %s\n", n.Name, commitmentID)
-	})
+	//events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
+	//	fmt.Printf("%s > ChainManager.CommitmentBelowRoot: %s\n", n.Name, commitmentID)
+	//})
 
 	events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
 	})
 
-	events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
-		fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
-	})
+	//events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+	//	fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
+	//})
 
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
-		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
 
 		n.attachEngineLogs(failOnBlockFiltered, e)
 	})
 
 	events.MainEngineSwitched.Hook(func(e *engine.Engine) {
-		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
 	})
 
 	events.Network.Error.Hook(func(err error, id peer.ID) {
@@ -323,17 +317,16 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		})
 		require.NoError(n.Testing, err)
 
-		rootsStorage, err := instance.Storage.Roots(details.Commitment.ID().Index())
-		require.NoError(n.Testing, err, "roots storage for slot %d not found", details.Commitment.Index())
+		rootsStorage, err := instance.Storage.Roots(details.Commitment.ID().Slot())
+		require.NoError(n.Testing, err, "roots storage for slot %d not found", details.Commitment.Slot())
 		roots, err := rootsStorage.Load(details.Commitment.ID())
 		require.NoError(n.Testing, err)
 
 		attestationBlockIDs := make([]iotago.BlockID, 0)
-		tree, err := instance.Attestations.GetMap(details.Commitment.Index())
+		tree, err := instance.Attestations.GetMap(details.Commitment.Slot())
 		if err == nil {
-			a := instance.APIForSlot(details.Commitment.Index())
 			err = tree.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
-				attestationBlockIDs = append(attestationBlockIDs, lo.PanicOnErr(value.BlockID(a)))
+				attestationBlockIDs = append(attestationBlockIDs, lo.PanicOnErr(value.BlockID()))
 				return nil
 			})
 			require.NoError(n.Testing, err)
@@ -351,7 +344,7 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 	})
 
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Index(), block.ProtocolBlock().SlotCommitmentID)
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Slot(), block.ProtocolBlock().SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
@@ -362,8 +355,8 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
 	})
 
-	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
-		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
+	events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slot)
 	})
 
 	events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
@@ -510,7 +503,7 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 
 	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, alias)
 
-	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
+	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }
@@ -520,7 +513,7 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
 
-	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
+	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }

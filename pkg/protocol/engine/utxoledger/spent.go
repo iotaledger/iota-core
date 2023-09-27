@@ -33,7 +33,7 @@ type Spent struct {
 	// the ID of the transaction that spent the output
 	transactionIDSpent iotago.TransactionID
 	// the index of the slot that spent the output
-	slotIndexSpent iotago.SlotIndex
+	slotSpent iotago.SlotIndex
 
 	output *Output
 }
@@ -69,24 +69,24 @@ func (s *Spent) TransactionIDSpent() iotago.TransactionID {
 
 // SlotIndexSpent returns the index of the slot that spent the output.
 func (s *Spent) SlotIndexSpent() iotago.SlotIndex {
-	return s.slotIndexSpent
+	return s.slotSpent
 }
 
 type Spents []*Spent
 
-func NewSpent(output *Output, transactionIDSpent iotago.TransactionID, slotIndexSpent iotago.SlotIndex) *Spent {
+func NewSpent(output *Output, transactionIDSpent iotago.TransactionID, slotSpent iotago.SlotIndex) *Spent {
 	return &Spent{
 		outputID:           output.outputID,
 		output:             output,
 		transactionIDSpent: transactionIDSpent,
-		slotIndexSpent:     slotIndexSpent,
+		slotSpent:          slotSpent,
 	}
 }
 
 func spentStorageKeyForOutputID(outputID iotago.OutputID) []byte {
-	ms := marshalutil.New(35)
+	ms := marshalutil.New(iotago.OutputIDLength + 1)
 	ms.WriteByte(StoreKeyPrefixOutputSpent) // 1 byte
-	ms.WriteBytes(outputID[:])              // 34 bytes
+	ms.WriteBytes(outputID[:])              // iotago.OutputIDLength bytes
 
 	return ms.Bytes()
 }
@@ -96,9 +96,9 @@ func (s *Spent) KVStorableKey() (key []byte) {
 }
 
 func (s *Spent) KVStorableValue() (value []byte) {
-	ms := marshalutil.New(48)
-	ms.WriteBytes(s.transactionIDSpent[:])      // 32 bytes
-	ms.WriteBytes(s.slotIndexSpent.MustBytes()) // 8 bytes
+	ms := marshalutil.New(iotago.SlotIdentifierLength + iotago.SlotIndexLength)
+	ms.WriteBytes(s.transactionIDSpent[:]) // iotago.SlotIdentifierLength bytes
+	ms.WriteBytes(s.slotSpent.MustBytes()) // iotago.SlotIndexLength bytes
 
 	return ms.Bytes()
 }
@@ -126,8 +126,8 @@ func (s *Spent) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
 		return err
 	}
 
-	// Read milestone index
-	s.slotIndexSpent, err = parseSlotIndex(valueUtil)
+	// Read slot index spent index
+	s.slotSpent, err = parseSlotIndex(valueUtil)
 	if err != nil {
 		return err
 	}
