@@ -168,7 +168,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		mutations.AddedElements().Range(func(chain *protocol.Chain) {
 			chain.SpawnedEngine.OnUpdate(func(_, newEngine *engine.Engine) {
 				if newEngine != nil && n.Name == "node6" && newEngine != n.Protocol.MainEngineInstance() {
-					//n.attachEngineLogs(failOnBlockFiltered, newEngine)
+					n.attachEngineLogs(failOnBlockFiltered, newEngine)
 				}
 			})
 		})

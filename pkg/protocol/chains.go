@@ -224,8 +224,6 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 			candidateEngineInstance, err := c.engineManager.ForkEngineAtSlot(snapshotTargetSlot)
 			if err != nil {
 				panic(ierrors.Wrap(err, "error creating new candidate engine"))
-
-				return
 			}
 
 			chain.SpawnedEngine.Set(candidateEngineInstance)

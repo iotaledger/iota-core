@@ -56,7 +56,7 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 		RequestBlocks:            reactive.NewVariable[bool](),
 		RequestedBlocksReceived:  reactive.NewVariable[bool](),
 		Weight:                   reactive.NewVariable[uint64](),
-		AttestedWeight:           reactive.NewVariable[uint64](func(current uint64, new uint64) uint64 { return max(current, new) }),
+		AttestedWeight:           reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
 		CumulativeAttestedWeight: reactive.NewVariable[uint64](),
 		IsSolid:                  reactive.NewEvent(),
 		IsAttested:               reactive.NewEvent(),
