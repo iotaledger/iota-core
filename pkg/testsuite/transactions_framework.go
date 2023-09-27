@@ -180,10 +180,9 @@ func (t *TransactionFramework) CreateAccountFromInput(inputAlias string, opts ..
 
 	accountOutput := options.Apply(builder.NewAccountOutputBuilder(t.DefaultAddress(), t.DefaultAddress(), input.BaseTokenAmount()).
 		Mana(input.StoredMana()).
-		UnlockConditions(iotago.AccountOutputUnlockConditions{
-			&iotago.StateControllerAddressUnlockCondition{Address: t.DefaultAddress()},
-			&iotago.GovernorAddressUnlockCondition{Address: t.DefaultAddress()},
-		}), opts).MustBuild()
+		StateController(t.DefaultAddress()).
+		Governor(t.DefaultAddress()),
+		opts).MustBuild()
 
 	outputStates := iotago.Outputs[iotago.Output]{accountOutput}
 
@@ -417,7 +416,14 @@ func WithAccountAmount(amount iotago.BaseToken) options.Option[builder.AccountOu
 
 func WithAccountConditions(conditions iotago.AccountOutputUnlockConditions) options.Option[builder.AccountOutputBuilder] {
 	return func(accountBuilder *builder.AccountOutputBuilder) {
-		accountBuilder.UnlockConditions(conditions)
+		for _, condition := range conditions.MustSet() {
+			switch condition.Type() {
+			case iotago.UnlockConditionStateControllerAddress:
+				accountBuilder.StateController(condition.(*iotago.StateControllerAddressUnlockCondition).Address)
+			case iotago.UnlockConditionGovernorAddress:
+				accountBuilder.Governor(condition.(*iotago.GovernorAddressUnlockCondition).Address)
+			}
+		}
 	}
 }
 
