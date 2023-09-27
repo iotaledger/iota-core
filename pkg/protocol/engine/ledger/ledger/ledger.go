@@ -462,7 +462,7 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		// for basic outputs (implicit accounts), get block issuer keys from the address in the unlock conditions.
 		case iotago.OutputBasic:
 			address, _ := createdOutput.Output().UnlockConditionSet().Address().Address.(*iotago.ImplicitAccountCreationAddress)
-			accountDiff.BlockIssuerKeysAdded = iotago.BlockIssuerKeys{iotago.Ed25519AddressBlockIssuerKeyFromAddress(address)}
+			accountDiff.BlockIssuerKeysAdded = iotago.NewBlockIssuerKeys(iotago.Ed25519AddressBlockIssuerKeyFromAddress(address))
 			accountDiff.NewExpirySlot = iotago.MaxSlotIndex
 		}
 		fmt.Printf("account diff for %s: %+v\n", createdAccountID, accountDiff)
