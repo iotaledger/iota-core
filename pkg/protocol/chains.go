@@ -219,9 +219,9 @@ func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 			c.protocol.Network.HookStopped(mainEngine.Shutdown)
 		} else {
 			forkingPoint := chain.ForkingPoint.Get()
-			snapshotTargetIndex := forkingPoint.Index() - 1
+			snapshotTargetSlot := forkingPoint.Slot() - 1
 
-			candidateEngineInstance, err := c.engineManager.ForkEngineAtSlot(snapshotTargetIndex)
+			candidateEngineInstance, err := c.engineManager.ForkEngineAtSlot(snapshotTargetSlot)
 			if err != nil {
 				panic(ierrors.Wrap(err, "error creating new candidate engine"))
 
@@ -284,7 +284,7 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 		withinContext(func() (unsubscribe func()) {
 			return engine.Ledger.HookInitialized(func() {
 				withinContext(func() (unsubscribe func()) {
-					var latestPublishedIndex iotago.SlotIndex
+					var latestPublishedSlot iotago.SlotIndex
 
 					publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment, published bool) {
 						publishedCommitment, published, err := c.PublishCommitment(commitment)
@@ -297,7 +297,7 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 						publishedCommitment.IsAttested.Trigger()
 						publishedCommitment.IsVerified.Trigger()
 
-						latestPublishedIndex = commitment.Index()
+						latestPublishedSlot = commitment.Slot()
 
 						return publishedCommitment, published
 					}
@@ -309,7 +309,7 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 							rootCommitment.IsRoot.Trigger()
 						}
 					} else {
-						latestPublishedIndex = forkingPoint.Index() - 1
+						latestPublishedSlot = forkingPoint.Slot() - 1
 					}
 
 					return engine.LatestCommitment.OnUpdate(func(_, latestModelCommitment *model.Commitment) {
@@ -318,8 +318,8 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 							return
 						}
 
-						for latestPublishedIndex < latestModelCommitment.Index() {
-							if commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedIndex + 1); err != nil {
+						for latestPublishedSlot < latestModelCommitment.Slot() {
+							if commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedSlot + 1); err != nil {
 								panic(err) // this should never happen, but we panic to get a stack trace if it does
 							} else {
 								publishCommitment(commitmentToPublish)

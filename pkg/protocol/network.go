@@ -236,11 +236,11 @@ func (n *Network) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, s
 	n.processTask("attestations request", func() (logLevel log.Level, err error) {
 		mainEngine := n.protocol.MainEngineInstance()
 
-		if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
+		if mainEngine.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
 			return log.LevelTrace, ierrors.New("requested commitment is not verified, yet")
 		}
 
-		commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Index())
+		commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Slot())
 		if err != nil {
 			return lo.Cond(ierrors.Is(err, kvstore.ErrKeyNotFound), log.LevelTrace, log.LevelError), ierrors.Wrapf(err, "failed to load commitment")
 		}
@@ -249,12 +249,12 @@ func (n *Network) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, s
 			return log.LevelTrace, ierrors.Errorf("requested commitment %s does not match main engine commitment %s", commitmentID, commitment.ID())
 		}
 
-		attestations, err := mainEngine.Attestations.Get(commitmentID.Index())
+		attestations, err := mainEngine.Attestations.Get(commitmentID.Slot())
 		if err != nil {
 			return log.LevelError, ierrors.Wrapf(err, "failed to load attestations")
 		}
 
-		rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Index())
+		rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Slot())
 		if err != nil {
 			return log.LevelError, ierrors.Wrapf(err, "failed to load roots")
 		}

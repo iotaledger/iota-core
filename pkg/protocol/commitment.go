@@ -151,7 +151,7 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 		c.isBelowSyncThreshold.Set(true)
 	})
 
-	c.Logger = logger.NewEntityLogger(fmt.Sprintf("Slot%d.Commitment", commitment.Index()), c.IsEvicted, func(entityLogger log.Logger) {
+	c.Logger = logger.NewEntityLogger(fmt.Sprintf("Slot%d.Commitment", commitment.Slot()), c.IsEvicted, func(entityLogger log.Logger) {
 		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
 		c.CumulativeAttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "CumulativeAttestedWeight")
@@ -241,8 +241,8 @@ func (c *Commitment) triggerEventIfBelowThreshold(event func(*Commitment) reacti
 				// since events only trigger once, we unsubscribe from the threshold after the trigger condition is met
 				chainThreshold(chain).OnUpdateOnce(func(_, _ iotago.SlotIndex) {
 					event(c).Trigger()
-				}, func(_, slotIndex iotago.SlotIndex) bool {
-					return c.Index() < slotIndex
+				}, func(_, slot iotago.SlotIndex) bool {
+					return c.Slot() < slot
 				})
 			})
 		})

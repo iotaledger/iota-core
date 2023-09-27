@@ -559,7 +559,7 @@ func (e *Engine) initRootCommitment() {
 func (e *Engine) initLatestCommitment() {
 	updateLatestCommitment := func(latestCommitment *model.Commitment) {
 		e.LatestCommitment.Compute(func(currentLatestComponent *model.Commitment) *model.Commitment {
-			return lo.Cond(currentLatestComponent == nil || currentLatestComponent.Index() < latestCommitment.Index(), latestCommitment, currentLatestComponent)
+			return lo.Cond(currentLatestComponent == nil || currentLatestComponent.Slot() < latestCommitment.Slot(), latestCommitment, currentLatestComponent)
 		})
 	}
 

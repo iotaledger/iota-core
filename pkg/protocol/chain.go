@@ -60,11 +60,11 @@ func NewChain(logger log.Logger) *Chain {
 	c.VerifiedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.LatestVerifiedCommitment)
 
 	c.WarpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {
-		if latestCommitment == nil || latestCommitment.Index() < WarpSyncOffset {
+		if latestCommitment == nil || latestCommitment.Slot() < WarpSyncOffset {
 			return 0
 		}
 
-		return latestCommitment.Index() - WarpSyncOffset
+		return latestCommitment.Slot() - WarpSyncOffset
 	}, c.LatestCommitment)
 
 	c.SyncThreshold = reactive.NewDerivedVariable2[iotago.SlotIndex](func(forkingPoint, latestVerifiedCommitment *Commitment) iotago.SlotIndex {
@@ -73,10 +73,10 @@ func NewChain(logger log.Logger) *Chain {
 		}
 
 		if latestVerifiedCommitment == nil {
-			return forkingPoint.Index() + SyncWindow + 1
+			return forkingPoint.Slot() + SyncWindow + 1
 		}
 
-		return latestVerifiedCommitment.Index() + SyncWindow + 1
+		return latestVerifiedCommitment.Slot() + SyncWindow + 1
 	}, c.ForkingPoint, c.LatestVerifiedCommitment)
 
 	c.Engine = reactive.NewDerivedVariable2(func(spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
@@ -126,15 +126,15 @@ func NewChain(logger log.Logger) *Chain {
 	return c
 }
 
-func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exists bool) {
+func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c; currentChain != nil; {
 		switch forkingPoint := currentChain.ForkingPoint.Get(); {
 		case forkingPoint == nil:
 			return nil, false // this should never happen, but we can handle it gracefully anyway
-		case forkingPoint.Index() == index:
+		case forkingPoint.Slot() == slot:
 			return forkingPoint, true
-		case index > forkingPoint.Index():
-			return currentChain.commitments.Get(index)
+		case slot > forkingPoint.Slot():
+			return currentChain.commitments.Get(slot)
 		default:
 			parent := forkingPoint.Parent.Get()
 			if parent == nil {
@@ -149,7 +149,7 @@ func (c *Chain) Commitment(index iotago.SlotIndex) (commitment *Commitment, exis
 }
 
 func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (err error) {
-	if !c.InSyncRange(block.ID().Index()) {
+	if !c.InSyncRange(block.ID().Slot()) {
 		return ierrors.Errorf("received block is not in sync range of %s", c.LogName())
 	}
 
@@ -165,22 +165,22 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (err error) {
 	return nil
 }
 
-func (c *Chain) InSyncRange(index iotago.SlotIndex) bool {
+func (c *Chain) InSyncRange(slot iotago.SlotIndex) bool {
 	if latestVerifiedCommitment := c.LatestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
-		return index > latestVerifiedCommitment.Index() && index < c.SyncThreshold.Get()
+		return slot > latestVerifiedCommitment.Slot() && slot < c.SyncThreshold.Get()
 	}
 
 	forkingPoint := c.ForkingPoint.Get()
 
-	return forkingPoint != nil && (index > forkingPoint.Index()-1 && index < c.SyncThreshold.Get())
+	return forkingPoint != nil && (slot > forkingPoint.Slot()-1 && slot < c.SyncThreshold.Get())
 }
 
 func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
-	c.commitments.Set(commitment.Index(), commitment)
+	c.commitments.Set(commitment.Slot(), commitment)
 
-	// maxCommitment returns the Commitment object with the higher index.
+	// maxCommitment returns the Commitment object with the higher slot.
 	maxCommitment := func(other *Commitment) *Commitment {
-		if commitment == nil || other != nil && other.Index() >= commitment.Index() {
+		if commitment == nil || other != nil && other.Slot() >= commitment.Slot() {
 			return other
 		}
 
@@ -199,10 +199,10 @@ func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
 	return func() {
 		unsubscribe()
 
-		c.commitments.Delete(commitment.Index())
+		c.commitments.Delete(commitment.Slot())
 
 		resetToParent := func(latestCommitment *Commitment) *Commitment {
-			if latestCommitment == nil || commitment.Index() > latestCommitment.Index() {
+			if latestCommitment == nil || commitment.Slot() > latestCommitment.Slot() {
 				return latestCommitment
 			}
 
