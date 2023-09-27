@@ -34,7 +34,7 @@ func stateMetadataFromBytes(b []byte) (*stateTreeMetadata, int, error) {
 }
 
 func (s *stateTreeMetadata) Bytes() ([]byte, error) {
-	ms := marshalutil.New(8)
+	ms := marshalutil.New(iotago.SlotIndexLength)
 	ms.WriteBytes(s.Time.MustBytes())
 
 	return ms.Bytes(), nil

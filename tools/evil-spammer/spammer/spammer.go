@@ -232,7 +232,7 @@ func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt wallet.Client) {
 		return
 	}
 
-	txID := lo.PanicOnErr(tx.ID(s.api))
+	txID := lo.PanicOnErr(tx.ID())
 	allSolid := s.handleSolidityForReuseOutputs(clt, tx)
 	if !allSolid {
 		s.log.Debug(ErrInputsNotSolid)

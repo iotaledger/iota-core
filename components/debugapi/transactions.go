@@ -18,14 +18,14 @@ func init() {
 func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) error {
 	slot := scd.Commitment.Index()
 	stateDiff := deps.Protocol.MainEngineInstance().Ledger.MemPool().StateDiff(slot)
-	mutationsTree := ads.NewSet(mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes)
+	mutationsTree := ads.NewSet(mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.SlotIdentifierFromBytes)
 	tcs := &TransactionsChangesResponse{
 		Index:                slot,
 		IncludedTransactions: make([]string, 0),
 	}
 
 	var innerErr error
-	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.Identifier, txMeta mempool.TransactionMetadata) bool {
+	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, txMeta mempool.TransactionMetadata) bool {
 		tcs.IncludedTransactions = append(tcs.IncludedTransactions, txMeta.ID().String())
 		if err := mutationsTree.Add(txMeta.ID()); err != nil {
 			innerErr = ierrors.Wrapf(err, "failed to add transaction to mutations tree, txID: %s", txMeta.ID())

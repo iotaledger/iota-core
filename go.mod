@@ -2,6 +2,8 @@ module github.com/iotaledger/iota-core
 
 go 1.21
 
+replace github.com/goccy/go-graphviz => github.com/mranney-dd/go-graphviz v0.0.0-20230707134512-55e1cb640211
+
 require (
 	github.com/goccy/go-graphviz v0.1.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
@@ -9,22 +11,22 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20230906114834-b50190b9f9c2
-	github.com/iotaledger/hive.go/app v0.0.0-20230912172434-dc477e1f5140
-	github.com/iotaledger/hive.go/constraints v0.0.0-20230912172434-dc477e1f5140
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230912172434-dc477e1f5140
-	github.com/iotaledger/hive.go/crypto v0.0.0-20230912172434-dc477e1f5140
-	github.com/iotaledger/hive.go/ds v0.0.0-20230912172434-dc477e1f5140
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20230912172434-dc477e1f5140
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230906114834-b50190b9f9c2
-	github.com/iotaledger/hive.go/lo v0.0.0-20230912172434-dc477e1f5140
-	github.com/iotaledger/hive.go/logger v0.0.0-20230912172434-dc477e1f5140
-	github.com/iotaledger/hive.go/runtime v0.0.0-20230912172434-dc477e1f5140
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230912172434-dc477e1f5140
-	github.com/iotaledger/hive.go/stringify v0.0.0-20230912172434-dc477e1f5140
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230919065227-618931c246c5
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230918132810-48814818bff9
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230921110244-f4f25eb27e05
+	github.com/iotaledger/hive.go/ads v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/app v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/constraints v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/crypto v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/ds v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/lo v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/logger v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/runtime v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230926122307-d671b36a4a65
+	github.com/iotaledger/hive.go/stringify v0.0.0-20230926122307-d671b36a4a65
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230925153303-c7fbe63a0ab4
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230925152824-4bfa09b8c132
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230927081440-4c25f83b8c40
 	github.com/labstack/echo/v4 v4.11.1
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.30.0
@@ -40,7 +42,7 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.0
 	golang.org/x/crypto v0.13.0
-	google.golang.org/grpc v1.57.0
+	google.golang.org/grpc v1.58.2
 	google.golang.org/protobuf v1.31.0
 )
 
@@ -177,7 +179,7 @@ require (
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230920204549-e6e6cdab5c13 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect

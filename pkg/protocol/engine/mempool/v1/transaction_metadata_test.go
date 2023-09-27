@@ -7,7 +7,6 @@ import (
 
 	mempooltests "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func TestAttachments(t *testing.T) {
@@ -16,7 +15,7 @@ func TestAttachments(t *testing.T) {
 		"2": iotago.SlotIdentifierRepresentingData(2, []byte("block2")),
 	}
 
-	attachments, err := NewTransactionWithMetadata(tpkg.TestAPI, mempooltests.NewTransaction(2))
+	attachments, err := NewTransactionWithMetadata(mempooltests.NewTransaction(2))
 	require.NoError(t, err)
 	require.True(t, attachments.addAttachment(blockIDs["1"]))
 	require.True(t, attachments.addAttachment(blockIDs["2"]))
