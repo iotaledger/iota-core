@@ -72,7 +72,7 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20230926122307-d671b36a4a65 // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230925153303-c7fbe63a0ab4 // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230925152824-4bfa09b8c132 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20230926162636-b083397f465c // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20230926171759-340cfc7c2478 // indirect
 	github.com/ipfs/boxo v0.10.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect

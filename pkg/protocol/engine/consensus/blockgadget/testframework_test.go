@@ -106,7 +106,7 @@ func (t *TestFramework) CreateBlock(alias string, issuerAlias string, parents ..
 		Build()
 	require.NoError(t, err)
 
-	modelBlock, err := model.BlockFromBlock(block, tpkg.TestAPI)
+	modelBlock, err := model.BlockFromBlock(block)
 	require.NoError(t, err)
 
 	blocksBlock := blocks.NewBlock(modelBlock)
