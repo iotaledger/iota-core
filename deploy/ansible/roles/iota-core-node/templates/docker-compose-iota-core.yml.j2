@@ -1,4 +1,11 @@
 #jinja2: trim_blocks:True, lstrip_blocks:True
+{% set ips = [] -%}
+{% for interface in ansible_interfaces -%}
+  {%- set interface_details = hostvars[inventory_hostname]['ansible_' + interface] %}
+  {%- if interface_details.ipv4 is defined and 'address' in interface_details.ipv4 -%}
+    {%- set _ = ips.append("/ip4/" + interface_details.ipv4.address + "/tcp/14666") -%}
+  {%- endif -%}
+{% endfor -%}
 version: '3.3'
 
 services:
@@ -18,7 +25,6 @@ services:
       # prometheus
       - "0.0.0.0:9311:9311/tcp"
     environment:
-      - P2P_BINDMULTIADDRESSES=/ip4/0.0.0.0/tcp/14666
       - WEBAPI_BINDADDRESS=0.0.0.0:8080
       - DASHBOARD_BINDADDRESS=0.0.0.0:8081
       - PROFILING_BINDADDRESS=0.0.0.0:6061
@@ -48,7 +54,8 @@ services:
       --restAPI.blockIssuerPrivateKey={{validatorPrivKey}}
       --inx.blockIssuerAccount={{validatorAccount}}
       --inx.blockIssuerPrivateKey={{validatorPrivKey}}
-      --p2p.peers=/dns/node-01.feature/tcp/14666/p2p/12D3KooWPZt81CSFZLswrV6y6GogLTqUHDAcNxWtov1sSMQiHmSn
+      --p2p.peers=/dns/node-01.feature/tcp/14666/p2p/12D3KooWCrjmh4dUCWfGVQT6ivzArieJB9Z3eKdy2mdEEN95NDPS
+      --p2p.externalMultiAddresses={{ ips | join(',') }}
       --p2p.identityPrivateKey={{p2pIdentityPrivateKey}}
       --inx.enabled=true
       --inx.bindAddress=iota-core:9029
