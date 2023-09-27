@@ -15,7 +15,7 @@ func (t *TestSuite) AssertStorageCommitments(commitments []*iotago.Commitment, n
 	for _, node := range nodes {
 		for _, commitment := range commitments {
 			t.Eventually(func() error {
-				storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(commitment.Index)
+				storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(commitment.Slot)
 				if err != nil {
 					return ierrors.Wrapf(err, "AssertStorageCommitments: %s: error loading commitment: %s", node.Name, commitment.MustID())
 				}

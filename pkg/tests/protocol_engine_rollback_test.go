@@ -175,12 +175,12 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 
 	// Assert state of the forked engine after rollback.
 	{
-		require.EqualValues(t, 13, newEngine.Storage.Settings().LatestCommitment().Index())
+		require.EqualValues(t, 13, newEngine.Storage.Settings().LatestCommitment().Slot())
 		require.EqualValues(t, 13, newEngine.Storage.Settings().LatestFinalizedSlot())
 		require.EqualValues(t, 13, newEngine.EvictionState.LastEvictedSlot())
 
-		for epochIndex := 0; epochIndex <= 2; epochIndex++ {
-			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epochIndex))
+		for epoch := 0; epoch <= 2; epoch++ {
+			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
 			require.Len(t, committeeEpoch.IDs(), 4)
 		}
@@ -190,10 +190,10 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, committeeEpoch3)
 
-		for slotIndex := 1; slotIndex <= 13; slotIndex++ {
-			copiedCommitment, err := newEngine.Storage.Commitments().Load(iotago.SlotIndex(slotIndex))
+		for slot := 1; slot <= 13; slot++ {
+			copiedCommitment, err := newEngine.Storage.Commitments().Load(iotago.SlotIndex(slot))
 			require.NoError(t, err)
-			sourceCommitment, err := node1.Protocol.MainEngineInstance().Storage.Commitments().Load(iotago.SlotIndex(slotIndex))
+			sourceCommitment, err := node1.Protocol.MainEngineInstance().Storage.Commitments().Load(iotago.SlotIndex(slot))
 			require.NoError(t, err)
 			require.Equal(t, sourceCommitment.ID(), copiedCommitment.ID())
 		}
@@ -366,12 +366,12 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 
 	// Assert state of the forked engine after rollback.
 	{
-		require.EqualValues(t, 13, newEngine.Storage.Settings().LatestCommitment().Index())
+		require.EqualValues(t, 13, newEngine.Storage.Settings().LatestCommitment().Slot())
 		require.EqualValues(t, 8, newEngine.Storage.Settings().LatestFinalizedSlot())
 		require.EqualValues(t, 13, newEngine.EvictionState.LastEvictedSlot())
 
-		for epochIndex := 0; epochIndex <= 2; epochIndex++ {
-			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epochIndex))
+		for epoch := 0; epoch <= 2; epoch++ {
+			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
 			require.Len(t, committeeEpoch.IDs(), 4)
 		}
@@ -381,10 +381,10 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, committeeEpoch3)
 
-		for slotIndex := 1; slotIndex <= 13; slotIndex++ {
-			copiedCommitment, err := newEngine.Storage.Commitments().Load(iotago.SlotIndex(slotIndex))
+		for slot := 1; slot <= 13; slot++ {
+			copiedCommitment, err := newEngine.Storage.Commitments().Load(iotago.SlotIndex(slot))
 			require.NoError(t, err)
-			sourceCommitment, err := node1.Protocol.MainEngineInstance().Storage.Commitments().Load(iotago.SlotIndex(slotIndex))
+			sourceCommitment, err := node1.Protocol.MainEngineInstance().Storage.Commitments().Load(iotago.SlotIndex(slot))
 			require.NoError(t, err)
 			require.Equal(t, sourceCommitment.ID(), copiedCommitment.ID())
 		}
@@ -557,12 +557,12 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 
 	// Assert state of the forked engine after rollback.
 	{
-		require.EqualValues(t, 15, newEngine.Storage.Settings().LatestCommitment().Index())
+		require.EqualValues(t, 15, newEngine.Storage.Settings().LatestCommitment().Slot())
 		require.EqualValues(t, 8, newEngine.Storage.Settings().LatestFinalizedSlot())
 		require.EqualValues(t, 15, newEngine.EvictionState.LastEvictedSlot())
 
-		for epochIndex := 0; epochIndex <= 2; epochIndex++ {
-			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epochIndex))
+		for epoch := 0; epoch <= 2; epoch++ {
+			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
 			require.Len(t, committeeEpoch.IDs(), 4)
 		}
@@ -572,10 +572,10 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, committeeEpoch3)
 
-		for slotIndex := 1; slotIndex <= 15; slotIndex++ {
-			copiedCommitment, err := newEngine.Storage.Commitments().Load(iotago.SlotIndex(slotIndex))
+		for slot := 1; slot <= 15; slot++ {
+			copiedCommitment, err := newEngine.Storage.Commitments().Load(iotago.SlotIndex(slot))
 			require.NoError(t, err)
-			sourceCommitment, err := node1.Protocol.MainEngineInstance().Storage.Commitments().Load(iotago.SlotIndex(slotIndex))
+			sourceCommitment, err := node1.Protocol.MainEngineInstance().Storage.Commitments().Load(iotago.SlotIndex(slot))
 			require.NoError(t, err)
 			require.Equal(t, sourceCommitment.ID(), copiedCommitment.ID())
 		}
@@ -748,12 +748,12 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 
 	// Assert state of the forked engine after rollback.
 	{
-		require.EqualValues(t, 9, newEngine.Storage.Settings().LatestCommitment().Index())
+		require.EqualValues(t, 9, newEngine.Storage.Settings().LatestCommitment().Slot())
 		require.EqualValues(t, 8, newEngine.Storage.Settings().LatestFinalizedSlot())
 		require.EqualValues(t, 9, newEngine.EvictionState.LastEvictedSlot())
 
-		for epochIndex := 0; epochIndex <= 1; epochIndex++ {
-			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epochIndex))
+		for epoch := 0; epoch <= 1; epoch++ {
+			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
 			require.Len(t, committeeEpoch.IDs(), 4)
 		}
@@ -763,10 +763,10 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 		require.NoError(t, err)
 		require.Nil(t, committeeEpoch2)
 
-		for slotIndex := 1; slotIndex <= 9; slotIndex++ {
-			copiedCommitment, err := newEngine.Storage.Commitments().Load(iotago.SlotIndex(slotIndex))
+		for slot := 1; slot <= 9; slot++ {
+			copiedCommitment, err := newEngine.Storage.Commitments().Load(iotago.SlotIndex(slot))
 			require.NoError(t, err)
-			sourceCommitment, err := node1.Protocol.MainEngineInstance().Storage.Commitments().Load(iotago.SlotIndex(slotIndex))
+			sourceCommitment, err := node1.Protocol.MainEngineInstance().Storage.Commitments().Load(iotago.SlotIndex(slot))
 			require.NoError(t, err)
 			require.Equal(t, sourceCommitment.ID(), copiedCommitment.ID())
 		}

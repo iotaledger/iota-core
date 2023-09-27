@@ -326,7 +326,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		resign = true
 	}
 
-	if err = i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Index(), references); err != nil {
+	if err = i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Slot(), references); err != nil {
 		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
@@ -410,7 +410,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, issu
 		return ierrors.Errorf("provided issuer account %s, but issuer provided in the block params is different %s", issuerAccount.ID(), blockParams.Issuer.ID())
 	}
 
-	if err := i.validateReferences(*blockParams.IssuingTime, blockParams.SlotCommitment.Index, blockParams.References); err != nil {
+	if err := i.validateReferences(*blockParams.IssuingTime, blockParams.SlotCommitment.Slot, blockParams.References); err != nil {
 		return ierrors.Wrap(err, "block references invalid")
 	}
 
@@ -421,16 +421,16 @@ func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitm
 	protoParams := i.protocol.CurrentAPI().ProtocolParameters()
 	commitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 
-	if blockSlot > commitment.Index+protoParams.MaxCommittableAge() {
-		return nil, ierrors.Errorf("can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Index)
+	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {
+		return nil, ierrors.Errorf("can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)
 	}
 
-	if blockSlot < commitment.Index+protoParams.MinCommittableAge() {
-		if blockSlot < protoParams.MinCommittableAge() || commitment.Index < protoParams.MinCommittableAge() {
+	if blockSlot < commitment.Slot+protoParams.MinCommittableAge() {
+		if blockSlot < protoParams.MinCommittableAge() || commitment.Slot < protoParams.MinCommittableAge() {
 			return commitment, nil
 		}
 
-		commitmentSlot := commitment.Index - protoParams.MinCommittableAge()
+		commitmentSlot := commitment.Slot - protoParams.MinCommittableAge()
 		loadedCommitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(commitmentSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "error loading valid commitment of slot %d according to minCommittableAge from storage", commitmentSlot)
@@ -461,8 +461,8 @@ func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIn
 		if b.IssuingTime().After(issuingTime) {
 			return ierrors.Errorf("cannot issue block if the parents issuingTime is ahead block's issuingTime: %s vs %s", b.IssuingTime(), issuingTime)
 		}
-		if b.SlotCommitmentID().Index() > slotCommitmentIndex {
-			return ierrors.Errorf("cannot issue block if the commitment is ahead of its parents' commitment: %s vs %s", b.SlotCommitmentID().Index(), slotCommitmentIndex)
+		if b.SlotCommitmentID().Slot() > slotCommitmentIndex {
+			return ierrors.Errorf("cannot issue block if the commitment is ahead of its parents' commitment: %s vs %s", b.SlotCommitmentID().Slot(), slotCommitmentIndex)
 		}
 	}
 

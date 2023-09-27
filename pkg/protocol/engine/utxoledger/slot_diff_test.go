@@ -45,7 +45,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 	spent := utxoledger.NewSpent(output, transactionIDSpent, indexSpent)
 
 	diff := &utxoledger.SlotDiff{
-		Index:   indexSpent,
+		Slot:    indexSpent,
 		Outputs: utxoledger.Outputs{output},
 		Spents:  utxoledger.Spents{spent},
 	}
@@ -71,16 +71,16 @@ func TestSlotDiffSerialization(t *testing.T) {
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),
 	}
 
-	index := iotago.SlotIndex(756)
+	slot := iotago.SlotIndex(756)
 
 	spents := utxoledger.Spents{
-		tpkg.RandLedgerStateSpentWithOutput(outputs[3], index),
-		tpkg.RandLedgerStateSpentWithOutput(outputs[2], index),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[3], slot),
+		tpkg.RandLedgerStateSpentWithOutput(outputs[2], slot),
 	}
 
-	require.NoError(t, manager.ApplyDiffWithoutLocking(index, outputs, spents))
+	require.NoError(t, manager.ApplyDiffWithoutLocking(slot, outputs, spents))
 
-	readDiff, err := manager.SlotDiffWithoutLocking(index)
+	readDiff, err := manager.SlotDiffWithoutLocking(slot)
 	require.NoError(t, err)
 
 	var sortedOutputs = utxoledger.LexicalOrderedOutputs(outputs)
@@ -89,7 +89,7 @@ func TestSlotDiffSerialization(t *testing.T) {
 	var sortedSpents = utxoledger.LexicalOrderedSpents(spents)
 	sort.Sort(sortedSpents)
 
-	require.Equal(t, index, readDiff.Index)
+	require.Equal(t, slot, readDiff.Slot)
 	tpkg.EqualOutputs(t, utxoledger.Outputs(sortedOutputs), readDiff.Outputs)
 	tpkg.EqualSpents(t, utxoledger.Spents(sortedSpents), readDiff.Spents)
 }

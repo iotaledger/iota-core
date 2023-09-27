@@ -60,7 +60,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 					o.ledger = e.Ledger
 					o.errHandler = e.ErrorHandler("SybilProtection")
 
-					latestCommittedSlot := e.Storage.Settings().LatestCommitment().Index()
+					latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
 					latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
 					o.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.ValidatorPerformances, latestCommittedEpoch, e, o.errHandler)
 					o.lastCommittedSlot = latestCommittedSlot
@@ -79,7 +79,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 						// (according to the latest committed slot), and potentially the next selected
 						// committee if we have one.
 
-						currentEpoch := e.CurrentAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Index())
+						currentEpoch := e.CurrentAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
 
 						committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 						if !exists {

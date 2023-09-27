@@ -75,7 +75,7 @@ func (o *Output) Output() iotago.Output {
 	o.outputOnce.Do(func() {
 		if o.output == nil {
 			var decoded iotago.TxEssenceOutput
-			if _, err := o.apiProvider.APIForSlot(o.blockID.Index()).Decode(o.encodedOutput, &decoded); err != nil {
+			if _, err := o.apiProvider.APIForSlot(o.blockID.Slot()).Decode(o.encodedOutput, &decoded); err != nil {
 				panic(err)
 			}
 			o.output = decoded
@@ -108,11 +108,11 @@ func (o Outputs) ToOutputSet() iotago.OutputSet {
 	return outputSet
 }
 
-func CreateOutput(apiProvider iotago.APIProvider, outputID iotago.OutputID, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, output iotago.Output, outputBytes ...[]byte) *Output {
+func CreateOutput(apiProvider iotago.APIProvider, outputID iotago.OutputID, blockID iotago.BlockID, slotBooked iotago.SlotIndex, output iotago.Output, outputBytes ...[]byte) *Output {
 	var encodedOutput []byte
 	if len(outputBytes) == 0 {
 		var err error
-		encodedOutput, err = apiProvider.APIForSlot(blockID.Index()).Encode(output)
+		encodedOutput, err = apiProvider.APIForSlot(blockID.Slot()).Encode(output)
 		if err != nil {
 			panic(err)
 		}
@@ -124,7 +124,7 @@ func CreateOutput(apiProvider iotago.APIProvider, outputID iotago.OutputID, bloc
 		apiProvider:   apiProvider,
 		outputID:      outputID,
 		blockID:       blockID,
-		slotBooked:    slotIndexBooked,
+		slotBooked:    slotBooked,
 		encodedOutput: encodedOutput,
 	}
 
@@ -135,7 +135,7 @@ func CreateOutput(apiProvider iotago.APIProvider, outputID iotago.OutputID, bloc
 	return o
 }
 
-func NewOutput(apiProvider iotago.APIProvider, blockID iotago.BlockID, slotIndexBooked iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
+func NewOutput(apiProvider iotago.APIProvider, blockID iotago.BlockID, slotBooked iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
 	txID, err := transaction.ID()
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func NewOutput(apiProvider iotago.APIProvider, blockID iotago.BlockID, slotIndex
 	output = transaction.Essence.Outputs[int(index)]
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(txID, index)
 
-	return CreateOutput(apiProvider, outputID, blockID, slotIndexBooked, output), nil
+	return CreateOutput(apiProvider, outputID, blockID, slotBooked, output), nil
 }
 
 // - kvStorable
@@ -197,7 +197,7 @@ func (o *Output) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
 		return err
 	}
 
-	// Read SlotIndex
+	// Read Slot
 	o.slotBooked, err = parseSlotIndex(valueUtil)
 	if err != nil {
 		return err

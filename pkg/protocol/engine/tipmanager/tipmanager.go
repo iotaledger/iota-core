@@ -34,7 +34,7 @@ type TipManager interface {
 	WeakTips(optAmount ...int) []TipMetadata
 
 	// Evict evicts a block from the TipManager.
-	Evict(slotIndex iotago.SlotIndex)
+	Evict(slot iotago.SlotIndex)
 
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface

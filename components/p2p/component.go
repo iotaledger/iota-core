@@ -60,7 +60,6 @@ type dependencies struct {
 }
 
 func initConfigParams(c *dig.Container) error {
-
 	type cfgResult struct {
 		dig.Out
 		P2PDatabasePath       string   `name:"p2pDatabasePath"`
@@ -151,7 +150,6 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps configManagerDeps) *p2p.ConfigManager {
-
 		p2pConfigManager := p2p.NewConfigManager(func(peers []*p2p.PeerConfigItem) error {
 			if err := deps.PeeringConfig.Set(CfgPeers, peers); err != nil {
 				return err
@@ -230,7 +228,6 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps p2pDeps) p2pResult {
-
 		res := p2pResult{}
 
 		privKeyFilePath := filepath.Join(deps.P2PDatabasePath, "identity.key")
@@ -251,15 +248,6 @@ func provide(c *dig.Container) error {
 			Component.LogInfof(`loaded existing private key for peer identity from "%s"`, privKeyFilePath)
 		}
 
-		peeringIP, err := readPeerIP()
-		if err != nil {
-			Component.LogFatalAndExit(err)
-		}
-
-		if !peeringIP.IsGlobalUnicast() {
-			Component.LogWarnf("IP is not a global unicast address: %s", peeringIP)
-		}
-
 		connManager, err := connmgr.NewConnManager(
 			ParamsP2P.ConnectionManager.LowWatermark,
 			ParamsP2P.ConnectionManager.HighWatermark,
@@ -269,13 +257,30 @@ func provide(c *dig.Container) error {
 			Component.LogPanicf("unable to initialize connection manager: %s", err)
 		}
 
-		// also see "defaults.go" in go-libp2p for the default values
 		createdHost, err := libp2p.New(
 			libp2p.ListenAddrStrings(ParamsP2P.BindMultiAddresses...),
 			libp2p.Identity(nodePrivateKey),
 			libp2p.Transport(tcp.NewTCPTransport),
 			libp2p.ConnectionManager(connManager),
 			libp2p.NATPortMap(),
+			// Define a custom address factory to inject external addresses to the DHT advertisements.
+			libp2p.AddrsFactory(func() func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+				var externalMultiAddrs []multiaddr.Multiaddr
+				if len(ParamsP2P.ExternalMultiAddresses) > 0 {
+					for _, externalMultiAddress := range ParamsP2P.ExternalMultiAddresses {
+						addr, err := multiaddr.NewMultiaddr(externalMultiAddress)
+						if err != nil {
+							Component.LogPanicf("unable to parse external multi address %s: %s", externalMultiAddress, err)
+						}
+
+						externalMultiAddrs = append(externalMultiAddrs, addr)
+					}
+				}
+
+				return func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
+					return append(addrs, externalMultiAddrs...)
+				}
+			}()),
 		)
 		if err != nil {
 			Component.LogFatalfAndExit("unable to initialize libp2p host: %s", err)
@@ -292,7 +297,6 @@ func provide(c *dig.Container) error {
 	return c.Provide(func(host host.Host, peerDB *network.DB) *p2p.Manager {
 		return p2p.NewManager(host, peerDB, Component.Logger())
 	})
-
 }
 
 func configure() error {

@@ -9,8 +9,6 @@ import (
 )
 
 type Block struct {
-	api iotago.API
-
 	blockID iotago.BlockID
 
 	data          []byte
@@ -107,7 +105,7 @@ func (blk *Block) ValidationBlock() (validationBlock *iotago.ValidationBlock, is
 }
 
 func (blk *Block) String() string {
-	encode, err := blk.api.JSONEncode(blk.ProtocolBlock())
+	encode, err := blk.protocolBlock.API.JSONEncode(blk.ProtocolBlock())
 	if err != nil {
 		panic(err)
 	}

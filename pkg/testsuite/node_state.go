@@ -20,8 +20,8 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.latestCommitment != nil {
 		t.AssertLatestCommitment(state.latestCommitment, nodes...)
 	}
-	if state.latestCommitmentSlotIndex != nil {
-		t.AssertLatestCommitmentSlotIndex(*state.latestCommitmentSlotIndex, nodes...)
+	if state.latestCommitmentSlot != nil {
+		t.AssertLatestCommitmentSlotIndex(*state.latestCommitmentSlot, nodes...)
 	}
 	if state.latestCommitmentCumulativeWeight != nil {
 		t.AssertLatestCommitmentCumulativeWeight(*state.latestCommitmentCumulativeWeight, nodes...)
@@ -32,14 +32,14 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.chainID != nil {
 		t.AssertChainID(*state.chainID, nodes...)
 	}
-	if state.sybilProtectionCommitteeSlotIndex != nil && state.sybilProtectionCommittee != nil {
-		t.AssertSybilProtectionCommittee(*state.sybilProtectionCommitteeSlotIndex, *state.sybilProtectionCommittee, nodes...)
+	if state.sybilProtectionCommitteeSlot != nil && state.sybilProtectionCommittee != nil {
+		t.AssertSybilProtectionCommittee(*state.sybilProtectionCommitteeSlot, *state.sybilProtectionCommittee, nodes...)
 	}
 	if state.sybilProtectionOnlineCommittee != nil {
 		t.AssertSybilProtectionOnlineCommittee(*state.sybilProtectionOnlineCommittee, nodes...)
 	}
-	if state.storageCommitmentAtIndex != nil {
-		t.AssertEqualStoredCommitmentAtIndex(*state.storageCommitmentAtIndex, nodes...)
+	if state.storageCommitmentAtSlot != nil {
+		t.AssertEqualStoredCommitmentAtIndex(*state.storageCommitmentAtSlot, nodes...)
 	}
 	if state.storageCommitments != nil {
 		t.AssertStorageCommitments(*state.storageCommitments, nodes...)
@@ -62,17 +62,17 @@ type NodeState struct {
 	snapshotImported                 *bool
 	protocolParameters               *iotago.ProtocolParameters
 	latestCommitment                 *iotago.Commitment
-	latestCommitmentSlotIndex        *iotago.SlotIndex
+	latestCommitmentSlot             *iotago.SlotIndex
 	latestCommitmentCumulativeWeight *uint64
 	latestFinalizedSlot              *iotago.SlotIndex
 	chainID                          *iotago.CommitmentID
 
-	sybilProtectionCommitteeSlotIndex *iotago.SlotIndex
-	sybilProtectionCommittee          *[]iotago.AccountID
-	sybilProtectionOnlineCommittee    *[]account.SeatIndex
+	sybilProtectionCommitteeSlot   *iotago.SlotIndex
+	sybilProtectionCommittee       *[]iotago.AccountID
+	sybilProtectionOnlineCommittee *[]account.SeatIndex
 
-	storageCommitments       *[]*iotago.Commitment
-	storageCommitmentAtIndex *iotago.SlotIndex
+	storageCommitments      *[]*iotago.Commitment
+	storageCommitmentAtSlot *iotago.SlotIndex
 
 	storageRootBlocks *[]*blocks.Block
 	activeRootBlocks  *[]*blocks.Block
@@ -100,15 +100,15 @@ func WithLatestCommitment(commitment *iotago.Commitment) options.Option[NodeStat
 	}
 }
 
-func WithLatestCommitmentSlotIndex(slotIndex iotago.SlotIndex) options.Option[NodeState] {
+func WithLatestCommitmentSlotIndex(slot iotago.SlotIndex) options.Option[NodeState] {
 	return func(state *NodeState) {
-		state.latestCommitmentSlotIndex = &slotIndex
+		state.latestCommitmentSlot = &slot
 	}
 }
 
-func WithEqualStoredCommitmentAtIndex(slotIndex iotago.SlotIndex) options.Option[NodeState] {
+func WithEqualStoredCommitmentAtIndex(slot iotago.SlotIndex) options.Option[NodeState] {
 	return func(state *NodeState) {
-		state.storageCommitmentAtIndex = &slotIndex
+		state.storageCommitmentAtSlot = &slot
 	}
 }
 
@@ -118,9 +118,9 @@ func WithLatestCommitmentCumulativeWeight(cumulativeWeight uint64) options.Optio
 	}
 }
 
-func WithLatestFinalizedSlot(slotIndex iotago.SlotIndex) options.Option[NodeState] {
+func WithLatestFinalizedSlot(slot iotago.SlotIndex) options.Option[NodeState] {
 	return func(state *NodeState) {
-		state.latestFinalizedSlot = &slotIndex
+		state.latestFinalizedSlot = &slot
 	}
 }
 
@@ -130,9 +130,9 @@ func WithChainID(chainID iotago.CommitmentID) options.Option[NodeState] {
 	}
 }
 
-func WithSybilProtectionCommittee(index iotago.SlotIndex, committee []iotago.AccountID) options.Option[NodeState] {
+func WithSybilProtectionCommittee(slot iotago.SlotIndex, committee []iotago.AccountID) options.Option[NodeState] {
 	return func(state *NodeState) {
-		state.sybilProtectionCommitteeSlotIndex = &index
+		state.sybilProtectionCommitteeSlot = &slot
 		state.sybilProtectionCommittee = &committee
 	}
 }
@@ -161,9 +161,9 @@ func WithActiveRootBlocks(blocks []*blocks.Block) options.Option[NodeState] {
 	}
 }
 
-func WithEvictedSlot(slotIndex iotago.SlotIndex) options.Option[NodeState] {
+func WithEvictedSlot(slot iotago.SlotIndex) options.Option[NodeState] {
 	return func(state *NodeState) {
-		state.evictedSlot = &slotIndex
+		state.evictedSlot = &slot
 	}
 }
 

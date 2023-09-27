@@ -109,15 +109,13 @@ Example:
 
 ## <a id="p2p"></a> 3. P2p
 
-| Name                                        | Description                                                                                                                                          | Type    | Default value                                |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------------------------- |
-| bindMultiAddresses                          | The bind multi addresses for p2p connections                                                                                                         | array   | /ip4/0.0.0.0/tcp/14666<br/>/ip6/::/tcp/14666 |
-| [connectionManager](#p2p_connectionmanager) | Configuration for connectionManager                                                                                                                  | object  |                                              |
-| seed                                        | Private key seed used to derive the node identity; optional base58 or base64 encoded 256-bit string. Prefix with 'base58:' or 'base64', respectively | string  | ""                                           |
-| overwriteStoredSeed                         | Whether to overwrite the private key if an existing peerdb exists                                                                                    | boolean | false                                        |
-| externalAddress                             | External IP address under which the node is reachable; or 'auto' to determine it automatically                                                       | string  | "auto"                                       |
-| identityPrivateKey                          | Private key used to derive the node identity (optional)                                                                                              | string  | ""                                           |
-| [db](#p2p_db)                               | Configuration for db                                                                                                                                 | object  |                                              |
+| Name                                        | Description                                                   | Type   | Default value                                |
+| ------------------------------------------- | ------------------------------------------------------------- | ------ | -------------------------------------------- |
+| bindMultiAddresses                          | The bind multi addresses for p2p connections                  | array  | /ip4/0.0.0.0/tcp/14666<br/>/ip6/::/tcp/14666 |
+| [connectionManager](#p2p_connectionmanager) | Configuration for connectionManager                           | object |                                              |
+| externalMultiAddresses                      | External reacheable multi addresses advertised to the network | array  |                                              |
+| identityPrivateKey                          | Private key used to derive the node identity (optional)       | string | ""                                           |
+| [db](#p2p_db)                               | Configuration for db                                          | object |                                              |
 
 ### <a id="p2p_connectionmanager"></a> ConnectionManager
 
@@ -145,9 +143,7 @@ Example:
         "highWatermark": 10,
         "lowWatermark": 5
       },
-      "seed": "",
-      "overwriteStoredSeed": false,
-      "externalAddress": "auto",
+      "externalMultiAddresses": [],
       "identityPrivateKey": "",
       "db": {
         "path": "testnet/p2pstore"

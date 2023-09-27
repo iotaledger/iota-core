@@ -9,15 +9,15 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertStorageAccountDiffs(slotIndex iotago.SlotIndex, accountDiffs map[iotago.AccountID]*model.AccountDiff, nodes ...*mock.Node) {
+func (t *TestSuite) AssertStorageAccountDiffs(slot iotago.SlotIndex, accountDiffs map[iotago.AccountID]*model.AccountDiff, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
 		for accountID, diffChange := range accountDiffs {
 			t.Eventually(func() error {
-				store, err := node.Protocol.MainEngineInstance().Storage.AccountDiffs(slotIndex)
+				store, err := node.Protocol.MainEngineInstance().Storage.AccountDiffs(slot)
 				if err != nil {
-					return ierrors.Wrapf(err, "AssertStorageAccountDiffs: %s: failed to load accounts diff for slot %d", node.Name, slotIndex)
+					return ierrors.Wrapf(err, "AssertStorageAccountDiffs: %s: failed to load accounts diff for slot %d", node.Name, slot)
 				}
 
 				storedDiffChange, _, err := store.Load(accountID)
