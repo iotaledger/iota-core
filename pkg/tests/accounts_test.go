@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/iotaledger/hive.go/lo"
@@ -344,7 +343,6 @@ func Test_TransitionAccount(t *testing.T) {
 		}),
 	)
 
-	fmt.Printf("inputForImplicitAccountTransition: %+v\n", inputForImplicitAccountTransition.ToOutputSet())
 	tx6 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX6", fullAccountWallet,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
