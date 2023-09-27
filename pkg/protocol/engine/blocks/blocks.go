@@ -40,10 +40,10 @@ func (b *Blocks) Block(id iotago.BlockID) (block *Block, exists bool) {
 	defer b.evictionMutex.RUnlock()
 
 	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
-		return NewRootBlock(id, commitmentID, b.apiProvider.APIForSlot(id.Index()).TimeProvider().SlotEndTime(id.Index())), true
+		return NewRootBlock(id, commitmentID, b.apiProvider.APIForSlot(id.Slot()).TimeProvider().SlotEndTime(id.Slot())), true
 	}
 
-	storage := b.blocks.Get(id.Index(), false)
+	storage := b.blocks.Get(id.Slot(), false)
 	if storage == nil {
 		return nil, false
 	}
@@ -55,11 +55,11 @@ func (b *Blocks) StoreOrUpdate(data *model.Block) (storedBlock *Block, evicted, 
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= data.ID().Index() {
+	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= data.ID().Slot() {
 		return nil, true, false
 	}
 
-	storage := b.blocks.Get(data.ID().Index(), true)
+	storage := b.blocks.Get(data.ID().Slot(), true)
 	createdBlock, created := storage.GetOrCreate(data.ID(), func() *Block { return NewBlock(data) })
 	if !created {
 		return createdBlock, false, createdBlock.Update(data)
@@ -72,11 +72,11 @@ func (b *Blocks) GetOrCreate(blockID iotago.BlockID, createFunc func() *Block) (
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= blockID.Index() {
+	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= blockID.Slot() {
 		return nil, false
 	}
 
-	storage := b.blocks.Get(blockID.Index(), true)
+	storage := b.blocks.Get(blockID.Slot(), true)
 
 	return storage.GetOrCreate(blockID, createFunc)
 }
@@ -85,11 +85,11 @@ func (b *Blocks) StoreBlock(block *Block) (stored bool) {
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= block.ID().Index() {
+	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= block.ID().Slot() {
 		return false
 	}
 
-	storage := b.blocks.Get(block.ID().Index(), true)
+	storage := b.blocks.Get(block.ID().Slot(), true)
 
 	return storage.Set(block.ID(), block)
 }

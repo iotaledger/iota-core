@@ -93,7 +93,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			protocol.WithSyncManagerProvider(
 				trivialsyncmanager.NewProvider(
 					trivialsyncmanager.WithBootstrappedFunc(func(e *engine.Engine) bool {
-						return e.Storage.Settings().LatestCommitment().Index() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
+						return e.Storage.Settings().LatestCommitment().Slot() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
 					}),
 				),
 			),

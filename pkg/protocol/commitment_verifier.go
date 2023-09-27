@@ -20,12 +20,12 @@ type CommitmentVerifier struct {
 }
 
 func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) *CommitmentVerifier {
-	committeeAtForkingPoint := mainEngine.SybilProtection.SeatManager().Committee(lastCommonCommitmentBeforeFork.Index()).Accounts().IDs()
+	committeeAtForkingPoint := mainEngine.SybilProtection.SeatManager().Committee(lastCommonCommitmentBeforeFork.Slot()).Accounts().IDs()
 
 	return &CommitmentVerifier{
 		engine:                  mainEngine,
 		cumulativeWeight:        lastCommonCommitmentBeforeFork.CumulativeWeight(),
-		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, lastCommonCommitmentBeforeFork.Index())),
+		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, lastCommonCommitmentBeforeFork.Slot())),
 		// TODO: what happens if the committee rotated after the fork?
 	}
 }
@@ -153,7 +153,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")
 		}
-		if _, seatExists := c.engine.SybilProtection.SeatManager().Committee(attestationBlockID.Index()).GetSeat(att.IssuerID); seatExists {
+		if _, seatExists := c.engine.SybilProtection.SeatManager().Committee(attestationBlockID.Slot()).GetSeat(att.IssuerID); seatExists {
 			seatCount++
 		}
 

@@ -35,8 +35,7 @@ func NewStateDiff(slot iotago.SlotIndex) *StateDiff {
 	}
 }
 
-// TODO: rename to Slot?
-func (s *StateDiff) Index() iotago.SlotIndex {
+func (s *StateDiff) Slot() iotago.SlotIndex {
 	return s.slot
 }
 

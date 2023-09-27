@@ -73,7 +73,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput)
-			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Index()
+			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
 			l.accountsLedger.SetLatestCommittedSlot(latestCommittedSlot)
 			l.rmcManager.SetLatestCommittedSlot(latestCommittedSlot)
 
@@ -260,7 +260,7 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 
 		earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
 
-		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Index(), stateWithMetadata.State().Output()), nil
+		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Slot(), stateWithMetadata.State().Output()), nil
 	default:
 		panic("unexpected State type")
 	}
@@ -573,13 +573,13 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 					return false
 				}
 
-				spend := utxoledger.NewSpent(inputState, txWithMeta.ID(), stateDiff.Index())
+				spend := utxoledger.NewSpent(inputState, txWithMeta.ID(), stateDiff.Slot())
 				spends = append(spends, spend)
 			}
 
 			// output side
 			txWithMeta.Outputs().Range(func(stateMetadata mempool.OutputStateMetadata) {
-				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Index(), stateMetadata.State().Output())
+				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Slot(), stateMetadata.State().Output())
 				outputs = append(outputs, output)
 			})
 		}
@@ -591,9 +591,9 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 				// so the diff defaults to empty new and previous outputIDs
 				accountDiff := getAccountDiff(accountDiffs, allotment.AccountID)
 
-				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID, stateDiff.Index()-1)
+				accountData, exists, accountErr := l.accountsLedger.Account(allotment.AccountID, stateDiff.Slot()-1)
 				if accountErr != nil {
-					panic(ierrors.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, stateDiff.Index()-1, accountErr))
+					panic(ierrors.Errorf("error loading account %s in slot %d: %w", allotment.AccountID, stateDiff.Slot()-1, accountErr))
 				}
 				// if the account does not exist in our AccountsLedger it means it doesn't have a BIC feature, so
 				// we burn this allotment.
@@ -694,7 +694,7 @@ func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[mempool.St
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().IssuingTime)
 
-	seat, exists := l.sybilProtection.SeatManager().Committee(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID)
+	seat, exists := l.sybilProtection.SeatManager().Committee(block.ID().Slot()).GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return
 	}
@@ -705,13 +705,13 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 }
 
 func (l *Ledger) loadCommitment(inputCommitmentID iotago.CommitmentID) (*iotago.Commitment, error) {
-	c, err := l.commitmentLoader(inputCommitmentID.Index())
+	c, err := l.commitmentLoader(inputCommitmentID.Slot())
 	if err != nil {
 		return nil, ierrors.Wrap(err, "could not get commitment inputs")
 	}
 	// The commitment with the specified ID was not found at that index: we are on a different chain.
 	if c == nil {
-		return nil, ierrors.Errorf("commitment with ID %s not found at index %d: engine on different chain", inputCommitmentID, inputCommitmentID.Index())
+		return nil, ierrors.Errorf("commitment with ID %s not found at index %d: engine on different chain", inputCommitmentID, inputCommitmentID.Slot())
 	}
 	storedCommitmentID, err := c.Commitment().ID()
 	if err != nil {

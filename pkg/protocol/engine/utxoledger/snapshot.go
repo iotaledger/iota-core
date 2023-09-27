@@ -51,7 +51,7 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvid
 	}
 
 	var output iotago.TxEssenceOutput
-	if _, err := apiProvider.APIForSlot(blockID.Index()).Decode(outputBytes, &output, serix.WithValidation()); err != nil {
+	if _, err := apiProvider.APIForSlot(blockID.Slot()).Decode(outputBytes, &output, serix.WithValidation()); err != nil {
 		return nil, ierrors.Errorf("invalid LS output address: %w", err)
 	}
 

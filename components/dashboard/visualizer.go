@@ -94,8 +94,8 @@ func runVisualizer(component *app.Component) {
 						})
 					}
 				}
-				// if block.ID().Index() > slot.Index(currentSlot.Load()) {
-				// 	currentSlot.Store(int64(block.ID().Index()))
+				// if block.ID().Slot() > slot.Slot(currentSlot.Load()) {
+				// 	currentSlot.Store(int64(block.ID().Slot()))
 				// }
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
@@ -124,8 +124,8 @@ func runVisualizer(component *app.Component) {
 // 	routeGroup.GET("/visualizer/history", func(c echo.Context) (err error) {
 // 		var res []vertex
 
-// 		start := slot.Index(currentSlot.Load())
-// 		for _, ei := range []slot.Index{start - 1, start} {
+// 		start := slot.Slot(currentSlot.Load())
+// 		for _, ei := range []slot.Slot{start - 1, start} {
 // 			blocks := deps.Retainer.LoadAllBlockMetadata(ei)
 // 			_ = blocks.ForEach(func(element *retainer.BlockMetadata) (err error) {
 // 				res = append(res, vertex{

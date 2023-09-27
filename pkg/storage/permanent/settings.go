@@ -123,7 +123,7 @@ func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedPro
 	s.loadFutureProtocolParameters()
 	s.loadProtocolParametersEpochMappings()
 	if s.IsSnapshotImported() {
-		s.apiProvider.SetCurrentSlot(s.latestCommitment().Index())
+		s.apiProvider.SetCurrentSlot(s.latestCommitment().Slot())
 	}
 
 	return s
@@ -252,10 +252,10 @@ func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.apiProvider.SetCurrentSlot(latestCommitment.Index())
+	s.apiProvider.SetCurrentSlot(latestCommitment.Slot())
 
 	// Delete the old future protocol parameters if they exist.
-	_ = s.storeFutureProtocolParameters.Delete(s.apiProvider.VersionForSlot(latestCommitment.Index()))
+	_ = s.storeFutureProtocolParameters.Delete(s.apiProvider.VersionForSlot(latestCommitment.Slot()))
 
 	return s.storeLatestCommitment.Set(latestCommitment)
 }
@@ -355,7 +355,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		return ierrors.Wrap(err, "failed to stream write protocol version epoch mapping")
 	}
 
-	// TODO: rollback future protocol parameters if it was added after targetCommitment.Index()
+	// TODO: rollback future protocol parameters if it was added after targetCommitment.Slot()
 	// Export future protocol parameters
 	if err := stream.WriteCollection(writer, func() (uint64, error) {
 		var count uint64
@@ -529,7 +529,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 }
 
 func (s *Settings) Rollback(targetCommitment *model.Commitment) error {
-	// TODO: rollback future protocol parameters if it was added after targetCommitment.Index()
+	// TODO: rollback future protocol parameters if it was added after targetCommitment.Slot()
 
 	if err := s.SetLatestCommitment(targetCommitment); err != nil {
 		return ierrors.Wrap(err, "failed to set latest commitment")

@@ -95,7 +95,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	block1 := ts.IssueBlockAtSlotWithOptions("block1", block1Slot, genesisCommitment, node1, tx1)
 
-	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Index(), activeNodes, block1)
+	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Slot(), activeNodes, block1)
 
 	ts.AssertAccountDiff(genesisAccountOutput.AccountID, block1Slot, &model.AccountDiff{
 		BICChange:              0,
@@ -121,7 +121,7 @@ func Test_TransitionAccount(t *testing.T) {
 	// commit until the expiry slot of the transitioned genesis account plus one
 	latestParent = ts.CommitUntilSlot(accountOutputs[0].FeatureSet().BlockIssuer().ExpirySlot+1, activeNodes, latestParent)
 	// set the expiry slof of the transitioned genesis account to the latest committed + MaxCommittableAge
-	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Index() + ts.API.ProtocolParameters().MaxCommittableAge()
+	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
 	inputForNewAccount, newAccountOutputs, newAccountWallets := ts.TransactionFramework.CreateAccountFromInput("TX1:1",
 		testsuite.WithAccountConditions(iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
@@ -141,7 +141,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	destroyedAccountInput, destructionOutputs, destroyWallets := ts.TransactionFramework.DestroyAccount("TX1:0")
 
-	block2Slot := latestParent.ID().Index()
+	block2Slot := latestParent.ID().Slot()
 
 	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX2", append(newAccountWallets, destroyWallets...),
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
@@ -215,7 +215,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithDelegationStartEpoch(1),
 	)
 
-	block3Slot := latestParent.ID().Index()
+	block3Slot := latestParent.ID().Slot()
 
 	tx3 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX3", newDelegationWallets,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
@@ -272,7 +272,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithSlotCreated(block3Slot),
 	))
 
-	block4Slot := latestParent.ID().Index()
+	block4Slot := latestParent.ID().Slot()
 
 	block4 := ts.IssueBlockAtSlotWithOptions("block4", block4Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx4, blockfactory.WithStrongParents(latestParent.ID()))
 

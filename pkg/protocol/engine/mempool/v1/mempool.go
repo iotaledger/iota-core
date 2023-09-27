@@ -99,7 +99,7 @@ func (m *MemPool[VoteRank]) OnTransactionAttached(handler func(transaction mempo
 
 // MarkAttachmentOrphaned marks the attachment of the given block as orphaned.
 func (m *MemPool[VoteRank]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool {
-	if attachmentSlot := m.attachments.Get(blockID.Index(), false); attachmentSlot != nil {
+	if attachmentSlot := m.attachments.Get(blockID.Slot(), false); attachmentSlot != nil {
 		defer attachmentSlot.Delete(blockID)
 	}
 
@@ -185,9 +185,9 @@ func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, bl
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	if m.lastEvictedSlot >= blockID.Index() {
+	if m.lastEvictedSlot >= blockID.Slot() {
 		// block will be retained as invalid, we do not store tx failure as it was block's fault
-		return nil, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Index(), m.lastEvictedSlot)
+		return nil, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastEvictedSlot)
 	}
 
 	newTransaction, err := NewTransactionWithMetadata(transaction)
@@ -201,7 +201,7 @@ func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, bl
 	}
 
 	storedTransaction.addAttachment(blockID)
-	m.attachments.Get(blockID.Index(), true).Set(blockID, storedTransaction)
+	m.attachments.Get(blockID.Slot(), true).Set(blockID, storedTransaction)
 
 	return storedTransaction, isNew, nil
 }
@@ -343,7 +343,7 @@ func (m *MemPool[VoteRank]) updateAttachment(blockID iotago.BlockID, updateFunc 
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	if m.lastEvictedSlot < blockID.Index() {
+	if m.lastEvictedSlot < blockID.Slot() {
 		if transaction, exists := m.transactionByAttachment(blockID); exists {
 			return updateFunc(transaction, blockID)
 		}
@@ -353,7 +353,7 @@ func (m *MemPool[VoteRank]) updateAttachment(blockID iotago.BlockID, updateFunc 
 }
 
 func (m *MemPool[VoteRank]) transactionByAttachment(blockID iotago.BlockID) (*TransactionMetadata, bool) {
-	if attachmentsInSlot := m.attachments.Get(blockID.Index()); attachmentsInSlot != nil {
+	if attachmentsInSlot := m.attachments.Get(blockID.Slot()); attachmentsInSlot != nil {
 		return attachmentsInSlot.Get(blockID)
 	}
 
@@ -402,7 +402,7 @@ func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (stateDiff *StateDi
 
 func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
-		if slot := transaction.EarliestIncludedAttachment().Index(); slot > 0 {
+		if slot := transaction.EarliestIncludedAttachment().Slot(); slot > 0 {
 			if stateDiff, evicted := m.stateDiff(slot); !evicted {
 				if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
 					m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
@@ -428,7 +428,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	})
 
 	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
-		if err := m.updateStateDiffs(transaction, prevBlock.Index(), newBlock.Index()); err != nil {
+		if err := m.updateStateDiffs(transaction, prevBlock.Slot(), newBlock.Slot()); err != nil {
 			m.errorHandler(ierrors.Wrap(err, "failed to update state diffs"))
 		}
 	})
@@ -436,7 +436,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnEvicted(func() {
 		if m.cachedTransactions.Delete(transaction.ID()) {
 			transaction.attachments.ForEach(func(blockID iotago.BlockID, _ bool) bool {
-				if slotAttachments := m.attachments.Get(blockID.Index(), false); slotAttachments != nil {
+				if slotAttachments := m.attachments.Get(blockID.Slot(), false); slotAttachments != nil {
 					slotAttachments.Delete(blockID)
 				}
 

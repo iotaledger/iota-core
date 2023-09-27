@@ -78,8 +78,8 @@ func (c *Commitment) ID() iotago.CommitmentID {
 	return c.commitmentID
 }
 
-func (c *Commitment) Index() iotago.SlotIndex {
-	return c.Commitment().Index
+func (c *Commitment) Slot() iotago.SlotIndex {
+	return c.Commitment().Slot
 }
 
 func (c *Commitment) PreviousCommitmentID() iotago.CommitmentID {

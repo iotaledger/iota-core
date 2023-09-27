@@ -76,7 +76,7 @@ func (s *State) InRootBlockSlot(id iotago.BlockID) bool {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	return s.withinActiveIndexRange(id.Index())
+	return s.withinActiveIndexRange(id.Slot())
 }
 
 func (s *State) ActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
@@ -107,12 +107,12 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	defer s.evictionMutex.RUnlock()
 
 	// The rootblock is too old, ignore it.
-	if id.Index() < lo.Return1(s.activeIndexRange()) {
+	if id.Slot() < lo.Return1(s.activeIndexRange()) {
 		return
 	}
 
-	if s.rootBlocks.Get(id.Index(), true).Set(id, commitmentID) {
-		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Index())).Store(id, commitmentID); err != nil {
+	if s.rootBlocks.Get(id.Slot(), true).Set(id, commitmentID) {
+		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Store(id, commitmentID); err != nil {
 			panic(ierrors.Wrapf(err, "failed to store root block %s", id))
 		}
 	}
@@ -125,8 +125,8 @@ func (s *State) RemoveRootBlock(id iotago.BlockID) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if rootBlocks := s.rootBlocks.Get(id.Index()); rootBlocks != nil && rootBlocks.Delete(id) {
-		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Index())).Delete(id); err != nil {
+	if rootBlocks := s.rootBlocks.Get(id.Slot()); rootBlocks != nil && rootBlocks.Delete(id) {
+		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Delete(id); err != nil {
 			panic(err)
 		}
 	}
@@ -137,11 +137,11 @@ func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if !s.withinActiveIndexRange(id.Index()) {
+	if !s.withinActiveIndexRange(id.Slot()) {
 		return false
 	}
 
-	slotBlocks := s.rootBlocks.Get(id.Index(), false)
+	slotBlocks := s.rootBlocks.Get(id.Slot(), false)
 
 	return slotBlocks != nil && slotBlocks.Has(id)
 }
@@ -151,11 +151,11 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if !s.withinActiveIndexRange(id.Index()) {
+	if !s.withinActiveIndexRange(id.Slot()) {
 		return iotago.CommitmentID{}, false
 	}
 
-	slotBlocks := s.rootBlocks.Get(id.Index(), false)
+	slotBlocks := s.rootBlocks.Get(id.Slot(), false)
 	if slotBlocks == nil {
 		return iotago.CommitmentID{}, false
 	}
@@ -252,8 +252,8 @@ func (s *State) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "failed to parse root block's %s commitment id", rootBlockID)
 		}
 
-		if s.rootBlocks.Get(rootBlockID.Index(), true).Set(rootBlockID, commitmentID) {
-			if err := lo.PanicOnErr(s.rootBlockStorageFunc(rootBlockID.Index())).Store(rootBlockID, commitmentID); err != nil {
+		if s.rootBlocks.Get(rootBlockID.Slot(), true).Set(rootBlockID, commitmentID) {
+			if err := lo.PanicOnErr(s.rootBlockStorageFunc(rootBlockID.Slot())).Store(rootBlockID, commitmentID); err != nil {
 				panic(ierrors.Wrapf(err, "failed to store root block %s", rootBlockID))
 			}
 		}

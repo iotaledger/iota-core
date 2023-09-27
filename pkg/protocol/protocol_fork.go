@@ -20,11 +20,11 @@ import (
 func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) {
 	mainEngine := p.MainEngineInstance()
 
-	if mainEngine.Storage.Settings().LatestCommitment().Index() < commitmentID.Index() {
+	if mainEngine.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
 		return
 	}
 
-	commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Index())
+	commitment, err := mainEngine.Storage.Commitments().Load(commitmentID.Slot())
 	if err != nil {
 		p.HandleError(ierrors.Wrapf(err, "failed to load commitment %s", commitmentID))
 		return
@@ -34,13 +34,13 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 		return
 	}
 
-	attestations, err := mainEngine.Attestations.Get(commitmentID.Index())
+	attestations, err := mainEngine.Attestations.Get(commitmentID.Slot())
 	if err != nil {
 		p.HandleError(ierrors.Wrapf(err, "failed to load attestations for commitment %s", commitmentID))
 		return
 	}
 
-	rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Index())
+	rootsStorage, err := mainEngine.Storage.Roots(commitmentID.Slot())
 	if err != nil {
 		p.HandleError(ierrors.Errorf("failed to get roots storage for commitment %s", commitmentID))
 		return
@@ -84,7 +84,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	//   1. The candidate engine becomes synced and its chain is heavier than the main chain -> switch to it.
 	//   2. The candidate engine never becomes synced or its chain is not heavier than the main chain -> discard it after a timeout.
 	//   3. The candidate engine is not creating the same commitments as the chain we decided to switch to -> discard it immediately.
-	snapshotTargetIndex := fork.ForkingPoint.Index() - 1
+	snapshotTargetIndex := fork.ForkingPoint.Slot() - 1
 	candidateEngineInstance, err := p.EngineManager.ForkEngineAtSlot(snapshotTargetIndex)
 	if err != nil {
 		p.HandleError(ierrors.Wrap(err, "error creating new candidate engine"))
@@ -120,8 +120,8 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	// Attach slot commitments to the chain manager and detach as soon as we switch to that engine
 	detachProcessCommitment = candidateEngineInstance.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		// Check whether the commitment produced by syncing the candidate engine is actually part of the forked chain.
-		if fork.ForkedChain.LatestCommitment().ID().Index() >= commitment.Index() {
-			forkedChainCommitmentID := fork.ForkedChain.Commitment(commitment.Index()).ID()
+		if fork.ForkedChain.LatestCommitment().ID().Slot() >= commitment.Slot() {
+			forkedChainCommitmentID := fork.ForkedChain.Commitment(commitment.Slot()).ID()
 			if forkedChainCommitmentID != commitment.ID() {
 				p.HandleError(ierrors.Errorf("candidate engine %s produced a commitment %s that is not part of the forked chain %s", candidateEngineInstance.Name(), commitment.ID(), forkedChainCommitmentID))
 				cleanupFunc()
@@ -193,7 +193,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	ch := make(chan *commitmentVerificationResult)
 	defer close(ch)
 
-	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.MainChain.Commitment(fork.ForkingPoint.Index()-1).Commitment())
+	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.MainChain.Commitment(fork.ForkingPoint.Slot()-1).Commitment())
 	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) {
 		blockIDs, actualCumulativeWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 
@@ -232,8 +232,8 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	var heavierCount int
 	// We start from the forking point to have all starting blocks for each slot. Even though the chain weight will only
 	// start to diverge at forking point + AttestationCommitmentOffset.
-	start := fork.ForkingPoint.Index()
-	end := fork.ForkedChain.LatestCommitment().ID().Index()
+	start := fork.ForkingPoint.Slot()
+	end := fork.ForkedChain.LatestCommitment().ID().Slot()
 	for i := start; i <= end; i++ {
 		mainChainChainCommitment := fork.MainChain.Commitment(i)
 		if mainChainChainCommitment == nil {

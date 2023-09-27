@@ -148,7 +148,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 	commitmentID := commitment.MustID()
 
 	require.NoError(t, err)
-	tf.AddCommitment(commitment.Index, modelCommitment)
+	tf.AddCommitment(commitment.Slot, modelCommitment)
 
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
 	accountID := iotago.AccountID(addr[:])
@@ -195,7 +195,7 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 	commitmentID := commitment.MustID()
 
 	require.NoError(t, err)
-	tf.AddCommitment(commitment.Index, modelCommitment)
+	tf.AddCommitment(commitment.Slot, modelCommitment)
 
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
 	accountID := iotago.AccountID(addr[:])
@@ -256,7 +256,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	commitmentID := commitment.MustID()
 	require.NoError(t, err)
 	// add the commitment and 0 RMC to the proxy state
-	tf.AddCommitment(commitment.Index, modelCommitment)
+	tf.AddCommitment(commitment.Slot, modelCommitment)
 	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
 
 	tf.IssueSignedBlockAtSlot("correct", currentSlot, commitmentID, keyPair)
@@ -269,7 +269,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	commitmentID = commitment.MustID()
 	require.NoError(t, err)
 	// add the commitment and 0 RMC to the proxy state
-	tf.AddCommitment(commitment.Index, modelCommitment)
+	tf.AddCommitment(commitment.Slot, modelCommitment)
 	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
 
 	tf.IssueSignedBlockAtSlot("almostExpired", currentSlot, commitmentID, keyPair)
@@ -282,7 +282,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	commitmentID = commitment.MustID()
 	require.NoError(t, err)
 	// add the commitment and 0 RMC to the proxy state
-	tf.AddCommitment(commitment.Index, modelCommitment)
+	tf.AddCommitment(commitment.Slot, modelCommitment)
 	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
 
 	tf.IssueSignedBlockAtSlot("expired", currentSlot, commitmentID, keyPair)

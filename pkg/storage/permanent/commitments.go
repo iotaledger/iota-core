@@ -34,7 +34,7 @@ func NewCommitments(store kvstore.KVStore, apiProvider iotago.APIProvider) *Comm
 }
 
 func (c *Commitments) Store(commitment *model.Commitment) error {
-	return c.store.Set(commitment.Commitment().Index, commitment)
+	return c.store.Set(commitment.Commitment().Slot, commitment)
 }
 
 func (c *Commitments) Load(slot iotago.SlotIndex) (commitment *model.Commitment, err error) {

@@ -164,24 +164,24 @@ func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentI
 
 	committedSlot, err := b.protocol.MainEngineInstance().CommittedSlot(commitmentID)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get slot %d (not committed yet)", commitmentID.Index())
+		return ierrors.Wrapf(err, "failed to get slot %d (not committed yet)", commitmentID.Slot())
 	}
 
 	commitment, err := committedSlot.Commitment()
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get commitment from slot %d", commitmentID.Index())
+		return ierrors.Wrapf(err, "failed to get commitment from slot %d", commitmentID.Slot())
 	} else if commitment.ID() != commitmentID {
 		return ierrors.Wrapf(err, "commitment ID mismatch: %s != %s", commitment.ID(), commitmentID)
 	}
 
 	blockIDs, err := committedSlot.BlockIDs()
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get block IDs from slot %d", commitmentID.Index())
+		return ierrors.Wrapf(err, "failed to get block IDs from slot %d", commitmentID.Slot())
 	}
 
 	roots, err := committedSlot.Roots()
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to get roots from slot %d", commitmentID.Index())
+		return ierrors.Wrapf(err, "failed to get roots from slot %d", commitmentID.Slot())
 	}
 
 	b.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), src)
@@ -235,10 +235,10 @@ func (b *BlockDispatcher) inSyncWindow(engine *engine.Engine, block *model.Block
 	}
 
 	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
-	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Index()
-	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Index()).ProtocolParameters().MaxCommittableAge()
+	latestCommitmentIndex := engine.Storage.Settings().LatestCommitment().Slot()
+	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Slot()).ProtocolParameters().MaxCommittableAge()
 
-	return block.ID().Index() <= latestCommitmentIndex+maxCommittableAge
+	return block.ID().Slot() <= latestCommitmentIndex+maxCommittableAge
 }
 
 // warpSyncIfNecessary triggers a warp sync if necessary.
@@ -248,13 +248,13 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	}
 
 	chain := chainCommitment.Chain()
-	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
+	latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Slot()
 
-	if latestCommitmentIndex+1 >= chain.LatestCommitment().Commitment().Index() {
+	if latestCommitmentIndex+1 >= chain.LatestCommitment().Commitment().Slot() {
 		return
 	}
 
-	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Index()).ProtocolParameters().MaxCommittableAge()
+	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Slot()).ProtocolParameters().MaxCommittableAge()
 	warpSyncWindowSize := lo.Max(maxCommittableAge, b.optWarpSyncWindowSize)
 
 	for slotToWarpSync := latestCommitmentIndex + 1; slotToWarpSync <= latestCommitmentIndex+warpSyncWindowSize; slotToWarpSync++ {

@@ -17,17 +17,17 @@ func createSnapshots(_ echo.Context) (*apimodels.CreateSnapshotsResponse, error)
 			return nil, errors.WithMessagef(httpserver.ErrInvalidParameter, "invalid request, error: %s", err)
 		}
 
-		if request.Index == 0 {
+		if request.Slot == 0 {
 			return nil, errors.WithMessage(httpserver.ErrInvalidParameter, "index needs to be specified")
 		}
 
-		filePath := filepath.Join(filepath.Dir(deps.SnapshotsFullPath), fmt.Sprintf("full_snapshot_%d.bin", request.Index))
-		if err := deps.SnapshotManager.CreateFullSnapshot(Component.Daemon().ContextStopped(), request.Index, filePath, false); err != nil {
+		filePath := filepath.Join(filepath.Dir(deps.SnapshotsFullPath), fmt.Sprintf("full_snapshot_%d.bin", request.Slot))
+		if err := deps.SnapshotManager.CreateFullSnapshot(Component.Daemon().ContextStopped(), request.Slot, filePath, false); err != nil {
 			return nil, errors.WithMessagef(echo.ErrInternalServerError, "creating snapshot failed: %s", err)
 		}
 
 		return &createSnapshotsResponse{
-			Index:    request.Index,
+			Slot:    request.Slot,
 			FilePath: filePath,
 		}, nil
 	*/

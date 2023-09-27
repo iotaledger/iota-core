@@ -90,7 +90,7 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	set, _ := m.blockBurns.GetOrCreate(block.ID().Index(), func() ds.Set[iotago.BlockID] {
+	set, _ := m.blockBurns.GetOrCreate(block.ID().Slot(), func() ds.Set[iotago.BlockID] {
 		return ds.NewSet[iotago.BlockID]()
 	})
 	set.Add(block.ID())
@@ -98,7 +98,7 @@ func (m *Manager) TrackBlock(block *blocks.Block) {
 	if validationBlock, isValidationBlock := block.ValidationBlock(); isValidationBlock {
 		newSignaledBlock := model.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
 
-		m.latestSupportedVersionSignals.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *model.SignaledBlock, exists bool) *model.SignaledBlock {
+		m.latestSupportedVersionSignals.Get(block.ID().Slot(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *model.SignaledBlock, exists bool) *model.SignaledBlock {
 			if !exists {
 				return newSignaledBlock
 			}

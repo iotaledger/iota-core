@@ -57,7 +57,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 
 		e.HookConstructed(func() {
 			s.latestCommittedSlot = func() iotago.SlotIndex {
-				return e.Storage.Settings().LatestCommitment().Index()
+				return e.Storage.Settings().LatestCommitment().Slot()
 			}
 			s.blockCache = e.BlockCache
 			e.Events.Scheduler.LinkTo(s.events)
@@ -66,12 +66,12 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			})
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 				// when the last slot of an epoch is committed, remove the queues of validators that are no longer in the committee.
-				if e.CurrentAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Index()) == 0 {
+				if e.CurrentAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
 					s.bufferMutex.Lock()
 					defer s.bufferMutex.Unlock()
 
 					s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
-						if !s.seatManager.Committee(commitment.Index() + 1).HasAccount(accountID) {
+						if !s.seatManager.Committee(commitment.Slot() + 1).HasAccount(accountID) {
 							s.shutdownValidatorQueue(validatorQueue)
 							s.validatorBuffer.Delete(accountID)
 						}

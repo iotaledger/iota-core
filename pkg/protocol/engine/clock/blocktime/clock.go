@@ -37,7 +37,7 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 			confirmedTime: NewRelativeTime(),
 		}, opts, func(c *Clock) {
 			e.HookConstructed(func() {
-				latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Index()
+				latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Slot()
 				c.acceptedTime.Set(e.APIForSlot(latestCommitmentIndex).TimeProvider().SlotEndTime(latestCommitmentIndex))
 
 				latestFinalizedSlotIndex := e.Storage.Settings().LatestFinalizedSlot()

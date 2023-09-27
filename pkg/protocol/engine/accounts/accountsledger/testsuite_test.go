@@ -73,7 +73,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	}
 
 	blockFunc := func(id iotago.BlockID) (*blocks.Block, bool) {
-		storage := t.blocks.Get(id.Index())
+		storage := t.blocks.Get(id.Slot())
 		if storage == nil {
 			return nil, false
 		}

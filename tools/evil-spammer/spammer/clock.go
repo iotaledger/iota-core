@@ -55,22 +55,22 @@ package spammer
 
 // type SlotClock struct {
 // 	lastUpdated time.Time
-// 	updatedSlot slot.Index
+// 	updatedSlot slot.Slot
 
 // 	slotDuration time.Duration
 // }
 
-// func (c *SlotClock) Update(value slot.Index) {
+// func (c *SlotClock) Update(value slot.Slot) {
 // 	c.lastUpdated = time.Now()
 // 	c.updatedSlot = value
 // }
 
-// func (c *SlotClock) Get() slot.Index {
+// func (c *SlotClock) Get() slot.Slot {
 // 	return c.updatedSlot
 // }
 
-// func (c *SlotClock) GetRelative() slot.Index {
-// 	return c.updatedSlot + slot.Index(time.Since(c.lastUpdated)/c.slotDuration)
+// func (c *SlotClock) GetRelative() slot.Slot {
+// 	return c.updatedSlot + slot.Slot(time.Since(c.lastUpdated)/c.slotDuration)
 // }
 
 // // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -70,7 +70,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 		latestCommitment := e.Storage.Settings().LatestCommitment()
 
 		return NewManager(
-			latestCommitment.Index(),
+			latestCommitment.Slot(),
 			latestCommitment.CumulativeWeight(),
 			e.Storage.Attestations,
 			e.SybilProtection.SeatManager().Committee,
@@ -152,7 +152,7 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
 	}
 
 	// Only track attestations of active committee members.
-	if _, exists := m.committeeFunc(block.ID().Index()).GetSeat(block.ProtocolBlock().IssuerID); !exists {
+	if _, exists := m.committeeFunc(block.ID().Slot()).GetSeat(block.ProtocolBlock().IssuerID); !exists {
 		return
 	}
 
@@ -160,14 +160,14 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
 	defer m.commitmentMutex.RUnlock()
 
 	// We only care about attestations that are newer than the last committed slot.
-	if block.ID().Index() <= m.lastCommittedSlot {
+	if block.ID().Slot() <= m.lastCommittedSlot {
 		return
 	}
 
-	newAttestation := iotago.NewAttestation(m.apiProvider.APIForSlot(block.ID().Index()), block.ProtocolBlock())
+	newAttestation := iotago.NewAttestation(m.apiProvider.APIForSlot(block.ID().Slot()), block.ProtocolBlock())
 
 	// We keep only the latest attestation for each committee member.
-	m.futureAttestations.Get(block.ID().Index(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
+	m.futureAttestations.Get(block.ID().Slot(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
 		if !exists {
 			return newAttestation
 		}
@@ -182,7 +182,7 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
 }
 
 func (m *Manager) applyToPendingAttestations(attestation *iotago.Attestation, cutoffSlot iotago.SlotIndex) {
-	if attestation.SlotCommitmentID.Index() < cutoffSlot {
+	if attestation.SlotCommitmentID.Slot() < cutoffSlot {
 		return
 	}
 
@@ -208,7 +208,7 @@ func (m *Manager) applyToPendingAttestations(attestation *iotago.Attestation, cu
 		return
 	}
 
-	for i := cutoffSlot; i <= updatedAttestation.SlotCommitmentID.Index(); i++ {
+	for i := cutoffSlot; i <= updatedAttestation.SlotCommitmentID.Slot(); i++ {
 		m.pendingAttestations.Get(i, true).Set(attestation.IssuerID, updatedAttestation)
 	}
 }

@@ -156,7 +156,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	n.attachEngineLogs(failOnBlockFiltered, n.Protocol.MainEngineInstance())
 
 	events.Network.BlockReceived.Hook(func(block *model.Block, source peer.ID) {
-		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Index())
+		fmt.Printf("%s > Network.BlockReceived: from %s %s - %d\n", n.Name, source, block.ID(), block.ID().Slot())
 	})
 
 	events.Network.BlockRequestReceived.Hook(func(blockID iotago.BlockID, source peer.ID) {
@@ -194,13 +194,13 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	//})
 
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
-		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
 
 		n.attachEngineLogs(failOnBlockFiltered, e)
 	})
 
 	events.MainEngineSwitched.Hook(func(e *engine.Engine) {
-		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Index:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Index())
+		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
 	})
 
 	events.Network.Error.Hook(func(err error, id peer.ID) {
@@ -318,13 +318,13 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		})
 		require.NoError(n.Testing, err)
 
-		rootsStorage, err := instance.Storage.Roots(details.Commitment.ID().Index())
-		require.NoError(n.Testing, err, "roots storage for slot %d not found", details.Commitment.Index())
+		rootsStorage, err := instance.Storage.Roots(details.Commitment.ID().Slot())
+		require.NoError(n.Testing, err, "roots storage for slot %d not found", details.Commitment.Slot())
 		roots, err := rootsStorage.Load(details.Commitment.ID())
 		require.NoError(n.Testing, err)
 
 		attestationBlockIDs := make([]iotago.BlockID, 0)
-		tree, err := instance.Attestations.GetMap(details.Commitment.Index())
+		tree, err := instance.Attestations.GetMap(details.Commitment.Slot())
 		if err == nil {
 			err = tree.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
 				attestationBlockIDs = append(attestationBlockIDs, lo.PanicOnErr(value.BlockID()))
@@ -345,7 +345,7 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 	})
 
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Index(), block.ProtocolBlock().SlotCommitmentID)
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Slot(), block.ProtocolBlock().SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
@@ -504,7 +504,7 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 
 	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, alias)
 
-	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
+	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }
@@ -514,7 +514,7 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
 
-	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Index(), block.SlotCommitmentID(), block.SlotCommitmentID().Index(), block.ProtocolBlock().LatestFinalizedSlot)
+	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }

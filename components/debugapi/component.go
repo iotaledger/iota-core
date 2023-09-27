@@ -90,7 +90,7 @@ func configure() error {
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v2")
 
 	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
-		blocksPerSlot.Set(block.ID().Index(), append(lo.Return1(blocksPerSlot.GetOrCreate(block.ID().Index(), func() []*blocks.Block {
+		blocksPerSlot.Set(block.ID().Slot(), append(lo.Return1(blocksPerSlot.GetOrCreate(block.ID().Slot(), func() []*blocks.Block {
 			return make([]*blocks.Block, 0)
 		})), block))
 	})
@@ -132,7 +132,7 @@ func configure() error {
 				continue
 			}
 
-			epoch := deps.Protocol.APIForSlot(block.ID().Index()).TimeProvider().EpochFromSlot(block.ID().Index())
+			epoch := deps.Protocol.APIForSlot(block.ID().Slot()).TimeProvider().EpochFromSlot(block.ID().Slot())
 			blockStore, err := blocksPrunableStorage.Get(epoch, []byte{debugPrefixBlocks})
 			if err != nil {
 				panic(err)
@@ -160,7 +160,7 @@ func configure() error {
 
 		}
 
-		epoch := deps.Protocol.APIForSlot(blockID.Index()).TimeProvider().EpochFromSlot(blockID.Index())
+		epoch := deps.Protocol.APIForSlot(blockID.Slot()).TimeProvider().EpochFromSlot(blockID.Slot())
 		blockStore, err := blocksPrunableStorage.Get(epoch, []byte{debugPrefixBlocks})
 		if err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())

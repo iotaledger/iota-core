@@ -23,7 +23,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		return nil, err
 	}
 
-	slot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index()
+	slot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
 	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slot)
 	if err != nil {
@@ -61,7 +61,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 			pageSize = restapi.ParamsRestAPI.MaxPageSize
 		}
 	}
-	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index()
+	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 	// no cursor provided will be the first request
 	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
@@ -109,7 +109,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterAccountID)
 	}
-	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index()
+	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
 	accountData, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
@@ -169,11 +169,11 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	case iotago.OutputDelegation:
 		//nolint:forcetypeassert
 		delegationOutput := utxoOutput.Output().(*iotago.DelegationOutput)
-		latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index()
+		latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 		stakingEnd := delegationOutput.EndEpoch
 		// the output is in delayed calaiming state if endEpoch is set, otherwise we use latest possible epoch
 		if delegationOutput.EndEpoch == 0 {
-			stakingEnd = deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Index())
+			stakingEnd = deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
 		}
 		reward, actualStart, actualEnd, err = deps.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
 			delegationOutput.ValidatorAddress.AccountID(),

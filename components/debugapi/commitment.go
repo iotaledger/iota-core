@@ -92,7 +92,7 @@ func prepareCommitmentGraph(g *graphviz.Graphviz, rootCommitment *chainmanager.C
 }
 
 func createNode(graph *cgraph.Graph, commitment *chainmanager.ChainCommitment) (*cgraph.Node, error) {
-	node, err := graph.Node(fmt.Sprintf("%d: %s", commitment.ID().Index(), commitment.ID().String()[:8]))
+	node, err := graph.Node(fmt.Sprintf("%d: %s", commitment.ID().Slot(), commitment.ID().String()[:8]))
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "could not create node %s", commitment.ID().String()[:8])
 	}

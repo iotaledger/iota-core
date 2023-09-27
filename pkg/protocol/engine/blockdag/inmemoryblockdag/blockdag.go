@@ -129,7 +129,7 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 		// This limited size buffer has a nice side effect: In normal behavior (e.g. no attack of a neighbor that sends you
 		// unsolidifiable blocks in your committed slots) it will prevent the node from storing too many blocks in memory.
 		if b.uncommittedSlotBlocks.AddWithFunc(block.SlotCommitmentID(), block, func() bool {
-			return block.SlotCommitmentID().Index() > b.latestCommitmentFunc().Commitment().Index
+			return block.SlotCommitmentID().Slot() > b.latestCommitmentFunc().Commitment().Slot
 		}) {
 			return
 		}
