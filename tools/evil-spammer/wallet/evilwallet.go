@@ -428,7 +428,7 @@ func (e *EvilWallet) CreateTransaction(options ...Option) (signedTx *iotago.Sign
 
 // addOutputsToOutputManager adds output to the OutputManager if.
 func (e *EvilWallet) addOutputsToOutputManager(signedTx *iotago.SignedTransaction, outWallet, tmpWallet *Wallet, tempAddresses map[string]types.Empty) {
-	for idx, o := range signedTx.Transaction.Essence.Outputs {
+	for idx, o := range signedTx.Transaction.Outputs {
 		if o.UnlockConditionSet().Address() == nil {
 			continue
 		}
@@ -736,7 +736,7 @@ func (e *EvilWallet) PrepareCustomConflictsSpam(scenario *EvilScenario) (signedT
 	return
 }
 
-func (e *EvilWallet) PrepareAccountSpam(scenario *EvilScenario) (*iotago.Transaction, ScenarioAlias, error) {
+func (e *EvilWallet) PrepareAccountSpam(scenario *EvilScenario) (*iotago.SignedTransaction, ScenarioAlias, error) {
 	accountSpamOptions, allAliases := e.prepareFlatOptionsForAccountScenario(scenario)
 
 	tx, err := e.CreateTransaction(accountSpamOptions...)
