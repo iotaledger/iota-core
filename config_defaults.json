@@ -32,9 +32,7 @@
       "highWatermark": 10,
       "lowWatermark": 5
     },
-    "seed": "",
-    "overwriteStoredSeed": false,
-    "externalAddress": "auto",
+    "externalMultiAddresses": [],
     "identityPrivateKey": "",
     "db": {
       "path": "testnet/p2pstore"

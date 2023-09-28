@@ -73,8 +73,8 @@ package spammer
 // 	if err != nil {
 // 		panic(errors.Wrapf(err, "failed to get initiation commitment"))
 // 	}
-// 	c.commitmentChain[comm.Index()] = comm
-// 	c.latestCommitted = comm.Index()
+// 	c.commitmentChain[comm.Slot()] = comm
+// 	c.latestCommitted = comm.Slot()
 // }
 
 // // SetupTimeParams requests through API and sets the genesis time and slot duration for the commitment manager.
@@ -105,12 +105,12 @@ package spammer
 // }
 
 // func (c *CommitmentManager) commit(comm *iotago.Commitment) {
-// 	c.commitmentChain[comm.Index()] = comm
-// 	if comm.Index() > c.latestCommitted {
-// 		if comm.Index()-c.latestCommitted != 1 {
-// 			panic("next committed slot is not sequential, lastCommitted: " + c.latestCommitted.String() + " nextCommitted: " + comm.Index().String())
+// 	c.commitmentChain[comm.Slot()] = comm
+// 	if comm.Slot() > c.latestCommitted {
+// 		if comm.Slot()-c.latestCommitted != 1 {
+// 			panic("next committed slot is not sequential, lastCommitted: " + c.latestCommitted.String() + " nextCommitted: " + comm.Slot().String())
 // 		}
-// 		c.latestCommitted = comm.Index()
+// 		c.latestCommitted = comm.Slot()
 // 	}
 // }
 
@@ -133,26 +133,26 @@ package spammer
 // 		}
 // 		return comm, index, err
 // 	case "random":
-// 		slotIndex := c.clockSync.LatestCommittedSlotClock.Get()
-// 		newCommitment := randomCommitmentChain(slotIndex)
+// 		slot := c.clockSync.LatestCommittedSlotClock.Get()
+// 		newCommitment := randomCommitmentChain(slot)
 
-// 		return newCommitment, slotIndex - 10, nil
+// 		return newCommitment, slot - 10, nil
 
 // 	case "fork":
 // 		// it should request time periodically, and be relative
-// 		slotIndex := c.clockSync.LatestCommittedSlotClock.Get()
+// 		slot := c.clockSync.LatestCommittedSlotClock.Get()
 // 		// make sure chain is upto date to the forking point
 // 		uptoSlot := c.forkIndex
 // 		// get minimum
-// 		if slotIndex < c.forkIndex {
-// 			uptoSlot = slotIndex
+// 		if slot < c.forkIndex {
+// 			uptoSlot = slot
 // 		}
 // 		err := c.updateChainWithValidCommitment(uptoSlot)
 // 		if err != nil {
 // 			return nil, 0, errors.Wrap(err, "failed to update chain with valid commitment")
 // 		}
-// 		if c.isAfterForkPoint(slotIndex) {
-// 			c.updateForkedChain(slotIndex)
+// 		if c.isAfterForkPoint(slot) {
+// 			c.updateForkedChain(slot)
 // 		}
 // 		comm := c.getLatestCommitment()
 // 		index, err := clt.GetLatestConfirmedIndex()
@@ -164,8 +164,8 @@ package spammer
 // 	return nil, 0, nil
 // }
 
-// func (c *CommitmentManager) isAfterForkPoint(slotIndex slot.Index) bool {
-// 	return c.forkIndex != 0 && slotIndex > c.forkIndex
+// func (c *CommitmentManager) isAfterForkPoint(slot slot.Index) bool {
+// 	return c.forkIndex != 0 && slot > c.forkIndex
 // }
 
 // // updateChainWithValidCommitment commits the chain up to the given slot with the valid commitments.
@@ -180,8 +180,8 @@ package spammer
 // 	return nil
 // }
 
-// func (c *CommitmentManager) updateForkedChain(slotIndex slot.Index) {
-// 	for i := c.latestCommitted + 1; i <= slotIndex; i++ {
+// func (c *CommitmentManager) updateForkedChain(slot slot.Index) {
+// 	for i := c.latestCommitted + 1; i <= slot; i++ {
 // 		comm, err := c.getForkedCommitment(i)
 // 		if err != nil {
 // 			panic(errors.Wrapf(err, "failed to get forked commitment for slot %d", i))
@@ -212,7 +212,7 @@ package spammer
 // 	}
 // 	prevComm := c.commitmentChain[slot-1]
 // 	forkedComm := commitment.New(
-// 		validComm.Index(),
+// 		validComm.Slot(),
 // 		prevComm.ID(),
 // 		randomRoot(),
 // 		validComm.CumulativeWeight(),

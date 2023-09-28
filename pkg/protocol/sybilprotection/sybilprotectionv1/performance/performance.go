@@ -68,7 +68,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 
 	t.performanceFactorsMutex.Lock()
 	defer t.performanceFactorsMutex.Unlock()
-	isCommitteeMember, err := t.isCommitteeMember(block.ID().Index(), block.ProtocolBlock().IssuerID)
+	isCommitteeMember, err := t.isCommitteeMember(block.ID().Slot(), block.ProtocolBlock().IssuerID)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to check if account %s is committee member", block.ProtocolBlock().IssuerID))
 
@@ -247,9 +247,9 @@ func (t *Tracker) isCommitteeMember(slot iotago.SlotIndex, accountID iotago.Acco
 }
 
 func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.ValidationBlock, block *blocks.Block) {
-	validatorPerformances, err := t.validatorPerformancesFunc(block.ID().Index())
+	validatorPerformances, err := t.validatorPerformancesFunc(block.ID().Slot())
 	if err != nil {
-		t.errHandler(ierrors.Errorf("failed to load performance factor for slot %s", block.ID().Index()))
+		t.errHandler(ierrors.Errorf("failed to load performance factor for slot %s", block.ID().Slot()))
 
 		return
 	}
@@ -264,9 +264,9 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	}
 
 	// set bit at subslotIndex to 1 to indicate activity in that subslot
-	validatorPerformance.SlotActivityVector = validatorPerformance.SlotActivityVector | (1 << t.subslotIndex(block.ID().Index(), block.ProtocolBlock().IssuingTime))
+	validatorPerformance.SlotActivityVector = validatorPerformance.SlotActivityVector | (1 << t.subslotIndex(block.ID().Slot(), block.ProtocolBlock().IssuingTime))
 
-	apiForSlot := t.apiProvider.APIForSlot(block.ID().Index())
+	apiForSlot := t.apiProvider.APIForSlot(block.ID().Slot())
 	// we restrict the number up to ValidatorBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
 	// also it can fint into uint8
 	if validatorPerformance.BlockIssuedCount < apiForSlot.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot+1 {

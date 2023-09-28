@@ -23,7 +23,7 @@ func (s *Storage) IsPruning() bool {
 	return s.isPruning
 }
 
-func (s *Storage) LastPrunedEpoch() (index iotago.EpochIndex, hasPruned bool) {
+func (s *Storage) LastPrunedEpoch() (epoch iotago.EpochIndex, hasPruned bool) {
 	s.pruningLock.RLock()
 	defer s.pruningLock.RUnlock()
 
@@ -80,19 +80,19 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 	return nil
 }
 
-func (s *Storage) PruneByDepth(depth iotago.EpochIndex) (firstPruned, lastPruned iotago.EpochIndex, err error) {
+func (s *Storage) PruneByDepth(epochDepth iotago.EpochIndex) (firstPruned, lastPruned iotago.EpochIndex, err error) {
 	// Depth of 0 and 1 means we prune to the latestPrunableEpoch.
-	if depth == 0 {
-		depth = 1
+	if epochDepth == 0 {
+		epochDepth = 1
 	}
 
 	latestPrunableEpoch := s.latestPrunableEpoch()
-	if depth > latestPrunableEpoch {
-		return 0, 0, ierrors.Wrapf(database.ErrNoPruningNeeded, "depth %d is too big, latest prunable epoch is %d", depth, latestPrunableEpoch)
+	if epochDepth > latestPrunableEpoch {
+		return 0, 0, ierrors.Wrapf(database.ErrNoPruningNeeded, "epochDepth %d is too big, latest prunable epoch is %d", epochDepth, latestPrunableEpoch)
 	}
 
-	// We need to do (depth-1) because latestPrunableEpoch is already making sure that we keep at least one full epoch.
-	end := latestPrunableEpoch - (depth - 1)
+	// We need to do (epochDepth-1) because latestPrunableEpoch is already making sure that we keep at least one full epoch.
+	end := latestPrunableEpoch - (epochDepth - 1)
 
 	s.pruningLock.Lock()
 	defer s.pruningLock.Unlock()
@@ -100,13 +100,13 @@ func (s *Storage) PruneByDepth(depth iotago.EpochIndex) (firstPruned, lastPruned
 	// Make sure epoch is not already pruned.
 	start, canPrune := s.getPruningStart(end)
 	if !canPrune {
-		return 0, 0, ierrors.Wrapf(database.ErrEpochPruned, "depth %d is too big, want to prune until %d but pruned epoch is already %d", depth, end, lo.Return1(s.lastPrunedEpoch.Index()))
+		return 0, 0, ierrors.Wrapf(database.ErrEpochPruned, "epochDepth %d is too big, want to prune until %d but pruned epoch is already %d", epochDepth, end, lo.Return1(s.lastPrunedEpoch.Index()))
 	}
 
 	s.setIsPruning(true)
 	defer s.setIsPruning(false)
 
-	if err := s.pruneUntilEpoch(start, end, depth); err != nil {
+	if err := s.pruneUntilEpoch(start, end, epochDepth); err != nil {
 		return 0, 0, ierrors.Wrapf(err, "failed to prune from epoch %d to %d", start, end)
 	}
 
@@ -210,18 +210,18 @@ func (s *Storage) latestPrunableEpoch() iotago.EpochIndex {
 
 // PruneUntilEpoch prunes the database until the given epoch.
 // The caller needs to make sure that the start and target epoch take into account the specified pruning delay.
-func (s *Storage) pruneUntilEpoch(start iotago.EpochIndex, target iotago.EpochIndex, pruningDelay iotago.EpochIndex) error {
-	for currentIndex := start; currentIndex <= target; currentIndex++ {
-		if err := s.prunable.Prune(currentIndex, pruningDelay); err != nil {
-			return ierrors.Wrapf(err, "failed to prune epoch in prunable %d", currentIndex)
+func (s *Storage) pruneUntilEpoch(startEpoch iotago.EpochIndex, targetEpoch iotago.EpochIndex, pruningDelay iotago.EpochIndex) error {
+	for currentEpoch := startEpoch; currentEpoch <= targetEpoch; currentEpoch++ {
+		if err := s.prunable.Prune(currentEpoch, pruningDelay); err != nil {
+			return ierrors.Wrapf(err, "failed to prune epoch in prunable %d", currentEpoch)
 		}
 
-		if err := s.permanent.PruneUTXOLedger(currentIndex); err != nil {
-			return ierrors.Wrapf(err, "failed to prune epoch in permanent %d", currentIndex)
+		if err := s.permanent.PruneUTXOLedger(currentEpoch); err != nil {
+			return ierrors.Wrapf(err, "failed to prune epoch in permanent %d", currentEpoch)
 		}
 	}
 
-	s.lastPrunedEpoch.MarkEvicted(target)
+	s.lastPrunedEpoch.MarkEvicted(targetEpoch)
 
 	return nil
 }

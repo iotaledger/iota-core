@@ -26,7 +26,7 @@ func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (
 	commitmentIndex := iotago.SlotIndex(req.GetCommitmentIndex())
 
 	if req.GetCommitmentId() != nil {
-		commitmentIndex = req.GetCommitmentId().Unwrap().Index()
+		commitmentIndex = req.GetCommitmentId().Unwrap().Slot()
 	}
 
 	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentIndex)

@@ -6,7 +6,7 @@
     - firewall
 
 - hosts: cores:&internal_nodes
-  gather_facts: no
+  gather_facts: yes
   roles:
     - wireguard
     - iota-core-node

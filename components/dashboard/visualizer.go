@@ -94,8 +94,8 @@ func runVisualizer(component *app.Component) {
 						})
 					}
 				}
-				// if block.ID().Index() > slot.Index(currentSlot.Load()) {
-				// 	currentSlot.Store(int64(block.ID().Index()))
+				// if block.ID().Slot() > slot.Index(currentSlot.Load()) {
+				// 	currentSlot.Store(int64(block.ID().Slot()))
 				// }
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {

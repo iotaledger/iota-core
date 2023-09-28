@@ -129,8 +129,8 @@ func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockI
 	b.retainBlockFailure = retainBlockFailure
 }
 
-func (b *Booker) evict(slotIndex iotago.SlotIndex) {
-	b.bookingOrder.EvictUntil(slotIndex)
+func (b *Booker) evict(slot iotago.SlotIndex) {
+	b.bookingOrder.EvictUntil(slot)
 }
 
 func (b *Booker) book(block *blocks.Block) error {

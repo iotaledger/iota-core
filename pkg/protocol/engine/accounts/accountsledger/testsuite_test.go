@@ -62,18 +62,18 @@ func NewTestSuite(test *testing.T) *TestSuite {
 
 func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	prunableStores := make(map[iotago.SlotIndex]kvstore.KVStore)
-	slotDiffFunc := func(index iotago.SlotIndex) (*slotstore.AccountDiffs, error) {
-		if _, exists := prunableStores[index]; !exists {
-			prunableStores[index] = mapdb.NewMapDB()
+	slotDiffFunc := func(slot iotago.SlotIndex) (*slotstore.AccountDiffs, error) {
+		if _, exists := prunableStores[slot]; !exists {
+			prunableStores[slot] = mapdb.NewMapDB()
 		}
 
-		p := slotstore.NewAccountDiffs(index, prunableStores[index], tpkg.TestAPI)
+		p := slotstore.NewAccountDiffs(slot, prunableStores[slot], tpkg.TestAPI)
 
 		return p, nil
 	}
 
 	blockFunc := func(id iotago.BlockID) (*blocks.Block, bool) {
-		storage := t.blocks.Get(id.Index())
+		storage := t.blocks.Get(id.Slot())
 		if storage == nil {
 			return nil, false
 		}
@@ -86,13 +86,13 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 	return manager
 }
 
-func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana, actions map[string]*AccountActions) {
+func (t *TestSuite) ApplySlotActions(slot iotago.SlotIndex, rmc iotago.Mana, actions map[string]*AccountActions) {
 	slotDetails := newSlotData()
-	t.slotData.Set(slotIndex, slotDetails)
+	t.slotData.Set(slot, slotDetails)
 
 	// Commit an empty diff if no actions specified.
 	if len(actions) == 0 {
-		err := t.Instance.ApplyDiff(slotIndex, rmc, make(map[iotago.AccountID]*model.AccountDiff), ds.NewSet[iotago.AccountID]())
+		err := t.Instance.ApplyDiff(slot, rmc, make(map[iotago.AccountID]*model.AccountDiff), ds.NewSet[iotago.AccountID]())
 		require.NoError(t.T, err)
 		return
 	}
@@ -104,8 +104,8 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 		// Apply the burns to the manager.
 		slotDetails.Burns[accountID] = iotago.Mana(action.NumBlocks) * rmc // this line assumes that the workscore of all block is 1
 		for i := 0; i < action.NumBlocks; i++ {
-			block := t.createBlockWithRMC(accountID, slotIndex, rmc)
-			t.blocks.Get(slotIndex, true).Set(block.ID(), block)
+			block := t.createBlockWithRMC(accountID, slot, rmc)
+			t.blocks.Get(slot, true).Set(block.ID(), block)
 			t.Instance.TrackBlock(block)
 		}
 
@@ -124,7 +124,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 			}
 			t.latestFieldsPerAccount.Set(accountID, prevAccountFields)
 		}
-		prevAccountFields.UpdatedInSlots.Add(slotIndex)
+		prevAccountFields.UpdatedInSlots.Add(slot)
 
 		// Put everything together in the format that the manager expects.
 		slotDetails.SlotDiff[accountID] = &model.AccountDiff{
@@ -141,7 +141,7 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 		}
 
 		if action.TotalAllotments+iotago.Mana(action.NumBlocks)*rmc != 0 || !exists { // this line assumes that workscore of all blocks is 1
-			prevAccountFields.BICUpdatedAt = slotIndex
+			prevAccountFields.BICUpdatedAt = slot
 		}
 
 		// If an output ID is specified, we need to update the latest output ID for the account as we transitioned it within this slot.
@@ -184,13 +184,13 @@ func (t *TestSuite) ApplySlotActions(slotIndex iotago.SlotIndex, rmc iotago.Mana
 		diffs[accountID] = diff.Clone()
 	}
 
-	err := t.Instance.ApplyDiff(slotIndex, rmc, diffs, slotDetails.DestroyedAccounts.Clone())
+	err := t.Instance.ApplyDiff(slot, rmc, diffs, slotDetails.DestroyedAccounts.Clone())
 	require.NoError(t.T, err)
 }
 
-func (t *TestSuite) createBlockWithRMC(accountID iotago.AccountID, index iotago.SlotIndex, rmc iotago.Mana) *blocks.Block {
+func (t *TestSuite) createBlockWithRMC(accountID iotago.AccountID, slot iotago.SlotIndex, rmc iotago.Mana) *blocks.Block {
 	innerBlock := tpkg.RandBasicBlockWithIssuerAndRMC(tpkg.TestAPI, accountID, rmc)
-	innerBlock.IssuingTime = tpkg.TestAPI.TimeProvider().SlotStartTime(index)
+	innerBlock.IssuingTime = tpkg.TestAPI.TimeProvider().SlotStartTime(slot)
 	modelBlock, err := model.BlockFromBlock(innerBlock)
 
 	require.NoError(t.T, err)
@@ -198,9 +198,9 @@ func (t *TestSuite) createBlockWithRMC(accountID iotago.AccountID, index iotago.
 	return blocks.NewBlock(modelBlock)
 }
 
-func (t *TestSuite) AssertAccountLedgerUntilWithoutNewState(slotIndex iotago.SlotIndex) {
+func (t *TestSuite) AssertAccountLedgerUntilWithoutNewState(slot iotago.SlotIndex) {
 	// Assert the state for each slot.
-	for i := iotago.SlotIndex(1); i <= slotIndex; i++ {
+	for i := iotago.SlotIndex(1); i <= slot; i++ {
 		storedAccountsState, exists := t.accountsStatePerSlot.Get(i)
 		require.True(t.T, exists, "accountsStatePerSlot should exist for slot %d should exist", i)
 
@@ -211,9 +211,9 @@ func (t *TestSuite) AssertAccountLedgerUntilWithoutNewState(slotIndex iotago.Slo
 	}
 }
 
-func (t *TestSuite) AssertAccountLedgerUntil(slotIndex iotago.SlotIndex, accountsState map[string]*AccountState) {
+func (t *TestSuite) AssertAccountLedgerUntil(slot iotago.SlotIndex, accountsState map[string]*AccountState) {
 	expectedAccountsStateForSlot := make(map[iotago.AccountID]*AccountState)
-	t.accountsStatePerSlot.Set(slotIndex, expectedAccountsStateForSlot)
+	t.accountsStatePerSlot.Set(slot, expectedAccountsStateForSlot)
 
 	// Populate accountsStatePerSlot with the expected state for the given slot.
 	for alias, expectedState := range accountsState {
@@ -221,14 +221,14 @@ func (t *TestSuite) AssertAccountLedgerUntil(slotIndex iotago.SlotIndex, account
 		expectedAccountsStateForSlot[accountID] = expectedState
 	}
 
-	t.AssertAccountLedgerUntilWithoutNewState(slotIndex)
+	t.AssertAccountLedgerUntilWithoutNewState(slot)
 }
 
-func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
+func (t *TestSuite) assertAccountState(slot iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
 	expectedBlockIssuerKeys := t.BlockIssuerKeys(expectedState.BlockIssuerKeys, false)
 	expectedCredits := accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(expectedState.BICAmount), expectedState.BICUpdatedTime)
 
-	actualState, exists, err := t.Instance.Account(accountID, slotIndex)
+	actualState, exists, err := t.Instance.Account(accountID, slot)
 	require.NoError(t.T, err)
 
 	if expectedState.Destroyed {
@@ -240,27 +240,27 @@ func (t *TestSuite) assertAccountState(slotIndex iotago.SlotIndex, accountID iot
 	require.True(t.T, exists)
 
 	require.Equal(t.T, accountID, actualState.ID)
-	require.Equal(t.T, expectedCredits, actualState.Credits, "slotIndex: %d, accountID %s: expected: %v, actual: %v", slotIndex, accountID, expectedCredits, actualState.Credits)
-	require.True(t.T, expectedBlockIssuerKeys.Equal(actualState.BlockIssuerKeys), "slotIndex: %d, accountID %s: expected: %s, actual: %s", slotIndex, accountID, expectedBlockIssuerKeys, actualState.BlockIssuerKeys)
+	require.Equal(t.T, expectedCredits, actualState.Credits, "slot: %d, accountID %s: expected: %v, actual: %v", slot, accountID, expectedCredits, actualState.Credits)
+	require.True(t.T, expectedBlockIssuerKeys.Equal(actualState.BlockIssuerKeys), "slot: %d, accountID %s: expected: %s, actual: %s", slot, accountID, expectedBlockIssuerKeys, actualState.BlockIssuerKeys)
 
 	require.Equal(t.T, t.OutputID(expectedState.OutputID, false), actualState.OutputID)
-	require.Equal(t.T, expectedState.StakeEndEpoch, actualState.StakeEndEpoch, "slotIndex: %d, accountID %s: expected StakeEndEpoch: %d, actual: %d", slotIndex, accountID, expectedState.StakeEndEpoch, actualState.StakeEndEpoch)
-	require.Equal(t.T, expectedState.ValidatorStake, actualState.ValidatorStake, "slotIndex: %d, accountID %s: expected ValidatorStake: %d, actual: %d", slotIndex, accountID, expectedState.ValidatorStake, actualState.ValidatorStake)
-	require.Equal(t.T, expectedState.FixedCost, actualState.FixedCost, "slotIndex: %d, accountID %s: expected FixedCost: %d, actual: %d", slotIndex, accountID, expectedState.FixedCost, actualState.FixedCost)
-	require.Equal(t.T, expectedState.DelegationStake, actualState.DelegationStake, "slotIndex: %d, accountID %s: expected DelegationStake: %d, actual: %d", slotIndex, accountID, expectedState.DelegationStake, actualState.DelegationStake)
-	require.Equal(t.T, expectedState.LatestSupportedProtocolVersionAndHash, actualState.LatestSupportedProtocolVersionAndHash, "slotIndex: %d, accountID %s: expected LatestSupportedProtocolVersionAndHash: %d, actual: %d", slotIndex, accountID, expectedState.LatestSupportedProtocolVersionAndHash, actualState.LatestSupportedProtocolVersionAndHash)
+	require.Equal(t.T, expectedState.StakeEndEpoch, actualState.StakeEndEpoch, "slot: %d, accountID %s: expected StakeEndEpoch: %d, actual: %d", slot, accountID, expectedState.StakeEndEpoch, actualState.StakeEndEpoch)
+	require.Equal(t.T, expectedState.ValidatorStake, actualState.ValidatorStake, "slot: %d, accountID %s: expected ValidatorStake: %d, actual: %d", slot, accountID, expectedState.ValidatorStake, actualState.ValidatorStake)
+	require.Equal(t.T, expectedState.FixedCost, actualState.FixedCost, "slot: %d, accountID %s: expected FixedCost: %d, actual: %d", slot, accountID, expectedState.FixedCost, actualState.FixedCost)
+	require.Equal(t.T, expectedState.DelegationStake, actualState.DelegationStake, "slot: %d, accountID %s: expected DelegationStake: %d, actual: %d", slot, accountID, expectedState.DelegationStake, actualState.DelegationStake)
+	require.Equal(t.T, expectedState.LatestSupportedProtocolVersionAndHash, actualState.LatestSupportedProtocolVersionAndHash, "slot: %d, accountID %s: expected LatestSupportedProtocolVersionAndHash: %d, actual: %d", slot, accountID, expectedState.LatestSupportedProtocolVersionAndHash, actualState.LatestSupportedProtocolVersionAndHash)
 
 }
 
-func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
-	actualDiff, destroyed, err := t.Instance.LoadSlotDiff(slotIndex, accountID)
-	if !lo.Return1(t.latestFieldsPerAccount.Get(accountID)).UpdatedInSlots.Has(slotIndex) {
-		require.Errorf(t.T, err, "expected error for account %s at slot %d", accountID, slotIndex)
+func (t *TestSuite) assertDiff(slot iotago.SlotIndex, accountID iotago.AccountID, expectedState *AccountState) {
+	actualDiff, destroyed, err := t.Instance.LoadSlotDiff(slot, accountID)
+	if !lo.Return1(t.latestFieldsPerAccount.Get(accountID)).UpdatedInSlots.Has(slot) {
+		require.Errorf(t.T, err, "expected error for account %s at slot %d", accountID, slot)
 		return
 	}
 	require.NoError(t.T, err)
 
-	accountsSlotBuildData, exists := t.slotData.Get(slotIndex)
+	accountsSlotBuildData, exists := t.slotData.Get(slot)
 	require.True(t.T, exists)
 	expectedAccountDiff := accountsSlotBuildData.SlotDiff[accountID]
 
@@ -273,8 +273,8 @@ func (t *TestSuite) assertDiff(slotIndex iotago.SlotIndex, accountID iotago.Acco
 		require.Equal(t.T, expectedState.Destroyed, destroyed)
 		require.True(t.T, accountsSlotBuildData.DestroyedAccounts.Has(accountID))
 
-		if slotIndex > 1 {
-			previousAccountState, exists := t.accountsStatePerSlot.Get(slotIndex - 1)
+		if slot > 1 {
+			previousAccountState, exists := t.accountsStatePerSlot.Get(slot - 1)
 			require.True(t.T, exists)
 
 			require.True(t.T, t.BlockIssuerKeys(previousAccountState[accountID].BlockIssuerKeys, false).Equal(actualDiff.BlockIssuerKeysRemoved))
