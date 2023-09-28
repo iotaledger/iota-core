@@ -108,7 +108,10 @@ func (t *TestFramework) AttachTransaction(transactionAlias, blockAlias string, s
 }
 
 func (t *TestFramework) CommitSlot(slot iotago.SlotIndex) {
-	stateDiff := t.Instance.StateDiff(slot)
+	stateDiff, err := t.Instance.StateDiff(slot)
+	if err != nil {
+		panic(err)
+	}
 
 	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.OutputStateMetadata) bool {
 		t.ledgerState.AddOutputState(state.State())
@@ -323,7 +326,8 @@ func (t *TestFramework) requireMarkedBooked(transactionAliases ...string) {
 }
 
 func (t *TestFramework) AssertStateDiff(slot iotago.SlotIndex, spentOutputAliases, createdOutputAliases, transactionAliases []string) {
-	stateDiff := t.Instance.StateDiff(slot)
+	stateDiff, err := t.Instance.StateDiff(slot)
+	require.NoError(t.test, err)
 
 	require.Equal(t.test, len(spentOutputAliases), stateDiff.DestroyedStates().Size())
 	require.Equal(t.test, len(createdOutputAliases), stateDiff.CreatedStates().Size())

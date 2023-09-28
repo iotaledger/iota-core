@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -28,6 +29,8 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 
 	// resolveState is the function that is used to request state from the ledger.
 	resolveState mempool.StateReferenceResolver
+
+	mutationsFunc func(iotago.SlotIndex) (kvstore.KVStore, error)
 
 	// attachments is the storage that is used to keep track of the attachments of transactions.
 	attachments *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata]
@@ -61,11 +64,12 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 }
 
 // New is the constructor of the MemPool.
-func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
+func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, mutationsFunc func(iotago.SlotIndex) (kvstore.KVStore, error), workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
 	return options.Apply(&MemPool[VoteRank]{
 		transactionAttached:    event.New1[mempool.TransactionMetadata](),
 		executeStateTransition: vm,
 		resolveState:           inputResolver,
+		mutationsFunc:          mutationsFunc,
 		attachments:            memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata](),
 		cachedTransactions:     shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
 		cachedStateRequests:    shrinkingmap.New[iotago.Identifier, *promise.Promise[mempool.State]](),
@@ -153,12 +157,17 @@ func (m *MemPool[VoteRank]) TransactionMetadataByAttachment(blockID iotago.Block
 }
 
 // StateDiff returns the state diff for the given slot.
-func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) mempool.StateDiff {
+func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) (mempool.StateDiff, error) {
 	if stateDiff, exists := m.stateDiffs.Get(slot); exists {
-		return stateDiff
+		return stateDiff, nil
 	}
 
-	return NewStateDiff(slot)
+	kv, err := m.mutationsFunc(slot)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get state diff for slot %d", slot)
+	}
+
+	return NewStateDiff(slot, kv), nil
 }
 
 // Evict evicts the slot with the given slot from the MemPool.
@@ -374,10 +383,13 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 	}
 
 	if transaction.IsAccepted() && newIndex != 0 {
-		if stateDiff, evicted := m.stateDiff(newIndex); !evicted {
-			if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
-				return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
-			}
+		stateDiff, err := m.stateDiff(newIndex)
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to get state diff for slot %d", newIndex)
+		}
+
+		if err = stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
+			return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
 		}
 	}
 
@@ -392,21 +404,30 @@ func (m *MemPool[VoteRank]) setup() {
 	})
 }
 
-func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (stateDiff *StateDiff, evicted bool) {
+func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error) {
 	if m.lastEvictedSlot >= slot {
-		return nil, true
+		return nil, ierrors.Errorf("slot %d is older than last evicted slot %d", slot, m.lastEvictedSlot)
 	}
 
-	return lo.Return1(m.stateDiffs.GetOrCreate(slot, func() *StateDiff { return NewStateDiff(slot) })), false
+	kv, err := m.mutationsFunc(slot)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get state diff for slot %d", slot)
+	}
+
+	return lo.Return1(m.stateDiffs.GetOrCreate(slot, func() *StateDiff { return NewStateDiff(slot, kv) })), nil
 }
 
 func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
-		if slot := transaction.EarliestIncludedAttachment().Slot(); slot > 0 {
-			if stateDiff, evicted := m.stateDiff(slot); !evicted {
-				if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
-					m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
-				}
+		// Transactions can only become accepted if there is at least one attachment is included.
+		if slot := transaction.EarliestIncludedAttachment().Slot(); slot != 0 {
+			stateDiff, err := m.stateDiff(slot)
+			if err != nil {
+				m.errorHandler(ierrors.Wrapf(err, "failed to get state diff for slot %d", slot))
+			}
+
+			if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
+				m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
 			}
 		}
 	})

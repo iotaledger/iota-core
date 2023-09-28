@@ -17,7 +17,10 @@ func init() {
 
 func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) error {
 	slot := scd.Commitment.Slot()
-	stateDiff := deps.Protocol.MainEngineInstance().Ledger.MemPool().StateDiff(slot)
+	stateDiff, err := deps.Protocol.MainEngineInstance().Ledger.MemPool().StateDiff(slot)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to retrieve state diff for slot %d", slot)
+	}
 	mutationsTree := ads.NewSet(mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.SlotIdentifierFromBytes)
 	tcs := &TransactionsChangesResponse{
 		Index:                slot,

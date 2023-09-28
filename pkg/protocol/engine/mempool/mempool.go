@@ -23,7 +23,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] interface {
 
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transaction TransactionMetadata, exists bool)
 
-	StateDiff(slot iotago.SlotIndex) StateDiff
+	StateDiff(slot iotago.SlotIndex) (StateDiff, error)
 
 	Evict(slot iotago.SlotIndex)
 }

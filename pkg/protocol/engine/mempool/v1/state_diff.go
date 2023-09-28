@@ -5,7 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -24,14 +24,14 @@ type StateDiff struct {
 	mutations ads.Set[iotago.TransactionID]
 }
 
-func NewStateDiff(slot iotago.SlotIndex) *StateDiff {
+func NewStateDiff(slot iotago.SlotIndex, kv kvstore.KVStore) *StateDiff {
 	return &StateDiff{
 		slot:                 slot,
 		spentOutputs:         shrinkingmap.New[iotago.OutputID, mempool.OutputStateMetadata](),
 		createdOutputs:       shrinkingmap.New[iotago.OutputID, mempool.OutputStateMetadata](),
 		executedTransactions: orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata](),
 		stateUsageCounters:   shrinkingmap.New[iotago.OutputID, int](),
-		mutations:            ads.NewSet(mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.SlotIdentifierFromBytes),
+		mutations:            ads.NewSet(kv, iotago.TransactionID.Bytes, iotago.SlotIdentifierFromBytes),
 	}
 }
 
