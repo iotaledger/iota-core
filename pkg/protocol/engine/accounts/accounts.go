@@ -141,7 +141,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 			}
 			bytesConsumed += bytesRead
 			a.BlockIssuerKeys.Add(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519PublicKey))
-		case iotago.BlockIssuerKeyEd25519Address:
+		case iotago.BlockIssuerKeyPublicKeyHash:
 			var implicitAccountCreationAddress iotago.ImplicitAccountCreationAddress
 			bytesRead, err = io.ReadFull(reader, implicitAccountCreationAddress[:])
 			if err != nil {

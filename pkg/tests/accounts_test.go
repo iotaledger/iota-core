@@ -329,10 +329,10 @@ func Test_TransitionAccount(t *testing.T) {
 
 	inputForImplicitAccountTransition, outputsForImplicitAccountTransition, fullAccountWallet := ts.TransactionFramework.TransitionImplicitAccountToAccountOutput(
 		"TX5:0",
-		testsuite.WithBlockIssuerFeature(&iotago.BlockIssuerFeature{
-			BlockIssuerKeys: iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
-			ExpirySlot:      iotago.MaxSlotIndex,
-		}),
+		testsuite.WithBlockIssuerFeature(
+			iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
+			iotago.MaxSlotIndex,
+		),
 	)
 
 	tx6 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX6", fullAccountWallet,

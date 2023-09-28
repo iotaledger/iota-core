@@ -313,7 +313,7 @@ func (t *TransactionFramework) TransitionAccount(alias string, opts ...options.O
 	return output, iotago.Outputs[iotago.Output]{accountOutput}, []*mock.HDWallet{t.wallet}
 }
 
-func (t *TransactionFramework) TransitionImplicitAccountToAccountOutput(alias string, opts ...options.Option[iotago.AccountOutput]) (consumedInput utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
+func (t *TransactionFramework) TransitionImplicitAccountToAccountOutput(alias string, opts ...options.Option[builder.AccountOutputBuilder]) (consumedInput utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
 	input, exists := t.states[alias]
 	if !exists {
 		panic(fmt.Sprintf("output with alias %s does not exist", alias))
