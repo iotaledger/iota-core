@@ -599,7 +599,6 @@ func (e *EvilWallet) matchOutputsWithAliases(buildOptions *Options, tempWallet *
 		case iotago.OutputAccount:
 			outputBuilder := builder.NewAccountOutputBuilder(addr, addr, output.BaseTokenAmount())
 			outputs = append(outputs, outputBuilder.MustBuild())
-			fmt.Println("having accout output", outputBuilder.MustBuild())
 		}
 
 		addrAliasMap[addr.String()] = alias

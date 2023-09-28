@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iotaledger/iota-core/tools/evil-spammer/accountwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/interactive"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/logger"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
@@ -38,13 +39,47 @@ func main() {
 	case "basic":
 		programs.CustomSpam(&customSpamParams)
 	case "accounts":
-		//AccountWalletRun()
+		accWallet := accountwallet.Run()
+		accountsSubcommands(accWallet)
 	case "quick":
 		programs.QuickTest(&quickTestParams)
 	// case SpammerTypeCommitments:
 	// 	CommitmentsSpam(&commitmentsSpamParams)
 	default:
 		log.Warnf("Unknown parameter for script, possible values: basic, quick, commitments")
+	}
+}
+
+func accountsSubcommands(wallet *accountwallet.AccountWallet) {
+	switch Subcommand {
+	case accountwallet.CreateAccountCommand:
+		err := wallet.CreateAccount(&createAccountParams)
+		if err != nil {
+			log.Errorf("Error creating account: %v", err)
+
+			return
+		}
+	case accountwallet.DestroyAccountCommand:
+		err := wallet.DestroyAccount(&destoryAccountParams)
+		if err != nil {
+			log.Errorf("Error destroying account: %v", err)
+
+			return
+		}
+	case accountwallet.ListAccountsCommand:
+		err := wallet.ListAccount()
+		if err != nil {
+			log.Errorf("Error listing accounts: %v", err)
+
+			return
+		}
+	case accountwallet.AllotAccountCommand:
+		err := wallet.AllotToAccount(&allotAccountParams)
+		if err != nil {
+			log.Errorf("Error allotting account: %v", err)
+
+			return
+		}
 	}
 }
 
@@ -60,6 +95,13 @@ func parseFlags() (help bool) {
 	switch Script {
 	case "basic":
 		parseBasicSpamFlags()
+	case "accounts":
+		// pass subcommands
+		subcommands := make([]string, 0)
+		if len(os.Args) > 2 {
+			subcommands = os.Args[2:]
+		}
+		parseAccountHandlerFlags(subcommands)
 	case "quick":
 		parseQuickTestFlags()
 		// case SpammerTypeCommitments:
@@ -72,8 +114,12 @@ func parseFlags() (help bool) {
 	return
 }
 
-func parseOptionFlagSet(flagSet *flag.FlagSet) {
-	err := flagSet.Parse(os.Args[2:])
+func parseOptionFlagSet(flagSet *flag.FlagSet, args ...[]string) {
+	commands := os.Args[2:]
+	if len(args) > 0 {
+		commands = args[0]
+	}
+	err := flagSet.Parse(commands)
 	if err != nil {
 		log.Errorf("Cannot parse first `script` parameter")
 		return
@@ -158,6 +204,19 @@ func parseQuickTestFlags() {
 	quickTestParams.TimeUnit = *timeunit
 	quickTestParams.DelayBetweenConflicts = *delayBetweenConflicts
 	quickTestParams.VerifyLedger = *verifyLedger
+}
+
+func parseAccountHandlerFlags(subcommands []string) {
+	Subcommand = subcommands[0]
+
+	switch Subcommand {
+	case "create-account":
+		alias := optionFlagSet.String("alias", "", "Alias of the account to be created")
+		amount := optionFlagSet.Int("amount", 100, "Amount of foucet tokens to be used for the accountcreation")
+		parseOptionFlagSet(optionFlagSet, subcommands)
+		createAccountParams.Alias = *alias
+		createAccountParams.Amount = uint64(*amount)
+	}
 }
 
 // func parseCommitmentsSpamFlags() {
