@@ -233,16 +233,16 @@ func (s *Spammer) StopSpamming() {
 
 // PostTransaction use provided client to issue a transaction. It chooses API method based on Spammer options. Counts errors,
 // counts transactions and provides debug logs.
-func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt wallet.Client) {
-	if tx == nil {
+func (s *Spammer) PostTransaction(signedTx *iotago.SignedTransaction, clt wallet.Client) {
+	if signedTx == nil {
 		s.log.Debug(ErrTransactionIsNil)
 		s.ErrCounter.CountError(ErrTransactionIsNil)
 
 		return
 	}
 
-	txID := lo.PanicOnErr(tx.ID())
-	allSolid := s.handleSolidityForReuseOutputs(clt, tx)
+	txID := lo.PanicOnErr(signedTx.ID())
+	allSolid := s.handleSolidityForReuseOutputs(clt, signedTx)
 	if !allSolid {
 		s.log.Debug(ErrInputsNotSolid)
 		s.ErrCounter.CountError(ierrors.Wrapf(ErrInputsNotSolid, "txID: %s", txID.ToHex()))
@@ -250,7 +250,7 @@ func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt wallet.Client) {
 		return
 	}
 
-	blockID, err := clt.PostTransaction(tx)
+	blockID, err := clt.PostTransaction(signedTx)
 	if err != nil {
 		s.log.Debug(ierrors.Wrapf(ErrFailPostTransaction, err.Error()))
 		s.ErrCounter.CountError(ierrors.Wrapf(ErrFailPostTransaction, err.Error()))
@@ -259,7 +259,7 @@ func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt wallet.Client) {
 	}
 	if s.EvilScenario.OutputWallet.Type() == wallet.Reuse {
 		var outputIDs iotago.OutputIDs
-		for index := range tx.Essence.Outputs {
+		for index := range signedTx.Transaction.Outputs {
 			outputIDs = append(outputIDs, iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(index)))
 		}
 		s.EvilWallet.SetTxOutputsSolid(outputIDs, clt.URL())
@@ -269,10 +269,10 @@ func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt wallet.Client) {
 	s.log.Debugf("%s: Last transaction sent, ID: %s, txCount: %d", blockID.ToHex(), txID.ToHex(), count)
 }
 
-func (s *Spammer) handleSolidityForReuseOutputs(_ wallet.Client, _ *iotago.Transaction) (ok bool) {
-	// ok = s.EvilWallet.AwaitInputsSolidity(tx.Essence().Inputs(), clt)
+func (s *Spammer) handleSolidityForReuseOutputs(_ wallet.Client, _ *iotago.SignedTransaction) (ok bool) {
+	// ok = s.EvilWallet.AwaitInputsSolidity(tx.SignedTransaction().Inputs(), clt)
 	// if s.EvilScenario.OutputWallet.Type() == wallet.Reuse {
-	// 	s.EvilWallet.AddReuseOutputsToThePool(tx.Essence().Outputs())
+	// 	s.EvilWallet.AddReuseOutputsToThePool(tx.SignedTransaction().Outputs())
 	// }
 	return true
 }

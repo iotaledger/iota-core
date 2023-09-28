@@ -46,7 +46,7 @@ const (
             1 byte         +     34 bytes
 
    Value:
-       TargetTransactionID (iotago.TransactionID) + TransactionAcceptedSlotIndex (iotago.SlotIndex) + TransactionCreationSlot (time.Time)
+       TargetTransactionID (iotago.SignedTransactionID) + TransactionAcceptedSlotIndex (iotago.SlotIndex) + TransactionCreationSlot (time.Time)
                   32 bytes                        +                    8 bytes                      +       8 bytes
 
    Unspent Output:

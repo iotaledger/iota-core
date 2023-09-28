@@ -311,8 +311,8 @@ github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230927140518-622f63be6182 h1:lQikt
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20230927140518-622f63be6182/go.mod h1:q24QEsS887ZWJVX76w2kwSgC84KS7wIKOy1otuqZ2ZM=
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230927140257-bfa0bb0af2bd h1:nFG3Zq/zFA4KhBYFX2IezX1C74zfE0DqCt0LrgTa9Ig=
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20230927140257-bfa0bb0af2bd/go.mod h1:c5778OnWpLq108YE+Eb2m8Ri/t/4ydV0TvI/Sy5YivQ=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230928103002-093e56bf1b19 h1:4vN+jZJECvlfP0Bam8tonH9ndFBJoi8G0nMb4m1kpKk=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230928103002-093e56bf1b19/go.mod h1:wR9xBbsofns9hFyRHFZ2bDYIb861qsfmQPVMBKcPvDo=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230928135522-335156827793 h1:YyhI+h6r2PkFZE7PorDhlT4EwAOvVuW2NdNF80FshIQ=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230928135522-335156827793/go.mod h1:wR9xBbsofns9hFyRHFZ2bDYIb861qsfmQPVMBKcPvDo=
 github.com/ipfs/boxo v0.10.0 h1:tdDAxq8jrsbRkYoF+5Rcqyeb91hgWe2hp7iLu7ORZLY=
 github.com/ipfs/boxo v0.10.0/go.mod h1:Fg+BnfxZ0RPzR0nOodzdIq3A7KgoWAOWsEIImrIQdBM=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=

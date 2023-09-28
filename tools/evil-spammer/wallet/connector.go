@@ -162,7 +162,7 @@ type Client interface {
 	// URL returns a client API url.
 	URL() (cltID string)
 	// PostTransaction sends a transaction to the Tangle via a given client.
-	PostTransaction(tx *iotago.Transaction) (iotago.BlockID, error)
+	PostTransaction(tx *iotago.SignedTransaction) (iotago.BlockID, error)
 	// PostData sends the given data (payload) by creating a block in the backend.
 	PostData(data []byte) (blkID string, err error)
 	// GetTransactionConfirmationState returns the AcceptanceState of a given transaction ID.
@@ -172,7 +172,7 @@ type Client interface {
 	// GetOutputConfirmationState gets the first unspent outputs of a given address.
 	GetOutputConfirmationState(outputID iotago.OutputID) string
 	// GetTransaction gets the transaction.
-	GetTransaction(txID iotago.TransactionID) (resp *iotago.Transaction, err error)
+	GetTransaction(txID iotago.TransactionID) (resp *iotago.SignedTransaction, err error)
 	// GetBlockIssuance returns the latest commitment and data needed to create a new block.
 	GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error)
 
@@ -220,7 +220,7 @@ func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
 }
 
 // PostTransaction sends a transaction to the Tangle via a given client.
-func (c *WebClient) PostTransaction(tx *iotago.Transaction) (blockID iotago.BlockID, err error) {
+func (c *WebClient) PostTransaction(tx *iotago.SignedTransaction) (blockID iotago.BlockID, err error) {
 	blockBuilder := builder.NewBasicBlockBuilder(c.client.CurrentAPI())
 
 	blockBuilder.Payload(tx)
@@ -289,7 +289,7 @@ func (c *WebClient) GetTransactionConfirmationState(txID iotago.TransactionID) s
 }
 
 // GetTransaction gets the transaction.
-func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.Transaction, err error) {
+func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.SignedTransaction, err error) {
 	resp, err := c.client.TransactionIncludedBlock(context.Background(), txID)
 	if err != nil {
 		return
@@ -300,7 +300,7 @@ func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.Transa
 		return
 	}
 
-	tx, _ = modelBlk.Transaction()
+	tx, _ = modelBlk.SignedTransaction()
 
 	return tx, nil
 }

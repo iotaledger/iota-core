@@ -24,7 +24,7 @@ func EqualOutput(t *testing.T, expected *utxoledger.Output, actual *utxoledger.O
 	case iotago.TransIndepIdentOutput:
 		expectedIdent = output.Ident()
 	case iotago.TransDepIdentOutput:
-		expectedIdent = output.Chain().ToAddress()
+		expectedIdent = output.ChainID().ToAddress()
 	default:
 		require.Fail(t, "unsupported output type")
 	}
@@ -34,7 +34,7 @@ func EqualOutput(t *testing.T, expected *utxoledger.Output, actual *utxoledger.O
 	case iotago.TransIndepIdentOutput:
 		actualIdent = output.Ident()
 	case iotago.TransDepIdentOutput:
-		actualIdent = output.Chain().ToAddress()
+		actualIdent = output.ChainID().ToAddress()
 	default:
 		require.Fail(t, "unsupported output type")
 	}

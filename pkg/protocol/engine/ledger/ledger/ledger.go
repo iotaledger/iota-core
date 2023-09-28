@@ -123,7 +123,7 @@ func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.Transact
 }
 
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
-	if transaction, hasTransaction := block.Transaction(); hasTransaction {
+	if transaction, hasTransaction := block.SignedTransaction(); hasTransaction {
 		transactionMetadata, err := l.memPool.AttachTransaction(transaction, block.ID())
 		if err != nil {
 			l.retainTransactionFailure(block.ID(), err)
@@ -212,7 +212,7 @@ func (l *Ledger) AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error
 func (l *Ledger) TrackBlock(block *blocks.Block) {
 	l.accountsLedger.TrackBlock(block)
 
-	if _, hasTransaction := block.Transaction(); hasTransaction {
+	if _, hasTransaction := block.SignedTransaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
 	}
 
@@ -584,7 +584,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 	accountDiffs = make(map[iotago.AccountID]*model.AccountDiff)
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
-		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
+		tx, ok := txWithMeta.Transaction().(*iotago.SignedTransaction)
 		if !ok {
 			err = iotago.ErrTxTypeInvalid
 			return false
@@ -619,7 +619,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 		// process allotments
 		{
-			for _, allotment := range tx.Essence.Allotments {
+			for _, allotment := range tx.Transaction.Allotments {
 				// in case it didn't exist, allotments won't change the outputID of the Account,
 				// so the diff defaults to empty new and previous outputIDs
 				accountDiff := getAccountDiff(accountDiffs, allotment.AccountID)
