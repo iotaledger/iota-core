@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/contextutils"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -119,39 +118,12 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 }
 
 func (s *Server) SubmitBlock(ctx context.Context, rawBlock *inx.RawBlock) (*inx.BlockId, error) {
-	version, _, err := iotago.VersionFromBytes(rawBlock.GetData())
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to parse block version: %s", err.Error())
-	}
-
-	apiForVersion, err := deps.Protocol.APIForVersion(version)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid block version: %s", err.Error())
-	}
-
-	block, err := rawBlock.UnwrapBlock(apiForVersion, serix.WithValidation())
+	block, err := rawBlock.UnwrapBlock(deps.Protocol)
 	if err != nil {
 		return nil, err
 	}
 
 	return s.attachBlock(ctx, block)
-}
-
-func (s *Server) SubmitPayload(ctx context.Context, rawPayload *inx.RawPayload) (*inx.BlockId, error) {
-	payload, err := rawPayload.Unwrap(deps.Protocol.CurrentAPI(), serix.WithValidation())
-	if err != nil {
-		return nil, err
-	}
-
-	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
-	defer mergedCtxCancel()
-
-	block, err := deps.BlockIssuer.CreateBlock(mergedCtx, blockIssuerAccount, blockfactory.WithPayload(payload))
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "failed to create block: %s", err.Error())
-	}
-
-	return s.attachBlock(ctx, block.ProtocolBlock())
 }
 
 func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (*inx.BlockId, error) {
