@@ -466,7 +466,6 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 			accountDiff.BlockIssuerKeysAdded = iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(address))
 			accountDiff.NewExpirySlot = iotago.MaxSlotIndex
 		}
-		fmt.Printf("account diff for %s: %+v\n", createdAccountID, accountDiff)
 	}
 }
 
