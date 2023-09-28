@@ -425,8 +425,10 @@ func WithAccountImmutableFeatures(features iotago.AccountOutputImmFeatures) opti
 		for _, feature := range features.MustSet() {
 			switch feature.Type() {
 			case iotago.FeatureMetadata:
+				//nolint:forcetypeassert
 				accountBuilder.ImmutableMetadata(feature.(*iotago.MetadataFeature).Data)
 			case iotago.FeatureSender:
+				//nolint:forcetypeassert
 				accountBuilder.ImmutableSender(feature.(*iotago.SenderFeature).Address)
 			}
 		}
@@ -438,8 +440,10 @@ func WithAccountConditions(conditions iotago.AccountOutputUnlockConditions) opti
 		for _, condition := range conditions.MustSet() {
 			switch condition.Type() {
 			case iotago.UnlockConditionStateControllerAddress:
+				//nolint:forcetypeassert
 				accountBuilder.StateController(condition.(*iotago.StateControllerAddressUnlockCondition).Address)
 			case iotago.UnlockConditionGovernorAddress:
+				//nolint:forcetypeassert
 				accountBuilder.Governor(condition.(*iotago.GovernorAddressUnlockCondition).Address)
 			}
 		}
