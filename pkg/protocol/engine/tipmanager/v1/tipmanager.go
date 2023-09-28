@@ -6,7 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
@@ -40,15 +39,20 @@ type TipManager struct {
 	module.Module
 }
 
-// NewTipManager creates a new TipManager.
-func NewTipManager(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool), opts ...options.Option[TipManager]) *TipManager {
-	return options.Apply(&TipManager{
+// New creates a new TipManager.
+func New(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool)) *TipManager {
+	t := &TipManager{
 		retrieveBlock:      blockRetriever,
 		tipMetadataStorage: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
 		strongTipSet:       randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:         randommap.New[iotago.BlockID, *TipMetadata](),
 		blockAdded:         event.New1[tipmanager.TipMetadata](),
-	}, opts, (*TipManager).TriggerConstructed)
+	}
+
+	t.TriggerConstructed()
+	t.TriggerInitialized()
+
+	return t
 }
 
 // AddBlock adds a Block to the TipManager and returns the TipMetadata if the Block was added successfully.
@@ -99,8 +103,11 @@ func (t *TipManager) Evict(slot iotago.SlotIndex) {
 	}
 }
 
-// Shutdown does nothing but is required by the module.Interface.
-func (t *TipManager) Shutdown() {}
+// Shutdown marks the TipManager as shutdown.
+func (t *TipManager) Shutdown() {
+	t.TriggerShutdown()
+	t.TriggerStopped()
+}
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
@@ -139,7 +146,13 @@ func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(pare
 
 	for _, parent := range block.ParentsWithType() {
 		if metadataStorage := t.metadataStorage(parent.ID.Slot()); metadataStorage != nil {
-			if parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(lo.Return1(t.retrieveBlock(parent.ID))) }); parentMetadata.Block() != nil {
+			// Make sure we don't add rootblocks back to the tips.
+			parentBlock, exists := t.retrieveBlock(parent.ID)
+			if !exists || parentBlock.IsRootBlock() {
+				continue
+			}
+
+			if parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(parentBlock) }); parentMetadata.Block() != nil {
 				consumer(parent.Type, parentMetadata)
 
 				if created {
