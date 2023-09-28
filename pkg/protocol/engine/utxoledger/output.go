@@ -142,10 +142,10 @@ func NewOutput(apiProvider iotago.APIProvider, blockID iotago.BlockID, slotBooke
 	}
 
 	var output iotago.Output
-	if len(transaction.Essence.Outputs) <= int(index) {
+	if len(transaction.Outputs) <= int(index) {
 		return nil, ierrors.New("output not found")
 	}
-	output = transaction.Essence.Outputs[int(index)]
+	output = transaction.Outputs[int(index)]
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(txID, index)
 
 	return CreateOutput(apiProvider, outputID, blockID, slotBooked, output), nil

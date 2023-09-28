@@ -22,7 +22,7 @@ type Framework struct {
 	// Assert provides a set of assertions that can be used to verify the state of the ConflictDAG.
 	Assert *Assertions
 
-	// ConflictID is a function that is used to translate a string alias into a (deterministic) iotago.TransactionID.
+	// ConflictID is a function that is used to translate a string alias into a (deterministic) iotago.SignedTransactionID.
 	ConflictID func(string) iotago.TransactionID
 
 	// ResourceID is a function that is used to translate a string alias into a (deterministic) iotago.OutputID.

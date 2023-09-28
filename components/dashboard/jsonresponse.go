@@ -99,10 +99,10 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 // }
 
 // // NewOutputMetadata returns the OutputMetadata from the given mempool.OutputMetadata.
-// func NewOutputMetadata(outputMetadata *mempool.OutputMetadata, confirmedConsumerID utxo.TransactionID) *OutputMetadata {
+// func NewOutputMetadata(outputMetadata *mempool.OutputMetadata, confirmedConsumerID utxo.SignedTransactionID) *OutputMetadata {
 // 	return &OutputMetadata{
 // 		OutputID: NewOutputID(outputMetadata.ID()),
-// 		ConflictIDs: lo.Map(lo.Map(outputMetadata.ConflictIDs().Slice(), func(t utxo.TransactionID) []byte {
+// 		ConflictIDs: lo.Map(lo.Map(outputMetadata.ConflictIDs().Slice(), func(t utxo.SignedTransactionID) []byte {
 // 			return lo.PanicOnErr(t.Bytes())
 // 		}), base58.Encode),
 // 		FirstConsumer:         outputMetadata.FirstConsumer().Base58(),
@@ -114,9 +114,9 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// region Transaction //////////////////////////////////////////////////////////////////////////////////////////////////
+// region SignedTransaction //////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Transaction represents the JSON model of a ledgerstate.Transaction.
+// Transaction represents the JSON model of a ledgerstate.SignedTransaction.
 type Transaction struct {
 	TransactionID    string                  `json:"txId"`
 	NetworkID        iotago.NetworkID        `json:"networkId"`
@@ -128,20 +128,20 @@ type Transaction struct {
 	Payload          []byte                  `json:"payload"`
 }
 
-// NewTransaction returns a Transaction from the given ledgerstate.Transaction.
-func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
+// NewTransaction returns a Transaction from the given ledgerstate.SignedTransaction.
+func NewTransaction(iotaTx *iotago.SignedTransaction) *Transaction {
 	txID, err := iotaTx.ID()
 	if err != nil {
 		return nil
 	}
 
-	inputs := make([]*Input, len(iotaTx.Essence.Inputs))
-	for i, input := range iotaTx.Essence.Inputs {
+	inputs := make([]*Input, len(iotaTx.Transaction.Inputs))
+	for i, input := range iotaTx.Transaction.Inputs {
 		inputs[i] = NewInput(input)
 	}
 
-	outputs := make([]*Output, len(iotaTx.Essence.Outputs))
-	for i, output := range iotaTx.Essence.Outputs {
+	outputs := make([]*Output, len(iotaTx.Transaction.Outputs))
+	for i, output := range iotaTx.Transaction.Outputs {
 		outputs[i] = NewOutput(output)
 		outputs[i].OutputID = &OutputID{
 			Hex:           iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(i)).ToHex(),
@@ -156,13 +156,13 @@ func NewTransaction(iotaTx *iotago.Transaction) *Transaction {
 	}
 
 	dataPayload := make([]byte, 0)
-	if iotaTx.Essence.Payload != nil {
-		dataPayload, _ = deps.Protocol.CurrentAPI().Encode(iotaTx.Essence.Payload)
+	if iotaTx.Transaction.Payload != nil {
+		dataPayload, _ = deps.Protocol.CurrentAPI().Encode(iotaTx.Transaction.Payload)
 	}
 
 	return &Transaction{
-		NetworkID:    iotaTx.Essence.NetworkID,
-		CreationSlot: iotaTx.Essence.CreationSlot,
+		NetworkID:    iotaTx.Transaction.NetworkID,
+		CreationSlot: iotaTx.Transaction.CreationSlot,
 		Inputs:       inputs,
 		Outputs:      outputs,
 		Unlocks:      unlockBlocks,

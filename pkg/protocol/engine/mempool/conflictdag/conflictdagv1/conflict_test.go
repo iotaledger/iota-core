@@ -22,7 +22,7 @@ import (
 
 type TestConflict = *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-//var NewTestConflict = NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
+//var NewTestConflict = NewConflict[iotago.SignedTransactionID, iotago.OutputID, vote.MockedRank]
 
 func NewTestConflict(id iotago.TransactionID, parentConflicts ds.Set[*Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], conflictSets ds.Set[*ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank] {
 	conflict := NewConflict[iotago.TransactionID, iotago.OutputID, vote.MockedRank](id, initialWeight, pendingTasksCounter, acceptanceThresholdProvider)

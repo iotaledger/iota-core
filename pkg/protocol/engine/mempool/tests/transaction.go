@@ -38,7 +38,7 @@ func (t *Transaction) ContextInputs() (iotago.TransactionContextInputs, error) {
 }
 
 func (t *Transaction) String() string {
-	return "Transaction(" + t.id.String() + ")"
+	return "SignedTransaction(" + t.id.String() + ")"
 }
 
 var _ mempool.Transaction = new(Transaction)

@@ -11,7 +11,7 @@ import (
 )
 
 func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.OutputState, timeReference mempool.ContextState) ([]mempool.OutputState, error) {
-	tx, ok := stateTransition.(*iotago.Transaction)
+	tx, ok := stateTransition.(*iotago.SignedTransaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
 	}
@@ -122,7 +122,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		created = append(created, &ExecutionOutput{
 			outputID:     outputID,
 			output:       output,
-			creationSlot: tx.Essence.CreationSlot,
+			creationSlot: tx.Transaction.CreationSlot,
 		})
 	}
 

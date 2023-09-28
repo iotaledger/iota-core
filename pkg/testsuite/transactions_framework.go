@@ -21,7 +21,7 @@ type TransactionFramework struct {
 
 	wallet       *mock.HDWallet
 	states       map[string]*utxoledger.Output
-	transactions map[string]*iotago.Transaction
+	transactions map[string]*iotago.SignedTransaction
 }
 
 func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, accounts ...snapshotcreator.AccountDetails) *TransactionFramework {
@@ -34,7 +34,7 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 	tf := &TransactionFramework{
 		apiProvider:  protocol,
 		states:       map[string]*utxoledger.Output{"Genesis:0": genesisOutput},
-		transactions: make(map[string]*iotago.Transaction),
+		transactions: make(map[string]*iotago.SignedTransaction),
 		wallet:       mock.NewHDWallet("genesis", genesisSeed, 0),
 	}
 
@@ -50,7 +50,7 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 	return tf
 }
 
-func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.Transaction) {
+func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.SignedTransaction) {
 	currentAPI := t.apiProvider.CurrentAPI()
 	(lo.PanicOnErr(transaction.ID())).RegisterAlias(alias)
 
@@ -69,7 +69,7 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 	}
 }
 
-func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signingWallets []*mock.HDWallet, opts ...options.Option[builder.TransactionBuilder]) (*iotago.Transaction, error) {
+func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signingWallets []*mock.HDWallet, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
 	currentAPI := t.apiProvider.CurrentAPI()
 
 	walletKeys := make([]iotago.AddressKeys, 0, len(signingWallets)*2)
@@ -96,7 +96,7 @@ func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signin
 	return tx, err
 }
 
-func (t *TransactionFramework) CreateSimpleTransaction(alias string, outputCount int, inputAliases ...string) (*iotago.Transaction, error) {
+func (t *TransactionFramework) CreateSimpleTransaction(alias string, outputCount int, inputAliases ...string) (*iotago.SignedTransaction, error) {
 	inputStates, outputStates, signingWallets := t.CreateBasicOutputsEqually(outputCount, inputAliases...)
 
 	return t.CreateTransactionWithOptions(alias, signingWallets, WithInputs(inputStates), WithOutputs(outputStates))
@@ -348,7 +348,7 @@ func (t *TransactionFramework) OutputID(alias string) iotago.OutputID {
 	return t.Output(alias).OutputID()
 }
 
-func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
+func (t *TransactionFramework) SignedTransaction(alias string) *iotago.SignedTransaction {
 	transaction, exists := t.transactions[alias]
 	if !exists {
 		panic(ierrors.Errorf("transaction with given alias does not exist %s", alias))
@@ -357,16 +357,16 @@ func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
 	return transaction
 }
 
-func (t *TransactionFramework) TransactionID(alias string) iotago.TransactionID {
-	return lo.PanicOnErr(t.Transaction(alias).ID())
+func (t *TransactionFramework) SignedTransactionID(alias string) iotago.TransactionID {
+	return lo.PanicOnErr(t.SignedTransaction(alias).ID())
 }
 
-func (t *TransactionFramework) Transactions(aliases ...string) []*iotago.Transaction {
-	return lo.Map(aliases, t.Transaction)
+func (t *TransactionFramework) SignedTransactions(aliases ...string) []*iotago.SignedTransaction {
+	return lo.Map(aliases, t.SignedTransaction)
 }
 
-func (t *TransactionFramework) TransactionIDs(aliases ...string) []iotago.TransactionID {
-	return lo.Map(aliases, t.TransactionID)
+func (t *TransactionFramework) SignedTransactionIDs(aliases ...string) []iotago.SignedTransactionID {
+	return lo.Map(aliases, t.SignedTransactionID)
 }
 
 func (t *TransactionFramework) DefaultAddress(addressType ...iotago.AddressType) iotago.Address {
@@ -502,7 +502,7 @@ func WithAccountNativeTokens(nativeTokens iotago.NativeTokens) options.Option[bu
 	}
 }
 
-// Transaction options
+// SignedTransaction options
 
 func WithInputs(inputs utxoledger.Outputs) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {

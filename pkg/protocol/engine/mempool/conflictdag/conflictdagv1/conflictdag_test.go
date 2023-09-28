@@ -36,7 +36,7 @@ func newTestFramework(t *testing.T) *tests.Framework {
 	)
 }
 
-// transactionID creates a (made up) TransactionID from the given alias.
+// transactionID creates a (made up) SignedTransactionID from the given alias.
 func transactionID(alias string) iotago.TransactionID {
 	result := iotago.TransactionIDFromData(TestTransactionCreationSlot, []byte(alias))
 	result.RegisterAlias(alias)

@@ -83,13 +83,13 @@ func (blk *Block) Payload() iotago.Payload {
 	return basicBlock.Payload
 }
 
-func (blk *Block) Transaction() (tx *iotago.Transaction, isTransaction bool) {
+func (blk *Block) SignedTransaction() (tx *iotago.SignedTransaction, isTransaction bool) {
 	payload := blk.Payload()
 	if payload == nil {
 		return nil, false
 	}
 
-	tx, isTransaction = payload.(*iotago.Transaction)
+	tx, isTransaction = payload.(*iotago.SignedTransaction)
 
 	return tx, isTransaction
 }

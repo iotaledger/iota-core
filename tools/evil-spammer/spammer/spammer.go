@@ -261,9 +261,9 @@ func (s *Spammer) PostTransaction(tx *iotago.Transaction, clt wallet.Client) {
 }
 
 func (s *Spammer) handleSolidityForReuseOutputs(_ wallet.Client, _ *iotago.Transaction) (ok bool) {
-	// ok = s.EvilWallet.AwaitInputsSolidity(tx.Essence().Inputs(), clt)
+	// ok = s.EvilWallet.AwaitInputsSolidity(tx.SignedTransaction().Inputs(), clt)
 	// if s.EvilScenario.OutputWallet.Type() == wallet.Reuse {
-	// 	s.EvilWallet.AddReuseOutputsToThePool(tx.Essence().Outputs())
+	// 	s.EvilWallet.AddReuseOutputsToThePool(tx.SignedTransaction().Outputs())
 	// }
 	return true
 }

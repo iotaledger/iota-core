@@ -292,9 +292,9 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	switch innerBlock := iotaBlock.Block.(type) {
 	case *iotago.BasicBlock:
 		switch payload := innerBlock.Payload.(type) {
-		case *iotago.Transaction:
-			if payload.Essence.NetworkID != protoParams.NetworkID() {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Essence.NetworkID)
+		case *iotago.SignedTransaction:
+			if payload.Transaction.NetworkID != protoParams.NetworkID() {
+				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Transaction.NetworkID)
 			}
 		}
 
