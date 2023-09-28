@@ -12,31 +12,31 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertTransaction(transaction *iotago.SignedTransaction, node *mock.Node) mempool.Transaction {
-	var loadedTransaction mempool.TransactionMetadata
-	transactionID, err := transaction.ID()
+func (t *TestSuite) AssertTransaction(signedTransaction *iotago.SignedTransaction, node *mock.Node) mempool.Transaction {
+	var loadedTransactionMetadata mempool.TransactionMetadata
+	signedTransactionID, err := signedTransaction.ID()
 	require.NoError(t.Testing, err)
 
 	t.Eventually(func() error {
 		var exists bool
-		loadedTransaction, exists = node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
+		loadedTransactionMetadata, exists = node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(signedTransactionID)
 		if !exists {
-			return ierrors.Errorf("AssertTransaction: %s: transaction %s does not exist", node.Name, transactionID)
+			return ierrors.Errorf("AssertTransaction: %s: signedTransaction %s does not exist", node.Name, signedTransactionID)
 		}
 
-		if transactionID != loadedTransaction.ID() {
-			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransaction.ID())
+		if signedTransactionID != loadedTransactionMetadata.ID() {
+			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, signedTransactionID, loadedTransactionMetadata.ID())
 		}
 
 		//nolint: forcetypeassert // we are in a test and want to assert it anyway
-		if !cmp.Equal(transaction.Transaction, loadedTransaction.Transaction().(*iotago.SignedTransaction).Transaction) {
-			return ierrors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, transaction, loadedTransaction.Transaction())
+		if !cmp.Equal(signedTransaction.Transaction, loadedTransactionMetadata.Transaction().(*iotago.SignedTransaction).Transaction) {
+			return ierrors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, signedTransaction, loadedTransactionMetadata.Transaction())
 		}
 
 		return nil
 	})
 
-	return loadedTransaction.Transaction()
+	return loadedTransactionMetadata.Transaction()
 }
 
 func (t *TestSuite) AssertTransactionsExist(transactions []*iotago.SignedTransaction, expectedExist bool, nodes ...*mock.Node) {

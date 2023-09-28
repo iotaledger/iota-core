@@ -99,10 +99,10 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 // }
 
 // // NewOutputMetadata returns the OutputMetadata from the given mempool.OutputMetadata.
-// func NewOutputMetadata(outputMetadata *mempool.OutputMetadata, confirmedConsumerID utxo.SignedTransactionID) *OutputMetadata {
+// func NewOutputMetadata(outputMetadata *mempool.OutputMetadata, confirmedConsumerID utxo.TransactionID) *OutputMetadata {
 // 	return &OutputMetadata{
 // 		OutputID: NewOutputID(outputMetadata.ID()),
-// 		ConflictIDs: lo.Map(lo.Map(outputMetadata.ConflictIDs().Slice(), func(t utxo.SignedTransactionID) []byte {
+// 		ConflictIDs: lo.Map(lo.Map(outputMetadata.ConflictIDs().Slice(), func(t utxo.TransactionID) []byte {
 // 			return lo.PanicOnErr(t.Bytes())
 // 		}), base58.Encode),
 // 		FirstConsumer:         outputMetadata.FirstConsumer().Base58(),
