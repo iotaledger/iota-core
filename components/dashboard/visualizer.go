@@ -43,7 +43,7 @@ type tipinfo struct {
 
 func sendVertex(blk *blocks.Block, confirmed bool) {
 	modelBlk, _ := model.BlockFromBlock(blk.ProtocolBlock())
-	tx, isTx := modelBlk.Transaction()
+	tx, isTx := modelBlk.SignedTransaction()
 
 	broadcastWsBlock(&wsblk{MsgTypeVertex, &vertex{
 		ID:                  blk.ID().ToHex(),
@@ -85,7 +85,7 @@ func runVisualizer(component *app.Component) {
 			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 				sendVertex(block, false)
 
-				tx, hasTx := block.Transaction()
+				tx, hasTx := block.SignedTransaction()
 				if hasTx {
 					txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(tx.ID()))
 					if exists {

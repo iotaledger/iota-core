@@ -26,24 +26,24 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 
 	ts.IssuePayloadWithOptions("block1", node1, tx2)
 
-	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx2"), true, node1)
-	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), false, node1)
+	ts.AssertTransactionsExist(ts.TransactionFramework.SignedTransactions("tx2"), true, node1)
+	ts.AssertTransactionsExist(ts.TransactionFramework.SignedTransactions("tx1"), false, node1)
 
-	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx2"), false, node1)
+	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.SignedTransactions("tx2"), false, node1)
 	// make sure that the block is not booked
 
 	ts.IssuePayloadWithOptions("block2", node1, tx1)
 
-	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)
-	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)
+	ts.AssertTransactionsExist(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, node1)
+	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, node1)
 	ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 		ts.Block("block1"): {"tx2"},
 		ts.Block("block2"): {"tx1"},
 	}, node1)
 
-	ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-		ts.TransactionFramework.Transaction("tx2"): {"tx2"},
-		ts.TransactionFramework.Transaction("tx1"): {"tx1"},
+	ts.AssertTransactionInCacheConflicts(map[*iotago.SignedTransaction][]string{
+		ts.TransactionFramework.SignedTransaction("tx2"): {"tx2"},
+		ts.TransactionFramework.SignedTransaction("tx1"): {"tx1"},
 	}, node1)
 }
 
@@ -69,17 +69,17 @@ func Test_DoubleSpend(t *testing.T) {
 		ts.IssuePayloadWithOptions("block1", node1, tx1, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssuePayloadWithOptions("block2", node1, tx2, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
 
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsExist(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block1"): {"tx1"},
 			ts.Block("block2"): {"tx2"},
 		}, node1, node2)
 
-		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			ts.TransactionFramework.Transaction("tx2"): {"tx2"},
-			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
+		ts.AssertTransactionInCacheConflicts(map[*iotago.SignedTransaction][]string{
+			ts.TransactionFramework.SignedTransaction("tx2"): {"tx2"},
+			ts.TransactionFramework.SignedTransaction("tx1"): {"tx1"},
 		}, node1, node2)
 	}
 
@@ -92,14 +92,14 @@ func Test_DoubleSpend(t *testing.T) {
 			ts.Block("block3"): {"tx1"},
 			ts.Block("block4"): {"tx2"},
 		}, node1, node2)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, node1, node2)
 	}
 
 	// Issue an invalid block and assert that its vote is not cast.
 	{
 		ts.IssueValidationBlock("block5", node2, blockfactory.WithStrongParents(ts.BlockIDs("block3", "block4")...))
 
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, node1, node2)
 	}
 
 	// Issue valid blocks that resolve the conflict.
@@ -110,8 +110,8 @@ func Test_DoubleSpend(t *testing.T) {
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block6"): {"tx2"},
 		}, node1, node2)
-		ts.AssertTransactionsInCacheAccepted(ts.TransactionFramework.Transactions("tx2"), true, node1, node2)
-		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCacheAccepted(ts.TransactionFramework.SignedTransactions("tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.SignedTransactions("tx1"), true, node1, node2)
 
 	}
 }
@@ -148,8 +148,8 @@ func Test_MultipleAttachments(t *testing.T) {
 			ts.Block("A.2"): {"tx1"},
 			ts.Block("B.2"): {"tx1"},
 		}), ts.Nodes()...)
-		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
+		ts.AssertTransactionInCacheConflicts(map[*iotago.SignedTransaction][]string{
+			ts.TransactionFramework.SignedTransaction("tx1"): {"tx1"},
 		}, ts.Nodes()...)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1"}, acceptance.Accepted, ts.Nodes()...)
 	}
@@ -171,8 +171,8 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("B.4", "A.5"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3"), true, ts.Nodes()...)
 
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheConflicts(lo.MergeMaps(blocksConflicts, map[*blocks.Block][]string{
 			ts.Block("A.3"): {"tx2"},
@@ -181,9 +181,9 @@ func Test_MultipleAttachments(t *testing.T) {
 			ts.Block("A.5"): {},
 			ts.Block("B.4"): {},
 		}), ts.Nodes()...)
-		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
-			ts.TransactionFramework.Transaction("tx2"): {"tx2"},
+		ts.AssertTransactionInCacheConflicts(map[*iotago.SignedTransaction][]string{
+			ts.TransactionFramework.SignedTransaction("tx1"): {"tx1"},
+			ts.TransactionFramework.SignedTransaction("tx2"): {"tx2"},
 		}, nodeA, nodeB)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, ts.Nodes()...)
 	}
@@ -200,9 +200,9 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1", "B.1"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.7", "B.6"), false, ts.Nodes()...)
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCacheAccepted(ts.TransactionFramework.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsExist(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheAccepted(ts.TransactionFramework.SignedTransactions("tx1", "tx2"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheConflicts(lo.MergeMaps(blocksConflicts, map[*blocks.Block][]string{
 			ts.Block("A.6"): {},
@@ -211,9 +211,9 @@ func Test_MultipleAttachments(t *testing.T) {
 			ts.Block("B.6"): {},
 		}), ts.Nodes()...)
 
-		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
-			ts.TransactionFramework.Transaction("tx2"): {"tx2"},
+		ts.AssertTransactionInCacheConflicts(map[*iotago.SignedTransaction][]string{
+			ts.TransactionFramework.SignedTransaction("tx1"): {"tx1"},
+			ts.TransactionFramework.SignedTransaction("tx2"): {"tx2"},
 		}, nodeA, nodeB)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, nodeA, nodeB)
 	}
