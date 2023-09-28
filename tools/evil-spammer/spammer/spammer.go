@@ -17,6 +17,15 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+const (
+	TypeBlock       = "blk"
+	TypeTx          = "tx"
+	TypeDs          = "ds"
+	TypeCustom      = "custom"
+	TypeCommitments = "commitments"
+	TypeAccounts    = "accounts"
+)
+
 // region Spammer //////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //nolint:revive

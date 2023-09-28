@@ -31,13 +31,6 @@ const (
 const (
 	AnswerEnable  = "enable"
 	AnswerDisable = "disable"
-
-	SpammerTypeBlock       = "blk"
-	SpammerTypeTx          = "tx"
-	SpammerTypeDs          = "ds"
-	SpammerTypeCustom      = "custom"
-	SpammerTypeCommitments = "commitments"
-	SpammerTypeAccounts    = "accounts"
 )
 
 var (
@@ -75,7 +68,7 @@ var configJSON = fmt.Sprintf(`{
 	"autoRequestingEnabled": false,
 	"autoRequestingAmount": "100",
 	"useRateSetter": true
-}`, SpammerTypeTx)
+}`, spammer.TypeTx)
 
 var defaultConfig = InteractiveConfig{
 	clientURLs: map[string]types.Empty{
@@ -87,7 +80,7 @@ var defaultConfig = InteractiveConfig{
 	timeUnit:             time.Second,
 	Deep:                 false,
 	Reuse:                true,
-	Scenario:             SpammerTypeTx,
+	Scenario:             spammer.TypeTx,
 	AutoRequesting:       false,
 	AutoRequestingAmount: "100",
 	UseRateSetter:        true,
@@ -145,7 +138,7 @@ const (
 )
 
 var (
-	scenarios     = []string{SpammerTypeBlock, SpammerTypeTx, SpammerTypeDs, "conflict-circle", "guava", "orange", "mango", "pear", "lemon", "banana", "kiwi", "peace"}
+	scenarios     = []string{spammer.TypeBlock, spammer.TypeTx, spammer.TypeDs, "conflict-circle", "guava", "orange", "mango", "pear", "lemon", "banana", "kiwi", "peace"}
 	confirms      = []string{AnswerEnable, AnswerDisable}
 	outputNumbers = []string{"100", "1000", "5000", "cancel"}
 	timeUnits     = []string{mpm, mps}
@@ -443,7 +436,7 @@ func (m *Mode) areEnoughFundsAvailable() bool {
 		outputsNeeded = int(float64(m.Config.Rate) * m.Config.duration.Minutes())
 	}
 
-	return m.evilWallet.UnspentOutputsLeft(wallet.Fresh) < outputsNeeded && m.Config.Scenario != SpammerTypeBlock
+	return m.evilWallet.UnspentOutputsLeft(wallet.Fresh) < outputsNeeded && m.Config.Scenario != spammer.TypeBlock
 }
 
 func (m *Mode) startSpam() {
@@ -451,7 +444,7 @@ func (m *Mode) startSpam() {
 	defer m.spamMutex.Unlock()
 
 	var s *spammer.Spammer
-	if m.Config.Scenario == SpammerTypeBlock {
+	if m.Config.Scenario == spammer.TypeBlock {
 		s = programs.SpamBlocks(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, 0, m.Config.UseRateSetter)
 	} else {
 		scenario, _ := wallet.GetScenario(m.Config.Scenario)
@@ -700,7 +693,7 @@ func (m *Mode) summarizeSpam(id int) {
 func (m *Mode) updateSentStatistic(s *spammer.Spammer, id int) {
 	blkSent := s.BlocksSent()
 	scenariosCreated := s.BatchesPrepared()
-	if m.spammerLog.SpamDetails(id).Scenario == SpammerTypeBlock {
+	if m.spammerLog.SpamDetails(id).Scenario == spammer.TypeBlock {
 		m.blkSent.Add(blkSent)
 	} else {
 		m.txSent.Add(blkSent)

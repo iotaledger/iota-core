@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
-	"github.com/iotaledger/iota-core/tools/evil-spammer/interactive"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/logger"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
@@ -26,7 +25,7 @@ func CustomSpam(params *CustomSpamParams) {
 	// funds are requested fro all spam types except SpammerTypeBlock
 	fundsNeeded := false
 	for _, st := range params.SpamTypes {
-		if st != interactive.SpammerTypeBlock {
+		if st != spammer.TypeBlock {
 			fundsNeeded = true
 		}
 	}
@@ -44,7 +43,7 @@ func CustomSpam(params *CustomSpamParams) {
 		log.Infof("Start spamming with rate: %d, time unit: %s, and spamming type: %s.", params.Rates[i], params.TimeUnit.String(), sType)
 
 		switch sType {
-		case interactive.SpammerTypeBlock:
+		case spammer.TypeBlock:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -54,19 +53,19 @@ func CustomSpam(params *CustomSpamParams) {
 				}
 				s.Spam()
 			}(i)
-		case interactive.SpammerTypeTx:
+		case spammer.TypeTx:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
 				SpamTransaction(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.DeepSpam, params.EnableRateSetter)
 			}(i)
-		case interactive.SpammerTypeDs:
+		case spammer.TypeDs:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
 				SpamDoubleSpends(w, params.Rates[i], params.NSpend, params.TimeUnit, params.Durations[i], params.DelayBetweenConflicts, params.DeepSpam, params.EnableRateSetter)
 			}(i)
-		case interactive.SpammerTypeCustom:
+		case spammer.TypeCustom:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
@@ -76,12 +75,12 @@ func CustomSpam(params *CustomSpamParams) {
 				}
 				s.Spam()
 			}(i)
-		case interactive.SpammerTypeCommitments:
+		case spammer.TypeCommitments:
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 			}()
-		case interactive.SpammerTypeAccounts:
+		case spammer.TypeAccounts:
 			wg.Add(1)
 			go func() {
 				defer wg.Done()

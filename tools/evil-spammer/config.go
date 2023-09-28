@@ -3,8 +3,8 @@ package main
 import (
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evil-spammer/interactive"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 )
 
@@ -20,7 +20,7 @@ var (
 
 	customSpamParams = programs.CustomSpamParams{
 		ClientURLs:            urls,
-		SpamTypes:             []string{interactive.SpammerTypeBlock},
+		SpamTypes:             []string{spammer.TypeBlock},
 		Rates:                 []int{1},
 		Durations:             []time.Duration{time.Second * 20},
 		BlkToBeSent:           []int{0},
