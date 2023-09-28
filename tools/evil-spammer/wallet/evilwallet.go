@@ -303,15 +303,15 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	}
 
 	// requested output to split and use in spammer
-	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 0), tx.Essence.Outputs[0])
+	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 0), tx.Transaction.Outputs[0])
 
 	// set remainder output to be reused by the faucet wallet
 	e.faucet.AddUnspentOutput(&Output{
 		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), 1),
 		Address:      faucetAddr,
 		Index:        0,
-		Balance:      tx.Essence.Outputs[1].BaseTokenAmount(),
-		OutputStruct: tx.Essence.Outputs[1],
+		Balance:      tx.Transaction.Outputs[1].BaseTokenAmount(),
+		OutputStruct: tx.Transaction.Outputs[1],
 	})
 
 	return output, nil
@@ -364,11 +364,11 @@ func (e *EvilWallet) ClearAllAliases() {
 	e.aliasManager.ClearAllAliases()
 }
 
-func (e *EvilWallet) PrepareCustomConflicts(conflictsMaps []ConflictSlice) (conflictBatch [][]*iotago.Transaction, err error) {
+func (e *EvilWallet) PrepareCustomConflicts(conflictsMaps []ConflictSlice) (conflictBatch [][]*iotago.SignedTransaction, err error) {
 	for _, conflictMap := range conflictsMaps {
-		var txs []*iotago.Transaction
-		for _, options := range conflictMap {
-			tx, err2 := e.CreateTransaction(options...)
+		var txs []*iotago.SignedTransaction
+		for _, conflictOptions := range conflictMap {
+			tx, err2 := e.CreateTransaction(conflictOptions...)
 			if err2 != nil {
 				return nil, err2
 			}
@@ -396,7 +396,7 @@ func (e *EvilWallet) SendCustomConflicts(conflictsMaps []ConflictSlice) (err err
 		wg := sync.WaitGroup{}
 		for i, tx := range txs {
 			wg.Add(1)
-			go func(clt Client, tx *iotago.Transaction) {
+			go func(clt Client, tx *iotago.SignedTransaction) {
 				defer wg.Done()
 				_, _ = clt.PostTransaction(tx)
 			}(clients[i], tx)
@@ -414,7 +414,7 @@ func (e *EvilWallet) SendCustomConflicts(conflictsMaps []ConflictSlice) (err err
 // Inputs of the transaction are determined in three ways:
 // 1 - inputs are provided directly without associated alias, 2- alias is provided, and input is already stored in an alias manager,
 // 3 - alias is provided, and there are no inputs assigned in Alias manager, so aliases are assigned to next ready inputs from input wallet.
-func (e *EvilWallet) CreateTransaction(options ...Option) (tx *iotago.Transaction, err error) {
+func (e *EvilWallet) CreateTransaction(options ...Option) (tx *iotago.SignedTransaction, err error) {
 	buildOptions, err := NewOptions(options...)
 	if err != nil {
 		return nil, err
@@ -457,8 +457,8 @@ func (e *EvilWallet) CreateTransaction(options ...Option) (tx *iotago.Transactio
 }
 
 // addOutputsToOutputManager adds output to the OutputManager if.
-func (e *EvilWallet) addOutputsToOutputManager(tx *iotago.Transaction, outWallet, tmpWallet *Wallet, tempAddresses map[string]types.Empty) {
-	for idx, o := range tx.Essence.Outputs {
+func (e *EvilWallet) addOutputsToOutputManager(tx *iotago.SignedTransaction, outWallet, tmpWallet *Wallet, tempAddresses map[string]types.Empty) {
+	for idx, o := range tx.Transaction.Outputs {
 		addr := o.UnlockConditionSet().Address().Address
 		out := &Output{
 			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), uint16(idx)),
@@ -498,12 +498,12 @@ func (e *EvilWallet) updateInputWallet(buildOptions *Options) error {
 	return nil
 }
 
-func (e *EvilWallet) registerOutputAliases(tx *iotago.Transaction, addrAliasMap map[string]string) {
+func (e *EvilWallet) registerOutputAliases(tx *iotago.SignedTransaction, addrAliasMap map[string]string) {
 	if len(addrAliasMap) == 0 {
 		return
 	}
 
-	for idx := range tx.Essence.Outputs {
+	for idx := range tx.Transaction.Outputs {
 		id := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(tx.ID()), uint16(idx))
 		out := e.outputManager.GetOutput(id)
 
@@ -707,7 +707,7 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 	return
 }
 
-func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[iotago.Output], w *Wallet) (tx *iotago.Transaction, err error) {
+func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[iotago.Output], w *Wallet) (tx *iotago.SignedTransaction, err error) {
 	clt := e.Connector().GetClient()
 
 	txBuilder := builder.NewTransactionBuilder(clt.CurrentAPI())
@@ -741,7 +741,7 @@ func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[io
 	return txBuilder.Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 }
 
-func (e *EvilWallet) PrepareCustomConflictsSpam(scenario *EvilScenario) (txs [][]*iotago.Transaction, allAliases ScenarioAlias, err error) {
+func (e *EvilWallet) PrepareCustomConflictsSpam(scenario *EvilScenario) (txs [][]*iotago.SignedTransaction, allAliases ScenarioAlias, err error) {
 	conflicts, allAliases := e.prepareConflictSliceForScenario(scenario)
 	txs, err = e.PrepareCustomConflicts(conflicts)
 

@@ -239,7 +239,7 @@ func (o *OutputManager) RequestOutputsByTxID(txID iotago.TransactionID) (outputI
 		return
 	}
 
-	for index := range tx.Essence.Outputs {
+	for index := range tx.Transaction.Outputs {
 		outputIDs = append(outputIDs, iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(index)))
 	}
 
