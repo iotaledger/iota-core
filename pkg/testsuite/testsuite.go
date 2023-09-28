@@ -44,24 +44,25 @@ type TestSuite struct {
 
 	API iotago.API
 
-	optsGenesisTimestampOffset int64
-	optsLivenessThreshold      iotago.SlotIndex
-	optsMinCommittableAge      iotago.SlotIndex
-	optsMaxCommittableAge      iotago.SlotIndex
-	optsSlotsPerEpochExponent  uint8
-	optsEpochNearingThreshold  iotago.SlotIndex
-	optsRMCMin                 iotago.Mana
-	optsRMCIncrease            iotago.Mana
-	optsRMCDecrease            iotago.Mana
-	optsRMCIncreaseThreshold   iotago.WorkScore
-	optsRMCDecreaseThreshold   iotago.WorkScore
-	optsSchedulerRate          iotago.WorkScore
-	optsMinMana                iotago.Mana
-	optsMaxBufferSize          uint32
-	optsAccounts               []snapshotcreator.AccountDetails
-	optsSnapshotOptions        []options.Option[snapshotcreator.Options]
-	optsWaitFor                time.Duration
-	optsTick                   time.Duration
+	optsGenesisTimestampOffset      int64
+	optsLivenessThresholdLowerBound uint16
+	optsLivenessThresholdUpperBound uint16
+	optsMinCommittableAge           iotago.SlotIndex
+	optsMaxCommittableAge           iotago.SlotIndex
+	optsSlotsPerEpochExponent       uint8
+	optsEpochNearingThreshold       iotago.SlotIndex
+	optsRMCMin                      iotago.Mana
+	optsRMCIncrease                 iotago.Mana
+	optsRMCDecrease                 iotago.Mana
+	optsRMCIncreaseThreshold        iotago.WorkScore
+	optsRMCDecreaseThreshold        iotago.WorkScore
+	optsSchedulerRate               iotago.WorkScore
+	optsMinMana                     iotago.Mana
+	optsMaxBufferSize               uint32
+	optsAccounts                    []snapshotcreator.AccountDetails
+	optsSnapshotOptions             []options.Option[snapshotcreator.Options]
+	optsWaitFor                     time.Duration
+	optsTick                        time.Duration
 
 	uniqueBlockTimeCounter              atomic.Int64
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
@@ -82,22 +83,23 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
 		automaticTransactionIssuingCounters: *shrinkingmap.New[string, int](),
 
-		optsWaitFor:                DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
-		optsTick:                   DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
-		optsGenesisTimestampOffset: 0,
-		optsLivenessThreshold:      3,
-		optsMinCommittableAge:      10,
-		optsMaxCommittableAge:      20,
-		optsSlotsPerEpochExponent:  5,
-		optsEpochNearingThreshold:  16,
-		optsRMCMin:                 500,
-		optsRMCIncrease:            500,
-		optsRMCDecrease:            500,
-		optsRMCIncreaseThreshold:   8 * schedulerRate,
-		optsRMCDecreaseThreshold:   5 * schedulerRate,
-		optsSchedulerRate:          schedulerRate,
-		optsMinMana:                1,
-		optsMaxBufferSize:          100 * iotago.MaxBlockSize,
+		optsWaitFor:                     DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:                        DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
+		optsGenesisTimestampOffset:      0,
+		optsLivenessThresholdLowerBound: 30,
+		optsLivenessThresholdUpperBound: 30,
+		optsMinCommittableAge:           10,
+		optsMaxCommittableAge:           20,
+		optsSlotsPerEpochExponent:       5,
+		optsEpochNearingThreshold:       16,
+		optsRMCMin:                      500,
+		optsRMCIncrease:                 500,
+		optsRMCDecrease:                 500,
+		optsRMCIncreaseThreshold:        8 * schedulerRate,
+		optsRMCDecreaseThreshold:        5 * schedulerRate,
+		optsSchedulerRate:               schedulerRate,
+		optsMinMana:                     1,
+		optsMaxBufferSize:               100 * iotago.MaxBlockSize,
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 		t.API = iotago.V3API(
@@ -121,7 +123,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsSlotsPerEpochExponent,
 				),
 				iotago.WithLivenessOptions(
-					t.optsLivenessThreshold,
+					t.optsLivenessThresholdLowerBound,
+					t.optsLivenessThresholdUpperBound,
 					t.optsMinCommittableAge,
 					t.optsMaxCommittableAge,
 					t.optsEpochNearingThreshold,

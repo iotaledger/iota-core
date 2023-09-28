@@ -383,6 +383,13 @@ func (b *Block) AddWitness(seat account.SeatIndex) (added bool) {
 	return b.witnesses.Add(seat)
 }
 
+func (b *Block) WitnessCount() int {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.witnesses.Size()
+}
+
 func (b *Block) Witnesses() []account.SeatIndex {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()

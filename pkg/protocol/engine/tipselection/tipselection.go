@@ -12,8 +12,8 @@ type TipSelection interface {
 	// SelectTips selects the tips that should be used as references for a new block.
 	SelectTips(count int) (references model.ParentReferences)
 
-	// SetLivenessThreshold sets the liveness threshold used for tip selection (it can only increase monotonically).
-	SetLivenessThreshold(threshold time.Time)
+	// SetAcceptanceTime updates the acceptance time of the TipSelection.
+	SetAcceptanceTime(acceptanceTime time.Time) (previousTime time.Time)
 
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface
