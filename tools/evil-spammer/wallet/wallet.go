@@ -72,7 +72,8 @@ func (w *Wallet) Address() *iotago.Ed25519Address {
 
 	index := uint64(w.lastAddrIdxUsed.Add(1))
 	hdWallet := mock.NewHDWallet("", w.seed[:], index)
-	addr := hdWallet.Address()
+	//nolint:forcetypeassert
+	addr := hdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	w.indexAddrMap[index] = addr.String()
 	w.addrIndexMap[addr.String()] = index
 
@@ -85,7 +86,8 @@ func (w *Wallet) AddressOnIndex(index uint64) *iotago.Ed25519Address {
 	defer w.Unlock()
 
 	hdWallet := mock.NewHDWallet("", w.seed[:], index)
-	addr := hdWallet.Address()
+	//nolint:forcetypeassert
+	addr := hdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)
 
 	return addr
 }

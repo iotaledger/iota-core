@@ -72,10 +72,14 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signingWallets []*mock.HDWallet, opts ...options.Option[builder.TransactionBuilder]) (*iotago.Transaction, error) {
 	currentAPI := t.apiProvider.CurrentAPI()
 
-	walletKeys := make([]iotago.AddressKeys, len(signingWallets))
-	for i, wallet := range signingWallets {
+	walletKeys := make([]iotago.AddressKeys, 0, len(signingWallets)*2)
+	for _, wallet := range signingWallets {
 		inputPrivateKey, _ := wallet.KeyPair()
-		walletKeys[i] = iotago.AddressKeys{Address: wallet.Address(), Keys: inputPrivateKey}
+		// add address keys for both types of directly unlockable addresses to simplify the TransactionFramework
+		//nolint:forcetypeassert
+		walletKeys = append(walletKeys, iotago.NewAddressKeysForEd25519Address(wallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address), inputPrivateKey))
+		//nolint:forcetypeassert
+		walletKeys = append(walletKeys, iotago.NewAddressKeysForImplicitAccountCreationAddress(wallet.Address(iotago.AddressImplicitAccountCreation).(*iotago.ImplicitAccountCreationAddress), inputPrivateKey))
 	}
 
 	txBuilder := builder.NewTransactionBuilder(currentAPI)
@@ -202,6 +206,26 @@ func (t *TransactionFramework) CreateAccountFromInput(inputAlias string, opts ..
 	return utxoledger.Outputs{input}, outputStates, []*mock.HDWallet{t.wallet}
 }
 
+// CreateImplicitAccountFromInput creates an implicit account output.
+func (t *TransactionFramework) CreateImplicitAccountFromInput(inputAlias string) (utxoledger.Outputs, iotago.Outputs[iotago.Output], *iotago.ImplicitAccountCreationAddress, []*mock.HDWallet) {
+	input := t.Output(inputAlias)
+
+	//nolint:forcetypeassert
+	implicitAccountAddress := t.DefaultAddress(iotago.AddressImplicitAccountCreation).(*iotago.ImplicitAccountCreationAddress)
+
+	basicOutput := &iotago.BasicOutput{
+		Amount:       input.BaseTokenAmount(),
+		Mana:         input.StoredMana(),
+		NativeTokens: iotago.NativeTokens{},
+		Conditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: implicitAccountAddress},
+		},
+		Features: iotago.BasicOutputFeatures{},
+	}
+
+	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{basicOutput}, implicitAccountAddress, []*mock.HDWallet{t.wallet}
+}
+
 // CreateDelegationFromInput creates a new DelegationOutput with given options from an input. If the remainder Output
 // is not created, then StoredMana from the input is not passed and can potentially be burned.
 // In order not to burn it, it needs to be assigned manually in another output in the transaction.
@@ -289,6 +313,28 @@ func (t *TransactionFramework) TransitionAccount(alias string, opts ...options.O
 	return output, iotago.Outputs[iotago.Output]{accountOutput}, []*mock.HDWallet{t.wallet}
 }
 
+func (t *TransactionFramework) TransitionImplicitAccountToAccountOutput(alias string, opts ...options.Option[builder.AccountOutputBuilder]) (consumedInput utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
+	input, exists := t.states[alias]
+	if !exists {
+		panic(fmt.Sprintf("output with alias %s does not exist", alias))
+	}
+
+	basicOutput, isBasic := input.Output().(*iotago.BasicOutput)
+	if !isBasic {
+		panic(fmt.Sprintf("output with alias %s is not *iotago.BasicOutput", alias))
+	}
+	if basicOutput.UnlockConditionSet().Address().Address.Type() != iotago.AddressImplicitAccountCreation {
+		panic(fmt.Sprintf("output with alias %s is not an implicit account", alias))
+	}
+
+	accountOutput := options.Apply(builder.NewAccountOutputBuilder(t.DefaultAddress(), t.DefaultAddress(), input.BaseTokenAmount()).
+		Mana(input.StoredMana()).
+		AccountID(iotago.AccountIDFromOutputID(input.OutputID())),
+		opts).MustBuild()
+
+	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{accountOutput}, []*mock.HDWallet{t.wallet}
+}
+
 func (t *TransactionFramework) Output(alias string) *utxoledger.Output {
 	output, exists := t.states[alias]
 	if !exists {
@@ -323,8 +369,8 @@ func (t *TransactionFramework) TransactionIDs(aliases ...string) []iotago.Transa
 	return lo.Map(aliases, t.TransactionID)
 }
 
-func (t *TransactionFramework) DefaultAddress() iotago.Address {
-	return t.wallet.Address()
+func (t *TransactionFramework) DefaultAddress(addressType ...iotago.AddressType) iotago.Address {
+	return t.wallet.Address(addressType...)
 }
 
 // DelegationOutput options
