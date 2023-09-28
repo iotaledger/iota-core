@@ -45,8 +45,8 @@ type TestSuite struct {
 	API iotago.API
 
 	optsGenesisTimestampOffset      int64
-	optsLivenessThresholdLowerBound time.Duration
-	optsLivenessThresholdUpperBound time.Duration
+	optsLivenessThresholdLowerBound uint16
+	optsLivenessThresholdUpperBound uint16
 	optsMinCommittableAge           iotago.SlotIndex
 	optsMaxCommittableAge           iotago.SlotIndex
 	optsSlotsPerEpochExponent       uint8
@@ -86,8 +86,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsWaitFor:                     DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
 		optsTick:                        DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 		optsGenesisTimestampOffset:      0,
-		optsLivenessThresholdLowerBound: 30 * time.Second,
-		optsLivenessThresholdUpperBound: 30 * time.Second,
+		optsLivenessThresholdLowerBound: 30,
+		optsLivenessThresholdUpperBound: 30,
 		optsMinCommittableAge:           10,
 		optsMaxCommittableAge:           20,
 		optsSlotsPerEpochExponent:       5,

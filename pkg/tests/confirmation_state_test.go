@@ -17,10 +17,10 @@ import (
 
 func TestConfirmationFlags(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10*time.Second), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
-		testsuite.WithLivenessThresholdUpperBound(10*time.Second), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
-		testsuite.WithMinCommittableAge(10),                       // TODO: remove this opt and use a proper value when refactoring the test with scheduler
-		testsuite.WithMaxCommittableAge(20),                       // TODO: remove this opt and use a proper value when refactoring the test with scheduler
+		testsuite.WithLivenessThresholdLowerBound(10), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
+		testsuite.WithLivenessThresholdUpperBound(10), // TODO: remove this opt and use a proper value when refactoring the test with scheduler
+		testsuite.WithMinCommittableAge(10),           // TODO: remove this opt and use a proper value when refactoring the test with scheduler
+		testsuite.WithMaxCommittableAge(20),           // TODO: remove this opt and use a proper value when refactoring the test with scheduler
 		testsuite.WithGenesisTimestampOffset(100*10),
 	)
 	defer ts.Shutdown()

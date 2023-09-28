@@ -39,19 +39,15 @@ func WithGenesisTimestampOffset(offset int64) options.Option[TestSuite] {
 	}
 }
 
-func WithLivenessThresholdLowerBound(lowerBound time.Duration) options.Option[TestSuite] {
-	// TODO: eventually this should not be used and common parameters should be used
-
+func WithLivenessThresholdLowerBound(lowerBoundInSeconds uint16) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
-		opts.optsLivenessThresholdLowerBound = lowerBound
+		opts.optsLivenessThresholdLowerBound = lowerBoundInSeconds
 	}
 }
 
-func WithLivenessThresholdUpperBound(upperBound time.Duration) options.Option[TestSuite] {
-	// TODO: eventually this should not be used and common parameters should be used
-
+func WithLivenessThresholdUpperBound(upperBoundInSeconds uint16) options.Option[TestSuite] {
 	return func(opts *TestSuite) {
-		opts.optsLivenessThresholdUpperBound = upperBound
+		opts.optsLivenessThresholdUpperBound = upperBoundInSeconds
 	}
 }
 

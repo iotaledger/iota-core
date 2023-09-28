@@ -29,8 +29,8 @@ import (
 
 func Test_Upgrade_Signaling(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10*time.Second),
-		testsuite.WithLivenessThresholdUpperBound(10*time.Second),
+		testsuite.WithLivenessThresholdLowerBound(10),
+		testsuite.WithLivenessThresholdUpperBound(10),
 		testsuite.WithMinCommittableAge(2),
 		testsuite.WithMaxCommittableAge(6),
 		testsuite.WithEpochNearingThreshold(2),
