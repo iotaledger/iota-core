@@ -1,7 +1,6 @@
 package ledger
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/core/safemath"
