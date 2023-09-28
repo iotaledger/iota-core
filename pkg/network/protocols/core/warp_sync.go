@@ -19,14 +19,16 @@ func (p *Protocol) SendWarpSyncRequest(id iotago.CommitmentID, to ...peer.ID) {
 	}}, to...)
 }
 
-func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], to ...peer.ID) {
+func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.BlockIDs, tangleMerkleProof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationsMerkleProof *merklehasher.Proof[iotago.Identifier], to ...peer.ID) {
 	serializer := p.apiProvider.APIForSlot(id.Slot())
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_WarpSyncResponse{
 		WarpSyncResponse: &nwmodels.WarpSyncResponse{
-			CommitmentId: lo.PanicOnErr(id.Bytes()),
-			BlockIds:     lo.PanicOnErr(serializer.Encode(blockIDs)),
-			MerkleProof:  lo.PanicOnErr(merkleProof.Bytes()),
+			CommitmentId:         lo.PanicOnErr(id.Bytes()),
+			BlockIds:             lo.PanicOnErr(serializer.Encode(blockIDs)),
+			TangleMerkleProof:    lo.PanicOnErr(tangleMerkleProof.Bytes()),
+			TransactionIds:       lo.PanicOnErr(serializer.Encode(transactionIDs)),
+			MutationsMerkleProof: lo.PanicOnErr(mutationsMerkleProof.Bytes()),
 		},
 	}}, to...)
 }
@@ -44,7 +46,7 @@ func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id peer.ID) {
 	})
 }
 
-func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, merkleProofBytes []byte, id peer.ID) {
+func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, tangleMerkleProofBytes []byte, transactionIDsBytes []byte, mutationProofBytes []byte, id peer.ID) {
 	p.workerPool.Submit(func() {
 		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
 		if err != nil {
@@ -60,13 +62,27 @@ func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsByte
 			return
 		}
 
-		merkleProof, _, err := merklehasher.ProofFromBytes[iotago.Identifier](merkleProofBytes)
+		tangleMerkleProof, _, err := merklehasher.ProofFromBytes[iotago.Identifier](tangleMerkleProofBytes)
 		if err != nil {
 			p.Events.Error.Trigger(ierrors.Wrapf(err, "failed to deserialize merkle proof when receiving waprsync response for commitment %s", commitmentID), id)
 
 			return
 		}
 
-		p.Events.WarpSyncResponseReceived.Trigger(commitmentID, blockIDs, merkleProof, id)
+		var transactionIDs iotago.TransactionIDs
+		if _, err = p.apiProvider.APIForSlot(commitmentID.Slot()).Decode(transactionIDsBytes, &transactionIDs, serix.WithValidation()); err != nil {
+			p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize transaction ids"), id)
+
+			return
+		}
+
+		mutationProof, _, err := merklehasher.ProofFromBytes[iotago.Identifier](mutationProofBytes)
+		if err != nil {
+			p.Events.Error.Trigger(ierrors.Wrapf(err, "failed to deserialize merkle proof when receiving waprsync response for commitment %s", commitmentID), id)
+
+			return
+		}
+
+		p.Events.WarpSyncResponseReceived.Trigger(commitmentID, blockIDs, tangleMerkleProof, transactionIDs, mutationProof, id)
 	})
 }

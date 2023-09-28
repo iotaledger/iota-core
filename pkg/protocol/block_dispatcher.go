@@ -151,9 +151,9 @@ func (b *BlockDispatcher) initNetworkConnection() {
 		}, b.warpSyncWorkers)
 	})
 
-	b.protocol.Events.Network.WarpSyncResponseReceived.Hook(func(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], src peer.ID) {
+	b.protocol.Events.Network.WarpSyncResponseReceived.Hook(func(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, tangleMerkleProof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationMerkleProof *merklehasher.Proof[iotago.Identifier], src peer.ID) {
 		b.runTask(func() {
-			b.protocol.HandleError(b.processWarpSyncResponse(commitmentID, blockIDs, merkleProof, src))
+			b.protocol.HandleError(b.processWarpSyncResponse(commitmentID, blockIDs, tangleMerkleProof, transactionIDs, mutationMerkleProof, src))
 		}, b.warpSyncWorkers)
 	})
 }
@@ -179,18 +179,23 @@ func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentI
 		return ierrors.Wrapf(err, "failed to get block IDs from slot %d", commitmentID.Slot())
 	}
 
+	transactionIDs, err := committedSlot.TransactionIDs()
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to get transaction IDs from slot %d", commitmentID.Slot())
+	}
+
 	roots, err := committedSlot.Roots()
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to get roots from slot %d", commitmentID.Slot())
 	}
 
-	b.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), src)
+	b.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), transactionIDs, roots.MutationProof(), src)
 
 	return nil
 }
 
 // processWarpSyncResponse processes a WarpSync response.
-func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) error {
+func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationMerkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) error {
 	if b.processedWarpSyncRequests.Has(commitmentID) {
 		return nil
 	}
