@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -9,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iotaledger/iota-core/tools/evil-spammer/interactive"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/logger"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 )
 
@@ -33,11 +34,13 @@ func main() {
 	// run selected test scenario
 	switch Script {
 	case "interactive":
-		Run()
+		interactive.Run()
 	case "basic":
-		CustomSpam(&customSpamParams)
+		programs.CustomSpam(&customSpamParams)
+	case "accounts":
+		//AccountWalletRun()
 	case "quick":
-		QuickTest(&quickTestParams)
+		programs.QuickTest(&quickTestParams)
 	// case SpammerTypeCommitments:
 	// 	CommitmentsSpam(&commitmentsSpamParams)
 	default:
@@ -133,7 +136,7 @@ func parseBasicSpamFlags() {
 		customSpamParams.BlkToBeSent = make([]int, len(customSpamParams.Durations))
 	}
 
-	customSpamParams.config = loadBasicConfig()
+	customSpamParams.Config = programs.LoadBasicConfig()
 }
 
 func parseQuickTestFlags() {
@@ -203,62 +206,4 @@ func parseDurations(durations string) []time.Duration {
 	}
 
 	return parsed
-}
-
-type BasicConfig struct {
-	LastFaucetUnspentOutputID string `json:"lastFaucetUnspentOutputId"`
-}
-
-var basicConfigJSON = `{
-	"lastFaucetUnspentOutputId": ""
-}`
-
-var basicConfigFile = "basic_config.json"
-
-// load the config file.
-func loadBasicConfig() *BasicConfig {
-	// open config file
-	config := new(BasicConfig)
-	file, err := os.Open(basicConfigFile)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			panic(err)
-		}
-
-		//nolint:gosec // users should be able to read the file
-		if err = os.WriteFile(basicConfigFile, []byte(basicConfigJSON), 0o644); err != nil {
-			panic(err)
-		}
-		if file, err = os.Open(basicConfigFile); err != nil {
-			panic(err)
-		}
-	}
-	defer file.Close()
-
-	// decode config file
-	if err = json.NewDecoder(file).Decode(config); err != nil {
-		panic(err)
-	}
-
-	return config
-}
-
-func saveConfigsToFile(config *BasicConfig) {
-	// open config file
-	file, err := os.Open(basicConfigFile)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	jsonConfigs, err := json.MarshalIndent(config, "", "    ")
-
-	if err != nil {
-		log.Errorf("failed to write configs to file %s", err)
-	}
-
-	//nolint:gosec // users should be able to read the file
-	if err = os.WriteFile(basicConfigFile, jsonConfigs, 0o644); err != nil {
-		panic(err)
-	}
 }

@@ -3,6 +3,8 @@ package main
 import (
 	"time"
 
+	"github.com/iotaledger/iota-core/tools/evil-spammer/interactive"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 )
 
@@ -16,9 +18,9 @@ var (
 var (
 	Script = "basic"
 
-	customSpamParams = CustomSpamParams{
+	customSpamParams = programs.CustomSpamParams{
 		ClientURLs:            urls,
-		SpamTypes:             []string{SpammerTypeBlock},
+		SpamTypes:             []string{interactive.SpammerTypeBlock},
 		Rates:                 []int{1},
 		Durations:             []time.Duration{time.Second * 20},
 		BlkToBeSent:           []int{0},
@@ -29,7 +31,7 @@ var (
 		DeepSpam:              false,
 		EnableRateSetter:      false,
 	}
-	quickTestParams = QuickTestParams{
+	quickTestParams = programs.QuickTestParams{
 		ClientURLs:            urls,
 		Rate:                  100,
 		Duration:              time.Second * 30,

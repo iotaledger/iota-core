@@ -1,4 +1,4 @@
-package main
+package interactive
 
 import (
 	"encoding/json"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
@@ -451,10 +452,10 @@ func (m *Mode) startSpam() {
 
 	var s *spammer.Spammer
 	if m.Config.Scenario == SpammerTypeBlock {
-		s = SpamBlocks(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, 0, m.Config.UseRateSetter)
+		s = programs.SpamBlocks(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, 0, m.Config.UseRateSetter)
 	} else {
 		scenario, _ := wallet.GetScenario(m.Config.Scenario)
-		s = SpamNestedConflicts(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, scenario, m.Config.Deep, m.Config.Reuse, m.Config.UseRateSetter)
+		s = programs.SpamNestedConflicts(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, scenario, m.Config.Deep, m.Config.Reuse, m.Config.UseRateSetter)
 		if s == nil {
 			return
 		}
