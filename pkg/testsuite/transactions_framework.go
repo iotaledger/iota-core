@@ -373,7 +373,7 @@ func WithBlockIssuerFeature(keys iotago.BlockIssuerKeys, expirySlot iotago.SlotI
 	}
 }
 
-func AddBlockIssuerKey(key iotago.BlockIssuerKey) options.Option[builder.AccountOutputBuilder] {
+func WithAddBlockIssuerKey(key iotago.BlockIssuerKey) options.Option[builder.AccountOutputBuilder] {
 	return func(accountBuilder *builder.AccountOutputBuilder) {
 		transition := accountBuilder.GovernanceTransition()
 		transition.BlockIssuerTransition().AddKeys(key)
@@ -411,6 +411,25 @@ func WithAccountMana(mana iotago.Mana) options.Option[builder.AccountOutputBuild
 func WithAccountAmount(amount iotago.BaseToken) options.Option[builder.AccountOutputBuilder] {
 	return func(accountBuilder *builder.AccountOutputBuilder) {
 		accountBuilder.Amount(amount)
+	}
+}
+
+func WithAccountIncreasedFoundryCounter(diff uint32) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.FoundriesToGenerate(diff)
+	}
+}
+
+func WithAccountImmutableFeatures(features iotago.AccountOutputImmFeatures) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		for _, feature := range features.MustSet() {
+			switch feature.Type() {
+			case iotago.FeatureMetadata:
+				accountBuilder.ImmutableMetadata(feature.(*iotago.MetadataFeature).Data)
+			case iotago.FeatureSender:
+				accountBuilder.ImmutableSender(feature.(*iotago.SenderFeature).Address)
+			}
+		}
 	}
 }
 

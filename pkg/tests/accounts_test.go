@@ -65,7 +65,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount(
 		"Genesis:1",
-		testsuite.AddBlockIssuerKey(newGenesisOutputKey),
+		testsuite.WithAddBlockIssuerKey(newGenesisOutputKey),
 		testsuite.WithBlockIssuerExpirySlot(1),
 	)
 	consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(2, "Genesis:0")
