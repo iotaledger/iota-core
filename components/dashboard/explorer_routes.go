@@ -132,7 +132,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 			return iotago.PayloadType(0)
 		}(),
 		Payload: func() json.RawMessage {
-			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
+			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadSignedTransaction {
 				tx, _ := basicBlock.Payload.(*iotago.SignedTransaction)
 				txResponse := NewTransaction(tx)
 				bytes, _ := json.Marshal(txResponse)
@@ -143,7 +143,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 			return payloadJSON
 		}(),
 		TransactionID: func() string {
-			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
+			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadSignedTransaction {
 				tx, _ := basicBlock.Payload.(*iotago.SignedTransaction)
 				id, _ := tx.ID()
 
