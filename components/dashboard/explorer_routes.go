@@ -213,7 +213,7 @@ func getTransaction(c echo.Context) error {
 
 	iotaTX, isTX := block.SignedTransaction()
 	if !isTX {
-		return ierrors.Errorf("payload is not a transaction: %s", output.BlockID().ToHex())
+		return ierrors.Errorf("payload is not a signed transaction: %s", output.BlockID().ToHex())
 	}
 
 	return httpserver.JSONResponse(c, http.StatusOK, NewTransaction(iotaTX))

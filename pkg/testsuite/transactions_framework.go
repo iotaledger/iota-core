@@ -357,7 +357,7 @@ func (t *TransactionFramework) SignedTransaction(alias string) *iotago.SignedTra
 	return transaction
 }
 
-func (t *TransactionFramework) SignedTransactionID(alias string) iotago.TransactionID {
+func (t *TransactionFramework) SignedTransactionID(alias string) iotago.SignedTransactionID {
 	return lo.PanicOnErr(t.SignedTransaction(alias).ID())
 }
 
@@ -502,7 +502,7 @@ func WithAccountNativeTokens(nativeTokens iotago.NativeTokens) options.Option[bu
 	}
 }
 
-// SignedTransaction options
+// TransactionBuilder options
 
 func WithInputs(inputs utxoledger.Outputs) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {

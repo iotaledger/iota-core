@@ -114,9 +114,9 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// region SignedTransaction //////////////////////////////////////////////////////////////////////////////////////////////////
+// region Transaction //////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Transaction represents the JSON model of a ledgerstate.SignedTransaction.
+// Transaction represents the JSON model of a iotago.SignedTransaction.
 type Transaction struct {
 	TransactionID    string                  `json:"txId"`
 	NetworkID        iotago.NetworkID        `json:"networkId"`
@@ -128,20 +128,20 @@ type Transaction struct {
 	Payload          []byte                  `json:"payload"`
 }
 
-// NewTransaction returns a Transaction from the given ledgerstate.SignedTransaction.
-func NewTransaction(iotaTx *iotago.SignedTransaction) *Transaction {
-	txID, err := iotaTx.ID()
+// NewTransaction returns a Transaction from the given iotago.SignedTransaction.
+func NewTransaction(signedTx *iotago.SignedTransaction) *Transaction {
+	txID, err := signedTx.ID()
 	if err != nil {
 		return nil
 	}
 
-	inputs := make([]*Input, len(iotaTx.Transaction.Inputs))
-	for i, input := range iotaTx.Transaction.Inputs {
+	inputs := make([]*Input, len(signedTx.Transaction.Inputs))
+	for i, input := range signedTx.Transaction.Inputs {
 		inputs[i] = NewInput(input)
 	}
 
-	outputs := make([]*Output, len(iotaTx.Transaction.Outputs))
-	for i, output := range iotaTx.Transaction.Outputs {
+	outputs := make([]*Output, len(signedTx.Transaction.Outputs))
+	for i, output := range signedTx.Transaction.Outputs {
 		outputs[i] = NewOutput(output)
 		outputs[i].OutputID = &OutputID{
 			Hex:           iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(i)).ToHex(),
@@ -150,19 +150,19 @@ func NewTransaction(iotaTx *iotago.SignedTransaction) *Transaction {
 		}
 	}
 
-	unlockBlocks := make([]*UnlockBlock, len(iotaTx.Unlocks))
-	for i, unlockBlock := range iotaTx.Unlocks {
+	unlockBlocks := make([]*UnlockBlock, len(signedTx.Unlocks))
+	for i, unlockBlock := range signedTx.Unlocks {
 		unlockBlocks[i] = NewUnlockBlock(unlockBlock)
 	}
 
 	dataPayload := make([]byte, 0)
-	if iotaTx.Transaction.Payload != nil {
-		dataPayload, _ = deps.Protocol.CurrentAPI().Encode(iotaTx.Transaction.Payload)
+	if signedTx.Transaction.Payload != nil {
+		dataPayload, _ = deps.Protocol.CurrentAPI().Encode(signedTx.Transaction.Payload)
 	}
 
 	return &Transaction{
-		NetworkID:    iotaTx.Transaction.NetworkID,
-		CreationSlot: iotaTx.Transaction.CreationSlot,
+		NetworkID:    signedTx.Transaction.NetworkID,
+		CreationSlot: signedTx.Transaction.CreationSlot,
 		Inputs:       inputs,
 		Outputs:      outputs,
 		Unlocks:      unlockBlocks,
@@ -174,7 +174,7 @@ func NewTransaction(iotaTx *iotago.SignedTransaction) *Transaction {
 
 // region Input ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Input represents the JSON model of a ledgerstate.Input.
+// Input represents the JSON model of a iotago.Input.
 type Input struct {
 	Type               string    `json:"type"`
 	ReferencedOutputID *OutputID `json:"referencedOutputID,omitempty"`
@@ -182,7 +182,7 @@ type Input struct {
 	Output *Output `json:"output,omitempty"`
 }
 
-// NewInput returns an Input from the given ledgerstate.Input.
+// NewInput returns an Input from the given iotago.Input.
 func NewInput(input iotago.Input) *Input {
 	utxoInput, isUtxoInput := input.(*iotago.UTXOInput)
 	if !isUtxoInput {
@@ -199,14 +199,14 @@ func NewInput(input iotago.Input) *Input {
 
 // region UnlockBlock //////////////////////////////////////////////////////////////////////////////////////////////////
 
-// UnlockBlock represents the JSON model of a ledgerstate.UnlockBlock.
+// UnlockBlock represents the JSON model of a iotago.UnlockBlock.
 type UnlockBlock struct {
 	Type          string               `json:"type"`
 	SignatureType iotago.SignatureType `json:"signatureType,omitempty"`
 	Signature     json.RawMessage      `json:"signature,omitempty"`
 }
 
-// NewUnlockBlock returns an UnlockBlock from the given ledgerstate.UnlockBlock.
+// NewUnlockBlock returns an UnlockBlock from the given UnlockBlock.
 func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
 	result := &UnlockBlock{
 		Type: unlockBlock.Type().String(),

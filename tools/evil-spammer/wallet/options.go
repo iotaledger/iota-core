@@ -117,7 +117,7 @@ func (o *Options) checkInputsAndOutputs() error {
 	return nil
 }
 
-// WithInputs returns an Option that is used to provide the Inputs of the SignedTransaction.
+// WithInputs returns an Option that is used to provide the Inputs of the Transaction.
 func WithInputs(inputs interface{}) Option {
 	return func(options *Options) {
 		switch in := inputs.(type) {
@@ -135,7 +135,7 @@ func WithInputs(inputs interface{}) Option {
 	}
 }
 
-// WithOutput returns an Option that is used to define a non-colored Output for the SignedTransaction in the Block.
+// WithOutput returns an Option that is used to define a non-colored Output for the Transaction in the Block.
 func WithOutput(output *OutputOption) Option {
 	return func(options *Options) {
 		if output.amount == 0 || output.address == nil {
@@ -162,7 +162,7 @@ func WithOutput(output *OutputOption) Option {
 	}
 }
 
-// WithOutputs returns an Option that is used to define a non-colored Outputs for the SignedTransaction in the Block.
+// WithOutputs returns an Option that is used to define a non-colored Outputs for the Transaction in the Block.
 func WithOutputs(outputs []*OutputOption) Option {
 	return func(options *Options) {
 		for _, output := range outputs {
@@ -248,7 +248,7 @@ func NewFaucetRequestOptions(options ...FaucetRequestOption) *FaucetRequestOptio
 // FaucetRequestOption is an option for faucet request.
 type FaucetRequestOption func(*FaucetRequestOptions)
 
-// WithOutputAlias returns an Option that is used to provide the Output of the SignedTransaction.
+// WithOutputAlias returns an Option that is used to provide the Output of the Transaction.
 func WithOutputAlias(aliasName string) FaucetRequestOption {
 	return func(options *FaucetRequestOptions) {
 		options.outputAliasName = aliasName
