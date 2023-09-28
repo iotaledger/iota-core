@@ -64,7 +64,7 @@ func (o *Output) SlotBooked() iotago.SlotIndex {
 }
 
 func (o *Output) SlotCreated() iotago.SlotIndex {
-	return o.outputID.CreationSlotIndex()
+	return o.outputID.CreationSlot()
 }
 
 func (o *Output) OutputType() iotago.OutputType {

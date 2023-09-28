@@ -17,11 +17,8 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 	}
 
 	inputSet := iotagovm.InputSet{}
-	for _, inputState := range inputStates {
-		inputSet[inputState.OutputID()] = iotagovm.OutputWithCreationSlot{
-			Output:       inputState.Output(),
-			CreationSlot: inputState.SlotCreated(),
-		}
+	for _, input := range inputStates {
+		inputSet[input.OutputID()] = input.Output()
 	}
 	resolvedInputs := iotagovm.ResolvedInputs{
 		InputSet: inputSet,
