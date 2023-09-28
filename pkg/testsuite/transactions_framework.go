@@ -327,19 +327,10 @@ func (t *TransactionFramework) TransitionImplicitAccountToAccountOutput(alias st
 		panic(fmt.Sprintf("output with alias %s is not an implicit account", alias))
 	}
 
-	accountOutput := options.Apply(&iotago.AccountOutput{
-		Amount:       input.BaseTokenAmount(),
-		Mana:         input.StoredMana(),
-		AccountID:    iotago.AccountIDFromOutputID(input.OutputID()),
-		StateIndex:   0,
-		NativeTokens: iotago.NativeTokens{},
-		Conditions: iotago.AccountOutputUnlockConditions{
-			&iotago.StateControllerAddressUnlockCondition{Address: t.DefaultAddress()},
-			&iotago.GovernorAddressUnlockCondition{Address: t.DefaultAddress()},
-		},
-		Features:          iotago.AccountOutputFeatures{},
-		ImmutableFeatures: iotago.AccountOutputImmFeatures{},
-	}, opts)
+	accountOutput := options.Apply(builder.NewAccountOutputBuilder(t.DefaultAddress(), t.DefaultAddress(), input.BaseTokenAmount()).
+		Mana(input.StoredMana()).
+		AccountID(iotago.AccountIDFromOutputID(input.OutputID())),
+		opts).MustBuild()
 
 	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{accountOutput}, []*mock.HDWallet{t.wallet}
 }
