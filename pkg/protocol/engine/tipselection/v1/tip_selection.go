@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -22,23 +21,26 @@ import (
 
 // TipSelection is a component that is used to abstract away the tip selection strategy, used to issue new blocks.
 type TipSelection struct {
-	// rootBlocks is a function that returns the current root blocks.
-	rootBlocks func() iotago.BlockIDs
-
 	// tipManager is the TipManager that is used to access the tip related metadata.
 	tipManager tipmanager.TipManager
 
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
 
-	// memPool holds information about pending transactions.
-	memPool mempool.MemPool[ledger.BlockVoteRank]
+	// rootBlocks is a function that returns the current root blocks.
+	rootBlocks func() iotago.BlockIDs
+
+	// livenessThreshold is a function that is used to determine the liveness threshold for a tip.
+	livenessThreshold func(tip tipmanager.TipMetadata) time.Duration
+
+	// transactionMetadata holds a function that is used to retrieve the metadata of a transaction.
+	transactionMetadata func(iotago.TransactionID) (mempool.TransactionMetadata, bool)
 
 	// livenessThresholdQueue holds a queue of tips that are waiting to reach the liveness threshold.
 	livenessThresholdQueue timed.PriorityQueue[tipmanager.TipMetadata]
 
-	// livenessThreshold holds the current liveness threshold.
-	livenessThreshold reactive.Variable[time.Time]
+	// acceptanceTime holds the current acceptance time.
+	acceptanceTime reactive.Variable[time.Time]
 
 	// optMaxStrongParents contains the maximum number of strong parents that are allowed.
 	optMaxStrongParents int
@@ -55,33 +57,43 @@ type TipSelection struct {
 
 	// Module embeds the required methods of the module.Interface.
 	module.Module
-	engine *engine.Engine
 }
 
 // New is the constructor for the TipSelection.
-func New(e *engine.Engine, tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], memPool mempool.MemPool[ledger.BlockVoteRank], rootBlocksRetriever func() iotago.BlockIDs, opts ...options.Option[TipSelection]) *TipSelection {
+func New(opts ...options.Option[TipSelection]) *TipSelection {
 	return options.Apply(&TipSelection{
-		tipManager:                   tipManager,
-		engine:                       e,
-		conflictDAG:                  conflictDAG,
-		memPool:                      memPool,
-		rootBlocks:                   rootBlocksRetriever,
-		livenessThresholdQueue:       timed.NewPriorityQueue[tipmanager.TipMetadata](true),
-		livenessThreshold:            reactive.NewVariable[time.Time](),
-		optMaxStrongParents:          8,
-		optMaxLikedInsteadReferences: 8,
-		optMaxWeakReferences:         8,
-	}, opts, func(t *TipSelection) {
-		t.optMaxLikedInsteadReferencesPerParent = t.optMaxLikedInsteadReferences / 2
+		livenessThresholdQueue:                timed.NewPriorityQueue[tipmanager.TipMetadata](true),
+		acceptanceTime:                        reactive.NewVariable[time.Time](monotonicallyIncreasing),
+		optMaxStrongParents:                   8,
+		optMaxLikedInsteadReferences:          8,
+		optMaxLikedInsteadReferencesPerParent: 4,
+		optMaxWeakReferences:                  8,
+	}, opts)
+}
 
-		t.livenessThreshold.OnUpdate(func(_, threshold time.Time) {
-			for _, tip := range t.livenessThresholdQueue.PopUntil(threshold) {
-				tip.LivenessThresholdReached().Trigger()
-			}
-		})
+// Construct fills in the dependencies of the TipSelection and triggers the constructed and initialized events of the
+// module.
+//
+// This method is separated from the constructor so the TipSelection can be initialized lazily after all dependencies
+// are available.
+func (t *TipSelection) Construct(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
+	t.tipManager = tipManager
+	t.conflictDAG = conflictDAG
+	t.transactionMetadata = transactionMetadataRetriever
+	t.rootBlocks = rootBlocksRetriever
+	t.livenessThreshold = livenessThresholdFunc
 
-		t.TriggerConstructed()
+	t.TriggerConstructed()
+
+	t.acceptanceTime.OnUpdate(func(_, acceptanceTime time.Time) {
+		t.triggerLivenessThreshold(acceptanceTime)
 	})
+
+	tipManager.OnBlockAdded(t.classifyTip)
+
+	t.TriggerInitialized()
+
+	return t
 }
 
 // SelectTips selects the tips that should be used as references for a new block.
@@ -125,15 +137,16 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 	return references
 }
 
-// SetLivenessThreshold sets the liveness threshold used for tip selection (it can only increase monotonically).
-func (t *TipSelection) SetLivenessThreshold(threshold time.Time) {
-	t.livenessThreshold.Compute(func(currentThreshold time.Time) time.Time {
-		return lo.Cond(threshold.Before(currentThreshold), currentThreshold, threshold)
-	})
+// SetAcceptanceTime updates the acceptance time of the TipSelection.
+func (t *TipSelection) SetAcceptanceTime(acceptanceTime time.Time) (previousValue time.Time) {
+	return t.acceptanceTime.Set(acceptanceTime)
 }
 
-// Shutdown does nothing but is required by the module.Interface.
-func (t *TipSelection) Shutdown() {}
+// Shutdown triggers the shutdown of the TipSelection.
+func (t *TipSelection) Shutdown() {
+	t.TriggerShutdown()
+	t.TriggerStopped()
+}
 
 // classifyTip determines the initial tip pool of the given tip.
 func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
@@ -145,14 +158,14 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 		tipMetadata.TipPool().Set(tipmanager.DroppedTipPool)
 	}
 
-	t.livenessThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime())
+	t.livenessThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime().Add(t.livenessThreshold(tipMetadata)))
 }
 
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
 func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.TransactionID], tipMetadata tipmanager.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts ds.Set[iotago.TransactionID], err error) {
 	necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
 	if err = t.conflictDAG.LikedInstead(tipMetadata.Block().ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
-		transactionMetadata, exists := t.memPool.TransactionMetadata(likedConflictID)
+		transactionMetadata, exists := t.transactionMetadata(likedConflictID)
 		if !exists {
 			return ierrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedConflictID)
 		}
@@ -215,6 +228,17 @@ func (t *TipSelection) isValidWeakTip(block *blocks.Block) bool {
 	return t.conflictDAG.LikedInstead(block.PayloadConflictIDs()).Size() == 0
 }
 
+// triggerLivenessThreshold triggers the liveness threshold for all tips that have reached the given threshold.
+func (t *TipSelection) triggerLivenessThreshold(threshold time.Time) {
+	for _, tip := range t.livenessThresholdQueue.PopUntil(threshold) {
+		if dynamicLivenessThreshold := tip.Block().IssuingTime().Add(t.livenessThreshold(tip)); dynamicLivenessThreshold.After(threshold) {
+			t.livenessThresholdQueue.Push(tip, dynamicLivenessThreshold)
+		} else {
+			tip.LivenessThresholdReached().Trigger()
+		}
+	}
+}
+
 // WithMaxStrongParents is an option for the TipSelection that allows to configure the maximum number of strong parents.
 func WithMaxStrongParents(maxStrongParents int) options.Option[TipSelection] {
 	return func(tipManager *TipSelection) {
@@ -235,4 +259,14 @@ func WithMaxWeakReferences(maxWeakReferences int) options.Option[TipSelection] {
 	return func(tipManager *TipSelection) {
 		tipManager.optMaxWeakReferences = maxWeakReferences
 	}
+}
+
+// monotonicallyIncreasing returns the maximum of the two given times which is used as a transformation function to make
+// the acceptance time of the TipSelection monotonically increasing.
+func monotonicallyIncreasing(currentTime time.Time, newTime time.Time) time.Time {
+	if currentTime.After(newTime) {
+		return currentTime
+	}
+
+	return newTime
 }
