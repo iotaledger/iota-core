@@ -7,12 +7,68 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/promise"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
+
+type SignedTransactionMetadata struct {
+	id iotago.SignedTransactionID
+
+	signaturesInvalid reactive.Variable[error]
+
+	signaturesValid reactive.Event
+
+	transactionMetadata *TransactionMetadata
+
+	attachments reactive.Set[iotago.BlockID]
+
+	allAttachmentsEvicted reactive.Event
+
+	attachmentsMutex syncutils.RWMutex
+}
+
+func NewSignedTransactionMetadata(signedTransaction mempool.SignedTransaction, transactionMetadata *TransactionMetadata) (*SignedTransactionMetadata, error) {
+	signedID, signedIDErr := signedTransaction.ID()
+	if signedIDErr != nil {
+		return nil, ierrors.Errorf("failed to retrieve signed transaction ID: %w", signedIDErr)
+	}
+
+	return &SignedTransactionMetadata{
+		id:                signedID,
+		signaturesInvalid: reactive.NewVariable[error](),
+
+		signaturesValid: reactive.NewEvent(),
+
+		transactionMetadata: transactionMetadata,
+
+		attachments: reactive.NewSet[iotago.BlockID](),
+
+		allAttachmentsEvicted: reactive.NewEvent(),
+	}, nil
+}
+
+func (t *SignedTransactionMetadata) ID() iotago.SignedTransactionID {
+	return t.id
+}
+
+func (t *SignedTransactionMetadata) TransactionMetadata() mempool.TransactionMetadata {
+	return t.transactionMetadata
+}
+
+func (t *SignedTransactionMetadata) OnSignaturesInvalid(callback func(error)) (unsubscribe func()) {
+	return t.signaturesInvalid.OnUpdate(func(_, err error) {
+		callback(err)
+	})
+}
+
+func (t *SignedTransactionMetadata) OnSignaturesValid(callback func()) (unsubscribe func()) {
+	return t.signaturesValid.OnTrigger(callback)
+}
+
+func (t *SignedTransactionMetadata) Attachments() []iotago.BlockID {
+	return t.attachments.ToSlice()
+}
 
 type TransactionMetadata struct {
 	id                iotago.TransactionID
@@ -26,32 +82,38 @@ type TransactionMetadata struct {
 
 	// lifecycle events
 	unsolidInputsCount uint64
-	solid              *promise.Event
-	executed           *promise.Event
-	invalid            *promise.Event1[error]
-	booked             *promise.Event
-	evicted            *promise.Event
+	solid              reactive.Event
+	shouldExecute      reactive.Event
+	executed           reactive.Event
+	invalid            reactive.Variable[error]
+	booked             reactive.Event
+	evicted            reactive.Event
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
 	allInputsAccepted     reactive.Variable[bool]
-	conflicting           *promise.Event
-	conflictAccepted      *promise.Event
+	conflicting           reactive.Event
+	conflictAccepted      reactive.Event
 
 	// attachments
-	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
-	earliestIncludedAttachment reactive.Variable[iotago.BlockID]
-	allAttachmentsEvicted      *promise.Event
+	signingTransactions           reactive.Set[*SignedTransactionMetadata]
+	allSigningTransactionsEvicted reactive.Event
+
+	validAttachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
+	earliestIncludedValidAttachment reactive.Variable[iotago.BlockID]
 
 	// mutex needed?
-	mutex syncutils.RWMutex
-
+	mutex            syncutils.RWMutex
 	attachmentsMutex syncutils.RWMutex
 
 	*inclusionFlags
 }
 
-func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMetadata, error) {
+func (t *TransactionMetadata) Attachments() []iotago.BlockID {
+	return t.validAttachments.Keys()
+}
+
+func NewTransactionMetadata(transaction mempool.Transaction) (*TransactionMetadata, error) {
 	transactionID, transactionIDErr := transaction.ID()
 	if transactionIDErr != nil {
 		return nil, ierrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
@@ -84,20 +146,23 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 		conflictIDs:       reactive.NewDerivedSet[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(utxoInputReferences) + len(contextInputReferences)),
-		booked:             promise.NewEvent(),
-		solid:              promise.NewEvent(),
-		executed:           promise.NewEvent(),
-		invalid:            promise.NewEvent1[error](),
-		evicted:            promise.NewEvent(),
+		booked:             reactive.NewEvent(),
+		solid:              reactive.NewEvent(),
+		shouldExecute:      reactive.NewEvent(),
+		executed:           reactive.NewEvent(),
+		invalid:            reactive.NewVariable[error](),
+		evicted:            reactive.NewEvent(),
 
 		unacceptedInputsCount: uint64(len(utxoInputReferences)),
 		allInputsAccepted:     reactive.NewVariable[bool](),
-		conflicting:           promise.NewEvent(),
-		conflictAccepted:      promise.NewEvent(),
+		conflicting:           reactive.NewEvent(),
+		conflictAccepted:      reactive.NewEvent(),
 
-		attachments:                shrinkingmap.New[iotago.BlockID, bool](),
-		earliestIncludedAttachment: reactive.NewVariable[iotago.BlockID](),
-		allAttachmentsEvicted:      promise.NewEvent(),
+		allSigningTransactionsEvicted: reactive.NewEvent(),
+		signingTransactions:           reactive.NewSet[*SignedTransactionMetadata](),
+
+		validAttachments:                shrinkingmap.New[iotago.BlockID, bool](),
+		earliestIncludedValidAttachment: reactive.NewVariable[iotago.BlockID](),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(), nil
@@ -189,11 +254,13 @@ func (t *TransactionMetadata) OnExecuted(callback func()) {
 }
 
 func (t *TransactionMetadata) IsInvalid() bool {
-	return t.invalid.WasTriggered()
+	return t.invalid.Get() != nil
 }
 
 func (t *TransactionMetadata) OnInvalid(callback func(error)) {
-	t.invalid.OnTrigger(callback)
+	t.invalid.OnUpdate(func(oldValue, newValue error) {
+		callback(newValue)
+	})
 }
 
 func (t *TransactionMetadata) IsBooked() bool {
@@ -225,7 +292,7 @@ func (t *TransactionMetadata) setBooked() bool {
 }
 
 func (t *TransactionMetadata) setInvalid(reason error) {
-	t.invalid.Trigger(reason)
+	_ = t.invalid.Set(reason)
 }
 
 func (t *TransactionMetadata) markInputSolid() (allInputsSolid bool) {
@@ -316,7 +383,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		t.conflictIDs.Replace(ds.NewSet(t.id))
 	})
 
-	t.allAttachmentsEvicted.OnTrigger(func() {
+	t.allSigningTransactionsEvicted.OnTrigger(func() {
 		if !t.IsCommitted() {
 			t.setOrphaned()
 		}
@@ -338,21 +405,21 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	return t
 }
 
-func (t *TransactionMetadata) addAttachment(blockID iotago.BlockID) (added bool) {
+func (t *SignedTransactionMetadata) addAttachment(blockID iotago.BlockID) (added bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
-	return lo.Return2(t.attachments.GetOrCreate(blockID, func() bool { return false }))
+	return t.attachments.Add(blockID)
 }
 
 func (t *TransactionMetadata) markAttachmentIncluded(blockID iotago.BlockID) (included bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
-	t.attachments.Set(blockID, true)
+	t.validAttachments.Set(blockID, true)
 
-	if lowestSlotIndex := t.earliestIncludedAttachment.Get().Slot(); lowestSlotIndex == 0 || blockID.Slot() < lowestSlotIndex {
-		t.earliestIncludedAttachment.Set(blockID)
+	if lowestSlotIndex := t.earliestIncludedValidAttachment.Get().Slot(); lowestSlotIndex == 0 || blockID.Slot() < lowestSlotIndex {
+		t.earliestIncludedValidAttachment.Set(blockID)
 	}
 
 	return true
@@ -362,42 +429,38 @@ func (t *TransactionMetadata) markAttachmentOrphaned(blockID iotago.BlockID) (or
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
-	previousState, exists := t.attachments.Get(blockID)
+	previousState, exists := t.validAttachments.Get(blockID)
 	if !exists {
 		return false
 	}
 
 	t.evictAttachment(blockID)
 
-	if previousState && blockID == t.earliestIncludedAttachment.Get() {
-		t.earliestIncludedAttachment.Set(t.findLowestIncludedAttachment())
+	if previousState && blockID == t.earliestIncludedValidAttachment.Get() {
+		t.earliestIncludedValidAttachment.Set(t.findLowestIncludedAttachment())
 	}
 
 	return true
 }
 
-func (t *TransactionMetadata) Attachments() []iotago.BlockID {
-	return t.attachments.Keys()
-}
-
 func (t *TransactionMetadata) EarliestIncludedAttachment() iotago.BlockID {
-	return t.earliestIncludedAttachment.Get()
+	return t.earliestIncludedValidAttachment.Get()
 }
 
 func (t *TransactionMetadata) OnEarliestIncludedAttachmentUpdated(callback func(prevBlock, newBlock iotago.BlockID)) {
-	t.earliestIncludedAttachment.OnUpdate(callback)
+	t.earliestIncludedValidAttachment.OnUpdate(callback)
 }
 
 func (t *TransactionMetadata) evictAttachment(id iotago.BlockID) {
-	if t.attachments.Delete(id) && t.attachments.IsEmpty() {
-		t.allAttachmentsEvicted.Trigger()
+	if t.validAttachments.Delete(id) && t.validAttachments.IsEmpty() {
+		t.allSigningTransactionsEvicted.Trigger()
 	}
 }
 
 func (t *TransactionMetadata) findLowestIncludedAttachment() iotago.BlockID {
 	var lowestIncludedBlock iotago.BlockID
 
-	t.attachments.ForEach(func(blockID iotago.BlockID, included bool) bool {
+	t.validAttachments.ForEach(func(blockID iotago.BlockID, included bool) bool {
 		if included && (lowestIncludedBlock.Slot() == 0 || blockID.Slot() < lowestIncludedBlock.Slot()) {
 			lowestIncludedBlock = blockID
 		}

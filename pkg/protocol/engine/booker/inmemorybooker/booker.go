@@ -98,23 +98,26 @@ var _ booker.Booker = new(Booker)
 
 // Queue checks if payload is solid and then adds the block to a Booker's CausalOrder.
 func (b *Booker) Queue(block *blocks.Block) error {
-	transactionMetadata, containsTransaction := b.ledger.AttachTransaction(block)
+	signedTransactionMetadata, containsTransaction := b.ledger.AttachTransaction(block)
 
 	if !containsTransaction {
 		b.bookingOrder.Queue(block)
 		return nil
 	}
 
-	if transactionMetadata == nil {
+	if signedTransactionMetadata == nil {
 		b.retainBlockFailure(block.ID(), apimodels.BlockFailurePayloadInvalid)
 
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
 	// Based on the assumption that we always fork and the UTXO and Tangle past cones are always fully known.
-	transactionMetadata.OnBooked(func() {
-		block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs())
-		b.bookingOrder.Queue(block)
+	signedTransactionMetadata.OnSignaturesValid(func() {
+		transactionMetadata := signedTransactionMetadata.TransactionMetadata()
+		transactionMetadata.OnBooked(func() {
+			block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs())
+			b.bookingOrder.Queue(block)
+		})
 	})
 
 	return nil

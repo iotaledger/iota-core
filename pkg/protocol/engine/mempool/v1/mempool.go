@@ -21,6 +21,8 @@ import (
 
 // MemPool is a component that manages the state of transactions that are not yet included in the ledger state.
 type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
+	signedTransactionAttached *event.Event1[mempool.SignedTransactionMetadata]
+
 	transactionAttached *event.Event1[mempool.TransactionMetadata]
 
 	// executeStateTransition is the VM that is used to execute the state transition of transactions.
@@ -34,6 +36,9 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 
 	// cachedTransactions holds the transactions that are currently in the MemPool.
 	cachedTransactions *shrinkingmap.ShrinkingMap[iotago.TransactionID, *TransactionMetadata]
+
+	// cachedSignedTransactions holds the signed transactions that are currently in the MemPool.
+	cachedSignedTransactions *shrinkingmap.ShrinkingMap[iotago.SignedTransactionID, *SignedTransactionMetadata]
 
 	// cachedStateRequests holds the requests for states that are required to execute transactions.
 	cachedStateRequests *shrinkingmap.ShrinkingMap[iotago.Identifier, *promise.Promise[mempool.State]]
@@ -63,34 +68,41 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 // New is the constructor of the MemPool.
 func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
 	return options.Apply(&MemPool[VoteRank]{
-		transactionAttached:    event.New1[mempool.TransactionMetadata](),
-		executeStateTransition: vm,
-		resolveState:           inputResolver,
-		attachments:            memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata](),
-		cachedTransactions:     shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
-		cachedStateRequests:    shrinkingmap.New[iotago.Identifier, *promise.Promise[mempool.State]](),
-		stateDiffs:             shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
-		executionWorkers:       workers.CreatePool("executionWorkers", 1),
-		conflictDAG:            conflictDAG,
-		apiProvider:            apiProvider,
-		errorHandler:           errorHandler,
+		signedTransactionAttached: event.New1[mempool.SignedTransactionMetadata](),
+		transactionAttached:       event.New1[mempool.TransactionMetadata](),
+		executeStateTransition:    vm,
+		resolveState:              inputResolver,
+		attachments:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata](),
+		cachedTransactions:        shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
+		cachedSignedTransactions:  shrinkingmap.New[iotago.SignedTransactionID, *SignedTransactionMetadata](),
+		cachedStateRequests:       shrinkingmap.New[iotago.Identifier, *promise.Promise[mempool.State]](),
+		stateDiffs:                shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
+		executionWorkers:          workers.CreatePool("executionWorkers", 1),
+		conflictDAG:               conflictDAG,
+		apiProvider:               apiProvider,
+		errorHandler:              errorHandler,
 	}, opts, (*MemPool[VoteRank]).setup)
 }
 
-// AttachTransaction adds a transaction to the MemPool that was attached by the given block.
-func (m *MemPool[VoteRank]) AttachTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (metadata mempool.TransactionMetadata, err error) {
-	storedTransaction, isNew, err := m.storeTransaction(transaction, blockID)
+// AttachSignedTransaction adds a transaction to the MemPool that was attached by the given block.
+func (m *MemPool[VoteRank]) AttachSignedTransaction(signedTransaction mempool.SignedTransaction, transaction mempool.Transaction, blockID iotago.BlockID) (signedTransactionMetadata mempool.SignedTransactionMetadata, err error) {
+	storedSignedTransaction, isNewSignedTransaction, isNewTransaction, err := m.storeTransaction(signedTransaction, transaction, blockID)
 	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to store transaction")
+		return nil, ierrors.Wrap(err, "failed to store signedTransaction")
 	}
 
-	if isNew {
-		m.transactionAttached.Trigger(storedTransaction)
+	if isNewSignedTransaction {
+		m.signedTransactionAttached.Trigger(storedSignedTransaction)
 
-		m.solidifyInputs(storedTransaction)
+		if isNewTransaction {
+			m.transactionAttached.Trigger(storedSignedTransaction.transactionMetadata)
+
+			m.solidifyInputs(storedSignedTransaction.transactionMetadata)
+		}
+
 	}
 
-	return storedTransaction, nil
+	return storedSignedTransaction, nil
 }
 
 func (m *MemPool[VoteRank]) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
@@ -181,29 +193,40 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 	}
 }
 
-func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (storedTransaction *TransactionMetadata, isNew bool, err error) {
+func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTransaction, transaction mempool.Transaction, blockID iotago.BlockID) (storedSignedTransaction *SignedTransactionMetadata, isNewSignedTransaction, isNewTransaction bool, err error) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
 	if m.lastEvictedSlot >= blockID.Slot() {
 		// block will be retained as invalid, we do not store tx failure as it was block's fault
-		return nil, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastEvictedSlot)
+		return nil, false, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastEvictedSlot)
 	}
 
-	newTransaction, err := NewTransactionWithMetadata(transaction)
+	newTransaction, err := NewTransactionMetadata(transaction)
 	if err != nil {
-		return nil, false, ierrors.Errorf("failed to create transaction metadata: %w", err)
+		return nil, false, false, ierrors.Errorf("failed to create transaction metadata: %w", err)
 	}
 
-	storedTransaction, isNew = m.cachedTransactions.GetOrCreate(newTransaction.ID(), func() *TransactionMetadata { return newTransaction })
-	if isNew {
+	storedTransaction, isNewTransaction := m.cachedTransactions.GetOrCreate(newTransaction.ID(), func() *TransactionMetadata { return newTransaction })
+	if isNewTransaction {
 		m.setupTransaction(storedTransaction)
 	}
 
-	storedTransaction.addAttachment(blockID)
+	newSignedTransaction, err := NewSignedTransactionMetadata(signedTransaction, storedTransaction)
+	if err != nil {
+		return nil, false, false, ierrors.Errorf("failed to create signedTransaction metadata: %w", err)
+	}
+
+	storedSignedTransaction, isNewSignedTransaction = m.cachedSignedTransactions.GetOrCreate(lo.PanicOnErr(signedTransaction.ID()), func() *SignedTransactionMetadata { return newSignedTransaction })
+	if isNewSignedTransaction {
+		m.setupSignedTransaction(storedSignedTransaction, storedTransaction)
+	}
+
+	// TODO: figure out how to handle attachments and eviction
+	storedSignedTransaction.addAttachment(blockID)
 	m.attachments.Get(blockID.Slot(), true).Set(blockID, storedTransaction)
 
-	return storedTransaction, isNew, nil
+	return storedSignedTransaction, isNewSignedTransaction, isNewTransaction, nil
 }
 
 func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
@@ -241,7 +264,9 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 
 			// an input has been successfully resolved, decrease the unsolid input counter and check solidity.
 			if transaction.markInputSolid() {
-				m.executeTransaction(transaction)
+				transaction.shouldExecute.OnTrigger(func() {
+					m.executeTransaction(transaction)
+				})
 			}
 		})
 
@@ -435,7 +460,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 
 	transaction.OnEvicted(func() {
 		if m.cachedTransactions.Delete(transaction.ID()) {
-			transaction.attachments.ForEach(func(blockID iotago.BlockID, _ bool) bool {
+			transaction.validAttachments.ForEach(func(blockID iotago.BlockID, _ bool) bool {
 				if slotAttachments := m.attachments.Get(blockID.Slot(), false); slotAttachments != nil {
 					slotAttachments.Delete(blockID)
 				}
@@ -456,6 +481,22 @@ func (m *MemPool[VoteRank]) setupOutputState(state *OutputStateMetadata) {
 	state.OnOrphaned(func() {
 		m.cachedStateRequests.Delete(state.StateID())
 	})
+}
+
+func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransaction *SignedTransactionMetadata, transaction *TransactionMetadata) {
+	transaction.OnSolid(func() {
+		// Validate if signatures are valid and do something further
+		//if err := validateSignatures(signedTransaction); err != nil {
+		//	_ = signedTransaction.signaturesInvalid.Set(err)
+		//
+		//	return
+		//}
+
+		// if signatures are valid
+		signedTransaction.signaturesValid.Trigger()
+		signedTransaction.transactionMetadata.shouldExecute.Trigger()
+	})
+
 }
 
 func WithForkAllTransactions[VoteRank conflictdag.VoteRankType[VoteRank]](forkAllTransactions bool) options.Option[MemPool[VoteRank]] {

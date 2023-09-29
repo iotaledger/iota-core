@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/vm/stardust"
 )
 
-func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.OutputState, timeReference mempool.ContextState) ([]mempool.OutputState, error) {
+func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.SignedTransaction, inputStates []mempool.OutputState, timeReference mempool.ContextState) ([]mempool.OutputState, error) {
 	tx, ok := stateTransition.(*iotago.SignedTransaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
@@ -24,12 +24,12 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 		InputSet: inputSet,
 	}
 
-	bicInputs, err := tx.BICInputs()
+	bicInputs, err := tx.Transaction.BICInputs()
 	if err != nil {
 		return nil, ierrors.Join(err, iotago.ErrBICInputInvalid)
 	}
 
-	rewardInputs, err := tx.RewardInputs()
+	rewardInputs, err := tx.Transaction.RewardInputs()
 	if err != nil {
 		return nil, ierrors.Join(err, iotago.ErrRewardInputInvalid)
 	}

@@ -6,6 +6,16 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+type SignedTransactionMetadata interface {
+	ID() iotago.SignedTransactionID
+
+	OnSignaturesValid(func()) (unsubscribe func())
+
+	OnSignaturesInvalid(func(err error)) (unsubscribe func())
+
+	TransactionMetadata() TransactionMetadata
+}
+
 type TransactionMetadata interface {
 	ID() iotago.TransactionID
 

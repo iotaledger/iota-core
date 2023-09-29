@@ -122,9 +122,9 @@ func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.Transact
 	l.memPool.OnTransactionAttached(handler, opts...)
 }
 
-func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
-	if transaction, hasTransaction := block.SignedTransaction(); hasTransaction {
-		transactionMetadata, err := l.memPool.AttachTransaction(transaction, block.ID())
+func (l *Ledger) AttachTransaction(block *blocks.Block) (attachedTransaction mempool.SignedTransactionMetadata, containsTransaction bool) {
+	if signedTransaction, hasTransaction := block.SignedTransaction(); hasTransaction {
+		signedTransactionMetadata, err := l.memPool.AttachSignedTransaction(signedTransaction, signedTransaction.Transaction, block.ID())
 		if err != nil {
 			l.retainTransactionFailure(block.ID(), err)
 			l.errorHandler(err)
@@ -132,7 +132,7 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mem
 			return nil, true
 		}
 
-		return transactionMetadata, true
+		return signedTransactionMetadata, true
 	}
 
 	return nil, false
@@ -584,7 +584,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 	accountDiffs = make(map[iotago.AccountID]*model.AccountDiff)
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
-		tx, ok := txWithMeta.Transaction().(*iotago.SignedTransaction)
+		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
 		if !ok {
 			err = iotago.ErrTxTypeInvalid
 			return false
@@ -619,7 +619,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 		// process allotments
 		{
-			for _, allotment := range tx.Transaction.Allotments {
+			for _, allotment := range tx.Allotments {
 				// in case it didn't exist, allotments won't change the outputID of the Account,
 				// so the diff defaults to empty new and previous outputIDs
 				accountDiff := getAccountDiff(accountDiffs, allotment.AccountID)
