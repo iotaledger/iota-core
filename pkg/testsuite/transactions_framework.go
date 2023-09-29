@@ -555,7 +555,7 @@ func WithAccountInput(input *utxoledger.Output, governorTransition bool) options
 func WithAllotments(allotments iotago.Allotments) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		for _, allotment := range allotments {
-			txBuilder.AddAllotment(allotment)
+			txBuilder.IncreaseAllotment(allotment.AccountID, allotment.Value)
 		}
 	}
 }

@@ -121,10 +121,10 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 				Reason: ierrors.Wrapf(err, "could not calculate Mana cost for block"),
 			})
 		}
-		if basicBlock.BurnedMana < manaCost {
+		if basicBlock.MaxBurnedMana < manaCost {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, manaCost, basicBlock.BurnedMana),
+				Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, manaCost, basicBlock.MaxBurnedMana),
 			})
 
 			return

@@ -93,7 +93,7 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 		block := tpkg.RandProtocolBlock(&iotago.BasicBlock{
 			StrongParents: tpkg.SortedRandBlockIDs(1 + rand.Intn(iotago.BlockMaxParents)),
 			Payload:       &iotago.TaggedData{Data: make([]byte, 8192)},
-			BurnedMana:    1000,
+			MaxBurnedMana: 1000,
 		}, apiForEpoch, 0)
 
 		modelBlock, err := model.BlockFromBlock(block)
