@@ -24,6 +24,7 @@ var (
 	ErrBlockAttacherInvalidBlock              = ierrors.New("invalid block")
 	ErrBlockAttacherAttachingNotPossible      = ierrors.New("attaching not possible")
 	ErrBlockAttacherIncompleteBlockNotAllowed = ierrors.New("incomplete block is not allowed on this node")
+	ErrBlockTooRecent                         = ierrors.New("block is too recent compared to latest commitment")
 )
 
 // TODO: make sure an honest validator does not issue blocks within the same slot ratification period in two conflicting chains.
@@ -77,6 +78,10 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount A
 	}
 
 	if err := i.setDefaultBlockParams(blockParams.BlockHeader, issuerAccount); err != nil {
+		if ierrors.Is(err, ErrBlockTooRecent) {
+			// TODO: revive chain
+		}
+
 		return nil, err
 	}
 
@@ -422,7 +427,7 @@ func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitm
 	commitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 
 	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {
-		return nil, ierrors.Errorf("can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)
+		return nil, ierrors.Wrapf(ErrBlockTooRecent, "can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)
 	}
 
 	if blockSlot < commitment.Slot+protoParams.MinCommittableAge() {
