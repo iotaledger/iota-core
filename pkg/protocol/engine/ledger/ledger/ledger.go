@@ -123,7 +123,7 @@ func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.Transact
 }
 
 func (l *Ledger) AttachTransaction(block *blocks.Block) (transactionMetadata mempool.TransactionMetadata, containsTransaction bool) {
-	if transaction, hasTransaction := block.Transaction(); hasTransaction {
+	if transaction, hasTransaction := block.SignedTransaction(); hasTransaction {
 		transactionMetadata, err := l.memPool.AttachTransaction(transaction, block.ID())
 		if err != nil {
 			l.retainTransactionFailure(block.ID(), err)
@@ -212,7 +212,7 @@ func (l *Ledger) AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error
 func (l *Ledger) TrackBlock(block *blocks.Block) {
 	l.accountsLedger.TrackBlock(block)
 
-	if _, hasTransaction := block.Transaction(); hasTransaction {
+	if _, hasTransaction := block.SignedTransaction(); hasTransaction {
 		l.memPool.MarkAttachmentIncluded(block.ID())
 	}
 
@@ -382,11 +382,19 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 			// case 1.
 			continue
 		}
-		accountDiff.NewOutputID = createdOutput.OutputID()
-		accountDiff.PreviousOutputID = consumedOutput.OutputID()
 
+		// case 2.
+		// created output can never be an implicit account as these can not be transitioned, but consumed output can be.
+		switch consumedOutput.Output().Type() {
+		case iotago.OutputAccount:
+			accountDiff.PreviousExpirySlot = consumedOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
+		case iotago.OutputBasic:
+			accountDiff.PreviousExpirySlot = iotago.MaxSlotIndex
+		}
+
+		accountDiff.PreviousOutputID = consumedOutput.OutputID()
+		accountDiff.NewOutputID = createdOutput.OutputID()
 		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
-		accountDiff.PreviousExpirySlot = consumedOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 
 		oldPubKeysSet := accountData.BlockIssuerKeys
 		newPubKeysSet := iotago.NewBlockIssuerKeys()
@@ -438,14 +446,24 @@ func (l *Ledger) prepareAccountDiffs(accountDiffs map[iotago.AccountID]*model.Ac
 		// have some values from the allotment, so no need to set them explicitly.
 		accountDiff.NewOutputID = createdOutput.OutputID()
 		accountDiff.PreviousOutputID = iotago.EmptyOutputID
-		accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
 		accountDiff.PreviousExpirySlot = 0
-		accountDiff.BlockIssuerKeysAdded = createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
 
-		if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
-			accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
-			accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch)
-			accountDiff.FixedCostChange = int64(stakingFeature.FixedCost)
+		switch createdOutput.Output().Type() {
+		// for account outputs, get block issuer keys from the block issuer feature, and check for staking info.
+		case iotago.OutputAccount:
+			accountDiff.BlockIssuerKeysAdded = createdOutput.Output().FeatureSet().BlockIssuer().BlockIssuerKeys
+			accountDiff.NewExpirySlot = createdOutput.Output().FeatureSet().BlockIssuer().ExpirySlot
+			if stakingFeature := createdOutput.Output().FeatureSet().Staking(); stakingFeature != nil {
+				accountDiff.ValidatorStakeChange = int64(stakingFeature.StakedAmount)
+				accountDiff.StakeEndEpochChange = int64(stakingFeature.EndEpoch)
+				accountDiff.FixedCostChange = int64(stakingFeature.FixedCost)
+			}
+		// for basic outputs (implicit accounts), get block issuer keys from the address in the unlock conditions.
+		case iotago.OutputBasic:
+			// If the Output is a Basic Output it can only be here if the address is an ImplicitAccountCreationAddress.
+			address, _ := createdOutput.Output().UnlockConditionSet().Address().Address.(*iotago.ImplicitAccountCreationAddress)
+			accountDiff.BlockIssuerKeysAdded = iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(address))
+			accountDiff.NewExpirySlot = iotago.MaxSlotIndex
 		}
 	}
 }
@@ -486,6 +504,14 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			// the delegation output was created => determine later if we need to add the stake to the validator
 			delegation, _ := createdOutput.Output().(*iotago.DelegationOutput)
 			createdAccountDelegation[delegation.DelegationID] = delegation
+
+		case iotago.OutputBasic:
+			// if a basic output is sent to an implicit account creation address, we need to create the account
+			if createdOutput.Output().UnlockConditionSet().Address().Address.Type() == iotago.AddressImplicitAccountCreation {
+				accountID := iotago.AccountIDFromOutputID(outputID)
+				l.events.AccountCreated.Trigger(accountID)
+				createdAccounts[accountID] = createdOutput
+			}
 		}
 
 		return true
@@ -506,7 +532,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 		switch spentOutput.OutputType() {
 		case iotago.OutputAccount:
 			consumedAccount, _ := spentOutput.Output().(*iotago.AccountOutput)
-			// if we transition / destroy an account that doesn't have a block issuer feature or staking, we don't need to track the changes.
+			// if we transition / destroy an account output that doesn't have a block issuer feature or staking, we don't need to track the changes.
 			if consumedAccount.FeatureSet().BlockIssuer() == nil && consumedAccount.FeatureSet().Staking() == nil {
 				return true
 			}
@@ -528,6 +554,13 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 				// the delegation output was destroyed => subtract the stake from the validator account
 				accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorAddress.AccountID())
 				accountDiff.DelegationStakeChange -= int64(delegationOutput.DelegatedAmount)
+			}
+
+		case iotago.OutputBasic:
+			// if a basic output (implicit account) is consumed, get the accountID as hash of the output ID.
+			if spentOutput.Output().UnlockConditionSet().Address().Address.Type() == iotago.AddressImplicitAccountCreation {
+				accountID := iotago.AccountIDFromOutputID(outputID)
+				consumedAccounts[accountID] = spentOutput
 			}
 		}
 
@@ -551,7 +584,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 	accountDiffs = make(map[iotago.AccountID]*model.AccountDiff)
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
-		tx, ok := txWithMeta.Transaction().(*iotago.Transaction)
+		tx, ok := txWithMeta.Transaction().(*iotago.SignedTransaction)
 		if !ok {
 			err = iotago.ErrTxTypeInvalid
 			return false
@@ -586,7 +619,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 
 		// process allotments
 		{
-			for _, allotment := range tx.Essence.Allotments {
+			for _, allotment := range tx.Transaction.Allotments {
 				// in case it didn't exist, allotments won't change the outputID of the Account,
 				// so the diff defaults to empty new and previous outputIDs
 				accountDiff := getAccountDiff(accountDiffs, allotment.AccountID)

@@ -8,6 +8,7 @@ import (
 	"github.com/wollac/iota-crypto-demo/pkg/slip10"
 	"github.com/wollac/iota-crypto-demo/pkg/slip10/eddsa"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -101,11 +102,22 @@ func (hd *HDWallet) Outputs() []*utxoledger.Output {
 }
 
 // Address calculates an ed25519 address by using slip10.
-func (hd *HDWallet) Address() *iotago.Ed25519Address {
+func (hd *HDWallet) Address(addressType ...iotago.AddressType) iotago.DirectUnlockableAddress {
 	_, pubKey := hd.KeyPair()
-	addr := iotago.Ed25519AddressFromPubKey(pubKey)
 
-	return addr
+	addrType := iotago.AddressEd25519
+	if len(addressType) > 0 {
+		addrType = addressType[0]
+	}
+
+	switch addrType {
+	case iotago.AddressEd25519:
+		return iotago.Ed25519AddressFromPubKey(pubKey)
+	case iotago.AddressImplicitAccountCreation:
+		return iotago.ImplicitAccountCreationAddressFromPubKey(pubKey)
+	default:
+		panic(ierrors.Wrapf(iotago.ErrUnknownAddrType, "type %d", addressType))
+	}
 }
 
 func (hd *HDWallet) PrintStatus() {

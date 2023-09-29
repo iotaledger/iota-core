@@ -121,10 +121,10 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 				Reason: ierrors.Wrapf(err, "could not calculate Mana cost for block"),
 			})
 		}
-		if basicBlock.BurnedMana < manaCost {
+		if basicBlock.MaxBurnedMana < manaCost {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, manaCost, basicBlock.BurnedMana),
+				Reason: ierrors.Errorf("block issuer account %s burned insufficient Mana, required %d, burned %d", block.ProtocolBlock().IssuerID, manaCost, basicBlock.MaxBurnedMana),
 			})
 
 			return
@@ -154,12 +154,22 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	switch signature := block.ProtocolBlock().Signature.(type) {
 	case *iotago.Ed25519Signature:
 		if !accountData.BlockIssuerKeys.Has(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(signature.PublicKey)) {
-			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
-				Block:  block,
-				Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have public key %s in slot %d", block.ProtocolBlock().IssuerID, signature.PublicKey, block.ProtocolBlock().SlotCommitmentID.Slot()),
-			})
+			// If the block issuer does not have the public key in the slot commitment, check if it is an implicit account with the corresponding address.
+			// There must be at least one block issuer key on any account, so extracting index 0 is fine.
+			// For implicit accounts there is exactly one key, so we do not have to check any other indices.
+			blockIssuerKey := accountData.BlockIssuerKeys[0]
+			// Implicit Accounts can only have Block Issuer Keys of type Ed25519PublicKeyHashBlockIssuerKey.
+			bikPubKeyHash, isBikPubKeyHash := blockIssuerKey.(*iotago.Ed25519PublicKeyHashBlockIssuerKey)
 
-			return
+			// Filter the block if it's not a Block Issuer Key from an Implicit Account or if the Pub Key Hashes do not match.
+			if !isBikPubKeyHash || bikPubKeyHash.PublicKeyHash != iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(signature.PublicKey[:]).PublicKeyHash {
+				c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+					Block:  block,
+					Reason: ierrors.Wrapf(ErrInvalidSignature, "block issuer account %s does not have block issuer key corresponding to public key %s in slot %d", block.ProtocolBlock().IssuerID, signature.PublicKey, block.ProtocolBlock().SlotCommitmentID.Index()),
+				})
+
+				return
+			}
 		}
 		signingMessage, err := block.ProtocolBlock().SigningMessage()
 		if err != nil {

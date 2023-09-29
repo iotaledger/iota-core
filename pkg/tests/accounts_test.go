@@ -65,10 +65,10 @@ func Test_TransitionAccount(t *testing.T) {
 
 	accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount(
 		"Genesis:1",
-		testsuite.AddBlockIssuerKey(newGenesisOutputKey),
+		testsuite.WithAddBlockIssuerKey(newGenesisOutputKey),
 		testsuite.WithBlockIssuerExpirySlot(1),
 	)
-	consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(2, "Genesis:0")
+	consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(4, "Genesis:0")
 
 	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
 		testsuite.WithAccountInput(accountInput, true),
@@ -102,7 +102,7 @@ func Test_TransitionAccount(t *testing.T) {
 		PreviousUpdatedTime:    0,
 		PreviousExpirySlot:     1,
 		NewExpirySlot:          1,
-		NewOutputID:            iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
+		NewOutputID:            iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.SignedTransaction("TX1").ID()), 0),
 		PreviousOutputID:       genesisAccount.OutputID(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newGenesisOutputKey),
@@ -111,7 +111,7 @@ func Test_TransitionAccount(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              genesisAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
-		OutputID:        iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
+		OutputID:        iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.SignedTransaction("TX1").ID()), 0),
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ExpirySlot:      1,
 	}, ts.Nodes()...)
@@ -127,16 +127,8 @@ func Test_TransitionAccount(t *testing.T) {
 			&iotago.StateControllerAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
 			&iotago.GovernorAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
 		}),
-		testsuite.WithBlockIssuerFeature(&iotago.BlockIssuerFeature{
-			BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
-			ExpirySlot:      newAccountExpirySlot,
-		}),
-		testsuite.WithStakingFeature(&iotago.StakingFeature{
-			StakedAmount: 10000,
-			FixedCost:    421,
-			StartEpoch:   0,
-			EndEpoch:     10,
-		}),
+		testsuite.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
+		testsuite.WithStakingFeature(10000, 421, 0, 10),
 	)
 
 	destroyedAccountInput, destructionOutputs, destroyWallets := ts.TransactionFramework.DestroyAccount("TX1:0")
@@ -169,7 +161,7 @@ func Test_TransitionAccount(t *testing.T) {
 		NewExpirySlot:          0,
 		PreviousExpirySlot:     1,
 		NewOutputID:            iotago.EmptyOutputID,
-		PreviousOutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
+		PreviousOutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.SignedTransaction("TX1").ID()), 0),
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ValidatorStakeChange:   0,
@@ -276,7 +268,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	block4 := ts.IssueBlockAtSlotWithOptions("block4", block4Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx4, blockfactory.WithStrongParents(latestParent.ID()))
 
-	_ = ts.CommitUntilSlot(block4Slot, activeNodes, block4)
+	latestParent = ts.CommitUntilSlot(block4Slot, activeNodes, block4)
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block4Slot, &model.AccountDiff{
 		BICChange:              0,
@@ -301,6 +293,91 @@ func Test_TransitionAccount(t *testing.T) {
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(delegatedAmount),
 		ValidatorStake:  10000,
+	}, ts.Nodes()...)
+
+	// CREATE IMPLICIT ACCOUNT FROM BASIC UTXO
+	inputForImplicitAccount, outputsForImplicitAccount, implicitAccountAddress, implicitWallet := ts.TransactionFramework.CreateImplicitAccountFromInput("TX1:3")
+
+	tx5 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX5", implicitWallet,
+		testsuite.WithInputs(inputForImplicitAccount),
+		testsuite.WithOutputs(outputsForImplicitAccount),
+	))
+
+	implicitAccountOutput := ts.TransactionFramework.Output("TX5:0")
+	implicitAccountOutputID := implicitAccountOutput.OutputID()
+	implicitAccountID := iotago.AccountIDFromOutputID(implicitAccountOutputID)
+
+	slotIndexBlock5 := latestParent.ID().Index()
+
+	block5 := ts.IssueBlockAtSlotWithOptions("block5", slotIndexBlock5, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx5, blockfactory.WithStrongParents(latestParent.ID()))
+
+	latestParent = ts.CommitUntilSlot(slotIndexBlock5, activeNodes, block5)
+
+	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(implicitAccountAddress)
+
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:              implicitAccountID,
+		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock5),
+		ExpirySlot:      iotago.MaxSlotIndex,
+		OutputID:        implicitAccountOutputID,
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(implicitBlockIssuerKey),
+	}, ts.Nodes()...)
+
+	// TRANSITION IMPLICIT ACCOUNT TO ACCOUNT OUTPUT
+
+	fullAccountBlockIssuerKey := utils.RandBlockIssuerKey()
+
+	inputForImplicitAccountTransition, outputsForImplicitAccountTransition, fullAccountWallet := ts.TransactionFramework.TransitionImplicitAccountToAccountOutput(
+		"TX5:0",
+		testsuite.WithBlockIssuerFeature(
+			iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
+			iotago.MaxSlotIndex,
+		),
+	)
+
+	tx6 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX6", fullAccountWallet,
+		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
+			&iotago.BlockIssuanceCreditInput{
+				AccountID: implicitAccountID,
+			},
+			&iotago.CommitmentInput{
+				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			},
+		}),
+		testsuite.WithInputs(inputForImplicitAccountTransition),
+		testsuite.WithOutputs(outputsForImplicitAccountTransition),
+		testsuite.WithSlotCreated(slotIndexBlock5),
+	))
+
+	slotIndexBlock6 := latestParent.ID().Index()
+
+	block6 := ts.IssueBlockAtSlotWithOptions("block6", slotIndexBlock6, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx6, blockfactory.WithStrongParents(latestParent.ID()))
+
+	latestParent = ts.CommitUntilSlot(slotIndexBlock6, activeNodes, block6)
+
+	fullAccountOutputID := ts.TransactionFramework.Output("TX6:0").OutputID()
+
+	ts.AssertAccountDiff(implicitAccountID, slotIndexBlock6, &model.AccountDiff{
+		BICChange:              0,
+		PreviousUpdatedTime:    0,
+		NewOutputID:            fullAccountOutputID,
+		PreviousOutputID:       implicitAccountOutputID,
+		PreviousExpirySlot:     iotago.MaxSlotIndex,
+		NewExpirySlot:          iotago.MaxSlotIndex,
+		BlockIssuerKeysAdded:   iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
+		BlockIssuerKeysRemoved: iotago.BlockIssuerKeys{implicitBlockIssuerKey},
+		ValidatorStakeChange:   0,
+		StakeEndEpochChange:    0,
+		FixedCostChange:        0,
+		DelegationStakeChange:  0,
+	}, false, ts.Nodes()...)
+
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:              implicitAccountID,
+		Credits:         accounts.NewBlockIssuanceCredits(0, slotIndexBlock5),
+		ExpirySlot:      iotago.MaxSlotIndex,
+		OutputID:        fullAccountOutputID,
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(fullAccountBlockIssuerKey),
 	}, ts.Nodes()...)
 
 	ts.Wait(ts.Nodes()...)
