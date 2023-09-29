@@ -116,7 +116,7 @@ func (t *TestFramework) IssueSignedBlockAtSlotWithBurnedMana(alias string, slot 
 		StrongParents(iotago.BlockIDs{}).
 		IssuingTime(apiForSlot.TimeProvider().SlotStartTime(slot)).
 		SlotCommitmentID(commitmentID).
-		BurnedMana(burnedMana).
+		MaxBurnedMana(burnedMana).
 		Sign(iotago.AccountID(addr[:]), keyPair.PrivateKey[:]).
 		Build()
 	require.NoError(t.Test, err)
