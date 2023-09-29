@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 )
 
-func VM(_ context.Context, inputTransaction mempool.Transaction, _ []mempool.OutputState, _ mempool.ContextState) (outputs []mempool.OutputState, err error) {
+func VM(_ context.Context, inputTransaction mempool.SignedTransaction, _ []mempool.OutputState, _ mempool.ContextState) (outputs []mempool.OutputState, err error) {
 	transaction, ok := inputTransaction.(*Transaction)
 	if !ok {
 		return nil, ierrors.New("invalid transaction type in MockedVM")

@@ -94,10 +94,6 @@ func (t *TestFramework) MarkAttachmentIncluded(alias string) bool {
 	return t.Instance.MarkAttachmentIncluded(t.BlockID(alias))
 }
 
-func (t *TestFramework) MarkAttachmentOrphaned(alias string) bool {
-	return t.Instance.MarkAttachmentOrphaned(t.BlockID(alias))
-}
-
 func (t *TestFramework) BlockID(alias string) iotago.BlockID {
 	blockID, exists := t.blockIDsByAlias[alias]
 	require.True(t.test, exists, "block ID with alias '%s' does not exist", alias)

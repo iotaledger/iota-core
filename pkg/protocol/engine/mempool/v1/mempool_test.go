@@ -84,7 +84,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	require.Equal(t, 0, mempoolInstance.cachedStateRequests.Size())
 
 	attachmentsSlotCount := 0
-	mempoolInstance.attachments.ForEach(func(index iotago.SlotIndex, storage *shrinkingmap.ShrinkingMap[iotago.BlockID, *TransactionMetadata]) {
+	mempoolInstance.attachments.ForEach(func(index iotago.SlotIndex, storage *shrinkingmap.ShrinkingMap[iotago.BlockID, *SignedTransactionMetadata]) {
 		attachmentsSlotCount++
 	})
 

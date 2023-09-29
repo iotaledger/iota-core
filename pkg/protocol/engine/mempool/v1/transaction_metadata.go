@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -24,6 +25,8 @@ type SignedTransactionMetadata struct {
 	attachments reactive.Set[iotago.BlockID]
 
 	allAttachmentsEvicted reactive.Event
+
+	evicted reactive.Event
 
 	attachmentsMutex syncutils.RWMutex
 }
@@ -45,6 +48,8 @@ func NewSignedTransactionMetadata(signedTransaction mempool.SignedTransaction, t
 		attachments: reactive.NewSet[iotago.BlockID](),
 
 		allAttachmentsEvicted: reactive.NewEvent(),
+
+		evicted: reactive.NewEvent(),
 	}, nil
 }
 
@@ -66,8 +71,36 @@ func (t *SignedTransactionMetadata) OnSignaturesValid(callback func()) (unsubscr
 	return t.signaturesValid.OnTrigger(callback)
 }
 
+func (t *SignedTransactionMetadata) IsEvicted() bool {
+	return t.evicted.WasTriggered()
+}
+
+func (t *SignedTransactionMetadata) OnEvicted(callback func()) {
+	t.evicted.OnTrigger(callback)
+}
+
+func (t *SignedTransactionMetadata) setEvicted() {
+	t.evicted.Trigger()
+}
+
 func (t *SignedTransactionMetadata) Attachments() []iotago.BlockID {
 	return t.attachments.ToSlice()
+}
+
+func (t *SignedTransactionMetadata) addAttachment(blockID iotago.BlockID) (added bool) {
+	t.attachmentsMutex.Lock()
+	defer t.attachmentsMutex.Unlock()
+
+	return t.attachments.Add(blockID)
+}
+
+func (t *SignedTransactionMetadata) evictAttachment(id iotago.BlockID) {
+	t.attachmentsMutex.Lock()
+	defer t.attachmentsMutex.Unlock()
+
+	if t.attachments.Delete(id) && t.attachments.IsEmpty() {
+		t.allAttachmentsEvicted.Trigger()
+	}
 }
 
 type TransactionMetadata struct {
@@ -101,6 +134,7 @@ type TransactionMetadata struct {
 
 	validAttachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
 	earliestIncludedValidAttachment reactive.Variable[iotago.BlockID]
+	allValidAttachmentsEvicted      reactive.Event
 
 	// mutex needed?
 	mutex            syncutils.RWMutex
@@ -163,6 +197,7 @@ func NewTransactionMetadata(transaction mempool.Transaction) (*TransactionMetada
 
 		validAttachments:                shrinkingmap.New[iotago.BlockID, bool](),
 		earliestIncludedValidAttachment: reactive.NewVariable[iotago.BlockID](),
+		allValidAttachmentsEvicted:      reactive.NewEvent(),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(), nil
@@ -405,11 +440,17 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	return t
 }
 
-func (t *SignedTransactionMetadata) addAttachment(blockID iotago.BlockID) (added bool) {
+func (t *TransactionMetadata) addSigningTransaction(signedTransactionMetadata *SignedTransactionMetadata) (added bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
-	return t.attachments.Add(blockID)
+	if added = t.signingTransactions.Add(signedTransactionMetadata); added {
+		signedTransactionMetadata.OnEvicted(func() {
+			t.evictSigningTransaction(signedTransactionMetadata)
+		})
+	}
+
+	return added
 }
 
 func (t *TransactionMetadata) markAttachmentIncluded(blockID iotago.BlockID) (included bool) {
@@ -425,24 +466,6 @@ func (t *TransactionMetadata) markAttachmentIncluded(blockID iotago.BlockID) (in
 	return true
 }
 
-func (t *TransactionMetadata) markAttachmentOrphaned(blockID iotago.BlockID) (orphaned bool) {
-	t.attachmentsMutex.Lock()
-	defer t.attachmentsMutex.Unlock()
-
-	previousState, exists := t.validAttachments.Get(blockID)
-	if !exists {
-		return false
-	}
-
-	t.evictAttachment(blockID)
-
-	if previousState && blockID == t.earliestIncludedValidAttachment.Get() {
-		t.earliestIncludedValidAttachment.Set(t.findLowestIncludedAttachment())
-	}
-
-	return true
-}
-
 func (t *TransactionMetadata) EarliestIncludedAttachment() iotago.BlockID {
 	return t.earliestIncludedValidAttachment.Get()
 }
@@ -451,22 +474,26 @@ func (t *TransactionMetadata) OnEarliestIncludedAttachmentUpdated(callback func(
 	t.earliestIncludedValidAttachment.OnUpdate(callback)
 }
 
-func (t *TransactionMetadata) evictAttachment(id iotago.BlockID) {
+func (t *TransactionMetadata) addValidAttachment(blockID iotago.BlockID) (added bool) {
+	t.attachmentsMutex.Lock()
+	defer t.attachmentsMutex.Unlock()
+
+	return lo.Return2(t.validAttachments.GetOrCreate(blockID, func() bool {
+		return false
+	}))
+}
+
+func (t *TransactionMetadata) evictValidAttachment(id iotago.BlockID) {
+	t.attachmentsMutex.Lock()
+	defer t.attachmentsMutex.Unlock()
+
 	if t.validAttachments.Delete(id) && t.validAttachments.IsEmpty() {
-		t.allSigningTransactionsEvicted.Trigger()
+		t.allValidAttachmentsEvicted.Trigger()
 	}
 }
 
-func (t *TransactionMetadata) findLowestIncludedAttachment() iotago.BlockID {
-	var lowestIncludedBlock iotago.BlockID
-
-	t.validAttachments.ForEach(func(blockID iotago.BlockID, included bool) bool {
-		if included && (lowestIncludedBlock.Slot() == 0 || blockID.Slot() < lowestIncludedBlock.Slot()) {
-			lowestIncludedBlock = blockID
-		}
-
-		return true
-	})
-
-	return lowestIncludedBlock
+func (t *TransactionMetadata) evictSigningTransaction(signedTransactionMetadata *SignedTransactionMetadata) {
+	if t.signingTransactions.Delete(signedTransactionMetadata) && t.signingTransactions.IsEmpty() {
+		t.allSigningTransactionsEvicted.Trigger()
+	}
 }

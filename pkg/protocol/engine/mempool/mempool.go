@@ -11,8 +11,6 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] interface {
 
 	OnTransactionAttached(callback func(metadata TransactionMetadata), opts ...event.Option)
 
-	MarkAttachmentOrphaned(blockID iotago.BlockID) bool
-
 	MarkAttachmentIncluded(blockID iotago.BlockID) bool
 
 	OutputStateMetadata(reference *iotago.UTXOInput) (state OutputStateMetadata, err error)

@@ -32,7 +32,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	resolveState mempool.StateReferenceResolver
 
 	// attachments is the storage that is used to keep track of the attachments of transactions.
-	attachments *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata]
+	attachments *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *SignedTransactionMetadata]
 
 	// cachedTransactions holds the transactions that are currently in the MemPool.
 	cachedTransactions *shrinkingmap.ShrinkingMap[iotago.TransactionID, *TransactionMetadata]
@@ -72,7 +72,7 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolv
 		transactionAttached:       event.New1[mempool.TransactionMetadata](),
 		executeStateTransition:    vm,
 		resolveState:              inputResolver,
-		attachments:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata](),
+		attachments:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *SignedTransactionMetadata](),
 		cachedTransactions:        shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
 		cachedSignedTransactions:  shrinkingmap.New[iotago.SignedTransactionID, *SignedTransactionMetadata](),
 		cachedStateRequests:       shrinkingmap.New[iotago.Identifier, *promise.Promise[mempool.State]](),
@@ -107,15 +107,6 @@ func (m *MemPool[VoteRank]) AttachSignedTransaction(signedTransaction mempool.Si
 
 func (m *MemPool[VoteRank]) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
 	m.transactionAttached.Hook(handler, opts...)
-}
-
-// MarkAttachmentOrphaned marks the attachment of the given block as orphaned.
-func (m *MemPool[VoteRank]) MarkAttachmentOrphaned(blockID iotago.BlockID) bool {
-	if attachmentSlot := m.attachments.Get(blockID.Slot(), false); attachmentSlot != nil {
-		defer attachmentSlot.Delete(blockID)
-	}
-
-	return m.updateAttachment(blockID, (*TransactionMetadata).markAttachmentOrphaned)
 }
 
 // MarkAttachmentIncluded marks the attachment of the given block as included.
@@ -161,7 +152,11 @@ func (m *MemPool[VoteRank]) PublishCommitmentState(commitment *iotago.Commitment
 
 // TransactionMetadataByAttachment returns the metadata of the transaction that was attached by the given block.
 func (m *MemPool[VoteRank]) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempool.TransactionMetadata, bool) {
-	return m.transactionByAttachment(blockID)
+	if signedTransactionMetadata, exists := m.cachedSignedTransactions.Get(blockID); exists {
+		return signedTransactionMetadata.TransactionMetadata(), true
+	}
+
+	return nil, false
 }
 
 // StateDiff returns the state diff for the given slot.
@@ -175,7 +170,7 @@ func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) mempool.StateDiff {
 
 // Evict evicts the slot with the given slot from the MemPool.
 func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
-	if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *TransactionMetadata] {
+	if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *SignedTransactionMetadata] {
 		m.evictionMutex.Lock()
 		defer m.evictionMutex.Unlock()
 
@@ -185,8 +180,8 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 
 		return m.attachments.Evict(slot)
 	}(); evictedAttachments != nil {
-		evictedAttachments.ForEach(func(blockID iotago.BlockID, transaction *TransactionMetadata) bool {
-			transaction.evictAttachment(blockID)
+		evictedAttachments.ForEach(func(blockID iotago.BlockID, signedTransactionMetadata *SignedTransactionMetadata) bool {
+			signedTransactionMetadata.evictAttachment(blockID)
 
 			return true
 		})
@@ -224,7 +219,7 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 
 	// TODO: figure out how to handle attachments and eviction
 	storedSignedTransaction.addAttachment(blockID)
-	m.attachments.Get(blockID.Slot(), true).Set(blockID, storedTransaction)
+	m.attachments.Get(blockID.Slot(), true).Set(blockID, storedSignedTransaction)
 
 	return storedSignedTransaction, isNewSignedTransaction, isNewTransaction, nil
 }
@@ -379,7 +374,9 @@ func (m *MemPool[VoteRank]) updateAttachment(blockID iotago.BlockID, updateFunc 
 
 func (m *MemPool[VoteRank]) transactionByAttachment(blockID iotago.BlockID) (*TransactionMetadata, bool) {
 	if attachmentsInSlot := m.attachments.Get(blockID.Slot()); attachmentsInSlot != nil {
-		return attachmentsInSlot.Get(blockID)
+		if signedTransactionMetadata, exists := attachmentsInSlot.Get(blockID); exists {
+			return signedTransactionMetadata.transactionMetadata, true
+		}
 	}
 
 	return nil, false
@@ -484,6 +481,8 @@ func (m *MemPool[VoteRank]) setupOutputState(state *OutputStateMetadata) {
 }
 
 func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransaction *SignedTransactionMetadata, transaction *TransactionMetadata) {
+	transaction.addSigningTransaction(signedTransaction)
+
 	transaction.OnSolid(func() {
 		// Validate if signatures are valid and do something further
 		//if err := validateSignatures(signedTransaction); err != nil {
@@ -493,8 +492,20 @@ func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransaction *SignedTran
 		//}
 
 		// if signatures are valid
+
+		// TODO: copy attachments of correct signed transaction to transaction
+		signedTransaction.attachments.OnUpdate(func(appliedMutations ds.SetMutations[iotago.BlockID]) {
+			appliedMutations.AddedElements().Range(func(element iotago.BlockID) {
+				transaction.addValidAttachment(element)
+			})
+
+			appliedMutations.DeletedElements().Range(func(element iotago.BlockID) {
+				transaction.evictValidAttachment(element)
+			})
+		})
 		signedTransaction.signaturesValid.Trigger()
 		signedTransaction.transactionMetadata.shouldExecute.Trigger()
+
 	})
 
 }

@@ -29,7 +29,7 @@ func (t *TestSuite) AssertTransaction(signedTransaction *iotago.SignedTransactio
 		}
 
 		//nolint: forcetypeassert // we are in a test and want to assert it anyway
-		if !cmp.Equal(signedTransaction.Transaction, loadedTransactionMetadata.Transaction().(*iotago.SignedTransaction).Transaction) {
+		if !cmp.Equal(signedTransaction.Transaction, loadedTransactionMetadata.Transaction().(*iotago.Transaction)) {
 			return ierrors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, signedTransaction, loadedTransactionMetadata.Transaction())
 		}
 

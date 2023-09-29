@@ -135,8 +135,8 @@ func NewTransaction(signedTx *iotago.SignedTransaction) *Transaction {
 		return nil
 	}
 
-	inputs := make([]*Input, len(signedTx.Transaction.Inputs))
-	for i, input := range signedTx.Transaction.Inputs {
+	inputs := make([]*Input, len(signedTx.Transaction.TransactionEssence.Inputs))
+	for i, input := range signedTx.Transaction.TransactionEssence.Inputs {
 		inputs[i] = NewInput(input)
 	}
 
