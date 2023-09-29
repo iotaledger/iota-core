@@ -313,7 +313,3 @@ func (c *WebClient) GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderRespo
 
 	return
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-var _ Client = NewWebClient("abc")
