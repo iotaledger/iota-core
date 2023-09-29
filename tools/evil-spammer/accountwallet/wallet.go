@@ -26,7 +26,7 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 
 func Run() (*AccountWallet, error) {
 	// load wallet
-	wallet, err := loadWallet()
+	wallet, err := loadWallet("")
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to load wallet from file")
 	}

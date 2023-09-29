@@ -3,6 +3,7 @@ package accountwallet
 import (
 	"os"
 
+	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -16,12 +17,16 @@ const (
 	ListAccountsCommand   = "list"
 )
 
-type configuration struct {
-	WebAPI string `json:"WebAPI,omitempty"`
+var AvailableCommands = map[string]types.Empty{
+	CreateAccountCommand:  types.Void,
+	DestroyAccountCommand: types.Void,
+	AllotAccountCommand:   types.Void,
+	ListAccountsCommand:   types.Void,
 }
 
-type CommandParams interface {
-	CreateAccountParams | DestroyAccountParams | AllotAccountParams
+// TODO how do wee read api
+type configuration struct {
+	WebAPI string `json:"WebAPI,omitempty"`
 }
 
 type CreateAccountParams struct {
@@ -34,10 +39,12 @@ type DestroyAccountParams struct {
 }
 
 type AllotAccountParams struct {
-	AccountAlias string
-	Amount       uint64
+	Amount uint64
+	To     string
+	From   string // if not set we use faucet
 }
 
+// TODO do wee need to restrict that only one instance of the wallet runs?
 const lockFile = "wallet.LOCK"
 
 type AccountData struct {
@@ -51,25 +58,22 @@ type Account struct {
 	// TODO: other info of an account
 }
 
-func loadWallet() (*AccountWallet, error) {
+func loadWallet(filename string) (*AccountWallet, error) {
 	wallet := NewAccountWallet()
 
-	bytes, err := os.ReadFile(lockFile)
-	if err != nil {
-		if err == os.ErrNotExist {
-			return wallet, nil
-		}
-		return nil, ierrors.Wrap(err, "failed to read account file")
-	}
-
-	var data AccountData
-	_, err = wallet.api.Decode(bytes, &data)
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to decode from file")
-	}
-
-	// TODO: import the data to Wallet
-	wallet.FromAccountData(data)
+	//walletStateBytes, err := os.ReadFile(filename)
+	//if err != nil {
+	//	return nil, ierrors.Wrap(err, "failed to read wallet file")
+	//}
+	//
+	//var data AccountData
+	//_, err = wallet.api.Decode(bytes, &data)
+	//if err != nil {
+	//	return nil, ierrors.Wrap(err, "failed to decode from file")
+	//}
+	//
+	//TODO: import the data to Wallet
+	//wallet.FromAccountData(data)
 
 	return wallet, nil
 }

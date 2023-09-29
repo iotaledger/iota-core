@@ -3,7 +3,6 @@ package main
 import (
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evil-spammer/accountwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
@@ -33,6 +32,7 @@ var (
 		DeepSpam:              false,
 		EnableRateSetter:      false,
 	}
+
 	quickTestParams = programs.QuickTestParams{
 		ClientURLs:            urls,
 		Rate:                  100,
@@ -42,19 +42,7 @@ var (
 		EnableRateSetter:      false,
 	}
 
-	createAccountParams = accountwallet.CreateAccountParams{
-		Alias:  "A",
-		Amount: 100,
-	}
-
-	destoryAccountParams = accountwallet.DestroyAccountParams{
-		AccountAlias: "A",
-	}
-
-	allotAccountParams = accountwallet.AllotAccountParams{
-		AccountAlias: "A",
-		Amount:       100,
-	}
+	accountsSubcommandsFlags = make([]*subcommand, 0)
 	//nolint:godot
 	// commitmentsSpamParams = CommitmentsSpamParams{
 	// 	Rate:           1,

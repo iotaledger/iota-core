@@ -39,12 +39,12 @@ func main() {
 	case "basic":
 		programs.CustomSpam(&customSpamParams)
 	case "accounts":
-		accWallet, err := accountwallet.Run()
-		if err != nil {
-			log.Warn(err)
-			return
-		}
-		accountsSubcommands(accWallet)
+		//accWallet, err := accountwallet.Run()
+		//if err != nil {
+		//	log.Warn(err)
+		//	return
+		//}
+		accountsSubcommands(nil, accountsSubcommandsFlags)
 	case "quick":
 		programs.QuickTest(&quickTestParams)
 	// case SpammerTypeCommitments:
@@ -54,17 +54,28 @@ func main() {
 	}
 }
 
-func accountsSubcommands(wallet *accountwallet.AccountWallet) {
-	switch Subcommand {
+func accountsSubcommands(wallet *accountwallet.AccountWallet, subcommands []*subcommand) {
+	for _, sub := range subcommands {
+		accountsSubcommand(wallet, sub)
+	}
+}
+
+func accountsSubcommand(wallet *accountwallet.AccountWallet, sub *subcommand) {
+	switch sub.command {
 	case accountwallet.CreateAccountCommand:
-		err := wallet.CreateAccount(&createAccountParams)
+		params := parseCreateAccountFlags(sub.flags)
+		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.CreateAccountCommand, params)
+		err := wallet.CreateAccount(params)
 		if err != nil {
 			log.Errorf("Error creating account: %v", err)
 
 			return
 		}
 	case accountwallet.DestroyAccountCommand:
-		err := wallet.DestroyAccount(&destoryAccountParams)
+		params := parseDestroyAccountFlags(sub.flags)
+		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.DestroyAccountCommand, params)
+
+		err := wallet.DestroyAccount(params)
 		if err != nil {
 			log.Errorf("Error destroying account: %v", err)
 
@@ -78,7 +89,10 @@ func accountsSubcommands(wallet *accountwallet.AccountWallet) {
 			return
 		}
 	case accountwallet.AllotAccountCommand:
-		err := wallet.AllotToAccount(&allotAccountParams)
+		params := parseAllotAccountFlags(sub.flags)
+		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.AllotAccountCommand, params)
+
+		err := wallet.AllotToAccount(params)
 		if err != nil {
 			log.Errorf("Error allotting account: %v", err)
 
@@ -105,7 +119,7 @@ func parseFlags() (help bool) {
 		if len(os.Args) > 2 {
 			subcommands = os.Args[2:]
 		}
-		parseAccountHandlerFlags(subcommands)
+		accountsSubcommandsFlags = parseSubcommands(subcommands)
 	case "quick":
 		parseQuickTestFlags()
 		// case SpammerTypeCommitments:
@@ -210,17 +224,94 @@ func parseQuickTestFlags() {
 	quickTestParams.VerifyLedger = *verifyLedger
 }
 
-func parseAccountHandlerFlags(subcommands []string) {
-	Subcommand = subcommands[0]
+type subcommand struct {
+	command string
+	flags   []string
+}
 
-	switch Subcommand {
-	case "create-account":
-		alias := optionFlagSet.String("alias", "", "Alias of the account to be created")
-		amount := optionFlagSet.Int("amount", 100, "Amount of foucet tokens to be used for the accountcreation")
-		parseOptionFlagSet(optionFlagSet, subcommands)
-		createAccountParams.Alias = *alias
-		createAccountParams.Amount = uint64(*amount)
+func parseSubcommands(subcommands []string) []*subcommand {
+	prevSplitIndex := 0
+	subcommandsSplit := make([]*subcommand, 0)
+
+	for index := 0; index < len(subcommands); index++ {
+		_, validCommand := accountwallet.AvailableCommands[subcommands[index]]
+		if !strings.HasPrefix(subcommands[index], "--") && validCommand {
+			if index != 0 {
+				subcommandsSplit = append(subcommandsSplit, &subcommand{command: subcommands[prevSplitIndex], flags: subcommands[prevSplitIndex+1 : index]})
+			}
+			prevSplitIndex = index
+		}
 	}
+	subcommandsSplit = append(subcommandsSplit, &subcommand{command: subcommands[prevSplitIndex], flags: subcommands[prevSplitIndex+1:]})
+
+	return subcommandsSplit
+}
+
+func parseCreateAccountFlags(subcommands []string) *accountwallet.CreateAccountParams {
+	flagSet := flag.NewFlagSet("script flag set", flag.ExitOnError)
+
+	alias := flagSet.String("alias", "", "Alias of the account to be created")
+	amount := flagSet.Int("amount", 100, "Amount of foucet tokens to be used for the accountcreation")
+
+	log.Infof("Parsing create account flags, subcommands: %v", subcommands)
+
+	err := flagSet.Parse(subcommands)
+	if err != nil {
+		log.Errorf("Cannot parse first `script` parameter")
+
+		return nil
+	}
+
+	createAccountParams := &accountwallet.CreateAccountParams{
+		Alias:  *alias,
+		Amount: uint64(*amount),
+	}
+	return createAccountParams
+}
+
+func parseDestroyAccountFlags(subcommands []string) *accountwallet.DestroyAccountParams {
+	flagSet := flag.NewFlagSet("script flag set", flag.ExitOnError)
+
+	alias := flagSet.String("alias", "", "Alias of the account to be destroyed")
+
+	log.Infof("Parsing destroy account flags, subcommands: %v", subcommands)
+	err := flagSet.Parse(subcommands)
+	if err != nil {
+		log.Errorf("Cannot parse first `script` parameter")
+
+		return nil
+	}
+	createAccountParams := &accountwallet.DestroyAccountParams{
+		AccountAlias: *alias,
+	}
+	return createAccountParams
+}
+
+func parseAllotAccountFlags(subcommands []string) *accountwallet.AllotAccountParams {
+	flagSet := flag.NewFlagSet("script flag set", flag.ExitOnError)
+
+	to := flagSet.String("to", "", "Alias of the account to allot mana")
+	amount := flagSet.Int("amount", 100, "Amount of mana to allot")
+	from := flagSet.String("from", "", "Alias of the account we allot from, if not specified, we allot from the faucet account")
+
+	log.Infof("Parsing allot account flags, subcommands: %v", subcommands)
+	err := flagSet.Parse(subcommands)
+	if err != nil {
+		log.Errorf("Cannot parse first `script` parameter")
+
+		return nil
+	}
+
+	createAccountParams := &accountwallet.AllotAccountParams{
+		To:     *to,
+		Amount: uint64(*amount),
+	}
+
+	if *from != "" {
+		createAccountParams.From = *from
+	}
+
+	return createAccountParams
 }
 
 // func parseCommitmentsSpamFlags() {
