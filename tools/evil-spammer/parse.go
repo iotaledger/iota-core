@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -144,9 +145,14 @@ type subcommand struct {
 func readSubcommandsAndFlagSets(subcommands []string) []*subcommand {
 	prevSplitIndex := 0
 	subcommandsSplit := make([]*subcommand, 0)
-
+	if len(subcommands) == 0 {
+		accountUsage()
+	}
 	for index := 0; index < len(subcommands); index++ {
 		_, validCommand := accountwallet.AvailableCommands[subcommands[index]]
+		if subcommands[index] == "-h" || subcommands[index] == "--help" {
+			accountUsage()
+		}
 		if !strings.HasPrefix(subcommands[index], "--") && validCommand {
 			if index != 0 {
 				subcommandsSplit = append(subcommandsSplit, &subcommand{command: subcommands[prevSplitIndex], flags: subcommands[prevSplitIndex+1 : index]})
@@ -159,11 +165,31 @@ func readSubcommandsAndFlagSets(subcommands []string) []*subcommand {
 	return subcommandsSplit
 }
 
+func accountUsage() {
+	fmt.Println("Usage for accounts [COMMAND] [FLAGS], multiple commands can be chained together.")
+	fmt.Printf("COMMAND: %s\n", accountwallet.CreateAccountCommand)
+	parseCreateAccountFlags(nil)
+
+	fmt.Printf("COMMAND: %s\n", accountwallet.DestroyAccountCommand)
+	parseDestroyAccountFlags(nil)
+
+	fmt.Printf("COMMAND: %s\n", accountwallet.AllotAccountCommand)
+	parseAllotAccountFlags(nil)
+
+	fmt.Printf("COMMAND: %s\n No flags available.", accountwallet.AllotAccountCommand)
+}
+
 func parseCreateAccountFlags(subcommands []string) *accountwallet.CreateAccountParams {
 	flagSet := flag.NewFlagSet("script flag set", flag.ExitOnError)
 
 	alias := flagSet.String("alias", "", "Alias of the account to be created")
 	amount := flagSet.Int("amount", 100, "Amount of foucet tokens to be used for the accountcreation")
+
+	if subcommands == nil {
+		flagSet.Usage()
+
+		return nil
+	}
 
 	log.Infof("Parsing create account flags, subcommands: %v", subcommands)
 
@@ -186,6 +212,12 @@ func parseDestroyAccountFlags(subcommands []string) *accountwallet.DestroyAccoun
 
 	alias := flagSet.String("alias", "", "Alias of the account to be destroyed")
 
+	if subcommands == nil {
+		flagSet.Usage()
+
+		return nil
+	}
+
 	log.Infof("Parsing destroy account flags, subcommands: %v", subcommands)
 	err := flagSet.Parse(subcommands)
 	if err != nil {
@@ -205,6 +237,12 @@ func parseAllotAccountFlags(subcommands []string) *accountwallet.AllotAccountPar
 	to := flagSet.String("to", "", "Alias of the account to allot mana")
 	amount := flagSet.Int("amount", 100, "Amount of mana to allot")
 	from := flagSet.String("from", "", "Alias of the account we allot from, if not specified, we allot from the faucet account")
+
+	if subcommands == nil {
+		flagSet.Usage()
+
+		return nil
+	}
 
 	log.Infof("Parsing allot account flags, subcommands: %v", subcommands)
 	err := flagSet.Parse(subcommands)

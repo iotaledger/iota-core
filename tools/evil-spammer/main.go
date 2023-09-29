@@ -26,8 +26,8 @@ func main() {
 		fmt.Println("Usage of the Evil Spammer tool, provide the first argument for the selected mode:\n" +
 			"'interactive' - enters the interactive mode.\n" +
 			"'basic' - can be parametrized with additional flags to run one time spammer. Run 'evil-wallet basic -h' for the list of possible flags.\n" +
-			"'quick' - runs simple stress test: tx spam -> blk spam -> ds spam. Run 'evil-wallet quick -h' for the list of possible flags.\n" +
-			"'commitments' - runs spammer for commitments. Run 'evil-wallet commitments -h' for the list of possible flags.")
+			"'accounts' - tool for account creation and transition. Run 'evil-wallet accounts -h' for the list of possible flags.\n" +
+			"'quick' - runs simple stress test: tx spam -> blk spam -> ds spam. Run 'evil-wallet quick -h' for the list of possible flags.")
 
 		return
 	}
@@ -38,7 +38,6 @@ func main() {
 	case "basic":
 		programs.CustomSpam(&customSpamParams)
 	case "accounts":
-		// TODO init wallet for the first time if no file was found
 		// load wallet
 		accWallet, err := accountwallet.Run(accountWalletFilename)
 		if err != nil {
@@ -58,7 +57,7 @@ func main() {
 	// case SpammerTypeCommitments:
 	// 	CommitmentsSpam(&commitmentsSpamParams)
 	default:
-		log.Warnf("Unknown parameter for script, possible values: basic, quick, commitments")
+		log.Warnf("Unknown parameter for script, possible values: interactive, basic, accounts, quick")
 	}
 }
 
