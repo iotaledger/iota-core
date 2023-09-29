@@ -9,4 +9,5 @@ type Gadget interface {
 	module.Interface
 
 	TrackWitnessWeight(votingBlock *blocks.Block)
+	SetAccepted(block *blocks.Block) bool
 }

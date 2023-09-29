@@ -26,7 +26,7 @@ type Block struct {
 	shallowLikeChildren []*Block
 
 	// Booker block
-	booked    bool
+	booked    reactive.Variable[bool]
 	witnesses ds.Set[account.SeatIndex]
 	// conflictIDs are the all conflictIDs of the block inherited from the parents + payloadConflictIDs.
 	conflictIDs ds.Set[iotago.TransactionID]
@@ -46,6 +46,9 @@ type Block struct {
 	skipped   bool
 	enqueued  bool
 	dropped   bool
+
+	// Notarization
+	notarized reactive.Variable[bool]
 
 	mutex syncutils.RWMutex
 
@@ -99,13 +102,14 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 			issuingTime:  issuingTime,
 		},
 		solid:       true,
-		booked:      true,
+		booked:      reactive.NewVariable[bool](),
 		preAccepted: true,
 		accepted:    reactive.NewVariable[bool](),
 		scheduled:   true,
 	}
 
 	// This should be true since we commit and evict on acceptance.
+	b.booked.Set(true)
 	b.accepted.Set(true)
 
 	return b
@@ -358,22 +362,17 @@ func (b *Block) Update(data *model.Block) (wasPublished bool) {
 	return true
 }
 
-func (b *Block) IsBooked() (isBooked bool) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
+// Booked returns a reactive variable that is true if the Block was booked.
+func (b *Block) Booked() reactive.Variable[bool] {
+	return b.accepted
+}
 
-	return b.booked
+func (b *Block) IsBooked() (isBooked bool) {
+	return b.booked.Get()
 }
 
 func (b *Block) SetBooked() (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if wasUpdated = !b.booked; wasUpdated {
-		b.booked = true
-	}
-
-	return
+	return !b.accepted.Set(true)
 }
 
 func (b *Block) AddWitness(seat account.SeatIndex) (added bool) {
@@ -607,6 +606,18 @@ func (b *Block) SetPreConfirmed() (wasUpdated bool) {
 	return wasUpdated
 }
 
+func (b *Block) Notarized() reactive.Variable[bool] {
+	return b.notarized
+}
+
+func (b *Block) IsNotarized() (isBooked bool) {
+	return b.notarized.Get()
+}
+
+func (b *Block) SetNotarized() (wasUpdated bool) {
+	return !b.notarized.Set(true)
+}
+
 func (b *Block) String() string {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
@@ -627,6 +638,7 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("Dropped", b.dropped))
 	builder.AddField(stringify.NewStructField("Skipped", b.skipped))
 	builder.AddField(stringify.NewStructField("Enqueued", b.enqueued))
+	builder.AddField(stringify.NewStructField("Notarized", b.notarized.Get()))
 
 	for index, child := range b.strongChildren {
 		builder.AddField(stringify.NewStructField(fmt.Sprintf("strongChildren%d", index), child.ID().String()))

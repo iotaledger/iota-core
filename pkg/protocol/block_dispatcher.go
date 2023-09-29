@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -195,11 +196,12 @@ func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentI
 }
 
 // processWarpSyncResponse processes a WarpSync response.
-func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, merkleProof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationMerkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) error {
+func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, tangleMerkleProof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationMerkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) error {
 	if b.processedWarpSyncRequests.Has(commitmentID) {
 		return nil
 	}
 
+	// First we make sure that the commitment, the provided blockIDs with tangle proof and the provided transactionIDs with mutation proof are valid.
 	chainCommitment, exists := b.protocol.ChainManager.Commitment(commitmentID)
 	if !exists {
 		return ierrors.Errorf("failed to get chain commitment for %s", commitmentID)
@@ -212,19 +214,82 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
 	for _, blockID := range blockIDs {
-		_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
+		_ = acceptedBlocks.Add(blockID) // a mapdb can never return an error
 	}
 
-	if !iotago.VerifyProof(merkleProof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.Commitment().RootsID()) {
-		return ierrors.Errorf("failed to verify merkle proof for %s", commitmentID)
+	if !iotago.VerifyProof(tangleMerkleProof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.Commitment().RootsID()) {
+		return ierrors.Errorf("failed to verify tangle merkle proof for %s", commitmentID)
+	}
+
+	acceptedTransactionIDs := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.SlotIdentifierFromBytes)
+	for _, transactionID := range transactionIDs {
+		_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
+	}
+
+	if !iotago.VerifyProof(mutationMerkleProof, iotago.Identifier(acceptedTransactionIDs.Root()), chainCommitment.Commitment().RootsID()) {
+		return ierrors.Errorf("failed to verify mutation merkle proof for %s", commitmentID)
 	}
 
 	b.pendingWarpSyncRequests.StopTicker(commitmentID)
 
 	b.processedWarpSyncRequests.Add(commitmentID)
 
+	// Once all blocks are booked we
+	//   1. Mark all transactions as accepted
+	//   2. Mark all blocks as accepted
+	//   3. Force commitment of the slot
+	var bookedBlocks atomic.Uint32
+	bookedBlocks.Store(uint32(len(blockIDs)))
+
+	var notarizedBlocks atomic.Uint32
+	notarizedBlocks.Store(uint32(len(blockIDs)))
+
+	blockBookedCallback := func(_, _ bool) {
+		if bookedBlocks.Add(-1) != 0 {
+			return
+		}
+
+		// 1. Mark all transactions as accepted
+		for _, transactionID := range transactionIDs {
+			targetEngine.Ledger.ConflictDAG().SetAccepted(transactionID)
+		}
+
+		// 2. Mark all blocks as accepted
+		for _, blockID := range blockIDs {
+			block, exists := targetEngine.BlockCache.Block(blockID)
+			if !exists { // this should never happen as we just booked these blocks in this slot.
+				continue
+			}
+
+			targetEngine.BlockGadget.SetAccepted(block)
+
+			// Wait for all blocks to be notarized before forcing the commitment of the slot.
+			if notarizedBlocks.Add(-1) != 0 {
+				return
+			}
+		}
+
+		// 3. Force commitment of the slot
+		producedCommitment, err := targetEngine.Notarization.ForceCommit(commitmentID.Slot())
+		if err != nil {
+			b.protocol.HandleError(err)
+			return
+		}
+
+		// 4. Verify that the produced commitment is the same as the initially requested one
+		if producedCommitment.ID() != commitmentID {
+			b.protocol.HandleError(ierrors.Errorf("producedCommitment ID mismatch: %s != %s", producedCommitment.ID(), commitmentID))
+			return
+		}
+	}
+
 	for _, blockID := range blockIDs {
-		targetEngine.BlockDAG.GetOrRequestBlock(blockID)
+		block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
+		if block == nil { // this should never happen as we're requesting the blocks for this slot so it can't be evicted.
+			continue
+		}
+
+		block.Booked().OnUpdate(blockBookedCallback)
 	}
 
 	return nil
