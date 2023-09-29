@@ -50,8 +50,8 @@ github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230928074706-d58e32f
 github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20230928074706-d58e32f86729/go.mod h1:IJgaaxbgKCsNat18jlJJEAxCY2oVYR3F30B+M4vJ89I=
 github.com/iotaledger/hive.go/stringify v0.0.0-20230928074706-d58e32f86729 h1:gZlIK1OzdA3aZ78PsiWe3poVzawyw4S3zboMHE1TrY0=
 github.com/iotaledger/hive.go/stringify v0.0.0-20230928074706-d58e32f86729/go.mod h1:FTo/UWzNYgnQ082GI9QVM9HFDERqf9rw9RivNpqrnTs=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230929074901-a2fa34aa5a35 h1:DyXUG4CZkJAgMUCMFUzG1DWNUVmstg6MCt6IZnHD/gY=
-github.com/iotaledger/iota.go/v4 v4.0.0-20230929074901-a2fa34aa5a35/go.mod h1:wR9xBbsofns9hFyRHFZ2bDYIb861qsfmQPVMBKcPvDo=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230929084735-000543e7b286 h1:Oxc8fSg1tv2stxBg4CfrjhIW44KjjQbq/avobjsAkG8=
+github.com/iotaledger/iota.go/v4 v4.0.0-20230929084735-000543e7b286/go.mod h1:wR9xBbsofns9hFyRHFZ2bDYIb861qsfmQPVMBKcPvDo=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
 github.com/ipfs/go-cid v0.4.1/go.mod h1:uQHwDeX4c6CtyrFwdqyhpNcxVewur1M7l7fNU7LKwZk=
 github.com/klauspost/cpuid/v2 v2.2.5 h1:0E5MSMDEoAulmXNFquVs//DdoomxaoTY1kUhbc/qbZg=
