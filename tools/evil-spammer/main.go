@@ -39,7 +39,11 @@ func main() {
 	case "basic":
 		programs.CustomSpam(&customSpamParams)
 	case "accounts":
-		accWallet := accountwallet.Run()
+		accWallet, err := accountwallet.Run()
+		if err != nil {
+			log.Warn(err)
+			return
+		}
 		accountsSubcommands(accWallet)
 	case "quick":
 		programs.QuickTest(&quickTestParams)
