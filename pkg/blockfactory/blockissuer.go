@@ -68,6 +68,27 @@ func (i *BlockIssuer) Shutdown() {
 func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount Account, opts ...options.Option[ValidatorBlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&ValidatorBlockParams{}, opts)
 
+	if blockParams.BlockHeader.IssuingTime == nil {
+		issuingTime := time.Now().UTC()
+		blockParams.BlockHeader.IssuingTime = &issuingTime
+	}
+
+	if blockParams.BlockHeader.SlotCommitment == nil {
+		var err error
+		blockParams.BlockHeader.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime))
+		if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
+			commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime)
+			if err != nil {
+				return nil, ierrors.Wrap(err, "failed to revive chain")
+			}
+			blockParams.BlockHeader.SlotCommitment = commitment
+			blockParams.BlockHeader.References[iotago.StrongParentType] = []iotago.BlockID{parentID}
+
+		} else if err != nil {
+			return nil, ierrors.Wrap(err, "error getting commitment")
+		}
+	}
+
 	if blockParams.BlockHeader.References == nil {
 		// TODO: change this to get references for validator block
 		references, err := i.getReferences(ctx, nil, blockParams.BlockHeader.ParentsCount)
@@ -78,11 +99,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount A
 	}
 
 	if err := i.setDefaultBlockParams(blockParams.BlockHeader, issuerAccount); err != nil {
-		if ierrors.Is(err, ErrBlockTooRecent) {
-			// TODO: revive chain
-		}
-
-		return nil, err
+		return nil, ierrors.Wrap(err, "error setting default block params")
 	}
 
 	if blockParams.HighestSupportedVersion == nil {
@@ -391,19 +408,6 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 }
 
 func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, issuerAccount Account) error {
-	if blockParams.IssuingTime == nil {
-		issuingTime := time.Now().UTC()
-		blockParams.IssuingTime = &issuingTime
-	}
-
-	if blockParams.SlotCommitment == nil {
-		var err error
-		blockParams.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime))
-		if err != nil {
-			return ierrors.Wrap(err, "error getting commitment")
-		}
-	}
-
 	if blockParams.LatestFinalizedSlot == nil {
 		latestFinalizedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		blockParams.LatestFinalizedSlot = &latestFinalizedSlot

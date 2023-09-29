@@ -83,6 +83,12 @@ func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedPro
 			iotago.SlotIndex.Bytes,
 			iotago.SlotIndexFromBytes,
 		),
+		storeLatestIssuedValidationBlock: kvstore.NewTypedValue(
+			store,
+			[]byte{latestIssuedValidationBlock},
+			(*model.Block).Bytes,
+			model.BlockFromBytesFunc(apiProvider),
+		),
 
 		storeProtocolVersionEpochMapping: kvstore.NewTypedStore(
 			lo.PanicOnErr(store.WithExtendedRealm([]byte{protocolVersionEpochMappingKey})),

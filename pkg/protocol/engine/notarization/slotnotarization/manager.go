@@ -102,7 +102,7 @@ func (m *Manager) tryCommitUntil(commitUntilSlot iotago.SlotIndex) {
 
 func (m *Manager) ForceCommit(slot iotago.SlotIndex) (*model.Commitment, error) {
 	if m.WasStopped() {
-
+		return nil, ierrors.New("notarization manager was stopped")
 	}
 
 	commitment, err := m.createCommitment(slot)
@@ -111,6 +111,16 @@ func (m *Manager) ForceCommit(slot iotago.SlotIndex) (*model.Commitment, error) 
 	}
 
 	return commitment, nil
+}
+
+func (m *Manager) ForceCommitUntil(commitUntilSlot iotago.SlotIndex) error {
+	for i := m.storage.Settings().LatestCommitment().Slot() + 1; i <= commitUntilSlot; i++ {
+		if _, err := m.ForceCommit(i); err != nil {
+			return ierrors.Wrapf(err, "failed to force commit slot %d", i)
+		}
+	}
+
+	return nil
 }
 
 // IsBootstrapped returns if the Manager finished committing all pending slots up to the current acceptance time.

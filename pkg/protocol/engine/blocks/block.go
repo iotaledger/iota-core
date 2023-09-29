@@ -83,6 +83,7 @@ func NewBlock(data *model.Block) *Block {
 		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
 		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
 		modelBlock:            data,
+		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
 		workScore:             data.WorkScore(),
 	}

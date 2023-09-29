@@ -238,14 +238,12 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 	//   1. Mark all transactions as accepted
 	//   2. Mark all blocks as accepted
 	//   3. Force commitment of the slot
+	totalBlocks := uint32(len(blockIDs))
 	var bookedBlocks atomic.Uint32
-	bookedBlocks.Store(uint32(len(blockIDs)))
-
 	var notarizedBlocks atomic.Uint32
-	notarizedBlocks.Store(uint32(len(blockIDs)))
 
 	blockBookedCallback := func(_, _ bool) {
-		if bookedBlocks.Add(-1) != 0 {
+		if bookedBlocks.Add(1) != totalBlocks {
 			return
 		}
 
@@ -264,7 +262,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 			targetEngine.BlockGadget.SetAccepted(block)
 
 			// Wait for all blocks to be notarized before forcing the commitment of the slot.
-			if notarizedBlocks.Add(-1) != 0 {
+			if notarizedBlocks.Add(1) != totalBlocks {
 				return
 			}
 		}

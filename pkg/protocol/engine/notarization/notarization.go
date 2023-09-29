@@ -11,6 +11,7 @@ type Notarization interface {
 	IsBootstrapped() bool
 
 	ForceCommit(slot iotago.SlotIndex) (*model.Commitment, error)
+	ForceCommitUntil(commitUntilSlot iotago.SlotIndex) error
 
 	module.Interface
 }
