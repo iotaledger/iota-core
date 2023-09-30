@@ -152,11 +152,7 @@ func (m *MemPool[VoteRank]) PublishCommitmentState(commitment *iotago.Commitment
 
 // TransactionMetadataByAttachment returns the metadata of the transaction that was attached by the given block.
 func (m *MemPool[VoteRank]) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempool.TransactionMetadata, bool) {
-	if signedTransactionMetadata, exists := m.cachedSignedTransactions.Get(blockID); exists {
-		return signedTransactionMetadata.TransactionMetadata(), true
-	}
-
-	return nil, false
+	return m.transactionByAttachment(blockID)
 }
 
 // StateDiff returns the state diff for the given slot.
@@ -182,7 +178,6 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 	}(); evictedAttachments != nil {
 		evictedAttachments.ForEach(func(blockID iotago.BlockID, signedTransactionMetadata *SignedTransactionMetadata) bool {
 			signedTransactionMetadata.evictAttachment(blockID)
-
 			return true
 		})
 	}
@@ -424,7 +419,7 @@ func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (stateDiff *StateDi
 
 func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
-		if slot := transaction.EarliestIncludedAttachment().Slot(); slot > 0 {
+		if slot := transaction.EarliestIncludedAttachment().Slot(); slot != 0 {
 			if stateDiff, evicted := m.stateDiff(slot); !evicted {
 				if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
 					m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
@@ -465,6 +460,8 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 				return true
 			})
 		}
+
+		transaction.signingTransactions.Range((*SignedTransactionMetadata).setEvicted)
 	})
 }
 
@@ -493,21 +490,14 @@ func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransaction *SignedTran
 
 		// if signatures are valid
 
-		// TODO: copy attachments of correct signed transaction to transaction
-		signedTransaction.attachments.OnUpdate(func(appliedMutations ds.SetMutations[iotago.BlockID]) {
-			appliedMutations.AddedElements().Range(func(element iotago.BlockID) {
-				transaction.addValidAttachment(element)
-			})
-
-			appliedMutations.DeletedElements().Range(func(element iotago.BlockID) {
-				transaction.evictValidAttachment(element)
-			})
+		signedTransaction.attachments.OnUpdate(func(mutations ds.SetMutations[iotago.BlockID]) {
+			mutations.AddedElements().Range(lo.Void(transaction.addValidAttachment))
+			mutations.DeletedElements().Range(transaction.evictValidAttachment)
 		})
+
 		signedTransaction.signaturesValid.Trigger()
 		signedTransaction.transactionMetadata.shouldExecute.Trigger()
-
 	})
-
 }
 
 func WithForkAllTransactions[VoteRank conflictdag.VoteRankType[VoteRank]](forkAllTransactions bool) options.Option[MemPool[VoteRank]] {

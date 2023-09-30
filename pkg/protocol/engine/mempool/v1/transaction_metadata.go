@@ -24,8 +24,6 @@ type SignedTransactionMetadata struct {
 
 	attachments reactive.Set[iotago.BlockID]
 
-	allAttachmentsEvicted reactive.Event
-
 	evicted reactive.Event
 
 	attachmentsMutex syncutils.RWMutex
@@ -46,8 +44,6 @@ func NewSignedTransactionMetadata(signedTransaction mempool.SignedTransaction, t
 		transactionMetadata: transactionMetadata,
 
 		attachments: reactive.NewSet[iotago.BlockID](),
-
-		allAttachmentsEvicted: reactive.NewEvent(),
 
 		evicted: reactive.NewEvent(),
 	}, nil
@@ -99,7 +95,7 @@ func (t *SignedTransactionMetadata) evictAttachment(id iotago.BlockID) {
 	defer t.attachmentsMutex.Unlock()
 
 	if t.attachments.Delete(id) && t.attachments.IsEmpty() {
-		t.allAttachmentsEvicted.Trigger()
+		t.evicted.Trigger()
 	}
 }
 
