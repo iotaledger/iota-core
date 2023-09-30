@@ -218,6 +218,12 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		return ierrors.Errorf("failed to get target engine for %s", commitmentID)
 	}
 
+	// Make sure that already evicted commitments are not processed. This might happen if there's a lot of slots to process ]
+	// and old responses are still in the task queue.
+	if loadedCommitment, err := targetEngine.Storage.Commitments().Load(commitmentID.Slot()); err == nil && loadedCommitment.ID() == commitmentID {
+		return nil
+	}
+
 	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
 	for _, blockID := range blockIDs {
 		_ = acceptedBlocks.Add(blockID) // a mapdb can never return an error
