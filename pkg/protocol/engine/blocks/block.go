@@ -85,6 +85,7 @@ func NewBlock(data *model.Block) *Block {
 		modelBlock:            data,
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
+		notarized:             reactive.NewVariable[bool](),
 		workScore:             data.WorkScore(),
 	}
 }
@@ -106,6 +107,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		booked:      reactive.NewVariable[bool](),
 		preAccepted: true,
 		accepted:    reactive.NewVariable[bool](),
+		notarized:   reactive.NewVariable[bool](),
 		scheduled:   true,
 	}
 
@@ -125,7 +127,9 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 		payloadConflictIDs:    ds.NewSet[iotago.TransactionID](),
 		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
 		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
+		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
+		notarized:             reactive.NewVariable[bool](),
 	}
 }
 
@@ -365,7 +369,7 @@ func (b *Block) Update(data *model.Block) (wasPublished bool) {
 
 // Booked returns a reactive variable that is true if the Block was booked.
 func (b *Block) Booked() reactive.Variable[bool] {
-	return b.accepted
+	return b.booked
 }
 
 func (b *Block) IsBooked() (isBooked bool) {
@@ -373,7 +377,7 @@ func (b *Block) IsBooked() (isBooked bool) {
 }
 
 func (b *Block) SetBooked() (wasUpdated bool) {
-	return !b.accepted.Set(true)
+	return !b.booked.Set(true)
 }
 
 func (b *Block) AddWitness(seat account.SeatIndex) (added bool) {
@@ -627,7 +631,7 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("Missing", b.missing))
 	builder.AddField(stringify.NewStructField("Solid", b.solid))
 	builder.AddField(stringify.NewStructField("Invalid", b.invalid))
-	builder.AddField(stringify.NewStructField("Booked", b.booked))
+	builder.AddField(stringify.NewStructField("Booked", b.booked.Get()))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
 	builder.AddField(stringify.NewStructField("PreAccepted", b.preAccepted))
 	builder.AddField(stringify.NewStructField("AcceptanceRatifiers", b.acceptanceRatifiers.String()))
