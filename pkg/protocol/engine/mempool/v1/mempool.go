@@ -498,6 +498,10 @@ func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransaction *SignedTran
 		signedTransaction.signaturesValid.Trigger()
 		signedTransaction.transactionMetadata.shouldExecute.Trigger()
 	})
+
+	signedTransaction.evicted.OnTrigger(func() {
+		m.cachedSignedTransactions.Delete(signedTransaction.ID())
+	})
 }
 
 func WithForkAllTransactions[VoteRank conflictdag.VoteRankType[VoteRank]](forkAllTransactions bool) options.Option[MemPool[VoteRank]] {

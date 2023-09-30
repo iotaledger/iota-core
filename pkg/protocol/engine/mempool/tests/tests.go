@@ -416,7 +416,7 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 	}
 
 	fmt.Println("Memory report before:")
-	fmt.Println(memanalyzer.MemoryReport(tf))
+	fmt.Println(memanalyzer.MemoryReport(tf.Instance))
 	memStatsStart := memanalyzer.MemSize(tf)
 
 	txIndex, prevStateAlias := issueTransactions(1, 20000, "genesis")
@@ -429,7 +429,7 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 	memStatsEnd := memanalyzer.MemSize(tf)
 	fmt.Println("Memory report after:")
 
-	fmt.Println(memanalyzer.MemoryReport(tf))
+	fmt.Println(memanalyzer.MemoryReport(tf.Instance))
 	fmt.Println(memStatsEnd, memStatsStart)
 
 	require.Less(t, float64(memStatsEnd), TestMemoryReleaseMaxMemoryIncreaseFactor*float64(memStatsStart), "the objects in the heap should not grow by more than 15%")
