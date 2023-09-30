@@ -386,6 +386,7 @@ func (t *TestFramework) Cleanup() {
 	iotago.UnregisterIdentifierAliases()
 
 	t.stateIDByAlias = make(map[string]iotago.OutputID)
+	t.transactionByAlias = make(map[string]mempool.Transaction)
 	t.signedTransactionByAlias = make(map[string]mempool.SignedTransaction)
 	t.blockIDsByAlias = make(map[string]iotago.BlockID)
 }
