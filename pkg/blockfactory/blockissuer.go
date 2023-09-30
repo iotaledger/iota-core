@@ -174,6 +174,19 @@ func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams) (iotago.API, e
 func (i *BlockIssuer) CreateBlock(ctx context.Context, issuerAccount Account, opts ...options.Option[BasicBlockParams]) (*model.Block, error) {
 	blockParams := options.Apply(&BasicBlockParams{}, opts)
 
+	if blockParams.BlockHeader.IssuingTime == nil {
+		issuingTime := time.Now().UTC()
+		blockParams.BlockHeader.IssuingTime = &issuingTime
+	}
+
+	if blockParams.BlockHeader.SlotCommitment == nil {
+		var err error
+		blockParams.BlockHeader.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime))
+		if err != nil {
+			return nil, ierrors.Wrap(err, "error getting commitment")
+		}
+	}
+
 	if blockParams.BlockHeader.References == nil {
 		references, err := i.getReferences(ctx, blockParams.Payload, blockParams.BlockHeader.ParentsCount)
 		if err != nil {
