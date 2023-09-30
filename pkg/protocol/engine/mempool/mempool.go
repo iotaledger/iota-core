@@ -9,6 +9,8 @@ import (
 type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] interface {
 	AttachSignedTransaction(signedTransaction SignedTransaction, transaction Transaction, blockID iotago.BlockID) (signedTransactionMetadata SignedTransactionMetadata, err error)
 
+	OnSignedTransactionAttached(callback func(signedTransactionMetadata SignedTransactionMetadata), opts ...event.Option)
+
 	OnTransactionAttached(callback func(metadata TransactionMetadata), opts ...event.Option)
 
 	MarkAttachmentIncluded(blockID iotago.BlockID) bool

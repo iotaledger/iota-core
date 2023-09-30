@@ -170,7 +170,7 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.Trans
 			return ierrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedConflictID)
 		}
 
-		necessaryReferences[likedConflictID] = lo.First(transactionMetadata.Attachments())
+		necessaryReferences[likedConflictID] = lo.First(transactionMetadata.ValidAttachments())
 
 		return nil
 	}); err != nil {

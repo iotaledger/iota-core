@@ -13,92 +13,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type SignedTransactionMetadata struct {
-	id iotago.SignedTransactionID
-
-	signaturesInvalid reactive.Variable[error]
-
-	signaturesValid reactive.Event
-
-	transactionMetadata *TransactionMetadata
-
-	attachments reactive.Set[iotago.BlockID]
-
-	evicted reactive.Event
-
-	attachmentsMutex syncutils.RWMutex
-}
-
-func NewSignedTransactionMetadata(signedTransaction mempool.SignedTransaction, transactionMetadata *TransactionMetadata) (*SignedTransactionMetadata, error) {
-	signedID, signedIDErr := signedTransaction.ID()
-	if signedIDErr != nil {
-		return nil, ierrors.Errorf("failed to retrieve signed transaction ID: %w", signedIDErr)
-	}
-
-	return &SignedTransactionMetadata{
-		id:                signedID,
-		signaturesInvalid: reactive.NewVariable[error](),
-
-		signaturesValid: reactive.NewEvent(),
-
-		transactionMetadata: transactionMetadata,
-
-		attachments: reactive.NewSet[iotago.BlockID](),
-
-		evicted: reactive.NewEvent(),
-	}, nil
-}
-
-func (t *SignedTransactionMetadata) ID() iotago.SignedTransactionID {
-	return t.id
-}
-
-func (t *SignedTransactionMetadata) TransactionMetadata() mempool.TransactionMetadata {
-	return t.transactionMetadata
-}
-
-func (t *SignedTransactionMetadata) OnSignaturesInvalid(callback func(error)) (unsubscribe func()) {
-	return t.signaturesInvalid.OnUpdate(func(_, err error) {
-		callback(err)
-	})
-}
-
-func (t *SignedTransactionMetadata) OnSignaturesValid(callback func()) (unsubscribe func()) {
-	return t.signaturesValid.OnTrigger(callback)
-}
-
-func (t *SignedTransactionMetadata) IsEvicted() bool {
-	return t.evicted.WasTriggered()
-}
-
-func (t *SignedTransactionMetadata) OnEvicted(callback func()) {
-	t.evicted.OnTrigger(callback)
-}
-
-func (t *SignedTransactionMetadata) setEvicted() {
-	t.evicted.Trigger()
-}
-
-func (t *SignedTransactionMetadata) Attachments() []iotago.BlockID {
-	return t.attachments.ToSlice()
-}
-
-func (t *SignedTransactionMetadata) addAttachment(blockID iotago.BlockID) (added bool) {
-	t.attachmentsMutex.Lock()
-	defer t.attachmentsMutex.Unlock()
-
-	return t.attachments.Add(blockID)
-}
-
-func (t *SignedTransactionMetadata) evictAttachment(id iotago.BlockID) {
-	t.attachmentsMutex.Lock()
-	defer t.attachmentsMutex.Unlock()
-
-	if t.attachments.Delete(id) && t.attachments.IsEmpty() {
-		t.evicted.Trigger()
-	}
-}
-
 type TransactionMetadata struct {
 	id                iotago.TransactionID
 	inputReferences   []iotago.Input
@@ -139,7 +53,7 @@ type TransactionMetadata struct {
 	*inclusionFlags
 }
 
-func (t *TransactionMetadata) Attachments() []iotago.BlockID {
+func (t *TransactionMetadata) ValidAttachments() []iotago.BlockID {
 	return t.validAttachments.Keys()
 }
 
