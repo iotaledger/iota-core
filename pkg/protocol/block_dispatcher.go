@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/buffer"
@@ -47,9 +46,6 @@ type BlockDispatcher struct {
 
 	// shutdownEvent is a reactive event that is triggered when the BlockDispatcher instance is stopped.
 	shutdownEvent reactive.Event
-
-	// optWarpSyncWindowSize is the optional warp sync window size.
-	optWarpSyncWindowSize iotago.SlotIndex
 }
 
 // NewBlockDispatcher creates a new BlockDispatcher instance.
@@ -254,7 +250,22 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 	var bookedBlocks atomic.Uint32
 	var notarizedBlocks atomic.Uint32
 
-	blockBookedCallback := func(_, _ bool) {
+	forceCommitmentFunc := func() {
+		// 3. Force commitment of the slot
+		producedCommitment, err := targetEngine.Notarization.ForceCommit(commitmentID.Slot())
+		if err != nil {
+			b.protocol.HandleError(err)
+			return
+		}
+
+		// 4. Verify that the produced commitment is the same as the initially requested one
+		if producedCommitment.ID() != commitmentID {
+			b.protocol.HandleError(ierrors.Errorf("producedCommitment ID mismatch: %s != %s", producedCommitment.ID(), commitmentID))
+			return
+		}
+	}
+
+	blockBookedFunc := func(_, _ bool) {
 		if bookedBlocks.Add(1) != totalBlocks {
 			return
 		}
@@ -277,20 +288,14 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 			if notarizedBlocks.Add(1) != totalBlocks {
 				return
 			}
-		}
 
-		// 3. Force commitment of the slot
-		producedCommitment, err := targetEngine.Notarization.ForceCommit(commitmentID.Slot())
-		if err != nil {
-			b.protocol.HandleError(err)
-			return
+			forceCommitmentFunc()
 		}
+	}
 
-		// 4. Verify that the produced commitment is the same as the initially requested one
-		if producedCommitment.ID() != commitmentID {
-			b.protocol.HandleError(ierrors.Errorf("producedCommitment ID mismatch: %s != %s", producedCommitment.ID(), commitmentID))
-			return
-		}
+	if len(blockIDs) == 0 {
+		forceCommitmentFunc()
+		return nil
 	}
 
 	for _, blockID := range blockIDs {
@@ -299,7 +304,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 			continue
 		}
 
-		block.Booked().OnUpdate(blockBookedCallback)
+		block.Booked().OnUpdate(blockBookedFunc)
 	}
 
 	return nil
@@ -334,10 +339,7 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 		return
 	}
 
-	maxCommittableAge := e.APIForSlot(chainCommitment.Commitment().Slot()).ProtocolParameters().MaxCommittableAge()
-	warpSyncWindowSize := lo.Max(maxCommittableAge, b.optWarpSyncWindowSize)
-
-	for slotToWarpSync := latestCommitmentSlot + 1; slotToWarpSync <= latestCommitmentSlot+warpSyncWindowSize; slotToWarpSync++ {
+	for slotToWarpSync := latestCommitmentSlot + 1; slotToWarpSync <= latestCommitmentSlot+1; slotToWarpSync++ {
 		commitmentToSync := chain.Commitment(slotToWarpSync)
 		if commitmentToSync == nil {
 			break
@@ -418,13 +420,6 @@ func (b *BlockDispatcher) runTask(task func(), pool *workerpool.WorkerPool) {
 
 		return isShutdown
 	})
-}
-
-// WithWarpSyncWindowSize is an option for the BlockDispatcher that allows to set the warp sync window size.
-func WithWarpSyncWindowSize(windowSize iotago.SlotIndex) options.Option[BlockDispatcher] {
-	return func(b *BlockDispatcher) {
-		b.optWarpSyncWindowSize = windowSize
-	}
 }
 
 // WarpSyncRetryInterval is the interval in which a warp sync request is retried.
