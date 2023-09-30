@@ -518,7 +518,7 @@ func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (ear
 
 	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentSlot)
 	if err != nil {
-		panic(fmt.Sprintln("could not load earliest commitment after engine initialization", err))
+		panic(fmt.Sprintf("could not load earliest commitment %d after engine initialization: %s", earliestRootCommitmentSlot, err))
 	}
 
 	return rootCommitment
