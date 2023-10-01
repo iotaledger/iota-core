@@ -473,7 +473,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	consumedAccounts = make(map[iotago.AccountID]*utxoledger.Output)
 	destroyedAccounts = ds.NewSet[iotago.AccountID]()
 
-	createdAccountDelegation := make(map[iotago.ChainID]*iotago.DelegationOutput)
+	newAccountDelegation := make(map[iotago.ChainID]*iotago.DelegationOutput)
 
 	stateDiff.CreatedStates().ForEachKey(func(outputID iotago.OutputID) bool {
 		createdOutput, errOutput := l.Output(outputID)
@@ -499,11 +499,17 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			}
 
 			createdAccounts[accountID] = createdOutput
-
 		case iotago.OutputDelegation:
-			// the delegation output was created => determine later if we need to add the stake to the validator
-			delegation, _ := createdOutput.Output().(*iotago.DelegationOutput)
-			createdAccountDelegation[delegation.DelegationID] = delegation
+			// The Delegation Output output was created or transitioned => determine later if we need to add the stake to the validator.
+			delegationOutput, _ := createdOutput.Output().(*iotago.DelegationOutput)
+			delegationID := delegationOutput.DelegationID
+			// Check if the output was newly created or if it was transitioned to delayed claiming.
+			// Zeroed Delegation ID => newly created.
+			// Non-Zero Delegation ID => delayed claiming transition.
+			if delegationID == iotago.EmptyDelegationID() {
+				delegationID = iotago.DelegationIDFromOutputID(outputID)
+				newAccountDelegation[delegationID] = delegationOutput
+			}
 
 		case iotago.OutputBasic:
 			// if a basic output is sent to an implicit account creation address, we need to create the account
@@ -545,13 +551,19 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 
 		case iotago.OutputDelegation:
 			delegationOutput, _ := spentOutput.Output().(*iotago.DelegationOutput)
+			delegationID := delegationOutput.DelegationID
+			if delegationID == iotago.EmptyDelegationID() {
+				delegationID = iotago.DelegationIDFromOutputID(outputID)
+			}
 
 			// TODO: do we have a testcase that checks transitioning a delegation output twice in the same slot?
-			if _, createdDelegationExists := createdAccountDelegation[delegationOutput.DelegationID]; createdDelegationExists {
+			if _, createdDelegationExists := newAccountDelegation[delegationID]; createdDelegationExists {
 				// the delegation output was created and destroyed in the same slot => do not track the delegation as newly created
-				delete(createdAccountDelegation, delegationOutput.DelegationID)
-			} else {
-				// the delegation output was destroyed => subtract the stake from the validator account
+				delete(newAccountDelegation, delegationID)
+			} else if delegationOutput.DelegationID.Empty() {
+				// The Delegation Output was destroyed or transitioned to delayed claiming => subtract the stake from the validator account.
+				// We check for a non-zero Delegation ID so we don't remove the stake twice when the output was destroyed
+				// in delayed claiming, since we already subtract it when the output is transitioned.
 				accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorAddress.AccountID())
 				accountDiff.DelegationStakeChange -= int64(delegationOutput.DelegatedAmount)
 			}
@@ -567,7 +579,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 		return true
 	})
 
-	for _, delegationOutput := range createdAccountDelegation {
+	for _, delegationOutput := range newAccountDelegation {
 		// the delegation output was newly created and not transitioned/destroyed => add the stake to the validator account
 		accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorAddress.AccountID())
 		accountDiff.DelegationStakeChange += int64(delegationOutput.DelegatedAmount)
