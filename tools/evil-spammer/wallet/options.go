@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
@@ -14,7 +15,7 @@ import (
 // Options is a struct that represents a collection of options that can be set when creating a block.
 type Options struct {
 	aliasInputs        map[string]types.Empty
-	inputs             []*Output
+	inputs             []*models.Output
 	aliasOutputs       map[string]iotago.Output
 	outputs            []iotago.Output
 	inputWallet        *Wallet
@@ -37,7 +38,7 @@ type OutputOption struct {
 func NewOptions(options ...Option) (option *Options, err error) {
 	option = &Options{
 		aliasInputs:        make(map[string]types.Empty),
-		inputs:             make([]*Output, 0),
+		inputs:             make([]*models.Output, 0),
 		aliasOutputs:       make(map[string]iotago.Output),
 		outputs:            make([]iotago.Output, 0),
 		specialOutputTypes: make(map[string]iotago.OutputType),
@@ -131,9 +132,9 @@ func WithInputs(inputs interface{}) Option {
 			for _, input := range in {
 				options.aliasInputs[input] = types.Void
 			}
-		case *Output:
+		case *models.Output:
 			options.inputs = append(options.inputs, in)
-		case []*Output:
+		case []*models.Output:
 			options.inputs = append(options.inputs, in...)
 		}
 	}

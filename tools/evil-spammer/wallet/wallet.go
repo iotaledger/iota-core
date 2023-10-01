@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -18,7 +19,7 @@ import (
 type Wallet struct {
 	ID                walletID
 	walletType        WalletType
-	unspentOutputs    map[string]*Output // maps addr to its unspentOutput
+	unspentOutputs    map[string]*models.Output // maps addr to its unspentOutput
 	indexAddrMap      map[uint64]string
 	addrIndexMap      map[string]uint64
 	inputTransactions map[string]types.Empty
@@ -44,7 +45,7 @@ func NewWallet(wType ...WalletType) *Wallet {
 		walletType:        walletType,
 		ID:                -1,
 		seed:              tpkg.RandEd25519Seed(),
-		unspentOutputs:    make(map[string]*Output),
+		unspentOutputs:    make(map[string]*models.Output),
 		indexAddrMap:      make(map[uint64]string),
 		addrIndexMap:      make(map[string]uint64),
 		inputTransactions: make(map[string]types.Empty),
@@ -93,7 +94,7 @@ func (w *Wallet) AddressOnIndex(index uint64) *iotago.Ed25519Address {
 }
 
 // UnspentOutput returns the unspent output on the address.
-func (w *Wallet) UnspentOutput(addr string) *Output {
+func (w *Wallet) UnspentOutput(addr string) *models.Output {
 	w.RLock()
 	defer w.RUnlock()
 
@@ -101,10 +102,10 @@ func (w *Wallet) UnspentOutput(addr string) *Output {
 }
 
 // UnspentOutputs returns all unspent outputs on the wallet.
-func (w *Wallet) UnspentOutputs() (outputs map[string]*Output) {
+func (w *Wallet) UnspentOutputs() (outputs map[string]*models.Output) {
 	w.RLock()
 	defer w.RUnlock()
-	outputs = make(map[string]*Output)
+	outputs = make(map[string]*models.Output)
 	for addr, outs := range w.unspentOutputs {
 		outputs[addr] = outs
 	}
@@ -129,7 +130,7 @@ func (w *Wallet) AddrIndexMap(address string) uint64 {
 }
 
 // AddUnspentOutput adds an unspentOutput of a given wallet.
-func (w *Wallet) AddUnspentOutput(output *Output) {
+func (w *Wallet) AddUnspentOutput(output *models.Output) {
 	w.Lock()
 	defer w.Unlock()
 	w.unspentOutputs[output.Address.String()] = output
@@ -200,7 +201,7 @@ func (w *Wallet) GetReuseAddress() string {
 }
 
 // GetUnspentOutput returns an unspent output on the oldest address ordered by index.
-func (w *Wallet) GetUnspentOutput() *Output {
+func (w *Wallet) GetUnspentOutput() *models.Output {
 	switch w.walletType {
 	case Reuse:
 		addr := w.GetReuseAddress()

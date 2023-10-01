@@ -97,7 +97,7 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 			}
 		}
 
-		w.faucet.AddUnspentOutput(&Output{
+		w.faucet.AddUnspentOutput(&models.Output{
 			Address:      w.faucet.AddressOnIndex(0),
 			Index:        0,
 			OutputID:     w.optFaucetUnspentOutputID,
@@ -249,7 +249,7 @@ func (e *EvilWallet) requestAndSplitFaucetFunds(initWallet, receiveWallet *Walle
 	return e.splitOutputs(splitOutput, initWallet, receiveWallet)
 }
 
-func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err error) {
+func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *models.Output, err error) {
 	receiveAddr := wallet.AddressOnIndex(0)
 	clt := e.connector.GetClient()
 
@@ -307,7 +307,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), 0), signedTx.Transaction.Outputs[0])
 
 	// set remainder output to be reused by the faucet wallet
-	e.faucet.AddUnspentOutput(&Output{
+	e.faucet.AddUnspentOutput(&models.Output{
 		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), 1),
 		Address:      faucetAddr,
 		Index:        0,
@@ -319,7 +319,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 }
 
 // splitOutputs splits faucet input to 100 outputs.
-func (e *EvilWallet) splitOutputs(splitOutput *Output, inputWallet, outputWallet *Wallet) (iotago.TransactionID, error) {
+func (e *EvilWallet) splitOutputs(splitOutput *models.Output, inputWallet, outputWallet *Wallet) (iotago.TransactionID, error) {
 	if inputWallet.IsEmpty() {
 		return iotago.TransactionID{}, ierrors.New("inputWallet is empty")
 	}
@@ -340,7 +340,7 @@ func (e *EvilWallet) splitOutputs(splitOutput *Output, inputWallet, outputWallet
 	return lo.PanicOnErr(signedTx.ID()), nil
 }
 
-func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitOutput *Output, splitNumber int, receiveWallet *Wallet) (input *Output, outputs []*OutputOption) {
+func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitOutput *models.Output, splitNumber int, receiveWallet *Wallet) (input *models.Output, outputs []*OutputOption) {
 	input = splitOutput
 
 	balances := SplitBalanceEqually(splitNumber, input.Balance)
@@ -436,7 +436,7 @@ func (e *EvilWallet) addOutputsToOutputManager(signedTx *iotago.SignedTransactio
 
 		// register UnlockConditionAddress only (skip account outputs)
 		addr := o.UnlockConditionSet().Address().Address
-		out := &Output{
+		out := &models.Output{
 			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), uint16(idx)),
 			Address:      addr,
 			Balance:      o.BaseTokenAmount(),
@@ -494,7 +494,7 @@ func (e *EvilWallet) registerOutputAliases(signedTx *iotago.SignedTransaction, a
 	}
 }
 
-func (e *EvilWallet) prepareInputs(buildOptions *Options) (inputs []*Output, err error) {
+func (e *EvilWallet) prepareInputs(buildOptions *Options) (inputs []*models.Output, err error) {
 	if buildOptions.areInputsProvidedWithoutAliases() {
 		inputs = append(inputs, buildOptions.inputs...)
 
@@ -526,7 +526,7 @@ func (e *EvilWallet) prepareOutputs(buildOptions *Options, tempWallet *Wallet) (
 
 // matchInputsWithAliases gets input from the alias manager. if input was not assigned to an alias before,
 // it assigns a new Fresh faucet output.
-func (e *EvilWallet) matchInputsWithAliases(buildOptions *Options) (inputs []*Output, err error) {
+func (e *EvilWallet) matchInputsWithAliases(buildOptions *Options) (inputs []*models.Output, err error) {
 	// get inputs by alias
 	for inputAlias := range buildOptions.aliasInputs {
 		in, ok := e.aliasManager.GetInput(inputAlias)
@@ -696,7 +696,7 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 	return
 }
 
-func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[iotago.Output], w *Wallet) (tx *iotago.SignedTransaction, err error) {
+func (e *EvilWallet) makeTransaction(inputs []*models.Output, outputs iotago.Outputs[iotago.Output], w *Wallet) (tx *iotago.SignedTransaction, err error) {
 	clt := e.Connector().GetClient()
 
 	txBuilder := builder.NewTransactionBuilder(clt.CurrentAPI())

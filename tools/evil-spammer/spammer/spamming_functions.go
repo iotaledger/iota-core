@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -50,7 +50,7 @@ func CustomConflictSpammingFunc(s *Spammer) {
 		wg := sync.WaitGroup{}
 		for i, tx := range txs {
 			wg.Add(1)
-			go func(clt wallet.Client, tx *iotago.SignedTransaction) {
+			go func(clt models.Client, tx *iotago.SignedTransaction) {
 				defer wg.Done()
 
 				// sleep randomly to avoid issuing blocks in different goroutines at once

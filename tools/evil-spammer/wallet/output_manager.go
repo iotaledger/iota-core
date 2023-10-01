@@ -16,25 +16,6 @@ var (
 	awaitOutputToBeConfirmed = 150 * time.Second
 )
 
-// Input contains details of an input.
-type Input struct {
-	OutputID iotago.OutputID
-	Address  iotago.Address
-}
-
-// Output contains details of an output ID.
-type Output struct {
-	OutputID iotago.OutputID
-	Address  iotago.Address
-	Index    uint64
-	Balance  iotago.BaseToken
-
-	OutputStruct iotago.Output
-}
-
-// Outputs is a list of Output.
-type Outputs []*Output
-
 // OutputManager keeps track of the output statuses.
 type OutputManager struct {
 	connector models.Connector
@@ -143,9 +124,9 @@ func (o *OutputManager) Track(outputIDs ...iotago.OutputID) (allConfirmed bool) 
 
 // CreateOutputFromAddress creates output, retrieves outputID, and adds it to the wallet.
 // Provided address should be generated from provided wallet. Considers only first output found on address.
-func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519Address, balance iotago.BaseToken, outputID iotago.OutputID, outputStruct iotago.Output) *Output {
+func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519Address, balance iotago.BaseToken, outputID iotago.OutputID, outputStruct iotago.Output) *models.Output {
 	index := w.AddrIndexMap(addr.String())
-	out := &Output{
+	out := &models.Output{
 		Address:      addr,
 		Index:        index,
 		OutputID:     outputID,
@@ -160,9 +141,9 @@ func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519A
 }
 
 // AddOutput adds existing output from wallet w to the OutputManager.
-func (o *OutputManager) AddOutput(w *Wallet, output *Output) *Output {
+func (o *OutputManager) AddOutput(w *Wallet, output *models.Output) *models.Output {
 	idx := w.AddrIndexMap(output.Address.String())
-	out := &Output{
+	out := &models.Output{
 		Address:      output.Address,
 		Index:        idx,
 		OutputID:     output.OutputID,
@@ -178,7 +159,7 @@ func (o *OutputManager) AddOutput(w *Wallet, output *Output) *Output {
 
 // GetOutput returns the Output of the given outputID.
 // Firstly checks if output can be retrieved by outputManager from wallet, if not does an API call.
-func (o *OutputManager) GetOutput(outputID iotago.OutputID) (output *Output) {
+func (o *OutputManager) GetOutput(outputID iotago.OutputID) (output *models.Output) {
 	output = o.getOutputFromWallet(outputID)
 
 	// get output info via web api
@@ -194,7 +175,7 @@ func (o *OutputManager) GetOutput(outputID iotago.OutputID) (output *Output) {
 			return nil
 		}
 
-		output = &Output{
+		output = &models.Output{
 			OutputID:     outputID,
 			Address:      basicOutput.UnlockConditionSet().Address().Address,
 			Balance:      basicOutput.BaseTokenAmount(),
@@ -205,7 +186,7 @@ func (o *OutputManager) GetOutput(outputID iotago.OutputID) (output *Output) {
 	return output
 }
 
-func (o *OutputManager) getOutputFromWallet(outputID iotago.OutputID) (output *Output) {
+func (o *OutputManager) getOutputFromWallet(outputID iotago.OutputID) (output *models.Output) {
 	o.RLock()
 	defer o.RUnlock()
 	w, ok := o.outputIDWalletMap[outputID.ToHex()]
