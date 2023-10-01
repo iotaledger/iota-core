@@ -306,6 +306,11 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 			continue
 		}
 
+		// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
+		// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
+		// block cache and thus if not root blocks no block in the next slot can become solid.
+		targetEngine.EvictionState.AddRootBlock(block.ID(), block.SlotCommitmentID())
+
 		block.Booked().OnUpdate(blockBookedFunc)
 	}
 

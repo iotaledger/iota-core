@@ -113,6 +113,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 
 	// This should be true since we commit and evict on acceptance.
 	b.booked.Set(true)
+	b.notarized.Set(true)
 	b.accepted.Set(true)
 
 	return b
