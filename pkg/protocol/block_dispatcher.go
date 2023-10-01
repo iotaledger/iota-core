@@ -284,12 +284,14 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 			targetEngine.BlockGadget.SetAccepted(block)
 
-			// Wait for all blocks to be notarized before forcing the commitment of the slot.
-			if notarizedBlocks.Add(1) != totalBlocks {
-				return
-			}
+			block.Notarized().OnUpdate(func(_, _ bool) {
+				// Wait for all blocks to be notarized before forcing the commitment of the slot.
+				if notarizedBlocks.Add(1) != totalBlocks {
+					return
+				}
 
-			forceCommitmentFunc()
+				forceCommitmentFunc()
+			})
 		}
 	}
 
