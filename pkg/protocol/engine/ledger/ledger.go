@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"context"
 	"io"
 
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -29,6 +30,8 @@ type Ledger interface {
 	OutputOrSpent(id iotago.OutputID) (output *utxoledger.Output, spent *utxoledger.Spent, err error)
 	ForEachUnspentOutput(func(output *utxoledger.Output) bool) error
 	AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error
+
+	ValidateTransactionInVM(ctx context.Context, transaction *iotago.SignedTransaction) error
 
 	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, BlockVoteRank]
 	MemPool() mempool.MemPool[BlockVoteRank]
