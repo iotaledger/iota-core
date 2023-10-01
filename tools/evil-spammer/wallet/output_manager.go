@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -36,7 +37,7 @@ type Outputs []*Output
 
 // OutputManager keeps track of the output statuses.
 type OutputManager struct {
-	connector Connector
+	connector models.Connector
 
 	wallets           *Wallets
 	outputIDWalletMap map[string]*Wallet
@@ -48,7 +49,7 @@ type OutputManager struct {
 }
 
 // NewOutputManager creates an OutputManager instance.
-func NewOutputManager(connector Connector, wallets *Wallets) *OutputManager {
+func NewOutputManager(connector models.Connector, wallets *Wallets) *OutputManager {
 	return &OutputManager{
 		connector:           connector,
 		wallets:             wallets,
@@ -326,7 +327,7 @@ func (o *OutputManager) AwaitTransactionToBeAccepted(txID iotago.TransactionID, 
 }
 
 // AwaitOutputToBeSolid awaits for solidification of a single output by provided clt.
-func (o *OutputManager) AwaitOutputToBeSolid(outID iotago.OutputID, clt Client, waitFor time.Duration) error {
+func (o *OutputManager) AwaitOutputToBeSolid(outID iotago.OutputID, clt models.Client, waitFor time.Duration) error {
 	s := time.Now()
 	var solid bool
 
@@ -350,7 +351,7 @@ func (o *OutputManager) AwaitOutputToBeSolid(outID iotago.OutputID, clt Client, 
 }
 
 // AwaitOutputsToBeSolid awaits for all provided outputs are solid for a provided client.
-func (o *OutputManager) AwaitOutputsToBeSolid(outputs iotago.OutputIDs, clt Client, maxGoroutines int) (allSolid bool) {
+func (o *OutputManager) AwaitOutputsToBeSolid(outputs iotago.OutputIDs, clt models.Client, maxGoroutines int) (allSolid bool) {
 	wg := sync.WaitGroup{}
 	semaphore := make(chan bool, maxGoroutines)
 	allSolid = true

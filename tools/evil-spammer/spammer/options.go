@@ -3,6 +3,7 @@ package spammer
 import (
 	"time"
 
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 )
 
@@ -118,7 +119,7 @@ func WithNumberOfSpends(n int) Options {
 
 func WithClientURL(clientURL string) Options {
 	return func(s *Spammer) {
-		s.Clients = wallet.NewWebClients([]string{clientURL})
+		s.Clients = models.NewWebClients([]string{clientURL})
 	}
 }
 

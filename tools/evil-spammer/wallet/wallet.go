@@ -80,7 +80,7 @@ func (w *Wallet) Address() *iotago.Ed25519Address {
 	return addr
 }
 
-// Address returns a new and unused address of a given wallet.
+// AddressOnIndex returns a new and unused address of a given wallet.
 func (w *Wallet) AddressOnIndex(index uint64) *iotago.Ed25519Address {
 	w.Lock()
 	defer w.Unlock()

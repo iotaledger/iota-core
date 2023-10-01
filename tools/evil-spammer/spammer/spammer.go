@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -58,7 +59,7 @@ type Spammer struct {
 	State           *State
 	UseRateSetter   bool
 	SpamType        SpamType
-	Clients         wallet.Connector
+	Clients         models.Connector
 	EvilWallet      *wallet.EvilWallet
 	EvilScenario    *wallet.EvilScenario
 	IdentityManager *IdentityManager
@@ -233,7 +234,7 @@ func (s *Spammer) StopSpamming() {
 
 // PostTransaction use provided client to issue a transaction. It chooses API method based on Spammer options. Counts errors,
 // counts transactions and provides debug logs.
-func (s *Spammer) PostTransaction(signedTx *iotago.SignedTransaction, clt wallet.Client) {
+func (s *Spammer) PostTransaction(signedTx *iotago.SignedTransaction, clt models.Client) {
 	if signedTx == nil {
 		s.log.Debug(ErrTransactionIsNil)
 		s.ErrCounter.CountError(ErrTransactionIsNil)
@@ -269,7 +270,7 @@ func (s *Spammer) PostTransaction(signedTx *iotago.SignedTransaction, clt wallet
 	s.log.Debugf("%s: Last transaction sent, ID: %s, txCount: %d", blockID.ToHex(), txID.ToHex(), count)
 }
 
-func (s *Spammer) handleSolidityForReuseOutputs(_ wallet.Client, _ *iotago.SignedTransaction) (ok bool) {
+func (s *Spammer) handleSolidityForReuseOutputs(_ models.Client, _ *iotago.SignedTransaction) (ok bool) {
 	// ok = s.EvilWallet.AwaitInputsSolidity(tx.SignedTransaction().Inputs(), clt)
 	// if s.EvilScenario.OutputWallet.Type() == wallet.Reuse {
 	// 	s.EvilWallet.AddReuseOutputsToThePool(tx.SignedTransaction().Outputs())

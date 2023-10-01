@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -53,7 +54,7 @@ type EvilWallet struct {
 	// faucet is the wallet of faucet
 	faucet        *Wallet
 	wallets       *Wallets
-	connector     Connector
+	connector     models.Connector
 	outputManager *OutputManager
 	aliasManager  *AliasManager
 
@@ -71,7 +72,7 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		optFaucetUnspentOutputID: iotago.OutputIDFromTransactionIDAndIndex(genesisTransactionID, 0),
 		optsClientURLs:           defaultClientsURLs,
 	}, opts, func(w *EvilWallet) {
-		connector := NewWebClients(w.optsClientURLs)
+		connector := models.NewWebClients(w.optsClientURLs)
 		w.connector = connector
 
 		clt := w.connector.GetClient()
@@ -124,12 +125,12 @@ func (e *EvilWallet) NewWallet(wType ...WalletType) *Wallet {
 }
 
 // GetClients returns the given number of clients.
-func (e *EvilWallet) GetClients(num int) []Client {
+func (e *EvilWallet) GetClients(num int) []models.Client {
 	return e.connector.GetClients(num)
 }
 
 // Connector give access to the EvilWallet connector.
-func (e *EvilWallet) Connector() Connector {
+func (e *EvilWallet) Connector() models.Connector {
 	return e.connector
 }
 
@@ -255,7 +256,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	faucetAddr := e.faucet.AddressOnIndex(0)
 	unspentFaucet := e.faucet.UnspentOutput(faucetAddr.String())
 	if unspentFaucet.OutputStruct == nil {
-		clt := e.connector.GetClient()
+		clt = e.connector.GetClient()
 		faucetOutput := clt.GetOutput(e.optFaucetUnspentOutputID)
 		if faucetOutput == nil {
 			panic("no valid faucet unspent output")
