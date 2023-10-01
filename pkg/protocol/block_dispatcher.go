@@ -342,6 +342,9 @@ func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment 
 	chain := chainCommitment.Chain()
 	latestCommitmentSlot := e.Storage.Settings().LatestCommitment().Slot()
 
+	// We don't want to warpsync if the latest commitment of the engine is very close to the latest commitment of the
+	// chain as the node might just be about to commit it itself. This is important for tests, as we always need to issue
+	// 2 slots ahead of the latest commitment of the chain to make sure that the other nodes can warp sync.
 	if latestCommitmentSlot+1 >= chain.LatestCommitment().Commitment().Slot() {
 		return
 	}
