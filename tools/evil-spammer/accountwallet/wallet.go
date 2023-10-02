@@ -70,6 +70,10 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 	})
 }
 
+func (a *AccountWallet) LastFaucetUnspentOutputID() iotago.OutputID {
+	return a.faucet.unspentOutput.OutputID
+}
+
 // toAccountStateFile write account states to file.
 func (a *AccountWallet) toAccountStateFile() error {
 	accounts := make([]Account, 0)

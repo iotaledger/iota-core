@@ -62,6 +62,11 @@ func accountsSubcommands(wallet *accountwallet.AccountWallet, subcommands []*sub
 	for _, sub := range subcommands {
 		accountsSubcommand(wallet, sub)
 	}
+
+	// save faucet unspent output id
+	programs.SaveConfigsToFile(&programs.BasicConfig{
+		LastFaucetUnspentOutputID: wallet.LastFaucetUnspentOutputID().ToHex(),
+	})
 }
 
 func accountsSubcommand(wallet *accountwallet.AccountWallet, sub *subcommand) {
