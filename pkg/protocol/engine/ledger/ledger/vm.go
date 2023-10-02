@@ -170,6 +170,7 @@ func (l *Ledger) ValidateTransactionInVM(ctx context.Context, transaction *iotag
 				return ierrors.Wrapf(err, "failed to load commitment %s", commitmentInput.CommitmentID)
 			}
 
+			// there can be only one CommitmentInput at most, so we can break the loop the moment we find one
 			break
 		}
 	}
