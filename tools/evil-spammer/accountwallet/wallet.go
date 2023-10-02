@@ -33,17 +33,7 @@ func Run() (*AccountWallet, error) {
 }
 
 func SaveState(w *AccountWallet) error {
-	bytesToWrite, err := w.Bytes()
-	if err != nil {
-		return ierrors.Wrap(err, "failed to encode wallet state")
-	}
-
-	//nolint:gosec // users should be able to read the file
-	if err = os.WriteFile(w.optsAccountStatesFile, bytesToWrite, 0o644); err != nil {
-		return ierrors.Wrap(err, "failed to write account file")
-	}
-
-	return nil
+	return w.toAccountStateFile()
 }
 
 type AccountWallet struct {
@@ -71,18 +61,8 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 	})
 }
 
-func (a *AccountWallet) Bytes() ([]byte, error) {
-	state := a.toStateData()
-	stateBytes, err := a.api.Encode(state)
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to encode state")
-	}
-
-	return stateBytes, nil
-}
-
-// toStateData converts accounts information to ToAccountData
-func (a *AccountWallet) toStateData() *StateData {
+// toAccountStateFile write account states to file.
+func (a *AccountWallet) toAccountStateFile() error {
 	accounts := make([]Account, 0)
 
 	for alias, acc := range a.accountsAliases {
@@ -92,7 +72,17 @@ func (a *AccountWallet) toStateData() *StateData {
 		})
 	}
 
-	return &StateData{Accounts: accounts}
+	stateBytes, err := a.api.Encode(&StateData{Accounts: accounts})
+	if err != nil {
+		return ierrors.Wrap(err, "failed to encode state")
+	}
+
+	//nolint:gosec // users should be able to read the file
+	if err = os.WriteFile(a.optsAccountStatesFile, stateBytes, 0o644); err != nil {
+		return ierrors.Wrap(err, "failed to write account states to file")
+	}
+
+	return nil
 }
 
 func (a *AccountWallet) fromAccountStateFile() error {
