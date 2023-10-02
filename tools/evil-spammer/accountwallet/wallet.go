@@ -89,8 +89,9 @@ func (a *AccountWallet) toAccountStateFile() error {
 	}
 
 	stateBytes, err := a.api.Encode(&StateData{
-		Seed:     base58.Encode(a.seed[:]),
-		Accounts: accounts,
+		Seed:          base58.Encode(a.seed[:]),
+		LastUsedIndex: a.latestUsedIndex,
+		Accounts:      accounts,
 	})
 	if err != nil {
 		return ierrors.Wrap(err, "failed to encode state")
@@ -125,6 +126,9 @@ func (a *AccountWallet) fromAccountStateFile() error {
 		return ierrors.Wrap(err, "failed to decode seed")
 	}
 	copy(a.seed[:], decodedSeeds)
+
+	// set latest used index
+	a.latestUsedIndex = data.LastUsedIndex
 
 	// account data
 	for _, acc := range data.Accounts {

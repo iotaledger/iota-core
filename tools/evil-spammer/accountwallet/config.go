@@ -84,8 +84,9 @@ type AllotAccountParams struct {
 
 // TODO do wee need to restrict that only one instance of the wallet runs?
 type StateData struct {
-	Seed     string    `serix:"0,mapKey=seed"`
-	Accounts []Account `serix:"1,mapKey=accounts,lengthPrefixType=uint8"`
+	Seed          string    `serix:"0,mapKey=seed"`
+	LastUsedIndex uint64    `serix:"1,mapKey=lastUsedIndex"`
+	Accounts      []Account `serix:"2,mapKey=accounts,lengthPrefixType=uint8"`
 	// TODO: other info that the account wallet needs to store
 }
 
