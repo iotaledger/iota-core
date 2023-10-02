@@ -10,10 +10,6 @@ import (
 	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
 )
 
-const (
-	accountWalletFilename = "wallet.dat"
-)
-
 var (
 	log           = logger.New("main")
 	optionFlagSet = flag.NewFlagSet("script flag set", flag.ExitOnError)
@@ -39,18 +35,18 @@ func main() {
 		programs.CustomSpam(&customSpamParams)
 	case "accounts":
 		// load wallet
-		accWallet, err := accountwallet.Run(accountWalletFilename)
+		accWallet, err := accountwallet.Run()
 		if err != nil {
 			log.Warn(err)
 			return
 		}
 		// save wallet
-		defer func(w *accountwallet.AccountWallet, filename string) {
-			err = accountwallet.SaveState(w, filename)
+		defer func(w *accountwallet.AccountWallet) {
+			err = accountwallet.SaveState(w)
 			if err != nil {
 				log.Errorf("Error while saving wallet state: %v", err)
 			}
-		}(accWallet, "wallet.dat")
+		}(accWallet)
 		accountsSubcommands(accWallet, accountsSubcommandsFlags)
 	case "quick":
 		programs.QuickTest(&quickTestParams)

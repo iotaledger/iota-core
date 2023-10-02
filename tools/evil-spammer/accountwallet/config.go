@@ -4,11 +4,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/google/martian/log"
-
 	"github.com/iotaledger/hive.go/ds/types"
-	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/runtime/options"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -29,13 +25,15 @@ var AvailableCommands = map[string]types.Empty{
 }
 
 type Configuration struct {
-	BindAddress string `json:"bindAddress,omitempty"`
+	BindAddress       string `json:"bindAddress,omitempty"`
+	AccountStatesFile string `json:"accountStatesFile,omitempty"`
 }
 
 var accountConfigFile = "account_config.json"
 
 var accountConfigJSON = `{
-	"bindAddress": "http://localhost:8080"
+	"bindAddress": "http://localhost:8080",
+	"accountStatesFile": "wallet.LOCK"
 }`
 
 // loadAccountConfig loads the config file.
@@ -82,8 +80,6 @@ type AllotAccountParams struct {
 }
 
 // TODO do wee need to restrict that only one instance of the wallet runs?
-const lockFile = "wallet.LOCK"
-
 type StateData struct {
 	Accounts []Account `serix:"0,mapKey=accounts,lengthPrefixType=uint8"`
 	// TODO: other info that the account wallet needs to store
@@ -93,21 +89,4 @@ type Account struct {
 	Alias     string           `serix:"0,mapKey=alias"`
 	AccountID iotago.AccountID `serix:"1,mapKey=accountID"`
 	// TODO: other info of an account
-}
-
-func loadWallet(filename string, opts ...options.Option[AccountWallet]) (wallet *AccountWallet, err error) {
-	wallet = NewAccountWallet(opts...)
-
-	walletStateBytes, err := os.ReadFile(filename)
-	if err != nil {
-		log.Infof("No working wallet file %s found, creating new wallet...", filename)
-		return wallet, nil
-	}
-
-	err = wallet.fromStateDataBytes(walletStateBytes)
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to create wallet from bytes")
-	}
-
-	return wallet, nil
 }

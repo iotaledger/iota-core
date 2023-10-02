@@ -9,12 +9,22 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func Run(walletSourceFile string) (*AccountWallet, error) {
+func Run() (*AccountWallet, error) {
 	// read config here
 	config := loadAccountConfig()
 
+	var opts []options.Option[AccountWallet]
+	if config.BindAddress != "" {
+		opts = append(opts, WithClientURL(config.BindAddress))
+	}
+	if config.AccountStatesFile != "" {
+		opts = append(opts, WithAccountStatesFile(config.AccountStatesFile))
+	}
+
+	wallet := NewAccountWallet(opts...)
+
 	// load wallet
-	wallet, err := loadWallet(walletSourceFile, WithClientURL(config.BindAddress))
+	err := wallet.fromAccountStateFile()
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to load wallet from file")
 	}
@@ -22,14 +32,14 @@ func Run(walletSourceFile string) (*AccountWallet, error) {
 	return wallet, nil
 }
 
-func SaveState(w *AccountWallet, filename string) error {
+func SaveState(w *AccountWallet) error {
 	bytesToWrite, err := w.Bytes()
 	if err != nil {
 		return ierrors.Wrap(err, "failed to encode wallet state")
 	}
 
 	//nolint:gosec // users should be able to read the file
-	if err = os.WriteFile(filename, bytesToWrite, 0o644); err != nil {
+	if err = os.WriteFile(w.optsAccountStatesFile, bytesToWrite, 0o644); err != nil {
 		return ierrors.Wrap(err, "failed to write account file")
 	}
 
@@ -47,12 +57,14 @@ type AccountWallet struct {
 	api    iotago.API
 
 	optsClientBindAddress string
+	optsAccountStatesFile string
 }
 
 func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 	return options.Apply(&AccountWallet{
 		accountsAliases:       make(map[string]iotago.Identifier),
 		optsClientBindAddress: "http://localhost:8080",
+		optsAccountStatesFile: "wallet.dat",
 	}, opts, func(w *AccountWallet) {
 		w.client = models.NewWebClient(w.optsClientBindAddress)
 		w.api = w.client.CurrentAPI()
@@ -83,21 +95,24 @@ func (a *AccountWallet) toStateData() *StateData {
 	return &StateData{Accounts: accounts}
 }
 
-func (a *AccountWallet) fromStateData(data StateData) {
-	for _, acc := range data.Accounts {
-		a.accountsAliases[acc.Alias] = acc.AccountID
+func (a *AccountWallet) fromAccountStateFile() error {
+	walletStateBytes, err := os.ReadFile(a.optsAccountStatesFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return ierrors.Wrap(err, "failed to read file")
+		}
+		return nil
 	}
-}
 
-func (a *AccountWallet) fromStateDataBytes(bytes []byte) error {
 	var data StateData
-	_, err := a.api.Decode(bytes, &data)
+	_, err = a.api.Decode(walletStateBytes, &data)
 	if err != nil {
 		return ierrors.Wrap(err, "failed to decode from file")
 	}
 
-	//TODO: import the data to Wallet
-	a.fromStateData(data)
+	for _, acc := range data.Accounts {
+		a.accountsAliases[acc.Alias] = acc.AccountID
+	}
 
 	return nil
 }
@@ -110,5 +125,11 @@ func (a *AccountWallet) getFunds(amount uint64) iotago.Output {
 func WithClientURL(url string) options.Option[AccountWallet] {
 	return func(w *AccountWallet) {
 		w.optsClientBindAddress = url
+	}
+}
+
+func WithAccountStatesFile(fileName string) options.Option[AccountWallet] {
+	return func(w *AccountWallet) {
+		w.optsAccountStatesFile = fileName
 	}
 }
