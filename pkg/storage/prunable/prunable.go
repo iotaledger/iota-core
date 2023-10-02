@@ -1,8 +1,6 @@
 package prunable
 
 import (
-	"fmt"
-
 	copydir "github.com/otiai10/copy"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -163,21 +161,21 @@ func (p *Prunable) Rollback(targetSlot iotago.SlotIndex) error {
 	// Removed entries that belong to the old fork and cannot be re-used.
 	for epoch := lastCommittedEpoch + 1; ; epoch++ {
 		if epoch > targetSlotEpoch {
+			if deleted := p.prunableSlotStore.DeleteBucket(epoch); !deleted {
+				break
+			}
+
 			shouldRollback, err := p.shouldRollbackCommittee(epoch, targetSlot)
 			if err != nil {
 				return ierrors.Wrapf(err, "error while checking if committee for epoch %d should be rolled back", epoch)
 			}
 
-			fmt.Println("rollback committee", shouldRollback, "epoch", epoch, "lastCommittedEpoch", lastCommittedEpoch, "targetSlotEpoch", targetSlotEpoch)
 			if shouldRollback {
 				if err := p.committee.DeleteEpoch(epoch); err != nil {
 					return ierrors.Wrapf(err, "error while deleting committee for epoch %d", epoch)
 				}
 			}
 
-			if deleted := p.prunableSlotStore.DeleteBucket(epoch); !deleted {
-				break
-			}
 		}
 
 		if err := p.poolRewards.DeleteEpoch(epoch); err != nil {
