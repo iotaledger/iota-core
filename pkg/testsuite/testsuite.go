@@ -357,7 +357,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			Mana:                 iotago.Mana(amount),
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.PubKey)),
 			ExpirySlot:           iotago.MaxSlotIndex,
-			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits,
+			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
 		}
 		if validator {
 			accountDetails.StakedAmount = accountDetails.Amount
