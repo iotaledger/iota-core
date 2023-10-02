@@ -215,7 +215,7 @@ func (t *TransactionMetadata) markInputSolid() (allInputsSolid bool) {
 }
 
 func (t *TransactionMetadata) Commit() {
-	t.setCommitted()
+	t.committed.Trigger()
 }
 
 func (t *TransactionMetadata) IsConflicting() bool {
@@ -241,7 +241,7 @@ func (t *TransactionMetadata) AllInputsAccepted() bool {
 func (t *TransactionMetadata) setConflictAccepted() {
 	if t.conflictAccepted.Trigger() {
 		if t.AllInputsAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
-			t.setAccepted()
+			t.accepted.Set(true)
 		}
 	}
 }
@@ -249,14 +249,13 @@ func (t *TransactionMetadata) setConflictAccepted() {
 func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	t.parentConflictIDs.InheritFrom(input.conflictIDs)
 
-	input.OnRejected(t.setRejected)
+	input.OnRejected(func() { t.rejected.Trigger() })
 	input.OnOrphaned(func() { t.orphaned.Trigger() })
-
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
 				if t.IsConflictAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
-					t.setAccepted()
+					t.accepted.Set(true)
 				}
 			}
 		}
@@ -264,13 +263,13 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 
 	input.OnPending(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, 1) == 1 && t.allInputsAccepted.Set(false) {
-			t.setPending()
+			t.accepted.Set(false)
 		}
 	})
 
 	input.OnAcceptedSpenderUpdated(func(spender mempool.TransactionMetadata) {
 		if spender != t {
-			t.setRejected()
+			t.rejected.Trigger()
 		}
 	})
 
@@ -298,11 +297,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 
 	t.OnEarliestIncludedAttachmentUpdated(func(previousIndex, newIndex iotago.BlockID) {
 		if isIncluded, wasIncluded := newIndex.Slot() != 0, previousIndex.Slot() != 0; isIncluded != wasIncluded {
-			if !isIncluded {
-				t.setPending()
-			} else if t.AllInputsAccepted() && t.IsConflictAccepted() {
-				t.setAccepted()
-			}
+			t.accepted.Set(isIncluded && t.AllInputsAccepted() && t.IsConflictAccepted())
 		}
 	})
 

@@ -98,6 +98,10 @@ func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) error 
 }
 
 func (s *StateDiff) compactStateChanges(output mempool.StateMetadata, newValue int) {
+	if output.State().Type() != iotago.InputUTXO {
+		return
+	}
+
 	switch {
 	case newValue > 0:
 		s.createdOutputs.Set(output.StateID(), output)

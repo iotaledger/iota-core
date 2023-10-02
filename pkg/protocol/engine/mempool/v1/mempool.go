@@ -317,8 +317,8 @@ func (m *MemPool[VoteRank]) requestState(stateRef iotago.Input, waitIfMissing ..
 			// The output was resolved from the ledger, meaning it was actually persisted as it was accepted and
 			// committed: otherwise we would have found it in cache or the request would have never resolved.
 			outputStateMetadata := NewStateMetadata(state)
-			outputStateMetadata.setAccepted()
-			outputStateMetadata.setCommitted()
+			outputStateMetadata.accepted.Set(true)
+			outputStateMetadata.committed.Trigger()
 
 			p.Resolve(outputStateMetadata)
 		})

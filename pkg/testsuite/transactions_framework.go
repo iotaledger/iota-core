@@ -50,7 +50,7 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 	return tf
 }
 
-func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.SignedTransaction) {
+func (t *TransactionFramework) RegisterSignedTransaction(alias string, transaction *iotago.SignedTransaction) {
 	currentAPI := t.apiProvider.CurrentAPI()
 	(lo.PanicOnErr(transaction.ID())).RegisterAlias(alias)
 
@@ -69,7 +69,7 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 	}
 }
 
-func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signingWallets []*mock.HDWallet, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
+func (t *TransactionFramework) CreateSignedTransactionWithOptions(alias string, signingWallets []*mock.HDWallet, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
 	currentAPI := t.apiProvider.CurrentAPI()
 
 	walletKeys := make([]iotago.AddressKeys, 0, len(signingWallets)*2)
@@ -90,7 +90,7 @@ func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signin
 
 	tx, err := options.Apply(txBuilder, opts).Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 	if err == nil {
-		t.RegisterTransaction(alias, tx)
+		t.RegisterSignedTransaction(alias, tx)
 	}
 
 	return tx, err
@@ -99,7 +99,7 @@ func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signin
 func (t *TransactionFramework) CreateSimpleTransaction(alias string, outputCount int, inputAliases ...string) (*iotago.SignedTransaction, error) {
 	inputStates, outputStates, signingWallets := t.CreateBasicOutputsEqually(outputCount, inputAliases...)
 
-	return t.CreateTransactionWithOptions(alias, signingWallets, WithInputs(inputStates), WithOutputs(outputStates))
+	return t.CreateSignedTransactionWithOptions(alias, signingWallets, WithInputs(inputStates), WithOutputs(outputStates))
 }
 
 func (t *TransactionFramework) CreateBasicOutputsEqually(outputCount int, inputAliases ...string) (consumedInputs utxoledger.Outputs, outputs iotago.Outputs[iotago.Output], signingWallets []*mock.HDWallet) {
@@ -361,6 +361,27 @@ func (t *TransactionFramework) SignedTransactions(aliases ...string) []*iotago.S
 
 func (t *TransactionFramework) SignedTransactionIDs(aliases ...string) []iotago.SignedTransactionID {
 	return lo.Map(aliases, t.SignedTransactionID)
+}
+
+func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
+	transaction, exists := t.transactions[alias]
+	if !exists {
+		panic(ierrors.Errorf("transaction with given alias does not exist %s", alias))
+	}
+
+	return transaction.Transaction
+}
+
+func (t *TransactionFramework) TransactionID(alias string) iotago.TransactionID {
+	return lo.PanicOnErr(t.SignedTransaction(alias).Transaction.ID())
+}
+
+func (t *TransactionFramework) Transactions(aliases ...string) []*iotago.Transaction {
+	return lo.Map(aliases, t.Transaction)
+}
+
+func (t *TransactionFramework) TransactionIDs(aliases ...string) []iotago.TransactionID {
+	return lo.Map(aliases, t.TransactionID)
 }
 
 func (t *TransactionFramework) DefaultAddress(addressType ...iotago.AddressType) iotago.Address {

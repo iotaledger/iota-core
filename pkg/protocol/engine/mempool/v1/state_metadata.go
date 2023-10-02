@@ -50,10 +50,10 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 
 	s.conflictIDs.InheritFrom(source.conflictIDs)
 
-	source.OnPending(s.setPending)
-	source.OnAccepted(s.setAccepted)
-	source.OnRejected(s.setRejected)
-	source.OnCommitted(s.setCommitted)
+	source.OnPending(func() { s.accepted.Set(false) })
+	source.OnAccepted(func() { s.accepted.Set(true) })
+	source.OnRejected(func() { s.rejected.Trigger() })
+	source.OnCommitted(func() { s.committed.Trigger() })
 	source.OnOrphaned(func() { s.orphaned.Trigger() })
 
 	return s
