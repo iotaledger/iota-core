@@ -295,6 +295,7 @@ func (t *TransactionMetadata) setupInput(input *OutputStateMetadata) {
 	})
 
 	input.OnAcceptedSpenderUpdated(func(spender mempool.TransactionMetadata) {
+		//nolint:forcetypeassert
 		if spender.(*TransactionMetadata) != nil && spender != t {
 			t.setRejected()
 		}
