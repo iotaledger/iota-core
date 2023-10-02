@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -22,6 +23,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 		testsuite.WithEpochNearingThreshold(2),
 		testsuite.WithSlotsPerEpochExponent(3),
 		testsuite.WithGenesisTimestampOffset(100*10),
+
+		testsuite.WithWaitFor(10*time.Second),
 	)
 	defer ts.Shutdown()
 
@@ -37,7 +40,6 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	ts.IssueValidationBlock("block0", node0,
 		blockfactory.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(50)),
-		blockfactory.WithStrongParents(ts.BlockIDs("Genesis")...),
 	)
 	require.EqualValues(t, 48, ts.Block("block0").SlotCommitmentID().Slot())
 	ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0")...)
@@ -71,4 +73,73 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	ts.AssertEqualStoredCommitmentAtIndex(57, ts.Nodes()...)
 	ts.AssertLatestCommitmentSlotIndex(57, ts.Nodes()...)
 	ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("59.0"), true, ts.Nodes()...)
+}
+
+func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithLivenessThresholdLowerBound(10),
+		testsuite.WithLivenessThresholdUpperBound(10),
+		testsuite.WithMinCommittableAge(2),
+		testsuite.WithMaxCommittableAge(4),
+		testsuite.WithEpochNearingThreshold(2),
+		testsuite.WithSlotsPerEpochExponent(3),
+		testsuite.WithGenesisTimestampOffset(100*10),
+	)
+	defer ts.Shutdown()
+
+	node0 := ts.AddValidatorNode("node0")
+	ts.AddValidatorNode("node1")
+	ts.AddNode("node2")
+
+	ts.Run(true, nil)
+
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, nil)
+
+	ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
+	ts.AssertLatestCommitmentSlotIndex(8, ts.Nodes()...)
+	ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
+
+	// Create snapshot and restart node0 from it.
+	var node0restarted *mock.Node
+	{
+		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
+		require.NoError(t, ts.Node("node0").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+
+		node0restarted = ts.AddNode("node0-restarted")
+		node0restarted.CopyIdentityFromNode(node0)
+		node0restarted.Initialize(true,
+			protocol.WithSnapshotPath(snapshotPath),
+			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node0restarted.Name)),
+		)
+		ts.Wait()
+	}
+
+	for _, node := range ts.Nodes("node0", "node1") {
+		ts.RemoveNode(node.Name)
+		node.Shutdown()
+	}
+
+	ts.IssueValidationBlock("block0", node0restarted,
+		blockfactory.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(20)),
+	)
+	require.EqualValues(t, 18, ts.Block("block0").SlotCommitmentID().Slot())
+	ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0-restarted")...)
+
+	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, nil)
+
+	ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
+	ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)
+
+	// Continue issuing on all nodes for a few slots.
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, nil)
+
+	ts.AssertEqualStoredCommitmentAtIndex(23, ts.Nodes()...)
+	ts.AssertLatestCommitmentSlotIndex(23, ts.Nodes()...)
+	ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
+
+	// TODO: check that commitments from 8-19 are empty -> all previously accepted blocks in 9,10 have been orphaned
+	for _, slot := range []iotago.SlotIndex{8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20} {
+		ts.AssertStorageCommitmentBlocks(slot, nil)
+	}
 }

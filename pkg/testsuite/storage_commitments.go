@@ -57,3 +57,34 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 		return nil
 	})
 }
+
+func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expectedBlocks iotago.BlockIDs, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	t.Eventually(func() error {
+		var commitment *model.Commitment
+		var commitmentNode *mock.Node
+		for _, node := range nodes {
+			storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error loading commitment for slot: %d", node.Name, slot)
+			}
+
+			committedSlot, err := node.Protocol.MainEngineInstance().CommittedSlot(storedCommitment.ID())
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error getting committed slot for commitment: %s", node.Name, storedCommitment.ID())
+			}
+
+			committedBlocks, err := committedSlot.BlockIDs()
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error getting committed blocks for slot: %d", node.Name, slot)
+			}
+
+			if !cmp.Equal(committedBlocks, expectedBlocks) {
+				return ierrors.Errorf("AssertEqualStoredCommitmentAtIndex: %s: expected %s (from %s), got %s", node.Name, commitment, commitmentNode.Name, storedCommitment)
+			}
+		}
+
+		return nil
+	})
+}
