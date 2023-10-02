@@ -27,8 +27,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 	address := utils.RandAddress(iotago.AddressEd25519)
 	amount := iotago.BaseToken(832493)
 	iotaOutput := &iotago.BasicOutput{
-		Amount:       amount,
-		NativeTokens: iotago.NativeTokens{},
+		Amount: amount,
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,

@@ -171,8 +171,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 	case iotago.OutputBasic:
 		//nolint:forcetypeassert // we already checked the type
 		iotaOutput = &iotago.BasicOutput{
-			Amount:       amount,
-			NativeTokens: iotago.NativeTokens{},
+			Amount: amount,
 			Conditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{
 					Address: address,
@@ -183,9 +182,8 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 	case iotago.OutputAccount:
 		//nolint:forcetypeassert // we already checked the type
 		iotaOutput = &iotago.AccountOutput{
-			Amount:       amount,
-			NativeTokens: iotago.NativeTokens{},
-			AccountID:    RandAccountID(),
+			Amount:    amount,
+			AccountID: RandAccountID(),
 			Conditions: iotago.AccountOutputUnlockConditions{
 				&iotago.StateControllerAddressUnlockCondition{
 					Address: address,
@@ -194,6 +192,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 					Address: address,
 				},
 			},
+			StateMetadata:     make([]byte, 0),
 			Features:          iotago.AccountOutputFeatures{},
 			ImmutableFeatures: iotago.AccountOutputImmFeatures{},
 		}
@@ -206,7 +205,6 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 		//nolint:forcetypeassert // we already checked the type
 		iotaOutput = &iotago.FoundryOutput{
 			Amount:       amount,
-			NativeTokens: iotago.NativeTokens{},
 			SerialNumber: 0,
 			TokenScheme: &iotago.SimpleTokenScheme{
 				MintedTokens:  supply,
@@ -224,9 +222,8 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 	case iotago.OutputNFT:
 		//nolint:forcetypeassert // we already checked the type
 		iotaOutput = &iotago.NFTOutput{
-			Amount:       amount,
-			NativeTokens: iotago.NativeTokens{},
-			NFTID:        RandNFTID(),
+			Amount: amount,
+			NFTID:  RandNFTID(),
 			Conditions: iotago.NFTOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{
 					Address: address,
