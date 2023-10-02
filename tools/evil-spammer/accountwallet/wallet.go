@@ -11,6 +11,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
+	"github.com/mr-tron/base58"
 )
 
 var log = logger.New("AccountWallet")
@@ -83,10 +84,14 @@ func (a *AccountWallet) toAccountStateFile() error {
 		accounts = append(accounts, Account{
 			Alias:     alias,
 			AccountID: acc,
+			Index:     a.aliasIndexMap[alias],
 		})
 	}
 
-	stateBytes, err := a.api.Encode(&StateData{Accounts: accounts})
+	stateBytes, err := a.api.Encode(&StateData{
+		Seed:     base58.Encode(a.seed[:]),
+		Accounts: accounts,
+	})
 	if err != nil {
 		return ierrors.Wrap(err, "failed to encode state")
 	}
@@ -114,8 +119,17 @@ func (a *AccountWallet) fromAccountStateFile() error {
 		return ierrors.Wrap(err, "failed to decode from file")
 	}
 
+	// copy seeds
+	decodedSeeds, err := base58.Decode(data.Seed)
+	if err != nil {
+		return ierrors.Wrap(err, "failed to decode seed")
+	}
+	copy(a.seed[:], decodedSeeds)
+
+	// account data
 	for _, acc := range data.Accounts {
 		a.accountsAliases[acc.Alias] = acc.AccountID
+		a.aliasIndexMap[acc.Alias] = acc.Index
 	}
 
 	return nil
