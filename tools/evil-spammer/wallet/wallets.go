@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 )
 
 type walletID int
@@ -146,7 +147,7 @@ func (w *Wallets) addReuseWallet(wallet *Wallet) {
 }
 
 // GetUnspentOutput gets first found unspent output for a given walletType.
-func (w *Wallets) GetUnspentOutput(wallet *Wallet) *Output {
+func (w *Wallets) GetUnspentOutput(wallet *Wallet) *models.Output {
 	if wallet == nil {
 		return nil
 	}
