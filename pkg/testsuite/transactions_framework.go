@@ -83,7 +83,7 @@ func (t *TransactionFramework) CreateTransactionWithOptions(alias string, signin
 	}
 
 	txBuilder := builder.NewTransactionBuilder(currentAPI)
-
+	txBuilder.WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything()))
 	// Always add a random payload to randomize transaction ID.
 	randomPayload := tpkg.Rand12ByteArray()
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
@@ -130,9 +130,8 @@ func (t *TransactionFramework) CreateBasicOutputsEqually(outputCount int, inputA
 		remainderMana -= manaAmount
 
 		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount:       tokenAmount,
-			Mana:         manaAmount,
-			NativeTokens: iotago.NativeTokens{},
+			Amount: tokenAmount,
+			Mana:   manaAmount,
 			Conditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 			},
@@ -166,9 +165,8 @@ func (t *TransactionFramework) CreateBasicOutputs(amountDistribution []iotago.Ba
 	outputStates := make(iotago.Outputs[iotago.Output], 0, len(amountDistribution))
 	for idx, outputAmount := range amountDistribution {
 		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount:       outputAmount,
-			Mana:         manaDistribution[idx],
-			NativeTokens: iotago.NativeTokens{},
+			Amount: outputAmount,
+			Mana:   manaDistribution[idx],
 			Conditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 			},
@@ -193,9 +191,8 @@ func (t *TransactionFramework) CreateAccountFromInput(inputAlias string, opts ..
 	// if amount was set by options, a remainder output needs to be created
 	if accountOutput.Amount != input.BaseTokenAmount() {
 		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount:       input.BaseTokenAmount() - accountOutput.Amount,
-			Mana:         input.StoredMana() - accountOutput.Mana,
-			NativeTokens: iotago.NativeTokens{},
+			Amount: input.BaseTokenAmount() - accountOutput.Amount,
+			Mana:   input.StoredMana() - accountOutput.Mana,
 			Conditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 			},
@@ -214,9 +211,8 @@ func (t *TransactionFramework) CreateImplicitAccountFromInput(inputAlias string)
 	implicitAccountAddress := t.DefaultAddress(iotago.AddressImplicitAccountCreation).(*iotago.ImplicitAccountCreationAddress)
 
 	basicOutput := &iotago.BasicOutput{
-		Amount:       input.BaseTokenAmount(),
-		Mana:         input.StoredMana(),
-		NativeTokens: iotago.NativeTokens{},
+		Amount: input.BaseTokenAmount(),
+		Mana:   input.StoredMana(),
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: implicitAccountAddress},
 		},
@@ -247,9 +243,8 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 	// if options set an Amount, a remainder output needs to be created
 	if delegationOutput.Amount != input.BaseTokenAmount() {
 		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount:       input.BaseTokenAmount() - delegationOutput.Amount,
-			Mana:         input.StoredMana(),
-			NativeTokens: iotago.NativeTokens{},
+			Amount: input.BaseTokenAmount() - delegationOutput.Amount,
+			Mana:   input.StoredMana(),
 			Conditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 			},
@@ -284,9 +279,8 @@ func (t *TransactionFramework) DestroyAccount(alias string) (consumedInputs *utx
 	output := t.Output(alias)
 
 	outputStates := iotago.Outputs[iotago.Output]{&iotago.BasicOutput{
-		Amount:       output.BaseTokenAmount(),
-		Mana:         output.StoredMana(),
-		NativeTokens: iotago.NativeTokens{},
+		Amount: output.BaseTokenAmount(),
+		Mana:   output.StoredMana(),
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: t.DefaultAddress()},
 		},
@@ -493,12 +487,6 @@ func WithAccountConditions(conditions iotago.AccountOutputUnlockConditions) opti
 				accountBuilder.Governor(condition.(*iotago.GovernorAddressUnlockCondition).Address)
 			}
 		}
-	}
-}
-
-func WithAccountNativeTokens(nativeTokens iotago.NativeTokens) options.Option[builder.AccountOutputBuilder] {
-	return func(accountBuilder *builder.AccountOutputBuilder) {
-		accountBuilder.NativeTokens(nativeTokens)
 	}
 }
 
