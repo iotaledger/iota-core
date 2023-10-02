@@ -258,4 +258,8 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 	return newModelCommitment, nil
 }
 
+func (m *Manager) AcceptedBlocksCount(index iotago.SlotIndex) int {
+	return m.slotMutations.AcceptedBlocksCount(index)
+}
+
 var _ notarization.Notarization = new(Manager)

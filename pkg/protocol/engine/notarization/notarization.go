@@ -13,5 +13,7 @@ type Notarization interface {
 	ForceCommit(slot iotago.SlotIndex) (*model.Commitment, error)
 	ForceCommitUntil(commitUntilSlot iotago.SlotIndex) error
 
+	AcceptedBlocksCount(index iotago.SlotIndex) int
+
 	module.Interface
 }
