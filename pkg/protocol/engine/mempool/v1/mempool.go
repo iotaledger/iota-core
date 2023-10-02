@@ -288,11 +288,11 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	}
 }
 
-func (m *MemPool[VoteRank]) forkTransaction(transaction *TransactionMetadata, resourceIDs ds.Set[mempool.StateID]) {
-	transaction.setConflicting()
+func (m *MemPool[VoteRank]) forkTransaction(transactionMetadata *TransactionMetadata, resourceIDs ds.Set[mempool.StateID]) {
+	transactionMetadata.conflicting.Trigger()
 
-	if err := m.conflictDAG.UpdateConflictingResources(transaction.ID(), resourceIDs); err != nil {
-		transaction.setOrphaned()
+	if err := m.conflictDAG.UpdateConflictingResources(transactionMetadata.ID(), resourceIDs); err != nil {
+		transactionMetadata.orphaned.Trigger()
 
 		m.errorHandler(err)
 	}

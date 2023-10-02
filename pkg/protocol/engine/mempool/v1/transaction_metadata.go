@@ -238,10 +238,6 @@ func (t *TransactionMetadata) AllInputsAccepted() bool {
 	return t.allInputsAccepted.Get()
 }
 
-func (t *TransactionMetadata) setConflicting() {
-	t.conflicting.Trigger()
-}
-
 func (t *TransactionMetadata) setConflictAccepted() {
 	if t.conflictAccepted.Trigger() {
 		if t.AllInputsAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
@@ -254,7 +250,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	t.parentConflictIDs.InheritFrom(input.conflictIDs)
 
 	input.OnRejected(t.setRejected)
-	input.OnOrphaned(t.setOrphaned)
+	input.OnOrphaned(func() { t.orphaned.Trigger() })
 
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
@@ -280,7 +276,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 
 	input.OnSpendCommitted(func(spender mempool.TransactionMetadata) {
 		if spender != t {
-			t.setOrphaned()
+			t.orphaned.Trigger()
 		}
 	})
 }
@@ -296,7 +292,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 
 	t.allSigningTransactionsEvicted.OnTrigger(func() {
 		if !t.IsCommitted() {
-			t.setOrphaned()
+			t.orphaned.Trigger()
 		}
 	})
 

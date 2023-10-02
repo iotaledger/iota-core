@@ -106,8 +106,3 @@ func (s *inclusionFlags) setRejected() {
 func (s *inclusionFlags) setCommitted() {
 	s.committed.Trigger()
 }
-
-// setOrphaned marks the entity as orphaned.
-func (s *inclusionFlags) setOrphaned() {
-	s.orphaned.Trigger()
-}

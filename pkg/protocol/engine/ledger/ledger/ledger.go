@@ -464,7 +464,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	stateDiff.CreatedStates().ForEach(func(_ mempool.StateID, output mempool.StateMetadata) bool {
 		createdOutput, ok := output.State().(*utxoledger.Output)
 		if !ok {
-			err = ierrors.Errorf("unexpected state type1 %T", output.State())
+			err = ierrors.Errorf("unexpected state type %T while processing created states", output.State())
 			return false
 		}
 
@@ -517,7 +517,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	stateDiff.DestroyedStates().ForEach(func(_ mempool.StateID, stateMetadata mempool.StateMetadata) bool {
 		spentOutput, ok := stateMetadata.State().(*utxoledger.Output)
 		if !ok {
-			err = ierrors.Errorf("unexpected state type2 %T", stateMetadata.State())
+			err = ierrors.Errorf("unexpected state type %T while processing destroyed states", stateMetadata.State())
 			return false
 		}
 
@@ -612,7 +612,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 			if err = txWithMeta.Outputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
 				typedOutput, ok := stateMetadata.State().(*utxoledger.Output)
 				if !ok {
-					err = ierrors.Errorf("unexpected state type3 %T", stateMetadata.State())
+					err = ierrors.Errorf("unexpected state type %T while processing state diff transactions", stateMetadata.State())
 					return err
 				}
 

@@ -54,7 +54,7 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	source.OnAccepted(s.setAccepted)
 	source.OnRejected(s.setRejected)
 	source.OnCommitted(s.setCommitted)
-	source.OnOrphaned(s.setOrphaned)
+	source.OnOrphaned(func() { s.orphaned.Trigger() })
 
 	return s
 }
