@@ -500,7 +500,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 
 			createdAccounts[accountID] = createdOutput
 		case iotago.OutputDelegation:
-			// The Delegation Output output was created or transitioned => determine later if we need to add the stake to the validator.
+			// The DelegationOutput was created or transitioned => determine later if we need to add the stake to the validator.
 			delegationOutput, _ := createdOutput.Output().(*iotago.DelegationOutput)
 			delegationID := delegationOutput.DelegationID
 			// Check if the output was newly created or if it was transitioned to delayed claiming.
