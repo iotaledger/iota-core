@@ -147,11 +147,15 @@ func readSubcommandsAndFlagSets(subcommands []string) []*subcommand {
 	subcommandsSplit := make([]*subcommand, 0)
 	if len(subcommands) == 0 {
 		accountUsage()
+
+		return nil
 	}
 	for index := 0; index < len(subcommands); index++ {
 		_, validCommand := accountwallet.AvailableCommands[subcommands[index]]
 		if subcommands[index] == "-h" || subcommands[index] == "--help" {
 			accountUsage()
+
+			return nil
 		}
 		if !strings.HasPrefix(subcommands[index], "--") && validCommand {
 			if index != 0 {
