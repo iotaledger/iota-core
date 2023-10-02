@@ -2,7 +2,10 @@ package accountwallet
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+
+	"github.com/mr-tron/base58/base58"
 
 	"github.com/iotaledger/hive.go/ds/types"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -90,3 +93,14 @@ type Account struct {
 	AccountID iotago.AccountID `serix:"1,mapKey=accountID"`
 	// TODO: other info of an account
 }
+
+var dockerFaucetSeed = func() []byte {
+	genesisSeed, err := base58.Decode("7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih")
+	if err != nil {
+		fmt.Printf("failed to decode base58 seed, using the default one: %v", err)
+	}
+
+	return genesisSeed
+}
+
+var genesisTransactionID = iotago.SlotIdentifierRepresentingData(0, []byte("genesis"))

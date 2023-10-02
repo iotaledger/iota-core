@@ -35,18 +35,19 @@ func main() {
 		programs.CustomSpam(&customSpamParams)
 	case "accounts":
 		// load wallet
-		accWallet, err := accountwallet.Run()
+		accWallet, err := accountwallet.Run(lastFaucetUnspendOutputID)
 		if err != nil {
 			log.Warn(err)
 			return
 		}
 		// save wallet
-		defer func(w *accountwallet.AccountWallet) {
+		defer func(w *accountwallet.AccountWallet, filename string) {
 			err = accountwallet.SaveState(w)
 			if err != nil {
 				log.Errorf("Error while saving wallet state: %v", err)
 			}
-		}(accWallet)
+		}(accWallet, "wallet.dat")
+
 		accountsSubcommands(accWallet, accountsSubcommandsFlags)
 	case "quick":
 		programs.QuickTest(&quickTestParams)

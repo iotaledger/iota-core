@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/tools/evil-spammer/accountwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func parseFlags() (help bool) {
@@ -32,6 +33,12 @@ func parseFlags() (help bool) {
 			subcommands = os.Args[2:]
 		}
 		accountsSubcommandsFlags = readSubcommandsAndFlagSets(subcommands)
+		basicConfig := programs.LoadBasicConfig()
+		outputID, err := iotago.OutputIDFromHex(basicConfig.LastFaucetUnspentOutputID)
+		if err != nil {
+			log.Warnf("Cannot parse faucet output id from config: %v", err)
+		}
+		lastFaucetUnspendOutputID = outputID
 	case "quick":
 		parseQuickTestFlags()
 		// case SpammerTypeCommitments:

@@ -1,9 +1,14 @@
 package accountwallet
 
+import (
+	"fmt"
+
+	iotago "github.com/iotaledger/iota.go/v4"
+)
+
 func (a *AccountWallet) CreateAccount(params *CreateAccountParams) error {
-	//input := a.getFunds(params.Amount)
-	//txBuilder := builder.NewTransactionBuilder(a.api)
-	//txBuilder.AddInput(input)
+	out := a.getFunds(params.Amount, iotago.AddressImplicitAccountCreation)
+	fmt.Printf("Created account %s with %d tokens\n", out.Address, params.Amount)
 
 	return nil
 }

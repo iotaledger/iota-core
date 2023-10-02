@@ -5,11 +5,13 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-func Run() (*AccountWallet, error) {
+func Run(lastFaucetUnspentOutputID iotago.OutputID) (*AccountWallet, error) {
 	// read config here
 	config := loadAccountConfig()
 
@@ -20,6 +22,8 @@ func Run() (*AccountWallet, error) {
 	if config.AccountStatesFile != "" {
 		opts = append(opts, WithAccountStatesFile(config.AccountStatesFile))
 	}
+
+	opts = append(opts, WithFaucetUnspendOutputID(lastFaucetUnspentOutputID))
 
 	wallet := NewAccountWallet(opts...)
 
@@ -37,27 +41,29 @@ func SaveState(w *AccountWallet) error {
 }
 
 type AccountWallet struct {
-	// TODO can we reuse faucet requests from evil wallet?
-	// faucetFunds    map[string]*Output
-	seed [32]byte
+	faucet *Faucet
+	seed   [32]byte
 
 	accountsAliases map[string]iotago.AccountID
+	latestUsedIndex uint64
+	aliasIndexMap   map[string]uint64
 
 	client *models.WebClient
 	api    iotago.API
 
-	optsClientBindAddress string
-	optsAccountStatesFile string
+	optsClientBindAddress     string
+	optsAccountStatesFile     string
+	optsFaucetUnspendOutputID iotago.OutputID
 }
 
 func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 	return options.Apply(&AccountWallet{
-		accountsAliases:       make(map[string]iotago.Identifier),
-		optsClientBindAddress: "http://localhost:8080",
-		optsAccountStatesFile: "wallet.dat",
+		accountsAliases: make(map[string]iotago.Identifier),
+		seed:            tpkg.RandEd25519Seed(),
 	}, opts, func(w *AccountWallet) {
 		w.client = models.NewWebClient(w.optsClientBindAddress)
 		w.api = w.client.CurrentAPI()
+		w.faucet = NewFaucet(w.client, w.optsFaucetUnspendOutputID)
 	})
 }
 
@@ -107,8 +113,19 @@ func (a *AccountWallet) fromAccountStateFile() error {
 	return nil
 }
 
-func (a *AccountWallet) getFunds(amount uint64) iotago.Output {
-	return nil
+func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) *models.Output {
+	hdWallet := mock.NewHDWallet("", a.seed[:], a.latestUsedIndex+1)
+
+	receiverAddr := hdWallet.Address(addressType)
+	createdOutput, err := a.faucet.RequestFunds(receiverAddr, iotago.BaseToken(amount))
+	if err != nil {
+		panic(err)
+	}
+
+	a.latestUsedIndex++
+	createdOutput.Index = a.latestUsedIndex
+
+	return createdOutput
 }
 
 // WithClientURL sets the client bind address.
@@ -121,5 +138,11 @@ func WithClientURL(url string) options.Option[AccountWallet] {
 func WithAccountStatesFile(fileName string) options.Option[AccountWallet] {
 	return func(w *AccountWallet) {
 		w.optsAccountStatesFile = fileName
+	}
+}
+
+func WithFaucetUnspendOutputID(id iotago.OutputID) options.Option[AccountWallet] {
+	return func(w *AccountWallet) {
+		w.optsFaucetUnspendOutputID = id
 	}
 }

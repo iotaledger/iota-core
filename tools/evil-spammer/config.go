@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Nodes used during the test, use at least two nodes to be able to doublespend.
@@ -42,7 +43,9 @@ var (
 		EnableRateSetter:      false,
 	}
 
-	accountsSubcommandsFlags = make([]*subcommand, 0)
+	accountsSubcommandsFlags  = make([]*subcommand, 0)
+	lastFaucetUnspendOutputID iotago.OutputID
+
 	//nolint:godot
 	// commitmentsSpamParams = CommitmentsSpamParams{
 	// 	Rate:           1,
