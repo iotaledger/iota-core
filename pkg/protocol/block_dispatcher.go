@@ -242,6 +242,31 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 	b.processedWarpSyncRequests.Add(commitmentID)
 
+	// If the engine is "dirty" we need to restore the state of the engine to the state of the chain commitment.
+	// As we already decided to switch and sync to this chain we should make sure that processing the blocks from the commitment
+	// leads to the verified commitment.
+	if targetEngine.Notarization.AcceptedBlocksCount(commitmentID.Slot()) > 0 {
+		b.protocol.activeEngineMutex.Lock()
+
+		newEngine, err := b.protocol.EngineManager.RollbackEngine(commitmentID.Slot() - 1)
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to rollback engine for slot %d", commitmentID.Slot())
+		}
+
+		newEngine.SetChainID(targetEngine.ChainID())
+
+		if err := b.protocol.EngineManager.SetActiveInstance(newEngine); err != nil {
+			return ierrors.Wrap(err, "failed to set active engine instance")
+		}
+		//
+		b.protocol.linkToEngine(newEngine)
+		//
+		b.protocol.mainEngine.Shutdown()
+		b.protocol.mainEngine = newEngine
+		targetEngine = newEngine
+		b.protocol.activeEngineMutex.Unlock()
+	}
+
 	// Once all blocks are booked we
 	//   1. Mark all transactions as accepted
 	//   2. Mark all blocks as accepted
@@ -335,7 +360,7 @@ func (b *BlockDispatcher) inSyncWindow(engine *engine.Engine, block *model.Block
 
 // warpSyncIfNecessary triggers a warp sync if necessary.
 func (b *BlockDispatcher) warpSyncIfNecessary(e *engine.Engine, chainCommitment *chainmanager.ChainCommitment) {
-	if e == nil {
+	if e == nil || e.WasShutdown() {
 		return
 	}
 
