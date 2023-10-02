@@ -82,6 +82,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount A
 				return nil, ierrors.Wrap(err, "failed to revive chain")
 			}
 			blockParams.BlockHeader.SlotCommitment = commitment
+			blockParams.BlockHeader.References = make(model.ParentReferences)
 			blockParams.BlockHeader.References[iotago.StrongParentType] = []iotago.BlockID{parentID}
 
 		} else if err != nil {

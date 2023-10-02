@@ -12,18 +12,16 @@ func (i *BlockIssuer) reviveChain(issuingTime time.Time) (*iotago.Commitment, io
 	apiForSlot := i.protocol.APIForSlot(lastCommittedSlot)
 
 	// Get a parent from the last committed slot.
-	store, err := i.protocol.MainEngineInstance().Storage.Blocks(lastCommittedSlot)
-	if err != nil {
-		return nil, iotago.EmptyBlockID(), ierrors.Wrapf(err, "failed to get blocks for slot %d", lastCommittedSlot)
-	}
-
-	expectedErr := ierrors.New("stop iteration")
 	parentBlockID := iotago.EmptyBlockID()
-	if err = store.StreamKeys(func(blockID iotago.BlockID) error {
-		parentBlockID = blockID
-		return expectedErr
-	}); err != nil && !ierrors.Is(err, expectedErr) {
-		return nil, iotago.EmptyBlockID(), ierrors.Wrapf(err, "failed to stream block IDs for slot %d", lastCommittedSlot)
+	for rootBlock := range i.protocol.MainEngineInstance().EvictionState.ActiveRootBlocks() {
+		if rootBlock.Slot() > parentBlockID.Slot() {
+			parentBlockID = rootBlock
+		}
+
+		// Exit the loop if we found a rootblock in the last committed slot (which is the highest we can get).
+		if parentBlockID.Slot() == lastCommittedSlot {
+			break
+		}
 	}
 
 	// Get last issued block and start issuing after that subslot.
@@ -41,7 +39,7 @@ func (i *BlockIssuer) reviveChain(issuingTime time.Time) (*iotago.Commitment, io
 	}
 	commitUntilSlot := issuingSlot - apiForSlot.ProtocolParameters().MinCommittableAge()
 
-	if err = i.protocol.MainEngineInstance().Notarization.ForceCommitUntil(commitUntilSlot); err != nil {
+	if err := i.protocol.MainEngineInstance().Notarization.ForceCommitUntil(commitUntilSlot); err != nil {
 		return nil, iotago.EmptyBlockID(), ierrors.Wrapf(err, "failed to force commit until slot %d", commitUntilSlot)
 	}
 
