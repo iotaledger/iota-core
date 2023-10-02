@@ -1,12 +1,14 @@
 package accountwallet
 
 import (
+	"encoding/json"
 	"os"
 
 	"github.com/google/martian/log"
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/options"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -26,9 +28,42 @@ var AvailableCommands = map[string]types.Empty{
 	ListAccountsCommand:   types.Void,
 }
 
-// TODO how do wee read api
-type configuration struct {
-	WebAPI string `json:"WebAPI,omitempty"`
+type Configuration struct {
+	BindAddress string `json:"bindAddress,omitempty"`
+}
+
+var accountConfigFile = "account_config.json"
+
+var accountConfigJSON = `{
+	"bindAddress": "http://localhost:8080"
+}`
+
+// loadAccountConfig loads the config file.
+func loadAccountConfig() *Configuration {
+	// open config file
+	config := new(Configuration)
+	file, err := os.Open(accountConfigFile)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			panic(err)
+		}
+
+		//nolint:gosec // users should be able to read the file
+		if err = os.WriteFile(accountConfigFile, []byte(accountConfigJSON), 0o644); err != nil {
+			panic(err)
+		}
+		if file, err = os.Open(accountConfigFile); err != nil {
+			panic(err)
+		}
+	}
+	defer file.Close()
+
+	// decode config file
+	if err = json.NewDecoder(file).Decode(config); err != nil {
+		panic(err)
+	}
+
+	return config
 }
 
 type CreateAccountParams struct {
@@ -60,16 +95,18 @@ type Account struct {
 	// TODO: other info of an account
 }
 
-func loadWallet(filename string, api iotago.API) (wallet *AccountWallet, err error) {
+func loadWallet(filename string, opts ...options.Option[AccountWallet]) (wallet *AccountWallet, err error) {
+	wallet = NewAccountWallet(opts...)
+
 	walletStateBytes, err := os.ReadFile(filename)
 	if err != nil {
 		log.Infof("No working wallet file %s found, creating new wallet...", filename)
-		wallet = NewAccountWallet(api)
-	} else {
-		wallet, err = AccountWalletFromBytes(api, walletStateBytes)
-		if err != nil {
-			return nil, ierrors.Wrap(err, "failed to create wallet from bytes")
-		}
+		return wallet, nil
+	}
+
+	err = wallet.fromStateDataBytes(walletStateBytes)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to create wallet from bytes")
 	}
 
 	return wallet, nil
