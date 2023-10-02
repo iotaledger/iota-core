@@ -71,7 +71,7 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 	return options.Apply(&AccountWallet{
 		accountsAliases:    make(map[string]*models.AccountData),
 		seed:               tpkg.RandEd25519Seed(),
-		optsRequestTimeout: time.Second * 30,
+		optsRequestTimeout: time.Second * 120,
 		optsRequestTicker:  time.Second * 5,
 	}, opts, func(w *AccountWallet) {
 		w.client = models.NewWebClient(w.optsClientBindAddress)
@@ -163,6 +163,7 @@ func (a *AccountWallet) getAccount(alias string) (*models.AccountData, error) {
 	creationSlot := accData.OutputID.CreationSlot()
 
 	// wait for the account to be committed
+	log.Infof("Waiting for account %s to be committed within slot %d...", alias, creationSlot)
 	err := a.retry(func() (bool, error) {
 		resp, err := a.client.GetBlockIssuance()
 		if err != nil {
@@ -170,6 +171,7 @@ func (a *AccountWallet) getAccount(alias string) (*models.AccountData, error) {
 		}
 
 		if resp.Commitment.Slot >= creationSlot {
+			log.Infof("Slot %d commited, account %s is ready to use", creationSlot, alias)
 			return true, nil
 		}
 
@@ -224,9 +226,10 @@ func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) 
 }
 
 func (a *AccountWallet) destroyAccount(alias string) error {
-	accData, exists := a.accountsAliases[alias]
-	if !exists {
-		return ierrors.Errorf("account with alias %s does not exist", alias)
+	accData, err := a.getAccount(alias)
+	if err != nil {
+
+		return err
 	}
 	hdWallet := mock.NewHDWallet("", a.seed[:], accData.Index)
 
@@ -263,5 +266,6 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 	// remove account from wallet
 	delete(a.accountsAliases, alias)
 
+	log.Infof("Account %s has been destroyed", alias)
 	return nil
 }
