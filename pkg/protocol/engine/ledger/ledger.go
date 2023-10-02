@@ -30,7 +30,7 @@ type Ledger interface {
 	ForEachUnspentOutput(func(output *utxoledger.Output) bool) error
 	AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error
 
-	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, BlockVoteRank]
+	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, BlockVoteRank]
 	MemPool() mempool.MemPool[BlockVoteRank]
 	SlotDiffs(slot iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 

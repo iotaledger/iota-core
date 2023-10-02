@@ -6,9 +6,8 @@ import (
 )
 
 type ExecutionOutput struct {
-	outputID     iotago.OutputID
-	output       iotago.Output
-	creationSlot iotago.SlotIndex
+	outputID iotago.OutputID
+	output   iotago.Output
 }
 
 func (o *ExecutionOutput) StateID() iotago.Identifier {
@@ -25,8 +24,4 @@ func (o *ExecutionOutput) OutputID() iotago.OutputID {
 
 func (o *ExecutionOutput) Output() iotago.Output {
 	return o.output
-}
-
-func (o *ExecutionOutput) SlotCreated() iotago.SlotIndex {
-	return o.creationSlot
 }

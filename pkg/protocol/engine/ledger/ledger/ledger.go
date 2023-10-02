@@ -23,7 +23,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
@@ -42,7 +41,7 @@ type Ledger struct {
 	sybilProtection          sybilprotection.SybilProtection
 	commitmentLoader         func(iotago.SlotIndex) (*model.Commitment, error)
 	memPool                  mempool.MemPool[ledger.BlockVoteRank]
-	conflictDAG              conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
+	conflictDAG              conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 	retainTransactionFailure func(iotago.SlotIdentifier, error)
 	errorHandler             func(error)
 
@@ -64,12 +63,12 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 		e.HookConstructed(func() {
 			e.Events.Ledger.LinkTo(l.events)
-			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
+			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
 
 			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
 
-			l.memPool = mempoolv1.New(l.executeStardustVM, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.memPool = mempoolv1.New(l.executeStardustVM, l.extractInputReferences, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput)
@@ -79,9 +78,10 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
-			e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
-				l.memPool.PublishRequestedState(scd.Commitment.Commitment())
-			})
+			// TODO: CHECK IF STILL NECESSARY
+			//e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
+			//	l.memPool.PublishRequestedState(scd.Commitment.Commitment())
+			//})
 
 			l.TriggerConstructed()
 			l.TriggerInitialized()
@@ -110,7 +110,7 @@ func New(
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
 		errorHandler:     errorHandler,
-		conflictDAG:      conflictdagv1.New[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank](sybilProtection.SeatManager().OnlineCommittee().Size),
+		conflictDAG:      conflictdagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](sybilProtection.SeatManager().OnlineCommittee().Size),
 	}
 }
 
@@ -260,7 +260,7 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 
 		earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
 
-		return utxoledger.CreateOutput(l.apiProvider, stateWithMetadata.State().OutputID(), earliestAttachment, earliestAttachment.Slot(), stateWithMetadata.State().Output()), nil
+		return utxoledger.CreateOutput(l.apiProvider, castState.OutputID(), earliestAttachment, earliestAttachment.Slot(), castState.Output()), nil
 	default:
 		panic("unexpected State type")
 	}
@@ -306,7 +306,7 @@ func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempoo
 	return l.memPool.TransactionMetadataByAttachment(blockID)
 }
 
-func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank] {
+func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank] {
 	return l.conflictDAG
 }
 
@@ -475,10 +475,10 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 
 	createdAccountDelegation := make(map[iotago.ChainID]*iotago.DelegationOutput)
 
-	stateDiff.CreatedStates().ForEachKey(func(outputID iotago.OutputID) bool {
-		createdOutput, errOutput := l.Output(outputID)
-		if errOutput != nil {
-			err = ierrors.Errorf("failed to retrieve output %s: %w", outputID, errOutput)
+	stateDiff.CreatedStates().ForEach(func(_ mempool.StateID, output mempool.StateMetadata) bool {
+		createdOutput, ok := output.State().(*utxoledger.Output)
+		if !ok {
+			err = ierrors.Errorf("unexpected state type %T", output.State())
 			return false
 		}
 
@@ -494,7 +494,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 
 			accountID := createdAccount.AccountID
 			if accountID.Empty() {
-				accountID = iotago.AccountIDFromOutputID(outputID)
+				accountID = iotago.AccountIDFromOutputID(createdOutput.OutputID())
 				l.events.AccountCreated.Trigger(accountID)
 			}
 
@@ -508,7 +508,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 		case iotago.OutputBasic:
 			// if a basic output is sent to an implicit account creation address, we need to create the account
 			if createdOutput.Output().UnlockConditionSet().Address().Address.Type() == iotago.AddressImplicitAccountCreation {
-				accountID := iotago.AccountIDFromOutputID(outputID)
+				accountID := iotago.AccountIDFromOutputID(createdOutput.OutputID())
 				l.events.AccountCreated.Trigger(accountID)
 				createdAccounts[accountID] = createdOutput
 			}
@@ -522,10 +522,10 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	}
 
 	// input side
-	stateDiff.DestroyedStates().ForEachKey(func(outputID iotago.OutputID) bool {
-		spentOutput, errOutput := l.Output(outputID)
-		if errOutput != nil {
-			err = ierrors.Errorf("failed to retrieve output %s: %w", outputID, errOutput)
+	stateDiff.DestroyedStates().ForEach(func(_ mempool.StateID, stateMetadata mempool.StateMetadata) bool {
+		spentOutput, ok := stateMetadata.State().(*utxoledger.Output)
+		if !ok {
+			err = ierrors.Errorf("unexpected state type %T", stateMetadata.State())
 			return false
 		}
 
@@ -559,7 +559,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 		case iotago.OutputBasic:
 			// if a basic output (implicit account) is consumed, get the accountID as hash of the output ID.
 			if spentOutput.Output().UnlockConditionSet().Address().Address.Type() == iotago.AddressImplicitAccountCreation {
-				accountID := iotago.AccountIDFromOutputID(outputID)
+				accountID := iotago.AccountIDFromOutputID(spentOutput.OutputID())
 				consumedAccounts[accountID] = spentOutput
 			}
 		}
@@ -611,10 +611,20 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 			}
 
 			// output side
-			txWithMeta.Outputs().Range(func(stateMetadata mempool.StateMetadata) {
-				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Slot(), stateMetadata.State().Output())
+			if err = txWithMeta.Outputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
+				typedOutput, ok := stateMetadata.State().(*utxoledger.Output)
+				if !ok {
+					err = ierrors.Errorf("unexpected state type %T", stateMetadata.State())
+					return err
+				}
+
+				output := utxoledger.CreateOutput(l.apiProvider, typedOutput.OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Slot(), typedOutput.Output())
 				outputs = append(outputs, output)
-			})
+
+				return nil
+			}); err != nil {
+				return false
+			}
 		}
 
 		// process allotments

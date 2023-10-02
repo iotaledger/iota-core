@@ -5,41 +5,51 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 	iotagovm "github.com/iotaledger/iota.go/v4/vm"
 	"github.com/iotaledger/iota.go/v4/vm/stardust"
 )
 
-func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.SignedTransaction, inputStates []mempool.OutputState, timeReference mempool.ContextState) ([]mempool.OutputState, error) {
-	tx, ok := stateTransition.(*iotago.SignedTransaction)
+func (l *Ledger) extractInputReferences(transaction mempool.Transaction) (inputReferences []iotago.Input, err error) {
+	stardustTransaction, ok := transaction.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	inputSet := iotagovm.InputSet{}
-	for _, input := range inputStates {
-		inputSet[input.OutputID()] = input.Output()
+	for _, input := range stardustTransaction.TransactionEssence.Inputs {
+		inputReferences = append(inputReferences, input)
 	}
-	resolvedInputs := iotagovm.ResolvedInputs{
-		InputSet: inputSet,
-	}
-
-	bicInputs, err := tx.Transaction.BICInputs()
-	if err != nil {
-		return nil, ierrors.Join(err, iotago.ErrBICInputInvalid)
+	for _, input := range stardustTransaction.TransactionEssence.ContextInputs {
+		inputReferences = append(inputReferences, input)
 	}
 
-	rewardInputs, err := tx.Transaction.RewardInputs()
-	if err != nil {
-		return nil, ierrors.Join(err, iotago.ErrRewardInputInvalid)
+	return inputReferences, nil
+}
+
+func (l *Ledger) validateStardustTransaction(signedTransaction mempool.SignedTransaction, resolvedInputStates []mempool.State) (executionContext context.Context, err error) {
+	signedStardustTransaction, ok := signedTransaction.(*iotago.SignedTransaction)
+	if !ok {
+		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	commitmentInput, ok := timeReference.(*iotago.Commitment)
-	if commitmentInput != nil && !ok {
-		return nil, ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.New("unsupported type for time reference"))
+	utxoInputSet := iotagovm.InputSet{}
+	commitmentInput := (*iotago.Commitment)(nil)
+	bicInputs := make([]*iotago.BlockIssuanceCreditInput, 0)
+	rewardInputs := make([]*iotago.RewardInput, 0)
+	for _, resolvedInput := range resolvedInputStates {
+		resolvedInput.Type()
+		switch typedInput := resolvedInput.(type) {
+		case *iotago.Commitment:
+			commitmentInput = typedInput
+		case *iotago.BlockIssuanceCreditInput:
+			bicInputs = append(bicInputs, typedInput)
+		case *iotago.RewardInput:
+			rewardInputs = append(rewardInputs, typedInput)
+		case *utxoledger.Output:
+			utxoInputSet[typedInput.OutputID()] = typedInput.Output()
+		}
 	}
-
-	resolvedInputs.CommitmentInput = commitmentInput
 
 	if (len(rewardInputs) > 0 || len(bicInputs) > 0) && commitmentInput == nil {
 		return nil, iotago.ErrCommitmentInputMissing
@@ -57,13 +67,16 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Si
 
 		bicInputSet[inp.AccountID] = accountData.Credits.Value
 	}
-	resolvedInputs.BlockIssuanceCreditInputSet = bicInputSet
 
 	rewardInputSet := make(iotagovm.RewardsInputSet)
 	for _, inp := range rewardInputs {
-		outputID := inputStates[inp.Index].OutputID()
+		output, ok := resolvedInputStates[inp.Index].(*utxoledger.Output)
+		if !ok {
+			return nil, ierrors.Wrapf(iotago.ErrRewardInputInvalid, "input at index %d is not an UTXO output", inp.Index)
+		}
+		outputID := output.OutputID()
 
-		switch castOutput := inputStates[inp.Index].Output().(type) {
+		switch castOutput := output.Output().(type) {
 		case *iotago.AccountOutput:
 			stakingFeature := castOutput.FeatureSet().Staking()
 			if stakingFeature == nil {
@@ -100,28 +113,57 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Si
 			rewardInputSet[delegationID] = reward
 		}
 	}
-	resolvedInputs.RewardsInputSet = rewardInputSet
 
-	vmParams := &iotagovm.Params{
-		API: tx.API,
-	}
-	if err = stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
-		return nil, err
+	resolvedInputs := iotagovm.ResolvedInputs{
+		InputSet:                    utxoInputSet,
+		CommitmentInput:             commitmentInput,
+		BlockIssuanceCreditInputSet: bicInputSet,
+		RewardsInputSet:             rewardInputSet,
 	}
 
-	outputSet, err := tx.OutputsSet()
+	unlockedIdentities, err := stardust.NewVirtualMachine().ValidateUnlocks(signedStardustTransaction, resolvedInputs)
 	if err != nil {
 		return nil, err
 	}
 
-	created := make([]mempool.OutputState, 0, len(outputSet))
-	for outputID, output := range outputSet {
-		created = append(created, &ExecutionOutput{
-			outputID:     outputID,
-			output:       output,
-			creationSlot: tx.Transaction.CreationSlot,
+	executionContext = context.Background()
+	executionContext = context.WithValue(executionContext, "unlockedIdentities", unlockedIdentities)
+	executionContext = context.WithValue(executionContext, "resolvedInputs", resolvedInputs)
+
+	return executionContext, nil
+}
+
+func (l *Ledger) executeStardustVM(executionContext context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
+	stardustTransaction, ok := transaction.(*iotago.Transaction)
+	if !ok {
+		return nil, iotago.ErrTxTypeInvalid
+	}
+
+	transactionID, err := stardustTransaction.ID()
+	if err != nil {
+		return nil, err
+	}
+
+	unlockedIdentities, ok := executionContext.Value("unlockedIdentities").(iotagovm.UnlockedIdentities)
+	if !ok {
+		return nil, ierrors.Errorf("unlockedIdentities not found in execution context")
+	}
+
+	resolvedInputs, ok := executionContext.Value("resolvedInputs").(iotagovm.ResolvedInputs)
+	if !ok {
+		return nil, ierrors.Errorf("resolvedInputs not found in execution context")
+	}
+
+	if err = stardust.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedIdentities); err != nil {
+		return nil, err
+	}
+
+	for index, output := range stardustTransaction.Outputs {
+		outputs = append(outputs, &ExecutionOutput{
+			outputID: iotago.OutputIDFromTransactionIDAndIndex(transactionID, uint16(index)),
+			output:   output,
 		})
 	}
 
-	return created, nil
+	return outputs, nil
 }
