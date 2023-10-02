@@ -84,7 +84,13 @@ func (l *Ledger) validateStardustVMTransaction(_ context.Context, tx *iotago.Sig
 
 	rewardInputSet := make(iotagovm.RewardsInputSet)
 	for _, inp := range rewardInputs {
-		outputID := tx.Transaction.Inputs[inp.Index].(*iotago.UTXOInput).OutputID()
+		var outputID iotago.OutputID
+		switch input := tx.Transaction.Inputs[inp.Index].(type) {
+		case *iotago.UTXOInput:
+			outputID = input.OutputID()
+		default:
+			return iotago.ErrUnknownInputType
+		}
 
 		switch castOutput := inputSet[outputID].(type) {
 		case *iotago.AccountOutput:
@@ -163,6 +169,7 @@ func (l *Ledger) ValidateTransactionInVM(ctx context.Context, transaction *iotag
 			if err != nil {
 				return ierrors.Wrapf(err, "failed to load commitment %s", commitmentInput.CommitmentID)
 			}
+
 			break
 		}
 	}
