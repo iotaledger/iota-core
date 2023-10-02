@@ -6,10 +6,13 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/logger"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
+
+var log = logger.New("AccountWallet")
 
 func Run(lastFaucetUnspentOutputID iotago.OutputID) (*AccountWallet, error) {
 	// read config here

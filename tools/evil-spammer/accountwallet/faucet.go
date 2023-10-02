@@ -67,13 +67,25 @@ func (f *Faucet) RequestFunds(receiveAddr iotago.Address, amount iotago.BaseToke
 		Input:        f.unspentOutput.OutputStruct,
 	})
 
-	// receiver output
-	txBuilder.AddOutput(&iotago.BasicOutput{
-		Amount: amount,
-		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: receiveAddr},
-		},
-	})
+	switch receiveAddr.(type) {
+	case *iotago.Ed25519Address:
+		txBuilder.AddOutput(&iotago.BasicOutput{
+			Amount: amount,
+			Conditions: iotago.BasicOutputUnlockConditions{
+				&iotago.AddressUnlockCondition{Address: receiveAddr},
+			},
+		})
+	case *iotago.ImplicitAccountCreationAddress:
+		log.Infof("creating account %s", receiveAddr)
+		accOutputBuilder := builder.NewAccountOutputBuilder(receiveAddr, receiveAddr, amount)
+		output, err := accOutputBuilder.Build()
+		if err != nil {
+			log.Errorf("failed to build account output: %s", err)
+
+			return nil, err
+		}
+		txBuilder.AddOutput(output)
+	}
 
 	// remainder output
 	txBuilder.AddOutput(&iotago.BasicOutput{
@@ -90,12 +102,16 @@ func (f *Faucet) RequestFunds(receiveAddr iotago.Address, amount iotago.BaseToke
 
 	signedTx, err := txBuilder.Build(hdWallet.AddressSigner())
 	if err != nil {
+		log.Errorf("failed to build transaction: %s", err)
+
 		return nil, err
 	}
 
 	// send transaction
 	_, err = f.clt.PostTransaction(signedTx)
 	if err != nil {
+		log.Errorf("failed to post transaction: %s", err)
+
 		return nil, err
 	}
 
@@ -107,13 +123,6 @@ func (f *Faucet) RequestFunds(receiveAddr iotago.Address, amount iotago.BaseToke
 		Balance:      signedTx.Transaction.Outputs[1].BaseTokenAmount(),
 		OutputStruct: signedTx.Transaction.Outputs[1],
 	}
-
-	// TODO handle implicit acc creation
-	//switch receiveAddr.(type) {
-	//case *iotago.Ed25519Address:
-	//case *iotago.ImplicitAccountCreationAddress:
-	//
-	//}
 
 	return &models.Output{
 		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), 0),
