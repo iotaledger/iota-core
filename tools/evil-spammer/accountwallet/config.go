@@ -8,6 +8,7 @@ import (
 	"github.com/mr-tron/base58/base58"
 
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -82,19 +83,10 @@ type AllotAccountParams struct {
 	From   string // if not set we use faucet
 }
 
-// TODO do wee need to restrict that only one instance of the wallet runs?
 type StateData struct {
-	Seed          string    `serix:"0,mapKey=seed"`
-	LastUsedIndex uint64    `serix:"1,mapKey=lastUsedIndex"`
-	Accounts      []Account `serix:"2,mapKey=accounts,lengthPrefixType=uint8"`
-	// TODO: other info that the account wallet needs to store
-}
-
-type Account struct {
-	Alias     string           `serix:"0,mapKey=alias"`
-	AccountID iotago.AccountID `serix:"1,mapKey=accountID"`
-	Index     uint64           `serix:"2,mapKey=index"`
-	// TODO: other info of an account
+	Seed          string                `serix:"0,mapKey=seed"`
+	LastUsedIndex uint64                `serix:"1,mapKey=lastUsedIndex"`
+	AccountsData  []*models.AccountData `serix:"2,mapKey=accounts,lengthPrefixType=uint8"`
 }
 
 var dockerFaucetSeed = func() []byte {

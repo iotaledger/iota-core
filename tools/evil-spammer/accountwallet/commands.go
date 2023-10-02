@@ -13,9 +13,8 @@ func (a *AccountWallet) CreateAccount(params *CreateAccountParams) (iotago.Accou
 		return iotago.EmptyAccountID(), ierrors.Wrap(err, "Failed to create account")
 	}
 
-	accountID := iotago.AccountAddressFromOutputID(accountOutput.OutputID).AccountID()
-	a.accountsAliases[params.Alias] = accountID
-	a.aliasIndexMap[params.Alias] = a.latestUsedIndex
+	accountID := a.registerAccount(params.Alias, accountOutput.OutputID, a.latestUsedIndex)
+
 	fmt.Printf("Created account %s with %d tokens\n", accountID.ToHex(), params.Amount)
 
 	return accountID, nil

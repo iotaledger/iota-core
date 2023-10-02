@@ -2,16 +2,19 @@ package accountwallet
 
 import (
 	"os"
+	"time"
+
+	"github.com/mr-tron/base58"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/timeutil"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/logger"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
-	"github.com/mr-tron/base58"
 )
 
 var log = logger.New("AccountWallet")
@@ -49,9 +52,10 @@ type AccountWallet struct {
 	faucet *Faucet
 	seed   [32]byte
 
-	accountsAliases map[string]iotago.AccountID
+	accountsAliases map[string]*models.AccountData
+
+	//accountsStatus map[string]models.AccountMetadata
 	latestUsedIndex uint64
-	aliasIndexMap   map[string]uint64
 
 	client *models.WebClient
 	api    iotago.API
@@ -59,12 +63,16 @@ type AccountWallet struct {
 	optsClientBindAddress     string
 	optsAccountStatesFile     string
 	optsFaucetUnspendOutputID iotago.OutputID
+	optsRequestTimeout        time.Duration
+	optsRequestTicker         time.Duration
 }
 
 func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 	return options.Apply(&AccountWallet{
-		accountsAliases: make(map[string]iotago.Identifier),
-		seed:            tpkg.RandEd25519Seed(),
+		accountsAliases:    make(map[string]*models.AccountData),
+		seed:               tpkg.RandEd25519Seed(),
+		optsRequestTimeout: time.Second * 30,
+		optsRequestTicker:  time.Second * 5,
 	}, opts, func(w *AccountWallet) {
 		w.client = models.NewWebClient(w.optsClientBindAddress)
 		w.api = w.client.CurrentAPI()
@@ -78,20 +86,16 @@ func (a *AccountWallet) LastFaucetUnspentOutputID() iotago.OutputID {
 
 // toAccountStateFile write account states to file.
 func (a *AccountWallet) toAccountStateFile() error {
-	accounts := make([]Account, 0)
+	accounts := make([]*models.AccountData, 0)
 
-	for alias, acc := range a.accountsAliases {
-		accounts = append(accounts, Account{
-			Alias:     alias,
-			AccountID: acc,
-			Index:     a.aliasIndexMap[alias],
-		})
+	for _, acc := range a.accountsAliases {
+		accounts = append(accounts, acc)
 	}
 
 	stateBytes, err := a.api.Encode(&StateData{
 		Seed:          base58.Encode(a.seed[:]),
 		LastUsedIndex: a.latestUsedIndex,
-		Accounts:      accounts,
+		AccountsData:  accounts,
 	})
 	if err != nil {
 		return ierrors.Wrap(err, "failed to encode state")
@@ -131,12 +135,77 @@ func (a *AccountWallet) fromAccountStateFile() error {
 	a.latestUsedIndex = data.LastUsedIndex
 
 	// account data
-	for _, acc := range data.Accounts {
-		a.accountsAliases[acc.Alias] = acc.AccountID
-		a.aliasIndexMap[acc.Alias] = acc.Index
+	for _, acc := range data.AccountsData {
+		a.accountsAliases[acc.Alias] = acc
 	}
 
 	return nil
+}
+
+func (a *AccountWallet) registerAccount(alias string, outputID iotago.OutputID, index uint64) iotago.AccountID {
+	accountID := iotago.AccountIDFromOutputID(outputID)
+	a.accountsAliases[alias] = &models.AccountData{
+		Alias:     alias,
+		AccountID: accountID,
+		Status:    "created",
+		OutputID:  outputID,
+		Index:     index,
+	}
+
+	return accountID
+}
+
+func (a *AccountWallet) getAccount(alias string) (*models.AccountData, error) {
+	accData, exists := a.accountsAliases[alias]
+	if !exists {
+		return nil, ierrors.Errorf("account with alias %s does not exist", alias)
+	}
+	creationSlot := accData.OutputID.CreationSlot()
+
+	// wait for the account to be committed
+	err := a.retry(func() (bool, error) {
+		resp, err := a.client.GetBlockIssuance()
+		if err != nil {
+			return false, err
+		}
+
+		if resp.Commitment.Slot >= creationSlot {
+			return true, nil
+		}
+
+		return false, nil
+	})
+
+	if err != nil {
+		log.Errorf("failed to get commitment details while waiting %s: %s", alias, err)
+		return nil, err
+	}
+
+	return accData, nil
+
+}
+
+func (a *AccountWallet) retry(requestFunc func() (bool, error)) error {
+	timeout := time.NewTimer(a.optsRequestTimeout)
+	interval := time.NewTicker(a.optsRequestTicker)
+	defer timeutil.CleanupTimer(timeout)
+	defer timeutil.CleanupTicker(interval)
+
+	for {
+		done, err := requestFunc()
+		if err != nil {
+			return err
+		}
+		if done {
+			return nil
+		}
+		select {
+		case <-interval.C:
+			continue
+		case <-timeout.C:
+			return ierrors.New("timeout while trying to request")
+		}
+	}
 }
 
 func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) (*models.Output, error) {
@@ -155,10 +224,11 @@ func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) 
 }
 
 func (a *AccountWallet) destroyAccount(alias string) error {
-	if _, ok := a.accountsAliases[alias]; !ok {
+	accData, exists := a.accountsAliases[alias]
+	if !exists {
 		return ierrors.Errorf("account with alias %s does not exist", alias)
 	}
-	hdWallet := mock.NewHDWallet("", a.seed[:], a.aliasIndexMap[alias])
+	hdWallet := mock.NewHDWallet("", a.seed[:], accData.Index)
 
 	// get output from node
 	// From TIP42: Indexers and node plugins shall map the account address of the output derived with Account ID to the regular address -> output mapping table, so that given an Account Address, its most recent unspent account output can be retrieved.
@@ -167,7 +237,7 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 
 	txBuilder := builder.NewTransactionBuilder(a.api)
 	txBuilder.AddInput(&builder.TxInput{
-		UnlockTarget: a.accountsAliases[alias].ToAddress(),
+		UnlockTarget: a.accountsAliases[alias].AccountID.ToAddress(),
 		// InputID:      accountOutput.ID(),
 		Input: accountOutput,
 	})
@@ -192,7 +262,6 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 
 	// remove account from wallet
 	delete(a.accountsAliases, alias)
-	delete(a.aliasIndexMap, alias)
 
 	return nil
 }
