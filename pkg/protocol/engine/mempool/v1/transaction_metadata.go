@@ -1,6 +1,7 @@
 package mempoolv1
 
 import (
+	"context"
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -25,7 +26,7 @@ type TransactionMetadata struct {
 	// lifecycle events
 	unsolidInputsCount uint64
 	solid              reactive.Event
-	shouldExecute      reactive.Event
+	executionContext   reactive.Variable[context.Context]
 	executed           reactive.Event
 	invalid            reactive.Variable[error]
 	booked             reactive.Event
@@ -73,7 +74,7 @@ func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []
 		unsolidInputsCount: uint64(len(referencedInputs)),
 		booked:             reactive.NewEvent(),
 		solid:              reactive.NewEvent(),
-		shouldExecute:      reactive.NewEvent(),
+		executionContext:   reactive.NewVariable[context.Context](),
 		executed:           reactive.NewEvent(),
 		invalid:            reactive.NewVariable[error](),
 		evicted:            reactive.NewEvent(),

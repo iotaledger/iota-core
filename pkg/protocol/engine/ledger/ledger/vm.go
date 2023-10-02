@@ -154,15 +154,19 @@ func (l *Ledger) executeStardustVM(executionContext context.Context, transaction
 		return nil, ierrors.Errorf("resolvedInputs not found in execution context")
 	}
 
-	if err = stardust.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedIdentities); err != nil {
+	createdOutputs, err := stardust.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedIdentities)
+	if err != nil {
 		return nil, err
 	}
 
-	for index, output := range stardustTransaction.Outputs {
-		outputs = append(outputs, &ExecutionOutput{
-			outputID: iotago.OutputIDFromTransactionIDAndIndex(transactionID, uint16(index)),
-			output:   output,
-		})
+	for index, output := range createdOutputs {
+		outputs = append(outputs, utxoledger.CreateOutput(
+			l.apiProvider,
+			iotago.OutputIDFromTransactionIDAndIndex(transactionID, uint16(index)),
+			iotago.EmptyBlockID(),
+			0,
+			output,
+		))
 	}
 
 	return outputs, nil

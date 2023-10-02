@@ -56,7 +56,7 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 
 	t.transactions[alias] = transaction
 
-	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
+	for outputID, output := range lo.PanicOnErr(transaction.Transaction.OutputsSet()) {
 		clonedOutput := output.Clone()
 		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
 		if clonedOutput.Type() == iotago.OutputAccount {

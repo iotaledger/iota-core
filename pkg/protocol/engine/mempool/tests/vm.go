@@ -8,6 +8,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 )
 
+func TransactionValidator(signedTransaction mempool.SignedTransaction, resolvedInputs []mempool.State) (executionContext context.Context, err error) {
+	return context.Background(), nil
+}
+
 func TransactionExecutor(_ context.Context, inputTransaction mempool.Transaction) (outputs []mempool.State, err error) {
 	transaction, ok := inputTransaction.(*Transaction)
 	if !ok {

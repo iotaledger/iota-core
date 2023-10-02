@@ -68,7 +68,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
 
-			l.memPool = mempoolv1.New(l.executeStardustVM, l.extractInputReferences, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.memPool = mempoolv1.New(l.validateStardustTransaction, l.executeStardustVM, l.extractInputReferences, l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, e, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput)
@@ -237,30 +237,16 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 
 	switch castState := stateWithMetadata.State().(type) {
 	case *utxoledger.Output:
-		return castState, nil
-	case *ExecutionOutput:
-		txWithMetadata, exists := l.memPool.TransactionMetadata(outputID.TransactionID())
-		// If the transaction is not in the mempool, we need to load the output from the ledger
-		if !exists {
-			var output *utxoledger.Output
-			stateRequest := l.resolveState(outputID.UTXOInput())
-			stateRequest.OnSuccess(func(loadedState mempool.State) {
-				concreteOutput, ok := loadedState.(*utxoledger.Output)
-				if !ok {
-					err = iotago.ErrUnknownOutputType
-					return
-				}
-				output = concreteOutput
-			})
-			stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
-			stateRequest.WaitComplete()
+		if castState.SlotBooked() == 0 {
+			txWithMetadata, exists := l.memPool.TransactionMetadata(outputID.TransactionID())
+			if exists {
+				earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
 
-			return output, nil
+				return utxoledger.CreateOutput(l.apiProvider, castState.OutputID(), earliestAttachment, earliestAttachment.Slot(), castState.Output()), nil
+			}
 		}
 
-		earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
-
-		return utxoledger.CreateOutput(l.apiProvider, castState.OutputID(), earliestAttachment, earliestAttachment.Slot(), castState.Output()), nil
+		return castState, nil
 	default:
 		panic("unexpected State type")
 	}
@@ -478,7 +464,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	stateDiff.CreatedStates().ForEach(func(_ mempool.StateID, output mempool.StateMetadata) bool {
 		createdOutput, ok := output.State().(*utxoledger.Output)
 		if !ok {
-			err = ierrors.Errorf("unexpected state type %T", output.State())
+			err = ierrors.Errorf("unexpected state type1 %T", output.State())
 			return false
 		}
 
@@ -507,7 +493,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			// Zeroed Delegation ID => newly created.
 			// Non-Zero Delegation ID => delayed claiming transition.
 			if delegationID == iotago.EmptyDelegationID() {
-				delegationID = iotago.DelegationIDFromOutputID(outputID)
+				delegationID = iotago.DelegationIDFromOutputID(createdOutput.OutputID())
 				newAccountDelegation[delegationID] = delegationOutput
 			}
 
@@ -531,7 +517,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	stateDiff.DestroyedStates().ForEach(func(_ mempool.StateID, stateMetadata mempool.StateMetadata) bool {
 		spentOutput, ok := stateMetadata.State().(*utxoledger.Output)
 		if !ok {
-			err = ierrors.Errorf("unexpected state type %T", stateMetadata.State())
+			err = ierrors.Errorf("unexpected state type2 %T", stateMetadata.State())
 			return false
 		}
 
@@ -553,7 +539,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 			delegationOutput, _ := spentOutput.Output().(*iotago.DelegationOutput)
 			delegationID := delegationOutput.DelegationID
 			if delegationID == iotago.EmptyDelegationID() {
-				delegationID = iotago.DelegationIDFromOutputID(outputID)
+				delegationID = iotago.DelegationIDFromOutputID(spentOutput.OutputID())
 			}
 
 			// TODO: do we have a testcase that checks transitioning a delegation output twice in the same slot?
@@ -626,7 +612,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 			if err = txWithMeta.Outputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
 				typedOutput, ok := stateMetadata.State().(*utxoledger.Output)
 				if !ok {
-					err = ierrors.Errorf("unexpected state type %T", stateMetadata.State())
+					err = ierrors.Errorf("unexpected state type3 %T", stateMetadata.State())
 					return err
 				}
 

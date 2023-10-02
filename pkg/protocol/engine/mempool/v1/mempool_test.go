@@ -36,7 +36,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](func() int { return 0 })
-	mempoolInstance := New[vote.MockedRank](mempooltests.TransactionExecutor, func(transaction mempool.Transaction) ([]iotago.Input, error) {
+	mempoolInstance := New[vote.MockedRank](mempooltests.TransactionValidator, mempooltests.TransactionExecutor, func(transaction mempool.Transaction) ([]iotago.Input, error) {
 		return transaction.(*mempooltests.Transaction).Inputs()
 	}, func(reference iotago.Input) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference.StateID())
@@ -107,7 +107,7 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
-	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.TransactionExecutor, func(transaction mempool.Transaction) ([]iotago.Input, error) {
+	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.TransactionValidator, mempooltests.TransactionExecutor, func(transaction mempool.Transaction) ([]iotago.Input, error) {
 		return transaction.(*mempooltests.Transaction).Inputs()
 	}, func(reference iotago.Input) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference.StateID())
@@ -120,7 +120,7 @@ func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
-	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.TransactionExecutor, func(transaction mempool.Transaction) ([]iotago.Input, error) {
+	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.TransactionValidator, mempooltests.TransactionExecutor, func(transaction mempool.Transaction) ([]iotago.Input, error) {
 		return transaction.(*mempooltests.Transaction).Inputs()
 	}, func(reference iotago.Input) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference.StateID())

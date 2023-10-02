@@ -33,6 +33,8 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 
 	inputsOfTransaction mempool.TransactionInputReferenceRetriever
 
+	validateSignedTransaction mempool.TransactionValidator
+
 	// attachments is the storage that is used to keep track of the attachments of transactions.
 	attachments *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *SignedTransactionMetadata]
 
@@ -69,6 +71,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 
 // New is the constructor of the MemPool.
 func New[VoteRank conflictdag.VoteRankType[VoteRank]](
+	transactionValidator mempool.TransactionValidator,
 	transactionExecutor mempool.TransactionExecutor,
 	transactionInputReferenceRetriever mempool.TransactionInputReferenceRetriever,
 	stateResolver mempool.StateReferenceResolver,
@@ -81,6 +84,7 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](
 	return options.Apply(&MemPool[VoteRank]{
 		signedTransactionAttached: event.New1[mempool.SignedTransactionMetadata](),
 		transactionAttached:       event.New1[mempool.TransactionMetadata](),
+		validateSignedTransaction: transactionValidator,
 		executeStateTransition:    transactionExecutor,
 		inputsOfTransaction:       transactionInputReferenceRetriever,
 		resolveState:              stateResolver,
@@ -246,8 +250,8 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 			}
 
 			if transaction.markInputSolid() {
-				transaction.shouldExecute.OnTrigger(func() {
-					m.executeTransaction(transaction)
+				transaction.executionContext.OnUpdate(func(_, executionContext context.Context) {
+					m.executeTransaction(executionContext, transaction)
 				})
 			}
 		})
@@ -256,9 +260,9 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 	}
 }
 
-func (m *MemPool[VoteRank]) executeTransaction(transaction *TransactionMetadata) {
+func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context, transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
-		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction()); err != nil {
+		if outputStates, err := m.executeStateTransition(executionContext, transaction.Transaction()); err != nil {
 			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)
@@ -451,30 +455,28 @@ func (m *MemPool[VoteRank]) setupOutputState(state *StateMetadata) {
 	})
 }
 
-func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransaction *SignedTransactionMetadata, transaction *TransactionMetadata) {
-	transaction.addSigningTransaction(signedTransaction)
+func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransactionMetadata *SignedTransactionMetadata, transaction *TransactionMetadata) {
+	transaction.addSigningTransaction(signedTransactionMetadata)
 
 	transaction.OnSolid(func() {
-		// Validate if signatures are valid and do something further
-		//if err := validateSignatures(signedTransaction); err != nil {
-		//	_ = signedTransaction.signaturesInvalid.Set(err)
-		//
-		//	return
-		//}
+		executionContext, err := m.validateSignedTransaction(signedTransactionMetadata.SignedTransaction(), lo.Map(signedTransactionMetadata.transactionMetadata.inputs, (*StateMetadata).State))
+		if err != nil {
+			_ = signedTransactionMetadata.signaturesInvalid.Set(err)
+			return
+		}
 
-		// if signatures are valid
-
-		signedTransaction.attachments.OnUpdate(func(mutations ds.SetMutations[iotago.BlockID]) {
+		signedTransactionMetadata.attachments.OnUpdate(func(mutations ds.SetMutations[iotago.BlockID]) {
 			mutations.AddedElements().Range(lo.Void(transaction.addValidAttachment))
 			mutations.DeletedElements().Range(transaction.evictValidAttachment)
 		})
 
-		signedTransaction.signaturesValid.Trigger()
-		signedTransaction.transactionMetadata.shouldExecute.Trigger()
+		signedTransactionMetadata.signaturesValid.Trigger()
+
+		transaction.executionContext.Set(executionContext)
 	})
 
-	signedTransaction.evicted.OnTrigger(func() {
-		m.cachedSignedTransactions.Delete(signedTransaction.ID())
+	signedTransactionMetadata.evicted.OnTrigger(func() {
+		m.cachedSignedTransactions.Delete(signedTransactionMetadata.ID())
 	})
 }
 
