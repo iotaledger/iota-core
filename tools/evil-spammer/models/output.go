@@ -24,8 +24,8 @@ type Output struct {
 type Outputs []*Output
 
 type AccountData struct {
-	Alias     string           `serix:"0"`
-	Status    string           `serix:"1"`
+	Alias     string           `serix:"0,lengthPrefixType=uint8"`
+	Status    string           `serix:"1,lengthPrefixType=uint8"`
 	AccountID iotago.AccountID `serix:"2"`
 	OutputID  iotago.OutputID  `serix:"3"`
 	Index     uint64           `serix:"4"`

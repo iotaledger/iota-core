@@ -84,9 +84,9 @@ type AllotAccountParams struct {
 }
 
 type StateData struct {
-	Seed          string                `serix:"0,mapKey=seed"`
+	Seed          string                `serix:"0,mapKey=seed,lengthPrefixType=uint8"`
 	LastUsedIndex uint64                `serix:"1,mapKey=lastUsedIndex"`
-	AccountsData  []*models.AccountData `serix:"2,mapKey=accounts,lengthPrefixType=uint8"`
+	AccountsData  []*models.AccountData `serix:"2,mapKey=accounts,lengthPrefixType=uint32"`
 }
 
 var dockerFaucetSeed = func() []byte {
