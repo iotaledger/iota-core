@@ -93,7 +93,9 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 						return 0, ierrors.Errorf("account %s has insufficient Mana for block to be scheduled: account Mana %d, min Mana %d", accountID, mana, minMana)
 					}
 
-					return Deficit(mana / minMana), nil
+					mana = lo.Min(mana, iotago.Mana(s.maxDeficit()-1))
+
+					return 1 + Deficit(mana/minMana), nil
 				}
 			})
 			s.TriggerConstructed()
