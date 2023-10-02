@@ -22,7 +22,7 @@ func (l *Ledger) executeStardustVM(ctx context.Context, stateTransition mempool.
 	}
 
 	commitmentInput, ok := timeReference.(*iotago.Commitment)
-	if commitmentInput != nil && !ok {
+	if timeReference == nil || !ok {
 		return nil, ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.New("unsupported type for time reference"))
 	}
 
