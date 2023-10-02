@@ -80,7 +80,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
 			e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
-				l.memPool.PublishCommitmentState(scd.Commitment.Commitment())
+				l.memPool.PublishRequestedState(scd.Commitment.Commitment())
 			})
 
 			l.TriggerConstructed()
@@ -230,7 +230,7 @@ func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.S
 }
 
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
-	stateWithMetadata, err := l.memPool.OutputStateMetadata(outputID.UTXOInput())
+	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
 	if err != nil {
 		return nil, err
 	}
@@ -611,7 +611,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 			}
 
 			// output side
-			txWithMeta.Outputs().Range(func(stateMetadata mempool.OutputStateMetadata) {
+			txWithMeta.Outputs().Range(func(stateMetadata mempool.StateMetadata) {
 				output := utxoledger.CreateOutput(l.apiProvider, stateMetadata.State().OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Slot(), stateMetadata.State().Output())
 				outputs = append(outputs, output)
 			})

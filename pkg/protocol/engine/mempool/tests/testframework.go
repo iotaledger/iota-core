@@ -20,9 +20,10 @@ import (
 
 type TestFramework struct {
 	Instance    mempool.MemPool[vote.MockedRank]
-	ConflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
+	ConflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank]
 
-	stateIDByAlias           map[string]iotago.OutputID
+	referencesByAlias        map[string]iotago.Input
+	stateIDByAlias           map[string]mempool.StateID
 	signedTransactionByAlias map[string]mempool.SignedTransaction
 	transactionByAlias       map[string]mempool.Transaction
 
@@ -35,11 +36,12 @@ type TestFramework struct {
 	mutex syncutils.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank], conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank], conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
 	t := &TestFramework{
 		Instance:                 instance,
 		ConflictDAG:              conflictDAG,
-		stateIDByAlias:           make(map[string]iotago.OutputID),
+		referencesByAlias:        make(map[string]iotago.Input),
+		stateIDByAlias:           make(map[string]mempool.StateID),
 		signedTransactionByAlias: make(map[string]mempool.SignedTransaction),
 		transactionByAlias:       make(map[string]mempool.Transaction),
 		blockIDsByAlias:          make(map[string]iotago.BlockID),
@@ -86,7 +88,12 @@ func (t *TestFramework) CreateTransaction(alias string, referencedStates []strin
 
 	// register the aliases for the generated output IDs
 	for i := uint16(0); i < transaction.outputCount; i++ {
-		t.stateIDByAlias[alias+":"+strconv.Itoa(int(i))] = iotago.OutputIDFromTransactionIDAndIndex(transactionID, i)
+		t.referencesByAlias[alias+":"+strconv.Itoa(int(i))] = &iotago.UTXOInput{
+			TransactionID:          transactionID,
+			TransactionOutputIndex: i,
+		}
+
+		t.stateIDByAlias[alias+":"+strconv.Itoa(int(i))] = t.referencesByAlias[alias+":"+strconv.Itoa(int(i))].StateID()
 	}
 }
 
@@ -131,14 +138,14 @@ func (t *TestFramework) AttachTransaction(signedTransactionAlias, transactionAli
 func (t *TestFramework) CommitSlot(slot iotago.SlotIndex) {
 	stateDiff := t.Instance.StateDiff(slot)
 
-	stateDiff.CreatedStates().ForEach(func(_ iotago.OutputID, state mempool.OutputStateMetadata) bool {
+	stateDiff.CreatedStates().ForEach(func(_ mempool.StateID, state mempool.StateMetadata) bool {
 		t.ledgerState.AddOutputState(state.State())
 
 		return true
 	})
 
-	stateDiff.DestroyedStates().ForEach(func(outputID iotago.OutputID, _ mempool.OutputStateMetadata) bool {
-		t.ledgerState.DestroyOutputState(outputID)
+	stateDiff.DestroyedStates().ForEach(func(stateID mempool.StateID, metadata mempool.StateMetadata) bool {
+		t.ledgerState.DestroyOutputState(stateID)
 
 		return true
 	})
@@ -158,13 +165,13 @@ func (t *TestFramework) TransactionMetadataByAttachment(alias string) (mempool.T
 	return t.Instance.TransactionMetadataByAttachment(t.BlockID(alias))
 }
 
-func (t *TestFramework) OutputStateMetadata(alias string) (mempool.OutputStateMetadata, error) {
-	return t.Instance.OutputStateMetadata(t.stateReference(alias))
+func (t *TestFramework) OutputStateMetadata(alias string) (mempool.StateMetadata, error) {
+	return t.Instance.StateMetadata(t.stateReference(alias))
 }
 
-func (t *TestFramework) OutputID(alias string) iotago.OutputID {
+func (t *TestFramework) StateID(alias string) mempool.StateID {
 	if alias == "genesis" {
-		return iotago.OutputID{}
+		return (&iotago.UTXOInput{}).StateID()
 	}
 
 	stateID, exists := t.stateIDByAlias[alias]
@@ -305,13 +312,15 @@ func (t *TestFramework) setupHookedEvents() {
 	})
 }
 
-func (t *TestFramework) stateReference(alias string) *iotago.UTXOInput {
-	outputID := t.OutputID(alias)
-
-	return &iotago.UTXOInput{
-		TransactionID:          outputID.TransactionID(),
-		TransactionOutputIndex: outputID.Index(),
+func (t *TestFramework) stateReference(alias string) iotago.Input {
+	if alias == "genesis" {
+		return &iotago.UTXOInput{}
 	}
+
+	reference, exists := t.referencesByAlias[alias]
+	require.True(t.test, exists, "reference with alias '%s' does not exist", alias)
+
+	return reference
 }
 
 func (t *TestFramework) waitBooked(transactionAliases ...string) {
@@ -362,16 +371,16 @@ func (t *TestFramework) AssertStateDiff(slot iotago.SlotIndex, spentOutputAliase
 	require.Equal(t.test, len(transactionAliases), stateDiff.Mutations().Size())
 
 	for _, transactionAlias := range transactionAliases {
-		require.True(t.test, stateDiff.ExecutedTransactions().Has(t.TransactionID(transactionAlias)))
-		require.True(t.test, lo.PanicOnErr(stateDiff.Mutations().Has(t.TransactionID(transactionAlias))))
+		require.True(t.test, stateDiff.ExecutedTransactions().Has(t.TransactionID(transactionAlias)), "transaction %s was not executed", transactionAlias)
+		require.True(t.test, lo.PanicOnErr(stateDiff.Mutations().Has(t.TransactionID(transactionAlias))), "transaction %s was not mutated", transactionAlias)
 	}
 
 	for _, createdOutputAlias := range createdOutputAliases {
-		require.True(t.test, stateDiff.CreatedStates().Has(t.OutputID(createdOutputAlias)))
+		require.Truef(t.test, stateDiff.CreatedStates().Has(t.StateID(createdOutputAlias)), "state %s was not created", createdOutputAlias)
 	}
 
 	for _, spentOutputAlias := range spentOutputAliases {
-		require.True(t.test, stateDiff.DestroyedStates().Has(t.OutputID(spentOutputAlias)))
+		require.Truef(t.test, stateDiff.DestroyedStates().Has(t.StateID(spentOutputAlias)), "state %s was not destroyed", spentOutputAlias)
 	}
 }
 
@@ -385,7 +394,8 @@ func (t *TestFramework) Cleanup() {
 
 	iotago.UnregisterIdentifierAliases()
 
-	t.stateIDByAlias = make(map[string]iotago.OutputID)
+	t.referencesByAlias = make(map[string]iotago.Input)
+	t.stateIDByAlias = make(map[string]mempool.StateID)
 	t.transactionByAlias = make(map[string]mempool.Transaction)
 	t.signedTransactionByAlias = make(map[string]mempool.SignedTransaction)
 	t.blockIDsByAlias = make(map[string]iotago.BlockID)

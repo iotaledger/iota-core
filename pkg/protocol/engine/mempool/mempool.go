@@ -15,11 +15,11 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] interface {
 
 	MarkAttachmentIncluded(blockID iotago.BlockID) bool
 
-	OutputStateMetadata(reference *iotago.UTXOInput) (state OutputStateMetadata, err error)
+	StateMetadata(reference iotago.Input) (state StateMetadata, err error)
 
 	TransactionMetadata(id iotago.TransactionID) (transaction TransactionMetadata, exists bool)
 
-	PublishCommitmentState(commitment *iotago.Commitment)
+	InjectRequestedState(state State)
 
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transaction TransactionMetadata, exists bool)
 

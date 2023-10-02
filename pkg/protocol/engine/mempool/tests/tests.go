@@ -61,7 +61,7 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
-	_ = tx1Metadata.Outputs().ForEach(func(state mempool.OutputStateMetadata) error {
+	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.Equal(t, 1, state.PendingSpenderCount())
 
@@ -71,7 +71,7 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 	tx2Metadata, exists := tf.TransactionMetadata("tx2")
 	require.True(t, exists)
 
-	_ = tx2Metadata.Outputs().ForEach(func(state mempool.OutputStateMetadata) error {
+	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.Equal(t, 0, state.PendingSpenderCount())
 
@@ -93,7 +93,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 
-	_ = tx1Metadata.Outputs().ForEach(func(state mempool.OutputStateMetadata) error {
+	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.Equal(t, 1, state.PendingSpenderCount())
 
@@ -103,7 +103,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	tx2Metadata, exists := tf.TransactionMetadata("tx2")
 	require.True(t, exists)
 
-	_ = tx2Metadata.Outputs().ForEach(func(state mempool.OutputStateMetadata) error {
+	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.Equal(t, 1, state.PendingSpenderCount())
 
@@ -113,7 +113,7 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 	tx3Metadata, exists := tf.TransactionMetadata("tx3")
 	require.True(t, exists)
 
-	_ = tx3Metadata.Outputs().ForEach(func(state mempool.OutputStateMetadata) error {
+	_ = tx3Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		require.False(t, state.IsAccepted())
 		require.Equal(t, 0, state.PendingSpenderCount())
 

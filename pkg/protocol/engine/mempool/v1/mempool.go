@@ -25,11 +25,13 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 
 	transactionAttached *event.Event1[mempool.TransactionMetadata]
 
-	// executeStateTransition is the VM that is used to execute the state transition of transactions.
-	executeStateTransition mempool.VM
+	// executeStateTransition is the TransactionExecutor that is used to execute the state transition of transactions.
+	executeStateTransition mempool.TransactionExecutor
 
 	// resolveState is the function that is used to request state from the ledger.
 	resolveState mempool.StateReferenceResolver
+
+	inputsOfTransaction mempool.TransactionInputReferenceRetriever
 
 	// attachments is the storage that is used to keep track of the attachments of transactions.
 	attachments *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *SignedTransactionMetadata]
@@ -41,13 +43,13 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	cachedSignedTransactions *shrinkingmap.ShrinkingMap[iotago.SignedTransactionID, *SignedTransactionMetadata]
 
 	// cachedStateRequests holds the requests for states that are required to execute transactions.
-	cachedStateRequests *shrinkingmap.ShrinkingMap[iotago.Identifier, *promise.Promise[mempool.State]]
+	cachedStateRequests *shrinkingmap.ShrinkingMap[mempool.StateID, *promise.Promise[*StateMetadata]]
 
 	// stateDiffs holds aggregated state mutations for each slot.
 	stateDiffs *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *StateDiff]
 
 	// conflictDAG is the DAG that is used to keep track of the conflicts between transactions.
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank]
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, VoteRank]
 
 	errorHandler func(error)
 
@@ -66,16 +68,26 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 }
 
 // New is the constructor of the MemPool.
-func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
+func New[VoteRank conflictdag.VoteRankType[VoteRank]](
+	transactionExecutor mempool.TransactionExecutor,
+	transactionInputReferenceRetriever mempool.TransactionInputReferenceRetriever,
+	stateResolver mempool.StateReferenceResolver,
+	workers *workerpool.Group,
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, VoteRank],
+	apiProvider iotago.APIProvider,
+	errorHandler func(error),
+	opts ...options.Option[MemPool[VoteRank]],
+) *MemPool[VoteRank] {
 	return options.Apply(&MemPool[VoteRank]{
 		signedTransactionAttached: event.New1[mempool.SignedTransactionMetadata](),
 		transactionAttached:       event.New1[mempool.TransactionMetadata](),
-		executeStateTransition:    vm,
-		resolveState:              inputResolver,
+		executeStateTransition:    transactionExecutor,
+		inputsOfTransaction:       transactionInputReferenceRetriever,
+		resolveState:              stateResolver,
 		attachments:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *SignedTransactionMetadata](),
 		cachedTransactions:        shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
 		cachedSignedTransactions:  shrinkingmap.New[iotago.SignedTransactionID, *SignedTransactionMetadata](),
-		cachedStateRequests:       shrinkingmap.New[iotago.Identifier, *promise.Promise[mempool.State]](),
+		cachedStateRequests:       shrinkingmap.New[mempool.StateID, *promise.Promise[*StateMetadata]](),
 		stateDiffs:                shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
 		executionWorkers:          workers.CreatePool("executionWorkers", 1),
 		conflictDAG:               conflictDAG,
@@ -123,34 +135,24 @@ func (m *MemPool[VoteRank]) TransactionMetadata(id iotago.TransactionID) (transa
 	return m.cachedTransactions.Get(id)
 }
 
-// OutputStateMetadata returns the metadata of the output state with the given ID.
-func (m *MemPool[VoteRank]) OutputStateMetadata(stateReference *iotago.UTXOInput) (state mempool.OutputStateMetadata, err error) {
+// StateMetadata returns the metadata of the output state with the given ID.
+func (m *MemPool[VoteRank]) StateMetadata(stateReference iotago.Input) (state mempool.StateMetadata, err error) {
 	stateRequest, exists := m.cachedStateRequests.Get(stateReference.StateID())
 
+	// create a new request that does not wait for missing states
 	if !exists || !stateRequest.WasCompleted() {
 		stateRequest = m.requestState(stateReference)
+		stateRequest.WaitComplete()
 	}
 
-	stateRequest.OnSuccess(func(loadedState mempool.State) {
-		switch loadedState.Type() {
-		case iotago.InputUTXO:
-			//nolint:forcetypeassert // we can safely assume that this is an OutputStateMetadata
-			state = loadedState.(mempool.OutputStateMetadata)
-		default:
-			// as we are waiting for this Promise completion, we can assign the outer err
-			err = ierrors.Errorf("invalid state type, only UTXO states can return metadata")
-		}
-	})
-	stateRequest.OnError(func(requestErr error) { err = ierrors.Errorf("failed to request state: %w", requestErr) })
-	stateRequest.WaitComplete()
-
-	return state, err
+	return stateRequest.Result(), stateRequest.Err()
 }
 
-// PublishCommitmentState publishes the given commitment state to the MemPool.
-func (m *MemPool[VoteRank]) PublishCommitmentState(commitment *iotago.Commitment) {
-	if stateRequest, exists := m.cachedStateRequests.Get(commitment.StateID()); exists {
-		stateRequest.Resolve(commitment)
+// InjectRequestedState allows to inject a requested state into the MemPool that is provided on the fly instead of being
+// provided by the ledger.
+func (m *MemPool[VoteRank]) InjectRequestedState(state mempool.State) {
+	if stateRequest, exists := m.cachedStateRequests.Get(state.StateID()); exists {
+		stateRequest.Resolve(NewStateMetadata(state))
 	}
 }
 
@@ -196,7 +198,12 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 		return nil, false, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastEvictedSlot)
 	}
 
-	newTransaction, err := NewTransactionMetadata(transaction)
+	inputReferences, err := m.inputsOfTransaction(transaction)
+	if err != nil {
+		return nil, false, false, ierrors.Wrap(err, "failed to get input references of transaction")
+	}
+
+	newTransaction, err := NewTransactionMetadata(transaction, inputReferences)
 	if err != nil {
 		return nil, false, false, ierrors.Errorf("failed to create transaction metadata: %w", err)
 	}
@@ -225,38 +232,19 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 
 func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 	for i, inputReference := range transaction.inputReferences {
-		stateReference, outputIndex := inputReference, i
+		stateReference, index := inputReference, i
 
-		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[mempool.State] {
+		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[*StateMetadata] {
 			return m.requestState(stateReference, true)
 		})
 
-		request.OnSuccess(func(state mempool.State) {
-			switch state.Type() {
-			case iotago.InputUTXO:
-				//nolint:forcetypeassert // we can safely assume that this is an OutputStateMetadata
-				outputStateMetadata := state.(*OutputStateMetadata)
+		request.OnSuccess(func(inputState *StateMetadata) {
+			transaction.publishInput(index, inputState)
 
-				transaction.publishInput(outputIndex, outputStateMetadata)
-
-				if created {
-					m.setupOutputState(outputStateMetadata)
-				}
-			case iotago.InputCommitment:
-				//nolint:forcetypeassert // we can safely assume that this is an ContextStateMetadata
-				contextStateMetadata := state.(*ContextStateMetadata)
-
-				transaction.publishCommitmentInput(contextStateMetadata)
-
-				if created {
-					contextStateMetadata.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(contextStateMetadata.StateID()) })
-				}
-			case iotago.InputBlockIssuanceCredit, iotago.InputReward:
-			default:
-				panic(ierrors.New("invalid state type resolved"))
+			if created {
+				m.setupOutputState(inputState)
 			}
 
-			// an input has been successfully resolved, decrease the unsolid input counter and check solidity.
 			if transaction.markInputSolid() {
 				transaction.shouldExecute.OnTrigger(func() {
 					m.executeTransaction(transaction)
@@ -270,12 +258,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 
 func (m *MemPool[VoteRank]) executeTransaction(transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
-		var timeReference mempool.ContextState
-		if commitmentStateMetadata, ok := transaction.CommitmentInput().(*ContextStateMetadata); ok && commitmentStateMetadata != nil {
-			timeReference = commitmentStateMetadata.State()
-		}
-
-		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction(), lo.Map(transaction.utxoInputs, (*OutputStateMetadata).State), timeReference); err != nil {
+		if outputStates, err := m.executeStateTransition(context.Background(), transaction.Transaction()); err != nil {
 			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)
@@ -287,11 +270,11 @@ func (m *MemPool[VoteRank]) executeTransaction(transaction *TransactionMetadata)
 
 func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	if m.optForkAllTransactions {
-		m.forkTransaction(transaction, ds.NewSet(lo.Map(transaction.utxoInputs, (*OutputStateMetadata).OutputID)...))
+		m.forkTransaction(transaction, ds.NewSet(lo.Map(transaction.inputs, (*StateMetadata).StateID)...))
 	} else {
-		lo.ForEach(transaction.utxoInputs, func(input *OutputStateMetadata) {
+		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 			input.OnDoubleSpent(func() {
-				m.forkTransaction(transaction, ds.NewSet(input.OutputID()))
+				m.forkTransaction(transaction, ds.NewSet(input.StateID()))
 			})
 		})
 	}
@@ -301,7 +284,7 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	}
 }
 
-func (m *MemPool[VoteRank]) forkTransaction(transaction *TransactionMetadata, resourceIDs ds.Set[iotago.OutputID]) {
+func (m *MemPool[VoteRank]) forkTransaction(transaction *TransactionMetadata, resourceIDs ds.Set[mempool.StateID]) {
 	transaction.setConflicting()
 
 	if err := m.conflictDAG.UpdateConflictingResources(transaction.ID(), resourceIDs); err != nil {
@@ -313,7 +296,7 @@ func (m *MemPool[VoteRank]) forkTransaction(transaction *TransactionMetadata, re
 
 func (m *MemPool[VoteRank]) publishOutputStates(transaction *TransactionMetadata) {
 	for _, output := range transaction.outputs {
-		stateRequest, isNew := m.cachedStateRequests.GetOrCreate(output.StateID(), lo.NoVariadic(promise.New[mempool.State]))
+		stateRequest, isNew := m.cachedStateRequests.GetOrCreate(output.StateID(), lo.NoVariadic(promise.New[*StateMetadata]))
 		stateRequest.Resolve(output)
 
 		if isNew {
@@ -322,31 +305,18 @@ func (m *MemPool[VoteRank]) publishOutputStates(transaction *TransactionMetadata
 	}
 }
 
-func (m *MemPool[VoteRank]) requestState(stateRef iotago.Input, waitIfMissing ...bool) *promise.Promise[mempool.State] {
-	return promise.New(func(p *promise.Promise[mempool.State]) {
+func (m *MemPool[VoteRank]) requestState(stateRef iotago.Input, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
+	return promise.New(func(p *promise.Promise[*StateMetadata]) {
 		request := m.resolveState(stateRef)
 
 		request.OnSuccess(func(state mempool.State) {
-			switch state.Type() {
-			case iotago.InputUTXO:
-				// The output was resolved from the ledger, meaning it was actually persisted as it was accepted and
-				// committed: otherwise we would have found it in cache or the request would have never resolved.
-				//nolint:forcetypeassert // we can safely assume that this is an OutputState
-				outputStateMetadata := NewOutputStateMetadata(state.(mempool.OutputState))
-				outputStateMetadata.setAccepted()
-				outputStateMetadata.setCommitted()
+			// The output was resolved from the ledger, meaning it was actually persisted as it was accepted and
+			// committed: otherwise we would have found it in cache or the request would have never resolved.
+			outputStateMetadata := NewStateMetadata(state)
+			outputStateMetadata.setAccepted()
+			outputStateMetadata.setCommitted()
 
-				p.Resolve(outputStateMetadata)
-			case iotago.InputCommitment:
-				//nolint:forcetypeassert // we can safely assume that this is an ContextState
-				commitmentStateMetadata := NewContextStateMetadata(state.(mempool.ContextState))
-
-				p.Resolve(commitmentStateMetadata)
-			case iotago.InputBlockIssuanceCredit, iotago.InputReward:
-				p.Resolve(state)
-			default:
-				p.Reject(ierrors.Errorf("unsupported input type %s", stateRef.Type()))
-			}
+			p.Resolve(outputStateMetadata)
 		})
 
 		request.OnError(func(err error) {
@@ -469,7 +439,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	})
 }
 
-func (m *MemPool[VoteRank]) setupOutputState(state *OutputStateMetadata) {
+func (m *MemPool[VoteRank]) setupOutputState(state *StateMetadata) {
 	state.OnCommitted(func() {
 		if !m.cachedStateRequests.Delete(state.StateID(), state.HasNoSpenders) && m.cachedStateRequests.Has(state.StateID()) {
 			state.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(state.StateID(), state.HasNoSpenders) })

@@ -10,9 +10,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type OutputStateMetadata struct {
-	outputID iotago.OutputID
-	state    mempool.OutputState
+type StateMetadata struct {
+	state mempool.State
 
 	// lifecycle
 	spenderCount       uint64
@@ -27,10 +26,9 @@ type OutputStateMetadata struct {
 	*inclusionFlags
 }
 
-func NewOutputStateMetadata(state mempool.OutputState, optSource ...*TransactionMetadata) *OutputStateMetadata {
-	return (&OutputStateMetadata{
-		outputID: state.OutputID(),
-		state:    state,
+func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *StateMetadata {
+	return (&StateMetadata{
+		state: state,
 
 		spent:              promise.NewEvent(),
 		doubleSpent:        promise.NewEvent(),
@@ -44,7 +42,7 @@ func NewOutputStateMetadata(state mempool.OutputState, optSource ...*Transaction
 	}).setup(optSource...)
 }
 
-func (s *OutputStateMetadata) setup(optSource ...*TransactionMetadata) *OutputStateMetadata {
+func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata {
 	if len(optSource) == 0 {
 		return s
 	}
@@ -61,41 +59,37 @@ func (s *OutputStateMetadata) setup(optSource ...*TransactionMetadata) *OutputSt
 	return s
 }
 
-func (s *OutputStateMetadata) StateID() iotago.Identifier {
+func (s *StateMetadata) StateID() mempool.StateID {
 	return s.state.StateID()
 }
 
-func (s *OutputStateMetadata) Type() iotago.StateType {
+func (s *StateMetadata) Type() iotago.StateType {
 	return iotago.InputUTXO
 }
 
-func (s *OutputStateMetadata) OutputID() iotago.OutputID {
-	return s.outputID
-}
-
-func (s *OutputStateMetadata) State() mempool.OutputState {
+func (s *StateMetadata) State() mempool.State {
 	return s.state
 }
 
-func (s *OutputStateMetadata) ConflictIDs() reactive.Set[iotago.TransactionID] {
+func (s *StateMetadata) ConflictIDs() reactive.Set[iotago.TransactionID] {
 	return s.conflictIDs
 }
 
-func (s *OutputStateMetadata) IsDoubleSpent() bool {
+func (s *StateMetadata) IsDoubleSpent() bool {
 	return s.doubleSpent.WasTriggered()
 }
 
-func (s *OutputStateMetadata) OnDoubleSpent(callback func()) {
+func (s *StateMetadata) OnDoubleSpent(callback func()) {
 	s.doubleSpent.OnTrigger(callback)
 }
 
-func (s *OutputStateMetadata) AcceptedSpender() (mempool.TransactionMetadata, bool) {
+func (s *StateMetadata) AcceptedSpender() (mempool.TransactionMetadata, bool) {
 	acceptedSpender := s.spendAccepted.Get()
 
 	return acceptedSpender, acceptedSpender != nil
 }
 
-func (s *OutputStateMetadata) OnAcceptedSpenderUpdated(callback func(spender mempool.TransactionMetadata)) {
+func (s *StateMetadata) OnAcceptedSpenderUpdated(callback func(spender mempool.TransactionMetadata)) {
 	s.spendAccepted.OnUpdate(func(prevValue, newValue *TransactionMetadata) {
 		if prevValue != newValue {
 			callback(newValue)
@@ -103,7 +97,7 @@ func (s *OutputStateMetadata) OnAcceptedSpenderUpdated(callback func(spender mem
 	})
 }
 
-func (s *OutputStateMetadata) OnSpendCommitted(callback func(spender mempool.TransactionMetadata)) {
+func (s *StateMetadata) OnSpendCommitted(callback func(spender mempool.TransactionMetadata)) {
 	s.spendCommitted.OnUpdate(func(prevValue, newValue *TransactionMetadata) {
 		if prevValue != newValue {
 			callback(newValue)
@@ -111,23 +105,23 @@ func (s *OutputStateMetadata) OnSpendCommitted(callback func(spender mempool.Tra
 	})
 }
 
-func (s *OutputStateMetadata) AllSpendersRemoved() bool {
+func (s *StateMetadata) AllSpendersRemoved() bool {
 	return s.allSpendersRemoved.WasTriggered()
 }
 
-func (s *OutputStateMetadata) onAllSpendersRemoved(callback func()) (unsubscribe func()) {
+func (s *StateMetadata) onAllSpendersRemoved(callback func()) (unsubscribe func()) {
 	return s.allSpendersRemoved.Hook(callback).Unhook
 }
 
-func (s *OutputStateMetadata) PendingSpenderCount() int {
+func (s *StateMetadata) PendingSpenderCount() int {
 	return int(atomic.LoadUint64(&s.spenderCount))
 }
 
-func (s *OutputStateMetadata) HasNoSpenders() bool {
+func (s *StateMetadata) HasNoSpenders() bool {
 	return atomic.LoadUint64(&s.spenderCount) == 0
 }
 
-func (s *OutputStateMetadata) increaseSpenderCount() {
+func (s *StateMetadata) increaseSpenderCount() {
 	if spenderCount := atomic.AddUint64(&s.spenderCount, 1); spenderCount == 1 {
 		s.spent.Trigger()
 	} else if spenderCount == 2 {
@@ -135,13 +129,13 @@ func (s *OutputStateMetadata) increaseSpenderCount() {
 	}
 }
 
-func (s *OutputStateMetadata) decreaseSpenderCount() {
+func (s *StateMetadata) decreaseSpenderCount() {
 	if atomic.AddUint64(&s.spenderCount, ^uint64(0)) == 0 {
 		s.allSpendersRemoved.Trigger()
 	}
 }
 
-func (s *OutputStateMetadata) setupSpender(spender *TransactionMetadata) {
+func (s *StateMetadata) setupSpender(spender *TransactionMetadata) {
 	s.increaseSpenderCount()
 
 	spender.OnAccepted(func() {

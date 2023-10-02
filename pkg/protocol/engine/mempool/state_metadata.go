@@ -5,10 +5,10 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type OutputStateMetadata interface {
-	OutputID() iotago.OutputID
+type StateMetadata interface {
+	StateID() StateID
 
-	State() OutputState
+	State() State
 
 	ConflictIDs() reactive.Set[iotago.TransactionID]
 
@@ -19,8 +19,4 @@ type OutputStateMetadata interface {
 	OnAcceptedSpenderUpdated(callback func(spender TransactionMetadata))
 
 	inclusionFlags
-}
-
-type ContextStateMetadata interface {
-	State() ContextState
 }
