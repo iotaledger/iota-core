@@ -28,10 +28,6 @@ func (m *MockedOutput) StoredMana() iotago.Mana {
 	panic("implement me")
 }
 
-func (m *MockedOutput) NativeTokenList() iotago.NativeTokens {
-	panic("implement me")
-}
-
 func (m *MockedOutput) UnlockConditionSet() iotago.UnlockConditionSet {
 	panic("implement me")
 }
