@@ -270,6 +270,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	latestParent = ts.CommitUntilSlot(block4Slot, activeNodes, block4)
 
+	// Transitioning to delayed claiming effectively removes the delegation, so we expect a negative delegation stake change.
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block4Slot, &model.AccountDiff{
 		BICChange:              0,
 		PreviousUpdatedTime:    0,
@@ -280,7 +281,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ValidatorStakeChange:   0,
 		StakeEndEpochChange:    0,
 		FixedCostChange:        0,
-		DelegationStakeChange:  0,
+		DelegationStakeChange:  -int64(delegatedAmount),
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -291,7 +292,7 @@ func Test_TransitionAccount(t *testing.T) {
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
-		DelegationStake: iotago.BaseToken(delegatedAmount),
+		DelegationStake: iotago.BaseToken(0),
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
