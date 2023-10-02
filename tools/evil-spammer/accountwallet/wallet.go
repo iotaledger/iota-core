@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/iota-core/tools/evil-spammer/logger"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -133,6 +134,49 @@ func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) 
 	createdOutput.Index = a.latestUsedIndex
 
 	return createdOutput, nil
+}
+
+func (a *AccountWallet) destroyAccount(alias string) error {
+	if _, ok := a.accountsAliases[alias]; !ok {
+		return ierrors.Errorf("account with alias %s does not exist", alias)
+	}
+	hdWallet := mock.NewHDWallet("", a.seed[:], a.aliasIndexMap[alias])
+
+	// get output from node
+	// From TIP42: Indexers and node plugins shall map the account address of the output derived with Account ID to the regular address -> output mapping table, so that given an Account Address, its most recent unspent account output can be retrieved.
+	// TODO: use correct outputID
+	accountOutput := a.client.GetOutput(iotago.EmptyOutputID)
+
+	txBuilder := builder.NewTransactionBuilder(a.api)
+	txBuilder.AddInput(&builder.TxInput{
+		UnlockTarget: a.accountsAliases[alias].ToAddress(),
+		// InputID:      accountOutput.ID(),
+		Input: accountOutput,
+	})
+
+	// send all tokens to faucet
+	txBuilder.AddOutput(&iotago.BasicOutput{
+		Amount: accountOutput.BaseTokenAmount(),
+		Conditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: a.faucet.facuetAddress},
+		},
+	})
+
+	tx, err := txBuilder.Build(hdWallet.AddressSigner())
+	if err != nil {
+		return ierrors.Wrap(err, "failed to build transaction")
+	}
+
+	_, err = a.client.PostTransaction(tx)
+	if err != nil {
+		return ierrors.Wrap(err, "failed to post transaction")
+	}
+
+	// remove account from wallet
+	delete(a.accountsAliases, alias)
+	delete(a.aliasIndexMap, alias)
+
+	return nil
 }
 
 // WithClientURL sets the client bind address.

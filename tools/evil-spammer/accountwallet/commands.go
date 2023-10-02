@@ -22,7 +22,7 @@ func (a *AccountWallet) CreateAccount(params *CreateAccountParams) (iotago.Accou
 }
 
 func (a *AccountWallet) DestroyAccount(params *DestroyAccountParams) error {
-	return nil
+	return a.destroyAccount(params.AccountAlias)
 }
 
 func (a *AccountWallet) ListAccount() error {
