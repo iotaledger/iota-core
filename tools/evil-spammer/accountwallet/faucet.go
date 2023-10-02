@@ -99,7 +99,6 @@ func (f *Faucet) RequestFunds(receiveAddr iotago.Address, amount iotago.BaseToke
 	txBuilder.SetCreationSlot(f.clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
 
 	hdWallet := mock.NewHDWallet("", f.seed[:], 0)
-
 	signedTx, err := txBuilder.Build(hdWallet.AddressSigner())
 	if err != nil {
 		log.Errorf("failed to build transaction: %s", err)

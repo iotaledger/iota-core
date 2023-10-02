@@ -116,19 +116,19 @@ func (a *AccountWallet) fromAccountStateFile() error {
 	return nil
 }
 
-func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) *models.Output {
+func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) (*models.Output, error) {
 	hdWallet := mock.NewHDWallet("", a.seed[:], a.latestUsedIndex+1)
 
 	receiverAddr := hdWallet.Address(addressType)
 	createdOutput, err := a.faucet.RequestFunds(receiverAddr, iotago.BaseToken(amount))
 	if err != nil {
-		panic(err)
+		return nil, ierrors.Wrap(err, "failed to request funds from faucet")
 	}
 
 	a.latestUsedIndex++
 	createdOutput.Index = a.latestUsedIndex
 
-	return createdOutput
+	return createdOutput, nil
 }
 
 // WithClientURL sets the client bind address.

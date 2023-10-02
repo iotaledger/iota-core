@@ -69,12 +69,13 @@ func accountsSubcommand(wallet *accountwallet.AccountWallet, sub *subcommand) {
 	case accountwallet.CreateAccountCommand:
 		params := parseCreateAccountFlags(sub.flags)
 		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.CreateAccountCommand, params)
-		err := wallet.CreateAccount(params)
+		accountID, err := wallet.CreateAccount(params)
 		if err != nil {
 			log.Errorf("Error creating account: %v", err)
 
 			return
 		}
+		log.Infof("Created account %s with %d tokens", accountID, params.Amount)
 	case accountwallet.DestroyAccountCommand:
 		params := parseDestroyAccountFlags(sub.flags)
 		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.DestroyAccountCommand, params)
