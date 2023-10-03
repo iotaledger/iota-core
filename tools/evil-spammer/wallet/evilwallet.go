@@ -61,6 +61,7 @@ type EvilWallet struct {
 	optFaucetSeed            []byte
 	optFaucetUnspentOutputID iotago.OutputID
 	optsClientURLs           []string
+	optsAccountsData         map[string]*models.AccountData
 }
 
 // NewEvilWallet creates an EvilWallet instance.
@@ -847,5 +848,11 @@ func WithFaucetOutputID(id iotago.OutputID) options.Option[EvilWallet] {
 func WithClients(urls ...string) options.Option[EvilWallet] {
 	return func(opts *EvilWallet) {
 		opts.optsClientURLs = urls
+	}
+}
+
+func WithAccountsData(accData map[string]*models.AccountData) options.Option[EvilWallet] {
+	return func(opts *EvilWallet) {
+		opts.optsAccountsData = accData
 	}
 }

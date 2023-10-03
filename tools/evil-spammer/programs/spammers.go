@@ -6,6 +6,7 @@ import (
 
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/logger"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	"github.com/iotaledger/iota.go/v4"
@@ -13,13 +14,13 @@ import (
 
 var log = logger.New("customSpam")
 
-func CustomSpam(params *CustomSpamParams) {
+func CustomSpam(params *CustomSpamParams, accData map[string]*models.AccountData) {
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 0)
 	if params.Config.LastFaucetUnspentOutputID != "" {
 		outputID, _ = iotago.OutputIDFromHex(params.Config.LastFaucetUnspentOutputID)
 	}
 
-	w := wallet.NewEvilWallet(wallet.WithClients(params.ClientURLs...), wallet.WithFaucetOutputID(outputID))
+	w := wallet.NewEvilWallet(wallet.WithClients(params.ClientURLs...), wallet.WithFaucetOutputID(outputID), wallet.WithAccountsData(accData))
 	wg := sync.WaitGroup{}
 
 	// funds are requested fro all spam types except SpammerTypeBlock
