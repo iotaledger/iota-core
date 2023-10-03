@@ -54,8 +54,8 @@ func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank]
 
 	return t
 }
-func (t *TestFramework) CreateSignedTransaction(transactionAlias string, referencedContextStates, referencedStates []string, outputCount uint16, invalid ...bool) {
-	t.CreateTransaction(transactionAlias, referencedContextStates, referencedStates, outputCount, invalid...)
+func (t *TestFramework) CreateSignedTransaction(transactionAlias string, referencedStates []string, outputCount uint16, invalid ...bool) {
+	t.CreateTransaction(transactionAlias, referencedStates, outputCount, invalid...)
 	t.SignedTransactionFromTransaction(transactionAlias+"-signed", transactionAlias)
 }
 func (t *TestFramework) SignedTransactionFromTransaction(signedTransactionAlias string, transactionAlias string) {
@@ -73,9 +73,9 @@ func (t *TestFramework) SignedTransactionFromTransaction(signedTransactionAlias 
 	signedTransactionID.RegisterAlias(signedTransactionAlias)
 }
 
-func (t *TestFramework) CreateTransaction(alias string, referencedContextStates, referencedStates []string, outputCount uint16, invalid ...bool) {
+func (t *TestFramework) CreateTransaction(alias string, referencedStates []string, outputCount uint16, invalid ...bool) {
 	// create transaction
-	transaction := NewTransaction(outputCount, lo.Map(referencedStates, t.stateReference), lo.Map(referencedContextStates, t.stateContextReference)...)
+	transaction := NewTransaction(outputCount, lo.Map(referencedStates, t.stateReference)...)
 	transaction.invalidTransaction = len(invalid) > 0 && invalid[0]
 
 	t.transactionByAlias[alias] = transaction
