@@ -57,13 +57,13 @@ func (s *StateDiff) Mutations() ads.Set[iotago.TransactionID] {
 
 func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata, direction int) {
 	for _, input := range transaction.inputs {
-		s.compactStateChanges(input, s.stateUsageCounters.Compute(input.State().StateID(), func(currentValue int, _ bool) int {
+		s.compactStateChanges(input, s.stateUsageCounters.Compute(input.state.StateID(), func(currentValue int, _ bool) int {
 			return currentValue - direction
 		}))
 	}
 
 	for _, output := range transaction.outputs {
-		s.compactStateChanges(output, s.stateUsageCounters.Compute(output.State().StateID(), func(currentValue int, _ bool) int {
+		s.compactStateChanges(output, s.stateUsageCounters.Compute(output.state.StateID(), func(currentValue int, _ bool) int {
 			return currentValue + direction
 		}))
 	}
@@ -91,6 +91,7 @@ func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) error 
 		if _, err := s.mutations.Delete(transaction.ID()); err != nil {
 			return ierrors.Wrapf(err, "failed to delete transaction from state diff's mutations, txID: %s", transaction.ID())
 		}
+
 		s.updateCompactedStateChanges(transaction, -1)
 	}
 
@@ -104,12 +105,12 @@ func (s *StateDiff) compactStateChanges(output *StateMetadata, newValue int) {
 
 	switch {
 	case newValue > 0:
-		s.createdOutputs.Set(output.State().StateID(), output)
+		s.createdOutputs.Set(output.state.StateID(), output)
 	case newValue < 0:
-		s.spentOutputs.Set(output.State().StateID(), output)
+		s.spentOutputs.Set(output.state.StateID(), output)
 	default:
-		s.createdOutputs.Delete(output.State().StateID())
-		s.spentOutputs.Delete(output.State().StateID())
+		s.createdOutputs.Delete(output.state.StateID())
+		s.spentOutputs.Delete(output.state.StateID())
 	}
 }
 
