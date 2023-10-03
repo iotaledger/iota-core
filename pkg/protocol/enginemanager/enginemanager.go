@@ -139,6 +139,18 @@ func (e *EngineManager) LoadActiveEngine(snapshotPath string) (*engine.Engine, e
 		if exists, isDirectory, err := ioutils.PathExists(e.directory.Path(info.Name)); err == nil && exists && isDirectory {
 			// Load previous engine as active
 			e.activeInstance = e.loadEngineInstanceFromSnapshot(info.Name, snapshotPath)
+
+			// Clear the storage of the active instance to be consistent with the latest committed slot.
+			// Everything after the latest committed slot is pruned to ensure a consistent state (e.g. accepted blocks).
+			targetSlot := e.activeInstance.Storage.Settings().LatestCommitment().Slot()
+			if err := e.rollbackStorage(e.activeInstance.Storage, targetSlot); err != nil {
+				return nil, ierrors.Wrapf(err, "failed to rollback storage to slot %d", targetSlot)
+			}
+
+			// Rollback attestations already on created engine instance, because this action modifies the in-memory storage.
+			if err := e.activeInstance.Attestations.Rollback(targetSlot); err != nil {
+				return nil, ierrors.Wrap(err, "error while rolling back attestations storage on candidate engine")
+			}
 		}
 	}
 
@@ -283,7 +295,7 @@ func (e *EngineManager) rollbackStorage(newStorage *storage.Storage, slot iotago
 		return ierrors.Wrap(err, "failed to rollback eviction state")
 	}
 	if err := newStorage.Ledger().Rollback(slot); err != nil {
-		return err
+		return ierrors.Wrapf(err, "failed to rollback ledger to slot %d", slot)
 	}
 
 	targetCommitment, err := newStorage.Commitments().Load(slot)
@@ -292,11 +304,11 @@ func (e *EngineManager) rollbackStorage(newStorage *storage.Storage, slot iotago
 	}
 
 	if err := newStorage.Settings().Rollback(targetCommitment); err != nil {
-		return err
+		return ierrors.Wrap(err, "failed to rollback settings")
 	}
 
 	if err := newStorage.RollbackPrunable(slot); err != nil {
-		return err
+		return ierrors.Wrap(err, "failed to rollback prunable data")
 	}
 
 	return nil

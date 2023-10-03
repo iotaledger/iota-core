@@ -252,6 +252,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to rollback engine for slot %d", commitmentID.Slot())
 		}
+		b.protocol.Events.MainEngineRestarted.Trigger(newEngine)
 
 		newEngine.SetChainID(targetEngine.ChainID())
 
