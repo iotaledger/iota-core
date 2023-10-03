@@ -21,7 +21,7 @@ func NewVM(ledger *Ledger) *VM {
 	}
 }
 
-func (v *VM) TransactionInputs(transaction mempool.Transaction) (inputReferences []iotago.Input, err error) {
+func (v *VM) StateReferences(transaction mempool.Transaction) (inputReferences []iotago.Input, err error) {
 	stardustTransaction, ok := transaction.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
@@ -143,7 +143,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 	return executionContext, nil
 }
 
-func (v *VM) ExecuteTransaction(executionContext context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
+func (v *VM) Execute(executionContext context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
 	stardustTransaction, ok := transaction.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid

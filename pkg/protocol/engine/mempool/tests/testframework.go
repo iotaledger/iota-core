@@ -22,7 +22,7 @@ type TestFramework struct {
 	Instance    mempool.MemPool[vote.MockedRank]
 	ConflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank]
 
-	referencesByAlias        map[string]iotago.Input
+	referencesByAlias        map[string]mempool.StateReference
 	stateIDByAlias           map[string]mempool.StateID
 	signedTransactionByAlias map[string]mempool.SignedTransaction
 	transactionByAlias       map[string]mempool.Transaction
@@ -39,7 +39,7 @@ func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank]
 	t := &TestFramework{
 		Instance:                 instance,
 		ConflictDAG:              conflictDAG,
-		referencesByAlias:        make(map[string]iotago.Input),
+		referencesByAlias:        make(map[string]mempool.StateReference),
 		stateIDByAlias:           make(map[string]mempool.StateID),
 		signedTransactionByAlias: make(map[string]mempool.SignedTransaction),
 		transactionByAlias:       make(map[string]mempool.Transaction),
@@ -311,7 +311,7 @@ func (t *TestFramework) setupHookedEvents() {
 	})
 }
 
-func (t *TestFramework) stateReference(alias string) iotago.Input {
+func (t *TestFramework) stateReference(alias string) mempool.StateReference {
 	if alias == "genesis" {
 		return &iotago.UTXOInput{}
 	}
@@ -393,7 +393,7 @@ func (t *TestFramework) Cleanup() {
 
 	iotago.UnregisterIdentifierAliases()
 
-	t.referencesByAlias = make(map[string]iotago.Input)
+	t.referencesByAlias = make(map[string]mempool.StateReference)
 	t.stateIDByAlias = make(map[string]mempool.StateID)
 	t.transactionByAlias = make(map[string]mempool.Transaction)
 	t.signedTransactionByAlias = make(map[string]mempool.SignedTransaction)

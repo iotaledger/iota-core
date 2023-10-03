@@ -25,7 +25,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	vm mempool.VM
 
 	// resolveState is the function that is used to request state from the ledger.
-	resolveState mempool.StateReferenceResolver
+	resolveState mempool.StateResolver
 
 	// attachments is the storage that is used to keep track of the attachments of transactions.
 	attachments *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *SignedTransactionMetadata]
@@ -66,7 +66,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 // New is the constructor of the MemPool.
 func New[VoteRank conflictdag.VoteRankType[VoteRank]](
 	vm mempool.VM,
-	stateResolver mempool.StateReferenceResolver,
+	stateResolver mempool.StateResolver,
 	workers *workerpool.Group,
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, VoteRank],
 	errorHandler func(error),
@@ -128,7 +128,7 @@ func (m *MemPool[VoteRank]) TransactionMetadata(id iotago.TransactionID) (transa
 }
 
 // StateMetadata returns the metadata of the output state with the given ID.
-func (m *MemPool[VoteRank]) StateMetadata(stateReference iotago.Input) (state mempool.StateMetadata, err error) {
+func (m *MemPool[VoteRank]) StateMetadata(stateReference mempool.StateReference) (state mempool.StateMetadata, err error) {
 	stateRequest, exists := m.cachedStateRequests.Get(stateReference.StateID())
 
 	// create a new request that does not wait for missing states
@@ -190,7 +190,7 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 		return nil, false, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastEvictedSlot)
 	}
 
-	inputReferences, err := m.vm.TransactionInputs(transaction)
+	inputReferences, err := m.vm.StateReferences(transaction)
 	if err != nil {
 		return nil, false, false, ierrors.Wrap(err, "failed to get input references of transaction")
 	}
@@ -249,7 +249,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 
 func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context, transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
-		if outputStates, err := m.vm.ExecuteTransaction(executionContext, transaction.Transaction()); err != nil {
+		if outputStates, err := m.vm.Execute(executionContext, transaction.Transaction()); err != nil {
 			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)
@@ -261,11 +261,13 @@ func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context,
 
 func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	if m.optForkAllTransactions {
-		m.forkTransaction(transaction, ds.NewSet(lo.Map(transaction.inputs, (*StateMetadata).StateID)...))
+		m.forkTransaction(transaction, ds.NewSet(lo.Map(transaction.inputs, func(stateMetadata *StateMetadata) mempool.StateID {
+			return stateMetadata.state.StateID()
+		})...))
 	} else {
 		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
 			input.OnDoubleSpent(func() {
-				m.forkTransaction(transaction, ds.NewSet(input.StateID()))
+				m.forkTransaction(transaction, ds.NewSet(input.state.StateID()))
 			})
 		})
 	}
@@ -287,7 +289,7 @@ func (m *MemPool[VoteRank]) forkTransaction(transactionMetadata *TransactionMeta
 
 func (m *MemPool[VoteRank]) publishOutputStates(transaction *TransactionMetadata) {
 	for _, output := range transaction.outputs {
-		stateRequest, isNew := m.cachedStateRequests.GetOrCreate(output.StateID(), lo.NoVariadic(promise.New[*StateMetadata]))
+		stateRequest, isNew := m.cachedStateRequests.GetOrCreate(output.State().StateID(), lo.NoVariadic(promise.New[*StateMetadata]))
 		stateRequest.Resolve(output)
 
 		if isNew {
@@ -296,7 +298,7 @@ func (m *MemPool[VoteRank]) publishOutputStates(transaction *TransactionMetadata
 	}
 }
 
-func (m *MemPool[VoteRank]) requestState(stateRef iotago.Input, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
+func (m *MemPool[VoteRank]) requestState(stateRef mempool.StateReference, waitIfMissing ...bool) *promise.Promise[*StateMetadata] {
 	return promise.New(func(p *promise.Promise[*StateMetadata]) {
 		request := m.resolveState(stateRef)
 
@@ -430,15 +432,15 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	})
 }
 
-func (m *MemPool[VoteRank]) setupOutputState(state *StateMetadata) {
-	state.OnCommitted(func() {
-		if !m.cachedStateRequests.Delete(state.StateID(), state.HasNoSpenders) && m.cachedStateRequests.Has(state.StateID()) {
-			state.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(state.StateID(), state.HasNoSpenders) })
+func (m *MemPool[VoteRank]) setupOutputState(stateMetadata *StateMetadata) {
+	stateMetadata.OnCommitted(func() {
+		if !m.cachedStateRequests.Delete(stateMetadata.state.StateID(), stateMetadata.HasNoSpenders) && m.cachedStateRequests.Has(stateMetadata.state.StateID()) {
+			stateMetadata.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(stateMetadata.state.StateID(), stateMetadata.HasNoSpenders) })
 		}
 	})
 
-	state.OnOrphaned(func() {
-		m.cachedStateRequests.Delete(state.StateID())
+	stateMetadata.OnOrphaned(func() {
+		m.cachedStateRequests.Delete(stateMetadata.state.StateID())
 	})
 }
 
