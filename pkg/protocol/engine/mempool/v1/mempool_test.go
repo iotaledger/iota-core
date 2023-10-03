@@ -35,9 +35,11 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	workers := workerpool.NewGroup(t.Name())
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
-	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](func() int { return 0 })
-	mempoolInstance := New[vote.MockedRank](mempooltests.VM, func(reference iotago.Input) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference.(*iotago.UTXOInput).OutputID())
+	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](func() int { return 0 })
+	mempoolInstance := New[vote.MockedRank](mempooltests.TransactionValidator, mempooltests.TransactionExecutor, func(transaction mempool.Transaction) ([]iotago.Input, error) {
+		return transaction.(*mempooltests.Transaction).Inputs()
+	}, func(reference iotago.Input) *promise.Promise[mempool.State] {
+		return ledgerState.ResolveOutputState(reference.StateID())
 	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {})
 
 	tf := mempooltests.NewTestFramework(t, mempoolInstance, conflictDAG, ledgerState, workers)
@@ -45,11 +47,12 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	issueTransactions := func(startIndex, transactionCount int, prevStateAlias string) (int, string) {
 		index := startIndex
 		for ; index < startIndex+transactionCount; index++ {
+			signedTxAlias := fmt.Sprintf("tx%d-signed", index)
 			txAlias := fmt.Sprintf("tx%d", index)
 			blockAlias := fmt.Sprintf("block%d", index)
-			tf.CreateTransaction(txAlias, []string{prevStateAlias}, 2)
+			tf.CreateSignedTransaction(txAlias, []string{prevStateAlias}, 2)
 
-			require.NoError(t, tf.AttachTransaction(txAlias, blockAlias, iotago.SlotIndex(index)))
+			require.NoError(t, tf.AttachTransaction(signedTxAlias, txAlias, blockAlias, iotago.SlotIndex(index)))
 			tf.RequireBooked(txAlias)
 
 			tf.MarkAttachmentIncluded(blockAlias)
@@ -83,7 +86,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	require.Equal(t, 0, mempoolInstance.cachedStateRequests.Size())
 
 	attachmentsSlotCount := 0
-	mempoolInstance.attachments.ForEach(func(index iotago.SlotIndex, storage *shrinkingmap.ShrinkingMap[iotago.BlockID, *TransactionMetadata]) {
+	mempoolInstance.attachments.ForEach(func(index iotago.SlotIndex, storage *shrinkingmap.ShrinkingMap[iotago.BlockID, *SignedTransactionMetadata]) {
 		attachmentsSlotCount++
 	})
 
@@ -102,10 +105,12 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	workers := workerpool.NewGroup(t.Name())
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
-	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
+	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
-	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.Input) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference.(*iotago.UTXOInput).OutputID())
+	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.TransactionValidator, mempooltests.TransactionExecutor, func(transaction mempool.Transaction) ([]iotago.Input, error) {
+		return transaction.(*mempooltests.Transaction).Inputs()
+	}, func(reference iotago.Input) *promise.Promise[mempool.State] {
+		return ledgerState.ResolveOutputState(reference.StateID())
 	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}), conflictDAG, ledgerState, workers)
 }
 
@@ -113,9 +118,11 @@ func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 	workers := workerpool.NewGroup(t.Name())
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
-	conflictDAG := conflictdagv1.New[iotago.TransactionID, iotago.OutputID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
+	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
-	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.VM, func(reference iotago.Input) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference.(*iotago.UTXOInput).OutputID())
+	return mempooltests.NewTestFramework(t, New[vote.MockedRank](mempooltests.TransactionValidator, mempooltests.TransactionExecutor, func(transaction mempool.Transaction) ([]iotago.Input, error) {
+		return transaction.(*mempooltests.Transaction).Inputs()
+	}, func(reference iotago.Input) *promise.Promise[mempool.State] {
+		return ledgerState.ResolveOutputState(reference.StateID())
 	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}, WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
 }

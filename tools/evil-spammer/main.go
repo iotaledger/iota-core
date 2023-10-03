@@ -27,20 +27,9 @@ func main() {
 
 		return
 	}
-	// run selected test scenario
-	switch Script {
-	case "interactive":
-		interactive.Run()
-	case "basic":
-		// load wallet
-		accData, err := accountwallet.ReadAccountWallet()
-		if err != nil {
-			log.Warn(err)
-			return
-		}
-
-		programs.CustomSpam(&customSpamParams, accData)
-	case "accounts":
+	// init account wallet
+	var accWallet *accountwallet.AccountWallet
+	if Script == "basic" || Script == "accounts" {
 		// load wallet
 		accWallet, err := accountwallet.Run(lastFaucetUnspendOutputID)
 		if err != nil {
@@ -54,7 +43,14 @@ func main() {
 				log.Errorf("Error while saving wallet state: %v", err)
 			}
 		}(accWallet, "wallet.dat")
-
+	}
+	// run selected test scenario
+	switch Script {
+	case "interactive":
+		interactive.Run()
+	case "basic":
+		programs.CustomSpam(&customSpamParams, accWallet)
+	case "accounts":
 		accountsSubcommands(accWallet, accountsSubcommandsFlags)
 	case "quick":
 		programs.QuickTest(&quickTestParams)

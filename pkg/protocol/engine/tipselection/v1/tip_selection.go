@@ -25,7 +25,7 @@ type TipSelection struct {
 	tipManager tipmanager.TipManager
 
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 
 	// rootBlocks is a function that returns the current root blocks.
 	rootBlocks func() iotago.BlockIDs
@@ -76,7 +76,7 @@ func New(opts ...options.Option[TipSelection]) *TipSelection {
 //
 // This method is separated from the constructor so the TipSelection can be initialized lazily after all dependencies
 // are available.
-func (t *TipSelection) Construct(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
+func (t *TipSelection) Construct(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
 	t.tipManager = tipManager
 	t.conflictDAG = conflictDAG
 	t.transactionMetadata = transactionMetadataRetriever
@@ -101,7 +101,7 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 	references = make(model.ParentReferences)
 	strongParents := ds.NewSet[iotago.BlockID]()
 	shallowLikesParents := ds.NewSet[iotago.BlockID]()
-	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]) error {
+	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]) error {
 		previousLikedInsteadConflicts := ds.NewSet[iotago.TransactionID]()
 
 		if t.collectReferences(references, iotago.StrongParentType, t.tipManager.StrongTips, func(tip tipmanager.TipMetadata) {
@@ -170,7 +170,7 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.Trans
 			return ierrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedConflictID)
 		}
 
-		necessaryReferences[likedConflictID] = lo.First(transactionMetadata.Attachments())
+		necessaryReferences[likedConflictID] = lo.First(transactionMetadata.ValidAttachments())
 
 		return nil
 	}); err != nil {

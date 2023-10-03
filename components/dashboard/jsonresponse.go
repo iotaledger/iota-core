@@ -130,13 +130,13 @@ type Transaction struct {
 
 // NewTransaction returns a Transaction from the given iotago.SignedTransaction.
 func NewTransaction(signedTx *iotago.SignedTransaction) *Transaction {
-	txID, err := signedTx.ID()
+	txID, err := signedTx.Transaction.ID()
 	if err != nil {
 		return nil
 	}
 
-	inputs := make([]*Input, len(signedTx.Transaction.Inputs))
-	for i, input := range signedTx.Transaction.Inputs {
+	inputs := make([]*Input, len(signedTx.Transaction.TransactionEssence.Inputs))
+	for i, input := range signedTx.Transaction.TransactionEssence.Inputs {
 		inputs[i] = NewInput(input)
 	}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/accountwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -52,57 +53,25 @@ type EvilWallet struct {
 	// faucet is the wallet of faucet
 	faucet        *Wallet
 	wallets       *Wallets
+	accWallet     *accountwallet.AccountWallet
 	connector     models.Connector
 	outputManager *OutputManager
 	aliasManager  *AliasManager
 
-	optFaucetSeed            []byte
-	optFaucetUnspentOutputID iotago.OutputID
-	optsClientURLs           []string
-	optsAccountsData         map[string]*models.AccountData
+	optsClientURLs []string
 }
 
 // NewEvilWallet creates an EvilWallet instance.
 func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 	return options.Apply(&EvilWallet{
-		wallets:                  NewWallets(),
-		aliasManager:             NewAliasManager(),
-		optFaucetSeed:            dockerFaucetSeed(),
-		optFaucetUnspentOutputID: iotago.OutputIDFromTransactionIDAndIndex(genesisTransactionID, 0),
-		optsClientURLs:           defaultClientsURLs,
+		wallets:        NewWallets(),
+		aliasManager:   NewAliasManager(),
+		optsClientURLs: defaultClientsURLs,
 	}, opts, func(w *EvilWallet) {
 		connector := models.NewWebClients(w.optsClientURLs)
 		w.connector = connector
-
-		clt := w.connector.GetClient()
-
 		w.outputManager = NewOutputManager(connector, w.wallets)
 
-		w.faucet = NewWallet()
-		w.faucet.seed = [32]byte(w.optFaucetSeed)
-
-		// get faucet output and amount
-		var faucetAmount iotago.BaseToken
-
-		faucetOutput := clt.GetOutput(w.optFaucetUnspentOutputID)
-		if faucetOutput != nil {
-			faucetAmount = faucetOutput.BaseTokenAmount()
-		} else {
-			// use the genesis output ID instead, if we relaunch the docker network
-			w.optFaucetUnspentOutputID = iotago.OutputIDFromTransactionIDAndIndex(genesisTransactionID, 0)
-			faucetOutput = clt.GetOutput(w.optFaucetUnspentOutputID)
-			if faucetOutput != nil {
-				faucetAmount = faucetOutput.BaseTokenAmount()
-			}
-		}
-
-		w.faucet.AddUnspentOutput(&models.Output{
-			Address:      w.faucet.AddressOnIndex(0),
-			Index:        0,
-			OutputID:     w.optFaucetUnspentOutputID,
-			Balance:      faucetAmount,
-			OutputStruct: faucetOutput,
-		})
 	})
 }
 
@@ -252,67 +221,10 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *models.Output
 	receiveAddr := wallet.AddressOnIndex(0)
 	clt := e.connector.GetClient()
 
-	faucetAddr := e.faucet.AddressOnIndex(0)
-	unspentFaucet := e.faucet.UnspentOutput(faucetAddr.String())
-	if unspentFaucet.OutputStruct == nil {
-		clt = e.connector.GetClient()
-		faucetOutput := clt.GetOutput(e.optFaucetUnspentOutputID)
-		if faucetOutput == nil {
-			panic("no valid faucet unspent output")
-		}
-		unspentFaucet.OutputStruct = faucetOutput
-	}
-	remainderAmount := unspentFaucet.Balance - faucetTokensPerRequest
-
-	txBuilder := builder.NewTransactionBuilder(clt.CurrentAPI())
-
-	txBuilder.AddInput(&builder.TxInput{
-		UnlockTarget: faucetAddr,
-		InputID:      unspentFaucet.OutputID,
-		Input:        unspentFaucet.OutputStruct,
-	})
-
-	// receiver output
-	txBuilder.AddOutput(&iotago.BasicOutput{
-		Amount: faucetTokensPerRequest,
-		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: receiveAddr},
-		},
-	})
-
-	// remainder output
-	txBuilder.AddOutput(&iotago.BasicOutput{
-		Amount: remainderAmount,
-		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: faucetAddr},
-		},
-	})
-
-	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
-	txBuilder.SetCreationSlot(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
-
-	signedTx, err := txBuilder.Build(e.faucet.AddressSigner(faucetAddr))
+	output, err := e.accWallet.Faucet.RequestFunds(clt, receiveAddr, faucetTokensPerRequest)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrap(err, "failed to request funds from faucet")
 	}
-
-	// send transaction
-	_, err = clt.PostTransaction(signedTx)
-	if err != nil {
-		return nil, err
-	}
-
-	// requested output to split and use in spammer
-	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0), signedTx.Transaction.Outputs[0])
-
-	// set remainder output to be reused by the faucet wallet
-	e.faucet.AddUnspentOutput(&models.Output{
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1),
-		Address:      faucetAddr,
-		Index:        0,
-		Balance:      signedTx.Transaction.Outputs[1].BaseTokenAmount(),
-		OutputStruct: signedTx.Transaction.Outputs[1],
-	})
 
 	return output, nil
 }
@@ -837,20 +749,14 @@ func (e *EvilWallet) SetTxOutputsSolid(outputs iotago.OutputIDs, clientID string
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func WithFaucetOutputID(id iotago.OutputID) options.Option[EvilWallet] {
-	return func(opts *EvilWallet) {
-		opts.optFaucetUnspentOutputID = id
-	}
-}
-
 func WithClients(urls ...string) options.Option[EvilWallet] {
 	return func(opts *EvilWallet) {
 		opts.optsClientURLs = urls
 	}
 }
 
-func WithAccountsData(accData map[string]*models.AccountData) options.Option[EvilWallet] {
+func WithAccountsWallet(wallet *accountwallet.AccountWallet) options.Option[EvilWallet] {
 	return func(opts *EvilWallet) {
-		opts.optsAccountsData = accData
+		opts.accWallet = wallet
 	}
 }
