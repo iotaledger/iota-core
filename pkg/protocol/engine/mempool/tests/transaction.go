@@ -21,7 +21,8 @@ func (s *SignedTransaction) String() string {
 
 type Transaction struct {
 	id                 iotago.TransactionID
-	inputs             []iotago.Input
+	utxoInputs         []iotago.Input
+	contextInputs      []iotago.Input
 	outputCount        uint16
 	invalidTransaction bool
 }
@@ -33,11 +34,12 @@ func NewSignedTransaction(transaction mempool.Transaction) *SignedTransaction {
 	}
 }
 
-func NewTransaction(outputCount uint16, inputs ...iotago.Input) *Transaction {
+func NewTransaction(outputCount uint16, inputs []iotago.Input, contextInputs ...iotago.Input) *Transaction {
 	return &Transaction{
-		id:          tpkg.RandTransactionID(),
-		inputs:      inputs,
-		outputCount: outputCount,
+		id:            tpkg.RandTransactionID(),
+		utxoInputs:    inputs,
+		contextInputs: contextInputs,
+		outputCount:   outputCount,
 	}
 }
 
@@ -46,15 +48,15 @@ func (t *Transaction) ID() (iotago.TransactionID, error) {
 }
 
 func (t *Transaction) Inputs() ([]iotago.Input, error) {
-	return t.inputs, nil
+	return append(t.utxoInputs, t.contextInputs...), nil
 }
 
-func (t *Transaction) CommitmentInput() *iotago.CommitmentInput {
-	return nil
+func (t *Transaction) UTXOInputs() ([]iotago.Input, error) {
+	return t.utxoInputs, nil
 }
 
-func (t *Transaction) ContextInputs() (iotago.TransactionContextInputs, error) {
-	return nil, nil
+func (t *Transaction) ContextInputs() ([]iotago.Input, error) {
+	return t.contextInputs, nil
 }
 
 func (t *Transaction) String() string {
