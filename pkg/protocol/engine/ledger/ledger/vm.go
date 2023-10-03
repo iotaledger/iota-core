@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 	iotagovm "github.com/iotaledger/iota.go/v4/vm"
-	"github.com/iotaledger/iota.go/v4/vm/stardust"
+	"github.com/iotaledger/iota.go/v4/vm/nova"
 )
 
 type VM struct {
@@ -131,7 +131,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 		RewardsInputSet:             rewardInputSet,
 	}
 
-	unlockedIdentities, err := stardust.NewVirtualMachine().ValidateUnlocks(signedStardustTransaction, resolvedInputs)
+	unlockedIdentities, err := nova.NewVirtualMachine().ValidateUnlocks(signedStardustTransaction, resolvedInputs)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (v *VM) Execute(executionContext context.Context, transaction mempool.Trans
 		return nil, ierrors.Errorf("resolvedInputs not found in execution context")
 	}
 
-	createdOutputs, err := stardust.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedIdentities)
+	createdOutputs, err := nova.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedIdentities)
 	if err != nil {
 		return nil, err
 	}
