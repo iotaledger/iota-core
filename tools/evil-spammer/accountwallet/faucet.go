@@ -12,18 +12,18 @@ import (
 )
 
 type Faucet struct {
-	facuetAddress *iotago.Ed25519Address
-	seed          []byte
-	faucerAddr    *iotago.Ed25519Address
-	clt           models.Client
-
+	address       *iotago.Ed25519Address
 	unspentOutput *models.Output
+	account       iotago.AccountID
+
+	seed []byte
+	clt  models.Client
 
 	sync.Mutex
 }
 
 func NewFaucet(clt models.Client, faucetUnspentOutputID iotago.OutputID) *Faucet {
-	//get faucet output and amount
+	//get Faucet output and amount
 	var faucetAmount iotago.BaseToken
 
 	faucetOutput := clt.GetOutput(faucetUnspentOutputID)
@@ -44,9 +44,9 @@ func NewFaucet(clt models.Client, faucetUnspentOutputID iotago.OutputID) *Faucet
 	}
 
 	hdWallet := mock.NewHDWallet("", f.seed[:], 0)
-	f.facuetAddress = hdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	f.address = hdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	f.unspentOutput = &models.Output{
-		Address:      f.faucerAddr,
+		Address:      f.address,
 		Index:        0,
 		OutputID:     faucetUnspentOutputID,
 		Balance:      faucetAmount,
@@ -56,13 +56,13 @@ func NewFaucet(clt models.Client, faucetUnspentOutputID iotago.OutputID) *Faucet
 	return f
 }
 
-func (f *Faucet) RequestFunds(receiveAddr iotago.Address, amount iotago.BaseToken) (*models.Output, error) {
+func (f *Faucet) RequestFunds(clt models.Client, receiveAddr iotago.Address, amount iotago.BaseToken) (*models.Output, error) {
 	remainderAmount := f.unspentOutput.Balance - amount
 
-	txBuilder := builder.NewTransactionBuilder(f.clt.CurrentAPI())
+	txBuilder := builder.NewTransactionBuilder(clt.CurrentAPI())
 
 	txBuilder.AddInput(&builder.TxInput{
-		UnlockTarget: f.facuetAddress,
+		UnlockTarget: f.address,
 		InputID:      f.unspentOutput.OutputID,
 		Input:        f.unspentOutput.OutputStruct,
 	})
@@ -91,12 +91,12 @@ func (f *Faucet) RequestFunds(receiveAddr iotago.Address, amount iotago.BaseToke
 	txBuilder.AddOutput(&iotago.BasicOutput{
 		Amount: remainderAmount,
 		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: f.facuetAddress},
+			&iotago.AddressUnlockCondition{Address: f.address},
 		},
 	})
 
-	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
-	txBuilder.SetCreationSlot(f.clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
+	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("Faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
+	txBuilder.SetCreationSlot(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
 
 	hdWallet := mock.NewHDWallet("", f.seed[:], 0)
 	signedTx, err := txBuilder.Build(hdWallet.AddressSigner())
@@ -107,17 +107,17 @@ func (f *Faucet) RequestFunds(receiveAddr iotago.Address, amount iotago.BaseToke
 	}
 
 	// send transaction
-	_, err = f.clt.PostTransaction(signedTx)
+	_, err = clt.PostTransaction(signedTx)
 	if err != nil {
 		log.Errorf("failed to post transaction: %s", err)
 
 		return nil, err
 	}
 
-	// set remainder output to be reused by the faucet wallet
+	// set remainder output to be reused by the Faucet wallet
 	f.unspentOutput = &models.Output{
 		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1),
-		Address:      f.facuetAddress,
+		Address:      f.address,
 		Index:        0,
 		Balance:      signedTx.Transaction.Outputs[1].BaseTokenAmount(),
 		OutputStruct: signedTx.Transaction.Outputs[1],
