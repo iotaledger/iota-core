@@ -265,22 +265,16 @@ func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context,
 
 func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	if m.optForkAllTransactions {
-		m.forkTransaction(
-			transaction,
-			ds.NewSet(
-				lo.Map(
-					lo.Filter(transaction.inputs, func(metadata *StateMetadata) bool {
-						return !metadata.state.ReadOnly()
-					}),
-					func(stateMetadata *StateMetadata) mempool.StateID {
-						return stateMetadata.state.StateID()
-					},
-				)...,
-			),
-		)
+		inputsToFork := lo.Filter(transaction.inputs, func(metadata *StateMetadata) bool {
+			return !metadata.state.IsReadOnly()
+		})
+
+		m.forkTransaction(transaction, ds.NewSet(lo.Map(inputsToFork, func(stateMetadata *StateMetadata) mempool.StateID {
+			return stateMetadata.state.StateID()
+		})...))
 	} else {
 		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
-			if !input.state.ReadOnly() {
+			if !input.state.IsReadOnly() {
 				input.OnDoubleSpent(func() {
 					m.forkTransaction(transaction, ds.NewSet(input.state.StateID()))
 				})
