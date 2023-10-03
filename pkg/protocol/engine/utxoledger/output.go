@@ -47,6 +47,10 @@ func (o *Output) Type() iotago.StateType {
 	return iotago.InputUTXO
 }
 
+func (o *Output) ReadOnly() bool {
+	return false
+}
+
 func (o *Output) OutputID() iotago.OutputID {
 	return o.outputID
 }

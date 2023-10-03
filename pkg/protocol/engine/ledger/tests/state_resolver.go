@@ -33,9 +33,9 @@ func (s *MockStateResolver) DestroyOutputState(stateID mempool.StateID) {
 
 func (s *MockStateResolver) ResolveOutputState(reference iotago.Input) *promise.Promise[mempool.State] {
 	if reference.Type() == iotago.InputUTXO {
-		output, exists := s.statesByID.Get(reference.StateID())
+		output, exists := s.statesByID.Get(reference.ReferencedStateID())
 		if !exists {
-			return promise.New[mempool.State]().Reject(ierrors.Errorf("output %s not found: %w", reference.StateID().ToHex(), mempool.ErrStateNotFound))
+			return promise.New[mempool.State]().Reject(ierrors.Errorf("output %s not found: %w", reference.ReferencedStateID().ToHex(), mempool.ErrStateNotFound))
 		}
 
 		return promise.New[mempool.State]().Resolve(output)

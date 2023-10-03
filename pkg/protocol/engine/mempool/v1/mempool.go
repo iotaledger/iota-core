@@ -129,7 +129,7 @@ func (m *MemPool[VoteRank]) TransactionMetadata(id iotago.TransactionID) (transa
 
 // StateMetadata returns the metadata of the output state with the given ID.
 func (m *MemPool[VoteRank]) StateMetadata(stateReference mempool.StateReference) (state mempool.StateMetadata, err error) {
-	stateRequest, exists := m.cachedStateRequests.Get(stateReference.StateID())
+	stateRequest, exists := m.cachedStateRequests.Get(stateReference.ReferencedStateID())
 
 	// create a new request that does not wait for missing states
 	if !exists || !stateRequest.WasCompleted() {
@@ -225,7 +225,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 	for i, inputReference := range transaction.inputReferences {
 		stateReference, index := inputReference, i
 
-		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[*StateMetadata] {
+		request, created := m.cachedStateRequests.GetOrCreate(stateReference.ReferencedStateID(), func() *promise.Promise[*StateMetadata] {
 			return m.requestState(stateReference, true)
 		})
 
@@ -261,14 +261,26 @@ func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context,
 
 func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 	if m.optForkAllTransactions {
-		m.forkTransaction(transaction, ds.NewSet(lo.Map(transaction.inputs, func(stateMetadata *StateMetadata) mempool.StateID {
-			return stateMetadata.state.StateID()
-		})...))
+		m.forkTransaction(
+			transaction,
+			ds.NewSet(
+				lo.Map(
+					lo.Filter(transaction.inputs, func(metadata *StateMetadata) bool {
+						return !metadata.state.ReadOnly()
+					}),
+					func(stateMetadata *StateMetadata) mempool.StateID {
+						return stateMetadata.state.StateID()
+					},
+				)...,
+			),
+		)
 	} else {
 		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
-			input.OnDoubleSpent(func() {
-				m.forkTransaction(transaction, ds.NewSet(input.state.StateID()))
-			})
+			if !input.state.ReadOnly() {
+				input.OnDoubleSpent(func() {
+					m.forkTransaction(transaction, ds.NewSet(input.state.StateID()))
+				})
+			}
 		})
 	}
 

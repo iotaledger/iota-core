@@ -6,4 +6,6 @@ type State interface {
 	StateID() StateID
 
 	Type() iotago.StateType
+
+	ReadOnly() bool
 }
