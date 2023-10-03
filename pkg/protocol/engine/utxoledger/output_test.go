@@ -122,8 +122,7 @@ func TestExtendedOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.
 	index := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.BasicOutput{
-		Amount:       amount,
-		NativeTokens: iotago.NativeTokens{},
+		Amount: amount,
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
@@ -156,8 +155,7 @@ func TestExtendedOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) 
 	timeLockUnlockSlot := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.BasicOutput{
-		Amount:       amount,
-		NativeTokens: iotago.NativeTokens{},
+		Amount: amount,
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
@@ -189,9 +187,8 @@ func TestNFTOutputSerialization(t *testing.T) {
 	index := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.NFTOutput{
-		Amount:       amount,
-		NativeTokens: iotago.NativeTokens{},
-		NFTID:        nftID,
+		Amount: amount,
+		NFTID:  nftID,
 		Conditions: iotago.NFTOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
@@ -223,9 +220,8 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 	expirationUnlockSlot := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.NFTOutput{
-		Amount:       amount,
-		NativeTokens: iotago.NativeTokens{},
-		NFTID:        nftID,
+		Amount: amount,
+		NFTID:  nftID,
 		Conditions: iotago.NFTOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address.ToAddress(),
@@ -265,9 +261,8 @@ func TestAccountOutputSerialization(t *testing.T) {
 	index := utils.RandSlotIndex()
 
 	iotaOutput := &iotago.AccountOutput{
-		Amount:       amount,
-		NativeTokens: iotago.NativeTokens{},
-		AccountID:    aliasID,
+		Amount:    amount,
+		AccountID: aliasID,
 		Conditions: iotago.AccountOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{
 				Address: stateController.ToAddress(),
@@ -276,6 +271,7 @@ func TestAccountOutputSerialization(t *testing.T) {
 				Address: governor,
 			},
 		},
+		StateMetadata: make([]byte, 0),
 		Features: iotago.AccountOutputFeatures{
 			&iotago.SenderFeature{
 				Address: sender.ToAddress(),
@@ -305,7 +301,6 @@ func TestFoundryOutputSerialization(t *testing.T) {
 
 	iotaOutput := &iotago.FoundryOutput{
 		Amount:       amount,
-		NativeTokens: iotago.NativeTokens{},
 		SerialNumber: utils.RandUint32(math.MaxUint32),
 		TokenScheme: &iotago.SimpleTokenScheme{
 			MintedTokens:  supply,
