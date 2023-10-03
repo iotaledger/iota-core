@@ -1,8 +1,6 @@
 package ledgertests
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
@@ -40,8 +38,6 @@ func (s *MockStateResolver) ResolveOutputState(reference iotago.Input) *promise.
 			return promise.New[mempool.State]().Reject(ierrors.Errorf("output %s not found: %w", reference.StateID().ToHex(), mempool.ErrStateNotFound))
 		}
 
-		fmt.Println("utxo input", output.StateID())
-
 		return promise.New[mempool.State]().Resolve(output)
 	} else if reference.Type() == iotago.InputCommitment {
 		output := &iotago.Commitment{
@@ -53,7 +49,6 @@ func (s *MockStateResolver) ResolveOutputState(reference iotago.Input) *promise.
 			ReferenceManaCost:    0,
 		}
 
-		fmt.Println("comitment input", output.StateID())
 		return promise.New[mempool.State]().Resolve(output)
 	}
 

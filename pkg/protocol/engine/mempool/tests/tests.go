@@ -95,7 +95,6 @@ func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
 		if state.State().Type() == iotago.InputUTXO {
-			fmt.Println("utxo", state.StateID())
 			require.False(t, state.IsAccepted())
 			require.Equal(t, 1, state.PendingSpenderCount())
 		}
@@ -121,7 +120,6 @@ func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
 	})
 
 	conflictSetsTx1, exists := tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))
-	fmt.Println(conflictSetsTx1.ToSlice()[0])
 	require.True(t, exists)
 	require.Equal(t, 1, conflictSetsTx1.Size())
 	require.True(t, conflictSetsTx1.Has(tf.StateID("genesis")))

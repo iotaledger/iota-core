@@ -2,7 +2,6 @@ package mempoolv1
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds"
@@ -280,7 +279,6 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 
 func (m *MemPool[VoteRank]) forkTransaction(transactionMetadata *TransactionMetadata, resourceIDs ds.Set[mempool.StateID]) {
 	transactionMetadata.conflicting.Trigger()
-	fmt.Println("fork transaction", transactionMetadata.ID(), "resources", resourceIDs.ToSlice())
 	if err := m.conflictDAG.UpdateConflictingResources(transactionMetadata.ID(), resourceIDs); err != nil {
 		transactionMetadata.orphaned.Trigger()
 
