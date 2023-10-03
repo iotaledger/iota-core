@@ -196,22 +196,6 @@ func (p *Promise[T]) WasResolved() bool {
 	return p.complete && p.err == nil
 }
 
-// Result returns the result of the promise (or the zero value if the promise was not resolved).
-func (p *Promise[T]) Result() T {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-
-	return p.result
-}
-
-// Err returns the error of the promise (or nil if the promise was not rejected).
-func (p *Promise[T]) Err() error {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-
-	return p.err
-}
-
 // WasRejected returns true if the promise was rejected.
 func (p *Promise[T]) WasRejected() bool {
 	p.mutex.RLock()
