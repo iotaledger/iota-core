@@ -19,9 +19,10 @@ import (
 type TransactionFramework struct {
 	apiProvider iotago.APIProvider
 
-	wallet       *mock.HDWallet
-	states       map[string]*utxoledger.Output
-	transactions map[string]*iotago.SignedTransaction
+	wallet             *mock.HDWallet
+	states             map[string]*utxoledger.Output
+	signedTransactions map[string]*iotago.SignedTransaction
+	transactions       map[string]*iotago.Transaction
 }
 
 func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, accounts ...snapshotcreator.AccountDetails) *TransactionFramework {
@@ -32,10 +33,12 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 	}
 
 	tf := &TransactionFramework{
-		apiProvider:  protocol,
-		states:       map[string]*utxoledger.Output{"Genesis:0": genesisOutput},
-		transactions: make(map[string]*iotago.SignedTransaction),
-		wallet:       mock.NewHDWallet("genesis", genesisSeed, 0),
+		apiProvider:        protocol,
+		states:             map[string]*utxoledger.Output{"Genesis:0": genesisOutput},
+		signedTransactions: make(map[string]*iotago.SignedTransaction),
+		transactions:       make(map[string]*iotago.Transaction),
+
+		wallet: mock.NewHDWallet("genesis", genesisSeed, 0),
 	}
 
 	for idx := range accounts {
@@ -50,13 +53,13 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 	return tf
 }
 
-func (t *TransactionFramework) RegisterSignedTransaction(alias string, transaction *iotago.SignedTransaction) {
+func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.Transaction) {
 	currentAPI := t.apiProvider.CurrentAPI()
 	(lo.PanicOnErr(transaction.ID())).RegisterAlias(alias)
 
 	t.transactions[alias] = transaction
 
-	for outputID, output := range lo.PanicOnErr(transaction.Transaction.OutputsSet()) {
+	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
 		clonedOutput := output.Clone()
 		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
 		if clonedOutput.Type() == iotago.OutputAccount {
@@ -67,6 +70,12 @@ func (t *TransactionFramework) RegisterSignedTransaction(alias string, transacti
 
 		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID(), currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
 	}
+}
+
+func (t *TransactionFramework) RegisterSignedTransaction(alias string, signedTransaction *iotago.SignedTransaction) {
+	(lo.PanicOnErr(signedTransaction.ID())).RegisterAlias(alias)
+
+	t.signedTransactions[alias] = signedTransaction
 }
 
 func (t *TransactionFramework) CreateSignedTransactionWithOptions(alias string, signingWallets []*mock.HDWallet, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
@@ -88,12 +97,13 @@ func (t *TransactionFramework) CreateSignedTransactionWithOptions(alias string, 
 	randomPayload := tpkg.Rand12ByteArray()
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
 
-	tx, err := options.Apply(txBuilder, opts).Build(iotago.NewInMemoryAddressSigner(walletKeys...))
+	signedTransaction, err := options.Apply(txBuilder, opts).Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 	if err == nil {
-		t.RegisterSignedTransaction(alias, tx)
+		t.RegisterSignedTransaction(alias, signedTransaction)
+		t.RegisterTransaction(alias, signedTransaction.Transaction)
 	}
 
-	return tx, err
+	return signedTransaction, err
 }
 
 func (t *TransactionFramework) CreateSimpleTransaction(alias string, outputCount int, inputAliases ...string) (*iotago.SignedTransaction, error) {
@@ -343,7 +353,7 @@ func (t *TransactionFramework) OutputID(alias string) iotago.OutputID {
 }
 
 func (t *TransactionFramework) SignedTransaction(alias string) *iotago.SignedTransaction {
-	transaction, exists := t.transactions[alias]
+	transaction, exists := t.signedTransactions[alias]
 	if !exists {
 		panic(ierrors.Errorf("transaction with given alias does not exist %s", alias))
 	}
@@ -369,11 +379,11 @@ func (t *TransactionFramework) Transaction(alias string) *iotago.Transaction {
 		panic(ierrors.Errorf("transaction with given alias does not exist %s", alias))
 	}
 
-	return transaction.Transaction
+	return transaction
 }
 
 func (t *TransactionFramework) TransactionID(alias string) iotago.TransactionID {
-	return lo.PanicOnErr(t.SignedTransaction(alias).Transaction.ID())
+	return lo.PanicOnErr(t.Transaction(alias).ID())
 }
 
 func (t *TransactionFramework) Transactions(aliases ...string) []*iotago.Transaction {

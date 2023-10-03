@@ -12,34 +12,37 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertTransaction(signedTransaction *iotago.SignedTransaction, node *mock.Node) mempool.Transaction {
+func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *mock.Node) mempool.Transaction {
 	var loadedTransactionMetadata mempool.TransactionMetadata
-	signedTransactionID, err := signedTransaction.ID()
+	transactionID, err := transaction.ID()
 	require.NoError(t.Testing, err)
 
 	t.Eventually(func() error {
 		var exists bool
-		loadedTransactionMetadata, exists = node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(signedTransactionID)
+		loadedTransactionMetadata, exists = node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
 		if !exists {
-			return ierrors.Errorf("AssertTransaction: %s: signedTransaction %s does not exist", node.Name, signedTransactionID)
+			return ierrors.Errorf("AssertTransaction: %s: transaction %s does not exist", node.Name, transactionID)
 		}
 
-		if signedTransactionID != loadedTransactionMetadata.ID() {
-			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, signedTransactionID, loadedTransactionMetadata.ID())
+		if transactionID != loadedTransactionMetadata.ID() {
+			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransactionMetadata.ID())
 		}
 
 		//nolint: forcetypeassert // we are in a test and want to assert it anyway
-		if !cmp.Equal(signedTransaction.Transaction, loadedTransactionMetadata.Transaction().(*iotago.Transaction)) {
-			return ierrors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, signedTransaction, loadedTransactionMetadata.Transaction())
+		if !cmp.Equal(transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence) {
+			return ierrors.Errorf("AssertTransaction: %s: expected TransactionEssence %v, got %v", node.Name, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence)
 		}
 
+		if !cmp.Equal(transaction.Outputs, loadedTransactionMetadata.Transaction().(*iotago.Transaction).Outputs) {
+			return ierrors.Errorf("AssertTransaction: %s: expected Outputs %s, got %s", node.Name, transaction.Outputs, loadedTransactionMetadata.Transaction().(*iotago.Transaction).Outputs)
+		}
 		return nil
 	})
 
 	return loadedTransactionMetadata.Transaction()
 }
 
-func (t *TestSuite) AssertTransactionsExist(transactions []*iotago.SignedTransaction, expectedExist bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertTransactionsExist(transactions []*iotago.Transaction, expectedExist bool, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -66,7 +69,7 @@ func (t *TestSuite) AssertTransactionsExist(transactions []*iotago.SignedTransac
 	}
 }
 
-func (t *TestSuite) assertTransactionsInCacheWithFunc(expectedTransactions []*iotago.SignedTransaction, expectedPropertyState bool, propertyFunc func(mempool.TransactionMetadata) bool, nodes ...*mock.Node) {
+func (t *TestSuite) assertTransactionsInCacheWithFunc(expectedTransactions []*iotago.Transaction, expectedPropertyState bool, propertyFunc func(mempool.TransactionMetadata) bool, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -92,31 +95,31 @@ func (t *TestSuite) assertTransactionsInCacheWithFunc(expectedTransactions []*io
 	}
 }
 
-func (t *TestSuite) AssertTransactionsInCacheAccepted(expectedTransactions []*iotago.SignedTransaction, expectedFlag bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertTransactionsInCacheAccepted(expectedTransactions []*iotago.Transaction, expectedFlag bool, nodes ...*mock.Node) {
 	t.assertTransactionsInCacheWithFunc(expectedTransactions, expectedFlag, mempool.TransactionMetadata.IsAccepted, nodes...)
 }
 
-func (t *TestSuite) AssertTransactionsInCacheRejected(expectedTransactions []*iotago.SignedTransaction, expectedFlag bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertTransactionsInCacheRejected(expectedTransactions []*iotago.Transaction, expectedFlag bool, nodes ...*mock.Node) {
 	t.assertTransactionsInCacheWithFunc(expectedTransactions, expectedFlag, mempool.TransactionMetadata.IsRejected, nodes...)
 }
 
-func (t *TestSuite) AssertTransactionsInCacheBooked(expectedTransactions []*iotago.SignedTransaction, expectedFlag bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertTransactionsInCacheBooked(expectedTransactions []*iotago.Transaction, expectedFlag bool, nodes ...*mock.Node) {
 	t.assertTransactionsInCacheWithFunc(expectedTransactions, expectedFlag, mempool.TransactionMetadata.IsBooked, nodes...)
 }
 
-func (t *TestSuite) AssertTransactionsInCacheConflicting(expectedTransactions []*iotago.SignedTransaction, expectedFlag bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertTransactionsInCacheConflicting(expectedTransactions []*iotago.Transaction, expectedFlag bool, nodes ...*mock.Node) {
 	t.assertTransactionsInCacheWithFunc(expectedTransactions, expectedFlag, mempool.TransactionMetadata.IsConflicting, nodes...)
 }
 
-func (t *TestSuite) AssertTransactionsInCacheInvalid(expectedTransactions []*iotago.SignedTransaction, expectedFlag bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertTransactionsInCacheInvalid(expectedTransactions []*iotago.Transaction, expectedFlag bool, nodes ...*mock.Node) {
 	t.assertTransactionsInCacheWithFunc(expectedTransactions, expectedFlag, mempool.TransactionMetadata.IsInvalid, nodes...)
 }
 
-func (t *TestSuite) AssertTransactionsInCachePending(expectedTransactions []*iotago.SignedTransaction, expectedFlag bool, nodes ...*mock.Node) {
+func (t *TestSuite) AssertTransactionsInCachePending(expectedTransactions []*iotago.Transaction, expectedFlag bool, nodes ...*mock.Node) {
 	t.assertTransactionsInCacheWithFunc(expectedTransactions, expectedFlag, mempool.TransactionMetadata.IsPending, nodes...)
 }
 
-func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*iotago.SignedTransaction][]string, nodes ...*mock.Node) {
+func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*iotago.Transaction][]string, nodes ...*mock.Node) {
 	for _, node := range nodes {
 		for transaction, conflictAliases := range transactionConflicts {
 			transactionID, err := transaction.ID()
@@ -128,7 +131,7 @@ func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*
 					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: block %s does not exist", node.Name, transactionID)
 				}
 
-				expectedConflictIDs := ds.NewSet(lo.Map(conflictAliases, t.TransactionFramework.SignedTransactionID)...)
+				expectedConflictIDs := ds.NewSet(lo.Map(conflictAliases, t.TransactionFramework.TransactionID)...)
 				actualConflictIDs := transactionFromCache.ConflictIDs()
 
 				if expectedConflictIDs.Size() != actualConflictIDs.Size() {

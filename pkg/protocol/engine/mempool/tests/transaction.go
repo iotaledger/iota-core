@@ -28,7 +28,7 @@ type Transaction struct {
 
 func NewSignedTransaction(transaction mempool.Transaction) *SignedTransaction {
 	return &SignedTransaction{
-		id:          tpkg.RandTransactionID(),
+		id:          tpkg.RandSignedTransactionID(),
 		transaction: transaction,
 	}
 }

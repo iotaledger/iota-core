@@ -130,7 +130,7 @@ type Transaction struct {
 
 // NewTransaction returns a Transaction from the given iotago.SignedTransaction.
 func NewTransaction(signedTx *iotago.SignedTransaction) *Transaction {
-	txID, err := signedTx.ID()
+	txID, err := signedTx.Transaction.ID()
 	if err != nil {
 		return nil
 	}

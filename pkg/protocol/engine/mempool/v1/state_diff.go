@@ -31,7 +31,7 @@ func NewStateDiff(slot iotago.SlotIndex) *StateDiff {
 		createdOutputs:       shrinkingmap.New[mempool.StateID, mempool.StateMetadata](),
 		executedTransactions: orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata](),
 		stateUsageCounters:   shrinkingmap.New[mempool.StateID, int](),
-		mutations:            ads.NewSet(mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.SlotIdentifierFromBytes),
+		mutations:            ads.NewSet(mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes),
 	}
 }
 

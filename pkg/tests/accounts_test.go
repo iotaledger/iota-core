@@ -161,7 +161,7 @@ func Test_TransitionAccount(t *testing.T) {
 		NewExpirySlot:          0,
 		PreviousExpirySlot:     1,
 		NewOutputID:            iotago.EmptyOutputID,
-		PreviousOutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.SignedTransaction("TX1").ID()), 0),
+		PreviousOutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ValidatorStakeChange:   0,
