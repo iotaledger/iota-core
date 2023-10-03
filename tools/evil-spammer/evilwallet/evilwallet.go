@@ -28,8 +28,6 @@ const (
 
 	awaitConfirmationSleep   = 3 * time.Second
 	awaitSolidificationSleep = time.Millisecond * 500
-
-	WaitForTxSolid = 150 * time.Second
 )
 
 var (
