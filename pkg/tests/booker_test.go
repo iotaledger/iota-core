@@ -416,17 +416,21 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-commit1"), true, node1, node2)
 	}
 
-	// Commit further and evict transactions
+	// Commit further and test eviction of transactions
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 1, "5.1", ts.Nodes("node1", "node2"), false, nil)
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2", "tx3"), true, node1, node2)
+
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, nil)
 
 		ts.AssertNodeState(ts.Nodes("node1", "node2"),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithLatestCommitmentSlotIndex(6),
-			testsuite.WithEqualStoredCommitmentAtIndex(6),
-			testsuite.WithEvictedSlot(6),
+			testsuite.WithLatestCommitmentSlotIndex(8),
+			testsuite.WithEqualStoredCommitmentAtIndex(8),
+			testsuite.WithEvictedSlot(8),
 		)
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2", "tx3"), false, node1, node2)
 	}
+
+	// TODO: test orphanage of pending conflict
 }
