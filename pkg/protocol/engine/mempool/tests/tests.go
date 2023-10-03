@@ -49,8 +49,8 @@ func TestAllWithForkingEverything(t *testing.T, frameworkProvider func(*testing.
 }
 
 func TestProcessTransaction(t *testing.T, tf *TestFramework) {
-	tf.CreateTransaction("tx1", []string{}, []string{"genesis"}, 1)
-	tf.CreateTransaction("tx2", []string{}, []string{"tx1:0"}, 1)
+	tf.CreateTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateTransaction("tx2", []string{"tx1:0"}, 1)
 
 	tf.SignedTransactionFromTransaction("tx2", "tx2")
 	tf.SignedTransactionFromTransaction("tx1", "tx1")
@@ -81,8 +81,8 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 }
 
 func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
-	tf.CreateTransaction("tx1", []string{"readOnlyInput"}, []string{"genesis"}, 1)
-	tf.CreateTransaction("tx2", []string{"readOnlyInput"}, []string{"tx1:0"}, 1)
+	tf.CreateTransaction("tx1", []string{"genesis", "readOnlyInput"}, 1)
+	tf.CreateTransaction("tx2", []string{"tx1:0", "readOnlyInput"}, 1)
 
 	tf.SignedTransactionFromTransaction("tx2", "tx2")
 	tf.SignedTransactionFromTransaction("tx1", "tx1")
@@ -131,9 +131,9 @@ func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
 }
 
 func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
-	tf.CreateSignedTransaction("tx1", []string{}, []string{"genesis"}, 1)
-	tf.CreateSignedTransaction("tx2", []string{}, []string{"tx1:0"}, 1)
-	tf.CreateSignedTransaction("tx3", []string{}, []string{"tx2:0"}, 1)
+	tf.CreateSignedTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateSignedTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateSignedTransaction("tx3", []string{"tx2:0"}, 1)
 
 	require.NoError(t, tf.AttachTransaction("tx3-signed", "tx3", "tx3", 1))
 	require.NoError(t, tf.AttachTransaction("tx2-signed", "tx2", "tx2", 1))
@@ -175,9 +175,9 @@ func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
 func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
-	tf.CreateSignedTransaction("tx1", []string{}, []string{"genesis"}, 1)
-	tf.CreateSignedTransaction("tx2", []string{}, []string{"tx1:0"}, 1)
-	tf.CreateSignedTransaction("tx3", []string{}, []string{"tx2:0"}, 1)
+	tf.CreateSignedTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateSignedTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateSignedTransaction("tx3", []string{"tx2:0"}, 1)
 
 	require.NoError(t, tf.AttachTransaction("tx3-signed", "tx3", "block3", 3))
 	require.NoError(t, tf.AttachTransaction("tx2-signed", "tx2", "block2", 2))
@@ -238,9 +238,9 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 func TestSetTransactionOrphanage(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
-	tf.CreateSignedTransaction("tx1", []string{}, []string{"genesis"}, 1)
-	tf.CreateSignedTransaction("tx2", []string{}, []string{"tx1:0"}, 1)
-	tf.CreateSignedTransaction("tx3", []string{}, []string{"tx2:0"}, 1)
+	tf.CreateSignedTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateSignedTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateSignedTransaction("tx3", []string{"tx2:0"}, 1)
 
 	require.NoError(t, tf.AttachTransaction("tx3-signed", "tx3", "block3", 3))
 	require.NoError(t, tf.AttachTransaction("tx2-signed", "tx2", "block2", 2))
@@ -276,9 +276,9 @@ func TestSetTransactionOrphanage(t *testing.T, tf *TestFramework) {
 func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
-	tf.CreateSignedTransaction("tx1", []string{}, []string{"genesis"}, 1)
-	tf.CreateSignedTransaction("tx2", []string{}, []string{"tx1:0"}, 1)
-	tf.CreateSignedTransaction("tx3", []string{}, []string{"tx2:0"}, 1)
+	tf.CreateSignedTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateSignedTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateSignedTransaction("tx3", []string{"tx2:0"}, 1)
 
 	require.NoError(t, tf.AttachTransaction("tx3-signed", "tx3", "block3", 4))
 	require.NoError(t, tf.AttachTransaction("tx2-signed", "tx2", "block2", 3))
@@ -330,9 +330,9 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 func TestStateDiff(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
-	tf.CreateSignedTransaction("tx1", []string{}, []string{"genesis"}, 1)
-	tf.CreateSignedTransaction("tx2", []string{}, []string{"tx1:0"}, 1)
-	tf.CreateSignedTransaction("tx3", []string{}, []string{"tx2:0"}, 1)
+	tf.CreateSignedTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateSignedTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateSignedTransaction("tx3", []string{"tx2:0"}, 1)
 
 	require.NoError(t, tf.AttachTransaction("tx3-signed", "tx3", "block3", 1))
 	require.NoError(t, tf.AttachTransaction("tx2-signed", "tx2", "block2", 1))
@@ -361,14 +361,14 @@ func TestStateDiff(t *testing.T, tf *TestFramework) {
 func TestConflictPropagationForkAll(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
-	tf.CreateSignedTransaction("tx1", []string{}, []string{"genesis"}, 1)
-	tf.CreateSignedTransaction("tx1*", []string{}, []string{"genesis"}, 1)
+	tf.CreateSignedTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateSignedTransaction("tx1*", []string{"genesis"}, 1)
 
-	tf.CreateSignedTransaction("tx2", []string{}, []string{"tx1:0"}, 1)
-	tf.CreateSignedTransaction("tx2*", []string{}, []string{"tx1*:0"}, 1)
-	tf.CreateSignedTransaction("tx3", []string{}, []string{"tx2:0"}, 1)
-	tf.CreateSignedTransaction("tx3*", []string{}, []string{"tx2*:0"}, 1)
-	tf.CreateSignedTransaction("tx4", []string{}, []string{"tx1:0"}, 1)
+	tf.CreateSignedTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateSignedTransaction("tx2*", []string{"tx1*:0"}, 1)
+	tf.CreateSignedTransaction("tx3", []string{"tx2:0"}, 1)
+	tf.CreateSignedTransaction("tx3*", []string{"tx2*:0"}, 1)
+	tf.CreateSignedTransaction("tx4", []string{"tx1:0"}, 1)
 
 	require.NoError(t, tf.AttachTransaction("tx3-signed", "tx3", "block3", 3))
 	require.NoError(t, tf.AttachTransaction("tx2-signed", "tx2", "block2", 2))
@@ -393,14 +393,14 @@ func TestConflictPropagationForkAll(t *testing.T, tf *TestFramework) {
 func TestConflictPropagationForkOnDoubleSpend(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
-	tf.CreateSignedTransaction("tx1", []string{}, []string{"genesis"}, 1)
-	tf.CreateSignedTransaction("tx1*", []string{}, []string{"genesis"}, 1)
+	tf.CreateSignedTransaction("tx1", []string{"genesis"}, 1)
+	tf.CreateSignedTransaction("tx1*", []string{"genesis"}, 1)
 
-	tf.CreateSignedTransaction("tx2", []string{}, []string{"tx1:0"}, 1)
-	tf.CreateSignedTransaction("tx2*", []string{}, []string{"tx1*:0"}, 1)
-	tf.CreateSignedTransaction("tx3", []string{}, []string{"tx2:0"}, 1)
-	tf.CreateSignedTransaction("tx3*", []string{}, []string{"tx2*:0"}, 1)
-	tf.CreateSignedTransaction("tx4", []string{}, []string{"tx1:0"}, 1)
+	tf.CreateSignedTransaction("tx2", []string{"tx1:0"}, 1)
+	tf.CreateSignedTransaction("tx2*", []string{"tx1*:0"}, 1)
+	tf.CreateSignedTransaction("tx3", []string{"tx2:0"}, 1)
+	tf.CreateSignedTransaction("tx3*", []string{"tx2*:0"}, 1)
+	tf.CreateSignedTransaction("tx4", []string{"tx1:0"}, 1)
 
 	require.NoError(t, tf.AttachTransaction("tx3-signed", "tx3", "block3", 3))
 	require.NoError(t, tf.AttachTransaction("tx2-signed", "tx2", "block2", 2))
@@ -426,7 +426,7 @@ func TestInvalidTransaction(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
 
-	tf.CreateSignedTransaction("tx1", []string{}, []string{"genesis"}, 1, true)
+	tf.CreateSignedTransaction("tx1", []string{"genesis"}, 1, true)
 	require.NoError(t, tf.AttachTransaction("tx1-signed", "tx1", "block2", 1))
 
 	tf.RequireInvalid("tx1")
@@ -438,7 +438,7 @@ func TestStoreAttachmentInEvictedSlot(t *testing.T, tf *TestFramework) {
 
 	tf.Instance.Evict(iotago.SlotIndex(5))
 
-	tf.CreateSignedTransaction("tx1", []string{}, []string{"genesis"}, 1, true)
+	tf.CreateSignedTransaction("tx1", []string{"genesis"}, 1, true)
 	require.Error(t, tf.AttachTransaction("tx1-signed", "tx1", "block2", 1))
 
 	require.False(t, lo.Return2(tf.TransactionMetadata("tx1")))
@@ -451,7 +451,7 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 			signedTxAlias := fmt.Sprintf("tx%d-signed", index)
 			txAlias := fmt.Sprintf("tx%d", index)
 			blockAlias := fmt.Sprintf("block%d", index)
-			tf.CreateSignedTransaction(txAlias, []string{}, []string{prevStateAlias}, 2)
+			tf.CreateSignedTransaction(txAlias, []string{prevStateAlias}, 2)
 
 			require.NoError(t, tf.AttachTransaction(signedTxAlias, txAlias, blockAlias, iotago.SlotIndex(index)))
 			tf.RequireBooked(txAlias)
