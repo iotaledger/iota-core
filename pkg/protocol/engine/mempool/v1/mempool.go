@@ -70,6 +70,7 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 func New[VoteRank conflictdag.VoteRankType[VoteRank]](
 	vm mempool.VM,
 	stateResolver mempool.StateResolver,
+	mutationsFunc func(iotago.SlotIndex) (kvstore.KVStore, error),
 	workers *workerpool.Group,
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, VoteRank],
 	errorHandler func(error),
@@ -78,6 +79,7 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](
 	return options.Apply(&MemPool[VoteRank]{
 		vm:                        vm,
 		resolveState:              stateResolver,
+		mutationsFunc:             mutationsFunc,
 		attachments:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *SignedTransactionMetadata](),
 		cachedTransactions:        shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
 		cachedSignedTransactions:  shrinkingmap.New[iotago.SignedTransactionID, *SignedTransactionMetadata](),
@@ -402,11 +404,15 @@ func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error)
 
 func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
+		// Transactions can only become accepted if there is at least one attachment is included.
 		if slot := transaction.EarliestIncludedAttachment().Slot(); slot != 0 {
-			if stateDiff, evicted := m.stateDiff(slot); !evicted {
-				if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
-					m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
-				}
+			stateDiff, err := m.stateDiff(slot)
+			if err != nil {
+				m.errorHandler(ierrors.Wrapf(err, "failed to get state diff for slot %d", slot))
+			}
+
+			if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
+				m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
 			}
 		}
 	})

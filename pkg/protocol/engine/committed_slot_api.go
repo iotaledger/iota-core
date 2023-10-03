@@ -83,7 +83,7 @@ func (c *CommittedSlotAPI) TransactionIDs() (iotago.TransactionIDs, error) {
 		return nil, ierrors.Errorf("failed to get mutations of slot index %d", c.CommitmentID.Slot())
 	}
 
-	set := ads.NewSet(store, iotago.TransactionID.Bytes, iotago.SlotIdentifierFromBytes)
+	set := ads.NewSet(store, iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
 	transactionIDs := make(iotago.TransactionIDs, 0, set.Size())
 
 	if err = set.Stream(func(key iotago.TransactionID) error {
