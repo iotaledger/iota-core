@@ -152,11 +152,11 @@ func (s *OutputStateMetadata) setupSpender(spender *TransactionMetadata) {
 		s.spendAccepted.Set(nil)
 	})
 
-	spender.OnCommitted(func() {
+	spender.OnCommitted(func(_ iotago.SlotIndex) {
 		s.spendCommitted.Set(spender)
 
 		s.decreaseSpenderCount()
 	})
 
-	spender.OnOrphaned(s.decreaseSpenderCount)
+	spender.OnOrphaned(func(_ iotago.SlotIndex) { s.decreaseSpenderCount() })
 }

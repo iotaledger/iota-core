@@ -3,6 +3,7 @@ package mempoolv1
 import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/runtime/promise"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // inclusionFlags represents important flags and events that relate to the inclusion of an entity in the distributed ledger.
@@ -10,23 +11,30 @@ type inclusionFlags struct {
 	// accepted gets triggered when the entity gets marked as accepted.
 	accepted reactive.Variable[bool]
 
-	// committed gets triggered when the entity gets marked as committed.
-	committed *promise.Event
+	// committed gets set when the entity gets marked as committed.
+	committed reactive.Variable[iotago.SlotIndex]
 
 	// rejected gets triggered when the entity gets marked as rejected.
 	rejected *promise.Event
 
-	// orphaned gets triggered when the entity gets marked as orphaned.
-	orphaned *promise.Event
+	// orphaned gets set when the entity gets marked as orphaned.
+	orphaned reactive.Variable[iotago.SlotIndex]
 }
 
 // newInclusionFlags creates a new inclusionFlags instance.
 func newInclusionFlags() *inclusionFlags {
 	return &inclusionFlags{
 		accepted:  reactive.NewVariable[bool](),
-		committed: promise.NewEvent(),
+		committed: reactive.NewVariable[iotago.SlotIndex](),
 		rejected:  promise.NewEvent(),
-		orphaned:  promise.NewEvent(),
+		// Make sure the oldest orphaned index doesn't get overridden by newer TX spending the orphaned conflit further.
+		orphaned: reactive.NewVariable[iotago.SlotIndex](func(currentValue, newValue iotago.SlotIndex) iotago.SlotIndex {
+			if currentValue != 0 {
+				return currentValue
+			}
+
+			return newValue
+		}),
 	}
 }
 
@@ -68,23 +76,27 @@ func (s *inclusionFlags) OnRejected(callback func()) {
 }
 
 // IsCommitted returns true if the entity was committed.
-func (s *inclusionFlags) IsCommitted() bool {
-	return s.committed.WasTriggered()
+func (s *inclusionFlags) IsCommitted() (slot iotago.SlotIndex, isCommitted bool) {
+	return s.committed.Get(), s.committed.Get() != 0
 }
 
 // OnCommitted registers a callback that gets triggered when the entity gets committed.
-func (s *inclusionFlags) OnCommitted(callback func()) {
-	s.committed.OnTrigger(callback)
+func (s *inclusionFlags) OnCommitted(callback func(slot iotago.SlotIndex)) {
+	s.committed.OnUpdate(func(_, newValue iotago.SlotIndex) {
+		callback(newValue)
+	})
 }
 
 // IsOrphaned returns true if the entity was orphaned.
-func (s *inclusionFlags) IsOrphaned() bool {
-	return s.orphaned.WasTriggered()
+func (s *inclusionFlags) IsOrphaned() (slot iotago.SlotIndex, isOrphaned bool) {
+	return s.orphaned.Get(), s.orphaned.Get() != 0
 }
 
 // OnOrphaned registers a callback that gets triggered when the entity gets orphaned.
-func (s *inclusionFlags) OnOrphaned(callback func()) {
-	s.orphaned.OnTrigger(callback)
+func (s *inclusionFlags) OnOrphaned(callback func(slot iotago.SlotIndex)) {
+	s.orphaned.OnUpdate(func(_, newValue iotago.SlotIndex) {
+		callback(newValue)
+	})
 }
 
 // setAccepted marks the entity as accepted.
@@ -103,11 +115,11 @@ func (s *inclusionFlags) setRejected() {
 }
 
 // setCommitted marks the entity as committed.
-func (s *inclusionFlags) setCommitted() {
-	s.committed.Trigger()
+func (s *inclusionFlags) setCommitted(slot iotago.SlotIndex) {
+	s.committed.Set(slot)
 }
 
 // setOrphaned marks the entity as orphaned.
-func (s *inclusionFlags) setOrphaned() {
-	s.orphaned.Trigger()
+func (s *inclusionFlags) setOrphaned(slot iotago.SlotIndex) {
+	s.orphaned.Set(slot)
 }

@@ -41,6 +41,14 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	// stateDiffs holds aggregated state mutations for each slot.
 	stateDiffs *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *StateDiff]
 
+	// delayedTransactionEviction holds the transactions that can only be evicted after MaxCommittableAge to objectively
+	// invalidate blocks that try to spend from them.
+	delayedTransactionEviction *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ds.Set[iotago.TransactionID]]
+
+	// delayedOutputStateEviction holds the outputs that can only be evicted after MaxCommittableAge to objectively
+	// invalidate blocks that try to spend them.
+	delayedOutputStateEviction *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.Identifier, *OutputStateMetadata]]
+
 	// conflictDAG is the DAG that is used to keep track of the conflicts between transactions.
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank]
 
@@ -63,17 +71,19 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 // New is the constructor of the MemPool.
 func New[VoteRank conflictdag.VoteRankType[VoteRank]](vm mempool.VM, inputResolver mempool.StateReferenceResolver, workers *workerpool.Group, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, VoteRank], apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[MemPool[VoteRank]]) *MemPool[VoteRank] {
 	return options.Apply(&MemPool[VoteRank]{
-		transactionAttached:    event.New1[mempool.TransactionMetadata](),
-		executeStateTransition: vm,
-		resolveState:           inputResolver,
-		attachments:            memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata](),
-		cachedTransactions:     shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
-		cachedStateRequests:    shrinkingmap.New[iotago.Identifier, *promise.Promise[mempool.State]](),
-		stateDiffs:             shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
-		executionWorkers:       workers.CreatePool("executionWorkers", 1),
-		conflictDAG:            conflictDAG,
-		apiProvider:            apiProvider,
-		errorHandler:           errorHandler,
+		transactionAttached:        event.New1[mempool.TransactionMetadata](),
+		executeStateTransition:     vm,
+		resolveState:               inputResolver,
+		attachments:                memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *TransactionMetadata](),
+		cachedTransactions:         shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
+		cachedStateRequests:        shrinkingmap.New[iotago.Identifier, *promise.Promise[mempool.State]](),
+		stateDiffs:                 shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
+		delayedTransactionEviction: shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.TransactionID]](),
+		delayedOutputStateEviction: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.Identifier, *OutputStateMetadata]](),
+		executionWorkers:           workers.CreatePool("executionWorkers", 1),
+		conflictDAG:                conflictDAG,
+		apiProvider:                apiProvider,
+		errorHandler:               errorHandler,
 	}, opts, (*MemPool[VoteRank]).setup)
 }
 
@@ -179,6 +189,32 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 			return true
 		})
 	}
+
+	maxCommittableAge := m.apiProvider.CurrentAPI().ProtocolParameters().MaxCommittableAge()
+	if slot <= maxCommittableAge {
+		return
+	}
+
+	delayedEvictionSlot := slot - maxCommittableAge
+	if delayedTransactions, exists := m.delayedTransactionEviction.Get(delayedEvictionSlot); exists {
+		delayedTransactions.Range(func(txID iotago.TransactionID) {
+			if transaction, exists := m.cachedTransactions.Get(txID); exists {
+				transaction.setEvicted()
+			}
+		})
+		m.delayedTransactionEviction.Delete(delayedEvictionSlot)
+	}
+
+	if delayedOutputs, exists := m.delayedOutputStateEviction.Get(delayedEvictionSlot); exists {
+		delayedOutputs.ForEach(func(stateID iotago.Identifier, state *OutputStateMetadata) bool {
+			if !m.cachedStateRequests.Delete(stateID, state.HasNoSpenders) && m.cachedStateRequests.Has(stateID) {
+				state.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(stateID, state.HasNoSpenders) })
+			}
+
+			return true
+		})
+		m.delayedOutputStateEviction.Delete(delayedEvictionSlot)
+	}
 }
 
 func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, blockID iotago.BlockID) (storedTransaction *TransactionMetadata, isNew bool, err error) {
@@ -209,6 +245,9 @@ func (m *MemPool[VoteRank]) storeTransaction(transaction mempool.Transaction, bl
 func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 	for i, inputReference := range transaction.inputReferences {
 		stateReference, outputIndex := inputReference, i
+
+		if inputReference.Type() == iotago.InputUTXO {
+		}
 
 		request, created := m.cachedStateRequests.GetOrCreate(stateReference.StateID(), func() *promise.Promise[mempool.State] {
 			return m.requestState(stateReference, true)
@@ -277,7 +316,8 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 		})
 	}
 
-	if !transaction.IsOrphaned() && transaction.setBooked() {
+	// if !lo.Return2(transaction.IsOrphaned()) && transaction.setBooked() {
+	if transaction.setBooked() {
 		m.publishOutputStates(transaction)
 	}
 }
@@ -286,7 +326,8 @@ func (m *MemPool[VoteRank]) forkTransaction(transaction *TransactionMetadata, re
 	transaction.setConflicting()
 
 	if err := m.conflictDAG.UpdateConflictingResources(transaction.ID(), resourceIDs); err != nil {
-		transaction.setOrphaned()
+		// this is a hack, as with a reactive.Variable we cannot set it to 0 and still check if it was orphaned.
+		transaction.setOrphaned(1)
 
 		m.errorHandler(err)
 	}
@@ -315,7 +356,7 @@ func (m *MemPool[VoteRank]) requestState(stateRef iotago.Input, waitIfMissing ..
 				//nolint:forcetypeassert // we can safely assume that this is an OutputState
 				outputStateMetadata := NewOutputStateMetadata(state.(mempool.OutputState))
 				outputStateMetadata.setAccepted()
-				outputStateMetadata.setCommitted()
+				outputStateMetadata.setCommitted(outputStateMetadata.state.SlotCreated())
 
 				p.Resolve(outputStateMetadata)
 			case iotago.InputCommitment:
@@ -444,17 +485,31 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 			})
 		}
 	})
+
+	transaction.OnOrphaned(func(slot iotago.SlotIndex) {
+		lo.Return1(m.delayedTransactionEviction.GetOrCreate(slot, func() ds.Set[iotago.TransactionID] { return ds.NewSet[iotago.TransactionID]() })).Add(transaction.ID())
+	})
+
+	transaction.OnCommitted(func(slot iotago.SlotIndex) {
+		lo.Return1(m.delayedTransactionEviction.GetOrCreate(slot, func() ds.Set[iotago.TransactionID] { return ds.NewSet[iotago.TransactionID]() })).Add(transaction.ID())
+	})
 }
 
 func (m *MemPool[VoteRank]) setupOutputState(state *OutputStateMetadata) {
-	state.OnCommitted(func() {
-		if !m.cachedStateRequests.Delete(state.StateID(), state.HasNoSpenders) && m.cachedStateRequests.Has(state.StateID()) {
-			state.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(state.StateID(), state.HasNoSpenders) })
-		}
+	state.onAllSpendersRemoved(func() {
+		m.cachedStateRequests.Delete(state.StateID(), state.HasNoSpenders)
 	})
 
-	state.OnOrphaned(func() {
-		m.cachedStateRequests.Delete(state.StateID())
+	state.OnCommitted(func(slot iotago.SlotIndex) {
+		lo.Return1(m.delayedOutputStateEviction.GetOrCreate(slot, func() *shrinkingmap.ShrinkingMap[iotago.Identifier, *OutputStateMetadata] {
+			return shrinkingmap.New[iotago.Identifier, *OutputStateMetadata]()
+		})).Set(state.StateID(), state)
+	})
+
+	state.OnOrphaned(func(slot iotago.SlotIndex) {
+		lo.Return1(m.delayedOutputStateEviction.GetOrCreate(slot, func() *shrinkingmap.ShrinkingMap[iotago.Identifier, *OutputStateMetadata] {
+			return shrinkingmap.New[iotago.Identifier, *OutputStateMetadata]()
+		})).Set(state.StateID(), state)
 	})
 }
 

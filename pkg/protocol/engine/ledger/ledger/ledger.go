@@ -192,7 +192,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 
 	// Mark each transaction as committed so the mempool can evict it
 	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, tx mempool.TransactionMetadata) bool {
-		tx.Commit()
+		tx.Commit(slot)
 		return true
 	})
 

@@ -56,7 +56,7 @@ func (s *ContextStateMetadata) onAllSpendersRemoved(callback func()) (unsubscrib
 func (s *ContextStateMetadata) setupSpender(spender *TransactionMetadata) {
 	s.increaseSpenderCount()
 
-	spender.OnCommitted(s.decreaseSpenderCount)
+	spender.OnCommitted(func(_ iotago.SlotIndex) { s.decreaseSpenderCount() })
 
-	spender.OnOrphaned(s.decreaseSpenderCount)
+	spender.OnOrphaned(func(_ iotago.SlotIndex) { s.decreaseSpenderCount() })
 }

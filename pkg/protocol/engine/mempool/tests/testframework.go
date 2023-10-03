@@ -123,7 +123,7 @@ func (t *TestFramework) CommitSlot(slot iotago.SlotIndex) {
 	})
 
 	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, transaction mempool.TransactionMetadata) bool {
-		transaction.Commit()
+		transaction.Commit(slot)
 
 		return true
 	})

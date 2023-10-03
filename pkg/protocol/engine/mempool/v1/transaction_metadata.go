@@ -41,7 +41,8 @@ type TransactionMetadata struct {
 	// attachments
 	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
 	earliestIncludedAttachment reactive.Variable[iotago.BlockID]
-	allAttachmentsEvicted      *promise.Event
+	// allAttachmentsEvicted is set on the slot of the last and newest evicted attachment
+	allAttachmentsEvicted reactive.Variable[iotago.SlotIndex]
 
 	// mutex needed?
 	mutex syncutils.RWMutex
@@ -97,7 +98,7 @@ func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMe
 
 		attachments:                shrinkingmap.New[iotago.BlockID, bool](),
 		earliestIncludedAttachment: reactive.NewVariable[iotago.BlockID](),
-		allAttachmentsEvicted:      promise.NewEvent(),
+		allAttachmentsEvicted:      reactive.NewVariable[iotago.SlotIndex](),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(), nil
@@ -236,8 +237,8 @@ func (t *TransactionMetadata) markInputSolid() (allInputsSolid bool) {
 	return false
 }
 
-func (t *TransactionMetadata) Commit() {
-	t.setCommitted()
+func (t *TransactionMetadata) Commit(slot iotago.SlotIndex) {
+	t.setCommitted(slot)
 }
 
 func (t *TransactionMetadata) IsConflicting() bool {
@@ -302,7 +303,9 @@ func (t *TransactionMetadata) setupInput(input *OutputStateMetadata) {
 
 	input.OnSpendCommitted(func(spender mempool.TransactionMetadata) {
 		if spender != t {
-			t.setOrphaned()
+			spender.OnCommitted(func(slot iotago.SlotIndex) {
+				t.setOrphaned(slot)
+			})
 		}
 	})
 }
@@ -316,9 +319,9 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		t.conflictIDs.Replace(ds.NewSet(t.id))
 	})
 
-	t.allAttachmentsEvicted.OnTrigger(func() {
-		if !t.IsCommitted() {
-			t.setOrphaned()
+	t.allAttachmentsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
+		if !lo.Return2(t.IsCommitted()) {
+			t.setOrphaned(slot)
 		}
 	})
 
@@ -331,9 +334,6 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 			}
 		}
 	})
-
-	t.OnCommitted(t.setEvicted)
-	t.OnOrphaned(t.setEvicted)
 
 	return t
 }
@@ -390,7 +390,7 @@ func (t *TransactionMetadata) OnEarliestIncludedAttachmentUpdated(callback func(
 
 func (t *TransactionMetadata) evictAttachment(id iotago.BlockID) {
 	if t.attachments.Delete(id) && t.attachments.IsEmpty() {
-		t.allAttachmentsEvicted.Trigger()
+		t.allAttachmentsEvicted.Set(id.Slot())
 	}
 }
 
