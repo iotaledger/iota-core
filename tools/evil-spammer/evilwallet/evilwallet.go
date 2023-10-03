@@ -33,7 +33,7 @@ const (
 var (
 	defaultClientsURLs = []string{"http://localhost:8080", "http://localhost:8090"}
 
-	genesisTransactionID = iotago.SlotIdentifierRepresentingData(0, []byte("genesis"))
+	genesisTransactionID = iotago.TransactionIDRepresentingData(0, []byte("genesis"))
 
 	dockerFaucetSeed = func() []byte {
 		genesisSeed, err := base58.Decode("7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih")
