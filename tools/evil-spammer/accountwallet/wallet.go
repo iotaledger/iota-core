@@ -155,15 +155,48 @@ func (a *AccountWallet) registerAccount(alias string, outputID iotago.OutputID, 
 	return accountID
 }
 
+func (a *AccountWallet) updateAccountStatus(alias string, status models.AccountStatus) (*models.AccountData, bool) {
+	accData, exists := a.accountsAliases[alias]
+	if !exists {
+		return nil, false
+	}
+
+	if accData.Status == status {
+		return accData, false
+	}
+
+	accData.Status = status
+	a.accountsAliases[alias] = accData
+
+	return accData, true
+}
+
 func (a *AccountWallet) getAccount(alias string) (*models.AccountData, error) {
 	accData, exists := a.accountsAliases[alias]
 	if !exists {
 		return nil, ierrors.Errorf("account with alias %s does not exist", alias)
 	}
+
+	// check if account is ready (to be included in a commitment)
+	ready := a.isAccountReady(accData)
+	if !ready {
+		return nil, ierrors.Errorf("account with alias %s is not ready", alias)
+	}
+
+	accData, _ = a.updateAccountStatus(alias, models.AccountReady)
+
+	return accData, nil
+}
+
+func (a *AccountWallet) isAccountReady(accData *models.AccountData) bool {
+	if accData.Status == models.AccountReady {
+		return true
+	}
+
 	creationSlot := accData.OutputID.CreationSlot()
 
 	// wait for the account to be committed
-	log.Infof("Waiting for account %s to be committed within slot %d...", alias, creationSlot)
+	log.Infof("Waiting for account %s to be committed within slot %d...", accData.Alias, creationSlot)
 	err := a.retry(func() (bool, error) {
 		resp, err := a.client.GetBlockIssuance()
 		if err != nil {
@@ -171,7 +204,7 @@ func (a *AccountWallet) getAccount(alias string) (*models.AccountData, error) {
 		}
 
 		if resp.Commitment.Slot >= creationSlot {
-			log.Infof("Slot %d commited, account %s is ready to use", creationSlot, alias)
+			log.Infof("Slot %d commited, account %s is ready to use", creationSlot, accData.Alias)
 			return true, nil
 		}
 
@@ -179,35 +212,11 @@ func (a *AccountWallet) getAccount(alias string) (*models.AccountData, error) {
 	})
 
 	if err != nil {
-		log.Errorf("failed to get commitment details while waiting %s: %s", alias, err)
-		return nil, err
+		log.Errorf("failed to get commitment details while waiting %s: %s", accData.Alias, err)
+		return false
 	}
 
-	return accData, nil
-
-}
-
-func (a *AccountWallet) retry(requestFunc func() (bool, error)) error {
-	timeout := time.NewTimer(a.optsRequestTimeout)
-	interval := time.NewTicker(a.optsRequestTicker)
-	defer timeutil.CleanupTimer(timeout)
-	defer timeutil.CleanupTicker(interval)
-
-	for {
-		done, err := requestFunc()
-		if err != nil {
-			return err
-		}
-		if done {
-			return nil
-		}
-		select {
-		case <-interval.C:
-			continue
-		case <-timeout.C:
-			return ierrors.New("timeout while trying to request")
-		}
-	}
+	return true
 }
 
 func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) (*models.Output, error) {
@@ -228,7 +237,6 @@ func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) 
 func (a *AccountWallet) destroyAccount(alias string) error {
 	accData, err := a.getAccount(alias)
 	if err != nil {
-
 		return err
 	}
 	hdWallet := mock.NewHDWallet("", a.seed[:], accData.Index)
@@ -268,4 +276,27 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 
 	log.Infof("Account %s has been destroyed", alias)
 	return nil
+}
+
+func (a *AccountWallet) retry(requestFunc func() (bool, error)) error {
+	timeout := time.NewTimer(a.optsRequestTimeout)
+	interval := time.NewTicker(a.optsRequestTicker)
+	defer timeutil.CleanupTimer(timeout)
+	defer timeutil.CleanupTicker(interval)
+
+	for {
+		done, err := requestFunc()
+		if err != nil {
+			return err
+		}
+		if done {
+			return nil
+		}
+		select {
+		case <-interval.C:
+			continue
+		case <-timeout.C:
+			return ierrors.New("timeout while trying to request")
+		}
+	}
 }
