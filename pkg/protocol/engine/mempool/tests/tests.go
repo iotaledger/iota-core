@@ -35,13 +35,14 @@ func TestAllWithoutForkingEverything(t *testing.T, frameworkProvider func(*testi
 
 func TestAllWithForkingEverything(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 	for testName, testCase := range map[string]func(*testing.T, *TestFramework){
-		"TestConflictPropagationForkAll":        TestConflictPropagationForkAll,
-		"TestSetTxOrphanageMultipleAttachments": TestSetTxOrphanageMultipleAttachments,
-		"TestProcessTransaction":                TestProcessTransaction,
-		"TestProcessTransactionsOutOfOrder":     TestProcessTransactionsOutOfOrder,
-		"TestSetTransactionOrphanage":           TestSetTransactionOrphanage,
-		"TestInvalidTransaction":                TestInvalidTransaction,
-		"TestStoreAttachmentInEvictedSlot":      TestStoreAttachmentInEvictedSlot,
+		"TestConflictPropagationForkAll":           TestConflictPropagationForkAll,
+		"TestSetTxOrphanageMultipleAttachments":    TestSetTxOrphanageMultipleAttachments,
+		"TestProcessTransactionWithReadOnlyInputs": TestProcessTransactionWithReadOnlyInputs,
+		"TestProcessTransaction":                   TestProcessTransaction,
+		"TestProcessTransactionsOutOfOrder":        TestProcessTransactionsOutOfOrder,
+		"TestSetTransactionOrphanage":              TestSetTransactionOrphanage,
+		"TestInvalidTransaction":                   TestInvalidTransaction,
+		"TestStoreAttachmentInEvictedSlot":         TestStoreAttachmentInEvictedSlot,
 	} {
 		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
 	}
@@ -77,6 +78,65 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 
 		return nil
 	})
+}
+
+func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
+	tf.InjectState("readOnlyInput", &iotago.Commitment{
+		ProtocolVersion:      0,
+		Slot:                 0,
+		PreviousCommitmentID: iotago.CommitmentID{},
+		RootsID:              iotago.Identifier{},
+		CumulativeWeight:     0,
+		ReferenceManaCost:    0,
+	})
+
+	tf.CreateTransaction("tx1", []string{"genesis", "readOnlyInput"}, 1)
+	tf.CreateTransaction("tx2", []string{"tx1:0", "readOnlyInput"}, 1)
+
+	tf.SignedTransactionFromTransaction("tx2", "tx2")
+	tf.SignedTransactionFromTransaction("tx1", "tx1")
+
+	require.NoError(t, tf.AttachTransactions("tx1", "tx2"))
+
+	tf.RequireBooked("tx1", "tx2")
+
+	tx1Metadata, exists := tf.TransactionMetadata("tx1")
+	require.True(t, exists)
+	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
+		if state.State().Type() == iotago.InputUTXO {
+			require.False(t, state.IsAccepted())
+			require.Equal(t, 1, state.PendingSpenderCount())
+		}
+
+		return nil
+	})
+
+	tx2Metadata, exists := tf.TransactionMetadata("tx2")
+	require.True(t, exists)
+
+	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
+		if state.State().Type() == iotago.InputUTXO {
+			require.False(t, state.IsAccepted())
+			require.Equal(t, 0, state.PendingSpenderCount())
+		}
+
+		if state.State().Type() == iotago.InputCommitment {
+			require.False(t, state.IsAccepted())
+			require.Equal(t, 2, state.PendingSpenderCount())
+		}
+
+		return nil
+	})
+
+	conflictSetsTx1, exists := tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))
+	require.True(t, exists)
+	require.Equal(t, 1, conflictSetsTx1.Size())
+	require.True(t, conflictSetsTx1.Has(tf.StateID("genesis")))
+
+	conflictSetsTx2, exists := tf.ConflictDAG.ConflictSets(tf.TransactionID("tx2"))
+	require.True(t, exists)
+	require.Equal(t, 1, conflictSetsTx2.Size())
+	require.True(t, conflictSetsTx2.Has(tf.StateID("tx1:0")))
 }
 
 func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {

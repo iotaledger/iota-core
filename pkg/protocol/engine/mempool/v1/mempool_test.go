@@ -35,7 +35,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](func() int { return 0 })
 	memPoolInstance := New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference.StateID())
+		return ledgerState.ResolveOutputState(reference)
 	}, workers, conflictDAG, func(error) {})
 
 	tf := mempooltests.NewTestFramework(t, memPoolInstance, conflictDAG, ledgerState, workers)
@@ -104,7 +104,7 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference.StateID())
+		return ledgerState.ResolveOutputState(reference)
 	}, workers, conflictDAG, func(error) {}), conflictDAG, ledgerState, workers)
 }
 
@@ -115,6 +115,6 @@ func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference.StateID())
+		return ledgerState.ResolveOutputState(reference)
 	}, workers, conflictDAG, func(error) {}, WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
 }

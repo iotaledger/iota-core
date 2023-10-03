@@ -49,14 +49,6 @@ func (t *Transaction) Inputs() ([]mempool.StateReference, error) {
 	return t.inputs, nil
 }
 
-func (t *Transaction) CommitmentInput() *iotago.CommitmentInput {
-	return nil
-}
-
-func (t *Transaction) ContextInputs() (iotago.TransactionContextInputs, error) {
-	return nil, nil
-}
-
 func (t *Transaction) String() string {
 	return "Transaction(" + t.id.String() + ")"
 }

@@ -30,10 +30,10 @@ func (s *MockStateResolver) DestroyOutputState(stateID mempool.StateID) {
 	s.statesByID.Delete(stateID)
 }
 
-func (s *MockStateResolver) ResolveOutputState(outputID mempool.StateID) *promise.Promise[mempool.State] {
-	output, exists := s.statesByID.Get(outputID)
+func (s *MockStateResolver) ResolveOutputState(reference mempool.StateReference) *promise.Promise[mempool.State] {
+	output, exists := s.statesByID.Get(reference.ReferencedStateID())
 	if !exists {
-		return promise.New[mempool.State]().Reject(ierrors.Errorf("output %s not found: %w", outputID.ToHex(), mempool.ErrStateNotFound))
+		return promise.New[mempool.State]().Reject(ierrors.Errorf("output %s not found: %w", reference.ReferencedStateID().ToHex(), mempool.ErrStateNotFound))
 	}
 
 	return promise.New[mempool.State]().Resolve(output)

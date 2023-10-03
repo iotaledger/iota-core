@@ -21,7 +21,7 @@ func NewVM(ledger *Ledger) *VM {
 	}
 }
 
-func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []iotago.Input, err error) {
+func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []mempool.StateReference, err error) {
 	stardustTransaction, ok := transaction.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
