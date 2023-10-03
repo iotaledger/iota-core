@@ -13,5 +13,3 @@ type Transaction interface {
 	// ID returns the identifier of the Transaction.
 	ID() (iotago.TransactionID, error)
 }
-
-type TransactionInputReferenceRetriever func(transaction Transaction) ([]iotago.Input, error)

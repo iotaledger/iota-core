@@ -22,7 +22,7 @@ func (s *SignedTransaction) String() string {
 type Transaction struct {
 	id                 iotago.TransactionID
 	utxoInputs         []iotago.Input
-	contextInputs      []iotago.Input
+	contextInputs      []mempool.StateReference
 	outputCount        uint16
 	invalidTransaction bool
 }
@@ -34,7 +34,7 @@ func NewSignedTransaction(transaction mempool.Transaction) *SignedTransaction {
 	}
 }
 
-func NewTransaction(outputCount uint16, inputs []iotago.Input, contextInputs ...iotago.Input) *Transaction {
+func NewTransaction(outputCount uint16, inputs []mempool.StateReference, contextInputs ...mempool.StateReference) *Transaction {
 	return &Transaction{
 		id:            tpkg.RandTransactionID(),
 		utxoInputs:    inputs,
@@ -47,7 +47,7 @@ func (t *Transaction) ID() (iotago.TransactionID, error) {
 	return t.id, nil
 }
 
-func (t *Transaction) Inputs() ([]iotago.Input, error) {
+func (t *Transaction) Inputs() ([]mempool.StateReference, error) {
 	return append(t.utxoInputs, t.contextInputs...), nil
 }
 

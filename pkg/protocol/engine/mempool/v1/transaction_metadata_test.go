@@ -15,7 +15,7 @@ func TestAttachments(t *testing.T) {
 		"2": iotago.SlotIdentifierRepresentingData(2, []byte("block2")),
 	}
 
-	transactionMetadata, err := NewTransactionMetadata(mempooltests.NewTransaction(2, []iotago.Input{}), []iotago.Input{})
+	transactionMetadata, err := NewTransactionMetadata(mempooltests.NewTransaction(2, nil), nil)
 	require.NoError(t, err)
 
 	signedTransactionMetadata, err := NewSignedTransactionMetadata(mempooltests.NewSignedTransaction(transactionMetadata.Transaction()), transactionMetadata)
