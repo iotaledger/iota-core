@@ -3,6 +3,8 @@ package inx
 import (
 	"context"
 
+	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -20,52 +22,47 @@ func (s *Server) RequestTips(_ context.Context, req *inx.TipsRequest) (*inx.Tips
 }
 
 func (s *Server) ValidatePayload(ctx context.Context, payload *inx.RawPayload) (*inx.PayloadValidationResponse, error) {
-	blockPayload, unwrapErr := payload.Unwrap(deps.Protocol.CurrentAPI(), serix.WithValidation())
-	if unwrapErr != nil {
-		//nolint:nilerr // this is expected behavior
-		return &inx.PayloadValidationResponse{IsValid: false, Error: unwrapErr.Error()}, nil
-	}
-
-	switch payload := blockPayload.(type) {
-	case *iotago.SignedTransaction:
-		memPool := deps.Protocol.MainEngineInstance().Ledger.MemPool()
-		inputReferences, inputsErr := memPool.VM().Inputs(payload.Transaction)
-		if inputsErr != nil {
-			//nolint:nilerr // this is expected behavior
-			return &inx.PayloadValidationResponse{IsValid: false, Error: inputsErr.Error()}, nil
+	if err := func() error {
+		blockPayload, unwrapErr := payload.Unwrap(deps.Protocol.CurrentAPI(), serix.WithValidation())
+		if unwrapErr != nil {
+			return unwrapErr
 		}
 
-		loadedInputs := make([]mempool.State, 0)
+		switch typedPayload := blockPayload.(type) {
+		case *iotago.SignedTransaction:
+			memPool := deps.Protocol.MainEngineInstance().Ledger.MemPool()
 
-		for _, inputReference := range inputReferences {
-			metadata, metadataErr := memPool.StateMetadata(inputReference)
-			if metadataErr != nil {
-				//nolint:nilerr // this is expected behavior
-				return &inx.PayloadValidationResponse{IsValid: false, Error: metadataErr.Error()}, nil
+			inputReferences, inputsErr := memPool.VM().Inputs(typedPayload.Transaction)
+			if inputsErr != nil {
+				return inputsErr
 			}
 
-			loadedInputs = append(loadedInputs, metadata.State())
+			loadedInputs := make([]mempool.State, 0)
+			for _, inputReference := range inputReferences {
+				if metadata, metadataErr := memPool.StateMetadata(inputReference); metadataErr != nil {
+					return metadataErr
+				} else {
+					loadedInputs = append(loadedInputs, metadata.State())
+				}
+			}
+
+			executionContext, validationErr := memPool.VM().ValidateSignatures(typedPayload, loadedInputs)
+			if validationErr != nil {
+				return validationErr
+			}
+
+			return lo.Return2(memPool.VM().Execute(executionContext, typedPayload.Transaction))
+
+		case *iotago.TaggedData:
+			return nil
+
+		default:
+			return ierrors.Errorf("unsupported payload type: %T", typedPayload)
 		}
-
-		executionContext, validationErr := memPool.VM().ValidateSignatures(payload, loadedInputs)
-		if validationErr != nil {
-			//nolint:nilerr // this is expected behavior
-			return &inx.PayloadValidationResponse{IsValid: false, Error: validationErr.Error()}, nil
-		}
-
-		_, executionErr := memPool.VM().Execute(executionContext, payload.Transaction)
-		if executionErr != nil {
-			//nolint:nilerr // this is expected behavior
-			return &inx.PayloadValidationResponse{IsValid: false, Error: executionErr.Error()}, nil
-		}
-
-		return &inx.PayloadValidationResponse{IsValid: true}, nil
-
-	case *iotago.TaggedData:
-		// TaggedData is always valid if serix decoding was successful
-		return &inx.PayloadValidationResponse{IsValid: true}, nil
-
-	default:
-		return &inx.PayloadValidationResponse{IsValid: false, Error: "given payload type unknown"}, nil
+	}(); err != nil {
+		//nolint:nilerr // this is expected behavior
+		return &inx.PayloadValidationResponse{IsValid: false, Error: err.Error()}, nil
 	}
+
+	return &inx.PayloadValidationResponse{IsValid: true}, nil
 }
