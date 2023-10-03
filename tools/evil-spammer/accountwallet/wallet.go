@@ -147,7 +147,7 @@ func (a *AccountWallet) registerAccount(alias string, outputID iotago.OutputID, 
 	a.accountsAliases[alias] = &models.AccountData{
 		Alias:     alias,
 		AccountID: accountID,
-		Status:    "created",
+		Status:    models.AccountPending,
 		OutputID:  outputID,
 		Index:     index,
 	}

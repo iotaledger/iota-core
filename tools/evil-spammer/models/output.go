@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/iotaledger/iota.go/v4"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Input contains details of an input.
@@ -23,9 +23,16 @@ type Output struct {
 // Outputs is a list of Output.
 type Outputs []*Output
 
+type AccountStatus uint8
+
+const (
+	AccountPending AccountStatus = iota
+	AccountReady
+)
+
 type AccountData struct {
 	Alias     string           `serix:"0,lengthPrefixType=uint8"`
-	Status    string           `serix:"1,lengthPrefixType=uint8"`
+	Status    AccountStatus    `serix:"1"`
 	AccountID iotago.AccountID `serix:"2"`
 	OutputID  iotago.OutputID  `serix:"3"`
 	Index     uint64           `serix:"4"`
