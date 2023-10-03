@@ -247,13 +247,15 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 		ts.IssueBlockAtSlotWithOptions("block1.1", 1, genesisCommitment, node1, tx1)
 		ts.IssueBlockAtSlotWithOptions("block1.2", 1, genesisCommitment, node1, tx2)
+		ts.IssueBlockAtSlot("block2.tx1", 2, genesisCommitment, node1, ts.BlockIDs("block1.1")...)
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
-			ts.Block("block1.1"): {"tx1"},
-			ts.Block("block1.2"): {"tx2"},
+			ts.Block("block1.1"):   {"tx1"},
+			ts.Block("block1.2"):   {"tx2"},
+			ts.Block("block2.tx1"): {"tx1"},
 		}, node1, node2)
 
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
@@ -268,8 +270,9 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		ts.IssueBlockAtSlot("block2.2", 2, genesisCommitment, node1, ts.BlockID("block1.2"))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
-			ts.Block("block2.1"): {"tx1"},
-			ts.Block("block2.2"): {"tx2"},
+			ts.Block("block2.1"):   {"tx1"},
+			ts.Block("block2.2"):   {"tx2"},
+			ts.Block("block2.tx1"): {"tx1"},
 		}, node1, node2)
 		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 	}
@@ -280,7 +283,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		ts.IssueBlockAtSlot("block2.4", 2, genesisCommitment, node1, ts.BlockIDs("block2.3")...)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
-			ts.Block("block2.3"): {"tx2"},
+			ts.Block("block2.3"):   {"tx2"},
+			ts.Block("block2.tx1"): {"tx1"},
 		}, node1, node2)
 		ts.AssertTransactionsInCacheAccepted(ts.TransactionFramework.Transactions("tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx1"), true, node1, node2)
@@ -301,14 +305,14 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		ts.IssueBlockAtSlot("block5.2", 5, genesisCommitment, node1, ts.BlockIDsWithPrefix("block1.2")...)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
-			ts.Block("block5.1"): {"tx1"}, // on rejected branch
-			ts.Block("block5.2"): {},      // accepted merged-to-master
+			ts.Block("block5.1"):   {"tx1"}, // on rejected conflict
+			ts.Block("block5.2"):   {},      // accepted merged-to-master
+			ts.Block("block2.tx1"): {"tx1"},
 		}, node1, node2)
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, nil)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.Nodes()...)
-
 	}
 
 	partitions := map[string][]*mock.Node{
@@ -316,7 +320,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		"node2": {node2},
 	}
 
-	// Split the nodes into partitions and commit sot 1 only on node2
+	// Split the nodes into partitions and commit slot 1 only on node2
 	{
 
 		ts.SplitIntoPartitions(partitions)
@@ -342,47 +346,63 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	commitment1 := lo.PanicOnErr(node2.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 
 	// This should be booked on the rejected tx1 conflict
-	tx3 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx3", 1, "tx1:0"))
+	tx4 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx4", 1, "tx1:0"))
 
 	// Issue TX3 on top of rejected TX1 and 1 commitment on node2 (committed to slot 1)
 	{
-		ts.IssueBlockAtSlotWithOptions("n2-commit1", 5, commitment1, node2, tx3)
+		ts.IssueBlockAtSlotWithOptions("n2-commit1", 5, commitment1, node2, tx4)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("n2-commit1"): {}, // no conflits inherited as the block is invalid and doesn't get booked.
+			ts.Block("block2.tx1"): {"tx1"},
 		}, node2)
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), true, node2)
-		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx3"), true, node2)
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx3"), true, node2)
+		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx4"), true, node2)
+		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx4"), true, node2)
 
 		// As the block commits to 1 but spending something orphaned in 1 it should be invalid
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-commit1"), false, node2)
 		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-commit1"), true, node2)
 	}
 
-	// Issue TX3 on top of rejected TX1 but Genesis commitment on node2 (committed to slot 1)
+	// Issue a block on node1 that inherits a pending conflict that has been orphaned on node2
 	{
-		ts.IssueBlockAtSlotWithOptions("n2-genesis", 5, genesisCommitment, node2, tx3, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBlockAtSlot("n1-rejected-genesis", 5, genesisCommitment, node1, ts.BlockIDs("block2.tx1")...)
+
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n1-rejected-genesis"), true, node1)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n1-rejected-genesis"), false, node1)
+
+		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx1"), true, node2)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
-			ts.Block("n2-genesis"): {"tx3"}, // on rejected branch
+			ts.Block("block2.tx1"):          {"tx1"},
+			ts.Block("n1-rejected-genesis"): {"tx1"}, // on rejected conflict
+		}, node1)
+	}
+
+	// Issue TX4 on top of rejected TX1 but Genesis commitment on node2 (committed to slot 1)
+	{
+		ts.IssueBlockAtSlotWithOptions("n2-genesis", 5, genesisCommitment, node2, tx4, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("n2-genesis"): {"tx4"}, // on rejected conflict
 		}, node2)
 
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-genesis"), true, node2)
 		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-genesis"), false, node2)
 	}
 
-	// Issue TX3 on top of rejected TX1 but Genesis commitment on node1 (committed to slot 0)
+	// Issue TX4 on top of rejected TX1 but Genesis commitment on node1 (committed to slot 0)
 	{
-		ts.IssueBlockAtSlotWithOptions("n1-genesis", 5, genesisCommitment, node1, tx3, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBlockAtSlotWithOptions("n1-genesis", 5, genesisCommitment, node1, tx4, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), true, node2)
-		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx3"), true, node2)
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx3"), true, node2)
+		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx4"), true, node2)
+		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx4"), true, node2)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
-			ts.Block("n1-genesis"): {"tx3"}, // on rejected branch
+			ts.Block("n1-genesis"): {"tx4"}, // on rejected conflict
 		}, node1)
 
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n1-genesis"), true, node1)
@@ -407,18 +427,23 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		ts.IssueExistingBlock("n2-genesis", node1)
 		ts.IssueExistingBlock("n2-commit1", node1)
 		ts.IssueExistingBlock("n1-genesis", node2)
+		ts.IssueExistingBlock("n1-rejected-genesis", node2)
+
+		ts.IssueBlockAtSlot("n1-rejected-commit1", 5, commitment1, node1, ts.BlockIDs("n1-rejected-genesis")...)
+		// Needs reissuing on node2 because it is invalid
+		ts.IssueExistingBlock("n1-rejected-commit1", node2)
 
 		// The nodes agree on the results of the invalid blocks
-		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-genesis", "n1-genesis"), true, node1, node2)
-		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-genesis", "n1-genesis"), false, node1, node2)
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-genesis", "n1-genesis", "n1-rejected-genesis"), true, node1, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-genesis", "n1-genesis", "n1-rejected-genesis"), false, node1, node2)
 
-		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-commit1"), false, node1, node2)
-		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-commit1"), true, node1, node2)
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n1-rejected-commit1", "n2-commit1"), false, node1, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n1-rejected-commit1", "n2-commit1"), true, node1, node2)
 	}
 
 	// Commit further and test eviction of transactions
 	{
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2", "tx3"), true, node1, node2)
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2", "tx4"), true, node1, node2)
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, nil)
 
@@ -429,8 +454,9 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 			testsuite.WithEvictedSlot(8),
 		)
 
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2", "tx3"), false, node1, node2)
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2", "tx4"), false, node1, node2)
 	}
 
 	// TODO: test orphanage of pending conflict
+	// TODO: what if you don't spend but inherit a conflit orphaned with respect to your commitment?
 }

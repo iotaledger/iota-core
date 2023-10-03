@@ -145,6 +145,24 @@ func (b *Booker) book(block *blocks.Block) error {
 		return ierrors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
 	}
 
+	// The block is invalid if it carries a conflict that has been orphaned with respect to its commitment.
+	for it := conflictsToInherit.Iterator(); it.HasNext(); {
+		conflictID := it.Next()
+
+		txMetadata, exists := b.ledger.MemPool().TransactionMetadata(conflictID)
+		if !exists {
+			return ierrors.Errorf("failed to load transaction %s for block %s", conflictID.String(), block.ID())
+		}
+
+		if orphanedSlot, orphaned := txMetadata.IsOrphaned(); orphaned {
+			if orphanedSlot <= block.SlotCommitmentID().Slot() {
+				block.SetInvalid()
+
+				return nil
+			}
+		}
+	}
+
 	block.SetConflictIDs(conflictsToInherit)
 	block.SetBooked()
 	b.events.BlockBooked.Trigger(block)
