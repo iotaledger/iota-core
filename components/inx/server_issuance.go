@@ -46,12 +46,11 @@ func (s *Server) ValidatePayload(ctx context.Context, payload *inx.RawPayload) (
 				}
 			}
 
-			executionContext, validationErr := memPool.VM().ValidateSignatures(typedPayload, loadedInputs)
-			if validationErr != nil {
+			if executionContext, validationErr := memPool.VM().ValidateSignatures(typedPayload, loadedInputs); validationErr != nil {
 				return validationErr
+			} else {
+				return lo.Return2(memPool.VM().Execute(executionContext, typedPayload.Transaction))
 			}
-
-			return lo.Return2(memPool.VM().Execute(executionContext, typedPayload.Transaction))
 
 		case *iotago.TaggedData:
 			return nil
