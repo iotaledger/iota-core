@@ -725,7 +725,7 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 
 		return p.Resolve(loadedCommitment)
 	case iotago.InputBlockIssuanceCredit, iotago.InputReward:
-		// these are always resolved as they depend on the commitment or UTXO inputs
+		//nolint:forcetypeassert
 		return p.Resolve(stateRef.(mempool.State))
 	default:
 		return p.Reject(ierrors.Errorf("unsupported input type %s", stateRef.Type()))
