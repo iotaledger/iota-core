@@ -4,4 +4,6 @@ import (
 	"context"
 )
 
-type VM func(ctx context.Context, stateTransition Transaction, inputs []OutputState, timeReference ContextState) (outputs []OutputState, err error)
+type TransactionValidator func(signedTransaction SignedTransaction, resolvedInputs []State) (executionContext context.Context, err error)
+
+type TransactionExecutor func(executionContext context.Context, transaction Transaction) (outputs []State, err error)
