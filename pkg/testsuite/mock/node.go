@@ -210,6 +210,12 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
 	})
 
+	events.MainEngineRestarted.Hook(func(e *engine.Engine) {
+		fmt.Printf("%s > MainEngineRestarted: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
+
+		n.attachEngineLogsWithName(failOnBlockFiltered, e, fmt.Sprintf("Main2 - %s", e.Name()[:8]))
+	})
+
 	events.Network.Error.Hook(func(err error, id peer.ID) {
 		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
 	})
@@ -219,8 +225,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	})
 }
 
-func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
-	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
+func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engine.Engine, engineName string) {
 	events := instance.Events
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
@@ -433,6 +438,12 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 			fmt.Printf("%s > [%s] MemPool.TransactionPending: %s\n", n.Name, engineName, transactionMetadata.ID())
 		})
 	})
+}
+
+func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
+	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
+
+	n.attachEngineLogsWithName(failOnBlockFiltered, instance, engineName)
 }
 
 func (n *Node) Wait() {

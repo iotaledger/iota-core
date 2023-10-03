@@ -511,3 +511,7 @@ func (t *TestSuite) SplitIntoPartitions(partitions map[string][]*mock.Node) {
 func (t *TestSuite) MergePartitionsToMain(partitions ...string) {
 	t.network.MergePartitionsToMain(partitions...)
 }
+
+func (t *TestSuite) SetAutomaticTransactionIssuingCounters(partition string, newValue int) {
+	t.automaticTransactionIssuingCounters.Set(partition, newValue)
+}

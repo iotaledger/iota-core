@@ -62,8 +62,6 @@ func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expecte
 	mustNodes(nodes)
 
 	t.Eventually(func() error {
-		var commitment *model.Commitment
-		var commitmentNode *mock.Node
 		for _, node := range nodes {
 			storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
 			if err != nil {
@@ -81,7 +79,7 @@ func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expecte
 			}
 
 			if !cmp.Equal(committedBlocks, expectedBlocks) {
-				return ierrors.Errorf("AssertEqualStoredCommitmentAtIndex: %s: expected %s (from %s), got %s", node.Name, commitment, commitmentNode.Name, storedCommitment)
+				return ierrors.Errorf("AssertStorageCommitmentBlocks: %s: expected %s, got %s", node.Name, expectedBlocks, committedBlocks)
 			}
 		}
 
