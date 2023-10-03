@@ -25,7 +25,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
 			iotago.WithLivenessOptions(30, 30, 7, 14, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
-			iotago.WithCongestionControlOptions(500, 500, 500, 800000, 500000, 100000, 1, 1000, 100),
+			iotago.WithCongestionControlOptions(500, 500, 500, 800000, 500000, 100000, 1000, 100),
 			iotago.WithWorkScoreOptions(25, 1, 100, 50, 10, 10, 50, 1, 10, 250),
 		),
 	),
@@ -99,7 +99,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
 			iotago.WithLivenessOptions(30, 30, 7, 14, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
-			iotago.WithCongestionControlOptions(500, 500, 500, 800000, 500000, 100000, 1, 1000, 100),
+			iotago.WithCongestionControlOptions(500, 500, 500, 800000, 500000, 100000, 1000, 100),
 			iotago.WithWorkScoreOptions(25, 1, 100, 50, 10, 10, 50, 1, 10, 250),
 		),
 	),
@@ -153,7 +153,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			iotago.WithTimeProviderOptions(1689848996, 10, 13),
 			iotago.WithLivenessOptions(30, 30, 10, 20, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
-			iotago.WithCongestionControlOptions(500, 500, 500, 800000, 500000, 100000, 1, 1000, 100),
+			iotago.WithCongestionControlOptions(500, 500, 500, 800000, 500000, 100000, 1000, 100),
 			iotago.WithWorkScoreOptions(25, 1, 100, 50, 10, 10, 50, 1, 10, 250),
 		),
 	),
