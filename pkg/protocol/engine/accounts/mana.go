@@ -22,6 +22,7 @@ func NewMana(value iotago.Mana, excessBaseTokens iotago.BaseToken, updateTime io
 	}
 }
 
+// Update is applied when the account output is transitioned, updating the total value and excess base tokens.
 func (m *Mana) Update(value iotago.Mana, excessBaseTokens iotago.BaseToken, updateTime iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -31,6 +32,7 @@ func (m *Mana) Update(value iotago.Mana, excessBaseTokens iotago.BaseToken, upda
 	m.updateTime = updateTime
 }
 
+// UpdateValue is applied when the total decayed value is updated but the account output is not changed.
 func (m *Mana) UpdateValue(value iotago.Mana, updateTime iotago.SlotIndex) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

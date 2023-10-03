@@ -71,7 +71,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
-			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput)
+			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput, l.accountsLedger.Account)
 			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
 			l.accountsLedger.SetLatestCommittedSlot(latestCommittedSlot)
 			l.rmcManager.SetLatestCommittedSlot(latestCommittedSlot)
@@ -170,9 +170,6 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	l.prepareAccountDiffs(accountDiffs, slot, consumedAccounts, createdAccounts)
 
 	// Commit the changes
-	// Update the mana manager's cache
-	l.manaManager.ApplyDiff(slot, destroyedAccounts, createdAccounts)
-
 	// Update the UTXO ledger
 	if err = l.utxoLedger.ApplyDiff(slot, outputs, spends); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to UTXO ledger for slot %d: %w", slot, err)
@@ -188,6 +185,11 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	}
 	if err = l.accountsLedger.ApplyDiff(slot, rmcForSlot, accountDiffs, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for slot %d: %w", slot, err)
+	}
+
+	// Update the mana manager's cache
+	if err = l.manaManager.ApplyDiff(slot, destroyedAccounts, createdAccounts, accountDiffs); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to mana manager for slot %d: %w", slot, err)
 	}
 
 	// Mark each transaction as committed so the mempool can evict it

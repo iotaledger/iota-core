@@ -57,7 +57,6 @@ type TestSuite struct {
 	optsRMCIncreaseThreshold        iotago.WorkScore
 	optsRMCDecreaseThreshold        iotago.WorkScore
 	optsSchedulerRate               iotago.WorkScore
-	optsMinMana                     iotago.Mana
 	optsMaxBufferSize               uint32
 	optsAccounts                    []snapshotcreator.AccountDetails
 	optsSnapshotOptions             []options.Option[snapshotcreator.Options]
@@ -98,7 +97,6 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		optsRMCIncreaseThreshold:        8 * schedulerRate,
 		optsRMCDecreaseThreshold:        5 * schedulerRate,
 		optsSchedulerRate:               schedulerRate,
-		optsMinMana:                     1,
 		optsMaxBufferSize:               100 * iotago.MaxBlockSize,
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
@@ -136,7 +134,6 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 					t.optsRMCIncreaseThreshold,
 					t.optsRMCDecreaseThreshold,
 					t.optsSchedulerRate,
-					t.optsMinMana,
 					t.optsMaxBufferSize,
 					t.optsMaxBufferSize,
 				),
@@ -357,7 +354,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			Mana:                 iotago.Mana(amount),
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.PubKey)),
 			ExpirySlot:           iotago.MaxSlotIndex,
-			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits,
+			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
 		}
 		if validator {
 			accountDetails.StakedAmount = accountDetails.Amount
