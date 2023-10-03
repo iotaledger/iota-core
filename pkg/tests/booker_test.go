@@ -456,7 +456,175 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2", "tx4"), false, node1, node2)
 	}
+}
 
-	// TODO: test orphanage of pending conflict
-	// TODO: what if you don't spend but inherit a conflit orphaned with respect to your commitment?
+func Test_SpendPendingCommittedRace(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithGenesisTimestampOffset(20*10),
+		testsuite.WithMinCommittableAge(2),
+		testsuite.WithMaxCommittableAge(5),
+	)
+	defer ts.Shutdown()
+
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddValidatorNode("node2")
+
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
+
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		node1.AccountID,
+		node2.AccountID,
+	}, ts.Nodes()...)
+
+	genesisCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(0)).Commitment()
+
+	// Create and issue double spends
+	{
+		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
+		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "Genesis:0"))
+
+		ts.IssueBlockAtSlotWithOptions("block1.1", 1, genesisCommitment, node2, tx1)
+		ts.IssueBlockAtSlotWithOptions("block1.2", 1, genesisCommitment, node2, tx2)
+
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block1.1"): {"tx1"},
+			ts.Block("block1.2"): {"tx2"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			ts.TransactionFramework.Transaction("tx2"): {"tx2"},
+			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
+		}, node1, node2)
+	}
+
+	// Issue some more blocks and assert that conflicts are propagated to blocks.
+	{
+		ts.IssueBlockAtSlot("block2.1", 2, genesisCommitment, node2, ts.BlockID("block1.1"))
+		ts.IssueBlockAtSlot("block2.2", 2, genesisCommitment, node2, ts.BlockID("block1.2"))
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block2.1"): {"tx1"},
+			ts.Block("block2.2"): {"tx2"},
+		}, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+	}
+
+	// Advance both nodes at the edge of slot 1 committability
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4}, 1, "Genesis", ts.Nodes("node1", "node2"), false, nil)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(0),
+			testsuite.WithEqualStoredCommitmentAtIndex(0),
+			testsuite.WithEvictedSlot(0),
+		)
+
+		ts.IssueBlockAtSlot("", 5, genesisCommitment, node1, ts.BlockIDsWithPrefix("4.0")...)
+
+		// ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+		// 	ts.Block("block5.1"): {}, // on rejected conflict
+		// }, node1, node2)
+
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, nil)
+
+		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.Nodes()...)
+	}
+
+	partitions := map[string][]*mock.Node{
+		"node1": {node1},
+		"node2": {node2},
+	}
+
+	// Split the nodes into partitions and commit slot 1 only on node2
+	{
+		ts.SplitIntoPartitions(partitions)
+
+		// Only node2 will commit after issuing this one
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, nil)
+
+		ts.AssertNodeState(ts.Nodes("node1"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(0),
+			testsuite.WithEqualStoredCommitmentAtIndex(0),
+			testsuite.WithEvictedSlot(0),
+		)
+
+		ts.AssertNodeState(ts.Nodes("node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
+			testsuite.WithEvictedSlot(1),
+		)
+	}
+
+	commitment1 := lo.PanicOnErr(node2.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
+
+	// Issue a block booked on a pending conflict on node2
+	{
+		ts.IssueBlockAtSlot("n2-pending-genesis", 5, genesisCommitment, node2, ts.BlockIDs("block2.1")...)
+		ts.IssueBlockAtSlot("n2-pending-commit1", 5, commitment1, node2, ts.BlockIDs("block2.1")...)
+
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1"), true, node2)
+
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-genesis"), true, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-genesis"), false, node2)
+
+		// As the block commits to 1 but spending something orphaned in 1 it should be invalid
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-commit1"), false, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-commit1"), true, node2)
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block2.1"):           {"tx1"},
+			ts.Block("n2-pending-genesis"): {"tx1"},
+			ts.Block("n2-pending-commit1"): {}, // no conflits inherited as the block is invalid and doesn't get booked.
+		}, node2)
+	}
+
+	ts.MergePartitionsToMain(lo.Keys(partitions)...)
+
+	// Sync up the nodes to he same point and check consistency between them.
+	{
+		// Let node1 catch up with commitment 1
+		ts.IssueBlocksAtSlots("5.1", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, nil)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(1),
+			testsuite.WithEqualStoredCommitmentAtIndex(1),
+			testsuite.WithEvictedSlot(1),
+		)
+
+		// Exchange each-other blocks, ignoring invalidity
+		ts.IssueExistingBlock("n2-pending-genesis", node1)
+		ts.IssueExistingBlock("n2-pending-commit1", node1)
+
+		// The nodes agree on the results of the invalid blocks
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-genesis"), true, node1, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-genesis"), false, node1, node2)
+
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-commit1"), false, node1, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-commit1"), true, node1, node2)
+	}
+
+	// Commit further and test eviction of transactions
+	{
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, nil)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(8),
+			testsuite.WithEqualStoredCommitmentAtIndex(8),
+			testsuite.WithEvictedSlot(8),
+		)
+
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), false, node1, node2)
+	}
 }
