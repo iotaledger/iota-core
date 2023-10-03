@@ -227,7 +227,6 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 		m.setupSignedTransaction(storedSignedTransaction, storedTransaction)
 	}
 
-	// TODO: figure out how to handle attachments and eviction
 	storedSignedTransaction.addAttachment(blockID)
 	m.attachments.Get(blockID.Slot(), true).Set(blockID, storedSignedTransaction)
 
