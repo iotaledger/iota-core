@@ -10,8 +10,13 @@ import (
 
 type VM struct{}
 
-func (V *VM) StateReferences(transaction mempool.Transaction) ([]mempool.StateReference, error) {
-	return transaction.(*Transaction).Inputs()
+func (V *VM) Inputs(transaction mempool.Transaction) ([]mempool.StateReference, error) {
+	testTransaction, ok := transaction.(*Transaction)
+	if !ok {
+		return nil, ierrors.New("invalid transaction type in MockedVM")
+	}
+
+	return testTransaction.Inputs()
 }
 
 func (V *VM) ValidateSignatures(_ mempool.SignedTransaction, _ []mempool.State) (executionContext context.Context, err error) {

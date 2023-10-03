@@ -190,7 +190,7 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 		return nil, false, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastEvictedSlot)
 	}
 
-	inputReferences, err := m.vm.StateReferences(transaction)
+	inputReferences, err := m.vm.Inputs(transaction)
 	if err != nil {
 		return nil, false, false, ierrors.Wrap(err, "failed to get input references of transaction")
 	}
