@@ -21,19 +21,11 @@ import (
 
 // MemPool is a component that manages the state of transactions that are not yet included in the ledger state.
 type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
-	signedTransactionAttached *event.Event1[mempool.SignedTransactionMetadata]
-
-	transactionAttached *event.Event1[mempool.TransactionMetadata]
-
-	// executeStateTransition is the TransactionExecutor that is used to execute the state transition of transactions.
-	executeStateTransition mempool.TransactionExecutor
+	// vm is the virtual machine that is used to validate and execute transactions.
+	vm mempool.VM
 
 	// resolveState is the function that is used to request state from the ledger.
 	resolveState mempool.StateReferenceResolver
-
-	inputsOfTransaction mempool.TransactionInputReferenceRetriever
-
-	validateSignedTransaction mempool.TransactionValidator
 
 	// attachments is the storage that is used to keep track of the attachments of transactions.
 	attachments *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, *SignedTransactionMetadata]
@@ -66,27 +58,22 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 
 	optForkAllTransactions bool
 
-	apiProvider iotago.APIProvider
+	signedTransactionAttached *event.Event1[mempool.SignedTransactionMetadata]
+
+	transactionAttached *event.Event1[mempool.TransactionMetadata]
 }
 
 // New is the constructor of the MemPool.
 func New[VoteRank conflictdag.VoteRankType[VoteRank]](
-	transactionValidator mempool.TransactionValidator,
-	transactionExecutor mempool.TransactionExecutor,
-	transactionInputReferenceRetriever mempool.TransactionInputReferenceRetriever,
+	vm mempool.VM,
 	stateResolver mempool.StateReferenceResolver,
 	workers *workerpool.Group,
 	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, VoteRank],
-	apiProvider iotago.APIProvider,
 	errorHandler func(error),
 	opts ...options.Option[MemPool[VoteRank]],
 ) *MemPool[VoteRank] {
 	return options.Apply(&MemPool[VoteRank]{
-		signedTransactionAttached: event.New1[mempool.SignedTransactionMetadata](),
-		transactionAttached:       event.New1[mempool.TransactionMetadata](),
-		validateSignedTransaction: transactionValidator,
-		executeStateTransition:    transactionExecutor,
-		inputsOfTransaction:       transactionInputReferenceRetriever,
+		vm:                        vm,
 		resolveState:              stateResolver,
 		attachments:               memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, *SignedTransactionMetadata](),
 		cachedTransactions:        shrinkingmap.New[iotago.TransactionID, *TransactionMetadata](),
@@ -95,8 +82,9 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](
 		stateDiffs:                shrinkingmap.New[iotago.SlotIndex, *StateDiff](),
 		executionWorkers:          workers.CreatePool("executionWorkers", 1),
 		conflictDAG:               conflictDAG,
-		apiProvider:               apiProvider,
 		errorHandler:              errorHandler,
+		signedTransactionAttached: event.New1[mempool.SignedTransactionMetadata](),
+		transactionAttached:       event.New1[mempool.TransactionMetadata](),
 	}, opts, (*MemPool[VoteRank]).setup)
 }
 
@@ -202,7 +190,7 @@ func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTra
 		return nil, false, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastEvictedSlot)
 	}
 
-	inputReferences, err := m.inputsOfTransaction(transaction)
+	inputReferences, err := m.vm.TransactionInputs(transaction)
 	if err != nil {
 		return nil, false, false, ierrors.Wrap(err, "failed to get input references of transaction")
 	}
@@ -261,7 +249,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 
 func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context, transaction *TransactionMetadata) {
 	m.executionWorkers.Submit(func() {
-		if outputStates, err := m.executeStateTransition(executionContext, transaction.Transaction()); err != nil {
+		if outputStates, err := m.vm.ExecuteTransaction(executionContext, transaction.Transaction()); err != nil {
 			transaction.setInvalid(err)
 		} else {
 			transaction.setExecuted(outputStates)
@@ -458,7 +446,7 @@ func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransactionMetadata *Si
 	transaction.addSigningTransaction(signedTransactionMetadata)
 
 	transaction.OnSolid(func() {
-		executionContext, err := m.validateSignedTransaction(signedTransactionMetadata.SignedTransaction(), lo.Map(signedTransactionMetadata.transactionMetadata.inputs, (*StateMetadata).State))
+		executionContext, err := m.vm.ValidateSignatures(signedTransactionMetadata.SignedTransaction(), lo.Map(signedTransactionMetadata.transactionMetadata.inputs, (*StateMetadata).State))
 		if err != nil {
 			_ = signedTransactionMetadata.signaturesInvalid.Set(err)
 			return
