@@ -40,6 +40,7 @@ func (s *MockStateResolver) ResolveOutputState(reference iotago.Input) *promise.
 
 		return promise.New[mempool.State]().Resolve(output)
 	} else if reference.Type() == iotago.InputCommitment {
+		//nolint:forcetypeassert
 		output := &iotago.Commitment{
 			ProtocolVersion:      0,
 			Slot:                 0,
