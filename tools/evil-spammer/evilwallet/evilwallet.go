@@ -303,11 +303,11 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *models.Output
 	}
 
 	// requested output to split and use in spammer
-	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), 0), signedTx.Transaction.Outputs[0])
+	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0), signedTx.Transaction.Outputs[0])
 
 	// set remainder output to be reused by the faucet wallet
 	e.faucet.AddUnspentOutput(&models.Output{
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), 1),
+		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1),
 		Address:      faucetAddr,
 		Index:        0,
 		Balance:      signedTx.Transaction.Outputs[1].BaseTokenAmount(),
@@ -336,7 +336,7 @@ func (e *EvilWallet) splitOutputs(splitOutput *models.Output, inputWallet, outpu
 		return iotago.TransactionID{}, err
 	}
 
-	return lo.PanicOnErr(signedTx.ID()), nil
+	return lo.PanicOnErr(signedTx.Transaction.ID()), nil
 }
 
 func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitOutput *models.Output, splitNumber int, receiveWallet *Wallet) (input *models.Output, outputs []*OutputOption) {
@@ -436,7 +436,7 @@ func (e *EvilWallet) addOutputsToOutputManager(signedTx *iotago.SignedTransactio
 		// register UnlockConditionAddress only (skip account outputs)
 		addr := o.UnlockConditionSet().Address().Address
 		out := &models.Output{
-			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), uint16(idx)),
+			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), uint16(idx)),
 			Address:      addr,
 			Balance:      o.BaseTokenAmount(),
 			OutputStruct: o,
@@ -479,7 +479,7 @@ func (e *EvilWallet) registerOutputAliases(signedTx *iotago.SignedTransaction, a
 	}
 
 	for idx := range signedTx.Transaction.Outputs {
-		id := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), uint16(idx))
+		id := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), uint16(idx))
 		out := e.outputManager.GetOutput(id)
 		if out == nil {
 			continue
