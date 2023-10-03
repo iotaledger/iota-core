@@ -88,6 +88,10 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](
 	}, opts, (*MemPool[VoteRank]).setup)
 }
 
+func (m *MemPool[VoteRank]) VM() mempool.VM {
+	return m.vm
+}
+
 // AttachSignedTransaction adds a transaction to the MemPool that was attached by the given block.
 func (m *MemPool[VoteRank]) AttachSignedTransaction(signedTransaction mempool.SignedTransaction, transaction mempool.Transaction, blockID iotago.BlockID) (signedTransactionMetadata mempool.SignedTransactionMetadata, err error) {
 	storedSignedTransaction, isNewSignedTransaction, isNewTransaction, err := m.storeTransaction(signedTransaction, transaction, blockID)
