@@ -28,9 +28,8 @@ var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	iotago.ErrInputAlreadySpent: apimodels.TxFailureUTXOInputAlreadySpent,
 
 	// native token errors
-	iotago.ErrNativeTokenSetInvalid:        apimodels.TxFailureGivenNativeTokensInvalid,
-	iotago.ErrMaxNativeTokensCountExceeded: apimodels.TxFailureGivenNativeTokensInvalid,
-	iotago.ErrNativeTokenSumUnbalanced:     apimodels.TxFailureGivenNativeTokensInvalid,
+	iotago.ErrNativeTokenSetInvalid:    apimodels.TxFailureGivenNativeTokensInvalid,
+	iotago.ErrNativeTokenSumUnbalanced: apimodels.TxFailureGivenNativeTokensInvalid,
 
 	// vm errors
 	iotago.ErrInputOutputSumMismatch:       apimodels.TxFailureSumOfInputAndOutputValuesDoesNotMatch,
