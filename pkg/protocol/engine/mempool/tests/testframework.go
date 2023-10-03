@@ -26,8 +26,7 @@ type TestFramework struct {
 	stateIDByAlias           map[string]mempool.StateID
 	signedTransactionByAlias map[string]mempool.SignedTransaction
 	transactionByAlias       map[string]mempool.Transaction
-
-	blockIDsByAlias map[string]iotago.BlockID
+	blockIDsByAlias          map[string]iotago.BlockID
 
 	ledgerState *ledgertests.MockStateResolver
 	workers     *workerpool.Group

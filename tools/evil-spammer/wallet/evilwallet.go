@@ -34,7 +34,7 @@ const (
 var (
 	defaultClientsURLs = []string{"http://localhost:8080", "http://localhost:8090"}
 
-	genesisTransactionID = iotago.SlotIdentifierRepresentingData(0, []byte("genesis"))
+	genesisTransactionID = iotago.TransactionIDRepresentingData(0, []byte("genesis"))
 
 	dockerFaucetSeed = func() []byte {
 		genesisSeed, err := base58.Decode("7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih")
@@ -303,11 +303,11 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	}
 
 	// requested output to split and use in spammer
-	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), 0), signedTx.Transaction.Outputs[0])
+	output := e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0), signedTx.Transaction.Outputs[0])
 
 	// set remainder output to be reused by the faucet wallet
 	e.faucet.AddUnspentOutput(&Output{
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), 1),
+		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1),
 		Address:      faucetAddr,
 		Index:        0,
 		Balance:      signedTx.Transaction.Outputs[1].BaseTokenAmount(),
@@ -336,7 +336,7 @@ func (e *EvilWallet) splitOutputs(splitOutput *Output, inputWallet, outputWallet
 		return iotago.TransactionID{}, err
 	}
 
-	return lo.PanicOnErr(signedTx.ID()), nil
+	return lo.PanicOnErr(signedTx.Transaction.ID()), nil
 }
 
 func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitOutput *Output, splitNumber int, receiveWallet *Wallet) (input *Output, outputs []*OutputOption) {
@@ -461,7 +461,7 @@ func (e *EvilWallet) addOutputsToOutputManager(signedTx *iotago.SignedTransactio
 	for idx, o := range signedTx.Transaction.Outputs {
 		addr := o.UnlockConditionSet().Address().Address
 		out := &Output{
-			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), uint16(idx)),
+			OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), uint16(idx)),
 			Address:      addr,
 			Balance:      o.BaseTokenAmount(),
 			OutputStruct: o,
@@ -504,7 +504,7 @@ func (e *EvilWallet) registerOutputAliases(signedTx *iotago.SignedTransaction, a
 	}
 
 	for idx := range signedTx.Transaction.Outputs {
-		id := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), uint16(idx))
+		id := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), uint16(idx))
 		out := e.outputManager.GetOutput(id)
 
 		// register output alias
