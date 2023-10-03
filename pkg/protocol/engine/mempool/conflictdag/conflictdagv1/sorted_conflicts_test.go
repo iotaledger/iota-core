@@ -217,7 +217,7 @@ func assertSortedConflictsOrder(t *testing.T, sortedConflicts SortedConflictSet,
 
 func id(alias string) iotago.OutputID {
 	bytes := blake2b.Sum256([]byte(alias))
-	txIdentifier := iotago.TransactionIDFromData(TestTransactionCreationSlot, bytes[:])
+	txIdentifier := iotago.TransactionIDRepresentingData(TestTransactionCreationSlot, bytes[:])
 	conflictID := iotago.OutputIDFromTransactionIDAndIndex(txIdentifier, 0)
 	txIdentifier.RegisterAlias(alias)
 
