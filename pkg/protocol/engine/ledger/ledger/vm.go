@@ -5,41 +5,61 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 	iotagovm "github.com/iotaledger/iota.go/v4/vm"
 	"github.com/iotaledger/iota.go/v4/vm/stardust"
 )
 
-func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Transaction, inputStates []mempool.OutputState, timeReference mempool.ContextState) ([]mempool.OutputState, error) {
-	tx, ok := stateTransition.(*iotago.SignedTransaction)
+type VM struct {
+	ledger *Ledger
+}
+
+func NewVM(ledger *Ledger) *VM {
+	return &VM{
+		ledger: ledger,
+	}
+}
+
+func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []iotago.Input, err error) {
+	stardustTransaction, ok := transaction.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	inputSet := iotagovm.InputSet{}
-	for _, input := range inputStates {
-		inputSet[input.OutputID()] = input.Output()
+	for _, input := range stardustTransaction.TransactionEssence.Inputs {
+		inputReferences = append(inputReferences, input)
 	}
-	resolvedInputs := iotagovm.ResolvedInputs{
-		InputSet: inputSet,
-	}
-
-	bicInputs, err := tx.BICInputs()
-	if err != nil {
-		return nil, ierrors.Join(err, iotago.ErrBICInputInvalid)
+	for _, input := range stardustTransaction.TransactionEssence.ContextInputs {
+		inputReferences = append(inputReferences, input)
 	}
 
-	rewardInputs, err := tx.RewardInputs()
-	if err != nil {
-		return nil, ierrors.Join(err, iotago.ErrRewardInputInvalid)
+	return inputReferences, nil
+}
+
+func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, resolvedInputStates []mempool.State) (executionContext context.Context, err error) {
+	signedStardustTransaction, ok := signedTransaction.(*iotago.SignedTransaction)
+	if !ok {
+		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	commitmentInput, ok := timeReference.(*iotago.Commitment)
-	if commitmentInput != nil && !ok {
-		return nil, ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.New("unsupported type for time reference"))
+	utxoInputSet := iotagovm.InputSet{}
+	commitmentInput := (*iotago.Commitment)(nil)
+	bicInputs := make([]*iotago.BlockIssuanceCreditInput, 0)
+	rewardInputs := make([]*iotago.RewardInput, 0)
+	for _, resolvedInput := range resolvedInputStates {
+		resolvedInput.Type()
+		switch typedInput := resolvedInput.(type) {
+		case *iotago.Commitment:
+			commitmentInput = typedInput
+		case *iotago.BlockIssuanceCreditInput:
+			bicInputs = append(bicInputs, typedInput)
+		case *iotago.RewardInput:
+			rewardInputs = append(rewardInputs, typedInput)
+		case *utxoledger.Output:
+			utxoInputSet[typedInput.OutputID()] = typedInput.Output()
+		}
 	}
-
-	resolvedInputs.CommitmentInput = commitmentInput
 
 	if (len(rewardInputs) > 0 || len(bicInputs) > 0) && commitmentInput == nil {
 		return nil, iotago.ErrCommitmentInputMissing
@@ -47,7 +67,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 	bicInputSet := make(iotagovm.BlockIssuanceCreditInputSet)
 	for _, inp := range bicInputs {
-		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, commitmentInput.Slot)
+		accountData, exists, accountErr := v.ledger.accountsLedger.Account(inp.AccountID, commitmentInput.Slot)
 		if accountErr != nil {
 			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, commitmentInput.Slot))
 		}
@@ -57,13 +77,16 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 		bicInputSet[inp.AccountID] = accountData.Credits.Value
 	}
-	resolvedInputs.BlockIssuanceCreditInputSet = bicInputSet
 
 	rewardInputSet := make(iotagovm.RewardsInputSet)
 	for _, inp := range rewardInputs {
-		outputID := inputStates[inp.Index].OutputID()
+		output, ok := resolvedInputStates[inp.Index].(*utxoledger.Output)
+		if !ok {
+			return nil, ierrors.Wrapf(iotago.ErrRewardInputInvalid, "input at index %d is not an UTXO output", inp.Index)
+		}
+		outputID := output.OutputID()
 
-		switch castOutput := inputStates[inp.Index].Output().(type) {
+		switch castOutput := output.Output().(type) {
 		case *iotago.AccountOutput:
 			stakingFeature := castOutput.FeatureSet().Staking()
 			if stakingFeature == nil {
@@ -74,7 +97,7 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 				accountID = iotago.AccountIDFromOutputID(outputID)
 			}
 
-			reward, _, _, rewardErr := l.sybilProtection.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			reward, _, _, rewardErr := v.ledger.sybilProtection.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimStakingReward, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			}
@@ -89,10 +112,10 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 
 			delegationEnd := castOutput.EndEpoch
 			if delegationEnd == 0 {
-				delegationEnd = l.apiProvider.APIForSlot(commitmentInput.Slot).TimeProvider().EpochFromSlot(commitmentInput.Slot) - iotago.EpochIndex(1)
+				delegationEnd = v.ledger.apiProvider.APIForSlot(commitmentInput.Slot).TimeProvider().EpochFromSlot(commitmentInput.Slot) - iotago.EpochIndex(1)
 			}
 
-			reward, _, _, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
+			reward, _, _, rewardErr := v.ledger.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimDelegationReward, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}
@@ -100,28 +123,72 @@ func (l *Ledger) executeStardustVM(_ context.Context, stateTransition mempool.Tr
 			rewardInputSet[delegationID] = reward
 		}
 	}
-	resolvedInputs.RewardsInputSet = rewardInputSet
 
-	vmParams := &iotagovm.Params{
-		API: tx.API,
-	}
-	if err = stardust.NewVirtualMachine().Execute(tx, vmParams, resolvedInputs); err != nil {
-		return nil, err
+	resolvedInputs := iotagovm.ResolvedInputs{
+		InputSet:                    utxoInputSet,
+		CommitmentInput:             commitmentInput,
+		BlockIssuanceCreditInputSet: bicInputSet,
+		RewardsInputSet:             rewardInputSet,
 	}
 
-	outputSet, err := tx.OutputsSet()
+	unlockedIdentities, err := stardust.NewVirtualMachine().ValidateUnlocks(signedStardustTransaction, resolvedInputs)
 	if err != nil {
 		return nil, err
 	}
 
-	created := make([]mempool.OutputState, 0, len(outputSet))
-	for outputID, output := range outputSet {
-		created = append(created, &ExecutionOutput{
-			outputID:     outputID,
-			output:       output,
-			creationSlot: tx.Transaction.CreationSlot,
-		})
+	executionContext = context.Background()
+	executionContext = context.WithValue(executionContext, ExecutionContextKeyUnlockedIdentities, unlockedIdentities)
+	executionContext = context.WithValue(executionContext, ExecutionContextKeyResolvedInputs, resolvedInputs)
+
+	return executionContext, nil
+}
+
+func (v *VM) Execute(executionContext context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
+	stardustTransaction, ok := transaction.(*iotago.Transaction)
+	if !ok {
+		return nil, iotago.ErrTxTypeInvalid
 	}
 
-	return created, nil
+	transactionID, err := stardustTransaction.ID()
+	if err != nil {
+		return nil, err
+	}
+
+	unlockedIdentities, ok := executionContext.Value(ExecutionContextKeyUnlockedIdentities).(iotagovm.UnlockedIdentities)
+	if !ok {
+		return nil, ierrors.Errorf("unlockedIdentities not found in execution context")
+	}
+
+	resolvedInputs, ok := executionContext.Value(ExecutionContextKeyResolvedInputs).(iotagovm.ResolvedInputs)
+	if !ok {
+		return nil, ierrors.Errorf("resolvedInputs not found in execution context")
+	}
+
+	createdOutputs, err := stardust.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedIdentities)
+	if err != nil {
+		return nil, err
+	}
+
+	for index, output := range createdOutputs {
+		outputs = append(outputs, utxoledger.CreateOutput(
+			v.ledger.apiProvider,
+			iotago.OutputIDFromTransactionIDAndIndex(transactionID, uint16(index)),
+			iotago.EmptyBlockID(),
+			0,
+			output,
+		))
+	}
+
+	return outputs, nil
 }
+
+// ExecutionContextKey is the type of the keys used in the execution context.
+type ExecutionContextKey uint8
+
+const (
+	// ExecutionContextKeyUnlockedIdentities is the key for the unlocked identities in the execution context.
+	ExecutionContextKeyUnlockedIdentities ExecutionContextKey = iota
+
+	// ExecutionContextKeyResolvedInputs is the key for the resolved inputs in the execution context.
+	ExecutionContextKeyResolvedInputs
+)

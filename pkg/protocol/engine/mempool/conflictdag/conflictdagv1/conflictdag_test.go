@@ -38,7 +38,7 @@ func newTestFramework(t *testing.T) *tests.Framework {
 
 // transactionID creates a (made up) TransactionID from the given alias.
 func transactionID(alias string) iotago.TransactionID {
-	result := iotago.TransactionIDFromData(TestTransactionCreationSlot, []byte(alias))
+	result := iotago.TransactionIDRepresentingData(TestTransactionCreationSlot, []byte(alias))
 	result.RegisterAlias(alias)
 
 	return result
@@ -46,7 +46,7 @@ func transactionID(alias string) iotago.TransactionID {
 
 // outputID creates a (made up) OutputID from the given alias.
 func outputID(alias string) iotago.OutputID {
-	return iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionIDFromData(TestTransactionCreationSlot, []byte(alias)), 1)
+	return iotago.OutputIDFromTransactionIDAndIndex(iotago.TransactionIDRepresentingData(TestTransactionCreationSlot, []byte(alias)), 1)
 }
 
 func TestMemoryRelease(t *testing.T) {
