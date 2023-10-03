@@ -39,18 +39,20 @@ func (s *Server) ValidatePayload(_ context.Context, payload *inx.RawPayload) (*i
 
 			loadedInputs := make([]mempool.State, 0)
 			for _, inputReference := range inputReferences {
-				if metadata, metadataErr := memPool.StateMetadata(inputReference); metadataErr != nil {
+				metadata, metadataErr := memPool.StateMetadata(inputReference)
+				if metadataErr != nil {
 					return metadataErr
-				} else {
-					loadedInputs = append(loadedInputs, metadata.State())
 				}
+
+				loadedInputs = append(loadedInputs, metadata.State())
 			}
 
-			if executionContext, validationErr := memPool.VM().ValidateSignatures(typedPayload, loadedInputs); validationErr != nil {
+			executionContext, validationErr := memPool.VM().ValidateSignatures(typedPayload, loadedInputs)
+			if validationErr != nil {
 				return validationErr
-			} else {
-				return lo.Return2(memPool.VM().Execute(executionContext, typedPayload.Transaction))
 			}
+
+			return lo.Return2(memPool.VM().Execute(executionContext, typedPayload.Transaction))
 
 		case *iotago.TaggedData:
 			// TaggedData is always valid if serix decoding was successful
