@@ -56,17 +56,17 @@ func (s *StateDiff) Mutations() ads.Set[iotago.TransactionID] {
 }
 
 func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata, direction int) {
-	transaction.Inputs().Range(func(input mempool.StateMetadata) {
-		s.compactStateChanges(input, s.stateUsageCounters.Compute(input.StateID(), func(currentValue int, _ bool) int {
+	for _, input := range transaction.inputs {
+		s.compactStateChanges(input, s.stateUsageCounters.Compute(input.state.StateID(), func(currentValue int, _ bool) int {
 			return currentValue - direction
 		}))
-	})
+	}
 
-	transaction.Outputs().Range(func(output mempool.StateMetadata) {
-		s.compactStateChanges(output, s.stateUsageCounters.Compute(output.StateID(), func(currentValue int, _ bool) int {
+	for _, output := range transaction.outputs {
+		s.compactStateChanges(output, s.stateUsageCounters.Compute(output.state.StateID(), func(currentValue int, _ bool) int {
 			return currentValue + direction
 		}))
-	})
+	}
 }
 
 func (s *StateDiff) AddTransaction(transaction *TransactionMetadata, errorHandler func(error)) error {
@@ -91,25 +91,26 @@ func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) error 
 		if _, err := s.mutations.Delete(transaction.ID()); err != nil {
 			return ierrors.Wrapf(err, "failed to delete transaction from state diff's mutations, txID: %s", transaction.ID())
 		}
+
 		s.updateCompactedStateChanges(transaction, -1)
 	}
 
 	return nil
 }
 
-func (s *StateDiff) compactStateChanges(output mempool.StateMetadata, newValue int) {
-	if output.State().Type() != iotago.InputUTXO {
+func (s *StateDiff) compactStateChanges(output *StateMetadata, newValue int) {
+	if output.state.Type() != iotago.InputUTXO {
 		return
 	}
 
 	switch {
 	case newValue > 0:
-		s.createdOutputs.Set(output.StateID(), output)
+		s.createdOutputs.Set(output.state.StateID(), output)
 	case newValue < 0:
-		s.spentOutputs.Set(output.StateID(), output)
+		s.spentOutputs.Set(output.state.StateID(), output)
 	default:
-		s.createdOutputs.Delete(output.StateID())
-		s.spentOutputs.Delete(output.StateID())
+		s.createdOutputs.Delete(output.state.StateID())
+		s.spentOutputs.Delete(output.state.StateID())
 	}
 }
 

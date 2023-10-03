@@ -59,14 +59,6 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	return s
 }
 
-func (s *StateMetadata) StateID() mempool.StateID {
-	return s.state.StateID()
-}
-
-func (s *StateMetadata) Type() iotago.StateType {
-	return iotago.InputUTXO
-}
-
 func (s *StateMetadata) State() mempool.State {
 	return s.state
 }
