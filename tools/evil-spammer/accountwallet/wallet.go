@@ -44,6 +44,30 @@ func Run(lastFaucetUnspentOutputID iotago.OutputID) (*AccountWallet, error) {
 	return wallet, nil
 }
 
+func ReadAccountWallet() (map[string]*models.AccountData, error) {
+	// read config here
+	config := loadAccountConfig()
+
+	var opts []options.Option[AccountWallet]
+	if config.BindAddress != "" {
+		opts = append(opts, WithClientURL(config.BindAddress))
+	}
+	if config.AccountStatesFile != "" {
+		opts = append(opts, WithAccountStatesFile(config.AccountStatesFile))
+	}
+
+	opts = append(opts, WithFaucetUnspendOutputID(iotago.EmptyOutputID))
+
+	wallet := NewAccountWallet(opts...)
+	accountsData, err := wallet.readAccountsStateFile()
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to read accounts state file")
+	}
+
+	return accountsData, nil
+
+}
+
 func SaveState(w *AccountWallet) error {
 	return w.toAccountStateFile()
 }
@@ -140,6 +164,14 @@ func (a *AccountWallet) fromAccountStateFile() error {
 	}
 
 	return nil
+}
+
+func (a *AccountWallet) readAccountsStateFile() (map[string]*models.AccountData, error) {
+	err := a.fromAccountStateFile()
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to load wallet from file")
+	}
+	return a.accountsAliases, nil
 }
 
 func (a *AccountWallet) registerAccount(alias string, outputID iotago.OutputID, index uint64) iotago.AccountID {

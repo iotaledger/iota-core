@@ -32,6 +32,7 @@ var (
 		Scenario:              wallet.Scenario1(),
 		DeepSpam:              false,
 		EnableRateSetter:      false,
+		AccountAlias:          "faucet",
 	}
 
 	quickTestParams = programs.QuickTestParams{

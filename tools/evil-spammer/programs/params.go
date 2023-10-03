@@ -20,6 +20,7 @@ type CustomSpamParams struct {
 	Scenario              wallet.EvilBatch
 	DeepSpam              bool
 	EnableRateSetter      bool
+	AccountAlias          string
 
 	Config *BasicConfig
 }

@@ -47,7 +47,7 @@ func CustomSpam(params *CustomSpamParams) {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				s := SpamBlocks(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.BlkToBeSent[i], params.EnableRateSetter)
+				s := SpamBlocks(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.BlkToBeSent[i], params.EnableRateSetter, params.AccountAlias)
 				if s == nil {
 					return
 				}
@@ -57,19 +57,19 @@ func CustomSpam(params *CustomSpamParams) {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				SpamTransaction(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.DeepSpam, params.EnableRateSetter)
+				SpamTransaction(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.DeepSpam, params.EnableRateSetter, params.AccountAlias)
 			}(i)
 		case spammer.TypeDs:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				SpamDoubleSpends(w, params.Rates[i], params.NSpend, params.TimeUnit, params.Durations[i], params.DelayBetweenConflicts, params.DeepSpam, params.EnableRateSetter)
+				SpamDoubleSpends(w, params.Rates[i], params.NSpend, params.TimeUnit, params.Durations[i], params.DelayBetweenConflicts, params.DeepSpam, params.EnableRateSetter, params.AccountAlias)
 			}(i)
 		case spammer.TypeCustom:
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				s := SpamNestedConflicts(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.Scenario, params.DeepSpam, false, params.EnableRateSetter)
+				s := SpamNestedConflicts(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.Scenario, params.DeepSpam, false, params.EnableRateSetter, params.AccountAlias)
 				if s == nil {
 					return
 				}
@@ -85,7 +85,7 @@ func CustomSpam(params *CustomSpamParams) {
 			go func() {
 				defer wg.Done()
 
-				s := SpamAccounts(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.EnableRateSetter)
+				s := SpamAccounts(w, params.Rates[i], params.TimeUnit, params.Durations[i], params.EnableRateSetter, params.AccountAlias)
 				if s == nil {
 					return
 				}
@@ -101,7 +101,7 @@ func CustomSpam(params *CustomSpamParams) {
 	log.Info("Basic spamming finished!")
 }
 
-func SpamTransaction(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, deepSpam, enableRateSetter bool) {
+func SpamTransaction(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, deepSpam, enableRateSetter bool, accountAlias string) {
 	if w.NumOfClient() < 1 {
 		log.Infof("Warning: At least one client is needed to spam.")
 	}
@@ -131,7 +131,7 @@ func SpamTransaction(w *wallet.EvilWallet, rate int, timeUnit, duration time.Dur
 	s.Spam()
 }
 
-func SpamDoubleSpends(w *wallet.EvilWallet, rate, nSpent int, timeUnit, duration, delayBetweenConflicts time.Duration, deepSpam, enableRateSetter bool) {
+func SpamDoubleSpends(w *wallet.EvilWallet, rate, nSpent int, timeUnit, duration, delayBetweenConflicts time.Duration, deepSpam, enableRateSetter bool, accountAlias string) {
 	log.Debugf("Setting up double spend spammer with rate: %d, time unit: %s, and duration: %s.", rate, timeUnit.String(), duration.String())
 	if w.NumOfClient() < 2 {
 		log.Infof("Warning: At least two client are needed to spam, and %d was provided", w.NumOfClient())
@@ -162,7 +162,7 @@ func SpamDoubleSpends(w *wallet.EvilWallet, rate, nSpent int, timeUnit, duration
 	s.Spam()
 }
 
-func SpamNestedConflicts(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, conflictBatch wallet.EvilBatch, deepSpam, reuseOutputs, enableRateSetter bool) *spammer.Spammer {
+func SpamNestedConflicts(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, conflictBatch wallet.EvilBatch, deepSpam, reuseOutputs, enableRateSetter bool, accountAlias string) *spammer.Spammer {
 	scenarioOptions := []wallet.ScenarioOption{
 		wallet.WithScenarioCustomConflicts(conflictBatch),
 	}
@@ -193,7 +193,7 @@ func SpamNestedConflicts(w *wallet.EvilWallet, rate int, timeUnit, duration time
 	return spammer.NewSpammer(options...)
 }
 
-func SpamBlocks(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, numBlkToSend int, enableRateSetter bool) *spammer.Spammer {
+func SpamBlocks(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, numBlkToSend int, enableRateSetter bool, accountAlias string) *spammer.Spammer {
 	if w.NumOfClient() < 1 {
 		log.Infof("Warning: At least one client is needed to spam.")
 	}
@@ -210,7 +210,7 @@ func SpamBlocks(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration
 	return spammer.NewSpammer(options...)
 }
 
-func SpamAccounts(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, enableRateSetter bool) *spammer.Spammer {
+func SpamAccounts(w *wallet.EvilWallet, rate int, timeUnit, duration time.Duration, enableRateSetter bool, accountAlias string) *spammer.Spammer {
 	if w.NumOfClient() < 1 {
 		log.Infof("Warning: At least one client is needed to spam.")
 	}
