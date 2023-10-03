@@ -1,4 +1,4 @@
-package wallet
+package evilwallet
 
 import (
 	"go.uber.org/atomic"

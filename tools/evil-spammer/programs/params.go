@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
 )
 
 type CustomSpamParams struct {
@@ -17,7 +17,7 @@ type CustomSpamParams struct {
 	TimeUnit              time.Duration
 	DelayBetweenConflicts time.Duration
 	NSpend                int
-	Scenario              wallet.EvilBatch
+	Scenario              evilwallet.EvilBatch
 	DeepSpam              bool
 	EnableRateSetter      bool
 	AccountAlias          string

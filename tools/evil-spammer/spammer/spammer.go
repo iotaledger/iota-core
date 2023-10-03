@@ -12,8 +12,8 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
-	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -60,8 +60,8 @@ type Spammer struct {
 	UseRateSetter   bool
 	SpamType        SpamType
 	Clients         models.Connector
-	EvilWallet      *wallet.EvilWallet
-	EvilScenario    *wallet.EvilScenario
+	EvilWallet      *evilwallet.EvilWallet
+	EvilScenario    *evilwallet.EvilScenario
 	IdentityManager *IdentityManager
 	// CommitmentManager *CommitmentManager
 	ErrCounter *ErrorCounter
@@ -93,7 +93,7 @@ func NewSpammer(options ...Options) *Spammer {
 		spamFunc:        CustomConflictSpammingFunc,
 		State:           state,
 		SpamType:        SpamEvilWallet,
-		EvilScenario:    wallet.NewEvilScenario(),
+		EvilScenario:    evilwallet.NewEvilScenario(),
 		IdentityManager: NewIdentityManager(),
 		// CommitmentManager: NewCommitmentManager(),
 		UseRateSetter:  true,
@@ -129,7 +129,7 @@ func (s *Spammer) setup() {
 	switch s.SpamType {
 	case SpamEvilWallet:
 		if s.EvilWallet == nil {
-			s.EvilWallet = wallet.NewEvilWallet()
+			s.EvilWallet = evilwallet.NewEvilWallet()
 		}
 		s.Clients = s.EvilWallet.Connector()
 		// case SpamCommitments:
@@ -258,7 +258,7 @@ func (s *Spammer) PostTransaction(signedTx *iotago.SignedTransaction, clt models
 
 		return
 	}
-	if s.EvilScenario.OutputWallet.Type() == wallet.Reuse {
+	if s.EvilScenario.OutputWallet.Type() == evilwallet.Reuse {
 		var outputIDs iotago.OutputIDs
 		for index := range signedTx.Transaction.Outputs {
 			outputIDs = append(outputIDs, iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(index)))
