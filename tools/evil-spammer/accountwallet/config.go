@@ -37,7 +37,7 @@ var accountConfigFile = "account_config.json"
 
 var accountConfigJSON = `{
 	"bindAddress": "http://localhost:8080",
-	"accountStatesFile": "wallet.LOCK"
+	"accountStatesFile": "wallet.dat"
 }`
 
 // loadAccountConfig loads the config file.
