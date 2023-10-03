@@ -16,7 +16,7 @@ func (m *MockedOutput) WorkScore(_ *iotago.WorkScoreStructure) (iotago.WorkScore
 	panic("implement me")
 }
 
-func (m *MockedOutput) VBytes(_ *iotago.RentStructure, _ iotago.VBytesFunc) iotago.VBytes {
+func (m *MockedOutput) StorageScore(_ *iotago.RentStructure, _ iotago.StorageScoreFunc) iotago.StorageScore {
 	panic("implement me")
 }
 
@@ -25,10 +25,6 @@ func (m *MockedOutput) BaseTokenAmount() iotago.BaseToken {
 }
 
 func (m *MockedOutput) StoredMana() iotago.Mana {
-	panic("implement me")
-}
-
-func (m *MockedOutput) NativeTokenList() iotago.NativeTokens {
 	panic("implement me")
 }
 

@@ -3,8 +3,10 @@ package mana
 import (
 	"github.com/zyedidia/generic/cache"
 
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -45,12 +47,15 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		if err != nil {
 			return 0, ierrors.Errorf("failed to resolve AccountOutput for %s in slot %s: %w", accountID, currentSlot, err)
 		}
-		minDeposit := m.apiProvider.CurrentAPI().RentStructure().MinDeposit(output.Output())
-		if output.BaseTokenAmount() <= minDeposit {
-			mana = accounts.NewMana(output.StoredMana(), 0, output.SlotCreated())
-		} else {
-			mana = accounts.NewMana(output.StoredMana(), output.BaseTokenAmount()-minDeposit, output.SlotCreated())
+		minDeposit, err := m.apiProvider.CurrentAPI().RentStructure().MinDeposit(output.Output())
+		if err != nil {
+			return 0, ierrors.Errorf("failed to get min deposit for %s: %w", accountID, err)
 		}
+		excessBaseTokens, err := safemath.SafeSub(output.BaseTokenAmount(), minDeposit)
+		if err != nil {
+			excessBaseTokens = 0
+		}
+		mana = accounts.NewMana(output.StoredMana(), excessBaseTokens, output.SlotCreated())
 
 		if !exists {
 			m.manaVectorCache.Put(accountID, mana)
@@ -92,12 +97,12 @@ func (m *Manager) ApplyDiff(slot iotago.SlotIndex, destroyedAccounts ds.Set[iota
 	for accountID, output := range accountOutputs {
 		mana, exists := m.manaVectorCache.Get(accountID)
 		if exists {
-			minDeposit := m.apiProvider.CurrentAPI().RentStructure().MinDeposit(output.Output())
-			if output.BaseTokenAmount() <= minDeposit {
-				mana.Update(output.StoredMana(), 0, slot)
-			} else {
-				mana.Update(output.StoredMana(), output.BaseTokenAmount()-minDeposit, slot)
+			minDeposit := lo.PanicOnErr(m.apiProvider.CurrentAPI().RentStructure().MinDeposit(output.Output()))
+			excessBaseTokens, err := safemath.SafeSub(output.BaseTokenAmount(), minDeposit)
+			if err != nil {
+				excessBaseTokens = 0
 			}
+			mana.Update(output.StoredMana(), excessBaseTokens, slot)
 		}
 	}
 }
