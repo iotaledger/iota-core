@@ -689,7 +689,7 @@ func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slot iotago.Sl
 	return accountOutput, nil
 }
 
-func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[mempool.State] {
+func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[mempool.State] {
 	p := promise.New[mempool.State]()
 
 	l.utxoLedger.ReadLockLedger()
