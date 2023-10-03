@@ -24,12 +24,6 @@ func (i *BlockIssuer) reviveChain(issuingTime time.Time) (*iotago.Commitment, io
 		}
 	}
 
-	// Get last issued block and start issuing after that subslot.
-	// TODO: also make sure to not issue on two distinct chains within the same slot.
-	lastIssuedBlockValidationBlock := i.protocol.MainEngineInstance().Storage.Settings().LatestIssuedValidationBlock()
-	if lastIssuedBlockValidationBlock != nil {
-
-	}
 	issuingSlot := apiForSlot.TimeProvider().SlotFromTime(issuingTime)
 
 	// Force commitments until minCommittableAge relative to the block's issuing time. We basically "pretend" that

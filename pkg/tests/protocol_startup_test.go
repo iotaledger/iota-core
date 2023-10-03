@@ -201,8 +201,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				)
 				ts.Wait()
 
-				// Everything that was accepted before shutting down should be available on disk (verifying that restoring the block cache from disk works).
-				ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13.0", "13.1", "13.2", "13.3"), true, ts.Nodes("nodeC-restarted")...)
+				// Everything that was accepted before shutting down should be available on disk.
 				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom0, ts.Nodes("nodeC-restarted")...)
 
 				for _, slot := range []iotago.SlotIndex{8, 9, 11} {

@@ -161,10 +161,6 @@ func (p *Prunable) Rollback(targetSlot iotago.SlotIndex) error {
 	// Removed entries that belong to the old fork and cannot be re-used.
 	for epoch := lastCommittedEpoch + 1; ; epoch++ {
 		if epoch > targetSlotEpoch {
-			if deleted := p.prunableSlotStore.DeleteBucket(epoch); !deleted {
-				break
-			}
-
 			shouldRollback, err := p.shouldRollbackCommittee(epoch, targetSlot)
 			if err != nil {
 				return ierrors.Wrapf(err, "error while checking if committee for epoch %d should be rolled back", epoch)
@@ -176,6 +172,9 @@ func (p *Prunable) Rollback(targetSlot iotago.SlotIndex) error {
 				}
 			}
 
+			if deleted := p.prunableSlotStore.DeleteBucket(epoch); !deleted {
+				break
+			}
 		}
 
 		if err := p.poolRewards.DeleteEpoch(epoch); err != nil {
@@ -205,6 +204,10 @@ func (p *Prunable) shouldRollbackCommittee(epoch iotago.EpochIndex, targetSlot i
 			committee, err := p.committee.Load(targetSlotEpoch + 1)
 			if err != nil {
 				return false, err
+			}
+
+			if committee == nil {
+				return false, nil
 			}
 
 			return committee.IsReused(), nil
