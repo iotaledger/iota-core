@@ -47,7 +47,7 @@ func (o *Output) Type() iotago.StateType {
 	return iotago.InputUTXO
 }
 
-func (o *Output) ReadOnly() bool {
+func (o *Output) IsReadOnly() bool {
 	return false
 }
 

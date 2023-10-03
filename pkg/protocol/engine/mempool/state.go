@@ -7,5 +7,5 @@ type State interface {
 
 	Type() iotago.StateType
 
-	ReadOnly() bool
+	IsReadOnly() bool
 }
