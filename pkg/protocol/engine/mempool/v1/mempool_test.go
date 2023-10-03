@@ -56,6 +56,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 
 			prevStateAlias = fmt.Sprintf("tx%d:0", index)
 
+			fmt.Println("EVICT", index)
 			tf.CommitSlot(iotago.SlotIndex(index))
 			tf.Instance.Evict(iotago.SlotIndex(index))
 
@@ -71,15 +72,51 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	txIndex, prevStateAlias := issueTransactions(1, 10, "genesis")
 	tf.WaitChildren()
 
-	require.Equal(t, 0, mempoolInstance.cachedTransactions.Size())
+	require.Equal(t, 10, mempoolInstance.cachedTransactions.Size())
+	require.Equal(t, 10, mempoolInstance.delayedTransactionEviction.Size())
 	require.Equal(t, 0, mempoolInstance.stateDiffs.Size())
-	require.Equal(t, 0, mempoolInstance.cachedStateRequests.Size())
+	require.Equal(t, 10, mempoolInstance.delayedOutputStateEviction.Size())
+	// genesis output is never committed or orphaned, so it is not evicted as it has still a non-evicted spender.
+	require.Equal(t, 11, mempoolInstance.cachedStateRequests.Size())
 
 	txIndex, prevStateAlias = issueTransactions(txIndex, 10, prevStateAlias)
 	tf.WaitChildren()
 
-	require.Equal(t, 0, mempoolInstance.cachedTransactions.Size())
+	require.Equal(t, 20, mempoolInstance.cachedTransactions.Size())
+	require.Equal(t, 20, mempoolInstance.delayedTransactionEviction.Size())
 	require.Equal(t, 0, mempoolInstance.stateDiffs.Size())
+	require.Equal(t, 20, mempoolInstance.delayedOutputStateEviction.Size())
+	require.Equal(t, 21, mempoolInstance.cachedStateRequests.Size())
+
+	txIndex, prevStateAlias = issueTransactions(txIndex, 10, prevStateAlias)
+	tf.WaitChildren()
+
+	// Cached transactions stop increasing after 20, because eviction is delayed by MCA.
+	require.Equal(t, 20, mempoolInstance.cachedTransactions.Size())
+	require.Equal(t, 20, mempoolInstance.delayedTransactionEviction.Size())
+	require.Equal(t, 0, mempoolInstance.stateDiffs.Size())
+	require.Equal(t, 20, mempoolInstance.delayedOutputStateEviction.Size())
+	require.Equal(t, 21, mempoolInstance.cachedStateRequests.Size())
+
+	txIndex, _ = issueTransactions(txIndex, 10, prevStateAlias)
+	tf.WaitChildren()
+
+	require.Equal(t, 20, mempoolInstance.cachedTransactions.Size())
+	require.Equal(t, 20, mempoolInstance.delayedTransactionEviction.Size())
+	require.Equal(t, 0, mempoolInstance.stateDiffs.Size())
+	require.Equal(t, 20, mempoolInstance.delayedOutputStateEviction.Size())
+	require.Equal(t, 21, mempoolInstance.cachedStateRequests.Size())
+
+	for index := txIndex; index <= txIndex+20; index++ {
+		tf.CommitSlot(iotago.SlotIndex(index))
+		tf.Instance.Evict(iotago.SlotIndex(index))
+	}
+
+	// Genesis output is also finally evicted thanks to the fact that all its spenders got evicted.
+	require.Equal(t, 0, mempoolInstance.cachedTransactions.Size())
+	require.Equal(t, 0, mempoolInstance.delayedTransactionEviction.Size())
+	require.Equal(t, 0, mempoolInstance.stateDiffs.Size())
+	require.Equal(t, 0, mempoolInstance.delayedOutputStateEviction.Size())
 	require.Equal(t, 0, mempoolInstance.cachedStateRequests.Size())
 
 	attachmentsSlotCount := 0
