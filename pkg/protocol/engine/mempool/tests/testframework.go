@@ -311,10 +311,6 @@ func (t *TestFramework) setupHookedEvents() {
 	})
 }
 
-func (t *TestFramework) stateContextReference(alias string) mempool.StateReference {
-	return &iotago.CommitmentInput{CommitmentID: iotago.SlotIdentifierRepresentingData(0, []byte(alias))}
-}
-
 func (t *TestFramework) stateReference(alias string) mempool.StateReference {
 	if alias == "genesis" {
 		return &iotago.UTXOInput{}
