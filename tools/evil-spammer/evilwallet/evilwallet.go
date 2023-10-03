@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/accountwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -59,7 +60,7 @@ type EvilWallet struct {
 	optFaucetSeed            []byte
 	optFaucetUnspentOutputID iotago.OutputID
 	optsClientURLs           []string
-	optsAccountsData         map[string]*models.AccountData
+	optsAccountsWallet       *accountwallet.AccountWallet
 }
 
 // NewEvilWallet creates an EvilWallet instance.
@@ -849,8 +850,8 @@ func WithClients(urls ...string) options.Option[EvilWallet] {
 	}
 }
 
-func WithAccountsData(accData map[string]*models.AccountData) options.Option[EvilWallet] {
+func WithAccountsWallet(wallet *accountwallet.AccountWallet) options.Option[EvilWallet] {
 	return func(opts *EvilWallet) {
-		opts.optsAccountsData = accData
+		opts.optsAccountsWallet = wallet
 	}
 }
