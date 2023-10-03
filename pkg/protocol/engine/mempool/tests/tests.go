@@ -81,6 +81,15 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 }
 
 func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
+	tf.InjectState("readOnlyInput", &iotago.Commitment{
+		ProtocolVersion:      0,
+		Slot:                 0,
+		PreviousCommitmentID: iotago.CommitmentID{},
+		RootsID:              iotago.Identifier{},
+		CumulativeWeight:     0,
+		ReferenceManaCost:    0,
+	})
+
 	tf.CreateTransaction("tx1", []string{"genesis", "readOnlyInput"}, 1)
 	tf.CreateTransaction("tx2", []string{"tx1:0", "readOnlyInput"}, 1)
 
