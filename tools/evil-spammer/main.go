@@ -32,7 +32,14 @@ func main() {
 	case "interactive":
 		interactive.Run()
 	case "basic":
-		programs.CustomSpam(&customSpamParams)
+		// load wallet
+		accData, err := accountwallet.ReadAccountWallet()
+		if err != nil {
+			log.Warn(err)
+			return
+		}
+
+		programs.CustomSpam(&customSpamParams, accData)
 	case "accounts":
 		// load wallet
 		accWallet, err := accountwallet.Run(lastFaucetUnspendOutputID)

@@ -1,4 +1,4 @@
-package wallet
+package evilwallet
 
 import (
 	"crypto/ed25519"

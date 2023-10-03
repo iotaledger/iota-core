@@ -37,7 +37,7 @@ var accountConfigFile = "account_config.json"
 
 var accountConfigJSON = `{
 	"bindAddress": "http://localhost:8080",
-	"accountStatesFile": "wallet.LOCK"
+	"accountStatesFile": "wallet.dat"
 }`
 
 // loadAccountConfig loads the config file.
@@ -98,4 +98,4 @@ var dockerFaucetSeed = func() []byte {
 	return genesisSeed
 }
 
-var genesisTransactionID = iotago.SlotIdentifierRepresentingData(0, []byte("genesis"))
+var genesisTransactionID = iotago.TransactionIDRepresentingData(0, []byte("genesis"))

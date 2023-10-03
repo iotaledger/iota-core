@@ -3,9 +3,9 @@ package main
 import (
 	"time"
 
+	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
-	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -29,9 +29,10 @@ var (
 		TimeUnit:              time.Second,
 		DelayBetweenConflicts: 0,
 		NSpend:                2,
-		Scenario:              wallet.Scenario1(),
+		Scenario:              evilwallet.Scenario1(),
 		DeepSpam:              false,
 		EnableRateSetter:      false,
+		AccountAlias:          "faucet",
 	}
 
 	quickTestParams = programs.QuickTestParams{
