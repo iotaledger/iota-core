@@ -98,4 +98,4 @@ var dockerFaucetSeed = func() []byte {
 	return genesisSeed
 }
 
-var genesisTransactionID = iotago.SlotIdentifierRepresentingData(0, []byte("genesis"))
+var genesisTransactionID = iotago.TransactionIDRepresentingData(0, []byte("genesis"))

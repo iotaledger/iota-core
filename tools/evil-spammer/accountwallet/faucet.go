@@ -116,7 +116,7 @@ func (f *Faucet) RequestFunds(receiveAddr iotago.Address, amount iotago.BaseToke
 
 	// set remainder output to be reused by the faucet wallet
 	f.unspentOutput = &models.Output{
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), 1),
+		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1),
 		Address:      f.facuetAddress,
 		Index:        0,
 		Balance:      signedTx.Transaction.Outputs[1].BaseTokenAmount(),
@@ -124,7 +124,7 @@ func (f *Faucet) RequestFunds(receiveAddr iotago.Address, amount iotago.BaseToke
 	}
 
 	return &models.Output{
-		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.ID()), 0),
+		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
 		Address:      receiveAddr,
 		Index:        0,
 		Balance:      signedTx.Transaction.Outputs[0].BaseTokenAmount(),

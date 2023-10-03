@@ -47,7 +47,7 @@ const (
 	GenesisTransactionCreationSlot = 0
 )
 
-var GenesisTransactionID = iotago.TransactionIDFromData(GenesisTransactionCreationSlot, []byte("genesis"))
+var GenesisTransactionID = iotago.TransactionIDRepresentingData(GenesisTransactionCreationSlot, []byte("genesis"))
 
 func CreateSnapshot(opts ...options.Option[Options]) error {
 	opt := NewOptions(opts...)
