@@ -46,7 +46,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 			signedTxAlias := fmt.Sprintf("tx%d-signed", index)
 			txAlias := fmt.Sprintf("tx%d", index)
 			blockAlias := fmt.Sprintf("block%d", index)
-			tf.CreateSignedTransaction(txAlias, []string{}, []string{prevStateAlias}, 2)
+			tf.CreateSignedTransaction(txAlias, []string{prevStateAlias}, 2)
 
 			require.NoError(t, tf.AttachTransaction(signedTxAlias, txAlias, blockAlias, iotago.SlotIndex(index)))
 			tf.RequireBooked(txAlias)

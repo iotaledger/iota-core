@@ -27,7 +27,7 @@ func (m *MockedState) Type() iotago.StateType {
 	return iotago.InputUTXO
 }
 
-func (m *MockedState) ReadOnly() bool {
+func (m *MockedState) IsReadOnly() bool {
 	return false
 }
 
