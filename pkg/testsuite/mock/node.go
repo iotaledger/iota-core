@@ -508,6 +508,12 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 	return block
 }
 
+func (n *Node) IssueExistingBlock(ctx context.Context, block *blocks.Block) {
+	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, block.ID().Alias())
+
+	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
+}
+
 func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
 	block := n.CreateValidationBlock(ctx, alias, opts...)
 
