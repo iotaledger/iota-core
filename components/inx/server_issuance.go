@@ -21,7 +21,7 @@ func (s *Server) RequestTips(_ context.Context, req *inx.TipsRequest) (*inx.Tips
 	}, nil
 }
 
-func (s *Server) ValidatePayload(ctx context.Context, payload *inx.RawPayload) (*inx.PayloadValidationResponse, error) {
+func (s *Server) ValidatePayload(payload *inx.RawPayload) (*inx.PayloadValidationResponse, error) {
 	if err := func() error {
 		blockPayload, unwrapErr := payload.Unwrap(deps.Protocol.CurrentAPI(), serix.WithValidation())
 		if unwrapErr != nil {
@@ -53,6 +53,7 @@ func (s *Server) ValidatePayload(ctx context.Context, payload *inx.RawPayload) (
 			}
 
 		case *iotago.TaggedData:
+			// TaggedData is always valid if serix decoding was successful
 			return nil
 
 		default:
