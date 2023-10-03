@@ -14,11 +14,11 @@ func (V *VM) StateReferences(transaction mempool.Transaction) ([]mempool.StateRe
 	return transaction.(*Transaction).Inputs()
 }
 
-func (V *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, resolvedInputs []mempool.State) (executionContext context.Context, err error) {
+func (V *VM) ValidateSignatures(_ mempool.SignedTransaction, _ []mempool.State) (executionContext context.Context, err error) {
 	return context.Background(), nil
 }
 
-func (V *VM) Execute(executionContext context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
+func (V *VM) Execute(_ context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
 	typedTransaction, ok := transaction.(*Transaction)
 	if !ok {
 		return nil, ierrors.New("invalid transaction type in MockedVM")
