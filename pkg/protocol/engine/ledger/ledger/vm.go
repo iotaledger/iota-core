@@ -127,8 +127,8 @@ func (l *Ledger) validateStardustTransaction(signedTransaction mempool.SignedTra
 	}
 
 	executionContext = context.Background()
-	executionContext = context.WithValue(executionContext, "unlockedIdentities", unlockedIdentities)
-	executionContext = context.WithValue(executionContext, "resolvedInputs", resolvedInputs)
+	executionContext = context.WithValue(executionContext, ExecutionContextKeyUnlockedIdentities, unlockedIdentities)
+	executionContext = context.WithValue(executionContext, ExecutionContextKeyResolvedInputs, resolvedInputs)
 
 	return executionContext, nil
 }
@@ -144,12 +144,12 @@ func (l *Ledger) executeStardustVM(executionContext context.Context, transaction
 		return nil, err
 	}
 
-	unlockedIdentities, ok := executionContext.Value("unlockedIdentities").(iotagovm.UnlockedIdentities)
+	unlockedIdentities, ok := executionContext.Value(ExecutionContextKeyUnlockedIdentities).(iotagovm.UnlockedIdentities)
 	if !ok {
 		return nil, ierrors.Errorf("unlockedIdentities not found in execution context")
 	}
 
-	resolvedInputs, ok := executionContext.Value("resolvedInputs").(iotagovm.ResolvedInputs)
+	resolvedInputs, ok := executionContext.Value(ExecutionContextKeyResolvedInputs).(iotagovm.ResolvedInputs)
 	if !ok {
 		return nil, ierrors.Errorf("resolvedInputs not found in execution context")
 	}
@@ -171,3 +171,14 @@ func (l *Ledger) executeStardustVM(executionContext context.Context, transaction
 
 	return outputs, nil
 }
+
+// ExecutionContextKey is the type of the keys used in the execution context.
+type ExecutionContextKey uint8
+
+const (
+	// ExecutionContextKeyUnlockedIdentities is the key for the unlocked identities in the execution context.
+	ExecutionContextKeyUnlockedIdentities ExecutionContextKey = iota
+
+	// ExecutionContextKeyResolvedInputs is the key for the resolved inputs in the execution context.
+	ExecutionContextKeyResolvedInputs
+)
