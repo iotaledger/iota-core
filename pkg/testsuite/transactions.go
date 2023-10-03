@@ -33,9 +33,15 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 			return ierrors.Errorf("AssertTransaction: %s: expected TransactionEssence %v, got %v", node.Name, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence)
 		}
 
-		if !cmp.Equal(transaction.Outputs, loadedTransactionMetadata.Transaction().(*iotago.Transaction).Outputs) {
-			return ierrors.Errorf("AssertTransaction: %s: expected Outputs %s, got %s", node.Name, transaction.Outputs, loadedTransactionMetadata.Transaction().(*iotago.Transaction).Outputs)
+		typedTransaction, ok := loadedTransactionMetadata.Transaction().(*iotago.Transaction)
+		if !ok {
+			return ierrors.Errorf("AssertTransaction: %s: expected Transaction type %T, got %T", node.Name, transaction, loadedTransactionMetadata.Transaction())
 		}
+
+		if !cmp.Equal(transaction.Outputs, typedTransaction.Outputs) {
+			return ierrors.Errorf("AssertTransaction: %s: expected Outputs %s, got %s", node.Name, transaction.Outputs, typedTransaction.Outputs)
+		}
+
 		return nil
 	})
 
