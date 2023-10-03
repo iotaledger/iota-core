@@ -70,7 +70,7 @@ func Test_TransitionAccount(t *testing.T) {
 	)
 	consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(4, "Genesis:0")
 
-	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
+	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
 		testsuite.WithAccountInput(accountInput, true),
 		testsuite.WithInputs(consumedInputs),
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
@@ -102,7 +102,7 @@ func Test_TransitionAccount(t *testing.T) {
 		PreviousUpdatedTime:    0,
 		PreviousExpirySlot:     1,
 		NewExpirySlot:          1,
-		NewOutputID:            iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.SignedTransaction("TX1").ID()), 0),
+		NewOutputID:            iotago.OutputIDFromTransactionIDAndIndex(ts.TransactionFramework.TransactionID("TX1"), 0),
 		PreviousOutputID:       genesisAccount.OutputID(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newGenesisOutputKey),
@@ -111,7 +111,7 @@ func Test_TransitionAccount(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              genesisAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
-		OutputID:        iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.SignedTransaction("TX1").ID()), 0),
+		OutputID:        iotago.OutputIDFromTransactionIDAndIndex(ts.TransactionFramework.TransactionID("TX1"), 0),
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ExpirySlot:      1,
 	}, ts.Nodes()...)
@@ -135,7 +135,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	block2Slot := latestParent.ID().Slot()
 
-	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX2", append(newAccountWallets, destroyWallets...),
+	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX2", append(newAccountWallets, destroyWallets...),
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
 				AccountID: genesisAccountOutput.AccountID,
@@ -161,7 +161,7 @@ func Test_TransitionAccount(t *testing.T) {
 		NewExpirySlot:          0,
 		PreviousExpirySlot:     1,
 		NewOutputID:            iotago.EmptyOutputID,
-		PreviousOutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.SignedTransaction("TX1").ID()), 0),
+		PreviousOutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(ts.TransactionFramework.Transaction("TX1").ID()), 0),
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ValidatorStakeChange:   0,
@@ -209,7 +209,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	block3Slot := latestParent.ID().Slot()
 
-	tx3 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX3", newDelegationWallets,
+	tx3 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX3", newDelegationWallets,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
 				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
@@ -253,7 +253,7 @@ func Test_TransitionAccount(t *testing.T) {
 	// transition a delegation output to a delayed claiming state
 	inputForDelegationTransition, delegationTransitionOutputs, delegationTransitionWallets := ts.TransactionFramework.DelayedClaimingTransition("TX3:0", 0)
 
-	tx4 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX4", delegationTransitionWallets,
+	tx4 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX4", delegationTransitionWallets,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
 				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
@@ -270,6 +270,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	latestParent = ts.CommitUntilSlot(block4Slot, activeNodes, block4)
 
+	// Transitioning to delayed claiming effectively removes the delegation, so we expect a negative delegation stake change.
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block4Slot, &model.AccountDiff{
 		BICChange:              0,
 		PreviousUpdatedTime:    0,
@@ -280,7 +281,7 @@ func Test_TransitionAccount(t *testing.T) {
 		ValidatorStakeChange:   0,
 		StakeEndEpochChange:    0,
 		FixedCostChange:        0,
-		DelegationStakeChange:  0,
+		DelegationStakeChange:  -int64(delegatedAmount),
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -291,14 +292,14 @@ func Test_TransitionAccount(t *testing.T) {
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
-		DelegationStake: iotago.BaseToken(delegatedAmount),
+		DelegationStake: iotago.BaseToken(0),
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
 	// CREATE IMPLICIT ACCOUNT FROM BASIC UTXO
 	inputForImplicitAccount, outputsForImplicitAccount, implicitAccountAddress, implicitWallet := ts.TransactionFramework.CreateImplicitAccountFromInput("TX1:3")
 
-	tx5 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX5", implicitWallet,
+	tx5 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX5", implicitWallet,
 		testsuite.WithInputs(inputForImplicitAccount),
 		testsuite.WithOutputs(outputsForImplicitAccount),
 	))
@@ -335,7 +336,7 @@ func Test_TransitionAccount(t *testing.T) {
 		),
 	)
 
-	tx6 := lo.PanicOnErr(ts.TransactionFramework.CreateTransactionWithOptions("TX6", fullAccountWallet,
+	tx6 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX6", fullAccountWallet,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
 				AccountID: implicitAccountID,

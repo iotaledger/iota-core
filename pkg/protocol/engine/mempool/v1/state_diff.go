@@ -13,13 +13,13 @@ import (
 type StateDiff struct {
 	slot iotago.SlotIndex
 
-	spentOutputs *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.OutputStateMetadata]
+	spentOutputs *shrinkingmap.ShrinkingMap[mempool.StateID, mempool.StateMetadata]
 
-	createdOutputs *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.OutputStateMetadata]
+	createdOutputs *shrinkingmap.ShrinkingMap[mempool.StateID, mempool.StateMetadata]
 
 	executedTransactions *orderedmap.OrderedMap[iotago.TransactionID, mempool.TransactionMetadata]
 
-	stateUsageCounters *shrinkingmap.ShrinkingMap[iotago.OutputID, int]
+	stateUsageCounters *shrinkingmap.ShrinkingMap[mempool.StateID, int]
 
 	mutations ads.Set[iotago.TransactionID]
 }
@@ -27,11 +27,11 @@ type StateDiff struct {
 func NewStateDiff(slot iotago.SlotIndex) *StateDiff {
 	return &StateDiff{
 		slot:                 slot,
-		spentOutputs:         shrinkingmap.New[iotago.OutputID, mempool.OutputStateMetadata](),
-		createdOutputs:       shrinkingmap.New[iotago.OutputID, mempool.OutputStateMetadata](),
+		spentOutputs:         shrinkingmap.New[mempool.StateID, mempool.StateMetadata](),
+		createdOutputs:       shrinkingmap.New[mempool.StateID, mempool.StateMetadata](),
 		executedTransactions: orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata](),
-		stateUsageCounters:   shrinkingmap.New[iotago.OutputID, int](),
-		mutations:            ads.NewSet(mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.SlotIdentifierFromBytes),
+		stateUsageCounters:   shrinkingmap.New[mempool.StateID, int](),
+		mutations:            ads.NewSet(mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes),
 	}
 }
 
@@ -39,11 +39,11 @@ func (s *StateDiff) Slot() iotago.SlotIndex {
 	return s.slot
 }
 
-func (s *StateDiff) DestroyedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.OutputStateMetadata] {
+func (s *StateDiff) DestroyedStates() *shrinkingmap.ShrinkingMap[mempool.StateID, mempool.StateMetadata] {
 	return s.spentOutputs
 }
 
-func (s *StateDiff) CreatedStates() *shrinkingmap.ShrinkingMap[iotago.OutputID, mempool.OutputStateMetadata] {
+func (s *StateDiff) CreatedStates() *shrinkingmap.ShrinkingMap[mempool.StateID, mempool.StateMetadata] {
 	return s.createdOutputs
 }
 
@@ -56,14 +56,14 @@ func (s *StateDiff) Mutations() ads.Set[iotago.TransactionID] {
 }
 
 func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata, direction int) {
-	transaction.Inputs().Range(func(input mempool.OutputStateMetadata) {
-		s.compactStateChanges(input, s.stateUsageCounters.Compute(input.OutputID(), func(currentValue int, _ bool) int {
+	transaction.Inputs().Range(func(input mempool.StateMetadata) {
+		s.compactStateChanges(input, s.stateUsageCounters.Compute(input.StateID(), func(currentValue int, _ bool) int {
 			return currentValue - direction
 		}))
 	})
 
-	transaction.Outputs().Range(func(output mempool.OutputStateMetadata) {
-		s.compactStateChanges(output, s.stateUsageCounters.Compute(output.OutputID(), func(currentValue int, _ bool) int {
+	transaction.Outputs().Range(func(output mempool.StateMetadata) {
+		s.compactStateChanges(output, s.stateUsageCounters.Compute(output.StateID(), func(currentValue int, _ bool) int {
 			return currentValue + direction
 		}))
 	})
@@ -97,15 +97,19 @@ func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) error 
 	return nil
 }
 
-func (s *StateDiff) compactStateChanges(output mempool.OutputStateMetadata, newValue int) {
+func (s *StateDiff) compactStateChanges(output mempool.StateMetadata, newValue int) {
+	if output.State().Type() != iotago.InputUTXO {
+		return
+	}
+
 	switch {
 	case newValue > 0:
-		s.createdOutputs.Set(output.OutputID(), output)
+		s.createdOutputs.Set(output.StateID(), output)
 	case newValue < 0:
-		s.spentOutputs.Set(output.OutputID(), output)
+		s.spentOutputs.Set(output.StateID(), output)
 	default:
-		s.createdOutputs.Delete(output.OutputID())
-		s.spentOutputs.Delete(output.OutputID())
+		s.createdOutputs.Delete(output.StateID())
+		s.spentOutputs.Delete(output.StateID())
 	}
 }
 

@@ -228,6 +228,22 @@ func (p *Promise[T]) WasCompleted() bool {
 	return p.complete
 }
 
+// Result returns the result of the promise (or the zero value if the promise was not resolved).
+func (p *Promise[T]) Result() T {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	return p.result
+}
+
+// Err returns the error of the promise (or nil if the promise was not rejected).
+func (p *Promise[T]) Err() error {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+
+	return p.err
+}
+
 // IsEmpty returns true if the promise has no updateCallbacks.
 func (p *Promise[T]) IsEmpty() bool {
 	p.mutex.RLock()
