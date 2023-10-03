@@ -222,8 +222,9 @@ func Test_MultipleAttachments(t *testing.T) {
 
 func Test_SpendRejectedCommittedRace(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithGenesisTimestampOffset(10*10),
+		testsuite.WithGenesisTimestampOffset(20*10),
 		testsuite.WithMinCommittableAge(2),
+		testsuite.WithMaxCommittableAge(5),
 	)
 	defer ts.Shutdown()
 
@@ -393,7 +394,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	// Sync up the nodes to he same point and check consistency between them.
 	{
 		// Let node1 catch up with commitment 1
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, nil)
+		ts.IssueBlocksAtSlots("5.1", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, nil)
 
 		ts.AssertNodeState(ts.Nodes("node1", "node2"),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -413,5 +414,19 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-commit1"), false, node1, node2)
 		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-commit1"), true, node1, node2)
+	}
+
+	// Commit further and evict transactions
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 1, "5.1", ts.Nodes("node1", "node2"), false, nil)
+
+		ts.AssertNodeState(ts.Nodes("node1", "node2"),
+			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
+			testsuite.WithLatestCommitmentSlotIndex(6),
+			testsuite.WithEqualStoredCommitmentAtIndex(6),
+			testsuite.WithEvictedSlot(6),
+		)
+
+		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2", "tx3"), false, node1, node2)
 	}
 }
