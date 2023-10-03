@@ -10,7 +10,7 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20230929122509-67f34bfed40d
 	github.com/iotaledger/hive.go/runtime v0.0.0-20230929122509-67f34bfed40d
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231003091902-6d534ca170ee
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231003101444-5687809cd68a
 	github.com/mr-tron/base58 v1.2.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.13.0
@@ -21,7 +21,7 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
-	github.com/ethereum/go-ethereum v1.13.1 // indirect
+	github.com/ethereum/go-ethereum v1.13.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
