@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 const (
@@ -417,7 +418,13 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 	txIndex, prevStateAlias := issueTransactions(1, 20000, "genesis")
 	tf.WaitChildren()
 
-	issueTransactions(txIndex, 20000, prevStateAlias)
+	txIndex, _ = issueTransactions(txIndex, 20000, prevStateAlias)
+
+	// Eviction is delayed by MCA, so we force Commit and Eviction.
+	for index := txIndex; index <= txIndex+int(tpkg.TestAPI.ProtocolParameters().MaxCommittableAge()); index++ {
+		tf.CommitSlot(iotago.SlotIndex(index))
+		tf.Instance.Evict(iotago.SlotIndex(index))
+	}
 
 	tf.Cleanup()
 

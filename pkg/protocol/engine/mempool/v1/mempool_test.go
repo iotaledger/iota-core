@@ -56,7 +56,6 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 
 			prevStateAlias = fmt.Sprintf("tx%d:0", index)
 
-			fmt.Println("EVICT", index)
 			tf.CommitSlot(iotago.SlotIndex(index))
 			tf.Instance.Evict(iotago.SlotIndex(index))
 
