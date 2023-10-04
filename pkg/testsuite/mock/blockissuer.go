@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/core/safemath"
@@ -23,7 +24,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
-	"github.com/stretchr/testify/require"
 )
 
 var (
