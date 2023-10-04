@@ -268,7 +268,8 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	})
 
 	input.OnAcceptedSpenderUpdated(func(spender mempool.TransactionMetadata) {
-		if spender != t {
+		//nolint:forcetypeassert
+		if spender.(*TransactionMetadata) != nil && spender != t {
 			t.rejected.Trigger()
 		}
 	})

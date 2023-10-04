@@ -31,7 +31,7 @@ func newInclusionFlags() *inclusionFlags {
 }
 
 func (s *inclusionFlags) IsPending() bool {
-	return !s.accepted.Get()
+	return !s.IsAccepted() && !s.IsRejected()
 }
 
 // IsAccepted returns true if the entity was accepted.
