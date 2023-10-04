@@ -17,7 +17,6 @@ type SignedTransactionMetadata struct {
 	signaturesInvalid   reactive.Variable[error]
 	signaturesValid     reactive.Event
 	evicted             reactive.Event
-	orphaned            reactive.Variable[iotago.SlotIndex]
 }
 
 func NewSignedTransactionMetadata(signedTransaction mempool.SignedTransaction, transactionMetadata *TransactionMetadata) (*SignedTransactionMetadata, error) {
@@ -34,13 +33,6 @@ func NewSignedTransactionMetadata(signedTransaction mempool.SignedTransaction, t
 		signaturesInvalid:   reactive.NewVariable[error](),
 		signaturesValid:     reactive.NewEvent(),
 		evicted:             reactive.NewEvent(),
-		orphaned: reactive.NewVariable[iotago.SlotIndex](func(currentValue, newValue iotago.SlotIndex) iotago.SlotIndex {
-			if currentValue != 0 {
-				return currentValue
-			}
-
-			return newValue
-		}),
 	}, nil
 }
 
@@ -64,20 +56,6 @@ func (s *SignedTransactionMetadata) OnSignaturesInvalid(callback func(error)) (u
 
 func (s *SignedTransactionMetadata) OnSignaturesValid(callback func()) (unsubscribe func()) {
 	return s.signaturesValid.OnTrigger(callback)
-}
-
-func (s *SignedTransactionMetadata) IsOrphaned() (slot iotago.SlotIndex, isOrphaned bool) {
-	return slot, s.orphaned.Get() != 0
-}
-
-func (s *SignedTransactionMetadata) OnOrphaned(callback func(slot iotago.SlotIndex)) (unsubscribe func()) {
-	return s.orphaned.OnUpdate(func(_, slot iotago.SlotIndex) {
-		callback(slot)
-	})
-}
-
-func (s *SignedTransactionMetadata) setOrphaned(slot iotago.SlotIndex) {
-	s.orphaned.Set(slot)
 }
 
 func (s *SignedTransactionMetadata) IsEvicted() bool {

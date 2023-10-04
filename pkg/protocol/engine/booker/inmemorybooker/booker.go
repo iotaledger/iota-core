@@ -111,15 +111,16 @@ func (b *Booker) Queue(block *blocks.Block) error {
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
-	signedTransactionMetadata.OnOrphaned(func(slot iotago.SlotIndex) {
-		if slot <= block.SlotCommitmentID().Slot() {
-			block.SetInvalid()
-		}
-	})
-
 	// Based on the assumption that we always fork and the UTXO and Tangle past cones are always fully known.
 	signedTransactionMetadata.OnSignaturesValid(func() {
 		transactionMetadata := signedTransactionMetadata.TransactionMetadata()
+
+		if orphanedSlot, isOrphaned := transactionMetadata.IsOrphaned(); isOrphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
+			block.SetInvalid()
+
+			return
+		}
+
 		transactionMetadata.OnBooked(func() {
 			block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs())
 			b.bookingOrder.Queue(block)

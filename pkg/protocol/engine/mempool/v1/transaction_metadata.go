@@ -306,12 +306,6 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		}
 	})
 
-	t.OnOrphaned(func(slot iotago.SlotIndex) {
-		t.signingTransactions.Range(func(signedTransactionMetadata *SignedTransactionMetadata) {
-			signedTransactionMetadata.setOrphaned(slot)
-		})
-	})
-
 	return t
 }
 
