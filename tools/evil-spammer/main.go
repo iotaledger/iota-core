@@ -29,20 +29,19 @@ func main() {
 	}
 	// init account wallet
 	var accWallet *accountwallet.AccountWallet
+	var err error
 	if Script == "basic" || Script == "accounts" {
 		// load wallet
-		accWallet, err := accountwallet.Run(lastFaucetUnspendOutputID)
+		accWallet, err = accountwallet.Run(lastFaucetUnspendOutputID)
 		if err != nil {
 			log.Warn(err)
 			return
 		}
 		// save wallet
-		defer func(w *accountwallet.AccountWallet, filename string) {
-			err = accountwallet.SaveState(w)
-			if err != nil {
-				log.Errorf("Error while saving wallet state: %v", err)
-			}
-		}(accWallet, "wallet.dat")
+		err = accountwallet.SaveState(accWallet)
+		if err != nil {
+			log.Errorf("Error while saving wallet state: %v", err)
+		}
 	}
 	// run selected test scenario
 	switch Script {
