@@ -200,7 +200,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, issuerAccount Account, op
 	}
 
 	// only set the burned Mana as the last step before signing, so workscore calculation is correct.
-	blockBuilder.BurnedMana(rmc)
+	blockBuilder.MaxBurnedMana(rmc)
 
 	blockBuilder.Sign(issuerAccount.ID(), issuerAccount.PrivateKey())
 
@@ -292,9 +292,9 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	switch innerBlock := iotaBlock.Block.(type) {
 	case *iotago.BasicBlock:
 		switch payload := innerBlock.Payload.(type) {
-		case *iotago.Transaction:
-			if payload.Essence.NetworkID != protoParams.NetworkID() {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Essence.NetworkID)
+		case *iotago.SignedTransaction:
+			if payload.Transaction.NetworkID != protoParams.NetworkID() {
+				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Transaction.NetworkID)
 			}
 		}
 
@@ -330,7 +330,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
-	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock && basicBlock.BurnedMana == 0 {
+	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
 		rmcSlot, err := safemath.SafeSub(apiForVesion.TimeProvider().SlotFromTime(iotaBlock.IssuingTime), apiForVesion.ProtocolParameters().MaxCommittableAge())
 		if err != nil {
 			rmcSlot = 0
@@ -341,7 +341,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		}
 
 		// only set the burned Mana as the last step before signing, so workscore calculation is correct.
-		basicBlock.BurnedMana, err = basicBlock.ManaCost(rmc, apiForVesion.ProtocolParameters().WorkScoreStructure())
+		basicBlock.MaxBurnedMana, err = basicBlock.ManaCost(rmc, apiForVesion.ProtocolParameters().WorkScoreStructure())
 		if err != nil {
 			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "could not calculate Mana cost for block")
 		}

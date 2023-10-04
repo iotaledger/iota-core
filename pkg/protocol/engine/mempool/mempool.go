@@ -7,19 +7,21 @@ import (
 )
 
 type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] interface {
-	AttachTransaction(transaction Transaction, blockID iotago.BlockID) (storedTransaction TransactionMetadata, err error)
+	AttachSignedTransaction(signedTransaction SignedTransaction, transaction Transaction, blockID iotago.BlockID) (signedTransactionMetadata SignedTransactionMetadata, err error)
+
+	OnSignedTransactionAttached(callback func(signedTransactionMetadata SignedTransactionMetadata), opts ...event.Option)
 
 	OnTransactionAttached(callback func(metadata TransactionMetadata), opts ...event.Option)
 
-	MarkAttachmentOrphaned(blockID iotago.BlockID) bool
-
 	MarkAttachmentIncluded(blockID iotago.BlockID) bool
 
-	OutputStateMetadata(reference *iotago.UTXOInput) (state OutputStateMetadata, err error)
+	StateMetadata(reference StateReference) (state StateMetadata, err error)
 
 	TransactionMetadata(id iotago.TransactionID) (transaction TransactionMetadata, exists bool)
 
-	PublishCommitmentState(commitment *iotago.Commitment)
+	VM() VM
+
+	InjectRequestedState(state State)
 
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transaction TransactionMetadata, exists bool)
 

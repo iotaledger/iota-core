@@ -162,12 +162,12 @@ func (b *Block) Payload() iotago.Payload {
 	return b.modelBlock.Payload()
 }
 
-func (b *Block) Transaction() (tx *iotago.Transaction, hasTransaction bool) {
+func (b *Block) SignedTransaction() (tx *iotago.SignedTransaction, hasTransaction bool) {
 	if b.modelBlock == nil {
 		return nil, false
 	}
 
-	return b.modelBlock.Transaction()
+	return b.modelBlock.SignedTransaction()
 }
 
 func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) {

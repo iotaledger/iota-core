@@ -83,43 +83,51 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 		})
 
 		e.HookInitialized(func() {
-			e.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
+			e.Ledger.MemPool().OnSignedTransactionAttached(func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
+				attachment := signedTransactionMetadata.Attachments()[0]
 
-				// transaction is not included yet, thus EarliestIncludedAttachment is not set.
-				if err := r.onTransactionAttached(transactionMetadata.Attachments()[0]); err != nil {
-					r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAttached in retainer"))
-				}
-
-				transactionMetadata.OnConflicting(func() {
-					// transaction is not included yet, thus EarliestIncludedAttachment is not set.
-					r.RetainTransactionFailure(transactionMetadata.Attachments()[0], iotago.ErrTxConflicting)
+				signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
+					r.RetainTransactionFailure(attachment, err)
 				})
 
-				transactionMetadata.OnInvalid(func(err error) {
-					// transaction is not included yet, thus EarliestIncludedAttachment is not set.
-					r.RetainTransactionFailure(transactionMetadata.Attachments()[0], err)
-				})
+				signedTransactionMetadata.OnSignaturesValid(func() {
+					transactionMetadata := signedTransactionMetadata.TransactionMetadata()
 
-				transactionMetadata.OnAccepted(func() {
-					attachmentID := transactionMetadata.EarliestIncludedAttachment()
-					if slot := attachmentID.Slot(); slot > 0 {
-						if err := r.onTransactionAccepted(attachmentID); err != nil {
-							r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAccepted in retainer"))
+					// transaction is not included yet, thus EarliestIncludedAttachment is not set.
+					if err := r.onTransactionAttached(attachment); err != nil {
+						r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAttached in retainer"))
+					}
+
+					transactionMetadata.OnConflicting(func() {
+						// transaction is not included yet, thus EarliestIncludedAttachment is not set.
+						r.RetainTransactionFailure(attachment, iotago.ErrTxConflicting)
+					})
+
+					transactionMetadata.OnInvalid(func(err error) {
+						// transaction is not included yet, thus EarliestIncludedAttachment is not set.
+						r.RetainTransactionFailure(attachment, err)
+					})
+
+					transactionMetadata.OnAccepted(func() {
+						attachmentID := transactionMetadata.EarliestIncludedAttachment()
+						if slot := attachmentID.Slot(); slot > 0 {
+							if err := r.onTransactionAccepted(attachmentID); err != nil {
+								r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAccepted in retainer"))
+							}
 						}
-					}
+					})
+
+					transactionMetadata.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
+						// if prevBlock is genesis, we do not need to update anything, bc the tx is included in the block we attached to at start.
+						if prevBlock.Slot() == 0 {
+							return
+						}
+
+						if err := r.onAttachmentUpdated(prevBlock, newBlock, transactionMetadata.IsAccepted()); err != nil {
+							r.errorHandler(ierrors.Wrap(err, "failed to delete/store on AttachmentUpdated in retainer"))
+						}
+					})
 				})
-
-				transactionMetadata.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
-					// if prevBlock is genesis, we do not need to update anything, bc the tx is included in the block we attached to at start.
-					if prevBlock.Slot() == 0 {
-						return
-					}
-
-					if err := r.onAttachmentUpdated(prevBlock, newBlock, transactionMetadata.IsAccepted()); err != nil {
-						r.errorHandler(ierrors.Wrap(err, "failed to delete/store on AttachmentUpdated in retainer"))
-					}
-				})
-
 			})
 		})
 

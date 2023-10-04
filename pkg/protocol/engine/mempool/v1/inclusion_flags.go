@@ -86,28 +86,3 @@ func (s *inclusionFlags) IsOrphaned() bool {
 func (s *inclusionFlags) OnOrphaned(callback func()) {
 	s.orphaned.OnTrigger(callback)
 }
-
-// setAccepted marks the entity as accepted.
-func (s *inclusionFlags) setAccepted() {
-	s.accepted.Set(true)
-}
-
-// setPending marks the entity as pending.
-func (s *inclusionFlags) setPending() {
-	s.accepted.Set(false)
-}
-
-// setRejected marks the entity as rejected.
-func (s *inclusionFlags) setRejected() {
-	s.rejected.Trigger()
-}
-
-// setCommitted marks the entity as committed.
-func (s *inclusionFlags) setCommitted() {
-	s.committed.Trigger()
-}
-
-// setOrphaned marks the entity as orphaned.
-func (s *inclusionFlags) setOrphaned() {
-	s.orphaned.Trigger()
-}
