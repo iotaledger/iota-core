@@ -8,10 +8,20 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 	iotagovm "github.com/iotaledger/iota.go/v4/vm"
-	"github.com/iotaledger/iota.go/v4/vm/stardust"
+	"github.com/iotaledger/iota.go/v4/vm/nova"
 )
 
-func (l *Ledger) extractInputReferences(transaction mempool.Transaction) (inputReferences []iotago.Input, err error) {
+type VM struct {
+	ledger *Ledger
+}
+
+func NewVM(ledger *Ledger) *VM {
+	return &VM{
+		ledger: ledger,
+	}
+}
+
+func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []mempool.StateReference, err error) {
 	stardustTransaction, ok := transaction.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
@@ -27,7 +37,7 @@ func (l *Ledger) extractInputReferences(transaction mempool.Transaction) (inputR
 	return inputReferences, nil
 }
 
-func (l *Ledger) validateStardustTransaction(signedTransaction mempool.SignedTransaction, resolvedInputStates []mempool.State) (executionContext context.Context, err error) {
+func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, resolvedInputStates []mempool.State) (executionContext context.Context, err error) {
 	signedStardustTransaction, ok := signedTransaction.(*iotago.SignedTransaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
@@ -57,7 +67,7 @@ func (l *Ledger) validateStardustTransaction(signedTransaction mempool.SignedTra
 
 	bicInputSet := make(iotagovm.BlockIssuanceCreditInputSet)
 	for _, inp := range bicInputs {
-		accountData, exists, accountErr := l.accountsLedger.Account(inp.AccountID, commitmentInput.Slot)
+		accountData, exists, accountErr := v.ledger.accountsLedger.Account(inp.AccountID, commitmentInput.Slot)
 		if accountErr != nil {
 			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, commitmentInput.Slot))
 		}
@@ -87,7 +97,7 @@ func (l *Ledger) validateStardustTransaction(signedTransaction mempool.SignedTra
 				accountID = iotago.AccountIDFromOutputID(outputID)
 			}
 
-			reward, _, _, rewardErr := l.sybilProtection.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			reward, _, _, rewardErr := v.ledger.sybilProtection.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimStakingReward, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
 			}
@@ -102,10 +112,10 @@ func (l *Ledger) validateStardustTransaction(signedTransaction mempool.SignedTra
 
 			delegationEnd := castOutput.EndEpoch
 			if delegationEnd == 0 {
-				delegationEnd = l.apiProvider.APIForSlot(commitmentInput.Slot).TimeProvider().EpochFromSlot(commitmentInput.Slot) - iotago.EpochIndex(1)
+				delegationEnd = v.ledger.apiProvider.APIForSlot(commitmentInput.Slot).TimeProvider().EpochFromSlot(commitmentInput.Slot) - iotago.EpochIndex(1)
 			}
 
-			reward, _, _, rewardErr := l.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
+			reward, _, _, rewardErr := v.ledger.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimDelegationReward, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}
@@ -121,7 +131,7 @@ func (l *Ledger) validateStardustTransaction(signedTransaction mempool.SignedTra
 		RewardsInputSet:             rewardInputSet,
 	}
 
-	unlockedIdentities, err := stardust.NewVirtualMachine().ValidateUnlocks(signedStardustTransaction, resolvedInputs)
+	unlockedIdentities, err := nova.NewVirtualMachine().ValidateUnlocks(signedStardustTransaction, resolvedInputs)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +143,7 @@ func (l *Ledger) validateStardustTransaction(signedTransaction mempool.SignedTra
 	return executionContext, nil
 }
 
-func (l *Ledger) executeStardustVM(executionContext context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
+func (v *VM) Execute(executionContext context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
 	stardustTransaction, ok := transaction.(*iotago.Transaction)
 	if !ok {
 		return nil, iotago.ErrTxTypeInvalid
@@ -154,14 +164,14 @@ func (l *Ledger) executeStardustVM(executionContext context.Context, transaction
 		return nil, ierrors.Errorf("resolvedInputs not found in execution context")
 	}
 
-	createdOutputs, err := stardust.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedIdentities)
+	createdOutputs, err := nova.NewVirtualMachine().Execute(stardustTransaction, resolvedInputs, unlockedIdentities)
 	if err != nil {
 		return nil, err
 	}
 
 	for index, output := range createdOutputs {
 		outputs = append(outputs, utxoledger.CreateOutput(
-			l.apiProvider,
+			v.ledger.apiProvider,
 			iotago.OutputIDFromTransactionIDAndIndex(transactionID, uint16(index)),
 			iotago.EmptyBlockID(),
 			0,

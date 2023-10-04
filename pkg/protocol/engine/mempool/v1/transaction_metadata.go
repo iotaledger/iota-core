@@ -16,7 +16,7 @@ import (
 
 type TransactionMetadata struct {
 	id                iotago.TransactionID
-	inputReferences   []iotago.Input
+	inputReferences   []mempool.StateReference
 	inputs            []*StateMetadata
 	outputs           []*StateMetadata
 	transaction       mempool.Transaction
@@ -57,7 +57,7 @@ func (t *TransactionMetadata) ValidAttachments() []iotago.BlockID {
 	return t.validAttachments.Keys()
 }
 
-func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []iotago.Input) (*TransactionMetadata, error) {
+func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []mempool.StateReference) (*TransactionMetadata, error) {
 	transactionID, transactionIDErr := transaction.ID()
 	if transactionIDErr != nil {
 		return nil, ierrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
