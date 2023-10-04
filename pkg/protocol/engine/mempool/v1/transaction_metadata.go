@@ -41,9 +41,6 @@ type TransactionMetadata struct {
 	// attachments
 	signingTransactions reactive.Set[*SignedTransactionMetadata]
 
-	// allSigningTransactionEvicted is set on the slot of the last and newest sigining evicted transaction
-	allSigningTransactionsEvicted reactive.Variable[iotago.SlotIndex]
-
 	validAttachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
 	earliestIncludedValidAttachment reactive.Variable[iotago.BlockID]
 
@@ -88,8 +85,7 @@ func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []
 		conflicting:           reactive.NewEvent(),
 		conflictAccepted:      reactive.NewEvent(),
 
-		allSigningTransactionsEvicted: reactive.NewVariable[iotago.SlotIndex](),
-		signingTransactions:           reactive.NewSet[*SignedTransactionMetadata](),
+		signingTransactions: reactive.NewSet[*SignedTransactionMetadata](),
 
 		validAttachments:                shrinkingmap.New[iotago.BlockID, bool](),
 		earliestIncludedValidAttachment: reactive.NewVariable[iotago.BlockID](),
@@ -297,13 +293,6 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		t.conflictIDs.Replace(ds.NewSet(t.id))
 	})
 
-	// TODO: REMOVE??
-	t.allSigningTransactionsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
-		if !lo.Return2(t.IsCommitted()) {
-			t.orphaned.Set(slot)
-		}
-	})
-
 	t.allValidAttachmentsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
 		if !lo.Return2(t.IsCommitted()) {
 			t.orphaned.Set(slot)
@@ -331,7 +320,7 @@ func (t *TransactionMetadata) addSigningTransaction(signedTransactionMetadata *S
 
 	if added = t.signingTransactions.Add(signedTransactionMetadata); added {
 		signedTransactionMetadata.OnEvicted(func() {
-			t.evictSigningTransaction(signedTransactionMetadata)
+			t.signingTransactions.Delete(signedTransactionMetadata)
 		})
 	}
 
@@ -374,11 +363,5 @@ func (t *TransactionMetadata) evictValidAttachment(id iotago.BlockID) {
 
 	if t.validAttachments.Delete(id) && t.validAttachments.IsEmpty() {
 		t.allValidAttachmentsEvicted.Set(id.Slot())
-	}
-}
-
-func (t *TransactionMetadata) evictSigningTransaction(signedTransactionMetadata *SignedTransactionMetadata) {
-	if t.signingTransactions.Delete(signedTransactionMetadata) && t.signingTransactions.IsEmpty() {
-		t.allSigningTransactionsEvicted.Set(signedTransactionMetadata.ID().Index())
 	}
 }
