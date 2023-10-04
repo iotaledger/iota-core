@@ -4,7 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 func issueValidatorBlock(ctx context.Context) {
@@ -35,17 +36,23 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	modelBlock, err := deps.BlockIssuer.CreateValidationBlock(ctx,
-		validatorAccount,
-		blockfactory.WithValidationBlockHeaderOptions(
-			blockfactory.WithIssuingTime(blockIssuingTime),
-			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
-		),
-		blockfactory.WithProtocolParametersHash(protocolParametersHash),
-		blockfactory.WithHighestSupportedVersion(deps.Protocol.LatestAPI().Version()),
-	)
+	// create the validation block here using the validation block builder from iota.go
+
+	validationBlock, err := builder.NewValidationBlockBuilder(deps.Protocol.CurrentAPI()).
+		IssuingTime(blockIssuingTime).
+		SlotCommitmentID(latestCommitment.ID()).
+		ProtocolParametersHash(protocolParametersHash).
+		HighestSupportedVersion(deps.Protocol.LatestAPI().Version()).
+		Build()
 	if err != nil {
-		Component.LogWarnf("error creating validator block: %s", err.Error())
+		Component.LogWarnf("error creating validation block: %s", err.Error())
+
+		return
+	}
+
+	modelBlock, err := model.BlockFromBlock(validationBlock)
+	if err != nil {
+		Component.LogWarnf("error creating model block from validation block: %s", err.Error())
 
 		return
 	}
@@ -56,7 +63,7 @@ func issueValidatorBlock(ctx context.Context) {
 		nextBroadcast = blockIssuingTime.Add(ParamsValidator.CandidateBroadcastInterval)
 	}
 
-	if err = deps.BlockIssuer.IssueBlock(modelBlock); err != nil {
+	if err = deps.BlockHandler.SubmitBlock(modelBlock); err != nil {
 		Component.LogWarnf("error issuing validator block: %s", err.Error())
 
 		return

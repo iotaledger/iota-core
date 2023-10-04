@@ -7,7 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -110,13 +110,13 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 		return nil, echo.ErrUnsupportedMediaType
 	}
 
-	blockID, err := deps.BlockIssuer.AttachBlock(c.Request().Context(), iotaBlock, blockIssuerAccount)
+	blockID, err := deps.BlockHandler.AttachBlock(c.Request().Context(), iotaBlock)
 	if err != nil {
 		switch {
-		case ierrors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
+		case ierrors.Is(err, blockhandler.ErrBlockAttacherInvalidBlock):
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to attach block: %w", err)
 
-		case ierrors.Is(err, blockfactory.ErrBlockAttacherAttachingNotPossible):
+		case ierrors.Is(err, blockhandler.ErrBlockAttacherAttachingNotPossible):
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to attach block: %w", err)
 
 		default:

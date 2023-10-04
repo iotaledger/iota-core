@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
@@ -38,14 +38,6 @@ const (
 	// RouteBlockMetadata is the route for getting block metadata by its blockID.
 	// GET returns block metadata.
 	RouteBlockMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/metadata"
-
-	// RouteBlocks is the route for creating new blocks.
-	// POST creates a single new block and returns the new block ID.
-	// The block is parsed based on the given type in the request "Content-Type" header.
-	// By providing only the protocolVersion and payload transaction user can POST a transaction.
-	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
-	RouteBlocks = "/blocks"
 
 	// RouteOutput is the route for getting an output by its outputID (transactionHash + outputIndex).
 	// GET returns the output based on the given type in the request "Accept" header.
@@ -134,8 +126,7 @@ var (
 	Component *app.Component
 	deps      dependencies
 
-	blockIssuerAccount blockfactory.Account
-	features           = []string{}
+	features = []string{}
 )
 
 type dependencies struct {
@@ -144,7 +135,7 @@ type dependencies struct {
 	AppInfo          *app.Info
 	RestRouteManager *restapipkg.RestRouteManager
 	Protocol         *protocolpkg.Protocol
-	BlockIssuer      *blockfactory.BlockIssuer `optional:"true"`
+	BlockHandler     *blockhandler.BlockHandler
 	MetricsTracker   *metricstracker.MetricsTracker
 	BaseToken        *protocol.BaseToken
 }
@@ -160,8 +151,6 @@ func configure() error {
 	if restapi.ParamsRestAPI.AllowIncompleteBlock {
 		AddFeature("allowIncompleteBlock")
 	}
-
-	blockIssuerAccount = blockfactory.AccountFromParams(restapi.ParamsRestAPI.BlockIssuerAccount, restapi.ParamsRestAPI.BlockIssuerPrivateKey)
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
 		resp := info()
@@ -186,16 +175,6 @@ func configure() error {
 
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
-
-	routeGroup.POST(RouteBlocks, func(c echo.Context) error {
-		resp, err := sendBlock(c)
-		if err != nil {
-			return err
-		}
-		c.Response().Header().Set(echo.HeaderLocation, resp.BlockID.ToHex())
-
-		return httpserver.JSONResponse(c, http.StatusCreated, resp)
-	}, checkNodeSynced(), checkUpcomingUnsupportedProtocolVersion())
 
 	routeGroup.GET(RouteBlockIssuance, func(c echo.Context) error {
 		resp, err := blockIssuance(c)
