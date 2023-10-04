@@ -437,8 +437,21 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-genesis", "n1-genesis", "n1-rejected-genesis"), true, node1, node2)
 		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-genesis", "n1-genesis", "n1-rejected-genesis"), false, node1, node2)
 
-		ts.AssertBlocksInCacheBooked(ts.Blocks("n1-rejected-commit1", "n2-commit1"), false, node1, node2)
-		ts.AssertBlocksInCacheInvalid(ts.Blocks("n1-rejected-commit1", "n2-commit1"), true, node1, node2)
+		// This block propagates the orphaned conflict from Tangle
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n1-rejected-commit1"), true, node1, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n1-rejected-commit1"), false, node1, node2)
+
+		// This block spends an orphaned conflict from its Transaction
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-commit1"), false, node1, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-commit1"), true, node1, node2)
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("n1-genesis"):          {"tx4"}, // on rejected conflict
+			ts.Block("n2-genesis"):          {"tx4"}, // on rejected conflict
+			ts.Block("n1-rejected-genesis"): {"tx1"}, // on rejected conflict
+			ts.Block("n2-commit1"):          {},      // invalid block
+			ts.Block("n1-rejected-commit1"): {},      // merged-to-master
+		}, node1, node2)
 	}
 
 	// Commit further and test eviction of transactions
@@ -567,17 +580,13 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), true, node2)
 		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1"), true, node2)
 
-		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-genesis"), true, node2)
-		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-genesis"), false, node2)
-
-		// As the block commits to 1 but spending something orphaned in 1 it should be invalid
-		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-commit1"), false, node2)
-		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-commit1"), true, node2)
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-genesis", "n2-pending-commit1"), true, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-genesis", "n2-pending-commit1"), false, node2)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block2.1"):           {"tx1"},
 			ts.Block("n2-pending-genesis"): {"tx1"},
-			ts.Block("n2-pending-commit1"): {}, // no conflits inherited as the block is invalid and doesn't get booked.
+			ts.Block("n2-pending-commit1"): {}, // no conflits inherited as the block merges orphaned conflicts.
 		}, node2)
 	}
 
@@ -600,11 +609,16 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		ts.IssueExistingBlock("n2-pending-commit1", node1)
 
 		// The nodes agree on the results of the invalid blocks
-		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-genesis"), true, node1, node2)
-		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-genesis"), false, node1, node2)
+		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-genesis", "n2-pending-commit1"), true, node1, node2)
+		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-genesis", "n2-pending-commit1"), false, node1, node2)
 
-		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-commit1"), false, node1, node2)
-		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-commit1"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block2.1"):           {"tx1"},
+			ts.Block("n2-pending-genesis"): {"tx1"},
+			ts.Block("n2-pending-commit1"): {}, // no conflits inherited as the block merges orphaned conflicts.
+		}, node1, node2)
+
+		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
 	// Commit further and test eviction of transactions
