@@ -335,19 +335,6 @@ func checkNodeSynced() echo.MiddlewareFunc {
 	}
 }
 
-func checkUpcomingUnsupportedProtocolVersion() echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// todo update with protocol upgrades support
-			// if !deps.ProtocolManager.NextPendingSupported() {
-			//	return ierrors.Wrap(echo.ErrServiceUnavailable, "node does not support the upcoming protocol upgrade")
-			// }
-
-			return next(c)
-		}
-	}
-}
-
 func responseByHeader(c echo.Context, obj any) error {
 	mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV2, echo.MIMEApplicationJSON)
 	if err != nil && err != httpserver.ErrNotAcceptable {
