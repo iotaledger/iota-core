@@ -16,8 +16,6 @@ type ParametersRestAPI struct {
 	ProtectedRoutes []string `usage:"the HTTP REST routes which need to be called with authorization. Wildcards using * are allowed"`
 	// whether the debug logging for requests should be enabled
 	DebugRequestLoggerEnabled bool `default:"false" usage:"whether the debug logging for requests should be enabled"`
-	// AllowIncompleteBlock defines whether the node allows to fill in incomplete block and issue it for user.
-	AllowIncompleteBlock bool `default:"false" usage:"whether the node allows to fill in incomplete block and issue it for user"`
 	// MaxPageSize defines the maximum number of results per page.
 	MaxPageSize uint32 `default:"100" usage:"the maximum number of results per page"`
 	// RequestsMemoryCacheGranularity defines per how many slots a cache is created for big API requests.

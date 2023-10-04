@@ -65,7 +65,6 @@
       "/api/*"
     ],
     "debugRequestLoggerEnabled": false,
-    "allowIncompleteBlock": false,
     "maxPageSize": 100,
     "requestsMemoryCacheGranularity": 10,
     "maxRequestedSlotAge": 10,
@@ -75,9 +74,7 @@
     "limits": {
       "maxBodyLength": "1M",
       "maxResults": 1000
-    },
-    "blockIssuerAccount": "",
-    "blockIssuerPrivateKey": ""
+    }
   },
   "debugAPI": {
     "enabled": true,
@@ -155,8 +152,6 @@
   },
   "inx": {
     "enabled": false,
-    "bindAddress": "localhost:9029",
-    "blockIssuerAccount": "",
-    "blockIssuerPrivateKey": ""
+    "bindAddress": "localhost:9029"
   }
 }

@@ -148,10 +148,6 @@ func configure() error {
 
 	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
 
-	if restapi.ParamsRestAPI.AllowIncompleteBlock {
-		AddFeature("allowIncompleteBlock")
-	}
-
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
 		resp := info()
 
