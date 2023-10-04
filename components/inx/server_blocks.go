@@ -130,7 +130,7 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (
 	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
 	defer mergedCtxCancel()
 
-	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, block, blockIssuerAccount)
+	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, block)
 	if err != nil {
 		switch {
 		case ierrors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):

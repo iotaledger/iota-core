@@ -6,7 +6,6 @@ import (
 	"go.uber.org/dig"
 
 	"github.com/iotaledger/hive.go/app"
-	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -47,7 +46,6 @@ func provide(c *dig.Container) error {
 		return blockfactory.New(deps.Protocol,
 			blockfactory.WithTipSelectionTimeout(ParamsBlockIssuer.TipSelectionTimeout),
 			blockfactory.WithTipSelectionRetryInterval(ParamsBlockIssuer.TipSelectionRetryInterval),
-			blockfactory.WithIncompleteBlockAccepted(restapi.ParamsRestAPI.AllowIncompleteBlock),
 			blockfactory.WithRateSetterEnabled(ParamsBlockIssuer.RateSetterEnabled),
 		)
 	})

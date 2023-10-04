@@ -21,9 +21,8 @@ import (
 )
 
 var (
-	ErrBlockAttacherInvalidBlock              = ierrors.New("invalid block")
-	ErrBlockAttacherAttachingNotPossible      = ierrors.New("attaching not possible")
-	ErrBlockAttacherIncompleteBlockNotAllowed = ierrors.New("incomplete block is not allowed on this node")
+	ErrBlockAttacherInvalidBlock         = ierrors.New("invalid block")
+	ErrBlockAttacherAttachingNotPossible = ierrors.New("attaching not possible")
 )
 
 // TODO: make sure an honest validator does not issue blocks within the same slot ratification period in two conflicting chains.
@@ -42,8 +41,7 @@ type BlockIssuer struct {
 	optsTipSelectionTimeout       time.Duration
 	optsTipSelectionRetryInterval time.Duration
 	// optsIncompleteBlockAccepted defines whether the node allows filling in incomplete block and issuing it for user.
-	optsIncompleteBlockAccepted bool
-	optsRateSetterEnabled       bool
+	optsRateSetterEnabled bool
 }
 
 func New(p *protocol.Protocol, opts ...options.Option[BlockIssuer]) *BlockIssuer {
@@ -51,7 +49,6 @@ func New(p *protocol.Protocol, opts ...options.Option[BlockIssuer]) *BlockIssuer
 		events:                        NewEvents(),
 		workerPool:                    p.Workers.CreatePool("BlockIssuer"),
 		protocol:                      p,
-		optsIncompleteBlockAccepted:   false,
 		optsRateSetterEnabled:         false,
 		optsTipSelectionTimeout:       5 * time.Second,
 		optsTipSelectionRetryInterval: 200 * time.Millisecond,
@@ -267,10 +264,21 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	}
 }
 
-func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock, optIssuerAccount ...Account) (iotago.BlockID, error) {
-	// if anything changes, need to make a new signature
-	var resign bool
+func (i *BlockIssuer) getBlockRMC(api iotago.API, protocolBlock *iotago.ProtocolBlock) (iotago.Mana, error) {
+	rmcSlot, err := safemath.SafeSub(api.TimeProvider().SlotFromTime(protocolBlock.IssuingTime), api.ProtocolParameters().MaxCommittableAge())
+	if err != nil {
+		rmcSlot = 0
+	}
 
+	rmc, err := i.protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
+	if err != nil {
+		return 0, ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
+	}
+
+	return rmc, nil
+}
+
+func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock) (iotago.BlockID, error) {
 	apiForVesion, err := i.protocol.APIForVersion(iotaBlock.ProtocolVersion)
 	if err != nil {
 		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
@@ -279,14 +287,28 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	protoParams := apiForVesion.ProtocolParameters()
 
 	if iotaBlock.NetworkID == 0 {
-		iotaBlock.NetworkID = protoParams.NetworkID()
-		resign = true
+		return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "invalid block, error: missing networkID")
 	}
 
-	if iotaBlock.SlotCommitmentID == iotago.EmptyCommitmentID {
-		iotaBlock.SlotCommitmentID = i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID()
-		iotaBlock.LatestFinalizedSlot = i.protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
-		resign = true
+	if iotaBlock.SlotCommitmentID.Empty() {
+		return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "invalid block, error: missing slotCommitmentID")
+	}
+
+	if iotaBlock.IssuingTime.Equal(time.Unix(0, 0)) {
+		return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "invalid block, error: missing issuingTime")
+	}
+
+	if iotaBlock.IssuerID.Empty() {
+		return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "invalid block, error: signature needed")
+	}
+
+	// check the block signature
+	valid, err := iotaBlock.VerifySignature()
+	if err != nil {
+		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid block, error: unable to verify block signature: %w", err)
+	}
+	if !valid {
+		return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "invalid block, error: invalid signature")
 	}
 
 	switch innerBlock := iotaBlock.Block.(type) {
@@ -294,26 +316,17 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		switch payload := innerBlock.Payload.(type) {
 		case *iotago.SignedTransaction:
 			if payload.Transaction.NetworkID != protoParams.NetworkID() {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Transaction.NetworkID)
+				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid basic block payload, error: wrong networkID: %d", payload.Transaction.NetworkID)
 			}
 		}
 
-		if len(iotaBlock.Parents()) == 0 {
-			references, referencesErr := i.getReferences(ctx, innerBlock.Payload)
-			if referencesErr != nil {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %w", referencesErr)
-			}
-
-			innerBlock.StrongParents = references[iotago.StrongParentType]
-			innerBlock.WeakParents = references[iotago.WeakParentType]
-			innerBlock.ShallowLikeParents = references[iotago.ShallowLikeParentType]
-			resign = true
+		if len(innerBlock.StrongParentIDs()) == 0 {
+			return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "invalid basic block, error: missing strongParents")
 		}
 
 	case *iotago.ValidationBlock:
-		//nolint:revive,staticcheck //temporarily disable
-		if len(iotaBlock.Parents()) == 0 {
-			// TODO: implement tipselection for validator blocks
+		if len(innerBlock.StrongParentIDs()) == 0 {
+			return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "invalid validation block, error: missing strongParents")
 		}
 	}
 
@@ -321,51 +334,25 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	references[iotago.StrongParentType] = iotaBlock.Block.StrongParentIDs().RemoveDupsAndSort()
 	references[iotago.WeakParentType] = iotaBlock.Block.WeakParentIDs().RemoveDupsAndSort()
 	references[iotago.ShallowLikeParentType] = iotaBlock.Block.ShallowLikeParentIDs().RemoveDupsAndSort()
-	if iotaBlock.IssuingTime.Equal(time.Unix(0, 0)) {
-		iotaBlock.IssuingTime = time.Now().UTC()
-		resign = true
-	}
 
 	if err = i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Slot(), references); err != nil {
 		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
-	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
-		rmcSlot, err := safemath.SafeSub(apiForVesion.TimeProvider().SlotFromTime(iotaBlock.IssuingTime), apiForVesion.ProtocolParameters().MaxCommittableAge())
+	// check if the block burns enough mana
+	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock {
+		rmc, err := i.getBlockRMC(apiForVesion, iotaBlock)
 		if err != nil {
-			rmcSlot = 0
-		}
-		rmc, err := i.protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
-		if err != nil {
-			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
+			return iotago.EmptyBlockID(), err
 		}
 
-		// only set the burned Mana as the last step before signing, so workscore calculation is correct.
-		basicBlock.MaxBurnedMana, err = basicBlock.ManaCost(rmc, apiForVesion.ProtocolParameters().WorkScoreStructure())
+		burnedMana, err := basicBlock.ManaCost(rmc, apiForVesion.ProtocolParameters().WorkScoreStructure())
 		if err != nil {
 			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "could not calculate Mana cost for block")
 		}
-		resign = true
-	}
 
-	if iotaBlock.IssuerID.Empty() || resign {
-		if i.optsIncompleteBlockAccepted && len(optIssuerAccount) > 0 {
-			issuerAccount := optIssuerAccount[0]
-			iotaBlock.IssuerID = issuerAccount.ID()
-
-			signature, signatureErr := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(issuerAccount.Address().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
-			if signatureErr != nil {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
-			}
-
-			edSig, isEdSig := signature.(*iotago.Ed25519Signature)
-			if !isEdSig {
-				return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "unsupported signature type")
-			}
-
-			iotaBlock.Signature = edSig
-		} else {
-			return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
+		if basicBlock.MaxBurnedMana < burnedMana {
+			return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid basic block, error: burnedMana lower than the required minimum to issue the block: %d<%d", basicBlock.MaxBurnedMana, burnedMana)
 		}
 	}
 
@@ -514,12 +501,6 @@ func WithTipSelectionTimeout(timeout time.Duration) options.Option[BlockIssuer] 
 func WithTipSelectionRetryInterval(interval time.Duration) options.Option[BlockIssuer] {
 	return func(i *BlockIssuer) {
 		i.optsTipSelectionRetryInterval = interval
-	}
-}
-
-func WithIncompleteBlockAccepted(accepted bool) options.Option[BlockIssuer] {
-	return func(i *BlockIssuer) {
-		i.optsIncompleteBlockAccepted = accepted
 	}
 }
 

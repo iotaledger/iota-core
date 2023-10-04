@@ -134,8 +134,7 @@ var (
 	Component *app.Component
 	deps      dependencies
 
-	blockIssuerAccount blockfactory.Account
-	features           = []string{}
+	features = []string{}
 )
 
 type dependencies struct {
@@ -156,12 +155,6 @@ func configure() error {
 	}
 
 	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
-
-	if restapi.ParamsRestAPI.AllowIncompleteBlock {
-		AddFeature("allowIncompleteBlock")
-	}
-
-	blockIssuerAccount = blockfactory.AccountFromParams(restapi.ParamsRestAPI.BlockIssuerAccount, restapi.ParamsRestAPI.BlockIssuerPrivateKey)
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
 		resp := info()

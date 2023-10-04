@@ -110,7 +110,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 		return nil, echo.ErrUnsupportedMediaType
 	}
 
-	blockID, err := deps.BlockIssuer.AttachBlock(c.Request().Context(), iotaBlock, blockIssuerAccount)
+	blockID, err := deps.BlockIssuer.AttachBlock(c.Request().Context(), iotaBlock)
 	if err != nil {
 		switch {
 		case ierrors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
