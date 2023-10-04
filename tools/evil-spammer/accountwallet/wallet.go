@@ -252,13 +252,13 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 	// get output from node
 	// From TIP42: Indexers and node plugins shall map the account address of the output derived with Account ID to the regular address -> output mapping table, so that given an Account Address, its most recent unspent account output can be retrieved.
 	// TODO: use correct outputID
-	accountOutput := a.client.GetOutput(iotago.EmptyOutputID)
+	accountOutput := a.client.GetOutput(accData.OutputID)
 
 	txBuilder := builder.NewTransactionBuilder(a.api)
 	txBuilder.AddInput(&builder.TxInput{
 		UnlockTarget: a.accountsAliases[alias].AccountID.ToAddress(),
-		// InputID:      accountOutput.ID(),
-		Input: accountOutput,
+		InputID:      accData.OutputID,
+		Input:        accountOutput,
 	})
 
 	// send all tokens to faucet
