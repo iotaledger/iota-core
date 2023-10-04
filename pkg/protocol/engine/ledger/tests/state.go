@@ -27,6 +27,10 @@ func (m *MockedState) Type() iotago.StateType {
 	return iotago.InputUTXO
 }
 
+func (m *MockedState) IsReadOnly() bool {
+	return false
+}
+
 func (m *MockedState) OutputID() iotago.OutputID {
 	return m.id
 }

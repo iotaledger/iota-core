@@ -6,8 +6,6 @@ import (
 )
 
 type StateMetadata interface {
-	StateID() StateID
-
 	State() State
 
 	ConflictIDs() reactive.Set[iotago.TransactionID]

@@ -89,7 +89,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeA").AccountID,
-		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits, UpdateTime: 0},
+		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateTime: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
 		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
 		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
@@ -102,7 +102,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeF").AccountID,
-		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits, UpdateTime: 0},
+		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateTime: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
 		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 6),
 		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeF").PubKey))),
@@ -126,7 +126,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	// check account data before all nodes set the current version
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeA").AccountID,
-		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits, UpdateTime: 0},
+		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateTime: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
 		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
 		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
@@ -139,7 +139,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeD").AccountID,
-		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits, UpdateTime: 0},
+		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateTime: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
 		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 4),
 		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeD").PubKey))),
@@ -160,7 +160,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeA").AccountID,
-		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits, UpdateTime: 0},
+		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateTime: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
 		OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
 		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
@@ -333,7 +333,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		// check account data at the end of the test
 		ts.AssertAccountData(&accounts.AccountData{
 			ID:                                    ts.Node("nodeA").AccountID,
-			Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits, UpdateTime: 0},
+			Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateTime: 0},
 			ExpirySlot:                            iotago.MaxSlotIndex,
 			OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 1),
 			BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").PubKey))),
@@ -346,7 +346,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 		ts.AssertAccountData(&accounts.AccountData{
 			ID:                                    ts.Node("nodeD").AccountID,
-			Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits, UpdateTime: 0},
+			Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateTime: 0},
 			ExpirySlot:                            iotago.MaxSlotIndex,
 			OutputID:                              iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 4),
 			BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeD").PubKey))),
