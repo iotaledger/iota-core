@@ -102,7 +102,7 @@ func (t *TestSuite) IssueExistingBlock(alias string, node *mock.Node) {
 	require.True(t.Testing, exists)
 	require.NotNil(t.Testing, block)
 
-	node.IssueExistingBlock(context.Background(), block)
+	node.IssueExistingBlock(block)
 }
 
 func (t *TestSuite) IssueValidationBlockWithOptions(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {

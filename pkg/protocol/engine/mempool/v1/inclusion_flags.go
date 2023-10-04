@@ -27,7 +27,7 @@ func newInclusionFlags() *inclusionFlags {
 		accepted:  reactive.NewVariable[bool](),
 		committed: reactive.NewVariable[iotago.SlotIndex](),
 		rejected:  promise.NewEvent(),
-		// Make sure the oldest orphaned index doesn't get overridden by newer TX spending the orphaned conflit further.
+		// Make sure the oldest orphaned index doesn't get overridden by newer TX spending the orphaned conflict further.
 		orphaned: reactive.NewVariable[iotago.SlotIndex](func(currentValue, newValue iotago.SlotIndex) iotago.SlotIndex {
 			if currentValue != 0 {
 				return currentValue

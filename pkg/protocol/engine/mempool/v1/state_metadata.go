@@ -102,8 +102,8 @@ func (s *StateMetadata) AllSpendersRemoved() bool {
 	return s.allSpendersRemoved.WasTriggered()
 }
 
-func (s *StateMetadata) onAllSpendersRemoved(callback func()) (unsubscribe func()) {
-	return s.allSpendersRemoved.Hook(callback).Unhook
+func (s *StateMetadata) onAllSpendersRemoved(callback func()) {
+	s.allSpendersRemoved.Hook(callback)
 }
 
 func (s *StateMetadata) PendingSpenderCount() int {
