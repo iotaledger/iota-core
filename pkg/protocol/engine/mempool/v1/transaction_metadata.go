@@ -1,6 +1,7 @@
 package mempoolv1
 
 import (
+	"context"
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -8,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/promise"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -16,89 +16,84 @@ import (
 
 type TransactionMetadata struct {
 	id                iotago.TransactionID
-	inputReferences   []iotago.Input
-	utxoInputs        []*OutputStateMetadata
-	commitmentInput   *ContextStateMetadata
-	outputs           []*OutputStateMetadata
+	inputReferences   []mempool.StateReference
+	inputs            []*StateMetadata
+	outputs           []*StateMetadata
 	transaction       mempool.Transaction
 	parentConflictIDs reactive.DerivedSet[iotago.TransactionID]
 	conflictIDs       reactive.DerivedSet[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
-	solid              *promise.Event
-	executed           *promise.Event
-	invalid            *promise.Event1[error]
-	booked             *promise.Event
-	evicted            *promise.Event
+	solid              reactive.Event
+	executionContext   reactive.Variable[context.Context]
+	executed           reactive.Event
+	invalid            reactive.Variable[error]
+	booked             reactive.Event
+	evicted            reactive.Event
 
 	// predecessors for acceptance
 	unacceptedInputsCount uint64
 	allInputsAccepted     reactive.Variable[bool]
-	conflicting           *promise.Event
-	conflictAccepted      *promise.Event
+	conflicting           reactive.Event
+	conflictAccepted      reactive.Event
 
 	// attachments
-	attachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
-	earliestIncludedAttachment reactive.Variable[iotago.BlockID]
-	// allAttachmentsEvicted is set on the slot of the last and newest evicted attachment
-	allAttachmentsEvicted reactive.Variable[iotago.SlotIndex]
+	signingTransactions reactive.Set[*SignedTransactionMetadata]
+
+	// allSigningTransactionEvicted is set on the slot of the last and newest sigining evicted transaction
+	allSigningTransactionsEvicted reactive.Variable[iotago.SlotIndex]
+
+	validAttachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
+	earliestIncludedValidAttachment reactive.Variable[iotago.BlockID]
+
+	// allValidAttachmentsEvicted is set on the slot of the last and newest evicted attachment
+	allValidAttachmentsEvicted reactive.Variable[iotago.SlotIndex]
 
 	// mutex needed?
-	mutex syncutils.RWMutex
-
+	mutex            syncutils.RWMutex
 	attachmentsMutex syncutils.RWMutex
 
 	*inclusionFlags
 }
 
-func NewTransactionWithMetadata(transaction mempool.Transaction) (*TransactionMetadata, error) {
+func (t *TransactionMetadata) ValidAttachments() []iotago.BlockID {
+	return t.validAttachments.Keys()
+}
+
+func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []mempool.StateReference) (*TransactionMetadata, error) {
 	transactionID, transactionIDErr := transaction.ID()
 	if transactionIDErr != nil {
 		return nil, ierrors.Errorf("failed to retrieve transaction ID: %w", transactionIDErr)
 	}
 
-	utxoInputReferences, inputsErr := transaction.Inputs()
-	if inputsErr != nil {
-		return nil, ierrors.Join(iotago.ErrUnknownInputType, ierrors.Wrapf(inputsErr, "failed to retrieve inputReferences of transaction %s", transactionID))
-	}
-
-	contextInputReferences, contextInputsErr := transaction.ContextInputs()
-	if contextInputsErr != nil {
-		return nil, ierrors.Wrapf(contextInputsErr, "failed to retrieve contextInputReferences of transaction %s", transactionID)
-	}
-
-	inputReferences := make([]iotago.Input, 0, len(utxoInputReferences)+len(contextInputReferences))
-	for _, utxoInput := range utxoInputReferences {
-		inputReferences = append(inputReferences, utxoInput)
-	}
-	for _, contextInput := range contextInputReferences {
-		inputReferences = append(inputReferences, contextInput)
-	}
-
 	return (&TransactionMetadata{
 		id:                transactionID,
-		inputReferences:   inputReferences,
-		utxoInputs:        make([]*OutputStateMetadata, len(utxoInputReferences)),
+		inputReferences:   referencedInputs,
+		inputs:            make([]*StateMetadata, len(referencedInputs)),
 		transaction:       transaction,
 		parentConflictIDs: reactive.NewDerivedSet[iotago.TransactionID](),
 		conflictIDs:       reactive.NewDerivedSet[iotago.TransactionID](),
 
-		unsolidInputsCount: uint64(len(utxoInputReferences) + len(contextInputReferences)),
-		booked:             promise.NewEvent(),
-		solid:              promise.NewEvent(),
-		executed:           promise.NewEvent(),
-		invalid:            promise.NewEvent1[error](),
-		evicted:            promise.NewEvent(),
+		unsolidInputsCount: uint64(len(referencedInputs)),
+		booked:             reactive.NewEvent(),
+		solid:              reactive.NewEvent(),
+		executionContext:   reactive.NewVariable[context.Context](),
+		executed:           reactive.NewEvent(),
+		invalid:            reactive.NewVariable[error](),
+		evicted:            reactive.NewEvent(),
 
-		unacceptedInputsCount: uint64(len(utxoInputReferences)),
+		unacceptedInputsCount: uint64(len(referencedInputs)),
 		allInputsAccepted:     reactive.NewVariable[bool](),
-		conflicting:           promise.NewEvent(),
-		conflictAccepted:      promise.NewEvent(),
+		conflicting:           reactive.NewEvent(),
+		conflictAccepted:      reactive.NewEvent(),
 
-		attachments:                shrinkingmap.New[iotago.BlockID, bool](),
-		earliestIncludedAttachment: reactive.NewVariable[iotago.BlockID](),
-		allAttachmentsEvicted:      reactive.NewVariable[iotago.SlotIndex](),
+		allSigningTransactionsEvicted: reactive.NewVariable[iotago.SlotIndex](),
+		signingTransactions:           reactive.NewSet[*SignedTransactionMetadata](),
+
+		validAttachments:                shrinkingmap.New[iotago.BlockID, bool](),
+		earliestIncludedValidAttachment: reactive.NewVariable[iotago.BlockID](),
+		allValidAttachmentsEvicted:      reactive.NewVariable[iotago.SlotIndex](),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(), nil
@@ -112,30 +107,23 @@ func (t *TransactionMetadata) Transaction() mempool.Transaction {
 	return t.transaction
 }
 
-func (t *TransactionMetadata) Inputs() ds.Set[mempool.OutputStateMetadata] {
+func (t *TransactionMetadata) Inputs() ds.Set[mempool.StateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	inputs := ds.NewSet[mempool.OutputStateMetadata]()
-	for _, input := range t.utxoInputs {
+	inputs := ds.NewSet[mempool.StateMetadata]()
+	for _, input := range t.inputs {
 		inputs.Add(input)
 	}
 
 	return inputs
 }
 
-func (t *TransactionMetadata) CommitmentInput() mempool.ContextStateMetadata {
+func (t *TransactionMetadata) Outputs() ds.Set[mempool.StateMetadata] {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	return t.commitmentInput
-}
-
-func (t *TransactionMetadata) Outputs() ds.Set[mempool.OutputStateMetadata] {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-
-	outputs := ds.NewSet[mempool.OutputStateMetadata]()
+	outputs := ds.NewSet[mempool.StateMetadata]()
 	for _, output := range t.outputs {
 		outputs.Add(output)
 	}
@@ -147,26 +135,17 @@ func (t *TransactionMetadata) ConflictIDs() reactive.Set[iotago.TransactionID] {
 	return t.conflictIDs
 }
 
-func (t *TransactionMetadata) publishInput(index int, input *OutputStateMetadata) {
-	t.utxoInputs[index] = input
+func (t *TransactionMetadata) publishInput(index int, input *StateMetadata) {
+	t.inputs[index] = input
 
 	input.setupSpender(t)
 	t.setupInput(input)
 }
 
-func (t *TransactionMetadata) publishCommitmentInput(commitment *ContextStateMetadata) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	t.commitmentInput = commitment
-
-	commitment.setupSpender(t)
-}
-
-func (t *TransactionMetadata) setExecuted(outputStates []mempool.OutputState) {
+func (t *TransactionMetadata) setExecuted(outputStates []mempool.State) {
 	t.mutex.Lock()
 	for _, outputState := range outputStates {
-		t.outputs = append(t.outputs, NewOutputStateMetadata(outputState, t))
+		t.outputs = append(t.outputs, NewStateMetadata(outputState, t))
 	}
 	t.mutex.Unlock()
 
@@ -190,11 +169,13 @@ func (t *TransactionMetadata) OnExecuted(callback func()) {
 }
 
 func (t *TransactionMetadata) IsInvalid() bool {
-	return t.invalid.WasTriggered()
+	return t.invalid.Get() != nil
 }
 
 func (t *TransactionMetadata) OnInvalid(callback func(error)) {
-	t.invalid.OnTrigger(callback)
+	t.invalid.OnUpdate(func(oldValue, newValue error) {
+		callback(newValue)
+	})
 }
 
 func (t *TransactionMetadata) IsBooked() bool {
@@ -226,7 +207,7 @@ func (t *TransactionMetadata) setBooked() bool {
 }
 
 func (t *TransactionMetadata) setInvalid(reason error) {
-	t.invalid.Trigger(reason)
+	_ = t.invalid.Set(reason)
 }
 
 func (t *TransactionMetadata) markInputSolid() (allInputsSolid bool) {
@@ -238,7 +219,7 @@ func (t *TransactionMetadata) markInputSolid() (allInputsSolid bool) {
 }
 
 func (t *TransactionMetadata) Commit(slot iotago.SlotIndex) {
-	t.setCommitted(slot)
+	t.committed.Set(slot)
 }
 
 func (t *TransactionMetadata) IsConflicting() bool {
@@ -261,29 +242,26 @@ func (t *TransactionMetadata) AllInputsAccepted() bool {
 	return t.allInputsAccepted.Get()
 }
 
-func (t *TransactionMetadata) setConflicting() {
-	t.conflicting.Trigger()
-}
-
 func (t *TransactionMetadata) setConflictAccepted() {
 	if t.conflictAccepted.Trigger() {
 		if t.AllInputsAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
-			t.setAccepted()
+			t.accepted.Set(true)
 		}
 	}
 }
 
-func (t *TransactionMetadata) setupInput(input *OutputStateMetadata) {
+func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	t.parentConflictIDs.InheritFrom(input.conflictIDs)
 
-	input.OnRejected(t.setRejected)
-	input.OnOrphaned(t.setOrphaned)
-
+	input.OnRejected(func() { t.rejected.Trigger() })
+	input.OnOrphaned(func(slot iotago.SlotIndex) {
+		t.orphaned.Set(slot)
+	})
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
 				if t.IsConflictAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
-					t.setAccepted()
+					t.accepted.Set(true)
 				}
 			}
 		}
@@ -291,21 +269,19 @@ func (t *TransactionMetadata) setupInput(input *OutputStateMetadata) {
 
 	input.OnPending(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, 1) == 1 && t.allInputsAccepted.Set(false) {
-			t.setPending()
+			t.accepted.Set(false)
 		}
 	})
 
 	input.OnAcceptedSpenderUpdated(func(spender mempool.TransactionMetadata) {
 		if spender.(*TransactionMetadata) != nil && spender != t {
-			t.setRejected()
+			t.rejected.Trigger()
 		}
 	})
 
 	input.OnSpendCommitted(func(spender mempool.TransactionMetadata) {
 		if spender != t {
-			spender.OnCommitted(func(slot iotago.SlotIndex) {
-				t.setOrphaned(slot)
-			})
+			spender.OnCommitted(t.orphaned.Set)
 		}
 	})
 }
@@ -319,91 +295,75 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		t.conflictIDs.Replace(ds.NewSet(t.id))
 	})
 
-	t.allAttachmentsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
+	t.allSigningTransactionsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
 		if !lo.Return2(t.IsCommitted()) {
-			t.setOrphaned(slot)
+			t.orphaned.Set(slot)
 		}
 	})
 
 	t.OnEarliestIncludedAttachmentUpdated(func(previousIndex, newIndex iotago.BlockID) {
 		if isIncluded, wasIncluded := newIndex.Slot() != 0, previousIndex.Slot() != 0; isIncluded != wasIncluded {
-			if !isIncluded {
-				t.setPending()
-			} else if t.AllInputsAccepted() && t.IsConflictAccepted() {
-				t.setAccepted()
-			}
+			t.accepted.Set(isIncluded && t.AllInputsAccepted() && t.IsConflictAccepted())
 		}
 	})
 
 	return t
 }
 
-func (t *TransactionMetadata) addAttachment(blockID iotago.BlockID) (added bool) {
+func (t *TransactionMetadata) addSigningTransaction(signedTransactionMetadata *SignedTransactionMetadata) (added bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
-	return lo.Return2(t.attachments.GetOrCreate(blockID, func() bool { return false }))
+	if added = t.signingTransactions.Add(signedTransactionMetadata); added {
+		signedTransactionMetadata.OnEvicted(func() {
+			t.evictSigningTransaction(signedTransactionMetadata)
+		})
+	}
+
+	return added
 }
 
 func (t *TransactionMetadata) markAttachmentIncluded(blockID iotago.BlockID) (included bool) {
 	t.attachmentsMutex.Lock()
 	defer t.attachmentsMutex.Unlock()
 
-	t.attachments.Set(blockID, true)
+	t.validAttachments.Set(blockID, true)
 
-	if lowestSlotIndex := t.earliestIncludedAttachment.Get().Slot(); lowestSlotIndex == 0 || blockID.Slot() < lowestSlotIndex {
-		t.earliestIncludedAttachment.Set(blockID)
+	if lowestSlotIndex := t.earliestIncludedValidAttachment.Get().Slot(); lowestSlotIndex == 0 || blockID.Slot() < lowestSlotIndex {
+		t.earliestIncludedValidAttachment.Set(blockID)
 	}
 
 	return true
-}
-
-func (t *TransactionMetadata) markAttachmentOrphaned(blockID iotago.BlockID) (orphaned bool) {
-	t.attachmentsMutex.Lock()
-	defer t.attachmentsMutex.Unlock()
-
-	previousState, exists := t.attachments.Get(blockID)
-	if !exists {
-		return false
-	}
-
-	t.evictAttachment(blockID)
-
-	if previousState && blockID == t.earliestIncludedAttachment.Get() {
-		t.earliestIncludedAttachment.Set(t.findLowestIncludedAttachment())
-	}
-
-	return true
-}
-
-func (t *TransactionMetadata) Attachments() []iotago.BlockID {
-	return t.attachments.Keys()
 }
 
 func (t *TransactionMetadata) EarliestIncludedAttachment() iotago.BlockID {
-	return t.earliestIncludedAttachment.Get()
+	return t.earliestIncludedValidAttachment.Get()
 }
 
 func (t *TransactionMetadata) OnEarliestIncludedAttachmentUpdated(callback func(prevBlock, newBlock iotago.BlockID)) {
-	t.earliestIncludedAttachment.OnUpdate(callback)
+	t.earliestIncludedValidAttachment.OnUpdate(callback)
 }
 
-func (t *TransactionMetadata) evictAttachment(id iotago.BlockID) {
-	if t.attachments.Delete(id) && t.attachments.IsEmpty() {
-		t.allAttachmentsEvicted.Set(id.Slot())
+func (t *TransactionMetadata) addValidAttachment(blockID iotago.BlockID) (added bool) {
+	t.attachmentsMutex.Lock()
+	defer t.attachmentsMutex.Unlock()
+
+	return lo.Return2(t.validAttachments.GetOrCreate(blockID, func() bool {
+		return false
+	}))
+}
+
+func (t *TransactionMetadata) evictValidAttachment(id iotago.BlockID) {
+	t.attachmentsMutex.Lock()
+	defer t.attachmentsMutex.Unlock()
+
+	if t.validAttachments.Delete(id) && t.validAttachments.IsEmpty() {
+		t.allValidAttachmentsEvicted.Set(id.Slot())
 	}
 }
 
-func (t *TransactionMetadata) findLowestIncludedAttachment() iotago.BlockID {
-	var lowestIncludedBlock iotago.BlockID
-
-	t.attachments.ForEach(func(blockID iotago.BlockID, included bool) bool {
-		if included && (lowestIncludedBlock.Slot() == 0 || blockID.Slot() < lowestIncludedBlock.Slot()) {
-			lowestIncludedBlock = blockID
-		}
-
-		return true
-	})
-
-	return lowestIncludedBlock
+func (t *TransactionMetadata) evictSigningTransaction(signedTransactionMetadata *SignedTransactionMetadata) {
+	if t.signingTransactions.Delete(signedTransactionMetadata) && t.signingTransactions.IsEmpty() {
+		t.allSigningTransactionsEvicted.Set(signedTransactionMetadata.ID().Index())
+	}
 }

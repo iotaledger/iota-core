@@ -132,8 +132,8 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 			return iotago.PayloadType(0)
 		}(),
 		Payload: func() json.RawMessage {
-			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
-				tx, _ := basicBlock.Payload.(*iotago.Transaction)
+			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadSignedTransaction {
+				tx, _ := basicBlock.Payload.(*iotago.SignedTransaction)
 				txResponse := NewTransaction(tx)
 				bytes, _ := json.Marshal(txResponse)
 
@@ -143,8 +143,8 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 			return payloadJSON
 		}(),
 		TransactionID: func() string {
-			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadTransaction {
-				tx, _ := basicBlock.Payload.(*iotago.Transaction)
+			if isBasic && basicBlock.Payload != nil && basicBlock.Payload.PayloadType() == iotago.PayloadSignedTransaction {
+				tx, _ := basicBlock.Payload.(*iotago.SignedTransaction)
 				id, _ := tx.ID()
 
 				return id.ToHex()
@@ -211,9 +211,9 @@ func getTransaction(c echo.Context) error {
 		return ierrors.Errorf("block not found: %s", output.BlockID().ToHex())
 	}
 
-	iotaTX, isTX := block.Transaction()
+	iotaTX, isTX := block.SignedTransaction()
 	if !isTX {
-		return ierrors.Errorf("payload is not a transaction: %s", output.BlockID().ToHex())
+		return ierrors.Errorf("payload is not a signed transaction: %s", output.BlockID().ToHex())
 	}
 
 	return httpserver.JSONResponse(c, http.StatusOK, NewTransaction(iotaTX))

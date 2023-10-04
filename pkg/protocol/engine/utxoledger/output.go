@@ -47,6 +47,10 @@ func (o *Output) Type() iotago.StateType {
 	return iotago.InputUTXO
 }
 
+func (o *Output) IsReadOnly() bool {
+	return false
+}
+
 func (o *Output) OutputID() iotago.OutputID {
 	return o.outputID
 }
@@ -64,7 +68,7 @@ func (o *Output) SlotBooked() iotago.SlotIndex {
 }
 
 func (o *Output) SlotCreated() iotago.SlotIndex {
-	return o.outputID.CreationSlotIndex()
+	return o.outputID.CreationSlot()
 }
 
 func (o *Output) OutputType() iotago.OutputType {
@@ -142,10 +146,10 @@ func NewOutput(apiProvider iotago.APIProvider, blockID iotago.BlockID, slotBooke
 	}
 
 	var output iotago.Output
-	if len(transaction.Essence.Outputs) <= int(index) {
+	if len(transaction.Outputs) <= int(index) {
 		return nil, ierrors.New("output not found")
 	}
-	output = transaction.Essence.Outputs[int(index)]
+	output = transaction.Outputs[int(index)]
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(txID, index)
 
 	return CreateOutput(apiProvider, outputID, blockID, slotBooked, output), nil

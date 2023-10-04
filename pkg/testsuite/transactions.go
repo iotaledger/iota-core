@@ -13,30 +13,39 @@ import (
 )
 
 func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *mock.Node) mempool.Transaction {
-	var loadedTransaction mempool.TransactionMetadata
+	var loadedTransactionMetadata mempool.TransactionMetadata
 	transactionID, err := transaction.ID()
 	require.NoError(t.Testing, err)
 
 	t.Eventually(func() error {
 		var exists bool
-		loadedTransaction, exists = node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
+		loadedTransactionMetadata, exists = node.Protocol.MainEngineInstance().Ledger.TransactionMetadata(transactionID)
 		if !exists {
 			return ierrors.Errorf("AssertTransaction: %s: transaction %s does not exist", node.Name, transactionID)
 		}
 
-		if transactionID != loadedTransaction.ID() {
-			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransaction.ID())
+		if transactionID != loadedTransactionMetadata.ID() {
+			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransactionMetadata.ID())
 		}
 
 		//nolint: forcetypeassert // we are in a test and want to assert it anyway
-		if !cmp.Equal(transaction.Essence, loadedTransaction.Transaction().(*iotago.Transaction).Essence) {
-			return ierrors.Errorf("AssertTransaction: %s: expected %s, got %s", node.Name, transaction, loadedTransaction.Transaction())
+		if !cmp.Equal(transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence) {
+			return ierrors.Errorf("AssertTransaction: %s: expected TransactionEssence %v, got %v", node.Name, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence)
+		}
+
+		typedTransaction, ok := loadedTransactionMetadata.Transaction().(*iotago.Transaction)
+		if !ok {
+			return ierrors.Errorf("AssertTransaction: %s: expected Transaction type %T, got %T", node.Name, transaction, loadedTransactionMetadata.Transaction())
+		}
+
+		if !cmp.Equal(transaction.Outputs, typedTransaction.Outputs) {
+			return ierrors.Errorf("AssertTransaction: %s: expected Outputs %s, got %s", node.Name, transaction.Outputs, typedTransaction.Outputs)
 		}
 
 		return nil
 	})
 
-	return loadedTransaction.Transaction()
+	return loadedTransactionMetadata.Transaction()
 }
 
 func (t *TestSuite) AssertTransactionsExist(transactions []*iotago.Transaction, expectedExist bool, nodes ...*mock.Node) {

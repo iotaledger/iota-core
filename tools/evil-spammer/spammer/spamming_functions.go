@@ -50,7 +50,7 @@ func CustomConflictSpammingFunc(s *Spammer) {
 		wg := sync.WaitGroup{}
 		for i, tx := range txs {
 			wg.Add(1)
-			go func(clt wallet.Client, tx *iotago.Transaction) {
+			go func(clt wallet.Client, tx *iotago.SignedTransaction) {
 				defer wg.Done()
 
 				// sleep randomly to avoid issuing blocks in different goroutines at once

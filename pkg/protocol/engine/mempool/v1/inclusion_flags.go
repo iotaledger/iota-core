@@ -98,28 +98,3 @@ func (s *inclusionFlags) OnOrphaned(callback func(slot iotago.SlotIndex)) {
 		callback(newValue)
 	})
 }
-
-// setAccepted marks the entity as accepted.
-func (s *inclusionFlags) setAccepted() {
-	s.accepted.Set(true)
-}
-
-// setPending marks the entity as pending.
-func (s *inclusionFlags) setPending() {
-	s.accepted.Set(false)
-}
-
-// setRejected marks the entity as rejected.
-func (s *inclusionFlags) setRejected() {
-	s.rejected.Trigger()
-}
-
-// setCommitted marks the entity as committed.
-func (s *inclusionFlags) setCommitted(slot iotago.SlotIndex) {
-	s.committed.Set(slot)
-}
-
-// setOrphaned marks the entity as orphaned.
-func (s *inclusionFlags) setOrphaned(slot iotago.SlotIndex) {
-	s.orphaned.Set(slot)
-}

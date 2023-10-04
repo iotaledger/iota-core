@@ -8,18 +8,33 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 )
 
-func VM(_ context.Context, inputTransaction mempool.Transaction, _ []mempool.OutputState, _ mempool.ContextState) (outputs []mempool.OutputState, err error) {
-	transaction, ok := inputTransaction.(*Transaction)
+type VM struct{}
+
+func (V *VM) Inputs(transaction mempool.Transaction) ([]mempool.StateReference, error) {
+	testTransaction, ok := transaction.(*Transaction)
 	if !ok {
 		return nil, ierrors.New("invalid transaction type in MockedVM")
 	}
 
-	if transaction.invalidTransaction {
+	return testTransaction.Inputs()
+}
+
+func (V *VM) ValidateSignatures(_ mempool.SignedTransaction, _ []mempool.State) (executionContext context.Context, err error) {
+	return context.Background(), nil
+}
+
+func (V *VM) Execute(_ context.Context, transaction mempool.Transaction) (outputs []mempool.State, err error) {
+	typedTransaction, ok := transaction.(*Transaction)
+	if !ok {
+		return nil, ierrors.New("invalid transaction type in MockedVM")
+	}
+
+	if typedTransaction.invalidTransaction {
 		return nil, ierrors.New("invalid transaction")
 	}
 
-	for i := uint16(0); i < transaction.outputCount; i++ {
-		id, err := transaction.ID()
+	for i := uint16(0); i < typedTransaction.outputCount; i++ {
+		id, err := typedTransaction.ID()
 		if err != nil {
 			return nil, err
 		}

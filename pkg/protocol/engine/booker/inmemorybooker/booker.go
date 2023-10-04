@@ -27,7 +27,7 @@ type Booker struct {
 
 	blockCache *blocks.Blocks
 
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, iotago.OutputID, ledger.BlockVoteRank]
+	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 
 	ledger ledger.Ledger
 
@@ -98,14 +98,14 @@ var _ booker.Booker = new(Booker)
 
 // Queue checks if payload is solid and then adds the block to a Booker's CausalOrder.
 func (b *Booker) Queue(block *blocks.Block) error {
-	transactionMetadata, containsTransaction := b.ledger.AttachTransaction(block)
+	signedTransactionMetadata, containsTransaction := b.ledger.AttachTransaction(block)
 
 	if !containsTransaction {
 		b.bookingOrder.Queue(block)
 		return nil
 	}
 
-	if transactionMetadata == nil {
+	if signedTransactionMetadata == nil {
 		b.retainBlockFailure(block.ID(), apimodels.BlockFailurePayloadInvalid)
 
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
@@ -118,9 +118,12 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	})
 
 	// Based on the assumption that we always fork and the UTXO and Tangle past cones are always fully known.
-	transactionMetadata.OnBooked(func() {
-		block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs())
-		b.bookingOrder.Queue(block)
+	signedTransactionMetadata.OnSignaturesValid(func() {
+		transactionMetadata := signedTransactionMetadata.TransactionMetadata()
+		transactionMetadata.OnBooked(func() {
+			block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs())
+			b.bookingOrder.Queue(block)
+		})
 	})
 
 	return nil
@@ -195,7 +198,7 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 		case iotago.ShallowLikeParentType:
 			// Check whether the parent contains a conflicting TX,
 			// otherwise reference is invalid and the block should be marked as invalid as well.
-			if tx, hasTx := parentBlock.Transaction(); !hasTx || !parentBlock.PayloadConflictIDs().Has(lo.PanicOnErr(tx.ID())) {
+			if signedTransaction, hasTx := parentBlock.SignedTransaction(); !hasTx || !parentBlock.PayloadConflictIDs().Has(lo.PanicOnErr(signedTransaction.Transaction.ID())) {
 				return nil, ierrors.Wrapf(err, "shallow like parent %s does not contain a conflicting transaction", parent.ID.String())
 			}
 
