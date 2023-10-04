@@ -22,9 +22,8 @@ func init() {
 		IsEnabled: func(c *dig.Container) bool {
 			return ParamsINX.Enabled
 		},
-		Provide:   provide,
-		Configure: configure,
-		Run:       run,
+		Provide: provide,
+		Run:     run,
 	}
 }
 
@@ -50,10 +49,6 @@ func provide(c *dig.Container) error {
 		Component.LogPanic(err)
 	}
 
-	return nil
-}
-
-func configure() error {
 	return nil
 }
 
