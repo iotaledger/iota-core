@@ -479,9 +479,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 			})
 		}
 
-		transaction.signingTransactions.Range(func(signedTransactionMetadata *SignedTransactionMetadata) {
-			signedTransactionMetadata.evicted.Trigger()
-		})
+		transaction.signingTransactions.Range((*SignedTransactionMetadata).setEvicted)
 	})
 
 	transaction.OnCommitted(func(slot iotago.SlotIndex) {
@@ -529,6 +527,10 @@ func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransactionMetadata *Si
 		signedTransactionMetadata.signaturesValid.Trigger()
 
 		transaction.executionContext.Set(executionContext)
+	})
+
+	signedTransactionMetadata.evicted.OnTrigger(func() {
+		m.cachedSignedTransactions.Delete(signedTransactionMetadata.ID())
 	})
 }
 
