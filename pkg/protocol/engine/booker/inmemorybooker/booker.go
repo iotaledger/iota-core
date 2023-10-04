@@ -158,12 +158,9 @@ func (b *Booker) book(block *blocks.Block) error {
 			return ierrors.Errorf("failed to load transaction %s for block %s", conflictID.String(), block.ID())
 		}
 
-		if orphanedSlot, orphaned := txMetadata.IsOrphaned(); orphaned {
-			if orphanedSlot <= block.SlotCommitmentID().Slot() {
-				block.SetInvalid()
-
-				return nil
-			}
+		if orphanedSlot, orphaned := txMetadata.IsOrphaned(); orphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
+			// Merge-to-master orphaned conflicts.
+			conflictsToInherit.Delete(conflictID)
 		}
 	}
 
