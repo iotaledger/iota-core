@@ -5,11 +5,11 @@ import (
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -18,13 +18,14 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1")
+	blockIssuer := ts.AddBasicBlockIssuer("default")
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
 
 	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "tx1:0"))
 
-	ts.IssuePayloadWithOptions("block1", node1, tx2)
+	ts.IssuePayloadWithOptions("block1", blockIssuer, node1, tx2)
 
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx2"), true, node1)
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), false, node1)
@@ -32,7 +33,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx2"), false, node1)
 	// make sure that the block is not booked
 
-	ts.IssuePayloadWithOptions("block2", node1, tx1)
+	ts.IssuePayloadWithOptions("block2", blockIssuer, node1, tx1)
 
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)
 	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)
@@ -53,12 +54,13 @@ func Test_DoubleSpend(t *testing.T) {
 
 	node1 := ts.AddValidatorNode("node1")
 	node2 := ts.AddValidatorNode("node2")
+	blockIssuer := ts.AddBasicBlockIssuer("default")
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.AccountID,
-		node2.AccountID,
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
 	}, ts.Nodes()...)
 
 	// Create and issue double spends
@@ -66,8 +68,8 @@ func Test_DoubleSpend(t *testing.T) {
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "Genesis:0"))
 
-		ts.IssuePayloadWithOptions("block1", node1, tx1, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssuePayloadWithOptions("block2", node1, tx2, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("block1", blockIssuer, node1, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("block2", blockIssuer, node1, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
@@ -85,8 +87,8 @@ func Test_DoubleSpend(t *testing.T) {
 
 	// Issue some more blocks and assert that conflicts are propagated to blocks.
 	{
-		ts.IssueValidationBlock("block3", node1, blockfactory.WithStrongParents(ts.BlockID("block1")))
-		ts.IssueValidationBlock("block4", node1, blockfactory.WithStrongParents(ts.BlockID("block2")))
+		ts.IssueValidationBlock("block3", node1, mock.WithStrongParents(ts.BlockID("block1")))
+		ts.IssueValidationBlock("block4", node1, mock.WithStrongParents(ts.BlockID("block2")))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block3"): {"tx1"},
@@ -97,15 +99,15 @@ func Test_DoubleSpend(t *testing.T) {
 
 	// Issue an invalid block and assert that its vote is not cast.
 	{
-		ts.IssueValidationBlock("block5", node2, blockfactory.WithStrongParents(ts.BlockIDs("block3", "block4")...))
+		ts.IssueValidationBlock("block5", node2, mock.WithStrongParents(ts.BlockIDs("block3", "block4")...))
 
 		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
 	// Issue valid blocks that resolve the conflict.
 	{
-		ts.IssueValidationBlock("block6", node2, blockfactory.WithStrongParents(ts.BlockIDs("block3", "block4")...), blockfactory.WithShallowLikeParents(ts.BlockID("block2")))
-		ts.IssueValidationBlock("block7", node1, blockfactory.WithStrongParents(ts.BlockIDs("block6")...))
+		ts.IssueValidationBlock("block6", node2, mock.WithStrongParents(ts.BlockIDs("block3", "block4")...), mock.WithShallowLikeParents(ts.BlockID("block2")))
+		ts.IssueValidationBlock("block7", node1, mock.WithStrongParents(ts.BlockIDs("block6")...))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block6"): {"tx2"},
@@ -122,6 +124,8 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	nodeA := ts.AddValidatorNode("nodeA")
 	nodeB := ts.AddValidatorNode("nodeB")
+	blockIssuerA := ts.AddBasicBlockIssuer("blockIssuerA")
+	blockIssuerB := ts.AddBasicBlockIssuer("blockIssuerA")
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
@@ -131,13 +135,13 @@ func Test_MultipleAttachments(t *testing.T) {
 	{
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 2, "Genesis:0"))
 
-		ts.IssuePayloadWithOptions("A.1", nodeA, tx1, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssueValidationBlock("A.1.1", nodeA, blockfactory.WithStrongParents(ts.BlockID("A.1")))
-		ts.IssuePayloadWithOptions("B.1", nodeB, tx1, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssueValidationBlock("B.1.1", nodeB, blockfactory.WithStrongParents(ts.BlockID("B.1")))
+		ts.IssuePayloadWithOptions("A.1", blockIssuerA, nodeA, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueValidationBlock("A.1.1", nodeA, mock.WithStrongParents(ts.BlockID("A.1")))
+		ts.IssuePayloadWithOptions("B.1", blockIssuerB, nodeB, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueValidationBlock("B.1.1", nodeB, mock.WithStrongParents(ts.BlockID("B.1")))
 
-		ts.IssueValidationBlock("A.2", nodeA, blockfactory.WithStrongParents(ts.BlockID("B.1.1")))
-		ts.IssueValidationBlock("B.2", nodeB, blockfactory.WithStrongParents(ts.BlockID("A.1.1")))
+		ts.IssueValidationBlock("A.2", nodeA, mock.WithStrongParents(ts.BlockID("B.1.1")))
+		ts.IssueValidationBlock("B.2", nodeB, mock.WithStrongParents(ts.BlockID("A.1.1")))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.1", "B.1"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1", "B.1"), false, ts.Nodes()...)
@@ -158,14 +162,14 @@ func Test_MultipleAttachments(t *testing.T) {
 	{
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "tx1:1"))
 
-		ts.IssuePayloadWithOptions("A.3", nodeA, tx2, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssueValidationBlock("B.3", nodeB, blockfactory.WithStrongParents(ts.BlockID("A.3")))
-		ts.IssueValidationBlock("A.4", nodeA, blockfactory.WithStrongParents(ts.BlockID("B.3")))
+		ts.IssuePayloadWithOptions("A.3", nodeA.Validator, nodeA, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueValidationBlock("B.3", nodeB, mock.WithStrongParents(ts.BlockID("A.3")))
+		ts.IssueValidationBlock("A.4", nodeA, mock.WithStrongParents(ts.BlockID("B.3")))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.3"), true, ts.Nodes()...)
 
-		ts.IssueValidationBlock("B.4", nodeB, blockfactory.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
-		ts.IssueValidationBlock("A.5", nodeA, blockfactory.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
+		ts.IssueValidationBlock("B.4", nodeB, mock.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
+		ts.IssueValidationBlock("A.5", nodeA, mock.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("B.3", "A.4"), true, ts.Nodes()...)
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("B.4", "A.5"), false, ts.Nodes()...)
@@ -190,11 +194,11 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	// Issue a block that includes tx1, and make sure that tx2 is accepted as well as a consequence.
 	{
-		ts.IssueValidationBlock("A.6", nodeA, blockfactory.WithStrongParents(ts.BlockIDs("A.2", "B.2")...))
-		ts.IssueValidationBlock("B.5", nodeB, blockfactory.WithStrongParents(ts.BlockIDs("A.2", "B.2")...))
+		ts.IssueValidationBlock("A.6", nodeA, mock.WithStrongParents(ts.BlockIDs("A.2", "B.2")...))
+		ts.IssueValidationBlock("B.5", nodeB, mock.WithStrongParents(ts.BlockIDs("A.2", "B.2")...))
 
-		ts.IssueValidationBlock("A.7", nodeA, blockfactory.WithStrongParents(ts.BlockIDs("A.6", "B.5")...))
-		ts.IssueValidationBlock("B.6", nodeB, blockfactory.WithStrongParents(ts.BlockIDs("A.6", "B.5")...))
+		ts.IssueValidationBlock("A.7", nodeA, mock.WithStrongParents(ts.BlockIDs("A.6", "B.5")...))
+		ts.IssueValidationBlock("B.6", nodeB, mock.WithStrongParents(ts.BlockIDs("A.6", "B.5")...))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.2", "B.2", "A.6", "B.5"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1", "B.1"), true, ts.Nodes()...)

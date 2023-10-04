@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -43,6 +42,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	node1 := ts.AddValidatorNode("node1")
 	_ = ts.AddNode("node2")
+	blockIssuer := ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
@@ -89,13 +89,12 @@ func Test_TransitionAccount(t *testing.T) {
 	))
 
 	var block1Slot iotago.SlotIndex = 1
-	activeNodes := []*mock.Node{node1}
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 
-	block1 := ts.IssueBlockAtSlotWithOptions("block1", block1Slot, genesisCommitment, node1, tx1)
+	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, genesisCommitment, blockIssuer, node1, tx1)
 
-	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Slot(), activeNodes, block1)
+	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Slot(), block1)
 
 	ts.AssertAccountDiff(genesisAccountOutput.AccountID, block1Slot, &model.AccountDiff{
 		BICChange:              0,
@@ -119,7 +118,7 @@ func Test_TransitionAccount(t *testing.T) {
 	// DESTROY GENESIS ACCOUNT, CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
 
 	// commit until the expiry slot of the transitioned genesis account plus one
-	latestParent = ts.CommitUntilSlot(accountOutputs[0].FeatureSet().BlockIssuer().ExpirySlot+1, activeNodes, latestParent)
+	latestParent = ts.CommitUntilSlot(accountOutputs[0].FeatureSet().BlockIssuer().ExpirySlot+1, latestParent)
 	// set the expiry slof of the transitioned genesis account to the latest committed + MaxCommittableAge
 	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
 	inputForNewAccount, newAccountOutputs, newAccountWallets := ts.TransactionFramework.CreateAccountFromInput("TX1:1",
@@ -150,9 +149,9 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithSlotCreated(block2Slot),
 	))
 
-	block2 := ts.IssueBlockAtSlotWithOptions("block2", block2Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx2, blockfactory.WithStrongParents(latestParent.ID()))
+	block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), blockIssuer, node1, tx2, mock.WithStrongParents(latestParent.ID()))
 
-	latestParent = ts.CommitUntilSlot(block2Slot, activeNodes, block2)
+	latestParent = ts.CommitUntilSlot(block2Slot, block2)
 
 	// assert diff of a destroyed account, to make sure we can correctly restore it
 	ts.AssertAccountDiff(genesisAccountOutput.AccountID, block2Slot, &model.AccountDiff{
@@ -220,9 +219,9 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithSlotCreated(block3Slot),
 	))
 
-	block3 := ts.IssueBlockAtSlotWithOptions("block3", block3Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx3, blockfactory.WithStrongParents(latestParent.ID()))
+	block3 := ts.IssueBasicBlockAtSlotWithOptions("block3", block3Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), blockIssuer, node1, tx3, mock.WithStrongParents(latestParent.ID()))
 
-	latestParent = ts.CommitUntilSlot(block3Slot, activeNodes, block3)
+	latestParent = ts.CommitUntilSlot(block3Slot, block3)
 	delegatedAmount := inputForNewDelegation[0].BaseTokenAmount()
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block3Slot, &model.AccountDiff{
@@ -266,9 +265,9 @@ func Test_TransitionAccount(t *testing.T) {
 
 	block4Slot := latestParent.ID().Slot()
 
-	block4 := ts.IssueBlockAtSlotWithOptions("block4", block4Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx4, blockfactory.WithStrongParents(latestParent.ID()))
+	block4 := ts.IssueBasicBlockAtSlotWithOptions("block4", block4Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), blockIssuer, node1, tx4, mock.WithStrongParents(latestParent.ID()))
 
-	latestParent = ts.CommitUntilSlot(block4Slot, activeNodes, block4)
+	latestParent = ts.CommitUntilSlot(block4Slot, block4)
 
 	// Transitioning to delayed claiming effectively removes the delegation, so we expect a negative delegation stake change.
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block4Slot, &model.AccountDiff{
@@ -310,9 +309,9 @@ func Test_TransitionAccount(t *testing.T) {
 
 	slotIndexBlock5 := latestParent.ID().Index()
 
-	block5 := ts.IssueBlockAtSlotWithOptions("block5", slotIndexBlock5, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx5, blockfactory.WithStrongParents(latestParent.ID()))
+	block5 := ts.IssueBasicBlockAtSlotWithOptions("block5", slotIndexBlock5, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), blockIssuer, node1, tx5, mock.WithStrongParents(latestParent.ID()))
 
-	latestParent = ts.CommitUntilSlot(slotIndexBlock5, activeNodes, block5)
+	latestParent = ts.CommitUntilSlot(slotIndexBlock5, block5)
 
 	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(implicitAccountAddress)
 
@@ -352,9 +351,9 @@ func Test_TransitionAccount(t *testing.T) {
 
 	slotIndexBlock6 := latestParent.ID().Index()
 
-	block6 := ts.IssueBlockAtSlotWithOptions("block6", slotIndexBlock6, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node1, tx6, blockfactory.WithStrongParents(latestParent.ID()))
+	block6 := ts.IssueBasicBlockAtSlotWithOptions("block6", slotIndexBlock6, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), blockIssuer, node1, tx6, mock.WithStrongParents(latestParent.ID()))
 
-	latestParent = ts.CommitUntilSlot(slotIndexBlock6, activeNodes, block6)
+	latestParent = ts.CommitUntilSlot(slotIndexBlock6, block6)
 
 	fullAccountOutputID := ts.TransactionFramework.Output("TX6:0").OutputID()
 

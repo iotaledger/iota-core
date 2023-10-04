@@ -35,9 +35,10 @@ type TestSuite struct {
 	fakeTesting *testing.T
 	network     *mock.Network
 
-	Directory *utils.Directory
-	nodes     *orderedmap.OrderedMap[string, *mock.Node]
-	running   bool
+	Directory    *utils.Directory
+	nodes        *orderedmap.OrderedMap[string, *mock.Node]
+	blockIssuers *orderedmap.OrderedMap[string, *mock.BlockIssuer]
+	running      bool
 
 	snapshotPath string
 	blocks       *shrinkingmap.ShrinkingMap[string, *blocks.Block]
@@ -79,6 +80,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		network:                             mock.NewNetwork(),
 		Directory:                           utils.NewDirectory(testingT.TempDir()),
 		nodes:                               orderedmap.New[string, *mock.Node](),
+		blockIssuers:                        orderedmap.New[string, *mock.BlockIssuer](),
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
 		automaticTransactionIssuingCounters: *shrinkingmap.New[string, int](),
 
@@ -347,12 +349,12 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	if len(optAmount) > 0 {
 		amount = optAmount[0]
 	}
-	if amount > 0 {
+	if amount > 0 && validator {
 		accountDetails := snapshotcreator.AccountDetails{
-			Address:              iotago.Ed25519AddressFromPubKey(node.PubKey),
+			Address:              iotago.Ed25519AddressFromPubKey(node.Validator.PublicKey),
 			Amount:               amount,
 			Mana:                 iotago.Mana(amount),
-			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.PubKey)),
+			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.Validator.PublicKey)),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
 		}
@@ -386,6 +388,37 @@ func (t *TestSuite) AddNode(name string, optAmount ...iotago.BaseToken) *mock.No
 
 func (t *TestSuite) RemoveNode(name string) {
 	t.nodes.Delete(name)
+}
+
+func (t *TestSuite) AddBasicBlockIssuer(name string, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.BlockIssuer {
+	newBlockIssuer := mock.NewBlockIssuer(t.Testing, name, false)
+	t.blockIssuers.Set(name, newBlockIssuer)
+	var bic iotago.BlockIssuanceCredits
+	if len(blockIssuanceCredits) == 0 {
+		bic = 0
+	} else {
+		bic = blockIssuanceCredits[0]
+	}
+
+	accountDetails := snapshotcreator.AccountDetails{
+		Address:              iotago.Ed25519AddressFromPubKey(newBlockIssuer.PublicKey),
+		Amount:               MinIssuerAccountAmount,
+		Mana:                 iotago.Mana(MinIssuerAccountAmount),
+		IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newBlockIssuer.PublicKey)),
+		ExpirySlot:           iotago.MaxSlotIndex,
+		BlockIssuanceCredits: bic,
+	}
+
+	t.optsAccounts = append(t.optsAccounts, accountDetails)
+
+	return newBlockIssuer
+}
+
+func (t *TestSuite) DefaultBasicBlockIssuer() *mock.BlockIssuer {
+	defaultBasicBlockIssuer, exists := t.blockIssuers.Get("default")
+	require.True(t.Testing, exists, "default block issuer not found")
+
+	return defaultBasicBlockIssuer
 }
 
 func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
@@ -449,7 +482,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 func (t *TestSuite) Validators() []*mock.Node {
 	validators := make([]*mock.Node, 0)
 	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
-		if node.Validator {
+		if node.IsValidator() {
 			validators = append(validators, node)
 		}
 
@@ -457,6 +490,20 @@ func (t *TestSuite) Validators() []*mock.Node {
 	})
 
 	return validators
+}
+
+// BlockIssersForNodes returns a map of block issuers for each node. If the node is a validator, its block issuer is the validator block issuer. Else, it is the block issuer for the test suite.
+func (t *TestSuite) BlockIssuersForNodes(nodes []*mock.Node) []*mock.BlockIssuer {
+	blockIssuers := make([]*mock.BlockIssuer, 0)
+	for _, node := range nodes {
+		if node.IsValidator() {
+			blockIssuers = append(blockIssuers, node.Validator)
+		} else {
+			blockIssuers = append(blockIssuers, t.DefaultBasicBlockIssuer())
+		}
+	}
+
+	return blockIssuers
 }
 
 // Eventually asserts that given condition will be met in opts.waitFor time,

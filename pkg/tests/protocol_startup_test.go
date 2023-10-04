@@ -35,6 +35,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	nodeA := ts.AddValidatorNode("nodeA")
 	nodeB := ts.AddValidatorNode("nodeB")
 	ts.AddNode("nodeC")
+	ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
 
 	nodeOptions := []options.Option[protocol.Protocol]{
 		protocol.WithStorageOptions(
@@ -56,13 +57,13 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts.Wait()
 
 	expectedCommittee := []iotago.AccountID{
-		nodeA.AccountID,
-		nodeB.AccountID,
+		nodeA.Validator.AccountID,
+		nodeB.Validator.AccountID,
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
+		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.Validator.AccountID)),
+		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.Validator.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -186,7 +187,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				ts.RemoveNode("nodeC")
 
 				nodeC1 := ts.AddNode("nodeC-restarted")
-				nodeC1.CopyIdentityFromNode(nodeC)
 				nodeC1.Initialize(true,
 					protocol.WithBaseDirectory(ts.Directory.Path(nodeC.Name)),
 					protocol.WithStorageOptions(
@@ -221,7 +221,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
 
 				nodeD := ts.AddNode("nodeD")
-				nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.
 				nodeD.Initialize(true, append(nodeOptions,
 					protocol.WithSnapshotPath(snapshotPath),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
@@ -372,7 +371,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
 
 		nodeD := ts.AddNode("nodeE")
-		nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.
 		nodeD.Initialize(true, append(nodeOptions,
 			protocol.WithSnapshotPath(snapshotPath),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
