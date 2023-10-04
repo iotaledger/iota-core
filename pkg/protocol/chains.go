@@ -290,12 +290,15 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 							panic(err) // this can never happen, but we panic to get a stack trace if it ever does
 						}
 
-						publishedCommitment.promote(chain)
 						publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
 						publishedCommitment.IsAttested.Trigger()
 						publishedCommitment.IsVerified.Trigger()
 
 						latestPublishedSlot = commitment.Slot()
+
+						if publishedCommitment.IsSolid.Get() {
+							publishedCommitment.promote(chain)
+						}
 
 						return publishedCommitment, published
 					}
@@ -305,17 +308,13 @@ func (c *Chains) publishEngineCommitments(chain *Chain) {
 							chain.ForkingPoint.Set(rootCommitment)
 
 							rootCommitment.IsRoot.Trigger()
+							rootCommitment.promote(chain)
 						}
 					} else {
 						latestPublishedSlot = forkingPoint.Slot() - 1
 					}
 
 					return engine.LatestCommitment.OnUpdate(func(_, latestModelCommitment *model.Commitment) {
-						if latestModelCommitment == nil {
-							// TODO: CHECK IF NECESSARY
-							return
-						}
-
 						for latestPublishedSlot < latestModelCommitment.Slot() {
 							if commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedSlot + 1); err != nil {
 								panic(err) // this should never happen, but we panic to get a stack trace if it does
