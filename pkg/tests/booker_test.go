@@ -525,10 +525,6 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 		ts.IssueBlockAtSlot("", 5, genesisCommitment, node1, ts.BlockIDsWithPrefix("4.0")...)
 
-		// ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
-		// 	ts.Block("block5.1"): {}, // on rejected conflict
-		// }, node1, node2)
-
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, nil)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.Nodes()...)

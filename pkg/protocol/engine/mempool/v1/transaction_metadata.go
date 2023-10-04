@@ -281,7 +281,9 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 
 	input.OnSpendCommitted(func(spender mempool.TransactionMetadata) {
 		if spender != t {
-			spender.OnCommitted(t.orphaned.Set)
+			spender.OnCommitted(func(slot iotago.SlotIndex) {
+				t.orphaned.Set(slot)
+			})
 		}
 	})
 }
@@ -295,7 +297,14 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		t.conflictIDs.Replace(ds.NewSet(t.id))
 	})
 
+	// TODO: REMOVE??
 	t.allSigningTransactionsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
+		if !lo.Return2(t.IsCommitted()) {
+			t.orphaned.Set(slot)
+		}
+	})
+
+	t.allValidAttachmentsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
 		if !lo.Return2(t.IsCommitted()) {
 			t.orphaned.Set(slot)
 		}
@@ -305,6 +314,12 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		if isIncluded, wasIncluded := newIndex.Slot() != 0, previousIndex.Slot() != 0; isIncluded != wasIncluded {
 			t.accepted.Set(isIncluded && t.AllInputsAccepted() && t.IsConflictAccepted())
 		}
+	})
+
+	t.OnOrphaned(func(slot iotago.SlotIndex) {
+		t.signingTransactions.Range(func(signedTransactionMetadata *SignedTransactionMetadata) {
+			signedTransactionMetadata.setOrphaned(slot)
+		})
 	})
 
 	return t

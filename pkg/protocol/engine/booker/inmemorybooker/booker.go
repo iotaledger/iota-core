@@ -111,7 +111,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
-	transactionMetadata.OnOrphaned(func(slot iotago.SlotIndex) {
+	signedTransactionMetadata.OnOrphaned(func(slot iotago.SlotIndex) {
 		if slot <= block.SlotCommitmentID().Slot() {
 			block.SetInvalid()
 		}

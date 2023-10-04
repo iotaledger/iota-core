@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -53,8 +54,8 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	source.OnPending(func() { s.accepted.Set(false) })
 	source.OnAccepted(func() { s.accepted.Set(true) })
 	source.OnRejected(func() { s.rejected.Trigger() })
-	source.OnCommitted(func() { s.committed.Trigger() })
-	source.OnOrphaned(func() { s.orphaned.Trigger() })
+	source.OnCommitted(lo.Void(s.committed.Set))
+	source.OnOrphaned(lo.Void(s.orphaned.Set))
 
 	return s
 }

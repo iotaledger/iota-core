@@ -11,6 +11,8 @@ type SignedTransactionMetadata interface {
 
 	OnSignaturesInvalid(func(err error)) (unsubscribe func())
 
+	OnOrphaned(func(slot iotago.SlotIndex)) (unsubscribe func())
+
 	TransactionMetadata() TransactionMetadata
 
 	Attachments() []iotago.BlockID

@@ -16,7 +16,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -360,7 +359,6 @@ func (m *MemPool[VoteRank]) requestState(stateRef mempool.StateReference, waitIf
 			// committed: otherwise we would have found it in cache or the request would have never resolved.
 			stateMetadata := NewStateMetadata(state)
 			stateMetadata.accepted.Set(true)
-			stateMetadata.committed.Set(stateMetadata.state.(*utxoledger.Output).SlotCreated())
 
 			p.Resolve(stateMetadata)
 		})
@@ -486,11 +484,11 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 		})
 	})
 
-	transaction.OnOrphaned(func(slot iotago.SlotIndex) {
+	transaction.OnCommitted(func(slot iotago.SlotIndex) {
 		lo.Return1(m.delayedTransactionEviction.GetOrCreate(slot, func() ds.Set[iotago.TransactionID] { return ds.NewSet[iotago.TransactionID]() })).Add(transaction.ID())
 	})
 
-	transaction.OnCommitted(func(slot iotago.SlotIndex) {
+	transaction.OnOrphaned(func(slot iotago.SlotIndex) {
 		lo.Return1(m.delayedTransactionEviction.GetOrCreate(slot, func() ds.Set[iotago.TransactionID] { return ds.NewSet[iotago.TransactionID]() })).Add(transaction.ID())
 	})
 }
