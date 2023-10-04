@@ -54,8 +54,8 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	source.OnPending(func() { s.accepted.Set(false) })
 	source.OnAccepted(func() { s.accepted.Set(true) })
 	source.OnRejected(func() { s.rejected.Trigger() })
-	source.OnCommitted(lo.Void(s.committed.Set))
-	source.OnOrphaned(lo.Void(s.orphaned.Set))
+	source.OnCommitted(lo.Void(s.committedOnSlot.Set))
+	source.OnOrphaned(lo.Void(s.orphanedOnSlot.Set))
 
 	return s
 }

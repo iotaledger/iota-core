@@ -115,7 +115,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	signedTransactionMetadata.OnSignaturesValid(func() {
 		transactionMetadata := signedTransactionMetadata.TransactionMetadata()
 
-		if orphanedSlot, isOrphaned := transactionMetadata.IsOrphaned(); isOrphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
+		if orphanedSlot, isOrphaned := transactionMetadata.GetOrphanedSlot(); isOrphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
 			block.SetInvalid()
 
 			return
@@ -158,7 +158,7 @@ func (b *Booker) book(block *blocks.Block) error {
 			return ierrors.Errorf("failed to load transaction %s for block %s", conflictID.String(), block.ID())
 		}
 
-		if orphanedSlot, orphaned := txMetadata.IsOrphaned(); orphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
+		if orphanedSlot, orphaned := txMetadata.GetOrphanedSlot(); orphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
 			// Merge-to-master orphaned conflicts.
 			conflictsToInherit.Delete(conflictID)
 		}

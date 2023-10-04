@@ -11,24 +11,24 @@ type inclusionFlags struct {
 	// accepted gets triggered when the entity gets marked as accepted.
 	accepted reactive.Variable[bool]
 
-	// committed gets set when the entity gets marked as committed.
-	committed reactive.Variable[iotago.SlotIndex]
+	// committedOnSlot gets set to the slot in which the entity gets marked as committed.
+	committedOnSlot reactive.Variable[iotago.SlotIndex]
 
 	// rejected gets triggered when the entity gets marked as rejected.
 	rejected *promise.Event
 
-	// orphaned gets set when the entity gets marked as orphaned.
-	orphaned reactive.Variable[iotago.SlotIndex]
+	// orphanedOnSlot gets set to the slot in which the entity gets marked as orphaned.
+	orphanedOnSlot reactive.Variable[iotago.SlotIndex]
 }
 
 // newInclusionFlags creates a new inclusionFlags instance.
 func newInclusionFlags() *inclusionFlags {
 	return &inclusionFlags{
-		accepted:  reactive.NewVariable[bool](),
-		committed: reactive.NewVariable[iotago.SlotIndex](),
-		rejected:  promise.NewEvent(),
+		accepted:        reactive.NewVariable[bool](),
+		committedOnSlot: reactive.NewVariable[iotago.SlotIndex](),
+		rejected:        promise.NewEvent(),
 		// Make sure the oldest orphaned index doesn't get overridden by newer TX spending the orphaned conflict further.
-		orphaned: reactive.NewVariable[iotago.SlotIndex](func(currentValue, newValue iotago.SlotIndex) iotago.SlotIndex {
+		orphanedOnSlot: reactive.NewVariable[iotago.SlotIndex](func(currentValue, newValue iotago.SlotIndex) iotago.SlotIndex {
 			if currentValue != 0 {
 				return currentValue
 			}
@@ -76,25 +76,25 @@ func (s *inclusionFlags) OnRejected(callback func()) {
 }
 
 // IsCommitted returns true if the entity was committed.
-func (s *inclusionFlags) IsCommitted() (slot iotago.SlotIndex, isCommitted bool) {
-	return s.committed.Get(), s.committed.Get() != 0
+func (s *inclusionFlags) GetCommittedSlot() (slot iotago.SlotIndex, isCommitted bool) {
+	return s.committedOnSlot.Get(), s.committedOnSlot.Get() != 0
 }
 
 // OnCommitted registers a callback that gets triggered when the entity gets committed.
 func (s *inclusionFlags) OnCommitted(callback func(slot iotago.SlotIndex)) {
-	s.committed.OnUpdate(func(_, newValue iotago.SlotIndex) {
+	s.committedOnSlot.OnUpdate(func(_, newValue iotago.SlotIndex) {
 		callback(newValue)
 	})
 }
 
 // IsOrphaned returns true if the entity was orphaned.
-func (s *inclusionFlags) IsOrphaned() (slot iotago.SlotIndex, isOrphaned bool) {
-	return s.orphaned.Get(), s.orphaned.Get() != 0
+func (s *inclusionFlags) GetOrphanedSlot() (slot iotago.SlotIndex, isOrphaned bool) {
+	return s.orphanedOnSlot.Get(), s.orphanedOnSlot.Get() != 0
 }
 
 // OnOrphaned registers a callback that gets triggered when the entity gets orphaned.
 func (s *inclusionFlags) OnOrphaned(callback func(slot iotago.SlotIndex)) {
-	s.orphaned.OnUpdate(func(_, newValue iotago.SlotIndex) {
+	s.orphanedOnSlot.OnUpdate(func(_, newValue iotago.SlotIndex) {
 		callback(newValue)
 	})
 }

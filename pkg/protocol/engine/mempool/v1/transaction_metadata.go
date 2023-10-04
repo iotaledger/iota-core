@@ -214,8 +214,8 @@ func (t *TransactionMetadata) markInputSolid() (allInputsSolid bool) {
 	return false
 }
 
-func (t *TransactionMetadata) Commit(slot iotago.SlotIndex) {
-	t.committed.Set(slot)
+func (t *TransactionMetadata) Commit() {
+	t.committedOnSlot.Set(t.earliestIncludedValidAttachment.Get().Slot())
 }
 
 func (t *TransactionMetadata) IsConflicting() bool {
@@ -251,7 +251,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 
 	input.OnRejected(func() { t.rejected.Trigger() })
 	input.OnOrphaned(func(slot iotago.SlotIndex) {
-		t.orphaned.Set(slot)
+		t.orphanedOnSlot.Set(slot)
 	})
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
@@ -279,7 +279,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	input.OnSpendCommitted(func(spender mempool.TransactionMetadata) {
 		if spender != t {
 			spender.OnCommitted(func(slot iotago.SlotIndex) {
-				t.orphaned.Set(slot)
+				t.orphanedOnSlot.Set(slot)
 			})
 		}
 	})
@@ -295,8 +295,8 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	})
 
 	t.allValidAttachmentsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
-		if !lo.Return2(t.IsCommitted()) {
-			t.orphaned.Set(slot)
+		if !lo.Return2(t.GetCommittedSlot()) {
+			t.orphanedOnSlot.Set(slot)
 		}
 	})
 

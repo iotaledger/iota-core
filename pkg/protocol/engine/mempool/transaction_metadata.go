@@ -17,7 +17,7 @@ type TransactionMetadata interface {
 
 	ConflictIDs() reactive.Set[iotago.TransactionID]
 
-	Commit(slot iotago.SlotIndex)
+	Commit()
 
 	IsSolid() bool
 
@@ -57,7 +57,7 @@ type inclusionFlags interface {
 
 	OnAccepted(callback func())
 
-	IsCommitted() (slot iotago.SlotIndex, isCommitted bool)
+	GetCommittedSlot() (slot iotago.SlotIndex, isCommitted bool)
 
 	OnCommitted(callback func(slot iotago.SlotIndex))
 
@@ -65,7 +65,7 @@ type inclusionFlags interface {
 
 	OnRejected(callback func())
 
-	IsOrphaned() (slot iotago.SlotIndex, isOrphaned bool)
+	GetOrphanedSlot() (slot iotago.SlotIndex, isOrphaned bool)
 
 	OnOrphaned(callback func(slot iotago.SlotIndex))
 }

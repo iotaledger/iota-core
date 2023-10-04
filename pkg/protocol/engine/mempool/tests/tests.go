@@ -235,9 +235,9 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tf.CommitSlot(3)
 	tf.RequireTransactionsEvicted(transactionDeletionState)
 
-	require.False(t, lo.Return2(tx1Metadata.IsOrphaned()))
-	require.False(t, lo.Return2(tx2Metadata.IsOrphaned()))
-	require.False(t, lo.Return2(tx3Metadata.IsOrphaned()))
+	require.False(t, lo.Return2(tx1Metadata.GetOrphanedSlot()))
+	require.False(t, lo.Return2(tx2Metadata.GetOrphanedSlot()))
+	require.False(t, lo.Return2(tx3Metadata.GetOrphanedSlot()))
 
 	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block1": true, "block2": true, "block3": false}))
 }
@@ -274,7 +274,7 @@ func TestSetTransactionOrphanage(t *testing.T, tf *TestFramework) {
 	// We only evict after MCA
 	tf.RequireTransactionsEvicted(map[string]bool{"tx1": false, "tx2": false, "tx3": false})
 
-	require.True(t, lo.Return2(tx1Metadata.IsOrphaned()))
+	require.True(t, lo.Return2(tx1Metadata.GetOrphanedSlot()))
 	require.True(t, tx2Metadata.IsPending())
 	require.True(t, tx3Metadata.IsPending())
 
@@ -312,9 +312,9 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 	require.False(t, tx3Metadata.IsAccepted())
 
 	tf.Instance.Evict(1)
-	require.False(t, lo.Return2(tx1Metadata.IsOrphaned()))
-	require.False(t, lo.Return2(tx2Metadata.IsOrphaned()))
-	require.False(t, lo.Return2(tx3Metadata.IsOrphaned()))
+	require.False(t, lo.Return2(tx1Metadata.GetOrphanedSlot()))
+	require.False(t, lo.Return2(tx2Metadata.GetOrphanedSlot()))
+	require.False(t, lo.Return2(tx3Metadata.GetOrphanedSlot()))
 
 	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))))
 	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx2"))))
@@ -322,9 +322,9 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 
 	tf.Instance.Evict(2)
 
-	require.True(t, lo.Return2(tx1Metadata.IsOrphaned()))
-	require.True(t, lo.Return2(tx2Metadata.IsOrphaned()))
-	require.True(t, lo.Return2(tx3Metadata.IsOrphaned()))
+	require.True(t, lo.Return2(tx1Metadata.GetOrphanedSlot()))
+	require.True(t, lo.Return2(tx2Metadata.GetOrphanedSlot()))
+	require.True(t, lo.Return2(tx3Metadata.GetOrphanedSlot()))
 
 	// All conflicts still exist, as they are kept around until MCA
 	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))))

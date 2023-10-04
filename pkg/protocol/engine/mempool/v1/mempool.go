@@ -215,9 +215,7 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 
 	if delayedOutputs, exists := m.delayedOutputStateEviction.Get(delayedEvictionSlot); exists {
 		delayedOutputs.ForEach(func(stateID iotago.Identifier, state *StateMetadata) bool {
-			if !m.cachedStateRequests.Delete(stateID, state.HasNoSpenders) && m.cachedStateRequests.Has(stateID) {
-				state.onAllSpendersRemoved(func() { m.cachedStateRequests.Delete(stateID, state.HasNoSpenders) })
-			}
+			m.cachedStateRequests.Delete(stateID, state.HasNoSpenders)
 
 			return true
 		})
@@ -333,7 +331,7 @@ func (m *MemPool[VoteRank]) forkTransaction(transactionMetadata *TransactionMeta
 
 	if err := m.conflictDAG.UpdateConflictingResources(transactionMetadata.ID(), resourceIDs); err != nil {
 		// this is a hack, as with a reactive.Variable we cannot set it to 0 and still check if it was orphaned.
-		transactionMetadata.orphaned.Set(1)
+		transactionMetadata.orphanedOnSlot.Set(1)
 
 		m.errorHandler(err)
 	}
