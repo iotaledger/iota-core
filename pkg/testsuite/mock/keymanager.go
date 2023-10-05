@@ -4,11 +4,12 @@ import (
 	"crypto/ed25519"
 	"fmt"
 
-	"github.com/iotaledger/hive.go/ierrors"
-	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/wollac/iota-crypto-demo/pkg/bip32path"
 	"github.com/wollac/iota-crypto-demo/pkg/slip10"
 	"github.com/wollac/iota-crypto-demo/pkg/slip10/eddsa"
+
+	"github.com/iotaledger/hive.go/ierrors"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // KeyManager is a hierarchical deterministic key manager.

@@ -21,22 +21,21 @@ type Wallet struct {
 	Testing *testing.T
 
 	Name string
-	utxo []*utxoledger.Output
 
 	KeyManager *KeyManager
 
 	BlockIssuer *BlockIssuer
+
+	outputs []*utxoledger.Output
 }
 
 func NewWallet(t *testing.T, name string, seed []byte, index uint64) *Wallet {
 	return &Wallet{
-		Testing: t,
-		Name:    name,
-		utxo:    make([]*utxoledger.Output, 0),
-
-		KeyManager: NewKeyManager(seed, index),
-
+		Testing:     t,
+		Name:        name,
+		KeyManager:  NewKeyManager(seed, index),
 		BlockIssuer: NewBlockIssuer(t, name, false),
+		outputs:     make([]*utxoledger.Output, 0),
 	}
 }
 
@@ -47,22 +46,22 @@ func (w *Wallet) BookSpents(spentOutputs []*utxoledger.Output) {
 }
 
 func (w *Wallet) BookSpent(spentOutput *utxoledger.Output) {
-	newUtxo := make([]*utxoledger.Output, 0)
-	for _, u := range w.utxo {
-		if u.OutputID() == spentOutput.OutputID() {
-			fmt.Printf("%s spent %s\n", w.Name, u.OutputID().ToHex())
+	newOutputs := make([]*utxoledger.Output, 0)
+	for _, output := range w.outputs {
+		if output.OutputID() == spentOutput.OutputID() {
+			fmt.Printf("%s spent %s\n", w.Name, output.OutputID().ToHex())
 
 			continue
 		}
-		newUtxo = append(newUtxo, u)
+		newOutputs = append(newOutputs, output)
 	}
-	w.utxo = newUtxo
+	w.outputs = newOutputs
 }
 
 func (w *Wallet) Balance() iotago.BaseToken {
 	var balance iotago.BaseToken
-	for _, u := range w.utxo {
-		balance += u.BaseTokenAmount()
+	for _, output := range w.outputs {
+		balance += output.BaseTokenAmount()
 	}
 
 	return balance
@@ -71,12 +70,12 @@ func (w *Wallet) Balance() iotago.BaseToken {
 func (w *Wallet) BookOutput(output *utxoledger.Output) {
 	if output != nil {
 		fmt.Printf("%s book %s\n", w.Name, output.OutputID().ToHex())
-		w.utxo = append(w.utxo, output)
+		w.outputs = append(w.outputs, output)
 	}
 }
 
 func (w *Wallet) Outputs() []*utxoledger.Output {
-	return w.utxo
+	return w.outputs
 }
 
 func (w *Wallet) PrintStatus() {
@@ -85,7 +84,7 @@ func (w *Wallet) PrintStatus() {
 	status += fmt.Sprintf("Address: %s\n", w.KeyManager.Address().Bech32(iotago.PrefixTestnet))
 	status += fmt.Sprintf("Balance: %d\n", w.Balance())
 	status += "Outputs: \n"
-	for _, u := range w.utxo {
+	for _, u := range w.outputs {
 		nativeTokenDescription := ""
 		nativeTokenFeature := u.Output().FeatureSet().NativeToken()
 		if nativeTokenFeature != nil {
