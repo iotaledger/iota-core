@@ -38,10 +38,12 @@ func main() {
 			return
 		}
 		// save wallet
-		err = accountwallet.SaveState(accWallet)
-		if err != nil {
-			log.Errorf("Error while saving wallet state: %v", err)
-		}
+		defer func() {
+			err = accountwallet.SaveState(accWallet)
+			if err != nil {
+				log.Errorf("Error while saving wallet state: %v", err)
+			}
+		}()
 	}
 	// run selected test scenario
 	switch Script {
