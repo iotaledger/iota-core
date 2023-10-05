@@ -331,7 +331,7 @@ func (m *MemPool[VoteRank]) forkTransaction(transactionMetadata *TransactionMeta
 
 	if err := m.conflictDAG.UpdateConflictingResources(transactionMetadata.ID(), resourceIDs); err != nil {
 		// this is a hack, as with a reactive.Variable we cannot set it to 0 and still check if it was orphaned.
-		transactionMetadata.orphanedOnSlot.Set(1)
+		transactionMetadata.orphanedSlot.Set(1)
 
 		m.errorHandler(err)
 	}
