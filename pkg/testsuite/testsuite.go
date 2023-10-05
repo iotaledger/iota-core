@@ -19,10 +19,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage/utils"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
+	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -427,11 +427,11 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 
 	// Create accounts for any block issuer nodes added before starting the network.
 	if t.optsAccounts != nil {
-		wallet := mock.NewHDWallet("genesis", t.genesisSeed[:], 0)
+		keyManager := mock.NewKeyManager(t.genesisSeed[:], 0)
 		t.optsSnapshotOptions = append(t.optsSnapshotOptions, snapshotcreator.WithAccounts(lo.Map(t.optsAccounts, func(accountDetails snapshotcreator.AccountDetails) snapshotcreator.AccountDetails {
 			// if no custom address is assigned to the account, assign an address generated from GenesisSeed
 			if accountDetails.Address == nil {
-				accountDetails.Address = wallet.Address()
+				accountDetails.Address = keyManager.Address()
 			}
 
 			if accountDetails.AccountID.Empty() {

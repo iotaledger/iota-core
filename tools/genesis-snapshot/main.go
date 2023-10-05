@@ -8,7 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
+	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
 )
 

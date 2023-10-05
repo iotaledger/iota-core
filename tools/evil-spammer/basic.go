@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
+	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	iotago "github.com/iotaledger/iota.go/v4"
