@@ -98,19 +98,17 @@ func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) error 
 	return nil
 }
 
-func (s *StateDiff) compactStateChanges(output *StateMetadata, newValue int) {
-	if output.state.Type() != iotago.InputUTXO {
-		return
-	}
-
+func (s *StateDiff) compactStateChanges(stateMetadata *StateMetadata, usageCounter int) {
 	switch {
-	case newValue > 0:
-		s.createdOutputs.Set(output.state.StateID(), output)
-	case newValue < 0:
-		s.spentOutputs.Set(output.state.StateID(), output)
+	case usageCounter > 0:
+		s.createdOutputs.Set(stateMetadata.state.StateID(), stateMetadata)
+	case usageCounter < 0:
+		if !stateMetadata.state.IsReadOnly() {
+			s.spentOutputs.Set(stateMetadata.state.StateID(), stateMetadata)
+		}
 	default:
-		s.createdOutputs.Delete(output.state.StateID())
-		s.spentOutputs.Delete(output.state.StateID())
+		s.createdOutputs.Delete(stateMetadata.state.StateID())
+		s.spentOutputs.Delete(stateMetadata.state.StateID())
 	}
 }
 

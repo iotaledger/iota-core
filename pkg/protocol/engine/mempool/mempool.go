@@ -19,6 +19,8 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] interface {
 
 	TransactionMetadata(id iotago.TransactionID) (transaction TransactionMetadata, exists bool)
 
+	VM() VM
+
 	InjectRequestedState(state State)
 
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transaction TransactionMetadata, exists bool)

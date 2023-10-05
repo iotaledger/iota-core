@@ -88,12 +88,9 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 						return 0, err
 					}
 
-					minMana := s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MinMana
-					if mana < minMana {
-						return 0, ierrors.Errorf("account %s has insufficient Mana for block to be scheduled: account Mana %d, min Mana %d", accountID, mana, minMana)
-					}
+					mana = lo.Min(mana, iotago.Mana(s.maxDeficit()-1))
 
-					return Deficit(mana / minMana), nil
+					return 1 + Deficit(mana), nil
 				}
 			})
 			s.TriggerConstructed()

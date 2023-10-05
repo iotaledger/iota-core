@@ -68,10 +68,10 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
 
-			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, e.Workers.CreateGroup("MemPool"), l.conflictDAG, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, e.Workers.CreateGroup("MemPool"), l.conflictDAG, l.apiProvider, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
-			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput)
+			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput, l.accountsLedger.Account)
 			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
 			l.accountsLedger.SetLatestCommittedSlot(latestCommittedSlot)
 			l.rmcManager.SetLatestCommittedSlot(latestCommittedSlot)
@@ -173,9 +173,6 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	l.prepareAccountDiffs(accountDiffs, slot, consumedAccounts, createdAccounts)
 
 	// Commit the changes
-	// Update the mana manager's cache
-	l.manaManager.ApplyDiff(slot, destroyedAccounts, createdAccounts)
-
 	// Update the UTXO ledger
 	if err = l.utxoLedger.ApplyDiff(slot, outputs, spends); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to UTXO ledger for slot %d: %w", slot, err)
@@ -191,6 +188,11 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	}
 	if err = l.accountsLedger.ApplyDiff(slot, rmcForSlot, accountDiffs, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for slot %d: %w", slot, err)
+	}
+
+	// Update the mana manager's cache
+	if err = l.manaManager.ApplyDiff(slot, destroyedAccounts, createdAccounts, accountDiffs); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to mana manager for slot %d: %w", slot, err)
 	}
 
 	// Mark each transaction as committed so the mempool can evict it
@@ -692,7 +694,7 @@ func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slot iotago.Sl
 	return accountOutput, nil
 }
 
-func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[mempool.State] {
+func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[mempool.State] {
 	p := promise.New[mempool.State]()
 
 	l.utxoLedger.ReadLockLedger()
@@ -728,8 +730,8 @@ func (l *Ledger) resolveState(stateRef iotago.Input) *promise.Promise[mempool.St
 
 		return p.Resolve(loadedCommitment)
 	case iotago.InputBlockIssuanceCredit, iotago.InputReward:
-		// these are always resolved as they depend on the commitment or UTXO inputs
-		return p.Resolve(stateRef)
+		//nolint:forcetypeassert
+		return p.Resolve(stateRef.(mempool.State))
 	default:
 		return p.Reject(ierrors.Errorf("unsupported input type %s", stateRef.Type()))
 	}

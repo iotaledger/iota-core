@@ -54,10 +54,18 @@ func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank]
 
 	return t
 }
+
+func (t *TestFramework) InjectState(alias string, state mempool.State) {
+	t.referencesByAlias[alias] = NewStateReference(state.StateID(), state.Type())
+
+	t.ledgerState.AddOutputState(state)
+}
+
 func (t *TestFramework) CreateSignedTransaction(transactionAlias string, referencedStates []string, outputCount uint16, invalid ...bool) {
 	t.CreateTransaction(transactionAlias, referencedStates, outputCount, invalid...)
 	t.SignedTransactionFromTransaction(transactionAlias+"-signed", transactionAlias)
 }
+
 func (t *TestFramework) SignedTransactionFromTransaction(signedTransactionAlias string, transactionAlias string) {
 	transaction, exists := t.transactionByAlias[transactionAlias]
 	require.True(t.test, exists, "transaction with alias %s does not exist", transactionAlias)
@@ -92,7 +100,7 @@ func (t *TestFramework) CreateTransaction(alias string, referencedStates []strin
 			TransactionOutputIndex: i,
 		}
 
-		t.stateIDByAlias[alias+":"+strconv.Itoa(int(i))] = t.referencesByAlias[alias+":"+strconv.Itoa(int(i))].StateID()
+		t.stateIDByAlias[alias+":"+strconv.Itoa(int(i))] = t.referencesByAlias[alias+":"+strconv.Itoa(int(i))].ReferencedStateID()
 	}
 }
 
@@ -173,11 +181,11 @@ func (t *TestFramework) OutputStateMetadata(alias string) (mempool.StateMetadata
 
 func (t *TestFramework) StateID(alias string) mempool.StateID {
 	if alias == "genesis" {
-		return (&iotago.UTXOInput{}).StateID()
+		return (&iotago.UTXOInput{}).ReferencedStateID()
 	}
 
 	stateID, exists := t.stateIDByAlias[alias]
-	require.True(t.test, exists, "StateID with alias '%s' does not exist", alias)
+	require.True(t.test, exists, "ReferencedStateID with alias '%s' does not exist", alias)
 
 	return stateID
 }
@@ -402,4 +410,24 @@ func (t *TestFramework) Cleanup() {
 	t.transactionByAlias = make(map[string]mempool.Transaction)
 	t.signedTransactionByAlias = make(map[string]mempool.SignedTransaction)
 	t.blockIDsByAlias = make(map[string]iotago.BlockID)
+}
+
+type genericReference struct {
+	referencedStateID iotago.Identifier
+	stateType         iotago.StateType
+}
+
+func NewStateReference(referencedStateID iotago.Identifier, stateType iotago.StateType) mempool.StateReference {
+	return &genericReference{
+		referencedStateID: referencedStateID,
+		stateType:         stateType,
+	}
+}
+
+func (g *genericReference) ReferencedStateID() iotago.Identifier {
+	return g.referencedStateID
+}
+
+func (g *genericReference) Type() iotago.StateType {
+	return g.stateType
 }

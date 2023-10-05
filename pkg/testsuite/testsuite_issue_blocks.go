@@ -94,6 +94,17 @@ func (t *TestSuite) IssueBlockAtSlot(alias string, slot iotago.SlotIndex, slotCo
 	return block
 }
 
+func (t *TestSuite) IssueExistingBlock(alias string, node *mock.Node) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	block, exists := t.blocks.Get(alias)
+	require.True(t.Testing, exists)
+	require.NotNil(t.Testing, block)
+
+	node.IssueExistingBlock(block)
+}
+
 func (t *TestSuite) IssueValidationBlockWithOptions(alias string, node *mock.Node, blockOpts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -270,7 +281,6 @@ func (t *TestSuite) SlotsForEpoch(epoch iotago.EpochIndex) []iotago.SlotIndex {
 }
 
 func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, activeNodes []*mock.Node, parent *blocks.Block) *blocks.Block {
-
 	// we need to get accepted tangle time up to slot + minCA + 1
 	// first issue a chain of blocks with step size minCA up until slot + minCA + 1
 	// then issue one more block to accept the last in the chain which will trigger commitment of the second last in the chain
