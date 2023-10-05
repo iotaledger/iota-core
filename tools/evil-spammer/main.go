@@ -60,7 +60,7 @@ func main() {
 	}
 }
 
-func accountsSubcommands(wallet *accountwallet.AccountWallet, subcommands []*subcommand) {
+func accountsSubcommands(wallet *accountwallet.AccountWallet, subcommands []accountwallet.AccountSubcommands) {
 	for _, sub := range subcommands {
 		accountsSubcommand(wallet, sub)
 	}
@@ -71,11 +71,11 @@ func accountsSubcommands(wallet *accountwallet.AccountWallet, subcommands []*sub
 	})
 }
 
-func accountsSubcommand(wallet *accountwallet.AccountWallet, sub *subcommand) {
-	switch sub.command {
-	case accountwallet.CreateAccountCommand:
-		params := parseCreateAccountFlags(sub.flags)
-		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.CreateAccountCommand, params)
+func accountsSubcommand(wallet *accountwallet.AccountWallet, sub accountwallet.AccountSubcommands) {
+	switch sub.Type() {
+	case accountwallet.OperationCreateAccount:
+		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.OperationCreateAccount.String(), sub)
+		params := sub.(*accountwallet.CreateAccountParams)
 		accountID, err := wallet.CreateAccount(params)
 		if err != nil {
 			log.Errorf("Error creating account: %v", err)
@@ -83,27 +83,25 @@ func accountsSubcommand(wallet *accountwallet.AccountWallet, sub *subcommand) {
 			return
 		}
 		log.Infof("Created account %s with %d tokens", accountID, params.Amount)
-	case accountwallet.DestroyAccountCommand:
-		params := parseDestroyAccountFlags(sub.flags)
-		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.DestroyAccountCommand, params)
-
+	case accountwallet.OperationDestroyAccound:
+		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.OperationDestroyAccound, sub)
+		params := sub.(*accountwallet.DestroyAccountParams)
 		err := wallet.DestroyAccount(params)
 		if err != nil {
 			log.Errorf("Error destroying account: %v", err)
 
 			return
 		}
-	case accountwallet.ListAccountsCommand:
+	case accountwallet.OperationListAccounts:
 		err := wallet.ListAccount()
 		if err != nil {
 			log.Errorf("Error listing accounts: %v", err)
 
 			return
 		}
-	case accountwallet.AllotAccountCommand:
-		params := parseAllotAccountFlags(sub.flags)
-		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.AllotAccountCommand, params)
-
+	case accountwallet.OperationAllotAccount:
+		log.Infof("Run subcommand: %s, with parametetr set: %v", accountwallet.OperationAllotAccount, sub)
+		params := sub.(*accountwallet.AllotAccountParams)
 		err := wallet.AllotToAccount(params)
 		if err != nil {
 			log.Errorf("Error allotting account: %v", err)

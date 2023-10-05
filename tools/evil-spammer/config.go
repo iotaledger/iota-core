@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/iotaledger/iota-core/tools/evil-spammer/accountwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
@@ -44,7 +45,7 @@ var (
 		EnableRateSetter:      false,
 	}
 
-	accountsSubcommandsFlags  = make([]*subcommand, 0)
+	accountsSubcommandsFlags  []accountwallet.AccountSubcommands
 	lastFaucetUnspendOutputID iotago.OutputID
 
 	//nolint:godot
