@@ -219,6 +219,13 @@ func parseAccountTestFlags(splitedCmds [][]string) []accountwallet.AccountSubcom
 			}
 
 			parsedCmds = append(parsedCmds, stakingAccountParams)
+		case "update":
+			updateAccountParams, err := parseUpdateAccountFlags(cmds[1:])
+			if err != nil {
+				continue
+			}
+
+			parsedCmds = append(parsedCmds, updateAccountParams)
 		default:
 			accountUsage()
 			return nil
@@ -408,6 +415,37 @@ func parseDelegateAccountFlags(subcommands []string) (*accountwallet.DelegateAcc
 		From:   *from,
 		To:     *to,
 		Amount: uint64(*amount),
+	}, nil
+}
+
+func parseUpdateAccountFlags(subcommands []string) (*accountwallet.UpdateAccountParams, error) {
+	flagSet := flag.NewFlagSet("update", flag.ExitOnError)
+	alias := flagSet.String("alias", "", "The alias name of the account to update")
+	bik := flagSet.String("bik", "", "The block issuer key (in hex) to add")
+	amount := flagSet.Int64("addamount", 100, "The amount of token to add")
+	mana := flagSet.Int64("addmana", 100, "The amount of mana to add")
+	expirySlot := flagSet.Int64("expirySlot", 0, "Update the expiry slot of the account")
+
+	if subcommands == nil {
+		flagSet.Usage()
+
+		return nil, ierrors.Errorf("no subcommands")
+	}
+
+	log.Infof("Parsing update account flags, subcommands: %v", subcommands)
+	err := flagSet.Parse(subcommands)
+	if err != nil {
+		log.Errorf("Cannot parse first `script` parameter")
+
+		return nil, ierrors.Wrap(err, "cannot parse first `script` parameter")
+	}
+
+	return &accountwallet.UpdateAccountParams{
+		Alias:          *alias,
+		BlockIssuerKey: *bik,
+		Amount:         uint64(*amount),
+		Mana:           uint64(*mana),
+		ExpirySlot:     uint64(*expirySlot),
 	}, nil
 }
 

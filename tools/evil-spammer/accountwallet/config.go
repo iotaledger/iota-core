@@ -24,6 +24,7 @@ const (
 	OperationDelegateAccount
 	OperationStakeAccount
 	OperationListAccounts
+	OperationUpdateAccount
 
 	CmdNameCreateAccount   = "create"
 	CmdNameConvertAccount  = "convert"
@@ -32,6 +33,7 @@ const (
 	CmdNameDelegateAccount = "delegate"
 	CmdNameStakeAccount    = "stake"
 	CmdNameListAccounts    = "list"
+	CmdNameUpdateAccount   = "update"
 )
 
 func (a AccountOperation) String() string {
@@ -43,6 +45,7 @@ func (a AccountOperation) String() string {
 		CmdNameDelegateAccount,
 		CmdNameStakeAccount,
 		CmdNameListAccounts,
+		CmdNameUpdateAccount,
 	}[a]
 }
 
@@ -55,6 +58,7 @@ func AvailableCommands(cmd string) bool {
 		CmdNameDelegateAccount: types.Void,
 		CmdNameStakeAccount:    types.Void,
 		CmdNameListAccounts:    types.Void,
+		CmdNameUpdateAccount:   types.Void,
 	}
 
 	_, ok := availableCommands[cmd]
@@ -163,6 +167,18 @@ type StakeAccountParams struct {
 
 func (a *StakeAccountParams) Type() AccountOperation {
 	return OperationStakeAccount
+}
+
+type UpdateAccountParams struct {
+	Alias          string
+	BlockIssuerKey string
+	Mana           uint64
+	Amount         uint64
+	ExpirySlot     uint64
+}
+
+func (a *UpdateAccountParams) Type() AccountOperation {
+	return OperationUpdateAccount
 }
 
 type StateData struct {
