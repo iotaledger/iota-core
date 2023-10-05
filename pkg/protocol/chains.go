@@ -275,58 +275,54 @@ func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFrom
 }
 
 func (c *Chains) publishEngineCommitments(chain *Chain) {
-	chain.SpawnedEngine.OnUpdateWithContext(func(_, engine *engine.Engine, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
-		if engine == nil {
-			return
-		}
+	chain.SpawnedEngine.OnUpdateWithContext(func(_, engine *engine.Engine, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+		if engine != nil {
+			var latestPublishedSlot iotago.SlotIndex
 
-		withinContext(func() (unsubscribe func()) {
-			return engine.Ledger.HookInitialized(func() {
-				withinContext(func() (unsubscribe func()) {
-					var latestPublishedSlot iotago.SlotIndex
+			publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment, published bool) {
+				publishedCommitment, published, err := c.PublishCommitment(commitment)
+				if err != nil {
+					panic(err) // this can never happen, but we panic to get a stack trace if it ever does
+				}
 
-					publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment, published bool) {
-						publishedCommitment, published, err := c.PublishCommitment(commitment)
-						if err != nil {
-							panic(err) // this can never happen, but we panic to get a stack trace if it ever does
-						}
+				publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
+				publishedCommitment.IsAttested.Trigger()
+				publishedCommitment.IsVerified.Trigger()
 
-						publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
-						publishedCommitment.IsAttested.Trigger()
-						publishedCommitment.IsVerified.Trigger()
+				latestPublishedSlot = commitment.Slot()
 
-						latestPublishedSlot = commitment.Slot()
+				if publishedCommitment.IsSolid.Get() {
+					publishedCommitment.promote(chain)
+				}
 
-						if publishedCommitment.IsSolid.Get() {
-							publishedCommitment.promote(chain)
-						}
+				return publishedCommitment, published
+			}
 
-						return publishedCommitment, published
-					}
-
-					if forkingPoint := chain.ForkingPoint.Get(); forkingPoint == nil {
-						if rootCommitment, published := publishCommitment(engine.RootCommitment.Get()); published {
-							chain.ForkingPoint.Set(rootCommitment)
-
+			unsubscribeOnUpdate(func() (unsubscribe func()) {
+				return engine.Ledger.HookInitialized(func() {
+					unsubscribeOnUpdate(func() (unsubscribe func()) {
+						if forkingPoint := chain.ForkingPoint.Get(); forkingPoint == nil {
+							rootCommitment, _ := publishCommitment(engine.RootCommitment.Get())
 							rootCommitment.IsRoot.Trigger()
 							rootCommitment.promote(chain)
-						}
-					} else {
-						latestPublishedSlot = forkingPoint.Slot() - 1
-					}
 
-					return engine.LatestCommitment.OnUpdate(func(_, latestModelCommitment *model.Commitment) {
-						for latestPublishedSlot < latestModelCommitment.Slot() {
-							if commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedSlot + 1); err != nil {
-								panic(err) // this should never happen, but we panic to get a stack trace if it does
-							} else {
-								publishCommitment(commitmentToPublish)
-							}
+							chain.ForkingPoint.Set(rootCommitment)
+						} else {
+							latestPublishedSlot = forkingPoint.Slot() - 1
 						}
+
+						return engine.LatestCommitment.OnUpdate(func(_, latestCommitment *model.Commitment) {
+							for latestPublishedSlot < latestCommitment.Slot() {
+								if commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedSlot + 1); err != nil {
+									panic(err) // this should never happen, but we panic to get a stack trace if it does
+								} else {
+									publishCommitment(commitmentToPublish)
+								}
+							}
+						})
 					})
 				})
 			})
-
-		})
+		}
 	})
 }

@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -148,21 +147,30 @@ func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exist
 	return nil, false
 }
 
-func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (err error) {
-	if !c.InSyncRange(block.ID().Slot()) {
-		return ierrors.Errorf("received block is not in sync range of %s", c.LogName())
+func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (blockDropped bool) {
+	targetSlot := block.ID().Slot()
+
+	for _, chain := range append([]*Chain{c}, c.ChildChains.ToSlice()...) {
+		if chain.InstantiateEngine.Get() && chain.earliestUncommittedSlot() <= targetSlot {
+			if targetEngine := chain.SpawnedEngine.Get(); targetEngine != nil && targetSlot < c.SyncThreshold.Get() {
+				targetEngine.ProcessBlockFromPeer(block, src)
+			} else {
+				blockDropped = true
+			}
+		}
 	}
 
-	engine := c.SpawnedEngine.Get()
-	if engine == nil {
-		return ierrors.Errorf("received block for %s without engine", c.LogName())
+	return blockDropped
+}
+
+func (c *Chain) earliestUncommittedSlot() iotago.SlotIndex {
+	if latestVerifiedCommitment := c.LatestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
+		return latestVerifiedCommitment.Slot() + 1
+	} else if forkingPoint := c.ForkingPoint.Get(); forkingPoint != nil {
+		return forkingPoint.Slot()
+	} else {
+		return 0
 	}
-
-	engine.ProcessBlockFromPeer(block, src)
-
-	c.LogTrace("dispatched block", "block", block.ID(), "src", src)
-
-	return nil
 }
 
 func (c *Chain) InSyncRange(slot iotago.SlotIndex) bool {

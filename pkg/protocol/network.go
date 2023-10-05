@@ -141,18 +141,10 @@ func (n *Network) ProcessReceivedBlock(block *model.Block, src peer.ID) {
 			return logLevel, commitmentRequest.Err()
 		}
 
-		referencedCommitment := commitmentRequest.Result()
-		dispatchBlockToChain := func(chain *Chain) {
-			if err = chain.DispatchBlock(block, src); err != nil {
-				chain.Log("failed to dispatch block", logLevel, "blockID", block.ID(), "referencedCommitment", referencedCommitment.LogName(), "peer", src, "error", err)
-			} else {
-				chain.Log("dispatched block", logLevel, "blockID", block.ID(), "referencedCommitment", referencedCommitment.LogName(), "peer", src)
+		if chain := commitmentRequest.Result().Chain.Get(); chain != nil {
+			if chain.DispatchBlock(block, src) {
+				n.protocol.LogError("block dropped", "blockID", block.ID(), "peer", src)
 			}
-		}
-
-		if chain := referencedCommitment.Chain.Get(); chain != nil {
-			dispatchBlockToChain(chain)
-			chain.ChildChains.Range(dispatchBlockToChain)
 		}
 
 		return logLevel, nil
