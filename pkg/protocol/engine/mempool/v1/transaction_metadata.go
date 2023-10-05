@@ -39,12 +39,13 @@ type TransactionMetadata struct {
 	conflictAccepted      reactive.Event
 
 	// attachments
-	signingTransactions           reactive.Set[*SignedTransactionMetadata]
-	allSigningTransactionsEvicted reactive.Event
+	signingTransactions reactive.Set[*SignedTransactionMetadata]
 
 	validAttachments                *shrinkingmap.ShrinkingMap[iotago.BlockID, bool]
 	earliestIncludedValidAttachment reactive.Variable[iotago.BlockID]
-	allValidAttachmentsEvicted      reactive.Event
+
+	// allValidAttachmentsEvicted is set on the slot of the last and newest evicted attachment
+	allValidAttachmentsEvicted reactive.Variable[iotago.SlotIndex]
 
 	// mutex needed?
 	mutex            syncutils.RWMutex
@@ -84,12 +85,11 @@ func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []
 		conflicting:           reactive.NewEvent(),
 		conflictAccepted:      reactive.NewEvent(),
 
-		allSigningTransactionsEvicted: reactive.NewEvent(),
-		signingTransactions:           reactive.NewSet[*SignedTransactionMetadata](),
+		signingTransactions: reactive.NewSet[*SignedTransactionMetadata](),
 
 		validAttachments:                shrinkingmap.New[iotago.BlockID, bool](),
 		earliestIncludedValidAttachment: reactive.NewVariable[iotago.BlockID](),
-		allValidAttachmentsEvicted:      reactive.NewEvent(),
+		allValidAttachmentsEvicted:      reactive.NewVariable[iotago.SlotIndex](),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(), nil
@@ -215,7 +215,7 @@ func (t *TransactionMetadata) markInputSolid() (allInputsSolid bool) {
 }
 
 func (t *TransactionMetadata) Commit() {
-	t.committed.Trigger()
+	t.committedSlot.Set(t.earliestIncludedValidAttachment.Get().Slot())
 }
 
 func (t *TransactionMetadata) IsConflicting() bool {
@@ -250,7 +250,9 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	t.parentConflictIDs.InheritFrom(input.conflictIDs)
 
 	input.OnRejected(func() { t.rejected.Trigger() })
-	input.OnOrphaned(func() { t.orphaned.Trigger() })
+	input.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
+		t.orphanedSlot.Set(slot)
+	})
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
@@ -268,14 +270,17 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	})
 
 	input.OnAcceptedSpenderUpdated(func(spender mempool.TransactionMetadata) {
-		if spender != t {
+		//nolint:forcetypeassert // we can be sure that the spender is a TransactionMetadata
+		if spender.(*TransactionMetadata) != nil && spender != t {
 			t.rejected.Trigger()
 		}
 	})
 
 	input.OnSpendCommitted(func(spender mempool.TransactionMetadata) {
 		if spender != t {
-			t.orphaned.Trigger()
+			spender.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
+				t.orphanedSlot.Set(slot)
+			})
 		}
 	})
 }
@@ -289,9 +294,9 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		t.conflictIDs.Replace(ds.NewSet(t.id))
 	})
 
-	t.allSigningTransactionsEvicted.OnTrigger(func() {
-		if !t.IsCommitted() {
-			t.orphaned.Trigger()
+	t.allValidAttachmentsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
+		if !lo.Return2(t.CommittedSlot()) {
+			t.orphanedSlot.Set(slot)
 		}
 	})
 
@@ -300,9 +305,6 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 			t.accepted.Set(isIncluded && t.AllInputsAccepted() && t.IsConflictAccepted())
 		}
 	})
-
-	t.OnCommitted(t.setEvicted)
-	t.OnOrphaned(t.setEvicted)
 
 	return t
 }
@@ -313,7 +315,7 @@ func (t *TransactionMetadata) addSigningTransaction(signedTransactionMetadata *S
 
 	if added = t.signingTransactions.Add(signedTransactionMetadata); added {
 		signedTransactionMetadata.OnEvicted(func() {
-			t.evictSigningTransaction(signedTransactionMetadata)
+			t.signingTransactions.Delete(signedTransactionMetadata)
 		})
 	}
 
@@ -355,12 +357,6 @@ func (t *TransactionMetadata) evictValidAttachment(id iotago.BlockID) {
 	defer t.attachmentsMutex.Unlock()
 
 	if t.validAttachments.Delete(id) && t.validAttachments.IsEmpty() {
-		t.allValidAttachmentsEvicted.Trigger()
-	}
-}
-
-func (t *TransactionMetadata) evictSigningTransaction(signedTransactionMetadata *SignedTransactionMetadata) {
-	if t.signingTransactions.Delete(signedTransactionMetadata) && t.signingTransactions.IsEmpty() {
-		t.allSigningTransactionsEvicted.Trigger()
+		t.allValidAttachmentsEvicted.Set(id.Slot())
 	}
 }

@@ -369,12 +369,12 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 			fmt.Printf("%s > [%s] MemPool.TransactionInvalid(%s): %s\n", n.Name, engineName, err, transactionMetadata.ID())
 		})
 
-		transactionMetadata.OnOrphaned(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionOrphaned: %s\n", n.Name, engineName, transactionMetadata.ID())
+		transactionMetadata.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
+			fmt.Printf("%s > [%s] MemPool.TransactiOnOrphanedSlotUpdated in slot %d: %s\n", n.Name, engineName, slot, transactionMetadata.ID())
 		})
 
-		transactionMetadata.OnCommitted(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionCommitted: %s\n", n.Name, engineName, transactionMetadata.ID())
+		transactionMetadata.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
+			fmt.Printf("%s > [%s] MemPool.TransactiOnCommittedSlotUpdated in slot %d: %s\n", n.Name, engineName, slot, transactionMetadata.ID())
 		})
 
 		transactionMetadata.OnPending(func() {
@@ -462,6 +462,12 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 	// fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
+}
+
+func (n *Node) IssueExistingBlock(block *blocks.Block) {
+	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, block.ID().Alias())
+
+	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 }
 
 func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
