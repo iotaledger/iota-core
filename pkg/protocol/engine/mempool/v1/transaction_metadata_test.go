@@ -11,8 +11,8 @@ import (
 
 func TestAttachments(t *testing.T) {
 	blockIDs := map[string]iotago.BlockID{
-		"1": iotago.SlotIdentifierRepresentingData(1, []byte("block1")),
-		"2": iotago.SlotIdentifierRepresentingData(2, []byte("block2")),
+		"1": iotago.BlockIDRepresentingData(1, []byte("block1")),
+		"2": iotago.BlockIDRepresentingData(2, []byte("block2")),
 	}
 
 	transactionMetadata, err := NewTransactionMetadata(mempooltests.NewTransaction(2), nil)

@@ -273,7 +273,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 
 	apiForVesion, err := i.protocol.APIForVersion(iotaBlock.ProtocolVersion)
 	if err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
+		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
 	}
 
 	protoParams := apiForVesion.ProtocolParameters()
@@ -294,14 +294,14 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		switch payload := innerBlock.Payload.(type) {
 		case *iotago.SignedTransaction:
 			if payload.Transaction.NetworkID != protoParams.NetworkID() {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Transaction.NetworkID)
+				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Transaction.NetworkID)
 			}
 		}
 
 		if len(iotaBlock.Parents()) == 0 {
 			references, referencesErr := i.getReferences(ctx, innerBlock.Payload)
 			if referencesErr != nil {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %w", referencesErr)
+				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %w", referencesErr)
 			}
 
 			innerBlock.StrongParents = references[iotago.StrongParentType]
@@ -327,7 +327,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	if err = i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Slot(), references); err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
+		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
 	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
@@ -337,13 +337,13 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		}
 		rmc, err := i.protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
 		if err != nil {
-			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
+			return iotago.EmptyBlockID, ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
 		}
 
 		// only set the burned Mana as the last step before signing, so workscore calculation is correct.
 		basicBlock.MaxBurnedMana, err = basicBlock.ManaCost(rmc, apiForVesion.ProtocolParameters().WorkScoreStructure())
 		if err != nil {
-			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "could not calculate Mana cost for block")
+			return iotago.EmptyBlockID, ierrors.Wrapf(err, "could not calculate Mana cost for block")
 		}
 		resign = true
 	}
@@ -355,30 +355,30 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 
 			signature, signatureErr := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(issuerAccount.Address().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
 			if signatureErr != nil {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
+				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
 			}
 
 			edSig, isEdSig := signature.(*iotago.Ed25519Signature)
 			if !isEdSig {
-				return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "unsupported signature type")
+				return iotago.EmptyBlockID, ierrors.Wrap(ErrBlockAttacherInvalidBlock, "unsupported signature type")
 			}
 
 			iotaBlock.Signature = edSig
 		} else {
-			return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
+			return iotago.EmptyBlockID, ierrors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
 		}
 	}
 
 	modelBlock, err := model.BlockFromBlock(iotaBlock)
 	if err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error serializing block to model block")
+		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
 	if !i.optsRateSetterEnabled || i.protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(modelBlock.ProtocolBlock().IssuerID) {
 		i.events.BlockConstructed.Trigger(modelBlock)
 
 		if err = i.IssueBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
-			return iotago.EmptyBlockID(), ierrors.Wrap(err, "error issuing model block")
+			return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 		}
 	}
 

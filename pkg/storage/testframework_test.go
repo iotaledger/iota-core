@@ -107,7 +107,7 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 		require.NoError(t.t, err)
 
 		createdBytes += int64(len(modelBlock.Data()))
-		createdBytes += iotago.SlotIdentifierLength
+		createdBytes += iotago.BlockIDLength
 	}
 
 	t.Instance.Flush()

@@ -79,12 +79,12 @@ func RandOutputID(index ...uint16) iotago.OutputID {
 	}
 
 	var outputID iotago.OutputID
-	_, err := RandomRead(outputID[:iotago.SlotIdentifierLength])
+	_, err := RandomRead(outputID[:iotago.TransactionIDLength])
 	if err != nil {
 		panic(err)
 	}
 
-	binary.LittleEndian.PutUint16(outputID[iotago.SlotIdentifierLength:], idx)
+	binary.LittleEndian.PutUint16(outputID[iotago.TransactionIDLength:], idx)
 
 	return outputID
 }
@@ -98,7 +98,7 @@ func RandBlockID() iotago.BlockID {
 
 func RandTransactionID() iotago.TransactionID {
 	transactionID := iotago.TransactionID{}
-	copy(transactionID[:], RandBytes(iotago.SlotIdentifierLength))
+	copy(transactionID[:], RandBytes(iotago.TransactionIDLength))
 
 	return transactionID
 }

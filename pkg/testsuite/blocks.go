@@ -39,7 +39,7 @@ func (t *TestSuite) AssertBlocksExist(blocks []*blocks.Block, expectedExist bool
 
 	for _, node := range nodes {
 		for _, block := range blocks {
-			if block.ID() == iotago.EmptyBlockID() {
+			if block.ID() == iotago.EmptyBlockID {
 				continue
 			}
 

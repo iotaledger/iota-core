@@ -205,7 +205,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		return ierrors.Errorf("failed to get target engine for %s", commitmentID)
 	}
 
-	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
+	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
 	for _, blockID := range blockIDs {
 		_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
 	}

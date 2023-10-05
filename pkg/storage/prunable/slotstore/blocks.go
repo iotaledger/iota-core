@@ -49,7 +49,7 @@ func (b *Blocks) StreamKeys(consumer func(blockID iotago.BlockID) error) error {
 	var innerErr error
 	if err := b.store.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
 		var blockID iotago.BlockID
-		blockID, _, innerErr = iotago.SlotIdentifierFromBytes(key)
+		blockID, _, innerErr = iotago.BlockIDFromBytes(key)
 		if innerErr != nil {
 			return false
 		}
@@ -70,7 +70,7 @@ func (b *Blocks) ForEachBlockInSlot(consumer func(block *model.Block) error) err
 	var innerErr error
 	if err := b.store.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
 		var id iotago.BlockID
-		id, _, innerErr = iotago.SlotIdentifierFromBytes(key)
+		id, _, innerErr = iotago.BlockIDFromBytes(key)
 		var block *model.Block
 		block, innerErr = model.BlockFromIDAndBytes(id, value, b.apiForSlot)
 

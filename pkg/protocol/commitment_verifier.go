@@ -33,8 +33,8 @@ func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBefore
 func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
 	// 1. Verify that the provided attestations are indeed the ones that were included in the commitment.
 	tree := ads.NewMap(mapdb.NewMapDB(),
-		iotago.Identifier.Bytes,
-		iotago.IdentifierFromBytes,
+		iotago.AccountID.Bytes,
+		iotago.AccountIDFromBytes,
 		func(attestation *iotago.Attestation) ([]byte, error) {
 			apiForVersion, err := c.engine.APIForVersion(attestation.ProtocolVersion)
 			if err != nil {

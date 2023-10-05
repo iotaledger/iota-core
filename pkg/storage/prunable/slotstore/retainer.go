@@ -85,8 +85,8 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 	return &Retainer{
 		slot: slot,
 		blockStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockStorePrefix})),
-			iotago.SlotIdentifier.Bytes,
-			iotago.SlotIdentifierFromBytes,
+			iotago.BlockID.Bytes,
+			iotago.BlockIDFromBytes,
 			(*BlockRetainerData).Bytes,
 			func(bytes []byte) (*BlockRetainerData, int, error) {
 				b := new(BlockRetainerData)
@@ -96,8 +96,8 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 			},
 		),
 		transactionStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionStorePrefix})),
-			iotago.SlotIdentifier.Bytes,
-			iotago.SlotIdentifierFromBytes,
+			iotago.BlockID.Bytes,
+			iotago.BlockIDFromBytes,
 			(*TransactionRetainerData).Bytes,
 			func(bytes []byte) (*TransactionRetainerData, int, error) {
 				t := new(TransactionRetainerData)
