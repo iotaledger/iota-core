@@ -181,6 +181,10 @@ func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitm
 
 	return func(_, mainChild *Commitment) {
 		c.SpawnedChain.Compute(func(spawnedChain *Chain) (newSpawnedChain *Chain) {
+			if c.IsRoot.WasTriggered() {
+				return spawnedChain
+			}
+
 			switch mainChild {
 			case nil:
 				panic("main child may not be changed to nil")
@@ -219,6 +223,7 @@ func (c *Commitment) promote(targetChain *Chain) {
 			// root commitment of the main chain that is the first commitment ever published (which means that we can just
 			// set the chain that we want it to have)
 			c.Chain.Set(targetChain)
+			c.SpawnedChain.Set(targetChain)
 		} else if parent := c.Parent.Get(); parent.Chain.Get() == targetChain {
 			parent.MainChild.Set(c)
 		}

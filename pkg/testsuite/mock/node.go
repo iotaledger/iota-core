@@ -140,22 +140,14 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 }
 
 func (n *Node) hookEvents() {
-	n.Protocol.HeaviestAttestedChain.OnUpdate(func(_, heaviestAttestedChain *protocol.Chain) {
-		n.forkDetectedCount.Add(1)
+	n.Protocol.HeaviestAttestedChain.OnUpdate(func(prevHeaviestAttestedChain, heaviestAttestedChain *protocol.Chain) {
+		if prevHeaviestAttestedChain != nil {
+			n.forkDetectedCount.Add(1)
 
-		heaviestAttestedChain.Engine.OnUpdate(func(prevEngine, newEngine *engine.Engine) {
-			prevEngineName := "<nil>"
-			if prevEngine != nil {
-				prevEngineName = prevEngine.Name()
-			}
-
-			newEngineName := "<nil>"
-			if newEngine != nil {
-				newEngineName = newEngine.Name()
-			}
-
-			n.Protocol.LogWarn("ENGINE ACTIVATED FOR CHAIN ", "name", heaviestAttestedChain.LogName(), "counter", n.candidateEngineActivatedCount.Add(1), "prevEngine", prevEngineName, "newEngine", newEngineName)
-		})
+			heaviestAttestedChain.Engine.OnUpdate(func(prevEngine, newEngine *engine.Engine) {
+				n.candidateEngineActivatedCount.Add(1)
+			})
+		}
 	})
 
 	n.Protocol.MainChain.OnUpdate(func(_, _ *protocol.Chain) {

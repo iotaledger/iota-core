@@ -350,17 +350,17 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		node8.IssueActivity(ctxP2, wg, 21)
 
 		// P1 finalized until slot 18. We do not expect any forks here because our CW is higher than the other partition's.
-		ts.AssertForkDetectedCount(1, nodesP1...)
+		ts.AssertForkDetectedCount(0, nodesP1...)
 		// P1's chain is heavier, they should not consider switching the chain.
-		ts.AssertCandidateEngineActivatedCount(1, nodesP1...)
+		ts.AssertCandidateEngineActivatedCount(0, nodesP1...)
 		ctxP2Cancel() // we can stop issuing on P2.
 
 		// Nodes from P2 should switch the chain.
-		ts.AssertForkDetectedCount(2, nodesP2...)
-		ts.AssertCandidateEngineActivatedCount(2, nodesP2...)
+		ts.AssertForkDetectedCount(1, nodesP2...)
+		ts.AssertCandidateEngineActivatedCount(1, nodesP2...)
 
 		// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
-		ts.AssertMainEngineSwitchedCount(2, nodesP2...)
+		ts.AssertMainEngineSwitchedCount(1, nodesP2...)
 
 		// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
 		// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.

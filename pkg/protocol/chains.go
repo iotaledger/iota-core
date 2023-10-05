@@ -195,41 +195,42 @@ func (c *Chains) initChainSwitching() {
 
 	c.HeaviestVerifiedChain.OnUpdate(func(_, heaviestVerifiedChain *Chain) {
 		c.MainChain.Set(heaviestVerifiedChain)
-
-		heaviestVerifiedChain.ForkingPoint.Get().IsRoot.Trigger()
 	})
 }
 
 func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
 	return chain.InstantiateEngine.OnUpdate(func(_, instantiate bool) {
-		if !instantiate {
-			chain.SpawnedEngine.Set(nil)
+		// TODO: MOVE TO WORKERPOOL
+		go func() {
+			if !instantiate {
+				chain.SpawnedEngine.Set(nil)
 
-			return
-		}
-
-		if currentEngine := chain.Engine.Get(); currentEngine == nil {
-			mainEngine, err := c.engineManager.LoadActiveEngine(c.protocol.options.SnapshotPath)
-			if err != nil {
-				panic(fmt.Sprintf("could not load active engine: %s", err))
+				return
 			}
 
-			chain.SpawnedEngine.Set(mainEngine)
+			if currentEngine := chain.Engine.Get(); currentEngine == nil {
+				mainEngine, err := c.engineManager.LoadActiveEngine(c.protocol.options.SnapshotPath)
+				if err != nil {
+					panic(fmt.Sprintf("could not load active engine: %s", err))
+				}
 
-			c.protocol.Network.HookStopped(mainEngine.Shutdown)
-		} else {
-			forkingPoint := chain.ForkingPoint.Get()
-			snapshotTargetSlot := forkingPoint.Slot() - 1
+				chain.SpawnedEngine.Set(mainEngine)
 
-			candidateEngineInstance, err := c.engineManager.ForkEngineAtSlot(snapshotTargetSlot)
-			if err != nil {
-				panic(ierrors.Wrap(err, "error creating new candidate engine"))
+				c.protocol.Network.HookStopped(mainEngine.Shutdown)
+			} else {
+				forkingPoint := chain.ForkingPoint.Get()
+				snapshotTargetSlot := forkingPoint.Slot() - 1
+
+				candidateEngineInstance, err := c.engineManager.ForkEngineAtSlot(snapshotTargetSlot)
+				if err != nil {
+					panic(ierrors.Wrap(err, "error creating new candidate engine"))
+				}
+
+				chain.SpawnedEngine.Set(candidateEngineInstance)
+
+				c.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
 			}
-
-			chain.SpawnedEngine.Set(candidateEngineInstance)
-
-			c.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
-		}
+		}()
 	})
 }
 

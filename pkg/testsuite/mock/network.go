@@ -153,8 +153,10 @@ func (e *Endpoint) Send(packet proto.Message, to ...peer.ID) {
 			e.network.dispatchersMutex.RLock()
 			defer e.network.dispatchersMutex.RUnlock()
 
-			if err := dispatcher.handler(e.id, packet); err != nil {
-				fmt.Println(e.id, "ERROR: ", err)
+			if dispatcher.handler != nil {
+				if err := dispatcher.handler(e.id, packet); err != nil {
+					fmt.Println(e.id, "ERROR: ", err)
+				}
 			}
 		}()
 	}

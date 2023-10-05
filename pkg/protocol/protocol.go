@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -38,7 +39,11 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 }
 
 func (p *Protocol) Run(ctx context.Context) error {
-	p.TriggerInitialized()
+	p.MainChain.OnUpdateOnce(func(_, mainChain *Chain) {
+		mainChain.Engine.OnUpdateOnce(func(_, _ *engine.Engine) {
+			p.TriggerInitialized()
+		})
+	})
 
 	<-ctx.Done()
 
