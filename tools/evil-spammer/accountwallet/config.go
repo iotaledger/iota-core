@@ -181,6 +181,14 @@ func (a *UpdateAccountParams) Type() AccountOperation {
 	return OperationUpdateAccount
 }
 
+type NoAccountParams struct {
+	Operation AccountOperation
+}
+
+func (a *NoAccountParams) Type() AccountOperation {
+	return a.Operation
+}
+
 type StateData struct {
 	Seed          string                `serix:"0,mapKey=seed,lengthPrefixType=uint8"`
 	LastUsedIndex uint64                `serix:"1,mapKey=lastUsedIndex"`

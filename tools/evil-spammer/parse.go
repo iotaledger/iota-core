@@ -226,6 +226,10 @@ func parseAccountTestFlags(splitedCmds [][]string) []accountwallet.AccountSubcom
 			}
 
 			parsedCmds = append(parsedCmds, updateAccountParams)
+		case "list":
+			parsedCmds = append(parsedCmds, &accountwallet.NoAccountParams{
+				Operation: accountwallet.OperationListAccounts,
+			})
 		default:
 			accountUsage()
 			return nil

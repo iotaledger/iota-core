@@ -25,6 +25,13 @@ func (a *AccountWallet) DestroyAccount(params *DestroyAccountParams) error {
 }
 
 func (a *AccountWallet) ListAccount() error {
+	fmt.Printf("%-10s \t%-33s\n\n", "Alias", "AccountID")
+	for _, accData := range a.accountsAliases {
+		fmt.Printf("%-10s \t", accData.Alias)
+		fmt.Printf("%-33s ", accData.AccountID.ToHex())
+		fmt.Printf("\n")
+	}
+
 	return nil
 }
 
