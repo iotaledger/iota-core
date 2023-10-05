@@ -12,7 +12,7 @@ func (m *MockedOutput) Size() int {
 	panic("implement me")
 }
 
-func (m *MockedOutput) WorkScore(_ *iotago.WorkScoreStructure) (iotago.WorkScore, error) {
+func (m *MockedOutput) WorkScore(_ *iotago.WorkScoreParameters) (iotago.WorkScore, error) {
 	panic("implement me")
 }
 
