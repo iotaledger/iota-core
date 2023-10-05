@@ -1,10 +1,13 @@
 package core
 
 import (
+	"io"
+
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -60,4 +63,68 @@ func blockIssuance(_ echo.Context) (*apimodels.IssuanceBlockHeaderResponse, erro
 	}
 
 	return resp, nil
+}
+
+func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
+	mimeType, err := httpserver.GetRequestContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV2, echo.MIMEApplicationJSON)
+	if err != nil {
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
+	}
+
+	var iotaBlock = &iotago.ProtocolBlock{}
+
+	if c.Request().Body == nil {
+		// bad request
+		return nil, ierrors.Wrap(httpserver.ErrInvalidParameter, "invalid block, error: request body missing")
+	}
+
+	bytes, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
+	}
+
+	switch mimeType {
+	case echo.MIMEApplicationJSON:
+		// Do not validate here, the parents might need to be set
+		if err := deps.Protocol.CurrentAPI().JSONDecode(bytes, iotaBlock); err != nil {
+			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
+		}
+
+	case httpserver.MIMEApplicationVendorIOTASerializerV2:
+		version, _, err := iotago.VersionFromBytes(bytes)
+		if err != nil {
+			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
+		}
+
+		apiForVersion, err := deps.Protocol.APIForVersion(version)
+		if err != nil {
+			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
+		}
+
+		// Do not validate here, the parents might need to be set
+		if _, err := apiForVersion.Decode(bytes, iotaBlock); err != nil {
+			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
+		}
+
+	default:
+		return nil, echo.ErrUnsupportedMediaType
+	}
+
+	blockID, err := deps.BlockHandler.AttachBlock(c.Request().Context(), iotaBlock)
+	if err != nil {
+		switch {
+		case ierrors.Is(err, blockhandler.ErrBlockAttacherInvalidBlock):
+			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to attach block: %w", err)
+
+		case ierrors.Is(err, blockhandler.ErrBlockAttacherAttachingNotPossible):
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to attach block: %w", err)
+
+		default:
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to attach block: %w", err)
+		}
+	}
+
+	return &apimodels.BlockCreatedResponse{
+		BlockID: blockID,
+	}, nil
 }

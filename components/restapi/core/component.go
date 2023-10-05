@@ -39,6 +39,13 @@ const (
 	// GET returns block metadata.
 	RouteBlockMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/metadata"
 
+	// RouteBlocks is the route for sending new blocks.
+	// POST creates a single new block and returns the new block ID.
+	// The block is parsed based on the given type in the request "Content-Type" header.
+	// MIMEApplicationJSON => json.
+	// MIMEVendorIOTASerializer => bytes.
+	RouteBlocks = "/blocks"
+
 	// RouteOutput is the route for getting an output by its outputID (transactionHash + outputIndex).
 	// GET returns the output based on the given type in the request "Accept" header.
 	// MIMEApplicationJSON => json.
@@ -170,6 +177,16 @@ func configure() error {
 		}
 
 		return responseByHeader(c, resp)
+	}, checkNodeSynced())
+
+	routeGroup.POST(RouteBlocks, func(c echo.Context) error {
+		resp, err := sendBlock(c)
+		if err != nil {
+			return err
+		}
+		c.Response().Header().Set(echo.HeaderLocation, resp.BlockID.ToHex())
+
+		return httpserver.JSONResponse(c, http.StatusCreated, resp)
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteBlockIssuance, func(c echo.Context) error {
