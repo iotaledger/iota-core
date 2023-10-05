@@ -250,7 +250,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	t.parentConflictIDs.InheritFrom(input.conflictIDs)
 
 	input.OnRejected(func() { t.rejected.Trigger() })
-	input.OnOrphaned(func(slot iotago.SlotIndex) {
+	input.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
 		t.orphanedOnSlot.Set(slot)
 	})
 	input.OnAccepted(func() {
@@ -278,7 +278,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 
 	input.OnSpendCommitted(func(spender mempool.TransactionMetadata) {
 		if spender != t {
-			spender.OnCommitted(func(slot iotago.SlotIndex) {
+			spender.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
 				t.orphanedOnSlot.Set(slot)
 			})
 		}
@@ -295,7 +295,7 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 	})
 
 	t.allValidAttachmentsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
-		if !lo.Return2(t.GetCommittedSlot()) {
+		if !lo.Return2(t.CommittedSlot()) {
 			t.orphanedOnSlot.Set(slot)
 		}
 	})

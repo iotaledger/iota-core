@@ -54,8 +54,8 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	source.OnPending(func() { s.accepted.Set(false) })
 	source.OnAccepted(func() { s.accepted.Set(true) })
 	source.OnRejected(func() { s.rejected.Trigger() })
-	source.OnCommitted(lo.Void(s.committedOnSlot.Set))
-	source.OnOrphaned(lo.Void(s.orphanedOnSlot.Set))
+	source.OnCommittedSlotUpdated(lo.Void(s.committedOnSlot.Set))
+	source.OnOrphanedSlotUpdated(lo.Void(s.orphanedOnSlot.Set))
 
 	return s
 }
@@ -139,11 +139,11 @@ func (s *StateMetadata) setupSpender(spender *TransactionMetadata) {
 		s.spendAccepted.Set(nil)
 	})
 
-	spender.OnCommitted(func(_ iotago.SlotIndex) {
+	spender.OnCommittedSlotUpdated(func(_ iotago.SlotIndex) {
 		s.spendCommitted.Set(spender)
 
 		s.decreaseSpenderCount()
 	})
 
-	spender.OnOrphaned(func(_ iotago.SlotIndex) { s.decreaseSpenderCount() })
+	spender.OnOrphanedSlotUpdated(func(_ iotago.SlotIndex) { s.decreaseSpenderCount() })
 }

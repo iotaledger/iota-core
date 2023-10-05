@@ -480,11 +480,11 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 		transaction.signingTransactions.Range((*SignedTransactionMetadata).setEvicted)
 	})
 
-	transaction.OnCommitted(func(slot iotago.SlotIndex) {
+	transaction.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
 		lo.Return1(m.delayedTransactionEviction.GetOrCreate(slot, func() ds.Set[iotago.TransactionID] { return ds.NewSet[iotago.TransactionID]() })).Add(transaction.ID())
 	})
 
-	transaction.OnOrphaned(func(slot iotago.SlotIndex) {
+	transaction.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
 		lo.Return1(m.delayedTransactionEviction.GetOrCreate(slot, func() ds.Set[iotago.TransactionID] { return ds.NewSet[iotago.TransactionID]() })).Add(transaction.ID())
 	})
 }
@@ -494,13 +494,13 @@ func (m *MemPool[VoteRank]) setupOutputState(stateMetadata *StateMetadata) {
 		m.cachedStateRequests.Delete(stateMetadata.state.StateID(), stateMetadata.HasNoSpenders)
 	})
 
-	stateMetadata.OnCommitted(func(slot iotago.SlotIndex) {
+	stateMetadata.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
 		lo.Return1(m.delayedOutputStateEviction.GetOrCreate(slot, func() *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata] {
 			return shrinkingmap.New[iotago.Identifier, *StateMetadata]()
 		})).Set(stateMetadata.state.StateID(), stateMetadata)
 	})
 
-	stateMetadata.OnOrphaned(func(slot iotago.SlotIndex) {
+	stateMetadata.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
 		lo.Return1(m.delayedOutputStateEviction.GetOrCreate(slot, func() *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata] {
 			return shrinkingmap.New[iotago.Identifier, *StateMetadata]()
 		})).Set(stateMetadata.state.StateID(), stateMetadata)
