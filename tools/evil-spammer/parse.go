@@ -35,7 +35,6 @@ func parseFlags() (help bool) {
 		}
 		splitedCmds := readSubcommandsAndFlagSets(subcommands)
 		accountsSubcommandsFlags = parseAccountTestFlags(splitedCmds)
-		fmt.Println(accountsSubcommandsFlags)
 
 		basicConfig := programs.LoadBasicConfig()
 		outputID, err := iotago.OutputIDFromHex(basicConfig.LastFaucetUnspentOutputID)
@@ -169,7 +168,6 @@ func readSubcommandsAndFlagSets(subcommands []string) [][]string {
 		}
 	}
 	subcommandsSplit = append(subcommandsSplit, subcommands[prevSplitIndex:])
-	fmt.Println(subcommandsSplit)
 
 	return subcommandsSplit
 }
@@ -221,10 +219,34 @@ func parseAccountTestFlags(splitedCmds [][]string) []accountwallet.AccountSubcom
 			}
 
 			parsedCmds = append(parsedCmds, stakingAccountParams)
+		default:
+			accountUsage()
+			return nil
 		}
 	}
 
 	return parsedCmds
+}
+
+func accountUsage() {
+	fmt.Println("Usage for accounts [COMMAND] [FLAGS], multiple commands can be chained together.")
+	fmt.Printf("COMMAND: %s\n", accountwallet.CmdNameCreateAccount)
+	parseCreateAccountFlags(nil)
+
+	fmt.Printf("COMMAND: %s\n", accountwallet.CmdNameConvertAccount)
+	parseConvertAccountFlags(nil)
+
+	fmt.Printf("COMMAND: %s\n", accountwallet.CmdNameDestroyAccount)
+	parseDestroyAccountFlags(nil)
+
+	fmt.Printf("COMMAND: %s\n", accountwallet.CmdNameAllotAccount)
+	parseAllotAccountFlags(nil)
+
+	fmt.Printf("COMMAND: %s\n", accountwallet.CmdNameDelegateAccount)
+	parseDelegateAccountFlags(nil)
+
+	fmt.Printf("COMMAND: %s\n", accountwallet.CmdNameStakeAccount)
+	parseStakeAccountFlags(nil)
 }
 
 func parseCreateAccountFlags(subcommands []string) (*accountwallet.CreateAccountParams, error) {
