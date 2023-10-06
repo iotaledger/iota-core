@@ -134,7 +134,11 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 
 		parentBlock.Booked().OnUpdateOnce(func(_, _ bool) {
 			if unbookedParentsCount.Add(-1) == 0 {
-				b.book(block)
+				if err := b.book(block); err != nil {
+					if block.SetInvalid() {
+						b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "failed to book block"))
+					}
+				}
 			}
 		})
 
