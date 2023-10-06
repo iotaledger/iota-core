@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
@@ -15,7 +14,6 @@ import (
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
-	"github.com/iotaledger/iota-core/pkg/core/buffer"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -35,7 +33,6 @@ type NetworkManager struct {
 	blockRequestStopped   *event.Event2[iotago.BlockID, *engine.Engine]
 	blockRequested        *event.Event2[iotago.BlockID, *engine.Engine]
 	commitmentVerifiers   *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *CommitmentVerifier]
-	droppedBlocksBuffer   *buffer.UnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]]
 
 	module.Module
 }
@@ -51,7 +48,6 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 		blockRequestStopped:   event.New2[iotago.BlockID, *engine.Engine](),
 		blockRequested:        event.New2[iotago.BlockID, *engine.Engine](),
 		commitmentVerifiers:   shrinkingmap.New[iotago.CommitmentID, *CommitmentVerifier](),
-		droppedBlocksBuffer:   buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]](20, 100),
 	}
 
 	n.TriggerConstructed()
@@ -70,26 +66,13 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 
 	var unsubscribeFromNetworkEvents func()
 
-	protocol.HookConstructed(func() {
-		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-			commitment.InSyncRange.OnUpdate(func(_, inSyncRange bool) {
-				if inSyncRange {
-					for _, droppedBlock := range n.droppedBlocksBuffer.GetValues(commitment.ID()) {
-						// TODO: replace with workerpool
-						go n.ProcessReceivedBlock(droppedBlock.A, droppedBlock.B)
-					}
-				}
-			})
-		})
-	})
-
 	protocol.HookInitialized(func() {
 		n.Network.OnError(func(err error, peer peer.ID) {
 			n.protocol.LogError("network error", "peer", peer, "error", err)
 		})
 
 		unsubscribeFromNetworkEvents = lo.Batch(
-			n.Network.OnBlockReceived(n.ProcessReceivedBlock),
+			n.Network.OnBlockReceived(n.protocol.ProcessReceivedBlock),
 			n.Network.OnBlockRequestReceived(n.ProcessBlockRequest),
 			n.Network.OnCommitmentReceived(n.ProcessCommitment),
 			n.Network.OnCommitmentRequestReceived(n.ProcessCommitmentRequest),
@@ -138,33 +121,6 @@ func (n *NetworkManager) IssueBlock(block *model.Block) error {
 	n.protocol.MainEngineInstance().ProcessBlockFromPeer(block, "self")
 
 	return nil
-}
-
-func (n *NetworkManager) ProcessReceivedBlock(block *model.Block, src peer.ID) {
-	n.processTask("received block", func() (logLevel log.Level, err error) {
-		logLevel = log.LevelTrace
-
-		commitmentRequest := n.protocol.requestCommitment(block.ProtocolBlock().SlotCommitmentID, true)
-		if !commitmentRequest.WasCompleted() {
-			if !n.droppedBlocksBuffer.Add(block.ProtocolBlock().SlotCommitmentID, types.NewTuple(block, src)) {
-				return log.LevelError, ierrors.New("failed to add block to dropped blocks buffer")
-			}
-
-			return logLevel, ierrors.Errorf("referenced commitment %s unknown", block.ProtocolBlock().SlotCommitmentID)
-		}
-
-		if commitmentRequest.WasRejected() {
-			return logLevel, commitmentRequest.Err()
-		}
-
-		if chain := commitmentRequest.Result().Chain.Get(); chain != nil {
-			if chain.DispatchBlock(block, src) {
-				n.protocol.LogError("block dropped", "blockID", block.ID(), "peer", src)
-			}
-		}
-
-		return logLevel, nil
-	}, "blockID", block.ID(), "peer", src)
 }
 
 func (n *NetworkManager) ProcessBlockRequest(blockID iotago.BlockID, peer peer.ID) {
