@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
@@ -26,7 +25,8 @@ import (
 type NetworkManager struct {
 	*Protocol
 
-	Network               *core.Protocol
+	Network *core.Protocol
+
 	attestationsRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 	commitmentRequester   *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 	warpSyncRequester     *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
@@ -34,8 +34,6 @@ type NetworkManager struct {
 	blockRequestStopped   *event.Event2[iotago.BlockID, *engine.Engine]
 	blockRequested        *event.Event2[iotago.BlockID, *engine.Engine]
 	commitmentVerifiers   *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *CommitmentVerifier]
-
-	module.Module
 }
 
 func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
@@ -50,8 +48,6 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 		blockRequested:        event.New2[iotago.BlockID, *engine.Engine](),
 		commitmentVerifiers:   shrinkingmap.New[iotago.CommitmentID, *CommitmentVerifier](),
 	}
-
-	n.TriggerConstructed()
 
 	n.startBlockRequester()
 	n.startAttestationsRequester()
@@ -97,16 +93,10 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 			n.OnAttestationsRequested(func(commitmentID iotago.CommitmentID) { n.Network.RequestAttestations(commitmentID) }),
 		)
 
-		n.TriggerInitialized()
-
 		protocol.HookShutdown(func() {
-			n.TriggerShutdown()
-
 			unsubscribeFromNetworkEvents()
 
 			n.Network.Shutdown()
-
-			n.TriggerStopped()
 		})
 	})
 

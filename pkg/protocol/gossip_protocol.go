@@ -22,23 +22,10 @@ func NewGossipProtocol(protocol *Protocol) *GossipProtocol {
 	}
 
 	g.HookConstructed(func() {
-		g.initDroppedBlocksReplay()
+		g.replayDroppedBlocks()
 	})
 
 	return g
-}
-
-func (g *GossipProtocol) initDroppedBlocksReplay() {
-	g.CommitmentCreated.Hook(func(commitment *Commitment) {
-		commitment.InSyncRange.OnUpdate(func(_, inSyncRange bool) {
-			if inSyncRange {
-				for _, droppedBlock := range g.droppedBlocksBuffer.GetValues(commitment.ID()) {
-					// TODO: replace with workerpool
-					go g.ProcessBlock(droppedBlock.A, droppedBlock.B)
-				}
-			}
-		})
-	})
 }
 
 func (g *GossipProtocol) ProcessBlock(block *model.Block, from peer.ID) {
@@ -77,4 +64,17 @@ func (g *GossipProtocol) SendBlock(block *model.Block, to ...peer.ID) {
 	g.Network.SendBlock(block, to...)
 
 	g.LogTrace("sent block", "blockID", block.ID(), "toPeers", to)
+}
+
+func (g *GossipProtocol) replayDroppedBlocks() {
+	g.CommitmentCreated.Hook(func(commitment *Commitment) {
+		commitment.InSyncRange.OnUpdate(func(_, inSyncRange bool) {
+			if inSyncRange {
+				for _, droppedBlock := range g.droppedBlocksBuffer.GetValues(commitment.ID()) {
+					// TODO: replace with workerpool
+					go g.ProcessBlock(droppedBlock.A, droppedBlock.B)
+				}
+			}
+		})
+	})
 }
