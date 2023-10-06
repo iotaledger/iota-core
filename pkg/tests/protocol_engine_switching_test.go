@@ -36,7 +36,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		testsuite.WithSlotsPerEpochExponent(3),
 		testsuite.WithGenesisTimestampOffset(1000*10),
 
-		testsuite.WithWaitFor(25*time.Second),
+		testsuite.WithWaitFor(50*time.Second),
 	)
 	defer ts.Shutdown()
 

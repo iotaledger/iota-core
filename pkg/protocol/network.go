@@ -221,6 +221,11 @@ func (n *Network) ProcessAttestations(commitmentModel *model.Commitment, attesta
 		return
 	}
 
+	if !commitment.RequestAttestations.Get() {
+		n.protocol.LogTrace("received attestations for previously attested commitment", "commitment", commitment.LogName())
+		return
+	}
+
 	chain := commitment.Chain.Get()
 	if chain == nil {
 		n.protocol.LogDebug("failed to find chain for commitment when processing attestations", "commitmentID", commitmentModel.ID())

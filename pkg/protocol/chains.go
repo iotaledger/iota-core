@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -27,7 +26,7 @@ type Chains struct {
 
 	protocol      *Protocol
 	commitments   *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
-	engineManager *enginemanager.EngineManager
+	engineManager *EngineManager
 
 	reactive.EvictionState[iotago.SlotIndex]
 }
@@ -43,31 +42,7 @@ func newChains(protocol *Protocol) *Chains {
 		HeaviestVerifiedChain: reactive.NewVariable[*Chain](),
 		commitments:           shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 		CommitmentCreated:     event.New1[*Commitment](),
-		engineManager: enginemanager.New(
-			protocol.Workers,
-			func(err error) { protocol.LogError("engine error", "err", err) },
-			protocol.options.BaseDirectory,
-			3,
-			protocol.options.StorageOptions,
-			protocol.options.EngineOptions,
-			protocol.options.FilterProvider,
-			protocol.options.CommitmentFilterProvider,
-			protocol.options.BlockDAGProvider,
-			protocol.options.BookerProvider,
-			protocol.options.ClockProvider,
-			protocol.options.BlockGadgetProvider,
-			protocol.options.SlotGadgetProvider,
-			protocol.options.SybilProtectionProvider,
-			protocol.options.NotarizationProvider,
-			protocol.options.AttestationProvider,
-			protocol.options.LedgerProvider,
-			protocol.options.SchedulerProvider,
-			protocol.options.TipManagerProvider,
-			protocol.options.TipSelectionProvider,
-			protocol.options.RetainerProvider,
-			protocol.options.UpgradeOrchestratorProvider,
-			protocol.options.SyncManagerProvider,
-		),
+		engineManager:         NewEngineManager(protocol, 3),
 	}
 
 	c.HeaviestChain.LogUpdates(c.protocol, log.LevelTrace, "Unchecked Heavier Chain", (*Chain).LogName)
