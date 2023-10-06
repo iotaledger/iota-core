@@ -1,8 +1,6 @@
 package protocol
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -66,7 +64,6 @@ func newChains(protocol *Protocol) *Chains {
 		}
 
 		c.OnChainCreated(func(chain *Chain) {
-			c.provideEngineIfRequested(chain)
 			c.publishEngineCommitments(chain)
 
 			trackHeaviestChain(c.HeaviestVerifiedChain, (*Chain).verifiedWeight, chain)
@@ -170,42 +167,6 @@ func (c *Chains) initChainSwitching() {
 
 	c.HeaviestVerifiedChain.OnUpdate(func(_, heaviestVerifiedChain *Chain) {
 		c.MainChain.Set(heaviestVerifiedChain)
-	})
-}
-
-func (c *Chains) provideEngineIfRequested(chain *Chain) func() {
-	return chain.InstantiateEngine.OnUpdate(func(_, instantiate bool) {
-		// TODO: MOVE TO WORKERPOOL
-		go func() {
-			if !instantiate {
-				chain.SpawnedEngine.Set(nil)
-
-				return
-			}
-
-			if currentEngine := chain.Engine.Get(); currentEngine == nil {
-				mainEngine, err := c.engineManager.LoadActiveEngine(c.protocol.options.SnapshotPath)
-				if err != nil {
-					panic(fmt.Sprintf("could not load active engine: %s", err))
-				}
-
-				chain.SpawnedEngine.Set(mainEngine)
-
-				c.protocol.Network.HookStopped(mainEngine.Shutdown)
-			} else {
-				forkingPoint := chain.ForkingPoint.Get()
-				snapshotTargetSlot := forkingPoint.Slot() - 1
-
-				candidateEngineInstance, err := c.engineManager.ForkEngineAtSlot(snapshotTargetSlot)
-				if err != nil {
-					panic(ierrors.Wrap(err, "error creating new candidate engine"))
-				}
-
-				chain.SpawnedEngine.Set(candidateEngineInstance)
-
-				c.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
-			}
-		}()
 	})
 }
 

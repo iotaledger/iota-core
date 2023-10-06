@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -32,11 +33,17 @@ type EngineManager struct {
 }
 
 func NewEngineManager(protocol *Protocol, dbVersion byte) *EngineManager {
-	return &EngineManager{
+	e := &EngineManager{
 		protocol:  protocol,
 		directory: utils.NewDirectory(protocol.options.BaseDirectory),
 		dbVersion: dbVersion,
 	}
+
+	protocol.HookConstructed(func() {
+		protocol.OnChainCreated(e.provideEngineIfRequested)
+	})
+
+	return e
 }
 
 func (e *EngineManager) LoadActiveEngine(snapshotPath string) (*engine.Engine, error) {
@@ -202,6 +209,42 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	}
 
 	return candidateEngine, nil
+}
+
+func (e *EngineManager) provideEngineIfRequested(chain *Chain) {
+	chain.InstantiateEngine.OnUpdate(func(_, instantiate bool) {
+		// TODO: MOVE TO WORKERPOOL
+		go func() {
+			if !instantiate {
+				chain.SpawnedEngine.Set(nil)
+
+				return
+			}
+
+			if currentEngine := chain.Engine.Get(); currentEngine == nil {
+				mainEngine, err := e.LoadActiveEngine(e.protocol.options.SnapshotPath)
+				if err != nil {
+					panic(fmt.Sprintf("could not load active engine: %s", err))
+				}
+
+				chain.SpawnedEngine.Set(mainEngine)
+
+				e.protocol.Network.HookStopped(mainEngine.Shutdown)
+			} else {
+				forkingPoint := chain.ForkingPoint.Get()
+				snapshotTargetSlot := forkingPoint.Slot() - 1
+
+				candidateEngineInstance, err := e.ForkEngineAtSlot(snapshotTargetSlot)
+				if err != nil {
+					panic(ierrors.Wrap(err, "error creating new candidate engine"))
+				}
+
+				chain.SpawnedEngine.Set(candidateEngineInstance)
+
+				e.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
+			}
+		}()
+	})
 }
 
 func newEngineAlias() string {

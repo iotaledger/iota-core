@@ -74,7 +74,7 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 
 	var unsubscribeFromNetworkEvents func()
 
-	protocol.HookInitialized(func() {
+	protocol.HookConstructed(func() {
 		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
 			commitment.InSyncRange.OnUpdate(func(_, inSyncRange bool) {
 				if inSyncRange {
@@ -85,7 +85,9 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 				}
 			})
 		})
+	})
 
+	protocol.HookInitialized(func() {
 		n.OnError(func(err error, peer peer.ID) {
 			n.protocol.LogError("network error", "peer", peer, "error", err)
 		})
