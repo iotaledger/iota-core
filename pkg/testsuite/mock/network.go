@@ -115,6 +115,9 @@ func (e *Endpoint) LocalPeerID() peer.ID {
 }
 
 func (e *Endpoint) RegisterProtocol(_ func() proto.Message, handler func(peer.ID, proto.Message) error) {
+	e.network.dispatchersMutex.Lock()
+	defer e.network.dispatchersMutex.Unlock()
+
 	e.handler = handler
 }
 
