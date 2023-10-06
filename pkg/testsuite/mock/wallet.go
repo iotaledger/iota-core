@@ -1,15 +1,13 @@
 package mock
 
 import (
+	"crypto/ed25519"
 	"fmt"
 	"testing"
 
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
-)
-
-const (
-	pathString = "44'/4218'/0'/%d'"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 // Wallet is an object representing a wallet (similar to a FireFly wallet) capable of the following:
@@ -22,18 +20,23 @@ type Wallet struct {
 
 	Name string
 
-	KeyManager *KeyManager
+	keyManager *KeyManager
 
 	BlockIssuer *BlockIssuer
 
 	outputs []*utxoledger.Output
 }
 
-func NewWallet(t *testing.T, name string, seed []byte, index uint64) *Wallet {
+func NewWallet(t *testing.T, name string, seed ...[]byte) *Wallet {
+	if len(seed) == 0 {
+		randomSeed := tpkg.RandEd25519Seed()
+		seed = append(seed, randomSeed[:])
+	}
+
 	return &Wallet{
 		Testing:     t,
 		Name:        name,
-		KeyManager:  NewKeyManager(seed, index),
+		keyManager:  NewKeyManager(seed[0], 0),
 		BlockIssuer: NewBlockIssuer(t, name, false),
 		outputs:     make([]*utxoledger.Output, 0),
 	}
@@ -81,7 +84,7 @@ func (w *Wallet) Outputs() []*utxoledger.Output {
 func (w *Wallet) PrintStatus() {
 	var status string
 	status += fmt.Sprintf("Name: %s\n", w.Name)
-	status += fmt.Sprintf("Address: %s\n", w.KeyManager.Address().Bech32(iotago.PrefixTestnet))
+	status += fmt.Sprintf("Address: %s\n", w.keyManager.Address().Bech32(iotago.PrefixTestnet))
 	status += fmt.Sprintf("Balance: %d\n", w.Balance())
 	status += "Outputs: \n"
 	for _, u := range w.outputs {
@@ -93,4 +96,22 @@ func (w *Wallet) PrintStatus() {
 		status += fmt.Sprintf("\t%s [%s] = %d %v\n", u.OutputID().ToHex(), u.OutputType(), u.BaseTokenAmount(), nativeTokenDescription)
 	}
 	fmt.Printf("%s\n", status)
+}
+
+func (w *Wallet) Address(addressType ...iotago.AddressType) iotago.DirectUnlockableAddress {
+	return w.keyManager.Address(addressType...)
+}
+
+func (w *Wallet) ImplicitAccountCreationAddress() *iotago.ImplicitAccountCreationAddress {
+	address := w.keyManager.Address(iotago.AddressImplicitAccountCreation)
+	//nolint:forcetypeassert
+	return address.(*iotago.ImplicitAccountCreationAddress)
+}
+
+func (w *Wallet) KeyPair() (ed25519.PrivateKey, ed25519.PublicKey) {
+	return w.keyManager.KeyPair()
+}
+
+func (w *Wallet) AddressSigner() iotago.AddressSigner {
+	return w.keyManager.AddressSigner()
 }

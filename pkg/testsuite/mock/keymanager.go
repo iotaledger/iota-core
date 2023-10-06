@@ -12,6 +12,10 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+const (
+	pathString = "44'/4218'/0'/%d'"
+)
+
 // KeyManager is a hierarchical deterministic key manager.
 type KeyManager struct {
 	seed  []byte
@@ -46,9 +50,14 @@ func (k *KeyManager) KeyPair() (ed25519.PrivateKey, ed25519.PublicKey) {
 // AddressSigner returns an address signer.
 func (k *KeyManager) AddressSigner() iotago.AddressSigner {
 	privKey, pubKey := k.KeyPair()
-	address := iotago.Ed25519AddressFromPubKey(pubKey)
 
-	return iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(address, privKey))
+	// add both address types for simplicity in tests
+	ed25519Address := iotago.Ed25519AddressFromPubKey(pubKey)
+	ed25519AddressKey := iotago.NewAddressKeysForEd25519Address(ed25519Address, privKey)
+	implicitAccountCreationAddress := iotago.ImplicitAccountCreationAddressFromPubKey(pubKey)
+	implicitAccountCreationAddressKey := iotago.NewAddressKeysForImplicitAccountCreationAddress(implicitAccountCreationAddress, privKey)
+
+	return iotago.NewInMemoryAddressSigner(ed25519AddressKey, implicitAccountCreationAddressKey)
 }
 
 // Address calculates an ed25519 address by using slip10.

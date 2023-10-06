@@ -470,7 +470,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 		node.Initialize(failOnBlockFiltered, baseOpts...)
 
 		if t.TransactionFramework == nil {
-			t.TransactionFramework = NewTransactionFramework(node.Protocol, t.genesisSeed[:], t.optsAccounts...)
+			t.TransactionFramework = NewTransactionFramework(t.Testing, node.Protocol, t.genesisSeed[:], t.optsAccounts...)
 		}
 
 		return true

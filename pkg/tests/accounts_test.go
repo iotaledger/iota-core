@@ -63,14 +63,14 @@ func Test_TransitionAccount(t *testing.T) {
 	newAccountBlockIssuerKey := utils.RandBlockIssuerKey()
 	latestCommitmentID := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID()
 
-	accountInput, accountOutputs, accountWallets := ts.TransactionFramework.TransitionAccount(
+	accountInput, accountOutputs := ts.TransactionFramework.TransitionAccount(
 		"Genesis:1",
 		testsuite.WithAddBlockIssuerKey(newGenesisOutputKey),
 		testsuite.WithBlockIssuerExpirySlot(1),
 	)
-	consumedInputs, equalOutputs, equalWallets := ts.TransactionFramework.CreateBasicOutputsEqually(4, "Genesis:0")
+	consumedInputs, equalOutputs := ts.TransactionFramework.CreateBasicOutputsEquallyFromGenesis(4, "Genesis:0")
 
-	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX1", append(accountWallets, equalWallets...),
+	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX1", ts.TransactionFramework.GenesisWallet,
 		testsuite.WithAccountInput(accountInput, true),
 		testsuite.WithInputs(consumedInputs),
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
@@ -121,20 +121,24 @@ func Test_TransitionAccount(t *testing.T) {
 	latestParent = ts.CommitUntilSlot(accountOutputs[0].FeatureSet().BlockIssuer().ExpirySlot+1, latestParent)
 	// set the expiry slof of the transitioned genesis account to the latest committed + MaxCommittableAge
 	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
-	inputForNewAccount, newAccountOutputs, newAccountWallets := ts.TransactionFramework.CreateAccountFromInput("TX1:1",
+	inputForNewAccount, newAccountOutputs := ts.TransactionFramework.CreateAccountFromInput(
+		ts.TransactionFramework.GenesisWallet,
+		"TX1:1",
 		testsuite.WithAccountConditions(iotago.AccountOutputUnlockConditions{
-			&iotago.StateControllerAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
-			&iotago.GovernorAddressUnlockCondition{Address: ts.TransactionFramework.DefaultAddress()},
+			&iotago.StateControllerAddressUnlockCondition{Address: ts.TransactionFramework.GenesisWallet.Address()},
+			&iotago.GovernorAddressUnlockCondition{Address: ts.TransactionFramework.GenesisWallet.Address()},
 		}),
 		testsuite.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
 		testsuite.WithStakingFeature(10000, 421, 0, 10),
 	)
 
-	destroyedAccountInput, destructionOutputs, destroyWallets := ts.TransactionFramework.DestroyAccount("TX1:0")
+	destroyedAccountInput, destructionOutputs := ts.TransactionFramework.DestroyAccount("TX1:0", ts.TransactionFramework.GenesisWallet)
 
 	block2Slot := latestParent.ID().Slot()
 
-	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX2", append(newAccountWallets, destroyWallets...),
+	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions(
+		"TX2",
+		ts.TransactionFramework.GenesisWallet,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
 				AccountID: genesisAccountOutput.AccountID,
@@ -201,14 +205,18 @@ func Test_TransitionAccount(t *testing.T) {
 
 	accountAddress := iotago.AccountAddress(newAccountOutput.AccountID)
 	// create a delegation output delegating to the newly created account
-	inputForNewDelegation, newDelegationOutputs, newDelegationWallets := ts.TransactionFramework.CreateDelegationFromInput("TX1:2",
+	inputForNewDelegation, newDelegationOutputs := ts.TransactionFramework.CreateDelegationFromInput(
+		ts.TransactionFramework.GenesisWallet,
+		"TX1:2",
 		testsuite.WithDelegatedValidatorAddress(&accountAddress),
 		testsuite.WithDelegationStartEpoch(1),
 	)
 
 	block3Slot := latestParent.ID().Slot()
 
-	tx3 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX3", newDelegationWallets,
+	tx3 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions(
+		"TX3",
+		ts.TransactionFramework.GenesisWallet,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
 				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
@@ -250,9 +258,11 @@ func Test_TransitionAccount(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// transition a delegation output to a delayed claiming state
-	inputForDelegationTransition, delegationTransitionOutputs, delegationTransitionWallets := ts.TransactionFramework.DelayedClaimingTransition("TX3:0", 0)
+	inputForDelegationTransition, delegationTransitionOutputs := ts.TransactionFramework.DelayedClaimingTransition("TX3:0", 0)
 
-	tx4 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX4", delegationTransitionWallets,
+	tx4 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions(
+		"TX4",
+		ts.TransactionFramework.GenesisWallet,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
 				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
@@ -296,9 +306,16 @@ func Test_TransitionAccount(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// CREATE IMPLICIT ACCOUNT FROM BASIC UTXO
-	inputForImplicitAccount, outputsForImplicitAccount, implicitAccountAddress, implicitWallet := ts.TransactionFramework.CreateImplicitAccountFromInput("TX1:3")
+	newUserWallet := mock.NewWallet(ts.Testing, "newUser")
+	inputForImplicitAccount, outputsForImplicitAccount := ts.TransactionFramework.CreateImplicitAccountFromInput(
+		ts.TransactionFramework.GenesisWallet,
+		newUserWallet.ImplicitAccountCreationAddress(),
+		"TX1:3",
+	)
 
-	tx5 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX5", implicitWallet,
+	tx5 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions(
+		"TX5",
+		ts.TransactionFramework.GenesisWallet,
 		testsuite.WithInputs(inputForImplicitAccount),
 		testsuite.WithOutputs(outputsForImplicitAccount),
 	))
@@ -313,7 +330,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	latestParent = ts.CommitUntilSlot(slotIndexBlock5, block5)
 
-	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(implicitAccountAddress)
+	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(newUserWallet.ImplicitAccountCreationAddress())
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              implicitAccountID,
@@ -327,15 +344,17 @@ func Test_TransitionAccount(t *testing.T) {
 
 	fullAccountBlockIssuerKey := utils.RandBlockIssuerKey()
 
-	inputForImplicitAccountTransition, outputsForImplicitAccountTransition, fullAccountWallet := ts.TransactionFramework.TransitionImplicitAccountToAccountOutput(
+	inputForImplicitAccountTransition, outputsForImplicitAccountTransition := ts.TransactionFramework.TransitionImplicitAccountToAccountOutput(
 		"TX5:0",
+		newUserWallet,
 		testsuite.WithBlockIssuerFeature(
 			iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
 			iotago.MaxSlotIndex,
 		),
 	)
 
-	tx6 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX6", fullAccountWallet,
+	tx6 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX6",
+		newUserWallet,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
 				AccountID: implicitAccountID,
