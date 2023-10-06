@@ -24,8 +24,9 @@ import (
 )
 
 type NetworkManager struct {
+	*Protocol
+
 	Network               *core.Protocol
-	protocol              *Protocol
 	attestationsRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 	commitmentRequester   *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 	warpSyncRequester     *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
@@ -39,8 +40,8 @@ type NetworkManager struct {
 
 func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 	n := &NetworkManager{
+		Protocol:              protocol,
 		Network:               core.NewProtocol(endpoint, protocol.Workers.CreatePool("NetworkProtocol"), protocol),
-		protocol:              protocol,
 		attestationsRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 		commitmentRequester:   eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 		warpSyncRequester:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
@@ -61,19 +62,19 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 		protocol.Events.Engine.Scheduler.BlockScheduled,
 		protocol.Events.Engine.Scheduler.BlockSkipped,
 	} {
-		gossipEvent.Hook(func(block *blocks.Block) { n.protocol.SendBlock(block.ModelBlock()) })
+		gossipEvent.Hook(func(block *blocks.Block) { n.SendBlock(block.ModelBlock()) })
 	}
 
 	var unsubscribeFromNetworkEvents func()
 
 	protocol.HookInitialized(func() {
 		n.Network.OnError(func(err error, peer peer.ID) {
-			n.protocol.LogError("network error", "peer", peer, "error", err)
+			n.LogError("network error", "peer", peer, "error", err)
 		})
 
 		unsubscribeFromNetworkEvents = lo.Batch(
-			n.Network.OnBlockReceived(n.protocol.ProcessBlock),
-			n.Network.OnBlockRequestReceived(n.protocol.ProcessBlockRequest),
+			n.Network.OnBlockReceived(n.ProcessBlock),
+			n.Network.OnBlockRequestReceived(n.ProcessBlockRequest),
 
 			n.Network.OnCommitmentReceived(n.ProcessCommitment),
 			n.Network.OnCommitmentRequestReceived(n.ProcessCommitmentRequest),
@@ -84,12 +85,12 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 
 			n.warpSyncRequester.Events.Tick.Hook(n.SendWarpSyncRequest).Unhook,
 			n.OnBlockRequested(func(blockID iotago.BlockID, engine *engine.Engine) {
-				n.protocol.LogDebug("block requested", "blockID", blockID, "engine", engine.Name())
+				n.LogDebug("block requested", "blockID", blockID, "engine", engine.Name())
 
 				n.Network.RequestBlock(blockID)
 			}),
 			n.OnCommitmentRequested(func(id iotago.CommitmentID) {
-				n.protocol.LogDebug("commitment requested", "commitmentID", id)
+				n.LogDebug("commitment requested", "commitmentID", id)
 
 				n.Network.RequestSlotCommitment(id)
 			}),
@@ -113,20 +114,20 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 }
 
 func (n *NetworkManager) SendWarpSyncRequest(id iotago.CommitmentID) {
-	n.protocol.LogDebug("request warp sync", "commitmentID", id)
+	n.LogDebug("request warp sync", "commitmentID", id)
 
 	n.Network.SendWarpSyncRequest(id)
 }
 
 func (n *NetworkManager) IssueBlock(block *model.Block) error {
-	n.protocol.MainEngineInstance().ProcessBlockFromPeer(block, "self")
+	n.MainEngineInstance().ProcessBlockFromPeer(block, "self")
 
 	return nil
 }
 
 func (n *NetworkManager) ProcessCommitment(commitmentModel *model.Commitment, peer peer.ID) {
 	n.processTask("commitment", func() (logLevel log.Level, err error) {
-		_, published, err := n.protocol.PublishCommitment(commitmentModel)
+		_, published, err := n.PublishCommitment(commitmentModel)
 		if err != nil {
 			return log.LevelError, ierrors.Wrapf(err, "failed to publish commitment")
 		}
@@ -140,48 +141,48 @@ func (n *NetworkManager) ProcessCommitment(commitmentModel *model.Commitment, pe
 }
 
 func (n *NetworkManager) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src peer.ID) {
-	n.protocol.LogTrace("commitment request received", "commitmentID", commitmentID, "peer", src)
+	n.LogTrace("commitment request received", "commitmentID", commitmentID, "peer", src)
 
-	if commitment, err := n.protocol.Commitment(commitmentID); err != nil {
+	if commitment, err := n.Commitment(commitmentID); err != nil {
 		if !ierrors.Is(err, ErrorCommitmentNotFound) {
-			n.protocol.LogDebug("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
+			n.LogDebug("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
 		} else {
-			n.protocol.LogTrace("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
+			n.LogTrace("failed to process commitment request", "commitmentID", commitmentID, "peer", src, "error", err)
 		}
 	} else {
-		n.protocol.LogTrace("sending commitment", "commitmentID", commitmentID, "peer", src)
+		n.LogTrace("sending commitment", "commitmentID", commitmentID, "peer", src)
 
 		n.Network.SendSlotCommitment(commitment.Commitment, src)
 	}
 }
 
 func (n *NetworkManager) ProcessAttestations(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
-	commitment, _, err := n.protocol.PublishCommitment(commitmentModel)
+	commitment, _, err := n.PublishCommitment(commitmentModel)
 	if err != nil {
-		n.protocol.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitmentModel.ID(), "peer", source, "error", err)
+		n.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitmentModel.ID(), "peer", source, "error", err)
 		return
 	}
 
 	if !commitment.RequestAttestations.Get() {
-		n.protocol.LogTrace("received attestations for previously attested commitment", "commitment", commitment.LogName())
+		n.LogTrace("received attestations for previously attested commitment", "commitment", commitment.LogName())
 		return
 	}
 
 	chain := commitment.Chain.Get()
 	if chain == nil {
-		n.protocol.LogDebug("failed to find chain for commitment when processing attestations", "commitmentID", commitmentModel.ID())
+		n.LogDebug("failed to find chain for commitment when processing attestations", "commitmentID", commitmentModel.ID())
 		return
 	}
 
 	commitmentVerifier, exists := n.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
 	if !exists {
-		n.protocol.LogDebug("failed to find commitment verifier for commitment %s when processing attestations", "commitmentID", commitmentModel.ID())
+		n.LogDebug("failed to find commitment verifier for commitment %s when processing attestations", "commitmentID", commitmentModel.ID())
 		return
 	}
 
 	_, actualWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 	if err != nil {
-		n.protocol.LogError("failed to verify commitment when processing attestations", "commitmentID", commitmentModel.ID(), "error", err)
+		n.LogError("failed to verify commitment when processing attestations", "commitmentID", commitmentModel.ID(), "error", err)
 		return
 	}
 
@@ -191,7 +192,7 @@ func (n *NetworkManager) ProcessAttestations(commitmentModel *model.Commitment, 
 
 func (n *NetworkManager) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) {
 	n.processTask("attestations request", func() (logLevel log.Level, err error) {
-		mainEngine := n.protocol.MainEngineInstance()
+		mainEngine := n.MainEngineInstance()
 
 		if mainEngine.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
 			return log.LevelTrace, ierrors.New("requested commitment is not verified, yet")
@@ -229,7 +230,7 @@ func (n *NetworkManager) ProcessWarpSyncResponse(commitmentID iotago.CommitmentI
 	n.processTask("warp sync response", func() (logLevel log.Level, err error) {
 		logLevel = log.LevelTrace
 
-		chainCommitment, err := n.protocol.Commitment(commitmentID)
+		chainCommitment, err := n.Commitment(commitmentID)
 		if err != nil {
 			if !ierrors.Is(err, ErrorCommitmentNotFound) {
 				logLevel = log.LevelError
@@ -276,9 +277,9 @@ func (n *NetworkManager) ProcessWarpSyncResponse(commitmentID iotago.CommitmentI
 
 func (n *NetworkManager) processTask(taskName string, task func() (logLevel log.Level, err error), args ...any) {
 	if logLevel, err := task(); err != nil {
-		n.protocol.Log("failed to process "+taskName, logLevel, append(args, "error", err)...)
+		n.Log("failed to process "+taskName, logLevel, append(args, "error", err)...)
 	} else {
-		n.protocol.Log("successfully processed "+taskName, logLevel, args...)
+		n.Log("successfully processed "+taskName, logLevel, args...)
 	}
 }
 
@@ -286,7 +287,7 @@ func (n *NetworkManager) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID
 	n.processTask("warp sync request", func() (logLevel log.Level, err error) {
 		logLevel = log.LevelTrace
 
-		commitment, err := n.protocol.Commitment(commitmentID)
+		commitment, err := n.Commitment(commitmentID)
 		if err != nil {
 			if !ierrors.Is(err, ErrorCommitmentNotFound) {
 				logLevel = log.LevelError
@@ -366,8 +367,8 @@ func (n *NetworkManager) Shutdown() {}
 
 func (n *NetworkManager) startAttestationsRequester() {
 
-	n.protocol.HookConstructed(func() {
-		n.protocol.OnChainCreated(func(chain *Chain) {
+	n.HookConstructed(func() {
+		n.OnChainCreated(func(chain *Chain) {
 			chain.RequestAttestations.OnUpdate(func(_, requestAttestations bool) {
 				forkingPoint := chain.ForkingPoint.Get()
 
@@ -383,7 +384,7 @@ func (n *NetworkManager) startAttestationsRequester() {
 			})
 		})
 
-		n.protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
+		n.CommitmentCreated.Hook(func(commitment *Commitment) {
 			commitment.RequestAttestations.OnUpdate(func(_, requestAttestations bool) {
 				if requestAttestations {
 					if commitment.CumulativeWeight() == 0 {
@@ -400,7 +401,7 @@ func (n *NetworkManager) startAttestationsRequester() {
 }
 
 func (n *NetworkManager) startWarpSyncRequester() {
-	n.protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
+	n.CommitmentCreated.Hook(func(commitment *Commitment) {
 		commitment.RequestBlocks.OnUpdate(func(_, warpSyncBlocks bool) {
 			if warpSyncBlocks {
 				n.warpSyncRequester.StartTicker(commitment.ID())
@@ -412,7 +413,7 @@ func (n *NetworkManager) startWarpSyncRequester() {
 }
 
 func (n *NetworkManager) startBlockRequester() {
-	n.protocol.ChainManager.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
+	n.ChainManager.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
 		mutations.AddedElements().Range(func(chain *Chain) {
 			chain.Engine.OnUpdate(func(_, engine *engine.Engine) {
 				unsubscribe := lo.Batch(
