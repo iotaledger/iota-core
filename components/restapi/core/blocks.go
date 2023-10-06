@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -71,7 +72,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 	}
 
-	var iotaBlock = &iotago.ProtocolBlock{}
+	var iotaBlock *iotago.ProtocolBlock
 
 	if c.Request().Body == nil {
 		// bad request
@@ -86,7 +87,9 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 	switch mimeType {
 	case echo.MIMEApplicationJSON:
 		// Do not validate here, the parents might need to be set
-		if err := deps.Protocol.CurrentAPI().JSONDecode(bytes, iotaBlock); err != nil {
+
+		iotaBlock, _, err = iotago.ProtocolBlockFromBytes(deps.Protocol)(bytes)
+		if err != nil {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 
@@ -101,8 +104,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 
-		// Do not validate here, the parents might need to be set
-		if _, err := apiForVersion.Decode(bytes, iotaBlock); err != nil {
+		if _, err := apiForVersion.Decode(bytes, iotaBlock, serix.WithValidation()); err != nil {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 

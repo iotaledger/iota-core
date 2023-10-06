@@ -160,7 +160,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
 	block := i.CreateValidationBlock(ctx, alias, NewEd25519Account(i.AccountID, i.privateKey), node, opts...)
 
-	require.NoError(i.Testing, i.issueBlock(block.ModelBlock(), node))
+	require.NoError(i.Testing, i.IssueBlock(block.ModelBlock(), node))
 
 	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 
@@ -239,7 +239,7 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *
 func (i *BlockIssuer) IssueBasicBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[BasicBlockParams]) *blocks.Block {
 	block := i.CreateBasicBlock(ctx, alias, node, opts...)
 
-	require.NoErrorf(i.Testing, i.issueBlock(block.ModelBlock(), node), "%s > failed to issue block with alias %s", i.Name, alias)
+	require.NoErrorf(i.Testing, i.IssueBlock(block.ModelBlock(), node), "%s > failed to issue block with alias %s", i.Name, alias)
 
 	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", i.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 
@@ -303,7 +303,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
 
-	if err := i.issueBlock(block, node); err != nil {
+	if err := i.IssueBlock(block, node); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", block.ID())
 	}
 
@@ -521,7 +521,7 @@ func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIn
 	return nil
 }
 
-func (i *BlockIssuer) issueBlock(block *model.Block, node *Node) error {
+func (i *BlockIssuer) IssueBlock(block *model.Block, node *Node) error {
 	if err := node.Protocol.IssueBlock(block); err != nil {
 		return err
 	}

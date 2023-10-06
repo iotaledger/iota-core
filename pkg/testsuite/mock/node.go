@@ -414,12 +414,12 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 			fmt.Printf("%s > [%s] MemPool.TransactionInvalid(%s): %s\n", n.Name, engineName, err, transactionMetadata.ID())
 		})
 
-		transactionMetadata.OnOrphaned(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionOrphaned: %s\n", n.Name, engineName, transactionMetadata.ID())
+		transactionMetadata.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
+			fmt.Printf("%s > [%s] MemPool.TransactiOnOrphanedSlotUpdated in slot %d: %s\n", n.Name, engineName, slot, transactionMetadata.ID())
 		})
 
-		transactionMetadata.OnCommitted(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionCommitted: %s\n", n.Name, engineName, transactionMetadata.ID())
+		transactionMetadata.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
+			fmt.Printf("%s > [%s] MemPool.TransactiOnCommittedSlotUpdated in slot %d: %s\n", n.Name, engineName, slot, transactionMetadata.ID())
 		})
 
 		transactionMetadata.OnPending(func() {

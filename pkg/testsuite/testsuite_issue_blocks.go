@@ -89,6 +89,17 @@ func (t *TestSuite) IssueValidationBlockAtSlot(alias string, slot iotago.SlotInd
 	return block
 }
 
+func (t *TestSuite) IssueExistingBlock(alias string, blockIssuer *mock.BlockIssuer, node *mock.Node) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	block, exists := t.blocks.Get(alias)
+	require.True(t.Testing, exists)
+	require.NotNil(t.Testing, block)
+
+	require.NoError(t.Testing, blockIssuer.IssueBlock(block.ModelBlock(), node))
+}
+
 func (t *TestSuite) IssueValidationBlockWithOptions(alias string, blockIssuer *mock.BlockIssuer, node *mock.Node, blockOpts ...options.Option[mock.ValidatorBlockParams]) *blocks.Block {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()

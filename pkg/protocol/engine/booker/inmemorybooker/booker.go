@@ -114,6 +114,13 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	// Based on the assumption that we always fork and the UTXO and Tangle past cones are always fully known.
 	signedTransactionMetadata.OnSignaturesValid(func() {
 		transactionMetadata := signedTransactionMetadata.TransactionMetadata()
+
+		if orphanedSlot, isOrphaned := transactionMetadata.OrphanedSlot(); isOrphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
+			block.SetInvalid()
+
+			return
+		}
+
 		transactionMetadata.OnBooked(func() {
 			block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs())
 			b.bookingOrder.Queue(block)
@@ -140,6 +147,21 @@ func (b *Booker) book(block *blocks.Block) error {
 	conflictsToInherit, err := b.inheritConflicts(block)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
+	}
+
+	// The block is invalid if it carries a conflict that has been orphaned with respect to its commitment.
+	for it := conflictsToInherit.Iterator(); it.HasNext(); {
+		conflictID := it.Next()
+
+		txMetadata, exists := b.ledger.MemPool().TransactionMetadata(conflictID)
+		if !exists {
+			return ierrors.Errorf("failed to load transaction %s for block %s", conflictID.String(), block.ID())
+		}
+
+		if orphanedSlot, orphaned := txMetadata.OrphanedSlot(); orphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
+			// Merge-to-master orphaned conflicts.
+			conflictsToInherit.Delete(conflictID)
+		}
 	}
 
 	block.SetConflictIDs(conflictsToInherit)

@@ -395,7 +395,7 @@ func (t *TestSuite) AddBasicBlockIssuer(name string, blockIssuanceCredits ...iot
 	t.blockIssuers.Set(name, newBlockIssuer)
 	var bic iotago.BlockIssuanceCredits
 	if len(blockIssuanceCredits) == 0 {
-		bic = 0
+		bic = iotago.MaxBlockIssuanceCredits / 2
 	} else {
 		bic = blockIssuanceCredits[0]
 	}
