@@ -147,20 +147,23 @@ func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exist
 	return nil, false
 }
 
-func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (blockDropped bool) {
-	targetSlot := block.ID().Slot()
+func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
+	if c == nil {
+		return false
+	}
 
+	success = true
 	for _, chain := range append([]*Chain{c}, c.ChildChains.ToSlice()...) {
-		if chain.InstantiateEngine.Get() && chain.earliestUncommittedSlot() <= targetSlot {
+		if targetSlot := block.ID().Slot(); chain.InstantiateEngine.Get() && chain.earliestUncommittedSlot() <= targetSlot {
 			if targetEngine := chain.SpawnedEngine.Get(); targetEngine != nil && targetSlot < c.SyncThreshold.Get() {
 				targetEngine.ProcessBlockFromPeer(block, src)
 			} else {
-				blockDropped = true
+				success = false
 			}
 		}
 	}
 
-	return blockDropped
+	return success
 }
 
 func (c *Chain) earliestUncommittedSlot() iotago.SlotIndex {

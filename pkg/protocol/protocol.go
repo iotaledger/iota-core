@@ -6,7 +6,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/types"
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -51,7 +50,7 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 				if inSyncRange {
 					for _, droppedBlock := range p.droppedBlocksBuffer.GetValues(commitment.ID()) {
 						// TODO: replace with workerpool
-						go p.ProcessReceivedBlock(droppedBlock.A, droppedBlock.B)
+						go p.ProcessBlock(droppedBlock.A, droppedBlock.B)
 					}
 				}
 			})
@@ -76,31 +75,42 @@ func (p *Protocol) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (p *Protocol) ProcessReceivedBlock(block *model.Block, src peer.ID) {
-	p.processTask("received block", func() (logLevel log.Level, err error) {
-		logLevel = log.LevelTrace
+func (p *Protocol) ProcessBlock(block *model.Block, peer peer.ID) {
+	commitmentRequest := p.requestCommitment(block.ProtocolBlock().SlotCommitmentID, true)
+	if commitmentRequest.WasRejected() {
+		p.LogError("dropped block referencing unsolidifiable commitment", "commitmentID", block.ProtocolBlock().SlotCommitmentID, "blockID", block.ID(), "fromPeer", peer, "err", commitmentRequest.Err())
+		return
+	}
 
-		commitmentRequest := p.requestCommitment(block.ProtocolBlock().SlotCommitmentID, true)
-		if !commitmentRequest.WasCompleted() {
-			if !p.droppedBlocksBuffer.Add(block.ProtocolBlock().SlotCommitmentID, types.NewTuple(block, src)) {
-				return log.LevelError, ierrors.New("failed to add block to dropped blocks buffer")
-			}
-
-			return logLevel, ierrors.Errorf("referenced commitment %s unknown", block.ProtocolBlock().SlotCommitmentID)
+	commitment := commitmentRequest.Result()
+	if commitment == nil || !commitment.Chain.Get().DispatchBlock(block, peer) {
+		if !p.droppedBlocksBuffer.Add(block.ProtocolBlock().SlotCommitmentID, types.NewTuple(block, peer)) {
+			p.LogError("failed to add dropped block referencing unsolid commitment to dropped blocks buffer", "blockID", block.ID(), "commitmentID", block.ProtocolBlock().SlotCommitmentID, "fromPeer", peer)
+		} else {
+			p.LogTrace("dropped block referencing unsolid commitment added to dropped blocks buffer", "blockID", block.ID(), "commitmentID", block.ProtocolBlock().SlotCommitmentID, "fromPeer", peer)
 		}
+		return
+	}
 
-		if commitmentRequest.WasRejected() {
-			return logLevel, commitmentRequest.Err()
-		}
+	p.LogTrace("processed received block", "blockID", block.ID(), "commitment", commitment.LogName(), "fromPeer", peer)
+}
 
-		if chain := commitmentRequest.Result().Chain.Get(); chain != nil {
-			if chain.DispatchBlock(block, src) {
-				p.LogError("block dropped", "blockID", block.ID(), "peer", src)
-			}
-		}
+func (p *Protocol) ProcessBlockRequest(blockID iotago.BlockID, peer peer.ID) {
+	block, exists := p.MainEngineInstance().Block(blockID)
+	if !exists {
+		p.LogTrace("requested block not found", "blockID", blockID, "fromPeer", peer)
+		return
+	}
 
-		return logLevel, nil
-	}, "blockID", block.ID(), "peer", src)
+	p.SendBlock(block, peer)
+
+	p.LogTrace("processed block request", "blockID", blockID, "fromPeer", peer)
+}
+
+func (p *Protocol) SendBlock(block *model.Block, to ...peer.ID) {
+	p.Network.SendBlock(block, to...)
+
+	p.LogTrace("sent block", "blockID", block.ID(), "toPeers", to)
 }
 
 // APIForVersion returns the API for the given version.

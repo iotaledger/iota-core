@@ -61,7 +61,7 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 		protocol.Events.Engine.Scheduler.BlockScheduled,
 		protocol.Events.Engine.Scheduler.BlockSkipped,
 	} {
-		gossipEvent.Hook(func(block *blocks.Block) { n.Network.SendBlock(block.ModelBlock()) })
+		gossipEvent.Hook(func(block *blocks.Block) { n.protocol.SendBlock(block.ModelBlock()) })
 	}
 
 	var unsubscribeFromNetworkEvents func()
@@ -72,8 +72,9 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 		})
 
 		unsubscribeFromNetworkEvents = lo.Batch(
-			n.Network.OnBlockReceived(n.protocol.ProcessReceivedBlock),
-			n.Network.OnBlockRequestReceived(n.ProcessBlockRequest),
+			n.Network.OnBlockReceived(n.protocol.ProcessBlock),
+			n.Network.OnBlockRequestReceived(n.protocol.ProcessBlockRequest),
+
 			n.Network.OnCommitmentReceived(n.ProcessCommitment),
 			n.Network.OnCommitmentRequestReceived(n.ProcessCommitmentRequest),
 			n.Network.OnAttestationsReceived(n.ProcessAttestations),
@@ -121,19 +122,6 @@ func (n *NetworkManager) IssueBlock(block *model.Block) error {
 	n.protocol.MainEngineInstance().ProcessBlockFromPeer(block, "self")
 
 	return nil
-}
-
-func (n *NetworkManager) ProcessBlockRequest(blockID iotago.BlockID, peer peer.ID) {
-	n.processTask("block request", func() (logLevel log.Level, err error) {
-		block, exists := n.protocol.MainEngineInstance().Block(blockID)
-		if !exists {
-			return log.LevelTrace, ierrors.Errorf("requested block %s not found", blockID)
-		}
-
-		n.Network.SendBlock(block, peer)
-
-		return log.LevelTrace, nil
-	}, "blockID", blockID, "peer", peer)
 }
 
 func (n *NetworkManager) ProcessCommitment(commitmentModel *model.Commitment, peer peer.ID) {
