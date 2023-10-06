@@ -36,9 +36,7 @@ type BlockDAG struct {
 
 	solidifierMutex syncutils.RWMutex
 
-	workers    *workerpool.Group
-	workerPool *workerpool.WorkerPool
-
+	workers      *workerpool.Group
 	errorHandler func(error)
 	apiProvider  iotago.APIProvider
 
@@ -115,7 +113,6 @@ func New(workers *workerpool.Group, apiProvider iotago.APIProvider, evictionStat
 		evictionState:         evictionState,
 		blockCache:            blockCache,
 		workers:               workers,
-		workerPool:            workers.CreatePool("Solidifier", 2),
 		errorHandler:          errorHandler,
 		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](int(apiProvider.CurrentAPI().ProtocolParameters().MaxCommittableAge()) * 2),
 	}, opts, (*BlockDAG).TriggerConstructed, (*BlockDAG).TriggerInitialized)

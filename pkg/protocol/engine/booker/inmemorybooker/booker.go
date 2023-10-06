@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -21,8 +20,6 @@ import (
 
 type Booker struct {
 	events *booker.Events
-
-	workers *workerpool.Group
 
 	blockCache *blocks.Blocks
 
@@ -40,7 +37,7 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e, e.BlockCache, e.ErrorHandler("booker"), opts...)
+		b := New(e, e.BlockCache, e.ErrorHandler("booker"), opts...)
 		e.HookConstructed(func() {
 			b.ledger = e.Ledger
 			b.ledger.HookConstructed(func() {
@@ -70,13 +67,12 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:      booker.NewEvents(),
 		apiProvider: apiProvider,
 
 		blockCache:   blockCache,
-		workers:      workers,
 		errorHandler: errorHandler,
 	}, opts, (*Booker).TriggerConstructed)
 }
@@ -119,7 +115,6 @@ func (b *Booker) Queue(block *blocks.Block) error {
 
 func (b *Booker) Shutdown() {
 	b.TriggerStopped()
-	b.workers.Shutdown()
 }
 
 func (b *Booker) setupBlock(block *blocks.Block) {
