@@ -20,7 +20,7 @@ type Block struct {
 	missing             bool
 	missingBlockID      iotago.BlockID
 	solid               bool
-	invalid             bool
+	invalid             reactive.Variable[bool]
 	strongChildren      []*Block
 	weakChildren        []*Block
 	shallowLikeChildren []*Block
@@ -75,7 +75,6 @@ func (r *rootBlock) String() string {
 
 // NewBlock creates a new Block with the given options.
 func NewBlock(data *model.Block) *Block {
-
 	return &Block{
 		witnesses:             ds.NewSet[account.SeatIndex](),
 		conflictIDs:           ds.NewSet[iotago.TransactionID](),
@@ -83,6 +82,7 @@ func NewBlock(data *model.Block) *Block {
 		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
 		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
 		modelBlock:            data,
+		invalid:               reactive.NewVariable[bool](),
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
 		notarized:             reactive.NewVariable[bool](),
@@ -104,6 +104,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 			issuingTime:  issuingTime,
 		},
 		solid:       true,
+		invalid:     reactive.NewVariable[bool](),
 		booked:      reactive.NewVariable[bool](),
 		preAccepted: true,
 		accepted:    reactive.NewVariable[bool](),
@@ -128,6 +129,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 		payloadConflictIDs:    ds.NewSet[iotago.TransactionID](),
 		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
 		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
+		invalid:               reactive.NewVariable[bool](),
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
 		notarized:             reactive.NewVariable[bool](),
@@ -261,12 +263,17 @@ func (b *Block) IsSolid() (isSolid bool) {
 	return b.solid
 }
 
+// Invalid returns a reactive variable that is true if the Block was marked as invalid.
+func (b *Block) Invalid() (invalid reactive.Variable[bool]) {
+	return b.invalid
+}
+
 // IsInvalid returns true if the Block was marked as invalid.
 func (b *Block) IsInvalid() (isInvalid bool) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	return b.invalid
+	return b.invalid.Get()
 }
 
 // Children returns the children of the Block.
@@ -329,11 +336,11 @@ func (b *Block) SetInvalid() (wasUpdated bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if b.invalid {
+	if b.invalid.Get() {
 		return false
 	}
 
-	b.invalid = true
+	b.invalid.Set(true)
 
 	return true
 }
