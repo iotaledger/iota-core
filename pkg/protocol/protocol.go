@@ -19,8 +19,9 @@ type Protocol struct {
 	error   *event.Event1[error]
 	options *Options
 
-	*Network
-	*Chains
+	*NetworkManager
+	*ChainManager
+	*EngineManager
 	log.Logger
 	module.Module
 }
@@ -33,8 +34,9 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 		error:   event.New1[error](),
 		options: newOptions(),
 	}, opts, func(p *Protocol) {
-		p.Chains = newChains(p)
-		p.Network = newNetwork(p, dispatcher)
+		p.ChainManager = newChainManager(p)
+		p.EngineManager = NewEngineManager(p)
+		p.NetworkManager = newNetwork(p, dispatcher)
 	}, (*Protocol).TriggerConstructed)
 }
 

@@ -25,12 +25,9 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-type Network struct {
-	protocol *Protocol
-
-	*core.Protocol
-
-	gossip                *event.Event1[*model.Block]
+type NetworkManager struct {
+	Network               *core.Protocol
+	protocol              *Protocol
 	attestationsRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 	commitmentRequester   *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 	warpSyncRequester     *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
@@ -43,11 +40,10 @@ type Network struct {
 	module.Module
 }
 
-func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
-	n := &Network{
+func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
+	n := &NetworkManager{
+		Network:               core.NewProtocol(endpoint, protocol.Workers.CreatePool("NetworkProtocol"), protocol),
 		protocol:              protocol,
-		Protocol:              core.NewProtocol(endpoint, protocol.Workers.CreatePool("NetworkProtocol"), protocol),
-		gossip:                event.New1[*model.Block](),
 		attestationsRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 		commitmentRequester:   eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 		warpSyncRequester:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
@@ -69,7 +65,7 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 		protocol.Events.Engine.Scheduler.BlockScheduled,
 		protocol.Events.Engine.Scheduler.BlockSkipped,
 	} {
-		gossipEvent.Hook(func(block *blocks.Block) { n.gossip.Trigger(block.ModelBlock()) })
+		gossipEvent.Hook(func(block *blocks.Block) { n.Network.SendBlock(block.ModelBlock()) })
 	}
 
 	var unsubscribeFromNetworkEvents func()
@@ -88,33 +84,32 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 	})
 
 	protocol.HookInitialized(func() {
-		n.OnError(func(err error, peer peer.ID) {
+		n.Network.OnError(func(err error, peer peer.ID) {
 			n.protocol.LogError("network error", "peer", peer, "error", err)
 		})
 
 		unsubscribeFromNetworkEvents = lo.Batch(
-			n.OnBlockReceived(n.ProcessReceivedBlock),
-			n.OnBlockRequestReceived(n.ProcessBlockRequest),
-			n.OnCommitmentReceived(n.ProcessCommitment),
-			n.OnCommitmentRequestReceived(n.ProcessCommitmentRequest),
-			n.OnAttestationsReceived(n.ProcessAttestations),
-			n.OnAttestationsRequestReceived(n.ProcessAttestationsRequest),
-			n.OnWarpSyncResponseReceived(n.ProcessWarpSyncResponse),
-			n.OnWarpSyncRequestReceived(n.ProcessWarpSyncRequest),
+			n.Network.OnBlockReceived(n.ProcessReceivedBlock),
+			n.Network.OnBlockRequestReceived(n.ProcessBlockRequest),
+			n.Network.OnCommitmentReceived(n.ProcessCommitment),
+			n.Network.OnCommitmentRequestReceived(n.ProcessCommitmentRequest),
+			n.Network.OnAttestationsReceived(n.ProcessAttestations),
+			n.Network.OnAttestationsRequestReceived(n.ProcessAttestationsRequest),
+			n.Network.OnWarpSyncResponseReceived(n.ProcessWarpSyncResponse),
+			n.Network.OnWarpSyncRequestReceived(n.ProcessWarpSyncRequest),
 
 			n.warpSyncRequester.Events.Tick.Hook(n.SendWarpSyncRequest).Unhook,
-			n.OnSendBlock(func(block *model.Block) { n.SendBlock(block) }),
 			n.OnBlockRequested(func(blockID iotago.BlockID, engine *engine.Engine) {
 				n.protocol.LogDebug("block requested", "blockID", blockID, "engine", engine.Name())
 
-				n.RequestBlock(blockID)
+				n.Network.RequestBlock(blockID)
 			}),
 			n.OnCommitmentRequested(func(id iotago.CommitmentID) {
 				n.protocol.LogDebug("commitment requested", "commitmentID", id)
 
-				n.RequestSlotCommitment(id)
+				n.Network.RequestSlotCommitment(id)
 			}),
-			n.OnAttestationsRequested(func(commitmentID iotago.CommitmentID) { n.RequestAttestations(commitmentID) }),
+			n.OnAttestationsRequested(func(commitmentID iotago.CommitmentID) { n.Network.RequestAttestations(commitmentID) }),
 		)
 
 		n.TriggerInitialized()
@@ -124,7 +119,7 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 
 			unsubscribeFromNetworkEvents()
 
-			n.Protocol.Shutdown()
+			n.Network.Shutdown()
 
 			n.TriggerStopped()
 		})
@@ -133,19 +128,19 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *Network {
 	return n
 }
 
-func (n *Network) SendWarpSyncRequest(id iotago.CommitmentID) {
+func (n *NetworkManager) SendWarpSyncRequest(id iotago.CommitmentID) {
 	n.protocol.LogDebug("request warp sync", "commitmentID", id)
 
-	n.Protocol.SendWarpSyncRequest(id)
+	n.Network.SendWarpSyncRequest(id)
 }
 
-func (n *Network) IssueBlock(block *model.Block) error {
+func (n *NetworkManager) IssueBlock(block *model.Block) error {
 	n.protocol.MainEngineInstance().ProcessBlockFromPeer(block, "self")
 
 	return nil
 }
 
-func (n *Network) ProcessReceivedBlock(block *model.Block, src peer.ID) {
+func (n *NetworkManager) ProcessReceivedBlock(block *model.Block, src peer.ID) {
 	n.processTask("received block", func() (logLevel log.Level, err error) {
 		logLevel = log.LevelTrace
 
@@ -172,20 +167,20 @@ func (n *Network) ProcessReceivedBlock(block *model.Block, src peer.ID) {
 	}, "blockID", block.ID(), "peer", src)
 }
 
-func (n *Network) ProcessBlockRequest(blockID iotago.BlockID, src peer.ID) {
+func (n *NetworkManager) ProcessBlockRequest(blockID iotago.BlockID, peer peer.ID) {
 	n.processTask("block request", func() (logLevel log.Level, err error) {
 		block, exists := n.protocol.MainEngineInstance().Block(blockID)
 		if !exists {
 			return log.LevelTrace, ierrors.Errorf("requested block %s not found", blockID)
 		}
 
-		n.protocol.SendBlock(block, src)
+		n.Network.SendBlock(block, peer)
 
 		return log.LevelTrace, nil
-	}, "blockID", blockID, "peer", src)
+	}, "blockID", blockID, "peer", peer)
 }
 
-func (n *Network) ProcessCommitment(commitmentModel *model.Commitment, peer peer.ID) {
+func (n *NetworkManager) ProcessCommitment(commitmentModel *model.Commitment, peer peer.ID) {
 	n.processTask("commitment", func() (logLevel log.Level, err error) {
 		_, published, err := n.protocol.PublishCommitment(commitmentModel)
 		if err != nil {
@@ -200,7 +195,7 @@ func (n *Network) ProcessCommitment(commitmentModel *model.Commitment, peer peer
 	}, "commitmentID", commitmentModel.ID(), "peer", peer)
 }
 
-func (n *Network) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src peer.ID) {
+func (n *NetworkManager) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src peer.ID) {
 	n.protocol.LogTrace("commitment request received", "commitmentID", commitmentID, "peer", src)
 
 	if commitment, err := n.protocol.Commitment(commitmentID); err != nil {
@@ -212,11 +207,11 @@ func (n *Network) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, src
 	} else {
 		n.protocol.LogTrace("sending commitment", "commitmentID", commitmentID, "peer", src)
 
-		n.protocol.SendSlotCommitment(commitment.Commitment, src)
+		n.Network.SendSlotCommitment(commitment.Commitment, src)
 	}
 }
 
-func (n *Network) ProcessAttestations(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
+func (n *NetworkManager) ProcessAttestations(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], source peer.ID) {
 	commitment, _, err := n.protocol.PublishCommitment(commitmentModel)
 	if err != nil {
 		n.protocol.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitmentModel.ID(), "peer", source, "error", err)
@@ -250,7 +245,7 @@ func (n *Network) ProcessAttestations(commitmentModel *model.Commitment, attesta
 	commitment.IsAttested.Set(true)
 }
 
-func (n *Network) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) {
+func (n *NetworkManager) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, src peer.ID) {
 	n.processTask("attestations request", func() (logLevel log.Level, err error) {
 		mainEngine := n.protocol.MainEngineInstance()
 
@@ -282,11 +277,11 @@ func (n *Network) ProcessAttestationsRequest(commitmentID iotago.CommitmentID, s
 			return log.LevelError, ierrors.Wrapf(err, "failed to load roots")
 		}
 
-		return log.LevelDebug, n.protocol.SendAttestations(commitment, attestations, roots.AttestationsProof(), src)
+		return log.LevelDebug, n.Network.SendAttestations(commitment, attestations, roots.AttestationsProof(), src)
 	}, "commitmentID", commitmentID, "peer", src)
 }
 
-func (n *Network) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], peer peer.ID) {
+func (n *NetworkManager) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], peer peer.ID) {
 	n.processTask("warp sync response", func() (logLevel log.Level, err error) {
 		logLevel = log.LevelTrace
 
@@ -335,7 +330,7 @@ func (n *Network) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, bloc
 	}, "commitmentID", commitmentID, "blockIDs", blockIDs, "proof", proof, "peer", peer)
 }
 
-func (n *Network) processTask(taskName string, task func() (logLevel log.Level, err error), args ...any) {
+func (n *NetworkManager) processTask(taskName string, task func() (logLevel log.Level, err error), args ...any) {
 	if logLevel, err := task(); err != nil {
 		n.protocol.Log("failed to process "+taskName, logLevel, append(args, "error", err)...)
 	} else {
@@ -343,7 +338,7 @@ func (n *Network) processTask(taskName string, task func() (logLevel log.Level, 
 	}
 }
 
-func (n *Network) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID, src peer.ID) {
+func (n *NetworkManager) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID, src peer.ID) {
 	n.processTask("warp sync request", func() (logLevel log.Level, err error) {
 		logLevel = log.LevelTrace
 
@@ -381,55 +376,51 @@ func (n *Network) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID, src p
 			return logLevel, ierrors.Wrap(err, "failed to get roots from slot")
 		}
 
-		n.protocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), src)
+		n.Network.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), src)
 
 		return logLevel, nil
 	}, "commitmentID", commitmentID, "peer", src)
 }
 
-func (n *Network) OnSendBlock(callback func(block *model.Block)) (unsubscribe func()) {
-	return n.gossip.Hook(callback).Unhook
-}
-
-func (n *Network) OnBlockRequested(callback func(blockID iotago.BlockID, engine *engine.Engine)) (unsubscribe func()) {
+func (n *NetworkManager) OnBlockRequested(callback func(blockID iotago.BlockID, engine *engine.Engine)) (unsubscribe func()) {
 	return n.blockRequested.Hook(callback).Unhook
 }
 
-func (n *Network) OnBlockRequestStarted(callback func(blockID iotago.BlockID, engine *engine.Engine)) (unsubscribe func()) {
+func (n *NetworkManager) OnBlockRequestStarted(callback func(blockID iotago.BlockID, engine *engine.Engine)) (unsubscribe func()) {
 	return n.blockRequestStarted.Hook(callback).Unhook
 }
 
-func (n *Network) OnBlockRequestStopped(callback func(blockID iotago.BlockID, engine *engine.Engine)) (unsubscribe func()) {
+func (n *NetworkManager) OnBlockRequestStopped(callback func(blockID iotago.BlockID, engine *engine.Engine)) (unsubscribe func()) {
 	return n.blockRequestStopped.Hook(callback).Unhook
 }
 
-func (n *Network) OnCommitmentRequestStarted(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
+func (n *NetworkManager) OnCommitmentRequestStarted(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
 	return n.commitmentRequester.Events.TickerStarted.Hook(callback).Unhook
 }
 
-func (n *Network) OnCommitmentRequestStopped(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
+func (n *NetworkManager) OnCommitmentRequestStopped(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
 	return n.commitmentRequester.Events.TickerStopped.Hook(callback).Unhook
 }
 
-func (n *Network) OnCommitmentRequested(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
+func (n *NetworkManager) OnCommitmentRequested(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
 	return n.commitmentRequester.Events.Tick.Hook(callback).Unhook
 }
 
-func (n *Network) OnAttestationsRequestStarted(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
+func (n *NetworkManager) OnAttestationsRequestStarted(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
 	return n.attestationsRequester.Events.TickerStarted.Hook(callback).Unhook
 }
 
-func (n *Network) OnAttestationsRequestStopped(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
+func (n *NetworkManager) OnAttestationsRequestStopped(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
 	return n.attestationsRequester.Events.TickerStopped.Hook(callback).Unhook
 }
 
-func (n *Network) OnAttestationsRequested(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
+func (n *NetworkManager) OnAttestationsRequested(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
 	return n.attestationsRequester.Events.Tick.Hook(callback).Unhook
 }
 
-func (n *Network) Shutdown() {}
+func (n *NetworkManager) Shutdown() {}
 
-func (n *Network) startAttestationsRequester() {
+func (n *NetworkManager) startAttestationsRequester() {
 
 	n.protocol.HookConstructed(func() {
 		n.protocol.OnChainCreated(func(chain *Chain) {
@@ -464,7 +455,7 @@ func (n *Network) startAttestationsRequester() {
 	})
 }
 
-func (n *Network) startWarpSyncRequester() {
+func (n *NetworkManager) startWarpSyncRequester() {
 	n.protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
 		commitment.RequestBlocks.OnUpdate(func(_, warpSyncBlocks bool) {
 			if warpSyncBlocks {
@@ -476,8 +467,8 @@ func (n *Network) startWarpSyncRequester() {
 	})
 }
 
-func (n *Network) startBlockRequester() {
-	n.protocol.Chains.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
+func (n *NetworkManager) startBlockRequester() {
+	n.protocol.ChainManager.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
 		mutations.AddedElements().Range(func(chain *Chain) {
 			chain.Engine.OnUpdate(func(_, engine *engine.Engine) {
 				unsubscribe := lo.Batch(

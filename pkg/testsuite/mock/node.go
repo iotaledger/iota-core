@@ -152,13 +152,15 @@ func (n *Node) hookEvents() {
 		}
 	})
 
-	n.Protocol.MainChain.OnUpdate(func(_, _ *protocol.Chain) {
-		n.mainEngineSwitchedCount.Add(1)
+	n.Protocol.MainChain.OnUpdate(func(prevChain, newChain *protocol.Chain) {
+		if prevChain != nil {
+			n.mainEngineSwitchedCount.Add(1)
+		}
 	})
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
-	n.Protocol.Chains.Chains.OnUpdate(func(mutations ds.SetMutations[*protocol.Chain]) {
+	n.Protocol.ChainManager.Chains.OnUpdate(func(mutations ds.SetMutations[*protocol.Chain]) {
 		mutations.AddedElements().Range(func(chain *protocol.Chain) {
 			chain.SpawnedEngine.OnUpdate(func(_, newEngine *engine.Engine) {
 				if newEngine != nil {

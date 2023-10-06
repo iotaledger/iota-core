@@ -28,15 +28,13 @@ type engineInfo struct {
 type EngineManager struct {
 	protocol       *Protocol
 	directory      *utils.Directory
-	dbVersion      byte
 	activeInstance *engine.Engine
 }
 
-func NewEngineManager(protocol *Protocol, dbVersion byte) *EngineManager {
+func NewEngineManager(protocol *Protocol) *EngineManager {
 	e := &EngineManager{
 		protocol:  protocol,
 		directory: utils.NewDirectory(protocol.options.BaseDirectory),
-		dbVersion: dbVersion,
 	}
 
 	protocol.HookConstructed(func() {
@@ -118,7 +116,7 @@ func (e *EngineManager) loadEngineInstanceFromSnapshot(engineAlias string, snaps
 
 	e.protocol.options.EngineOptions = append(e.protocol.options.EngineOptions, engine.WithSnapshotPath(snapshotPath))
 
-	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.directory.Path(engineAlias), e.dbVersion, errorHandler, e.protocol.options.StorageOptions...))
+	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.options.StorageOptions...))
 }
 
 func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storage *storage.Storage) *engine.Engine {
@@ -126,30 +124,7 @@ func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storag
 		e.protocol.LogError("engine error", "err", err, "name", engineAlias[0:8])
 	}
 
-	newEngine := engine.New(e.protocol.Workers.CreateGroup(engineAlias),
-		errorHandler,
-		storage,
-		e.protocol.options.FilterProvider,
-		e.protocol.options.CommitmentFilterProvider,
-		e.protocol.options.BlockDAGProvider,
-		e.protocol.options.BookerProvider,
-		e.protocol.options.ClockProvider,
-		e.protocol.options.BlockGadgetProvider,
-		e.protocol.options.SlotGadgetProvider,
-		e.protocol.options.SybilProtectionProvider,
-		e.protocol.options.NotarizationProvider,
-		e.protocol.options.AttestationProvider,
-		e.protocol.options.LedgerProvider,
-		e.protocol.options.SchedulerProvider,
-		e.protocol.options.TipManagerProvider,
-		e.protocol.options.TipSelectionProvider,
-		e.protocol.options.RetainerProvider,
-		e.protocol.options.UpgradeOrchestratorProvider,
-		e.protocol.options.SyncManagerProvider,
-		e.protocol.options.EngineOptions...,
-	)
-
-	return newEngine
+	return engine.New(e.protocol.Workers.CreateGroup(engineAlias), errorHandler, storage, e.protocol.options.FilterProvider, e.protocol.options.CommitmentFilterProvider, e.protocol.options.BlockDAGProvider, e.protocol.options.BookerProvider, e.protocol.options.ClockProvider, e.protocol.options.BlockGadgetProvider, e.protocol.options.SlotGadgetProvider, e.protocol.options.SybilProtectionProvider, e.protocol.options.NotarizationProvider, e.protocol.options.AttestationProvider, e.protocol.options.LedgerProvider, e.protocol.options.SchedulerProvider, e.protocol.options.TipManagerProvider, e.protocol.options.TipSelectionProvider, e.protocol.options.RetainerProvider, e.protocol.options.UpgradeOrchestratorProvider, e.protocol.options.SyncManagerProvider, e.protocol.options.EngineOptions...)
 }
 
 func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine, error) {
@@ -159,7 +134,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	}
 
 	// Copy raw data on disk.
-	newStorage, err := storage.Clone(e.activeInstance.Storage, e.directory.Path(engineAlias), e.dbVersion, errorHandler, e.protocol.options.StorageOptions...)
+	newStorage, err := storage.Clone(e.activeInstance.Storage, e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.options.StorageOptions...)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to copy storage from active engine instance (%s) to new engine instance (%s)", e.activeInstance.Storage.Directory(), e.directory.Path(engineAlias))
 	}
@@ -229,7 +204,7 @@ func (e *EngineManager) provideEngineIfRequested(chain *Chain) {
 
 				chain.SpawnedEngine.Set(mainEngine)
 
-				e.protocol.Network.HookStopped(mainEngine.Shutdown)
+				e.protocol.NetworkManager.HookStopped(mainEngine.Shutdown)
 			} else {
 				forkingPoint := chain.ForkingPoint.Get()
 				snapshotTargetSlot := forkingPoint.Slot() - 1
@@ -241,7 +216,7 @@ func (e *EngineManager) provideEngineIfRequested(chain *Chain) {
 
 				chain.SpawnedEngine.Set(candidateEngineInstance)
 
-				e.protocol.Network.HookStopped(candidateEngineInstance.Shutdown)
+				e.protocol.NetworkManager.HookStopped(candidateEngineInstance.Shutdown)
 			}
 		}()
 	})

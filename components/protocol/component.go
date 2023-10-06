@@ -178,7 +178,7 @@ func provide(c *dig.Container) error {
 }
 
 func configure() error {
-	deps.Protocol.OnBlockReceived(func(block *model.Block, source peer.ID) {
+	deps.Protocol.Network.OnBlockReceived(func(block *model.Block, source peer.ID) {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})
 
@@ -274,11 +274,11 @@ func configure() error {
 		Component.LogDebugf("RequestCommitment: %s", id)
 	})
 
-	deps.Protocol.OnCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, id peer.ID) {
+	deps.Protocol.Network.OnCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentRequestReceived: %s", commitmentID)
 	})
 
-	deps.Protocol.OnCommitmentReceived(func(commitment *model.Commitment, id peer.ID) {
+	deps.Protocol.Network.OnCommitmentReceived(func(commitment *model.Commitment, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentReceived: %s", commitment.ID())
 	})
 
