@@ -118,7 +118,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 	)
 
 	n.hookEvents()
-	n.hookLogging(failOnBlockFiltered)
+	//n.hookLogging(failOnBlockFiltered)
 
 	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
@@ -160,7 +160,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		mutations.AddedElements().Range(func(chain *protocol.Chain) {
 			chain.SpawnedEngine.OnUpdate(func(_, newEngine *engine.Engine) {
 				if newEngine != nil {
-					//n.attachEngineLogs(failOnBlockFiltered, newEngine)
+					n.attachEngineLogs(failOnBlockFiltered, newEngine)
 				}
 			})
 		})
