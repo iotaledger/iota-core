@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/iotaledger/iota-core/pkg/model"
+	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
@@ -36,13 +37,19 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	// create the validation block here using the validation block builder from iota.go
+	parents := engineInstance.TipSelection.SelectTips(iotago.BlockMaxParents)
 
+	// create the validation block here using the validation block builder from iota.go
 	validationBlock, err := builder.NewValidationBlockBuilder(deps.Protocol.CurrentAPI()).
 		IssuingTime(blockIssuingTime).
 		SlotCommitmentID(latestCommitment.ID()).
 		ProtocolParametersHash(protocolParametersHash).
 		HighestSupportedVersion(deps.Protocol.LatestAPI().Version()).
+		LatestFinalizedSlot(engineInstance.SyncManager.LatestFinalizedSlot()).
+		StrongParents(parents[iotago.StrongParentType]).
+		WeakParents(parents[iotago.WeakParentType]).
+		ShallowLikeParents(parents[iotago.ShallowLikeParentType]).
+		Sign(validatorAccount.ID(), validatorAccount.PrivateKey()).
 		Build()
 	if err != nil {
 		Component.LogWarnf("error creating validation block: %s", err.Error())
