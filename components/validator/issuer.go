@@ -37,7 +37,7 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	parents := engineInstance.TipSelection.SelectTips(iotago.BlockMaxParents + engineInstance.SybilProtection.SeatManager().SeatCount())
+	parents := engineInstance.TipSelection.SelectTips(iotago.BlockTypeValidationMaxParents)
 
 	// create the validation block here using the validation block builder from iota.go
 	validationBlock, err := builder.NewValidationBlockBuilder(deps.Protocol.CurrentAPI()).
