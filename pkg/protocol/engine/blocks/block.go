@@ -19,7 +19,7 @@ type Block struct {
 	// BlockDAG block
 	missing             bool
 	missingBlockID      iotago.BlockID
-	solid               bool
+	solid               reactive.Variable[bool]
 	invalid             reactive.Variable[bool]
 	strongChildren      []*Block
 	weakChildren        []*Block
@@ -82,6 +82,7 @@ func NewBlock(data *model.Block) *Block {
 		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
 		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
 		modelBlock:            data,
+		solid:                 reactive.NewVariable[bool](),
 		invalid:               reactive.NewVariable[bool](),
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
@@ -103,7 +104,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 			commitmentID: commitmentID,
 			issuingTime:  issuingTime,
 		},
-		solid:       true,
+		solid:       reactive.NewVariable[bool](),
 		invalid:     reactive.NewVariable[bool](),
 		booked:      reactive.NewVariable[bool](),
 		preAccepted: true,
@@ -113,6 +114,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 	}
 
 	// This should be true since we commit and evict on acceptance.
+	b.solid.Set(true)
 	b.booked.Set(true)
 	b.notarized.Set(true)
 	b.accepted.Set(true)
@@ -129,6 +131,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 		payloadConflictIDs:    ds.NewSet[iotago.TransactionID](),
 		acceptanceRatifiers:   ds.NewSet[account.SeatIndex](),
 		confirmationRatifiers: ds.NewSet[account.SeatIndex](),
+		solid:                 reactive.NewVariable[bool](),
 		invalid:               reactive.NewVariable[bool](),
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
@@ -255,12 +258,20 @@ func (b *Block) IsMissing() (isMissing bool) {
 	return b.missing
 }
 
+// Solid returns a reactive variable that is true if the Block is solid (the entire causal history is known).
+func (b *Block) Solid() (solid reactive.Variable[bool]) {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	return b.solid
+}
+
 // IsSolid returns true if the Block is solid (the entire causal history is known).
 func (b *Block) IsSolid() (isSolid bool) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	return b.solid
+	return b.solid.Get()
 }
 
 // Invalid returns a reactive variable that is true if the Block was marked as invalid.
@@ -324,11 +335,13 @@ func (b *Block) SetSolid() (wasUpdated bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if wasUpdated = !b.solid; wasUpdated {
-		b.solid = true
+	if b.solid.Get() {
+		return false
 	}
 
-	return
+	b.solid.Set(true)
+
+	return true
 }
 
 // SetInvalid marks the Block as invalid.

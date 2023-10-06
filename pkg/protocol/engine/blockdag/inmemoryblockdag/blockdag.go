@@ -1,7 +1,8 @@
 package inmemoryblockdag
 
 import (
-	"github.com/iotaledger/hive.go/core/causalorder"
+	"sync/atomic"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -25,9 +26,6 @@ type BlockDAG struct {
 
 	// evictionState contains information about the current eviction state.
 	evictionState *eviction.State
-
-	// solidifier contains the solidifier instance used to determine the solidity of Blocks.
-	solidifier *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
 
 	latestCommitmentFunc  func() *model.Commitment
 	uncommittedSlotBlocks *buffer.UnsolidCommitmentBuffer[*blocks.Block]
@@ -67,7 +65,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 				defer b.solidifierMutex.RUnlock()
 
 				for _, block := range unsolidBlocks {
-					b.solidifier.Queue(block)
+					b.setupBlock(block)
 				}
 			}, event.WithWorkerPool(wp))
 
@@ -83,6 +81,32 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 	})
 }
 
+func (b *BlockDAG) setupBlock(block *blocks.Block) {
+	var unsolidParentsCount atomic.Int32
+	unsolidParentsCount.Store(int32(len(block.Parents())))
+
+	block.ForEachParent(func(parent iotago.Parent) {
+		parentBlock, exists := b.blockCache.Block(parent.ID)
+		if !exists {
+			panic("cannot setup block without existing parent")
+		}
+
+		parentBlock.Solid().OnUpdateOnce(func(_, _ bool) {
+			if unsolidParentsCount.Add(-1) == 0 {
+				if block.SetSolid() {
+					b.events.BlockSolid.Trigger(block)
+				}
+			}
+		})
+
+		parentBlock.Invalid().OnUpdateOnce(func(_, _ bool) {
+			if block.SetInvalid() {
+				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("parent block %s is marked as invalid", parent.ID))
+			}
+		})
+	})
+}
+
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
 func New(workers *workerpool.Group, apiProvider iotago.APIProvider, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
@@ -94,23 +118,7 @@ func New(workers *workerpool.Group, apiProvider iotago.APIProvider, evictionStat
 		workerPool:            workers.CreatePool("Solidifier", 2),
 		errorHandler:          errorHandler,
 		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](int(apiProvider.CurrentAPI().ProtocolParameters().MaxCommittableAge()) * 2),
-	}, opts,
-		func(b *BlockDAG) {
-			b.solidifier = causalorder.New(
-				b.workerPool,
-				blockCache.Block,
-				(*blocks.Block).IsSolid,
-				b.markSolid,
-				b.markInvalid,
-				(*blocks.Block).Parents,
-				causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](checkReference),
-			)
-
-			blockCache.Evict.Hook(b.evictSlot)
-		},
-		(*BlockDAG).TriggerConstructed,
-		(*BlockDAG).TriggerInitialized,
-	)
+	}, opts, (*BlockDAG).TriggerConstructed, (*BlockDAG).TriggerInitialized)
 }
 
 var _ blockdag.BlockDAG = new(BlockDAG)
@@ -137,7 +145,7 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 		b.solidifierMutex.RLock()
 		defer b.solidifierMutex.RUnlock()
 
-		b.solidifier.Queue(block)
+		b.setupBlock(block)
 	}
 
 	return
@@ -155,15 +163,6 @@ func (b *BlockDAG) GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Bloc
 	})
 }
 
-// SetInvalid marks a Block as invalid.
-func (b *BlockDAG) SetInvalid(block *blocks.Block, reason error) (wasUpdated bool) {
-	if wasUpdated = block.SetInvalid(); wasUpdated {
-		b.events.BlockInvalid.Trigger(block, reason)
-	}
-
-	return
-}
-
 func (b *BlockDAG) Shutdown() {
 	b.TriggerStopped()
 	b.workers.Shutdown()
@@ -171,26 +170,6 @@ func (b *BlockDAG) Shutdown() {
 
 func (b *BlockDAG) setRetainBlockFailureFunc(retainBlockFailure func(blockID iotago.BlockID, failureReason apimodels.BlockFailureReason)) {
 	b.retainBlockFailure = retainBlockFailure
-}
-
-// evictSlot is used to evict Blocks from committed slots from the BlockDAG.
-func (b *BlockDAG) evictSlot(slot iotago.SlotIndex) {
-	b.solidifierMutex.Lock()
-	defer b.solidifierMutex.Unlock()
-
-	b.solidifier.EvictUntil(slot)
-}
-
-func (b *BlockDAG) markSolid(block *blocks.Block) (err error) {
-	if block.SetSolid() {
-		b.events.BlockSolid.Trigger(block)
-	}
-
-	return nil
-}
-
-func (b *BlockDAG) markInvalid(block *blocks.Block, reason error) {
-	b.SetInvalid(block, ierrors.Wrap(reason, "block marked as invalid in BlockDAG"))
 }
 
 // attach tries to attach the given Block to the BlockDAG.
@@ -264,13 +243,4 @@ func (b *BlockDAG) registerChild(child *blocks.Block, parent iotago.Parent) {
 	if parentBlock, _ := b.GetOrRequestBlock(parent.ID); parentBlock != nil {
 		parentBlock.AppendChild(child, parent.Type)
 	}
-}
-
-// checkReference checks if the reference between the child and its parent is valid.
-func checkReference(child *blocks.Block, parent *blocks.Block) (err error) {
-	if parent.IsInvalid() {
-		return ierrors.Errorf("parent %s of child %s is marked as invalid", parent.ID(), child.ID())
-	}
-
-	return nil
 }
