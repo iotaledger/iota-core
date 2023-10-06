@@ -47,11 +47,11 @@ func Test_BookInCommittedSlot(t *testing.T) {
 	ts.Wait()
 
 	expectedCommittee := []iotago.AccountID{
-		nodeA.AccountID,
+		nodeA.Validator.AccountID,
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
+		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.Validator.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -106,7 +106,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 			})
 			ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes()...)
 		}
-		ts.IssueBlockAtSlot("5*", 5, lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(3)).Commitment(), ts.Node("nodeA"), ts.BlockIDsWithPrefix("4.3-")...)
+		ts.IssueValidationBlockAtSlot("5*", 5, lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(3)).Commitment(), ts.Node("nodeA"), ts.BlockIDsWithPrefix("4.3-")...)
 
 		ts.AssertBlocksExist(ts.Blocks("5*"), false, ts.Nodes("nodeA")...)
 	}
