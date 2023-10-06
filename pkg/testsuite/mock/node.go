@@ -118,7 +118,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 	)
 
 	n.hookEvents()
-	if n == nil {
+	if n.Name == "disabled" {
 		n.hookLogging(failOnBlockFiltered)
 	}
 
