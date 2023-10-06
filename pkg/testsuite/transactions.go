@@ -125,6 +125,10 @@ func (t *TestSuite) AssertTransactionsInCachePending(expectedTransactions []*iot
 	t.assertTransactionsInCacheWithFunc(expectedTransactions, expectedFlag, mempool.TransactionMetadata.IsPending, nodes...)
 }
 
+func (t *TestSuite) AssertTransactionsInCacheOrphaned(expectedTransactions []*iotago.Transaction, expectedFlag bool, nodes ...*mock.Node) {
+	t.assertTransactionsInCacheWithFunc(expectedTransactions, expectedFlag, func(tm mempool.TransactionMetadata) bool { return lo.Return2(tm.OrphanedSlot()) }, nodes...)
+}
+
 func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*iotago.Transaction][]string, nodes ...*mock.Node) {
 	for _, node := range nodes {
 		for transaction, conflictAliases := range transactionConflicts {
