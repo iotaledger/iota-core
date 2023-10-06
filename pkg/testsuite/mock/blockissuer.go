@@ -521,7 +521,7 @@ func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIn
 	return nil
 }
 
-func (i *BlockIssuer) issueBlock(block *model.Block, node *Node) error {
+func (i *BlockIssuer) IssueBlock(block *model.Block, node *Node) error {
 	if err := node.Protocol.IssueBlock(block); err != nil {
 		return err
 	}
