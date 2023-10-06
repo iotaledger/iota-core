@@ -146,7 +146,7 @@ func (n *Node) hookEvents() {
 		if prevHeaviestAttestedChain != nil {
 			n.forkDetectedCount.Add(1)
 
-			heaviestAttestedChain.Engine.OnUpdate(func(prevEngine, newEngine *engine.Engine) {
+			heaviestAttestedChain.SpawnedEngine.OnUpdate(func(prevEngine, newEngine *engine.Engine) {
 				n.candidateEngineActivatedCount.Add(1)
 			})
 		}
