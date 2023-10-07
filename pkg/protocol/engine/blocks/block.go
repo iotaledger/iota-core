@@ -260,18 +260,17 @@ func (b *Block) IsMissing() (isMissing bool) {
 
 // Solid returns a reactive variable that is true if the Block is solid (the entire causal history is known).
 func (b *Block) Solid() (solid reactive.Variable[bool]) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
 	return b.solid
 }
 
 // IsSolid returns true if the Block is solid (the entire causal history is known).
 func (b *Block) IsSolid() (isSolid bool) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
 	return b.solid.Get()
+}
+
+// SetSolid marks the Block as solid.
+func (b *Block) SetSolid() (wasUpdated bool) {
+	return !b.solid.Set(true)
 }
 
 // Invalid returns a reactive variable that is true if the Block was marked as invalid.
@@ -281,10 +280,12 @@ func (b *Block) Invalid() (invalid reactive.Variable[bool]) {
 
 // IsInvalid returns true if the Block was marked as invalid.
 func (b *Block) IsInvalid() (isInvalid bool) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
-
 	return b.invalid.Get()
+}
+
+// SetInvalid marks the Block as invalid.
+func (b *Block) SetInvalid() (wasUpdated bool) {
+	return !b.invalid.Set(true)
 }
 
 // Children returns the children of the Block.
@@ -328,34 +329,6 @@ func (b *Block) ShallowLikeChildren() []*Block {
 	defer b.mutex.RUnlock()
 
 	return lo.CopySlice(b.shallowLikeChildren)
-}
-
-// SetSolid marks the Block as solid.
-func (b *Block) SetSolid() (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if b.solid.Get() {
-		return false
-	}
-
-	b.solid.Set(true)
-
-	return true
-}
-
-// SetInvalid marks the Block as invalid.
-func (b *Block) SetInvalid() (wasUpdated bool) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	if b.invalid.Get() {
-		return false
-	}
-
-	b.invalid.Set(true)
-
-	return true
 }
 
 func (b *Block) AppendChild(child *Block, childType iotago.ParentsType) {
@@ -484,6 +457,11 @@ func (b *Block) AcceptanceRatifiers() []account.SeatIndex {
 	return b.acceptanceRatifiers.ToSlice()
 }
 
+// Accepted returns a reactive variable that is true if the Block was accepted.
+func (b *Block) Accepted() reactive.Variable[bool] {
+	return b.accepted
+}
+
 // IsAccepted returns true if the Block was accepted.
 func (b *Block) IsAccepted() bool {
 	return b.accepted.Get()
@@ -492,11 +470,6 @@ func (b *Block) IsAccepted() bool {
 // SetAccepted sets the Block as accepted.
 func (b *Block) SetAccepted() (wasUpdated bool) {
 	return !b.accepted.Set(true)
-}
-
-// Accepted returns a reactive variable that is true if the Block was accepted.
-func (b *Block) Accepted() reactive.Variable[bool] {
-	return b.accepted
 }
 
 // IsScheduled returns true if the Block was scheduled.
