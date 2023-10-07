@@ -8,8 +8,8 @@ type APIProvider struct {
 	*Protocol
 }
 
-// NewApiProvider creates a new APIProvider.
-func NewApiProvider(protocol *Protocol) *APIProvider {
+// NewAPIProvider creates a new APIProvider.
+func NewAPIProvider(protocol *Protocol) *APIProvider {
 	return &APIProvider{Protocol: protocol}
 }
 

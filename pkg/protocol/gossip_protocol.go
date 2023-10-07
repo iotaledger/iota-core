@@ -54,7 +54,7 @@ func (g *GossipProtocol) ProcessBlockRequest(blockID iotago.BlockID, from peer.I
 	block, exists := g.MainEngineInstance().Block(blockID)
 	if !exists {
 		g.LogTrace("requested block not found", "blockID", blockID, "fromPeer", from)
-		
+
 		return
 	}
 

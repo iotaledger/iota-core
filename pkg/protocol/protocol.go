@@ -37,7 +37,7 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 		error:   event.New1[error](),
 		options: newOptions(),
 	}, opts, func(p *Protocol) {
-		p.APIProvider = NewApiProvider(p)
+		p.APIProvider = NewAPIProvider(p)
 		p.ChainManager = newChainManager(p)
 		p.EngineManager = NewEngineManager(p)
 		p.NetworkManager = newNetwork(p, dispatcher)
