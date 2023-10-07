@@ -19,6 +19,8 @@ type Protocol struct {
 	error   *event.Event1[error]
 	options *Options
 
+	AttestationsRequester *AttestationsRequester
+
 	*APIProvider
 	*NetworkManager
 	*ChainManager
@@ -38,6 +40,7 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 		options: newOptions(),
 	}, opts, func(p *Protocol) {
 		p.APIProvider = NewAPIProvider(p)
+		p.AttestationsRequester = NewAttestationsRequester(p)
 		p.ChainManager = newChainManager(p)
 		p.EngineManager = NewEngineManager(p)
 		p.NetworkManager = newNetwork(p, dispatcher)
@@ -63,7 +66,7 @@ func (p *Protocol) TriggerInitialized() {
 
 	waitInitialized.Add(1)
 	p.MainChain.OnUpdateOnce(func(_, mainChain *Chain) {
-		mainChain.SpawnedEngine.OnUpdateOnce(func(_, _ *engine.Engine) {
+		mainChain.Engine.OnUpdateOnce(func(_, _ *engine.Engine) {
 			p.Module.TriggerInitialized()
 
 			waitInitialized.Done()
