@@ -23,7 +23,6 @@ type Protocol struct {
 	*NetworkManager
 	*ChainManager
 	*EngineManager
-	*GossipProtocol
 
 	log.Logger
 	module.Module
@@ -41,7 +40,6 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 		p.ChainManager = newChainManager(p)
 		p.EngineManager = NewEngineManager(p)
 		p.NetworkManager = newNetwork(p, dispatcher)
-		p.GossipProtocol = NewGossipProtocol(p)
 	}, (*Protocol).TriggerConstructed)
 }
 

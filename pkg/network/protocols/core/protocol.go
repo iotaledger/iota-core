@@ -7,6 +7,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/ds/bytesfilter"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -34,6 +35,8 @@ type Protocol struct {
 
 	requestedBlockHashes      *shrinkingmap.ShrinkingMap[types.Identifier, types.Empty]
 	requestedBlockHashesMutex syncutils.Mutex
+
+	shutdown reactive.Event
 }
 
 func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, apiProvider iotago.APIProvider, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -45,6 +48,7 @@ func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, ap
 		apiProvider:               apiProvider,
 		duplicateBlockBytesFilter: bytesfilter.New(10000),
 		requestedBlockHashes:      shrinkingmap.New[types.Identifier, types.Empty](shrinkingmap.WithShrinkingThresholdCount(1000)),
+		shutdown:                  reactive.NewEvent(),
 	}, opts, func(p *Protocol) {
 		network.RegisterProtocol(newPacket, p.handlePacket)
 	})
@@ -147,6 +151,12 @@ func (p *Protocol) Shutdown() {
 
 	p.workerPool.Shutdown()
 	p.workerPool.ShutdownComplete.Wait()
+
+	p.shutdown.Trigger()
+}
+
+func (n *Protocol) OnShutdown(callback func()) (unsubscribe func()) {
+	return n.shutdown.OnTrigger(callback)
 }
 
 func (p *Protocol) handlePacket(nbr peer.ID, packet proto.Message) (err error) {

@@ -196,10 +196,10 @@ func (c *ChainManager) requestCommitment(commitmentID iotago.CommitmentID, reque
 	commitmentRequest, requestCreated := c.commitments.GetOrCreate(commitmentID, lo.NoVariadic(promise.New[*Commitment]))
 	if requestCreated {
 		if requestFromPeers {
-			c.protocol.CommitmentRequester.ticker.StartTicker(commitmentID)
+			c.protocol.Commitments.ticker.StartTicker(commitmentID)
 
 			commitmentRequest.OnComplete(func() {
-				c.protocol.CommitmentRequester.ticker.StopTicker(commitmentID)
+				c.protocol.Commitments.ticker.StopTicker(commitmentID)
 			})
 		}
 

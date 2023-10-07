@@ -12,7 +12,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type CommitmentRequester struct {
+type CommitmentsProtocol struct {
 	protocol   *Protocol
 	workerPool *workerpool.WorkerPool
 	ticker     *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
@@ -20,11 +20,11 @@ type CommitmentRequester struct {
 	log.Logger
 }
 
-func NewCommitmentRequester(protocol *Protocol) *CommitmentRequester {
-	c := &CommitmentRequester{
-		Logger:     lo.Return1(protocol.Logger.NewChildLogger("CommitmentRequester")),
+func NewCommitmentRequester(protocol *Protocol) *CommitmentsProtocol {
+	c := &CommitmentsProtocol{
+		Logger:     lo.Return1(protocol.Logger.NewChildLogger("Commitments")),
 		protocol:   protocol,
-		workerPool: protocol.Workers.CreatePool("CommitmentRequester"),
+		workerPool: protocol.Workers.CreatePool("Commitments"),
 		ticker:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 	}
 
@@ -33,7 +33,7 @@ func NewCommitmentRequester(protocol *Protocol) *CommitmentRequester {
 	return c
 }
 
-func (c *CommitmentRequester) SendRequest(commitmentID iotago.CommitmentID) {
+func (c *CommitmentsProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 	c.workerPool.Submit(func() {
 		c.protocol.Network.RequestSlotCommitment(commitmentID)
 
@@ -41,7 +41,7 @@ func (c *CommitmentRequester) SendRequest(commitmentID iotago.CommitmentID) {
 	})
 }
 
-func (c *CommitmentRequester) SendResponse(commitment *Commitment, to peer.ID) {
+func (c *CommitmentsProtocol) SendResponse(commitment *Commitment, to peer.ID) {
 	c.workerPool.Submit(func() {
 		c.protocol.Network.SendSlotCommitment(commitment.Commitment, to)
 
@@ -49,7 +49,7 @@ func (c *CommitmentRequester) SendResponse(commitment *Commitment, to peer.ID) {
 	})
 }
 
-func (c *CommitmentRequester) ProcessResponse(commitmentModel *model.Commitment, from peer.ID) {
+func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment, from peer.ID) {
 	c.workerPool.Submit(func() {
 		if commitment, published, err := c.protocol.PublishCommitment(commitmentModel); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
@@ -59,7 +59,7 @@ func (c *CommitmentRequester) ProcessResponse(commitmentModel *model.Commitment,
 	})
 }
 
-func (c *CommitmentRequester) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+func (c *CommitmentsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	c.workerPool.Submit(func() {
 		commitment, err := c.protocol.Commitment(commitmentID)
 		if err != nil {
@@ -74,7 +74,7 @@ func (c *CommitmentRequester) ProcessRequest(commitmentID iotago.CommitmentID, f
 	})
 }
 
-func (c *CommitmentRequester) Shutdown() {
+func (c *CommitmentsProtocol) Shutdown() {
 	c.ticker.Shutdown()
 	c.workerPool.Shutdown().ShutdownComplete.Wait()
 }

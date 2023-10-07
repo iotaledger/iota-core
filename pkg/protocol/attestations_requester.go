@@ -15,7 +15,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-type AttestationsRequester struct {
+type AttestationsProtocol struct {
 	protocol            *Protocol
 	workerPool          *workerpool.WorkerPool
 	ticker              *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
@@ -24,11 +24,11 @@ type AttestationsRequester struct {
 	log.Logger
 }
 
-func NewAttestationsRequester(protocol *Protocol) *AttestationsRequester {
-	a := &AttestationsRequester{
-		Logger:              lo.Return1(protocol.Logger.NewChildLogger("AttestationsRequester")),
+func NewAttestationsRequester(protocol *Protocol) *AttestationsProtocol {
+	a := &AttestationsProtocol{
+		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Attestations")),
 		protocol:            protocol,
-		workerPool:          protocol.Workers.CreatePool("AttestationsRequester"),
+		workerPool:          protocol.Workers.CreatePool("Attestations"),
 		ticker:              eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 		commitmentVerifiers: shrinkingmap.New[iotago.CommitmentID, *CommitmentVerifier](),
 	}
@@ -70,7 +70,7 @@ func NewAttestationsRequester(protocol *Protocol) *AttestationsRequester {
 	return a
 }
 
-func (a *AttestationsRequester) ProcessResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
+func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	a.workerPool.Submit(func() {
 		commitment, _, err := a.protocol.PublishCommitment(commitmentModel)
 		if err != nil {
@@ -118,7 +118,7 @@ func (a *AttestationsRequester) ProcessResponse(commitmentModel *model.Commitmen
 	})
 }
 
-func (a *AttestationsRequester) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	a.workerPool.Submit(func() {
 		commitment, err := a.protocol.Commitment(commitmentID, false)
 		if err != nil {
@@ -197,12 +197,12 @@ func (a *AttestationsRequester) ProcessRequest(commitmentID iotago.CommitmentID,
 	})
 }
 
-func (a *AttestationsRequester) Shutdown() {
+func (a *AttestationsProtocol) Shutdown() {
 	a.ticker.Shutdown()
 	a.workerPool.Shutdown().ShutdownComplete.Wait()
 }
 
-func (a *AttestationsRequester) sendRequest(commitmentID iotago.CommitmentID) {
+func (a *AttestationsProtocol) sendRequest(commitmentID iotago.CommitmentID) {
 	a.workerPool.Submit(func() {
 		if commitment, err := a.protocol.Commitment(commitmentID, false); err == nil {
 			a.protocol.Network.RequestAttestations(commitmentID)

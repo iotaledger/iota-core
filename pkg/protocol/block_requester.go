@@ -15,7 +15,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type BlockRequester struct {
+type BlocksProtocol struct {
 	protocol            *Protocol
 	workerPool          *workerpool.WorkerPool
 	droppedBlocksBuffer *buffer.UnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]]
@@ -23,11 +23,11 @@ type BlockRequester struct {
 	log.Logger
 }
 
-func NewBlockRequester(protocol *Protocol) *BlockRequester {
-	b := &BlockRequester{
-		Logger:              lo.Return1(protocol.Logger.NewChildLogger("BlockRequester")),
+func NewBlockRequester(protocol *Protocol) *BlocksProtocol {
+	b := &BlocksProtocol{
+		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Blocks")),
 		protocol:            protocol,
-		workerPool:          protocol.Workers.CreatePool("BlockRequester"),
+		workerPool:          protocol.Workers.CreatePool("Blocks"),
 		droppedBlocksBuffer: buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]](20, 100),
 	}
 
@@ -67,7 +67,7 @@ func NewBlockRequester(protocol *Protocol) *BlockRequester {
 	return b
 }
 
-func (b *BlockRequester) SendRequest(blockID iotago.BlockID) {
+func (b *BlocksProtocol) SendRequest(blockID iotago.BlockID) {
 	b.workerPool.Submit(func() {
 		b.protocol.Network.RequestBlock(blockID)
 
@@ -75,7 +75,7 @@ func (b *BlockRequester) SendRequest(blockID iotago.BlockID) {
 	})
 }
 
-func (b *BlockRequester) SendResponse(block *model.Block) {
+func (b *BlocksProtocol) SendResponse(block *model.Block) {
 	b.workerPool.Submit(func() {
 		b.protocol.Network.SendBlock(block)
 
@@ -83,7 +83,7 @@ func (b *BlockRequester) SendResponse(block *model.Block) {
 	})
 }
 
-func (b *BlockRequester) ProcessResponse(block *model.Block, from peer.ID) {
+func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 	b.workerPool.Submit(func() {
 		commitmentRequest := b.protocol.requestCommitment(block.ProtocolBlock().SlotCommitmentID, true)
 		if commitmentRequest.WasRejected() {
@@ -107,7 +107,7 @@ func (b *BlockRequester) ProcessResponse(block *model.Block, from peer.ID) {
 	})
 }
 
-func (b *BlockRequester) ProcessRequest(blockID iotago.BlockID, from peer.ID) {
+func (b *BlocksProtocol) ProcessRequest(blockID iotago.BlockID, from peer.ID) {
 	b.workerPool.Submit(func() {
 		block, exists := b.protocol.MainEngineInstance().Block(blockID)
 		if !exists {
@@ -122,6 +122,6 @@ func (b *BlockRequester) ProcessRequest(blockID iotago.BlockID, from peer.ID) {
 	})
 }
 
-func (b *BlockRequester) Shutdown() {
+func (b *BlocksProtocol) Shutdown() {
 	b.workerPool.Shutdown().ShutdownComplete.Wait()
 }
