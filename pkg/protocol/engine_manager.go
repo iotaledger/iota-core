@@ -187,7 +187,7 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 }
 
 func (e *EngineManager) provideEngineIfRequested(chain *Chain) {
-	chain.InstantiateEngine.OnUpdate(func(_, instantiate bool) {
+	chain.SpawnEngine.OnUpdate(func(_, instantiate bool) {
 		// TODO: MOVE TO WORKERPOOL
 		go func() {
 			if !instantiate {

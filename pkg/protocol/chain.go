@@ -24,8 +24,8 @@ type Chain struct {
 	VerifiedWeight           reactive.Variable[uint64]
 	SyncThreshold            reactive.Variable[iotago.SlotIndex]
 	WarpSyncThreshold        reactive.Variable[iotago.SlotIndex]
-	RequestAttestations      reactive.Variable[bool]
-	InstantiateEngine        reactive.Variable[bool]
+	CheckAttestations        reactive.Variable[bool]
+	SpawnEngine              reactive.Variable[bool]
 	Engine                   reactive.Variable[*engine.Engine]
 	IsSolid                  reactive.Event
 	IsEvicted                reactive.Event
@@ -45,13 +45,13 @@ func NewChain(logger log.Logger) *Chain {
 		LatestCommitment:         reactive.NewVariable[*Commitment](),
 		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
 		LatestVerifiedCommitment: reactive.NewVariable[*Commitment](),
-		RequestAttestations:      reactive.NewVariable[bool](),
+		CheckAttestations:        reactive.NewVariable[bool](),
 		IsEvicted:                reactive.NewEvent(),
 
-		commitments:       shrinkingmap.New[iotago.SlotIndex, *Commitment](),
-		parentEngine:      reactive.NewVariable[*engine.Engine](),
-		InstantiateEngine: reactive.NewVariable[bool](),
-		SpawnedEngine:     reactive.NewVariable[*engine.Engine](),
+		commitments:   shrinkingmap.New[iotago.SlotIndex, *Commitment](),
+		parentEngine:  reactive.NewVariable[*engine.Engine](),
+		SpawnEngine:   reactive.NewVariable[bool](),
+		SpawnedEngine: reactive.NewVariable[*engine.Engine](),
 	}
 
 	c.ClaimedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.LatestCommitment)
@@ -110,16 +110,14 @@ func NewChain(logger log.Logger) *Chain {
 	})
 
 	c.Logger = logger.NewEntityLogger("Chain", c.IsEvicted, func(entityLogger log.Logger) {
-		logger.LogDebug("chain created", "name", entityLogger.LogName())
-
-		c.ForkingPoint.LogUpdates(entityLogger, log.LevelDebug, "ForkingPoint", (*Commitment).LogName)
+		c.ForkingPoint.LogUpdates(entityLogger, log.LevelTrace, "ForkingPoint", (*Commitment).LogName)
 		c.ClaimedWeight.LogUpdates(entityLogger, log.LevelTrace, "ClaimedWeight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
 		c.VerifiedWeight.LogUpdates(entityLogger, log.LevelTrace, "VerifiedWeight")
 		c.LatestCommitment.LogUpdates(entityLogger, log.LevelTrace, "LatestCommitment", (*Commitment).LogName)
 		c.LatestVerifiedCommitment.LogUpdates(entityLogger, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
-		c.RequestAttestations.LogUpdates(entityLogger, log.LevelDebug, "RequestAttestations")
-		c.InstantiateEngine.LogUpdates(entityLogger, log.LevelDebug, "InstantiateEngine")
+		c.CheckAttestations.LogUpdates(entityLogger, log.LevelTrace, "CheckAttestations")
+		c.SpawnEngine.LogUpdates(entityLogger, log.LevelDebug, "SpawnEngine")
 	})
 
 	return c
@@ -154,7 +152,7 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
 
 	success = true
 	for _, chain := range append([]*Chain{c}, c.ChildChains.ToSlice()...) {
-		if targetSlot := block.ID().Slot(); chain.InstantiateEngine.Get() && chain.earliestUncommittedSlot() <= targetSlot {
+		if targetSlot := block.ID().Slot(); chain.SpawnEngine.Get() && chain.earliestUncommittedSlot() <= targetSlot {
 			if targetEngine := chain.SpawnedEngine.Get(); targetEngine != nil && targetSlot < c.SyncThreshold.Get() {
 				targetEngine.ProcessBlockFromPeer(block, src)
 			} else {

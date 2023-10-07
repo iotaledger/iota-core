@@ -121,7 +121,7 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 		withinContext(func() (unsubscribe func()) {
 			requestAttestations := reactive.NewDerivedVariable2(func(requestAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
 				return requestAttestations && isDirectlyAboveLatestAttestedCommitment
-			}, chain.RequestAttestations, c.isDirectlyAboveLatestAttestedCommitment)
+			}, chain.CheckAttestations, c.isDirectlyAboveLatestAttestedCommitment)
 
 			c.RequestAttestations.InheritFrom(requestAttestations)
 
@@ -151,7 +151,7 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 		c.isBelowSyncThreshold.Set(true)
 	})
 
-	c.Logger = logger.NewEntityLogger(fmt.Sprintf("Slot%d.Commitment", commitment.Slot()), c.IsEvicted, func(entityLogger log.Logger) {
+	c.Logger = logger.NewEntityLogger(fmt.Sprintf("Slot%d.", commitment.Slot()), c.IsEvicted, func(entityLogger log.Logger) {
 		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
 		c.CumulativeAttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "CumulativeAttestedWeight")
@@ -207,6 +207,9 @@ func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitm
 					}
 
 					spawnedChain = NewChain(c.protocolLogger)
+
+					c.protocolLogger.LogDebug("new chain created", "name", spawnedChain.LogName(), "forkingPoint", c.LogName())
+
 					spawnedChain.ForkingPoint.Set(c)
 				}
 

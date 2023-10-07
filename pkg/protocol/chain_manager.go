@@ -88,6 +88,10 @@ func (c *ChainManager) PublishCommitment(commitment *model.Commitment) (commitme
 		commitmentMetadata = resolvedMetadata
 	})
 
+	if published = commitmentMetadata == publishedCommitmentMetadata; published {
+		c.protocol.LogDebug("new commitment created", "name", commitmentMetadata.LogName(), "id", commitment.ID())
+	}
+
 	return commitmentMetadata, commitmentMetadata == publishedCommitmentMetadata, nil
 }
 
@@ -121,8 +125,13 @@ func (c *ChainManager) OnChainCreated(callback func(chain *Chain)) (unsubscribe 
 }
 
 func (c *ChainManager) initMainChain() {
+	c.protocol.LogDebug("initializing main chain")
+
 	mainChain := NewChain(c.protocol.Logger)
-	mainChain.InstantiateEngine.Set(true)
+
+	c.protocol.LogDebug("new chain created", "name", mainChain.LogName(), "forkingPoint", "<snapshot>")
+
+	mainChain.SpawnEngine.Set(true)
 	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
 	c.MainChain.Set(mainChain)
@@ -150,17 +159,17 @@ func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent 
 func (c *ChainManager) initChainSwitching() {
 	c.HeaviestChain.OnUpdate(func(prevHeaviestChain, heaviestChain *Chain) {
 		if prevHeaviestChain != nil {
-			prevHeaviestChain.RequestAttestations.Set(false)
+			prevHeaviestChain.CheckAttestations.Set(false)
 		}
 
-		if !heaviestChain.InstantiateEngine.Get() {
-			heaviestChain.RequestAttestations.Set(true)
+		if !heaviestChain.SpawnEngine.Get() {
+			heaviestChain.CheckAttestations.Set(true)
 		}
 	})
 
 	c.HeaviestAttestedChain.OnUpdate(func(_, heaviestAttestedChain *Chain) {
-		heaviestAttestedChain.RequestAttestations.Set(false)
-		heaviestAttestedChain.InstantiateEngine.Set(true)
+		heaviestAttestedChain.CheckAttestations.Set(false)
+		heaviestAttestedChain.SpawnEngine.Set(true)
 	})
 
 	c.HeaviestVerifiedChain.OnUpdate(func(_, heaviestVerifiedChain *Chain) {
