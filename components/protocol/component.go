@@ -270,10 +270,6 @@ func configure() error {
 		Component.LogDebugf("BlockSkipped: %s", block.ID())
 	})
 
-	deps.Protocol.OnCommitmentRequestStarted(func(id iotago.CommitmentID) {
-		Component.LogDebugf("RequestCommitment: %s", id)
-	})
-
 	deps.Protocol.Network.OnCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, id peer.ID) {
 		Component.LogDebugf("SlotCommitmentRequestReceived: %s", commitmentID)
 	})
