@@ -204,7 +204,7 @@ func (e *EngineManager) provideEngineIfRequested(chain *Chain) {
 
 				chain.SpawnedEngine.Set(mainEngine)
 
-				e.protocol.NetworkManager.HookStopped(mainEngine.Shutdown)
+				e.protocol.NetworkManager.OnShutdown(mainEngine.Shutdown)
 			} else {
 				forkingPoint := chain.ForkingPoint.Get()
 				snapshotTargetSlot := forkingPoint.Slot() - 1
@@ -216,7 +216,7 @@ func (e *EngineManager) provideEngineIfRequested(chain *Chain) {
 
 				chain.SpawnedEngine.Set(candidateEngineInstance)
 
-				e.protocol.NetworkManager.HookStopped(candidateEngineInstance.Shutdown)
+				e.protocol.NetworkManager.OnShutdown(candidateEngineInstance.Shutdown)
 			}
 		}()
 	})
