@@ -2,38 +2,38 @@ package protocol
 
 import iotago "github.com/iotaledger/iota.go/v4"
 
-// ApiProvider is a protocol component that exposes the methods to comply with the iotago.APIProvider interface.
-type ApiProvider struct {
+// APIProvider is a protocol component that exposes the methods to comply with the iotago.APIProvider interface.
+type APIProvider struct {
 	// Protocol is the protocol instance.
 	*Protocol
 }
 
-// newApiProvider creates a new ApiProvider.
-func newApiProvider(protocol *Protocol) *ApiProvider {
-	return &ApiProvider{Protocol: protocol}
+// NewApiProvider creates a new APIProvider.
+func NewApiProvider(protocol *Protocol) *APIProvider {
+	return &APIProvider{Protocol: protocol}
 }
 
 // APIForVersion returns the API for the given version.
-func (p *ApiProvider) APIForVersion(version iotago.Version) (api iotago.API, err error) {
-	return p.MainEngineInstance().APIForVersion(version)
+func (a *APIProvider) APIForVersion(version iotago.Version) (api iotago.API, err error) {
+	return a.MainEngineInstance().APIForVersion(version)
 }
 
 // APIForSlot returns the API for the given slot.
-func (p *ApiProvider) APIForSlot(slot iotago.SlotIndex) iotago.API {
-	return p.MainEngineInstance().APIForSlot(slot)
+func (a *APIProvider) APIForSlot(slot iotago.SlotIndex) iotago.API {
+	return a.MainEngineInstance().APIForSlot(slot)
 }
 
 // APIForEpoch returns the API for the given epoch.
-func (p *ApiProvider) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
-	return p.MainEngineInstance().APIForEpoch(epoch)
+func (a *APIProvider) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
+	return a.MainEngineInstance().APIForEpoch(epoch)
 }
 
 // CurrentAPI returns the current API.
-func (p *ApiProvider) CurrentAPI() iotago.API {
-	return p.MainEngineInstance().CurrentAPI()
+func (a *APIProvider) CurrentAPI() iotago.API {
+	return a.MainEngineInstance().CurrentAPI()
 }
 
 // LatestAPI returns the latest API.
-func (p *ApiProvider) LatestAPI() iotago.API {
-	return p.MainEngineInstance().LatestAPI()
+func (a *APIProvider) LatestAPI() iotago.API {
+	return a.MainEngineInstance().LatestAPI()
 }

@@ -32,6 +32,7 @@ func (g *GossipProtocol) ProcessBlock(block *model.Block, from peer.ID) {
 	commitmentRequest := g.requestCommitment(block.ProtocolBlock().SlotCommitmentID, true)
 	if commitmentRequest.WasRejected() {
 		g.LogError("dropped block referencing unsolidifiable commitment", "commitmentID", block.ProtocolBlock().SlotCommitmentID, "blockID", block.ID(), "fromPeer", from, "err", commitmentRequest.Err())
+
 		return
 	}
 
@@ -42,6 +43,7 @@ func (g *GossipProtocol) ProcessBlock(block *model.Block, from peer.ID) {
 		} else {
 			g.LogTrace("dropped block referencing unsolid commitment added to dropped blocks buffer", "blockID", block.ID(), "commitmentID", block.ProtocolBlock().SlotCommitmentID, "fromPeer", from)
 		}
+
 		return
 	}
 
@@ -52,6 +54,7 @@ func (g *GossipProtocol) ProcessBlockRequest(blockID iotago.BlockID, from peer.I
 	block, exists := g.MainEngineInstance().Block(blockID)
 	if !exists {
 		g.LogTrace("requested block not found", "blockID", blockID, "fromPeer", from)
+		
 		return
 	}
 
