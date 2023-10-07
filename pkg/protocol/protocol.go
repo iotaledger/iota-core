@@ -19,8 +19,6 @@ type Protocol struct {
 	error   *event.Event1[error]
 	options *Options
 
-	AttestationsRequester *AttestationsRequester
-
 	*APIProvider
 	*NetworkManager
 	*ChainManager
@@ -40,7 +38,6 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 		options: newOptions(),
 	}, opts, func(p *Protocol) {
 		p.APIProvider = NewAPIProvider(p)
-		p.AttestationsRequester = NewAttestationsRequester(p)
 		p.ChainManager = newChainManager(p)
 		p.EngineManager = NewEngineManager(p)
 		p.NetworkManager = newNetwork(p, dispatcher)

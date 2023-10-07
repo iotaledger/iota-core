@@ -5,17 +5,9 @@ import (
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/eventticker"
-	"github.com/iotaledger/hive.go/ds"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/core/buffer"
-	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -23,100 +15,27 @@ import (
 type GossipProtocol struct {
 	protocol *Protocol
 
-	inboundWorkers      *workerpool.WorkerPool
-	outboundWorkers     *workerpool.WorkerPool
-	droppedBlocksBuffer *buffer.UnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]]
+	inboundWorkers  *workerpool.WorkerPool
+	outboundWorkers *workerpool.WorkerPool
 
-	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
-	warpSyncRequester   *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
-	blockRequested      *event.Event2[iotago.BlockID, *engine.Engine]
+	warpSyncRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 }
 
 func NewGossipProtocol(protocol *Protocol) *GossipProtocol {
 	g := &GossipProtocol{
 		protocol: protocol,
 
-		inboundWorkers:      protocol.Workers.CreatePool("Gossip.Inbound"),
-		outboundWorkers:     protocol.Workers.CreatePool("Gossip.Outbound"),
-		droppedBlocksBuffer: buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]](20, 100),
-		commitmentRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
-		warpSyncRequester:   eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
-		blockRequested:      event.New2[iotago.BlockID, *engine.Engine](),
+		inboundWorkers:  protocol.Workers.CreatePool("Gossip.Inbound"),
+		outboundWorkers: protocol.Workers.CreatePool("Gossip.Outbound"),
+
+		warpSyncRequester: eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 	}
 
 	protocol.HookConstructed(func() {
-		g.startBlockRequester()
 		g.startWarpSyncRequester()
-		g.replayDroppedBlocks()
 	})
 
 	return g
-}
-
-func (g *GossipProtocol) ProcessBlock(block *model.Block, from peer.ID) {
-	g.inboundWorkers.Submit(func() {
-		commitmentRequest := g.protocol.requestCommitment(block.ProtocolBlock().SlotCommitmentID, true)
-		if commitmentRequest.WasRejected() {
-			g.protocol.LogError("dropped block referencing unsolidifiable commitment", "commitmentID", block.ProtocolBlock().SlotCommitmentID, "blockID", block.ID(), "err", commitmentRequest.Err())
-
-			return
-		}
-
-		commitment := commitmentRequest.Result()
-		if commitment == nil || !commitment.Chain.Get().DispatchBlock(block, from) {
-			if !g.droppedBlocksBuffer.Add(block.ProtocolBlock().SlotCommitmentID, types.NewTuple(block, from)) {
-				g.protocol.LogError("failed to add dropped block referencing unsolid commitment to dropped blocks buffer", "commitmentID", block.ProtocolBlock().SlotCommitmentID, "blockID", block.ID())
-			} else {
-				g.protocol.LogTrace("dropped block referencing unsolid commitment added to dropped blocks buffer", "commitmentID", block.ProtocolBlock().SlotCommitmentID, "blockID", block.ID())
-			}
-
-			return
-		}
-
-		g.protocol.LogTrace("processed received block", "blockID", block.ID(), "commitment", commitment.LogName())
-	})
-}
-
-func (g *GossipProtocol) ProcessBlockRequest(blockID iotago.BlockID, from peer.ID) {
-	g.inboundWorkers.Submit(func() {
-		block, exists := g.protocol.MainEngineInstance().Block(blockID)
-		if !exists {
-			g.protocol.LogTrace("requested block not found", "blockID", blockID)
-
-			return
-		}
-
-		g.protocol.Network.SendBlock(block, from)
-
-		g.protocol.LogTrace("processed block request", "blockID", blockID)
-	})
-}
-
-func (g *GossipProtocol) ProcessCommitment(commitmentModel *model.Commitment, from peer.ID) {
-	g.inboundWorkers.Submit(func() {
-		if commitment, published, err := g.protocol.PublishCommitment(commitmentModel); err != nil {
-			g.protocol.LogError("failed to process commitment", "fromPeer", from, "err", err)
-		} else if published {
-			g.protocol.LogDebug("processed received commitment", "commitment", commitment.LogName())
-		}
-	})
-}
-
-func (g *GossipProtocol) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	g.inboundWorkers.Submit(func() {
-		commitment, err := g.protocol.Commitment(commitmentID)
-		if err != nil {
-			logLevel := lo.Cond(ierrors.Is(err, ErrorCommitmentNotFound), log.LevelTrace, log.LevelError)
-
-			g.protocol.Log("failed to load commitment for commitment request", logLevel, "commitmentID", commitmentID, "fromPeer", from, "error", err)
-
-			return
-		}
-
-		g.protocol.Network.SendSlotCommitment(commitment.Commitment, from)
-
-		g.protocol.LogTrace("processed commitment request", "commitment", commitment.LogName(), "fromPeer", from)
-	})
 }
 
 func (g *GossipProtocol) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
@@ -224,30 +143,6 @@ func (g *GossipProtocol) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID
 	})
 }
 
-func (g *GossipProtocol) SendBlock(block *model.Block) {
-	g.outboundWorkers.Submit(func() {
-		g.protocol.Network.SendBlock(block)
-
-		g.protocol.LogTrace("sent block", "blockID", block.ID())
-	})
-}
-
-func (g *GossipProtocol) SendBlockRequest(blockID iotago.BlockID, engine *engine.Engine) {
-	g.outboundWorkers.Submit(func() {
-		g.protocol.Network.RequestBlock(blockID)
-
-		g.protocol.LogTrace("sent block request", "engine", engine.Name(), "blockID", blockID)
-	})
-}
-
-func (g *GossipProtocol) SendCommitmentRequest(commitmentID iotago.CommitmentID) {
-	g.outboundWorkers.Submit(func() {
-		g.protocol.Network.RequestSlotCommitment(commitmentID)
-
-		g.protocol.LogDebug("sent commitment request", "commitmentID", commitmentID)
-	})
-}
-
 func (g *GossipProtocol) SendWarpSyncRequest(id iotago.CommitmentID) {
 	g.outboundWorkers.Submit(func() {
 		if commitment, err := g.protocol.Commitment(id, false); err == nil {
@@ -265,34 +160,6 @@ func (g *GossipProtocol) startWarpSyncRequester() {
 				g.warpSyncRequester.StartTicker(commitment.ID())
 			} else {
 				g.warpSyncRequester.StopTicker(commitment.ID())
-			}
-		})
-	})
-}
-
-func (g *GossipProtocol) startBlockRequester() {
-	g.protocol.ChainManager.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
-		mutations.AddedElements().Range(func(chain *Chain) {
-			chain.Engine.OnUpdate(func(_, engine *engine.Engine) {
-				unsubscribe := lo.Batch(
-					engine.Events.BlockRequester.Tick.Hook(func(id iotago.BlockID) {
-						g.blockRequested.Trigger(id, engine)
-					}).Unhook,
-				)
-
-				engine.HookShutdown(unsubscribe)
-			})
-		})
-	})
-}
-
-func (g *GossipProtocol) replayDroppedBlocks() {
-	g.protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-		commitment.InSyncRange.OnUpdate(func(_, inSyncRange bool) {
-			if inSyncRange {
-				for _, droppedBlock := range g.droppedBlocksBuffer.GetValues(commitment.ID()) {
-					g.ProcessBlock(droppedBlock.A, droppedBlock.B)
-				}
 			}
 		})
 	})

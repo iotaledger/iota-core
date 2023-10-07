@@ -1,0 +1,80 @@
+package protocol
+
+import (
+	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/model"
+	iotago "github.com/iotaledger/iota.go/v4"
+)
+
+type CommitmentRequester struct {
+	protocol   *Protocol
+	workerPool *workerpool.WorkerPool
+	ticker     *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+
+	log.Logger
+}
+
+func NewCommitmentRequester(protocol *Protocol) *CommitmentRequester {
+	c := &CommitmentRequester{
+		Logger:     lo.Return1(protocol.Logger.NewChildLogger("CommitmentRequester")),
+		protocol:   protocol,
+		workerPool: protocol.Workers.CreatePool("CommitmentRequester"),
+		ticker:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
+	}
+
+	c.ticker.Events.Tick.Hook(c.SendRequest)
+
+	return c
+}
+
+func (c *CommitmentRequester) SendRequest(commitmentID iotago.CommitmentID) {
+	c.workerPool.Submit(func() {
+		c.protocol.Network.RequestSlotCommitment(commitmentID)
+
+		c.LogDebug("sent request", "commitmentID", commitmentID)
+	})
+}
+
+func (c *CommitmentRequester) SendResponse(commitment *Commitment, to peer.ID) {
+	c.workerPool.Submit(func() {
+		c.protocol.Network.SendSlotCommitment(commitment.Commitment, to)
+
+		c.LogTrace("sent commitment", "commitment", commitment.LogName(), "toPeer", to)
+	})
+}
+
+func (c *CommitmentRequester) ProcessResponse(commitmentModel *model.Commitment, from peer.ID) {
+	c.workerPool.Submit(func() {
+		if commitment, published, err := c.protocol.PublishCommitment(commitmentModel); err != nil {
+			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
+		} else if published {
+			c.LogTrace("received response", "commitment", commitment.LogName(), "fromPeer", from)
+		}
+	})
+}
+
+func (c *CommitmentRequester) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+	c.workerPool.Submit(func() {
+		commitment, err := c.protocol.Commitment(commitmentID)
+		if err != nil {
+			logLevel := lo.Cond(ierrors.Is(err, ErrorCommitmentNotFound), log.LevelTrace, log.LevelError)
+
+			c.Log("failed to load commitment for commitment request", logLevel, "commitmentID", commitmentID, "fromPeer", from, "error", err)
+
+			return
+		}
+
+		c.SendResponse(commitment, from)
+	})
+}
+
+func (c *CommitmentRequester) Shutdown() {
+	c.ticker.Shutdown()
+	c.workerPool.Shutdown().ShutdownComplete.Wait()
+}
