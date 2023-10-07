@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
@@ -34,6 +35,7 @@ type NetworkManager struct {
 	blockRequestStopped   *event.Event2[iotago.BlockID, *engine.Engine]
 	blockRequested        *event.Event2[iotago.BlockID, *engine.Engine]
 	commitmentVerifiers   *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *CommitmentVerifier]
+	stopped               reactive.Event
 }
 
 func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
@@ -47,6 +49,7 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 		blockRequestStopped:   event.New2[iotago.BlockID, *engine.Engine](),
 		blockRequested:        event.New2[iotago.BlockID, *engine.Engine](),
 		commitmentVerifiers:   shrinkingmap.New[iotago.CommitmentID, *CommitmentVerifier](),
+		stopped:               reactive.NewEvent(),
 	}
 
 	n.startBlockRequester()
@@ -97,10 +100,16 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 			unsubscribeFromNetworkEvents()
 
 			n.Network.Shutdown()
+
+			n.stopped.Trigger()
 		})
 	})
 
 	return n
+}
+
+func (n *NetworkManager) HookStopped(callback func()) (unsubscribe func()) {
+	return n.stopped.OnTrigger(callback)
 }
 
 func (n *NetworkManager) SendWarpSyncRequest(id iotago.CommitmentID) {
