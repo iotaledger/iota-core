@@ -76,22 +76,16 @@ func newNetwork(protocol *Protocol, endpoint network.Endpoint) *NetworkManager {
 			n.Network.OnCommitmentReceived(n.ProcessCommitment),
 			n.Network.OnCommitmentRequestReceived(n.ProcessCommitmentRequest),
 			n.Network.OnWarpSyncResponseReceived(n.ProcessWarpSyncResponse),
+			n.Network.OnWarpSyncRequestReceived(n.ProcessWarpSyncRequest),
 
 			// outbound: GossipProtocol -> Network
-			n.warpSyncRequester.Events.Tick.Hook(n.SendWarpSyncRequest).Unhook,
-			n.attestationsRequester.Events.Tick.Hook(n.SendAttestationsRequest).Unhook,
 			n.blockRequested.Hook(n.SendBlockRequest).Unhook,
+			n.commitmentRequester.Events.Tick.Hook(n.SendCommitmentRequest).Unhook,
+			n.attestationsRequester.Events.Tick.Hook(n.SendAttestationsRequest).Unhook,
+			n.warpSyncRequester.Events.Tick.Hook(n.SendWarpSyncRequest).Unhook,
 
 			n.Network.OnAttestationsReceived(n.ProcessAttestations),
 			n.Network.OnAttestationsRequestReceived(n.ProcessAttestationsRequest),
-
-			n.Network.OnWarpSyncRequestReceived(n.ProcessWarpSyncRequest),
-
-			n.OnCommitmentRequested(func(id iotago.CommitmentID) {
-				n.LogDebug("commitment requested", "commitmentID", id)
-
-				n.Network.RequestSlotCommitment(id)
-			}),
 		)
 
 		protocol.HookShutdown(func() {
@@ -198,70 +192,6 @@ func (n *NetworkManager) processTask(taskName string, task func() (logLevel log.
 	}
 }
 
-func (n *NetworkManager) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID, src peer.ID) {
-	n.processTask("warp sync request", func() (logLevel log.Level, err error) {
-		logLevel = log.LevelTrace
-
-		commitment, err := n.Commitment(commitmentID)
-		if err != nil {
-			if !ierrors.Is(err, ErrorCommitmentNotFound) {
-				logLevel = log.LevelError
-			}
-
-			return logLevel, ierrors.Wrap(err, "failed to load commitment")
-		}
-
-		chain := commitment.Chain.Get()
-		if chain == nil {
-			return logLevel, ierrors.New("requested commitment is not solid")
-		}
-
-		engine := commitment.Engine.Get()
-		if engine == nil {
-			return logLevel, ierrors.New("requested commitment does not have an engine, yet")
-		}
-
-		committedSlot, err := engine.CommittedSlot(commitmentID)
-		if err != nil {
-			return logLevel, ierrors.Wrap(err, "failed to get slot for commitment")
-		}
-
-		blockIDs, err := committedSlot.BlockIDs()
-		if err != nil {
-			return log.LevelError, ierrors.Wrap(err, "failed to get block IDs from slot")
-		}
-
-		roots, err := committedSlot.Roots()
-		if err != nil {
-			return logLevel, ierrors.Wrap(err, "failed to get roots from slot")
-		}
-
-		n.Network.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), src)
-
-		return logLevel, nil
-	}, "commitmentID", commitmentID, "peer", src)
-}
-
-func (n *NetworkManager) OnBlockRequestStarted(callback func(blockID iotago.BlockID, engine *engine.Engine)) (unsubscribe func()) {
-	return n.blockRequestStarted.Hook(callback).Unhook
-}
-
-func (n *NetworkManager) OnBlockRequestStopped(callback func(blockID iotago.BlockID, engine *engine.Engine)) (unsubscribe func()) {
-	return n.blockRequestStopped.Hook(callback).Unhook
-}
-
-func (n *NetworkManager) OnCommitmentRequestStarted(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
-	return n.commitmentRequester.Events.TickerStarted.Hook(callback).Unhook
-}
-
-func (n *NetworkManager) OnCommitmentRequestStopped(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
-	return n.commitmentRequester.Events.TickerStopped.Hook(callback).Unhook
-}
-
-func (n *NetworkManager) OnCommitmentRequested(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
-	return n.commitmentRequester.Events.Tick.Hook(callback).Unhook
-}
-
 func (n *NetworkManager) OnAttestationsRequestStarted(callback func(commitmentID iotago.CommitmentID)) (unsubscribe func()) {
 	return n.attestationsRequester.Events.TickerStarted.Hook(callback).Unhook
 }
@@ -273,7 +203,6 @@ func (n *NetworkManager) OnAttestationsRequestStopped(callback func(commitmentID
 func (n *NetworkManager) Shutdown() {}
 
 func (n *NetworkManager) startAttestationsRequester() {
-
 	n.HookConstructed(func() {
 		n.OnChainCreated(func(chain *Chain) {
 			chain.CheckAttestations.OnUpdate(func(_, requestAttestations bool) {

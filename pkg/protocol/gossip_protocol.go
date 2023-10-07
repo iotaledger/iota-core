@@ -90,43 +90,45 @@ func (g *GossipProtocol) ProcessCommitment(commitmentModel *model.Commitment, fr
 }
 
 func (g *GossipProtocol) ProcessCommitmentRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	commitment, err := g.Commitment(commitmentID)
-	if err != nil {
-		logLevel := lo.Cond(ierrors.Is(err, ErrorCommitmentNotFound), log.LevelTrace, log.LevelError)
+	g.inboundWorkers.Submit(func() {
+		commitment, err := g.Commitment(commitmentID)
+		if err != nil {
+			logLevel := lo.Cond(ierrors.Is(err, ErrorCommitmentNotFound), log.LevelTrace, log.LevelError)
 
-		g.Log("failed to load commitment for commitment request", logLevel, "commitmentID", commitmentID, "fromPeer", from, "error", err)
+			g.Log("failed to load commitment for commitment request", logLevel, "commitmentID", commitmentID, "fromPeer", from, "error", err)
 
-		return
-	}
+			return
+		}
 
-	g.Network.SendSlotCommitment(commitment.Commitment, from)
+		g.Network.SendSlotCommitment(commitment.Commitment, from)
 
-	g.LogTrace("processed commitment request", "commitment", commitment.LogName(), "fromPeer", from)
+		g.LogTrace("processed commitment request", "commitment", commitment.LogName(), "fromPeer", from)
+	})
 }
 
 func (g *GossipProtocol) ProcessWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	g.inboundWorkers.Submit(func() {
-		chainCommitment, err := g.Commitment(commitmentID)
+		commitment, err := g.Commitment(commitmentID)
 		if err != nil {
 			if !ierrors.Is(err, ErrorCommitmentNotFound) {
-				g.LogError("failed to load commitment for warp-sync response", "commitmentID", commitmentID, "err", err)
+				g.LogError("failed to load commitment for warp-sync response", "commitmentID", commitmentID, "fromPeer", from, "err", err)
 			} else {
-				g.LogTrace("failed to load commitment for warp-sync response", "commitmentID", commitmentID, "err", err)
+				g.LogTrace("failed to load commitment for warp-sync response", "commitmentID", commitmentID, "fromPeer", from, "err", err)
 			}
 
 			return
 		}
 
-		targetEngine := chainCommitment.Engine.Get()
+		targetEngine := commitment.Engine.Get()
 		if targetEngine == nil {
-			g.LogDebug("failed to get target engine for warp-sync response", "commitment", chainCommitment.LogName())
+			g.LogDebug("failed to get target engine for warp-sync response", "commitment", commitment.LogName())
 
 			return
 		}
 
-		chainCommitment.RequestedBlocksReceived.Compute(func(requestedBlocksReceived bool) bool {
-			if requestedBlocksReceived || !chainCommitment.RequestBlocks.Get() {
-				g.LogTrace("warp-sync response for already synced commitment received", "commitment", chainCommitment.LogName())
+		commitment.RequestedBlocksReceived.Compute(func(requestedBlocksReceived bool) bool {
+			if requestedBlocksReceived || !commitment.RequestBlocks.Get() {
+				g.LogTrace("warp-sync response for already synced commitment received", "commitment", commitment.LogName(), "fromPeer", from)
 
 				return requestedBlocksReceived
 			}
@@ -136,8 +138,8 @@ func (g *GossipProtocol) ProcessWarpSyncResponse(commitmentID iotago.CommitmentI
 				_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
 			}
 
-			if !iotago.VerifyProof(proof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.RootsID()) {
-				g.LogError("failed to verify merkle proof in warp-sync response", "commitment", chainCommitment.LogName(), "blockIDs", blockIDs, "proof", proof)
+			if !iotago.VerifyProof(proof, iotago.Identifier(acceptedBlocks.Root()), commitment.RootsID()) {
+				g.LogError("failed to verify merkle proof in warp-sync response", "commitment", commitment.LogName(), "blockIDs", blockIDs, "proof", proof, "fromPeer", from)
 
 				return false
 			}
@@ -148,10 +150,64 @@ func (g *GossipProtocol) ProcessWarpSyncResponse(commitmentID iotago.CommitmentI
 				targetEngine.BlockDAG.GetOrRequestBlock(blockID)
 			}
 
-			g.LogDebug("processed warp-sync response", "commitment", chainCommitment.LogName())
+			g.LogDebug("processed warp-sync response", "commitment", commitment.LogName())
 
 			return true
 		})
+	})
+}
+
+func (g *GossipProtocol) ProcessWarpSyncRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+	g.inboundWorkers.Submit(func() {
+		commitment, err := g.Commitment(commitmentID)
+		if err != nil {
+			if !ierrors.Is(err, ErrorCommitmentNotFound) {
+				g.LogError("failed to load commitment for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
+			} else {
+				g.LogTrace("failed to load commitment for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
+			}
+
+			return
+		}
+
+		chain := commitment.Chain.Get()
+		if chain == nil {
+			g.LogTrace("warp-sync request for unsolid commitment", "commitment", commitment.LogName(), "fromPeer", from)
+
+			return
+		}
+
+		engineInstance := commitment.Engine.Get()
+		if engineInstance == nil {
+			g.LogTrace("warp-sync request for chain without engine", "chain", chain.LogName(), "fromPeer", from)
+
+			return
+		}
+
+		committedSlot, err := engineInstance.CommittedSlot(commitmentID)
+		if err != nil {
+			g.LogTrace("warp-sync request for uncommitted slot", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from)
+
+			return
+		}
+
+		blockIDs, err := committedSlot.BlockIDs()
+		if err != nil {
+			g.LogTrace("failed to get block ids for warp-sync request", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from, "err", err)
+
+			return
+		}
+
+		roots, err := committedSlot.Roots()
+		if err != nil {
+			g.LogTrace("failed to get roots for warp-sync request", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from, "err", err)
+
+			return
+		}
+
+		g.Network.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), from)
+
+		g.LogTrace("processed warp-sync request", "commitment", commitment.LogName(), "fromPeer", from)
 	})
 }
 
@@ -161,6 +217,12 @@ func (g *GossipProtocol) SendBlock(block *model.Block, to ...peer.ID) {
 
 		g.LogTrace("sent block", "blockID", block.ID(), "toPeers", to)
 	})
+}
+
+func (g *GossipProtocol) SendCommitmentRequest(commitmentID iotago.CommitmentID) {
+	g.Network.RequestSlotCommitment(commitmentID)
+
+	g.LogDebug("sent commitment request", "commitmentID", commitmentID)
 }
 
 func (g *GossipProtocol) SendAttestationsRequest(commitmentID iotago.CommitmentID) {
