@@ -173,7 +173,11 @@ func (c *ChainManager) initChainSwitching() {
 	})
 
 	c.HeaviestVerifiedChain.OnUpdate(func(_, heaviestVerifiedChain *Chain) {
-		c.MainChain.Set(heaviestVerifiedChain)
+		heaviestVerifiedChain.LatestVerifiedCommitment.OnUpdate(func(_, latestVerifiedCommitment *Commitment) {
+			if forkingPoint := heaviestVerifiedChain.ForkingPoint.Get(); latestVerifiedCommitment != nil && forkingPoint != nil && latestVerifiedCommitment.ID().Slot()-forkingPoint.ID().Slot() > c.protocol.options.ChainSwitchingThreshold {
+				c.MainChain.Set(heaviestVerifiedChain)
+			}
+		})
 	})
 }
 

@@ -40,13 +40,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	retainer1 "github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Options struct {
 	Logger                  *logger.Logger
 	BaseDirectory           string
 	SnapshotPath            string
-	ChainSwitchingThreshold int
+	ChainSwitchingThreshold iotago.SlotIndex
 
 	EngineOptions  []options.Option[engine.Engine]
 	StorageOptions []options.Option[storage.Storage]
@@ -107,7 +108,7 @@ func WithSnapshotPath(snapshot string) options.Option[Protocol] {
 	}
 }
 
-func WithChainSwitchingThreshold(threshold int) options.Option[Protocol] {
+func WithChainSwitchingThreshold(threshold iotago.SlotIndex) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.options.ChainSwitchingThreshold = threshold
 	}

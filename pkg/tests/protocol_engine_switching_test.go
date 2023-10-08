@@ -50,7 +50,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	node7 := ts.AddValidatorNode("node7")
 	node8 := ts.AddNode("node8")
 
-	const expectedCommittedSlotAfterPartitionMerge = 19
+	const expectedCommittedSlotAfterPartitionMerge = 18
 	nodesP1 := []*mock.Node{node0, node1, node2, node3, node4, node5}
 	nodesP2 := []*mock.Node{node6, node7, node8}
 
