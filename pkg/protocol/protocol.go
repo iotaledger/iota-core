@@ -55,7 +55,7 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 		p.EngineManager = NewEngineManager(p)
 
 		p.HookInitialized(func() {
-			unsubscribeFromNetworkEvents := lo.Batch(
+			unsubscribeFromNetwork := lo.Batch(
 				p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
 				p.Network.OnBlockReceived(p.BlocksProtocol.ProcessResponse),
 				p.Network.OnBlockRequestReceived(p.BlocksProtocol.ProcessRequest),
@@ -68,7 +68,7 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 			)
 
 			p.HookShutdown(func() {
-				unsubscribeFromNetworkEvents()
+				unsubscribeFromNetwork()
 
 				p.BlocksProtocol.Shutdown()
 				p.CommitmentsProtocol.Shutdown()

@@ -86,10 +86,10 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 							panic("failed to load committee for last finalized slot to initialize sybil protection")
 						}
 						o.seatManager.ImportCommittee(currentEpoch, committee)
-						// TODO: REPLACE WITH LOG: fmt.Println("committee import", committee.TotalStake(), currentEpoch)
+						fmt.Println("committee import", committee.TotalStake(), currentEpoch)
 						if nextCommittee, nextCommitteeExists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
 							o.seatManager.ImportCommittee(currentEpoch+1, nextCommittee)
-							// TODO: REPLACE WITH LOG: fmt.Println("next committee", nextCommittee.TotalStake(), currentEpoch+1)
+							fmt.Println("next committee", nextCommittee.TotalStake(), currentEpoch+1)
 						}
 
 						o.TriggerInitialized()
@@ -136,7 +136,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 			}
 
 			committee.SetReused()
-			// TODO: REPLACE WITH LOG: fmt.Println("reuse committee", currentEpoch, "stake", committee.TotalValidatorStake())
+			fmt.Println("reuse committee", currentEpoch, "stake", committee.TotalValidatorStake())
 			o.seatManager.SetCommittee(nextEpoch, committee)
 
 			o.events.CommitteeSelected.Trigger(committee, nextEpoch)
