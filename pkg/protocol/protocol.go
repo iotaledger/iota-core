@@ -53,6 +53,30 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 		p.APIProvider = NewAPIProvider(p)
 		p.ChainManager = newChainManager(p)
 		p.EngineManager = NewEngineManager(p)
+
+		p.HookInitialized(func() {
+			unsubscribeFromNetworkEvents := lo.Batch(
+				p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
+				p.Network.OnBlockReceived(p.BlocksProtocol.ProcessResponse),
+				p.Network.OnBlockRequestReceived(p.BlocksProtocol.ProcessRequest),
+				p.Network.OnCommitmentReceived(p.CommitmentsProtocol.ProcessResponse),
+				p.Network.OnCommitmentRequestReceived(p.CommitmentsProtocol.ProcessRequest),
+				p.Network.OnAttestationsReceived(p.AttestationsProtocol.ProcessResponse),
+				p.Network.OnAttestationsRequestReceived(p.AttestationsProtocol.ProcessRequest),
+				p.Network.OnWarpSyncResponseReceived(p.WarpSyncProtocol.ProcessResponse),
+				p.Network.OnWarpSyncRequestReceived(p.WarpSyncProtocol.ProcessRequest),
+			)
+
+			p.HookShutdown(func() {
+				unsubscribeFromNetworkEvents()
+
+				p.BlocksProtocol.Shutdown()
+				p.CommitmentsProtocol.Shutdown()
+				p.AttestationsProtocol.Shutdown()
+				p.WarpSyncProtocol.Shutdown()
+				p.Network.Shutdown()
+			})
+		})
 	}, (*Protocol).TriggerConstructed)
 }
 
@@ -65,27 +89,7 @@ func (p *Protocol) IssueBlock(block *model.Block) error {
 func (p *Protocol) Run(ctx context.Context) error {
 	p.TriggerInitialized()
 
-	unsubscribeFromNetworkEvents := lo.Batch(
-		p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
-		p.Network.OnBlockReceived(p.BlocksProtocol.ProcessResponse),
-		p.Network.OnBlockRequestReceived(p.BlocksProtocol.ProcessRequest),
-		p.Network.OnCommitmentReceived(p.CommitmentsProtocol.ProcessResponse),
-		p.Network.OnCommitmentRequestReceived(p.CommitmentsProtocol.ProcessRequest),
-		p.Network.OnAttestationsReceived(p.AttestationsProtocol.ProcessResponse),
-		p.Network.OnAttestationsRequestReceived(p.AttestationsProtocol.ProcessRequest),
-		p.Network.OnWarpSyncResponseReceived(p.WarpSyncProtocol.ProcessResponse),
-		p.Network.OnWarpSyncRequestReceived(p.WarpSyncProtocol.ProcessRequest),
-	)
-
 	<-ctx.Done()
-
-	unsubscribeFromNetworkEvents()
-
-	p.BlocksProtocol.Shutdown()
-	p.CommitmentsProtocol.Shutdown()
-	p.AttestationsProtocol.Shutdown()
-	p.WarpSyncProtocol.Shutdown()
-	p.Network.Shutdown()
 
 	p.TriggerShutdown()
 	p.TriggerStopped()
