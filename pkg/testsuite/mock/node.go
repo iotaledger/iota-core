@@ -118,9 +118,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 	)
 
 	n.hookEvents()
-	if n.Name == "disabled" {
-		n.hookLogging(failOnBlockFiltered)
-	}
+	n.hookLogging(failOnBlockFiltered)
 
 	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
@@ -315,8 +313,8 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
 	})
 
-	events.SlotGadget.SlotFinalized.Hook(func(slotIndex iotago.SlotIndex) {
-		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slotIndex)
+	events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slot)
 	})
 
 	events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
@@ -463,7 +461,7 @@ func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Opt
 
 	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, alias)
 
-	// fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
+	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }
@@ -479,7 +477,7 @@ func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...o
 
 	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
 
-	//fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
+	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }
