@@ -139,21 +139,18 @@ func newFaucet(clt models.Client, faucetUnspentOutputID iotago.OutputID, api iot
 		OutputStruct: faucetOutput,
 	}
 
-	f.createFaucetAccountFromSeed(api)
+	f.createFaucetAccountFromSeed()
 
 	return f
 }
 
-func (f *faucet) createFaucetAccountFromSeed(api iotago.API) {
+func (f *faucet) createFaucetAccountFromSeed() {
 	privateKey := ed25519.NewKeyFromSeed(f.seed[:])
 	ed25519PubKey := privateKey.Public().(ed25519.PublicKey)
 	accIdBytes := blake2b.Sum256(ed25519PubKey[:])
 
 	var accountID iotago.AccountID
-	_, err := api.Decode(accIdBytes[:], &accountID)
-	if err != nil {
-		log.Panicf("failed to decode accountID: %s", err)
-	}
+	copy(accountID[:], accIdBytes[:iotago.AccountIDLength])
 
 	f.account = blockfactory.NewEd25519Account(accountID, privateKey)
 }
