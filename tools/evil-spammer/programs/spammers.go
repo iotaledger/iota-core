@@ -28,9 +28,6 @@ func CustomSpam(params *CustomSpamParams, accWallet *accountwallet.AccountWallet
 		if err != nil {
 			panic(err)
 		}
-		SaveConfigsToFile(&BasicConfig{
-			LastFaucetUnspentOutputID: w.LastFaucetUnspentOutput().ToHex(),
-		})
 	}
 
 	for i, sType := range params.SpamTypes {

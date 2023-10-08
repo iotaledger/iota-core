@@ -31,18 +31,23 @@ func main() {
 	var accWallet *accountwallet.AccountWallet
 	var err error
 	if Script == "basic" || Script == "accounts" {
+		// read config here
+		config := accountwallet.LoadConfiguration()
 		// load wallet
-		accWallet, err = accountwallet.Run(lastFaucetUnspendOutputID)
+		accWallet, err = accountwallet.Run(config)
 		if err != nil {
 			log.Warn(err)
 			return
 		}
-		// save wallet
+		// save wallet and latest faucet output
 		defer func() {
 			err = accountwallet.SaveState(accWallet)
 			if err != nil {
 				log.Errorf("Error while saving wallet state: %v", err)
 			}
+			config.Update(accWallet.LastFaucetUnspentOutputID())
+			accountwallet.SaveConfiguration(config)
+
 		}()
 	}
 	// run selected test scenario
@@ -66,11 +71,6 @@ func accountsSubcommands(wallet *accountwallet.AccountWallet, subcommands []acco
 	for _, sub := range subcommands {
 		accountsSubcommand(wallet, sub)
 	}
-
-	// save faucet unspent output id
-	programs.SaveConfigsToFile(&programs.BasicConfig{
-		LastFaucetUnspentOutputID: wallet.LastFaucetUnspentOutputID().ToHex(),
-	})
 }
 
 func accountsSubcommand(wallet *accountwallet.AccountWallet, sub accountwallet.AccountSubcommands) {

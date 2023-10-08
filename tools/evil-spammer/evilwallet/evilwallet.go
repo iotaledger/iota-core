@@ -2,11 +2,8 @@ package evilwallet
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
-
-	"github.com/mr-tron/base58"
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -33,17 +30,6 @@ const (
 
 var (
 	defaultClientsURLs = []string{"http://localhost:8080", "http://localhost:8090"}
-
-	genesisTransactionID = iotago.TransactionIDRepresentingData(0, []byte("genesis"))
-
-	dockerFaucetSeed = func() []byte {
-		genesisSeed, err := base58.Decode("7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih")
-		if err != nil {
-			log.Fatal(ierrors.Errorf("failed to decode base58 seed, using the default one: %w", err))
-		}
-
-		return genesisSeed
-	}
 )
 
 // region EvilWallet ///////////////////////////////////////////////////////////////////////////////////////////////////////

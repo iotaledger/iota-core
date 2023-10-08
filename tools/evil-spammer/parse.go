@@ -11,8 +11,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/accountwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
-	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func parseFlags() (help bool) {
@@ -36,12 +34,6 @@ func parseFlags() (help bool) {
 		splitedCmds := readSubcommandsAndFlagSets(subcommands)
 		accountsSubcommandsFlags = parseAccountTestFlags(splitedCmds)
 
-		basicConfig := programs.LoadBasicConfig()
-		outputID, err := iotago.OutputIDFromHex(basicConfig.LastFaucetUnspentOutputID)
-		if err != nil {
-			log.Warnf("Cannot parse faucet output id from config: %v", err)
-		}
-		lastFaucetUnspendOutputID = outputID
 	case "quick":
 		parseQuickTestFlags()
 		// case SpammerTypeCommitments:
@@ -123,8 +115,6 @@ func parseBasicSpamFlags() {
 	if *blkNum == "" && *duration != "" {
 		customSpamParams.BlkToBeSent = make([]int, len(customSpamParams.Durations))
 	}
-
-	customSpamParams.Config = programs.LoadBasicConfig()
 }
 
 func parseQuickTestFlags() {

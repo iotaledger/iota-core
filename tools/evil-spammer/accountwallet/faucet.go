@@ -108,9 +108,14 @@ type faucet struct {
 	sync.Mutex
 }
 
-func newFaucet(clt models.Client, faucetUnspentOutputID iotago.OutputID, api iotago.API) *faucet {
+func newFaucet(clt models.Client, hexFaucetUnspentOutputID string) *faucet {
 	//get Faucet output and amount
 	var faucetAmount iotago.BaseToken
+
+	faucetUnspentOutputID, err := iotago.OutputIDFromHex(hexFaucetUnspentOutputID)
+	if err != nil {
+		log.Warnf("Cannot parse faucet output id from config: %v", err)
+	}
 
 	faucetOutput := clt.GetOutput(faucetUnspentOutputID)
 	if faucetOutput != nil {
@@ -125,7 +130,7 @@ func newFaucet(clt models.Client, faucetUnspentOutputID iotago.OutputID, api iot
 	}
 
 	f := &faucet{
-		seed: dockerFaucetSeed(),
+		seed: dockerGenesisSeed(),
 		clt:  clt,
 	}
 

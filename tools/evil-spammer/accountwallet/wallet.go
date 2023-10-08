@@ -19,9 +19,7 @@ import (
 
 var log = logger.New("AccountWallet")
 
-func Run(lastFaucetUnspentOutputID iotago.OutputID) (*AccountWallet, error) {
-	// read config here
-	config := loadAccountConfig()
+func Run(config *Configuration) (*AccountWallet, error) {
 
 	var opts []options.Option[AccountWallet]
 	if config.BindAddress != "" {
@@ -31,7 +29,7 @@ func Run(lastFaucetUnspentOutputID iotago.OutputID) (*AccountWallet, error) {
 		opts = append(opts, WithAccountStatesFile(config.AccountStatesFile))
 	}
 
-	opts = append(opts, WithFaucetUnspendOutputID(lastFaucetUnspentOutputID))
+	opts = append(opts, WithFaucetUnspendOutputID(config.LastFauctUnspentOutputID))
 
 	wallet := NewAccountWallet(opts...)
 
@@ -62,7 +60,7 @@ type AccountWallet struct {
 
 	optsClientBindAddress     string
 	optsAccountStatesFile     string
-	optsFaucetUnspendOutputID iotago.OutputID
+	optsFaucetUnspendOutputID string
 	optsRequestTimeout        time.Duration
 	optsRequestTicker         time.Duration
 }
@@ -75,9 +73,8 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 		optsRequestTicker:  time.Second * 5,
 	}, opts, func(w *AccountWallet) {
 		w.client = models.NewWebClient(w.optsClientBindAddress)
-		log.Infof("APi: %s", w.client.CurrentAPI())
 		w.api = w.client.CurrentAPI()
-		w.faucet = newFaucet(w.client, w.optsFaucetUnspendOutputID, w.api)
+		w.faucet = newFaucet(w.client, w.optsFaucetUnspendOutputID)
 	})
 }
 

@@ -66,19 +66,32 @@ func AvailableCommands(cmd string) bool {
 }
 
 type Configuration struct {
-	BindAddress       string `json:"bindAddress,omitempty"`
-	AccountStatesFile string `json:"accountStatesFile,omitempty"`
+	BindAddress              string `json:"bindAddress,omitempty"`
+	AccountStatesFile        string `json:"accountStatesFile,omitempty"`
+	GenesisSeed              string `json:"genesisSeed,omitempty"`
+	LastFauctUnspentOutputID string `json:"lastFaucetUnspentOutputID,omitempty"`
+	BlockIssuerPrivateKey    string `json:"blockIssuerPrivateKey,omitempty"`
+	AccountID                string `json:"accountID,omitempty"`
 }
 
-var accountConfigFile = "account_config.json"
+func (c *Configuration) Update(latestFaucetOutput iotago.OutputID) {
+	c.LastFauctUnspentOutputID = latestFaucetOutput.ToHex()
+}
 
-var accountConfigJSON = `{
+var accountConfigFile = "config.json"
+
+var (
+	dockerAccountConfigJSON = `{
 	"bindAddress": "http://localhost:8080",
-	"accountStatesFile": "wallet.LOCK"
-}`
+	"accountStatesFile": "wallet.dat",
+	"lastFaucetUnspentOutputID": "",
+	"genesisSeed": "7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih",
+	"blockIssuerPrivateKey": "db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648",
+	"accountID": "0x6aee704f25558e8aa7630fed0121da53074188abc423b3c5810f80be4936eb6e"}`
+)
 
-// loadAccountConfig loads the config file.
-func loadAccountConfig() *Configuration {
+// LoadConfiguration loads the config file.
+func LoadConfiguration() *Configuration {
 	// open config file
 	config := new(Configuration)
 	file, err := os.Open(accountConfigFile)
@@ -88,7 +101,7 @@ func loadAccountConfig() *Configuration {
 		}
 
 		//nolint:gosec // users should be able to read the file
-		if err = os.WriteFile(accountConfigFile, []byte(accountConfigJSON), 0o644); err != nil {
+		if err = os.WriteFile(accountConfigFile, []byte(dockerAccountConfigJSON), 0o644); err != nil {
 			panic(err)
 		}
 		if file, err = os.Open(accountConfigFile); err != nil {
@@ -103,6 +116,26 @@ func loadAccountConfig() *Configuration {
 	}
 
 	return config
+}
+
+func SaveConfiguration(config *Configuration) {
+	// open config file
+	file, err := os.Open(accountConfigFile)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	jsonConfigs, err := json.MarshalIndent(config, "", "    ")
+
+	if err != nil {
+		log.Errorf("failed to write configs to file %s", err)
+	}
+
+	//nolint:gosec // users should be able to read the file
+	if err = os.WriteFile(accountConfigFile, jsonConfigs, 0o644); err != nil {
+		panic(err)
+	}
 }
 
 type AccountSubcommands interface {
@@ -195,7 +228,7 @@ type StateData struct {
 	AccountsData  []*models.AccountData `serix:"2,mapKey=accounts,lengthPrefixType=uint8"`
 }
 
-var dockerFaucetSeed = func() []byte {
+var dockerGenesisSeed = func() []byte {
 	genesisSeed, err := base58.Decode("7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih")
 	if err != nil {
 		fmt.Printf("failed to decode base58 seed, using the default one: %v", err)

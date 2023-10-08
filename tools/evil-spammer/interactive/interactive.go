@@ -26,6 +26,7 @@ const (
 	maxConcurrentSpams = 5
 	lastSpamsShowed    = 15
 	timeFormat         = "2006/01/02 15:04:05"
+	configFilename     = "interactive_config.json"
 )
 
 const (
@@ -704,7 +705,7 @@ func (m *Mode) updateSentStatistic(s *spammer.Spammer, id int) {
 // load the config file.
 func (m *Mode) loadConfig() {
 	// open config file
-	file, err := os.Open("config.json")
+	file, err := os.Open(configFilename)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			panic(err)
