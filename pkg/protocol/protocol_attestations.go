@@ -24,7 +24,7 @@ type AttestationsProtocol struct {
 	log.Logger
 }
 
-func NewAttestationsRequester(protocol *Protocol) *AttestationsProtocol {
+func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 	a := &AttestationsProtocol{
 		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Attestations")),
 		protocol:            protocol,
@@ -95,14 +95,14 @@ func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment
 
 			commitmentVerifier, exists := a.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
 			if !exists {
-				a.LogDebug("failed to find commitment verifier for commitment %s when processing attestations", "commitment", commitment.LogName())
+				a.LogDebug("failed to find commitment verifier", "commitment", commitment.LogName())
 
 				return currentWeight
 			}
 
 			_, actualWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 			if err != nil {
-				a.LogError("failed to verify commitment when processing attestations", "commitment", commitment.LogName(), "error", err)
+				a.LogError("failed to verify commitment", "commitment", commitment.LogName(), "error", err)
 
 				return currentWeight
 			}

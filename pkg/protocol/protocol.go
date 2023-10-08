@@ -4,26 +4,35 @@ import (
 	"context"
 	"sync"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 )
 
 type Protocol struct {
-	Events  *Events
-	Workers *workerpool.Group
+	Events               *Events
+	Workers              *workerpool.Group
+	Network              *core.Protocol
+	BlocksProtocol       *BlocksProtocol
+	CommitmentsProtocol  *CommitmentsProtocol
+	AttestationsProtocol *AttestationsProtocol
+	WarpSyncProtocol     *WarpSyncProtocol
+
 	error   *event.Event1[error]
 	options *Options
 
 	*APIProvider
-	*NetworkManager
 	*ChainManager
 	*EngineManager
-
 	log.Logger
 	module.Module
 }
@@ -36,11 +45,45 @@ func New(logger log.Logger, workers *workerpool.Group, dispatcher network.Endpoi
 		error:   event.New1[error](),
 		options: newOptions(),
 	}, opts, func(p *Protocol) {
+		p.Network = core.NewProtocol(dispatcher, workers.CreatePool("NetworkProtocol"), p)
+		p.BlocksProtocol = NewBlocksProtocol(p)
+		p.CommitmentsProtocol = NewCommitmentsProtocol(p)
+		p.AttestationsProtocol = NewAttestationsProtocol(p)
+		p.WarpSyncProtocol = NewWarpSyncProtocol(p)
 		p.APIProvider = NewAPIProvider(p)
 		p.ChainManager = newChainManager(p)
 		p.EngineManager = NewEngineManager(p)
-		p.NetworkManager = newNetwork(p, dispatcher)
+
+		p.HookInitialized(func() {
+			unsubscribeFromNetworkEvents := lo.Batch(
+				p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
+				p.Network.OnBlockReceived(p.BlocksProtocol.ProcessResponse),
+				p.Network.OnBlockRequestReceived(p.BlocksProtocol.ProcessRequest),
+				p.Network.OnCommitmentReceived(p.CommitmentsProtocol.ProcessResponse),
+				p.Network.OnCommitmentRequestReceived(p.CommitmentsProtocol.ProcessRequest),
+				p.Network.OnAttestationsReceived(p.AttestationsProtocol.ProcessResponse),
+				p.Network.OnAttestationsRequestReceived(p.AttestationsProtocol.ProcessRequest),
+				p.Network.OnWarpSyncResponseReceived(p.WarpSyncProtocol.ProcessResponse),
+				p.Network.OnWarpSyncRequestReceived(p.WarpSyncProtocol.ProcessRequest),
+			)
+
+			p.HookShutdown(func() {
+				unsubscribeFromNetworkEvents()
+
+				p.BlocksProtocol.Shutdown()
+				p.CommitmentsProtocol.Shutdown()
+				p.AttestationsProtocol.Shutdown()
+				p.WarpSyncProtocol.Shutdown()
+				p.Network.Shutdown()
+			})
+		})
 	}, (*Protocol).TriggerConstructed)
+}
+
+func (p *Protocol) IssueBlock(block *model.Block) error {
+	p.BlocksProtocol.ProcessResponse(block, "self")
+
+	return nil
 }
 
 func (p *Protocol) Run(ctx context.Context) error {

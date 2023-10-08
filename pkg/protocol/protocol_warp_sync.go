@@ -22,7 +22,7 @@ type WarpSyncProtocol struct {
 	log.Logger
 }
 
-func NewWarpSyncRequester(protocol *Protocol) *WarpSyncProtocol {
+func NewWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 	c := &WarpSyncProtocol{
 		Logger:     lo.Return1(protocol.Logger.NewChildLogger("WarpSync")),
 		protocol:   protocol,
@@ -32,23 +32,25 @@ func NewWarpSyncRequester(protocol *Protocol) *WarpSyncProtocol {
 
 	c.ticker.Events.Tick.Hook(c.SendRequest)
 
-	c.protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-		commitment.RequestBlocks.OnUpdate(func(_, warpSyncBlocks bool) {
-			if warpSyncBlocks {
-				c.ticker.StartTicker(commitment.ID())
-			} else {
-				c.ticker.StopTicker(commitment.ID())
-			}
+	protocol.HookConstructed(func() {
+		c.protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
+			commitment.RequestBlocks.OnUpdate(func(_, warpSyncBlocks bool) {
+				if warpSyncBlocks {
+					c.ticker.StartTicker(commitment.ID())
+				} else {
+					c.ticker.StopTicker(commitment.ID())
+				}
+			})
 		})
 	})
 
 	return c
 }
 
-func (w *WarpSyncProtocol) SendRequest(id iotago.CommitmentID) {
+func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 	w.workerPool.Submit(func() {
-		if commitment, err := w.protocol.Commitment(id, false); err == nil {
-			w.protocol.Network.SendWarpSyncRequest(id)
+		if commitment, err := w.protocol.Commitment(commitmentID, false); err == nil {
+			w.protocol.Network.SendWarpSyncRequest(commitmentID)
 
 			w.LogDebug("sent request", "commitment", commitment.LogName())
 		}
