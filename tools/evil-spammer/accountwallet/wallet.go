@@ -49,7 +49,7 @@ func SaveState(w *AccountWallet) error {
 }
 
 type AccountWallet struct {
-	Faucet *Faucet
+	faucet *faucet
 	seed   [32]byte
 
 	accountsAliases map[string]*models.AccountData
@@ -75,13 +75,14 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 		optsRequestTicker:  time.Second * 5,
 	}, opts, func(w *AccountWallet) {
 		w.client = models.NewWebClient(w.optsClientBindAddress)
+		log.Infof("APi: %s", w.client.CurrentAPI())
 		w.api = w.client.CurrentAPI()
-		w.Faucet = NewFaucet(w.client, w.optsFaucetUnspendOutputID)
+		w.faucet = newFaucet(w.client, w.optsFaucetUnspendOutputID, w.api)
 	})
 }
 
 func (a *AccountWallet) LastFaucetUnspentOutputID() iotago.OutputID {
-	return a.Faucet.unspentOutput.OutputID
+	return a.faucet.unspentOutput.OutputID
 }
 
 // toAccountStateFile write account states to file.
@@ -231,7 +232,7 @@ func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) 
 	hdWallet := mock.NewHDWallet("", a.seed[:], a.latestUsedIndex+1)
 
 	receiverAddr := hdWallet.Address(addressType)
-	createdOutput, err := a.Faucet.RequestFunds(a.client, receiverAddr, iotago.BaseToken(amount))
+	createdOutput, err := a.RequestFaucetFunds(a.client, receiverAddr, iotago.BaseToken(amount))
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to request funds from Faucet")
 	}
@@ -265,7 +266,7 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 	txBuilder.AddOutput(&iotago.BasicOutput{
 		Amount: accountOutput.BaseTokenAmount(),
 		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: a.Faucet.address},
+			&iotago.AddressUnlockCondition{Address: a.faucet.address},
 		},
 	})
 

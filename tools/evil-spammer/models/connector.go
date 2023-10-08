@@ -163,6 +163,8 @@ type Client interface {
 	URL() (cltID string)
 	// PostTransaction sends a transaction to the Tangle via a given client.
 	PostTransaction(tx *iotago.SignedTransaction) (iotago.BlockID, error)
+	// PostBlock sends a block to the Tangle via a given client.
+	PostBlock(block *iotago.ProtocolBlock) (iotago.BlockID, error)
 	// PostData sends the given data (payload) by creating a block in the backend.
 	PostData(data []byte) (blkID string, err error)
 	// GetTransactionConfirmationState returns the AcceptanceState of a given transaction ID.
@@ -239,6 +241,15 @@ func (c *WebClient) PostTransaction(tx *iotago.SignedTransaction) (blockID iotag
 	return id, nil
 }
 
+func (c *WebClient) PostBlock(block *iotago.ProtocolBlock) (blockID iotago.BlockID, err error) {
+	id, err := c.client.SubmitBlock(context.Background(), block)
+	if err != nil {
+		return
+	}
+
+	return id, nil
+}
+
 // PostData sends the given data (payload) by creating a block in the backend.
 func (c *WebClient) PostData(data []byte) (blkID string, err error) {
 	blockBuilder := builder.NewBasicBlockBuilder(c.client.CurrentAPI())
@@ -307,6 +318,15 @@ func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.Signed
 
 func (c *WebClient) GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error) {
 	resp, err = c.client.BlockIssuance(context.Background())
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (c *WebClient) GetCongestion(accountID iotago.AccountID) (resp *apimodels.CongestionResponse, err error) {
+	resp, err = c.client.Congestion(context.Background(), accountID)
 	if err != nil {
 		return
 	}

@@ -221,7 +221,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *models.Output
 	receiveAddr := wallet.AddressOnIndex(0)
 	clt := e.connector.GetClient()
 
-	output, err := e.accWallet.Faucet.RequestFunds(clt, receiveAddr, faucetTokensPerRequest)
+	output, err := e.accWallet.RequestFaucetFunds(clt, receiveAddr, faucetTokensPerRequest)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to request funds from faucet")
 	}
