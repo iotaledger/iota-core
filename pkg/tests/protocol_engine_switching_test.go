@@ -363,7 +363,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertMainEngineSwitchedCount(1, nodesP2...)
 
 		ctxP1Cancel()
-
 		wg.Wait()
 	}
 
