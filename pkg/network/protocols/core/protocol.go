@@ -155,8 +155,8 @@ func (p *Protocol) Shutdown() {
 	p.shutdown.Trigger()
 }
 
-func (n *Protocol) OnShutdown(callback func()) (unsubscribe func()) {
-	return n.shutdown.OnTrigger(callback)
+func (p *Protocol) OnShutdown(callback func()) (unsubscribe func()) {
+	return p.shutdown.OnTrigger(callback)
 }
 
 func (p *Protocol) handlePacket(nbr peer.ID, packet proto.Message) (err error) {
