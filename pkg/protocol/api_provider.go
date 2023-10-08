@@ -1,6 +1,9 @@
 package protocol
 
-import iotago "github.com/iotaledger/iota.go/v4"
+import (
+	"github.com/iotaledger/hive.go/ierrors"
+	iotago "github.com/iotaledger/iota.go/v4"
+)
 
 // APIProvider is a protocol component that exposes the methods to comply with the iotago.APIProvider interface.
 type APIProvider struct {
@@ -15,7 +18,11 @@ func NewAPIProvider(protocol *Protocol) *APIProvider {
 
 // APIForVersion returns the API for the given version.
 func (a *APIProvider) APIForVersion(version iotago.Version) (api iotago.API, err error) {
-	return a.MainEngineInstance().APIForVersion(version)
+	if mainEngineInstance := a.MainEngineInstance(); mainEngineInstance != nil {
+		return a.MainEngineInstance().APIForVersion(version)
+	}
+
+	return nil, ierrors.New("no engine instance available")
 }
 
 // APIForSlot returns the API for the given slot.

@@ -298,11 +298,7 @@ func (e *Engine) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 }
 
 func (e *Engine) APIForVersion(version iotago.Version) (iotago.API, error) {
-	storageInstance := e.Storage
-	settings := storageInstance.Settings()
-	apiProvider := settings.APIProvider()
-
-	return apiProvider.APIForVersion(version)
+	return e.Storage.Settings().APIProvider().APIForVersion(version)
 }
 
 func (e *Engine) LatestAPI() iotago.API {
