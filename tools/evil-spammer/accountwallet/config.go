@@ -2,10 +2,7 @@ package accountwallet
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
-
-	"github.com/mr-tron/base58/base58"
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
@@ -226,15 +223,6 @@ type StateData struct {
 	Seed          string                `serix:"0,mapKey=seed,lengthPrefixType=uint8"`
 	LastUsedIndex uint64                `serix:"1,mapKey=lastUsedIndex"`
 	AccountsData  []*models.AccountData `serix:"2,mapKey=accounts,lengthPrefixType=uint8"`
-}
-
-var dockerGenesisSeed = func() []byte {
-	genesisSeed, err := base58.Decode("7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih")
-	if err != nil {
-		fmt.Printf("failed to decode base58 seed, using the default one: %v", err)
-	}
-
-	return genesisSeed
 }
 
 var genesisTransactionID = iotago.TransactionIDRepresentingData(0, []byte("genesis"))

@@ -1,12 +1,11 @@
 package accountwallet
 
 import (
-	"crypto/ed25519"
 	"fmt"
 	"sync"
 	"time"
 
-	"golang.org/x/crypto/blake2b"
+	"github.com/mr-tron/base58"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/blockfactory"
@@ -55,7 +54,7 @@ func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago
 	// set remainder output to be reused by the Faucet wallet
 	a.faucet.unspentOutput = &models.Output{
 		OutputID:     iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 1),
-		Address:      a.faucet.address,
+		Address:      a.faucet.genesisHdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address),
 		Index:        0,
 		Balance:      signedTx.Transaction.Outputs[1].BaseTokenAmount(),
 		OutputStruct: signedTx.Transaction.Outputs[1],
@@ -97,22 +96,28 @@ func (a *AccountWallet) createBlock(issuerResp *apimodels.IssuanceBlockHeaderRes
 	return blk, nil
 }
 
-type faucet struct {
-	address       *iotago.Ed25519Address
-	unspentOutput *models.Output
-	account       blockfactory.Account
+type faucetParams struct {
+	latestUsedOutputID string
+	faucetPrivateKey   string
+	faucetAccountID    string
+	genesisSeed        string
+}
 
-	seed []byte
-	clt  models.Client
+type faucet struct {
+	unspentOutput   *models.Output
+	account         blockfactory.Account
+	genesisHdWallet *mock.HDWallet
+
+	clt models.Client
 
 	sync.Mutex
 }
 
-func newFaucet(clt models.Client, hexFaucetUnspentOutputID string) *faucet {
+func newFaucet(clt models.Client, faucetParams *faucetParams) *faucet {
 	//get Faucet output and amount
 	var faucetAmount iotago.BaseToken
 
-	faucetUnspentOutputID, err := iotago.OutputIDFromHex(hexFaucetUnspentOutputID)
+	faucetUnspentOutputID, err := iotago.OutputIDFromHex(faucetParams.latestUsedOutputID)
 	if err != nil {
 		log.Warnf("Cannot parse faucet output id from config: %v", err)
 	}
@@ -128,36 +133,27 @@ func newFaucet(clt models.Client, hexFaucetUnspentOutputID string) *faucet {
 			faucetAmount = faucetOutput.BaseTokenAmount()
 		}
 	}
-
-	f := &faucet{
-		seed: dockerGenesisSeed(),
-		clt:  clt,
+	genesisSeed, err := base58.Decode(faucetParams.genesisSeed)
+	if err != nil {
+		fmt.Printf("failed to decode base58 seed, using the default one: %v", err)
 	}
 
-	hdWallet := mock.NewHDWallet("", f.seed[:], 0)
-	f.address = hdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	f := &faucet{
+		clt:             clt,
+		account:         blockfactory.AccountFromParams(faucetParams.faucetAccountID, faucetParams.faucetPrivateKey),
+		genesisHdWallet: mock.NewHDWallet("", genesisSeed, 0),
+	}
+
+	f.genesisHdWallet.Address()
 	f.unspentOutput = &models.Output{
-		Address:      f.address,
+		Address:      f.genesisHdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address),
 		Index:        0,
 		OutputID:     faucetUnspentOutputID,
 		Balance:      faucetAmount,
 		OutputStruct: faucetOutput,
 	}
 
-	f.createFaucetAccountFromSeed()
-
 	return f
-}
-
-func (f *faucet) createFaucetAccountFromSeed() {
-	privateKey := ed25519.NewKeyFromSeed(f.seed[:])
-	ed25519PubKey := privateKey.Public().(ed25519.PublicKey)
-	accIdBytes := blake2b.Sum256(ed25519PubKey[:])
-
-	var accountID iotago.AccountID
-	copy(accountID[:], accIdBytes[:iotago.AccountIDLength])
-
-	f.account = blockfactory.NewEd25519Account(accountID, privateKey)
 }
 
 func (f *faucet) prepareFaucetRequest(receiveAddr iotago.Address, amount iotago.BaseToken) (*iotago.SignedTransaction, error) {
@@ -175,7 +171,7 @@ func (f *faucet) createFaucetTransaction(receiveAddr iotago.Address, amount iota
 	txBuilder := builder.NewTransactionBuilder(f.clt.CurrentAPI())
 
 	txBuilder.AddInput(&builder.TxInput{
-		UnlockTarget: f.address,
+		UnlockTarget: f.genesisHdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address),
 		InputID:      f.unspentOutput.OutputID,
 		Input:        f.unspentOutput.OutputStruct,
 	})
@@ -204,15 +200,14 @@ func (f *faucet) createFaucetTransaction(receiveAddr iotago.Address, amount iota
 	txBuilder.AddOutput(&iotago.BasicOutput{
 		Amount: remainderAmount,
 		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: f.address},
+			&iotago.AddressUnlockCondition{Address: f.genesisHdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)},
 		},
 	})
 
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("Faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
 	txBuilder.SetCreationSlot(f.clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
 
-	hdWallet := mock.NewHDWallet("", f.seed[:], 0)
-	signedTx, err := txBuilder.Build(hdWallet.AddressSigner())
+	signedTx, err := txBuilder.Build(f.genesisHdWallet.AddressSigner())
 	if err != nil {
 		log.Errorf("failed to build transaction: %s", err)
 

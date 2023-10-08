@@ -20,7 +20,6 @@ import (
 var log = logger.New("AccountWallet")
 
 func Run(config *Configuration) (*AccountWallet, error) {
-
 	var opts []options.Option[AccountWallet]
 	if config.BindAddress != "" {
 		opts = append(opts, WithClientURL(config.BindAddress))
@@ -29,7 +28,12 @@ func Run(config *Configuration) (*AccountWallet, error) {
 		opts = append(opts, WithAccountStatesFile(config.AccountStatesFile))
 	}
 
-	opts = append(opts, WithFaucetUnspendOutputID(config.LastFauctUnspentOutputID))
+	opts = append(opts, WithFaucetAccountParams(&faucetParams{
+		latestUsedOutputID: config.LastFauctUnspentOutputID,
+		genesisSeed:        config.GenesisSeed,
+		faucetPrivateKey:   config.BlockIssuerPrivateKey,
+		faucetAccountID:    config.AccountID,
+	}))
 
 	wallet := NewAccountWallet(opts...)
 
@@ -58,11 +62,11 @@ type AccountWallet struct {
 	client *models.WebClient
 	api    iotago.API
 
-	optsClientBindAddress     string
-	optsAccountStatesFile     string
-	optsFaucetUnspendOutputID string
-	optsRequestTimeout        time.Duration
-	optsRequestTicker         time.Duration
+	optsClientBindAddress string
+	optsAccountStatesFile string
+	optsFaucetParams      *faucetParams
+	optsRequestTimeout    time.Duration
+	optsRequestTicker     time.Duration
 }
 
 func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
@@ -74,7 +78,7 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 	}, opts, func(w *AccountWallet) {
 		w.client = models.NewWebClient(w.optsClientBindAddress)
 		w.api = w.client.CurrentAPI()
-		w.faucet = newFaucet(w.client, w.optsFaucetUnspendOutputID)
+		w.faucet = newFaucet(w.client, w.optsFaucetParams)
 	})
 }
 
@@ -263,7 +267,7 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 	txBuilder.AddOutput(&iotago.BasicOutput{
 		Amount: accountOutput.BaseTokenAmount(),
 		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: a.faucet.address},
+			&iotago.AddressUnlockCondition{Address: a.faucet.genesisHdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)},
 		},
 	})
 
