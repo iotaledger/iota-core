@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/promise"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -53,8 +54,8 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	source.OnPending(func() { s.accepted.Set(false) })
 	source.OnAccepted(func() { s.accepted.Set(true) })
 	source.OnRejected(func() { s.rejected.Trigger() })
-	source.OnCommitted(func() { s.committed.Trigger() })
-	source.OnOrphaned(func() { s.orphaned.Trigger() })
+	source.OnCommittedSlotUpdated(lo.Void(s.committedSlot.Set))
+	source.OnOrphanedSlotUpdated(lo.Void(s.orphanedSlot.Set))
 
 	return s
 }
@@ -101,8 +102,8 @@ func (s *StateMetadata) AllSpendersRemoved() bool {
 	return s.allSpendersRemoved.WasTriggered()
 }
 
-func (s *StateMetadata) onAllSpendersRemoved(callback func()) (unsubscribe func()) {
-	return s.allSpendersRemoved.Hook(callback).Unhook
+func (s *StateMetadata) onAllSpendersRemoved(callback func()) {
+	s.allSpendersRemoved.Hook(callback)
 }
 
 func (s *StateMetadata) PendingSpenderCount() int {
@@ -138,11 +139,11 @@ func (s *StateMetadata) setupSpender(spender *TransactionMetadata) {
 		s.spendAccepted.Set(nil)
 	})
 
-	spender.OnCommitted(func() {
+	spender.OnCommittedSlotUpdated(func(_ iotago.SlotIndex) {
 		s.spendCommitted.Set(spender)
 
 		s.decreaseSpenderCount()
 	})
 
-	spender.OnOrphaned(s.decreaseSpenderCount)
+	spender.OnOrphanedSlotUpdated(func(_ iotago.SlotIndex) { s.decreaseSpenderCount() })
 }

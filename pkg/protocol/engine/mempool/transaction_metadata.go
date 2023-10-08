@@ -57,15 +57,15 @@ type inclusionFlags interface {
 
 	OnAccepted(callback func())
 
-	IsCommitted() bool
+	CommittedSlot() (slot iotago.SlotIndex, isCommitted bool)
 
-	OnCommitted(callback func())
+	OnCommittedSlotUpdated(callback func(slot iotago.SlotIndex))
 
 	IsRejected() bool
 
 	OnRejected(callback func())
 
-	IsOrphaned() bool
+	OrphanedSlot() (slot iotago.SlotIndex, isOrphaned bool)
 
-	OnOrphaned(callback func())
+	OnOrphanedSlotUpdated(callback func(slot iotago.SlotIndex))
 }

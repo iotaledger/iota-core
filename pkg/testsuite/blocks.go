@@ -109,6 +109,14 @@ func (t *TestSuite) AssertBlocksInCacheRootBlock(expectedBlocks []*blocks.Block,
 	t.assertBlocksInCacheWithFunc(expectedBlocks, "root-block", expectedRootBlock, (*blocks.Block).IsRootBlock, nodes...)
 }
 
+func (t *TestSuite) AssertBlocksInCacheBooked(expectedBlocks []*blocks.Block, expectedBooked bool, nodes ...*mock.Node) {
+	t.assertBlocksInCacheWithFunc(expectedBlocks, "booked", expectedBooked, (*blocks.Block).IsBooked, nodes...)
+}
+
+func (t *TestSuite) AssertBlocksInCacheInvalid(expectedBlocks []*blocks.Block, expectedInvalid bool, nodes ...*mock.Node) {
+	t.assertBlocksInCacheWithFunc(expectedBlocks, "valid", expectedInvalid, (*blocks.Block).IsInvalid, nodes...)
+}
+
 func (t *TestSuite) AssertBlocksInCacheConflicts(blockConflicts map[*blocks.Block][]string, nodes ...*mock.Node) {
 	for _, node := range nodes {
 		for block, conflictAliases := range blockConflicts {
@@ -135,7 +143,6 @@ func (t *TestSuite) AssertBlocksInCacheConflicts(blockConflicts map[*blocks.Bloc
 
 				return nil
 			})
-
 		}
 	}
 }

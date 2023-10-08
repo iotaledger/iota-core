@@ -1,4 +1,4 @@
-package models
+package wallet
 
 import (
 	"context"
@@ -333,7 +333,3 @@ func (c *WebClient) GetCongestion(accountID iotago.AccountID) (resp *apimodels.C
 
 	return
 }
-
-// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-var _ Client = NewWebClient("abc")

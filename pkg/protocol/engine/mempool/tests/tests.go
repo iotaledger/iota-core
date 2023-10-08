@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 const (
@@ -210,11 +211,10 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	tf.CommitSlot(1)
-	// time.Sleep(1 * time.Second)
-	transactionDeletionState := map[string]bool{"tx1": true, "tx2": false, "tx3": false}
+	transactionDeletionState := map[string]bool{"tx1": false, "tx2": false, "tx3": false}
 	tf.RequireTransactionsEvicted(transactionDeletionState)
 
-	attachmentDeletionState := map[string]bool{"block1": true, "block2": false, "block3": false}
+	attachmentDeletionState := map[string]bool{"block1": false, "block2": false, "block3": false}
 	tf.RequireAttachmentsEvicted(attachmentDeletionState)
 
 	tf.Instance.Evict(1)
@@ -223,9 +223,8 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tf.RequireBooked("tx3")
 
 	tf.CommitSlot(2)
-	// time.Sleep(1 * time.Second)
-	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx2": true}))
-	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block2": true}))
+	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx2": false}))
+	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block1": true}))
 
 	tf.Instance.Evict(2)
 	tf.RequireBooked("tx3")
@@ -234,14 +233,13 @@ func TestSetInclusionSlot(t *testing.T, tf *TestFramework) {
 	tf.RequireAccepted(map[string]bool{"tx3": true})
 
 	tf.CommitSlot(3)
-	// time.Sleep(1 * time.Second)
-	tf.RequireTransactionsEvicted(lo.MergeMaps(transactionDeletionState, map[string]bool{"tx3": true}))
+	tf.RequireTransactionsEvicted(transactionDeletionState)
 
-	require.False(t, tx1Metadata.IsOrphaned())
-	require.False(t, tx2Metadata.IsOrphaned())
-	require.False(t, tx3Metadata.IsOrphaned())
+	require.False(t, lo.Return2(tx1Metadata.OrphanedSlot()))
+	require.False(t, lo.Return2(tx2Metadata.OrphanedSlot()))
+	require.False(t, lo.Return2(tx3Metadata.OrphanedSlot()))
 
-	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block3": true}))
+	tf.RequireAttachmentsEvicted(lo.MergeMaps(attachmentDeletionState, map[string]bool{"block1": true, "block2": true, "block3": false}))
 }
 
 func TestSetTransactionOrphanage(t *testing.T, tf *TestFramework) {
@@ -273,13 +271,14 @@ func TestSetTransactionOrphanage(t *testing.T, tf *TestFramework) {
 
 	tf.Instance.Evict(1)
 
-	tf.RequireTransactionsEvicted(map[string]bool{"tx1": true, "tx2": true, "tx3": true})
+	// We only evict after MCA
+	tf.RequireTransactionsEvicted(map[string]bool{"tx1": false, "tx2": false, "tx3": false})
 
-	require.True(t, tx1Metadata.IsOrphaned())
-	require.True(t, tx2Metadata.IsOrphaned())
-	require.True(t, tx3Metadata.IsOrphaned())
+	require.True(t, lo.Return2(tx1Metadata.OrphanedSlot()))
+	require.True(t, tx2Metadata.IsPending())
+	require.True(t, tx3Metadata.IsPending())
 
-	tf.RequireAttachmentsEvicted(map[string]bool{"block1": true, "block2": true, "block3": true})
+	tf.RequireAttachmentsEvicted(map[string]bool{"block1": true, "block2": false, "block3": false})
 }
 
 func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
@@ -313,9 +312,9 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 	require.False(t, tx3Metadata.IsAccepted())
 
 	tf.Instance.Evict(1)
-	require.False(t, tx1Metadata.IsOrphaned())
-	require.False(t, tx2Metadata.IsOrphaned())
-	require.False(t, tx3Metadata.IsOrphaned())
+	require.False(t, lo.Return2(tx1Metadata.OrphanedSlot()))
+	require.False(t, lo.Return2(tx2Metadata.OrphanedSlot()))
+	require.False(t, lo.Return2(tx3Metadata.OrphanedSlot()))
 
 	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))))
 	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx2"))))
@@ -323,17 +322,18 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 
 	tf.Instance.Evict(2)
 
-	require.True(t, tx1Metadata.IsOrphaned())
-	require.True(t, tx2Metadata.IsOrphaned())
-	require.True(t, tx3Metadata.IsOrphaned())
+	require.True(t, lo.Return2(tx1Metadata.OrphanedSlot()))
+	require.True(t, lo.Return2(tx2Metadata.OrphanedSlot()))
+	require.True(t, lo.Return2(tx3Metadata.OrphanedSlot()))
 
-	require.False(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))))
-	require.False(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx2"))))
-	require.False(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx3"))))
+	// All conflicts still exist, as they are kept around until MCA
+	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx1"))))
+	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx2"))))
+	require.True(t, lo.Return2(tf.ConflictDAG.ConflictSets(tf.TransactionID("tx3"))))
 
-	tf.RequireTransactionsEvicted(map[string]bool{"tx1": true, "tx2": true, "tx3": true})
+	tf.RequireTransactionsEvicted(map[string]bool{"tx1": false, "tx2": false, "tx3": false})
 
-	tf.RequireAttachmentsEvicted(map[string]bool{"block1.1": true, "block1.2": true, "block2": true, "block3": true})
+	tf.RequireAttachmentsEvicted(map[string]bool{"block1.1": true, "block1.2": true, "block2": false, "block3": false})
 }
 
 func TestStateDiff(t *testing.T, tf *TestFramework) {
@@ -482,7 +482,13 @@ func TestMemoryRelease(t *testing.T, tf *TestFramework) {
 	txIndex, prevStateAlias := issueTransactions(1, 20000, "genesis")
 	tf.WaitChildren()
 
-	issueTransactions(txIndex, 20000, prevStateAlias)
+	txIndex, _ = issueTransactions(txIndex, 20000, prevStateAlias)
+
+	// Eviction is delayed by MCA, so we force Commit and Eviction.
+	for index := txIndex; index <= txIndex+int(tpkg.TestAPI.ProtocolParameters().MaxCommittableAge()); index++ {
+		tf.CommitSlot(iotago.SlotIndex(index))
+		tf.Instance.Evict(iotago.SlotIndex(index))
+	}
 
 	tf.Cleanup()
 
