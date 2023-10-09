@@ -40,7 +40,6 @@ services:
       --profiling.bindAddress=0.0.0.0:6061
       --profiling.enabled=true
       --protocol.snapshot.path=/app/data/snapshot.bin
-      --restAPI.allowIncompleteBlock=true
       {% if 'node-01' in inventory_hostname or 'node-02' in inventory_hostname or 'node-03' in inventory_hostname %}
       --validator.enabled=true
       --validator.account={{validatorAccount}}
@@ -49,11 +48,6 @@ services:
       {% if 'node-01' in inventory_hostname %}
       --validator.ignoreBootstrapped=true
       {% endif %}
-      --restAPI.allowIncompleteBlock=true
-      --restAPI.blockIssuerAccount={{validatorAccount}}
-      --restAPI.blockIssuerPrivateKey={{validatorPrivKey}}
-      --inx.blockIssuerAccount={{validatorAccount}}
-      --inx.blockIssuerPrivateKey={{validatorPrivKey}}
       --p2p.peers=/dns/node-01.feature/tcp/14666/p2p/12D3KooWCrjmh4dUCWfGVQT6ivzArieJB9Z3eKdy2mdEEN95NDPS
       --p2p.externalMultiAddresses={{ ips | join(',') }}
       --p2p.identityPrivateKey={{p2pIdentityPrivateKey}}

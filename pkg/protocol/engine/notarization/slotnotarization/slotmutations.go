@@ -75,8 +75,8 @@ func (m *SlotMutations) Reset(index iotago.SlotIndex) {
 // AcceptedBlocks returns the set of accepted blocks for the given slot.
 func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) ads.Set[iotago.BlockID] {
 	if len(createIfMissing) > 0 && createIfMissing[0] {
-		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, func() ads.Set[iotago.SlotIdentifier] {
-			return ads.NewSet(mapdb.NewMapDB(), iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes)
+		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, func() ads.Set[iotago.BlockID] {
+			return ads.NewSet(mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
 		}))
 	}
 

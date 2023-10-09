@@ -179,14 +179,11 @@ Example:
 | publicRoutes                   | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes<br/>/api/core/v3/info<br/>/api/core/v3/blocks\*<br/>/api/core/v3/transactions\*<br/>/api/core/v3/commitments\*<br/>/api/core/v3/outputs\*<br/>/api/core/v3/accounts\*<br/>/api/core/v3/validators\*<br/>/api/core/v3/rewards\*<br/>/api/core/v3/committee<br/>/api/debug/v2/\*<br/>/api/indexer/v2/\*<br/>/api/mqtt/v2 |
 | protectedRoutes                | The HTTP REST routes which need to be called with authorization. Wildcards using \* are allowed | array   | /api/\*                                                                                                                                                                                                                                                                                                                                |
 | debugRequestLoggerEnabled      | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                                                                                                                                                 |
-| allowIncompleteBlock           | Whether the node allows to fill in incomplete block and issue it for user                      | boolean | false                                                                                                                                                                                                                                                                                                                                 |
 | maxPageSize                    | The maximum number of results per page                                                         | uint    | 100                                                                                                                                                                                                                                                                                                                                   |
 | requestsMemoryCacheGranularity | Defines per how many slots a cache is created for big API requests                             | uint    | 10                                                                                                                                                                                                                                                                                                                                    |
 | maxRequestedSlotAge            | The maximum age of a request that will be processed                                            | uint    | 10                                                                                                                                                                                                                                                                                                                                    |
 | [jwtAuth](#restapi_jwtauth)    | Configuration for jwtAuth                                                                      | object  |                                                                                                                                                                                                                                                                                                                                       |
 | [limits](#restapi_limits)      | Configuration for limits                                                                       | object  |                                                                                                                                                                                                                                                                                                                                       |
-| blockIssuerAccount             | The accountID of the account that will issue the blocks                                        | string  | ""                                                                                                                                                                                                                                                                                                                                    |
-| blockIssuerPrivateKey          | The private key of the account that will issue the blocks                                      | string  | ""                                                                                                                                                                                                                                                                                                                                    |
 
 ### <a id="restapi_jwtauth"></a> JwtAuth
 
@@ -228,7 +225,6 @@ Example:
         "/api/*"
       ],
       "debugRequestLoggerEnabled": false,
-      "allowIncompleteBlock": false,
       "maxPageSize": 100,
       "requestsMemoryCacheGranularity": 10,
       "maxRequestedSlotAge": 10,
@@ -238,9 +234,7 @@ Example:
       "limits": {
         "maxBodyLength": "1M",
         "maxResults": 1000
-      },
-      "blockIssuerAccount": "",
-      "blockIssuerPrivateKey": ""
+      }
     }
   }
 ```
@@ -381,29 +375,7 @@ Example:
   }
 ```
 
-## <a id="blockissuer"></a> 10. BlockIssuer
-
-| Name                      | Description                                                             | Type    | Default value |
-| ------------------------- | ----------------------------------------------------------------------- | ------- | ------------- |
-| enabled                   | Whether the BlockIssuer component is enabled                            | boolean | true          |
-| tipSelectionTimeout       | The timeout for tip selection                                           | string  | "10s"         |
-| tipSelectionRetryInterval | The interval for retrying tip selection                                 | string  | "200ms"       |
-| rateSetterEnabled         | Whether the RateSetter should be taken into account when issuing blocks | boolean | false         |
-
-Example:
-
-```json
-  {
-    "blockIssuer": {
-      "enabled": true,
-      "tipSelectionTimeout": "10s",
-      "tipSelectionRetryInterval": "200ms",
-      "rateSetterEnabled": false
-    }
-  }
-```
-
-## <a id="validator"></a> 11. Validator
+## <a id="validator"></a> 10. Validator
 
 | Name                       | Description                                                                                                  | Type    | Default value |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------- |
@@ -431,7 +403,7 @@ Example:
   }
 ```
 
-## <a id="dashboard"></a> 12. Dashboard
+## <a id="dashboard"></a> 11. Dashboard
 
 | Name                              | Description                             | Type    | Default value  |
 | --------------------------------- | --------------------------------------- | ------- | -------------- |
@@ -473,7 +445,7 @@ Example:
   }
 ```
 
-## <a id="metrics"></a> 13. Metrics
+## <a id="metrics"></a> 12. Metrics
 
 | Name            | Description                                          | Type    | Default value  |
 | --------------- | ---------------------------------------------------- | ------- | -------------- |
@@ -497,14 +469,12 @@ Example:
   }
 ```
 
-## <a id="inx"></a> 14. Inx
+## <a id="inx"></a> 13. Inx
 
-| Name                  | Description                                               | Type    | Default value    |
-| --------------------- | --------------------------------------------------------- | ------- | ---------------- |
-| enabled               | Whether the INX plugin is enabled                         | boolean | false            |
-| bindAddress           | The bind address on which the INX can be accessed from    | string  | "localhost:9029" |
-| blockIssuerAccount    | The accountID of the account that will issue the blocks   | string  | ""               |
-| blockIssuerPrivateKey | The private key of the account that will issue the blocks | string  | ""               |
+| Name        | Description                                            | Type    | Default value    |
+| ----------- | ------------------------------------------------------ | ------- | ---------------- |
+| enabled     | Whether the INX plugin is enabled                      | boolean | false            |
+| bindAddress | The bind address on which the INX can be accessed from | string  | "localhost:9029" |
 
 Example:
 
@@ -512,9 +482,7 @@ Example:
   {
     "inx": {
       "enabled": false,
-      "bindAddress": "localhost:9029",
-      "blockIssuerAccount": "",
-      "blockIssuerPrivateKey": ""
+      "bindAddress": "localhost:9029"
     }
   }
 ```

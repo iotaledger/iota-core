@@ -35,7 +35,7 @@ func (p *Protocol) SendWarpSyncResponse(id iotago.CommitmentID, blockIDs iotago.
 
 func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id peer.ID) {
 	p.workerPool.Submit(func() {
-		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
+		commitmentID, _, err := iotago.CommitmentIDFromBytes(commitmentIDBytes)
 		if err != nil {
 			p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize commitmentID in warp sync request"), id)
 
@@ -48,7 +48,7 @@ func (p *Protocol) handleWarpSyncRequest(commitmentIDBytes []byte, id peer.ID) {
 
 func (p *Protocol) handleWarpSyncResponse(commitmentIDBytes []byte, blockIDsBytes []byte, tangleMerkleProofBytes []byte, transactionIDsBytes []byte, mutationProofBytes []byte, id peer.ID) {
 	p.workerPool.Submit(func() {
-		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
+		commitmentID, _, err := iotago.CommitmentIDFromBytes(commitmentIDBytes)
 		if err != nil {
 			p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize commitmentID in warp sync response"), id)
 

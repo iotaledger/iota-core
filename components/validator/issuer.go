@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/model"
+	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 func issueValidatorBlock(ctx context.Context) {
@@ -32,16 +34,28 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	modelBlock, err := deps.BlockIssuer.CreateValidationBlock(ctx,
-		validatorAccount,
-		blockfactory.WithValidationBlockHeaderOptions(
-			blockfactory.WithIssuingTime(blockIssuingTime),
-		),
-		blockfactory.WithProtocolParametersHash(protocolParametersHash),
-		blockfactory.WithHighestSupportedVersion(deps.Protocol.LatestAPI().Version()),
-	)
+	parents := engineInstance.TipSelection.SelectTips(iotago.BlockTypeValidationMaxParents)
+
+	// create the validation block here using the validation block builder from iota.go
+	validationBlock, err := builder.NewValidationBlockBuilder(deps.Protocol.CurrentAPI()).
+		IssuingTime(blockIssuingTime).
+		ProtocolParametersHash(protocolParametersHash).
+		HighestSupportedVersion(deps.Protocol.LatestAPI().Version()).
+		LatestFinalizedSlot(engineInstance.SyncManager.LatestFinalizedSlot()).
+		StrongParents(parents[iotago.StrongParentType]).
+		WeakParents(parents[iotago.WeakParentType]).
+		ShallowLikeParents(parents[iotago.ShallowLikeParentType]).
+		Sign(validatorAccount.ID(), validatorAccount.PrivateKey()).
+		Build()
 	if err != nil {
-		Component.LogWarnf("error creating validator block: %s", err.Error())
+		Component.LogWarnf("error creating validation block: %s", err.Error())
+
+		return
+	}
+
+	modelBlock, err := model.BlockFromBlock(validationBlock)
+	if err != nil {
+		Component.LogWarnf("error creating model block from validation block: %s", err.Error())
 
 		return
 	}
@@ -52,7 +66,7 @@ func issueValidatorBlock(ctx context.Context) {
 		nextBroadcast = blockIssuingTime.Add(ParamsValidator.CandidateBroadcastInterval)
 	}
 
-	if err = deps.BlockIssuer.IssueBlock(modelBlock); err != nil {
+	if err = deps.BlockHandler.SubmitBlock(modelBlock); err != nil {
 		Component.LogWarnf("error issuing validator block: %s", err.Error())
 
 		return

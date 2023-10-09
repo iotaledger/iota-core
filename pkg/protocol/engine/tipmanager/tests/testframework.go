@@ -37,7 +37,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		API:                tpkg.TestAPI,
 	}
 
-	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID()
+	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID
 
 	t.Instance = tipmanagerv1.New(func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]

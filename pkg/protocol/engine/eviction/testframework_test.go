@@ -42,7 +42,7 @@ func (t *TestFramework) CreateAndAddRootBlock(alias string, slot iotago.SlotInde
 
 	id := iotago.Identifier{}
 	binary.LittleEndian.PutUint64(id[:], t.idCounter)
-	blockID := iotago.NewSlotIdentifier(slot, id)
+	blockID := iotago.NewBlockID(slot, id)
 	blockID.RegisterAlias(alias)
 
 	if !t.rootBlockIDs.Set(alias, blockID) {

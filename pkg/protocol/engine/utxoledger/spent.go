@@ -96,8 +96,8 @@ func (s *Spent) KVStorableKey() (key []byte) {
 }
 
 func (s *Spent) KVStorableValue() (value []byte) {
-	ms := marshalutil.New(iotago.SlotIdentifierLength + iotago.SlotIndexLength)
-	ms.WriteBytes(s.transactionIDSpent[:]) // iotago.SlotIdentifierLength bytes
+	ms := marshalutil.New(iotago.TransactionIDLength + iotago.SlotIndexLength)
+	ms.WriteBytes(s.transactionIDSpent[:]) // iotago.TransactionIDLength bytes
 	ms.WriteBytes(s.slotSpent.MustBytes()) // iotago.SlotIndexLength bytes
 
 	return ms.Bytes()

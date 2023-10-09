@@ -220,9 +220,9 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		return nil
 	}
 
-	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.SlotIdentifierFromBytes)
+	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
 	for _, blockID := range blockIDs {
-		_ = acceptedBlocks.Add(blockID) // a mapdb can never return an error
+		_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
 	}
 
 	if !iotago.VerifyProof(tangleMerkleProof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.Commitment().RootsID()) {

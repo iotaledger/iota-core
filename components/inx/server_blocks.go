@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -130,13 +130,13 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (
 	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
 	defer mergedCtxCancel()
 
-	blockID, err := deps.BlockIssuer.AttachBlock(mergedCtx, block, blockIssuerAccount)
+	blockID, err := deps.BlockHandler.AttachBlock(mergedCtx, block)
 	if err != nil {
 		switch {
-		case ierrors.Is(err, blockfactory.ErrBlockAttacherInvalidBlock):
+		case ierrors.Is(err, blockhandler.ErrBlockAttacherInvalidBlock):
 			return nil, status.Errorf(codes.InvalidArgument, "failed to attach block: %s", err.Error())
 
-		case ierrors.Is(err, blockfactory.ErrBlockAttacherAttachingNotPossible):
+		case ierrors.Is(err, blockhandler.ErrBlockAttacherAttachingNotPossible):
 			return nil, status.Errorf(codes.Internal, "failed to attach block: %s", err.Error())
 
 		default:
