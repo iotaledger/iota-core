@@ -91,7 +91,7 @@ func (i *BlockIssuer) Shutdown() {
 	i.workerPool.ShutdownComplete.Wait()
 }
 
-func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, issuerAccount Account, node *Node, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
+func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, issuerAccount Account, node *Node, opts ...options.Option[ValidatorBlockParams]) (*blocks.Block, error) {
 	blockParams := options.Apply(&ValidatorBlockParams{}, opts)
 
 	if blockParams.BlockHeader.IssuingTime == nil {
@@ -101,9 +101,9 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		var err error
-		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime))
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime), node)
 		if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
-			commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime)
+			commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime, node)
 			if err != nil {
 				return nil, ierrors.Wrap(err, "failed to revive chain")
 			}
@@ -177,11 +177,12 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 
 	modelBlock.ID().RegisterAlias(alias)
 
-	return blocks.NewBlock(modelBlock)
+	return blocks.NewBlock(modelBlock), nil
 }
 
 func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
-	block := i.CreateValidationBlock(ctx, alias, NewEd25519Account(i.AccountID, i.privateKey), node, opts...)
+	block, err := i.CreateValidationBlock(ctx, alias, NewEd25519Account(i.AccountID, i.privateKey), node, opts...)
+	require.NoError(i.Testing, err)
 
 	require.NoError(i.Testing, i.IssueBlock(block.ModelBlock(), node))
 
@@ -199,7 +200,7 @@ func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams, node *Node) (i
 }
 
 // CreateBlock creates a new block with the options.
-func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[BasicBlockParams]) *blocks.Block {
+func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[BasicBlockParams]) (*blocks.Block, error) {
 	blockParams := options.Apply(&BasicBlockParams{}, opts)
 
 	if blockParams.BlockHeader.IssuingTime == nil {
@@ -209,7 +210,7 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *
 
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		var err error
-		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime))
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime), node)
 		if err != nil {
 			return nil, ierrors.Wrap(err, "error getting commitment")
 		}
@@ -269,11 +270,12 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *
 
 	modelBlock.ID().RegisterAlias(alias)
 
-	return blocks.NewBlock(modelBlock)
+	return blocks.NewBlock(modelBlock), err
 }
 
 func (i *BlockIssuer) IssueBasicBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[BasicBlockParams]) *blocks.Block {
-	block := i.CreateBasicBlock(ctx, alias, node, opts...)
+	block, err := i.CreateBasicBlock(ctx, alias, node, opts...)
+	require.NoError(i.Testing, err)
 
 	require.NoErrorf(i.Testing, i.IssueBlock(block.ModelBlock(), node), "%s > failed to issue block with alias %s", i.Name, alias)
 
@@ -481,7 +483,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 
 	if blockParams.SlotCommitment == nil {
 		var err error
-		blockParams.SlotCommitment, err = i.getCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime), node)
+		blockParams.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime), node)
 		if err != nil {
 			return ierrors.Wrap(err, "error getting commitment")
 		}
@@ -563,7 +565,7 @@ func (i *BlockIssuer) IssueBlock(block *model.Block, node *Node) error {
 	}
 
 	if _, isValidationBlock := block.ValidationBlock(); isValidationBlock {
-		_ = i.protocol.MainEngineInstance().Storage.Settings().SetLatestIssuedValidationBlock(block)
+		_ = node.Protocol.MainEngineInstance().Storage.Settings().SetLatestIssuedValidationBlock(block)
 	}
 
 	i.events.BlockIssued.Trigger(block)

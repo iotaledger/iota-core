@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -26,6 +25,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
+	ts.AddBasicBlockIssuer("default")
 	node0 := ts.AddValidatorNode("node0")
 	ts.AddValidatorNode("node1")
 	ts.AddNode("node2")
@@ -39,7 +39,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	// Revive chain on node0.
 	{
 		block0 := ts.IssueValidationBlock("block0", node0,
-			blockfactory.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(50)),
+			mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(50)),
 		)
 		require.EqualValues(t, 48, ts.Block("block0").SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
@@ -103,6 +103,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
+	ts.AddBasicBlockIssuer("default")
 	node0 := ts.AddValidatorNode("node0")
 	ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
@@ -125,7 +126,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 		require.NoError(t, ts.Node("node0").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
 
 		node0restarted = ts.AddNode("node0-restarted")
-		node0restarted.CopyIdentityFromNode(node0)
+		node0restarted.Validator = node0.Validator
 		node0restarted.Initialize(true,
 			protocol.WithSnapshotPath(snapshotPath),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node0restarted.Name)),
@@ -141,7 +142,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	// Revive chain on node0-restarted.
 	{
 		block0 := ts.IssueValidationBlock("block0", node0restarted,
-			blockfactory.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(20)),
+			mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(20)),
 		)
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
@@ -189,6 +190,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
+	ts.AddBasicBlockIssuer("default")
 	node0 := ts.AddValidatorNode("node0")
 	ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
@@ -213,7 +215,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	var node0restarted *mock.Node
 	{
 		node0restarted = ts.AddNode("node0-restarted")
-		node0restarted.CopyIdentityFromNode(node0)
+		node0restarted.Validator = node0.Validator
 		node0restarted.Initialize(true,
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node0.Name)),
 		)
@@ -223,7 +225,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	// Revive chain on node0-restarted.
 	{
 		block0 := ts.IssueValidationBlock("block0", node0restarted,
-			blockfactory.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(20)),
+			mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(20)),
 		)
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
