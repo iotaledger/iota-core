@@ -255,25 +255,22 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 }
 
 func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *utxoledger.Spent, error) {
-	l.utxoLedger.ReadLockLedger()
-
-	unspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(outputID)
+	output, err := l.Output(outputID)
 	if err != nil {
-		l.utxoLedger.ReadUnlockLedger()
+		if ierrors.Is(iotago.ErrInputAlreadySpent, err) {
+			l.utxoLedger.ReadLockLedger()
+			defer l.utxoLedger.ReadUnlockLedger()
+
+			spent, err := l.utxoLedger.ReadSpentForOutputIDWithoutLocking(outputID)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			return nil, spent, err
+		}
+
 		return nil, nil, err
 	}
-
-	if !unspent {
-		spent, err := l.utxoLedger.ReadSpentForOutputIDWithoutLocking(outputID)
-		l.utxoLedger.ReadUnlockLedger()
-
-		return nil, spent, err
-	}
-
-	l.utxoLedger.ReadUnlockLedger()
-
-	// l.Output might read-lock the ledger again if the mem-pool needs to resolve the output, so we cannot be in a locked state
-	output, err := l.Output(outputID)
 
 	return output, nil, err
 }
