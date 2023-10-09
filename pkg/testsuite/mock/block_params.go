@@ -1,4 +1,4 @@
-package blockfactory
+package mock
 
 import (
 	"time"
