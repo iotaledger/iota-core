@@ -231,31 +231,36 @@ func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.S
 	return l.accountsLedger.PastAccounts(accountIDs, targetIndex)
 }
 
+func (l *Ledger) outputFromState(state mempool.State) *utxoledger.Output {
+	switch output := state.(type) {
+	case *utxoledger.Output:
+		// If this output was not booked yet, then it came directly from the mempool, so we need to set the earliest attachment and the booking slot
+		if output.SlotBooked() == 0 {
+			txWithMetadata, exists := l.memPool.TransactionMetadata(output.OutputID().TransactionID())
+			if exists {
+				earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
+
+				return utxoledger.CreateOutput(l.apiProvider, output.OutputID(), earliestAttachment, earliestAttachment.Slot(), output.Output())
+			}
+		}
+
+		return output
+	default:
+		panic("unexpected State type")
+	}
+}
+
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
 	if err != nil {
 		return nil, err
 	}
 
-	switch castState := stateWithMetadata.State().(type) {
-	case *utxoledger.Output:
-		if castState.SlotBooked() == 0 {
-			txWithMetadata, exists := l.memPool.TransactionMetadata(outputID.TransactionID())
-			if exists {
-				earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
-
-				return utxoledger.CreateOutput(l.apiProvider, castState.OutputID(), earliestAttachment, earliestAttachment.Slot(), castState.Output()), nil
-			}
-		}
-
-		return castState, nil
-	default:
-		panic("unexpected State type")
-	}
+	return l.outputFromState(stateWithMetadata.State()), nil
 }
 
 func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *utxoledger.Spent, error) {
-	output, err := l.Output(outputID)
+	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
 	if err != nil {
 		if ierrors.Is(iotago.ErrInputAlreadySpent, err) {
 			l.utxoLedger.ReadLockLedger()
@@ -272,7 +277,12 @@ func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *u
 		return nil, nil, err
 	}
 
-	return output, nil, err
+	spender, spent := stateWithMetadata.AcceptedSpender()
+	if spent {
+		return nil, utxoledger.NewSpent(l.outputFromState(stateWithMetadata.State()), spender.ID(), spender.ID().Slot()), nil
+	}
+
+	return l.outputFromState(stateWithMetadata.State()), nil, nil
 }
 
 func (l *Ledger) ForEachUnspentOutput(consumer func(output *utxoledger.Output) bool) error {
