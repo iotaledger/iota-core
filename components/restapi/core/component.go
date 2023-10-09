@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
@@ -39,10 +39,9 @@ const (
 	// GET returns block metadata.
 	RouteBlockMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/metadata"
 
-	// RouteBlocks is the route for creating new blocks.
+	// RouteBlocks is the route for sending new blocks.
 	// POST creates a single new block and returns the new block ID.
 	// The block is parsed based on the given type in the request "Content-Type" header.
-	// By providing only the protocolVersion and payload transaction user can POST a transaction.
 	// MIMEApplicationJSON => json.
 	// MIMEVendorIOTASerializer => bytes.
 	RouteBlocks = "/blocks"
@@ -134,8 +133,7 @@ var (
 	Component *app.Component
 	deps      dependencies
 
-	blockIssuerAccount blockfactory.Account
-	features           = []string{}
+	features = []string{}
 )
 
 type dependencies struct {
@@ -144,7 +142,7 @@ type dependencies struct {
 	AppInfo          *app.Info
 	RestRouteManager *restapipkg.RestRouteManager
 	Protocol         *protocolpkg.Protocol
-	BlockIssuer      *blockfactory.BlockIssuer `optional:"true"`
+	BlockHandler     *blockhandler.BlockHandler
 	MetricsTracker   *metricstracker.MetricsTracker
 	BaseToken        *protocol.BaseToken
 }
@@ -156,12 +154,6 @@ func configure() error {
 	}
 
 	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
-
-	if restapi.ParamsRestAPI.AllowIncompleteBlock {
-		AddFeature("allowIncompleteBlock")
-	}
-
-	blockIssuerAccount = blockfactory.AccountFromParams(restapi.ParamsRestAPI.BlockIssuerAccount, restapi.ParamsRestAPI.BlockIssuerPrivateKey)
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
 		resp := info()
@@ -195,7 +187,7 @@ func configure() error {
 		c.Response().Header().Set(echo.HeaderLocation, resp.BlockID.ToHex())
 
 		return httpserver.JSONResponse(c, http.StatusCreated, resp)
-	}, checkNodeSynced(), checkUpcomingUnsupportedProtocolVersion())
+	}, checkNodeSynced())
 
 	routeGroup.GET(RouteBlockIssuance, func(c echo.Context) error {
 		resp, err := blockIssuance(c)
@@ -354,19 +346,6 @@ func checkNodeSynced() echo.MiddlewareFunc {
 			if !deps.Protocol.MainEngineInstance().SyncManager.IsNodeSynced() {
 				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
 			}
-
-			return next(c)
-		}
-	}
-}
-
-func checkUpcomingUnsupportedProtocolVersion() echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// todo update with protocol upgrades support
-			// if !deps.ProtocolManager.NextPendingSupported() {
-			//	return ierrors.Wrap(echo.ErrServiceUnavailable, "node does not support the upcoming protocol upgrade")
-			// }
 
 			return next(c)
 		}
