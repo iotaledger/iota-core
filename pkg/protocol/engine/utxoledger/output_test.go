@@ -86,9 +86,9 @@ func CreateOutputAndAssertSerialization(t *testing.T, blockID iotago.BlockID, in
 	require.Equal(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutput}, outputID[:]), output.KVStorableKey())
 
 	value := output.KVStorableValue()
-	require.Equal(t, blockID[:], value[:iotago.SlotIdentifierLength])
-	require.Equal(t, indexBooked, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[iotago.SlotIdentifierLength:iotago.SlotIdentifierLength+iotago.SlotIndexLength]))))
-	require.Equal(t, outputBytes, value[iotago.SlotIdentifierLength+iotago.SlotIndexLength:])
+	require.Equal(t, blockID[:], value[:iotago.BlockIDLength])
+	require.Equal(t, indexBooked, lo.PanicOnErr(lo.DropCount(iotago.SlotIndexFromBytes(value[iotago.BlockIDLength:iotago.BlockIDLength+iotago.SlotIndexLength]))))
+	require.Equal(t, outputBytes, value[iotago.BlockIDLength+iotago.SlotIndexLength:])
 
 	return output
 }

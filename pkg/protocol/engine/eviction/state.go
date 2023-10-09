@@ -167,7 +167,7 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 func (s *State) LatestRootBlocks() iotago.BlockIDs {
 	rootBlocks := s.latestRootBlocks.ToSlice()
 	if len(rootBlocks) == 0 {
-		return iotago.BlockIDs{iotago.EmptyBlockID()}
+		return iotago.BlockIDs{iotago.EmptyBlockID}
 	}
 
 	return rootBlocks
@@ -237,7 +237,7 @@ func (s *State) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "failed to read root block id %d", i)
 		}
 
-		rootBlockID, _, err := iotago.SlotIdentifierFromBytes(blockIDBytes)
+		rootBlockID, _, err := iotago.BlockIDFromBytes(blockIDBytes)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to parse root block id %d", i)
 		}
@@ -247,7 +247,7 @@ func (s *State) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
 		}
 
-		commitmentID, _, err := iotago.SlotIdentifierFromBytes(commitmentIDBytes)
+		commitmentID, _, err := iotago.CommitmentIDFromBytes(commitmentIDBytes)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to parse root block's %s commitment id", rootBlockID)
 		}

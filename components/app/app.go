@@ -4,7 +4,6 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/app/components/profiling"
 	"github.com/iotaledger/hive.go/app/components/shutdown"
-	"github.com/iotaledger/iota-core/components/blockissuer"
 	"github.com/iotaledger/iota-core/components/dashboard"
 	dashboardmetrics "github.com/iotaledger/iota-core/components/dashboard_metrics"
 	"github.com/iotaledger/iota-core/components/debugapi"
@@ -39,7 +38,6 @@ func App() *app.App {
 			debugapi.Component,
 			metricstracker.Component,
 			protocol.Component,
-			blockissuer.Component,
 			validator.Component,
 			dashboardmetrics.Component,
 			dashboard.Component,

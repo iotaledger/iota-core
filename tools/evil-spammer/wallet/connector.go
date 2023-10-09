@@ -228,7 +228,7 @@ func (c *WebClient) PostTransaction(tx *iotago.SignedTransaction) (blockID iotag
 
 	blk, err := blockBuilder.Build()
 	if err != nil {
-		return iotago.EmptyBlockID(), err
+		return iotago.EmptyBlockID, err
 	}
 
 	id, err := c.client.SubmitBlock(context.Background(), blk)
@@ -250,7 +250,7 @@ func (c *WebClient) PostData(data []byte) (blkID string, err error) {
 
 	blk, err := blockBuilder.Build()
 	if err != nil {
-		return iotago.EmptyBlockID().ToHex(), err
+		return iotago.EmptyBlockID.ToHex(), err
 	}
 
 	id, err := c.client.SubmitBlock(context.Background(), blk)

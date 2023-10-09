@@ -59,8 +59,8 @@ func (t *TestSuite) InitPerformanceTracker() {
 		}
 
 		p := slotstore.NewStore(slot, prunableStores[slot],
-			iotago.Identifier.Bytes,
-			iotago.IdentifierFromBytes,
+			iotago.AccountID.Bytes,
+			iotago.AccountIDFromBytes,
 			func(s *model.ValidatorPerformance) ([]byte, error) {
 				return s.Bytes(t.api)
 			},

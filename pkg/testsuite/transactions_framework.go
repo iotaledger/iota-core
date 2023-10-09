@@ -63,12 +63,12 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 		clonedOutput := output.Clone()
 		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
 		if clonedOutput.Type() == iotago.OutputAccount {
-			if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID() {
+			if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID {
 				accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
 			}
 		}
 
-		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID(), currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
+		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
 	}
 }
 
@@ -242,7 +242,7 @@ func (t *TransactionFramework) CreateDelegationFromInput(inputAlias string, opts
 		DelegatedAmount(input.BaseTokenAmount()),
 		opts).MustBuild()
 
-	if delegationOutput.ValidatorAddress.AccountID() == iotago.EmptyAccountID() ||
+	if delegationOutput.ValidatorAddress.AccountID() == iotago.EmptyAccountID ||
 		delegationOutput.DelegatedAmount == 0 ||
 		delegationOutput.StartEpoch == 0 {
 		panic(fmt.Sprintf("delegation output created incorrectly %+v", delegationOutput))

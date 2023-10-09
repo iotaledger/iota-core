@@ -42,7 +42,7 @@ type Ledger struct {
 	commitmentLoader         func(iotago.SlotIndex) (*model.Commitment, error)
 	memPool                  mempool.MemPool[ledger.BlockVoteRank]
 	conflictDAG              conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
-	retainTransactionFailure func(iotago.SlotIdentifier, error)
+	retainTransactionFailure func(iotago.BlockID, error)
 	errorHandler             func(error)
 
 	module.Module
@@ -79,9 +79,9 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
 			// TODO: CHECK IF STILL NECESSARY
-			//e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
+			// e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
 			//	l.memPool.PublishRequestedState(scd.Commitment.Commitment())
-			//})
+			// })
 
 			l.TriggerConstructed()
 			l.TriggerInitialized()
@@ -114,7 +114,7 @@ func New(
 	}
 }
 
-func (l *Ledger) setRetainTransactionFailureFunc(retainTransactionFailure func(iotago.SlotIdentifier, error)) {
+func (l *Ledger) setRetainTransactionFailureFunc(retainTransactionFailure func(iotago.BlockID, error)) {
 	l.retainTransactionFailure = retainTransactionFailure
 }
 

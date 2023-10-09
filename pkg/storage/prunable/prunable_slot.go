@@ -45,9 +45,10 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.Bl
 	}
 
 	return slotstore.NewStore(slot, kv,
-		iotago.SlotIdentifier.Bytes,
-		iotago.SlotIdentifierFromBytes,
-		iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes,
+		iotago.BlockID.Bytes,
+		iotago.BlockIDFromBytes,
+		iotago.CommitmentID.Bytes,
+		iotago.CommitmentIDFromBytes,
 	), nil
 }
 
@@ -77,8 +78,8 @@ func (p *Prunable) ValidatorPerformances(slot iotago.SlotIndex) (*slotstore.Stor
 	apiForSlot := p.apiProvider.APIForSlot(slot)
 
 	return slotstore.NewStore(slot, kv,
-		iotago.Identifier.Bytes,
-		iotago.IdentifierFromBytes,
+		iotago.AccountID.Bytes,
+		iotago.AccountIDFromBytes,
 		func(s *model.ValidatorPerformance) ([]byte, error) {
 			return s.Bytes(apiForSlot)
 		},
@@ -126,7 +127,7 @@ func (p *Prunable) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.Commitm
 
 	return slotstore.NewStore(slot, kv,
 		iotago.CommitmentID.Bytes,
-		iotago.SlotIdentifierFromBytes,
+		iotago.CommitmentIDFromBytes,
 		rootsBytes,
 		rootsFromBytes,
 	), nil
