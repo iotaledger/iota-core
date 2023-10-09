@@ -27,9 +27,12 @@ type TransactionFramework struct {
 
 func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, accounts ...snapshotcreator.AccountDetails) *TransactionFramework {
 	// The genesis output is on index 0 of the genesis TX
-	genesisOutput, err := protocol.MainEngineInstance().Ledger.Output(iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 0))
+	genesisOutput, spent, err := protocol.MainEngineInstance().Ledger.OutputOrSpent(iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 0))
 	if err != nil {
 		panic(err)
+	}
+	if spent != nil {
+		panic("genesis output already spent")
 	}
 
 	tf := &TransactionFramework{
@@ -45,8 +48,10 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 		// Genesis TX
 		outputID := iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, uint16(idx+1))
 
-		if tf.states[fmt.Sprintf("Genesis:%d", idx+1)], err = protocol.MainEngineInstance().Ledger.Output(outputID); err != nil {
+		if tf.states[fmt.Sprintf("Genesis:%d", idx+1)], spent, err = protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID); err != nil {
 			panic(err)
+		} else if spent != nil {
+			panic("genesis output already spent")
 		}
 	}
 

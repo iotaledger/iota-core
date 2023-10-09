@@ -16,9 +16,13 @@ func getOutput(c echo.Context) (*utxoledger.Output, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID param: %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get output: %s from the Ledger", outputID.String())
+	}
+
+	if spent != nil {
+		output = spent.Output()
 	}
 
 	return output, nil

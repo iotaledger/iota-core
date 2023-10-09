@@ -25,9 +25,13 @@ func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockI
 	outputID := iotago.OutputID{}
 	copy(outputID[:], transactionID[:])
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to get output: %s", outputID.String())
+	}
+
+	if spent != nil {
+		output = spent.Output()
 	}
 
 	return output.BlockID(), nil

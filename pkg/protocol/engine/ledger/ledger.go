@@ -25,7 +25,6 @@ type Ledger interface {
 	PastAccounts(accountIDs iotago.AccountIDs, targetSlot iotago.SlotIndex) (pastAccountsData map[iotago.AccountID]*accounts.AccountData, err error)
 	AddAccount(account *utxoledger.Output, credits iotago.BlockIssuanceCredits) error
 
-	Output(id iotago.OutputID) (*utxoledger.Output, error)
 	OutputOrSpent(id iotago.OutputID) (output *utxoledger.Output, spent *utxoledger.Spent, err error)
 	ForEachUnspentOutput(func(output *utxoledger.Output) bool) error
 	AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error

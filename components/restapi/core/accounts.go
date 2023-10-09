@@ -139,9 +139,13 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterOutputID)
 	}
 
-	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	utxoOutput, uxtoSpent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get output %s from ledger", outputID)
+	}
+
+	if uxtoSpent != nil {
+		utxoOutput = uxtoSpent.Output()
 	}
 
 	var reward iotago.Mana

@@ -201,9 +201,12 @@ func getTransaction(c echo.Context) error {
 	outputID := iotago.OutputID{}
 	copy(outputID[:], txID[:])
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return err
+	}
+	if spent != nil {
+		output = spent.Output()
 	}
 
 	block, exists := deps.Protocol.MainEngineInstance().Block(output.BlockID())
@@ -244,9 +247,13 @@ func getOutput(c echo.Context) error {
 		return err
 	}
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return err
+	}
+
+	if spent != nil {
+		output = spent.Output()
 	}
 
 	return httpserver.JSONResponse(c, http.StatusOK, NewOutputFromLedgerstateOutput(output))
