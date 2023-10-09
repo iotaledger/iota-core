@@ -20,7 +20,7 @@ type CommitmentVerifier struct {
 }
 
 func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) *CommitmentVerifier {
-	committeeAtForkingPoint := mainEngine.SybilProtection.SeatManager().Committee(lastCommonCommitmentBeforeFork.Slot()).Accounts().IDs()
+	committeeAtForkingPoint := lo.Return1(mainEngine.SybilProtection.SeatManager().CommitteeInSlot(lastCommonCommitmentBeforeFork.Slot())).Accounts().IDs()
 
 	return &CommitmentVerifier{
 		engine:                  mainEngine,
@@ -153,7 +153,7 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")
 		}
-		if _, seatExists := c.engine.SybilProtection.SeatManager().Committee(attestationBlockID.Slot()).GetSeat(att.IssuerID); seatExists {
+		if _, seatExists := lo.Return1(c.engine.SybilProtection.SeatManager().CommitteeInSlot(attestationBlockID.Slot())).GetSeat(att.IssuerID); seatExists {
 			seatCount++
 		}
 

@@ -100,8 +100,12 @@ func (m *ManualPOA) Accounts() *account.Accounts {
 	return m.accounts
 }
 
-func (m *ManualPOA) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
-	return m.committee
+func (m *ManualPOA) CommitteeInSlot(_ iotago.SlotIndex) (*account.SeatedAccounts, bool) {
+	return m.committee, true
+}
+
+func (m *ManualPOA) CommitteeInEpoch(_ iotago.EpochIndex) (*account.SeatedAccounts, bool) {
+	return m.committee, true
 }
 
 func (m *ManualPOA) OnlineCommittee() ds.Set[account.SeatIndex] {
@@ -112,16 +116,19 @@ func (m *ManualPOA) SeatCount() int {
 	return m.committee.SeatCount()
 }
 
-func (m *ManualPOA) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *account.SeatedAccounts {
-	return m.committee
+func (m *ManualPOA) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) (*account.SeatedAccounts, error) {
+	return m.committee, nil
 }
 
-func (m *ManualPOA) SetCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
-}
-
-func (m *ManualPOA) ImportCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
+func (m *ManualPOA) SetCommittee(_ iotago.EpochIndex, validators *account.Accounts) error {
 	m.accounts = validators
 	m.committee = m.accounts.SelectCommittee(validators.IDs()...)
+
+	return nil
+}
+
+func (m *ManualPOA) InitializeCommittee(_ iotago.EpochIndex) error {
+	return nil
 }
 
 func (m *ManualPOA) Shutdown() {}

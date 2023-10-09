@@ -6,6 +6,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -26,7 +27,7 @@ type Filter struct {
 
 	optsMaxAllowedWallClockDrift time.Duration
 
-	committeeFunc func(iotago.SlotIndex) *account.SeatedAccounts
+	committeeFunc func(iotago.SlotIndex) (*account.SeatedAccounts, bool)
 
 	module.Module
 }
@@ -39,7 +40,7 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 		e.HookConstructed(func() {
 			e.Events.Filter.LinkTo(f.events)
 			e.SybilProtection.HookInitialized(func() {
-				f.committeeFunc = e.SybilProtection.SeatManager().Committee
+				f.committeeFunc = e.SybilProtection.SeatManager().CommitteeInSlot
 			})
 			f.TriggerInitialized()
 		})
@@ -87,7 +88,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 			return
 		}
 		blockSlot := blockAPI.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
-		if !f.committeeFunc(blockSlot).HasAccount(block.ProtocolBlock().IssuerID) {
+		if !lo.Return1(f.committeeFunc(blockSlot)).HasAccount(block.ProtocolBlock().IssuerID) {
 			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 				Block:  block,
 				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().IssuerID, blockSlot),

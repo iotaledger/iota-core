@@ -71,7 +71,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 					defer s.bufferMutex.Unlock()
 
 					s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
-						if !s.seatManager.Committee(commitment.Slot() + 1).HasAccount(accountID) {
+						if !lo.Return1(s.seatManager.CommitteeInSlot(commitment.Slot() + 1)).HasAccount(accountID) {
 							s.shutdownValidatorQueue(validatorQueue)
 							s.validatorBuffer.Delete(accountID)
 						}

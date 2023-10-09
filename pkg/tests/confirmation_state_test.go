@@ -98,7 +98,7 @@ func TestConfirmationFlags(t *testing.T) {
 		testsuite.WithChainID(genesisCommitment.MustID()),
 		testsuite.WithStorageCommitments([]*iotago.Commitment{genesisCommitment}),
 		testsuite.WithSybilProtectionCommittee(0, expectedCommittee),
-		testsuite.WithSybilProtectionOnlineCommittee(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.Validator.AccountID))),
+		testsuite.WithSybilProtectionOnlineCommittee(lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID))),
 		testsuite.WithEvictedSlot(0),
 		testsuite.WithActiveRootBlocks(ts.Blocks("Genesis")),
 		testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
@@ -155,8 +155,8 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(slot2CommittableSlot, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(
-				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.Validator.AccountID)),
-				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.Validator.AccountID)),
+				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
+				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),
 			),
 			testsuite.WithEvictedSlot(2),
 		)
@@ -195,9 +195,9 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
 			testsuite.WithSybilProtectionCommittee(slot3CommittableSlot, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(
-				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.Validator.AccountID)),
-				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.Validator.AccountID)),
-				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeC.Validator.AccountID)),
+				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
+				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),
+				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeC.Validator.AccountID)),
 			),
 			testsuite.WithEvictedSlot(2),
 		)
@@ -250,9 +250,9 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithEqualStoredCommitmentAtIndex(3),
 			testsuite.WithSybilProtectionCommittee(slot4CommittableSlot, expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(
-				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.Validator.AccountID)),
-				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.Validator.AccountID)),
-				lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeC.Validator.AccountID)),
+				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
+				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),
+				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeC.Validator.AccountID)),
 			),
 			testsuite.WithEvictedSlot(3),
 		)

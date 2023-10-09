@@ -117,15 +117,15 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		node7.Validator.AccountID,
 	}
 	expectedP1OnlineCommittee := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.Validator.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.Validator.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node4.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node1.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node2.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node3.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node4.Validator.AccountID)),
 	}
 	expectedP2OnlineCommittee := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node6.Validator.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node7.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node6.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node7.Validator.AccountID)),
 	}
 	expectedOnlineCommittee := append(expectedP1OnlineCommittee, expectedP2OnlineCommittee...)
 

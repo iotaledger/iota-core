@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -23,12 +24,11 @@ import (
 
 // SeatManager is a sybil protection module for the engine that manages the weights of actors according to their stake.
 type SeatManager struct {
-	events *seatmanager.Events
+	apiProvider iotago.APIProvider
+	events      *seatmanager.Events
 
 	clock            clock.Clock
 	workers          *workerpool.Group
-	accounts         *account.Accounts
-	committee        *account.SeatedAccounts
 	committeeStore   *epochstore.Store[*account.Accounts]
 	onlineCommittee  ds.Set[account.SeatIndex]
 	inactivityQueue  timed.PriorityQueue[account.SeatIndex]
@@ -45,14 +45,14 @@ type SeatManager struct {
 }
 
 // NewProvider returns a new sybil protection provider that uses the ProofOfStake module.
-func NewProvider(committeeStore *epochstore.Store[*account.Accounts], opts ...options.Option[SeatManager]) module.Provider[*engine.Engine, seatmanager.SeatManager] {
+func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.Engine, seatmanager.SeatManager] {
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
 		return options.Apply(
 			&SeatManager{
+				apiProvider:     e,
 				events:          seatmanager.NewEvents(),
 				workers:         e.Workers.CreateGroup("SeatManager"),
-				committeeStore:  committeeStore,
-				accounts:        account.NewAccounts(),
+				committeeStore:  e.Storage.Committee(),
 				onlineCommittee: ds.NewSet[account.SeatIndex](),
 				inactivityQueue: timed.NewPriorityQueue[account.SeatIndex](true),
 				lastActivities:  shrinkingmap.New[account.SeatIndex, time.Time](),
@@ -70,7 +70,12 @@ func NewProvider(committeeStore *epochstore.Store[*account.Accounts], opts ...op
 					// recover if no node was part of the online committee anymore.
 					e.Events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 						// Only track identities that are part of the committee.
-						seat, exists := s.Committee(block.ID().Slot()).GetSeat(block.ProtocolBlock().IssuerID)
+						committee, exists := s.CommitteeInSlot(block.ID().Slot())
+						if !exists {
+							panic(ierrors.Errorf("committee not selected for slot %d, but received block in that slot", block.ID().Slot()))
+						}
+
+						seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
 						if exists {
 							s.markSeatActive(seat, block.ProtocolBlock().IssuerID, block.IssuingTime())
 						}
@@ -84,7 +89,7 @@ func NewProvider(committeeStore *epochstore.Store[*account.Accounts], opts ...op
 
 var _ seatmanager.SeatManager = &SeatManager{}
 
-func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates *account.Accounts) *account.SeatedAccounts {
+func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates *account.Accounts) (*account.SeatedAccounts, error) {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
@@ -110,28 +115,45 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates *accou
 
 		// two candidates never have the same account ID because they come in a map
 		return bytes.Compare(candidateAccountIDs[i][:], candidateAccountIDs[j][:]) < 0
-
 	})
 
-	s.committee = candidates.SelectCommittee(candidateAccountIDs[:s.optsSeatCount]...)
+	committee := candidates.SelectCommittee(candidateAccountIDs[:s.optsSeatCount]...)
 
-	err := s.committeeStore.Store(epoch, s.committee.Accounts())
+	err := s.committeeStore.Store(epoch, committee.Accounts())
 	if err != nil {
-		// TODO: panic?w
-		return nil
+		return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
 	}
 
-	return s.committee
+	return committee, nil
 }
 
-// TODO: does that method make sense? this component does not have any committee storage so it has no knowledge of past committees.
-
-// Committee returns the set of validators selected to be part of the committee.
-func (s *SeatManager) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
+// CommitteeInSlot returns the set of validators selected to be part of the committee in the given slot.
+func (s *SeatManager) CommitteeInSlot(slot iotago.SlotIndex) (*account.SeatedAccounts, bool) {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
-	return s.committee
+	return s.committeeInEpoch(s.apiProvider.APIForSlot(slot).TimeProvider().EpochFromSlot(slot))
+}
+
+// CommitteeInEpoch returns the set of validators selected to be part of the committee in the given epoch.
+func (s *SeatManager) CommitteeInEpoch(epoch iotago.EpochIndex) (*account.SeatedAccounts, bool) {
+	s.committeeMutex.RLock()
+	defer s.committeeMutex.RUnlock()
+
+	return s.committeeInEpoch(epoch)
+}
+
+func (s *SeatManager) committeeInEpoch(epoch iotago.EpochIndex) (*account.SeatedAccounts, bool) {
+	c, err := s.committeeStore.Load(epoch)
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to load committee for epoch %d", epoch))
+	}
+
+	if c == nil {
+		return nil, false
+	}
+
+	return c.SelectCommittee(c.IDs()...), true
 }
 
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
@@ -146,7 +168,7 @@ func (s *SeatManager) SeatCount() int {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
-	return s.committee.SeatCount()
+	return int(s.optsSeatCount)
 }
 
 func (s *SeatManager) Shutdown() {
@@ -154,14 +176,18 @@ func (s *SeatManager) Shutdown() {
 	s.workers.Shutdown()
 }
 
-func (s *SeatManager) ImportCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
+func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	s.accounts = validators
-	s.committee = s.accounts.SelectCommittee(validators.IDs()...)
+	committeeAccounts, err := s.committeeStore.Load(epoch)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to load PoA committee for epoch %d", epoch)
+	}
 
-	onlineValidators := s.accounts.IDs()
+	committee := committeeAccounts.SelectCommittee(committeeAccounts.IDs()...)
+
+	onlineValidators := committeeAccounts.IDs()
 	if len(s.optsOnlineCommitteeStartup) > 0 {
 		onlineValidators = s.optsOnlineCommitteeStartup
 	}
@@ -169,22 +195,28 @@ func (s *SeatManager) ImportCommittee(_ iotago.EpochIndex, validators *account.A
 	for _, v := range onlineValidators {
 		activityTime := s.clock.Accepted().RelativeTime()
 
-		seat, exists := s.committee.GetSeat(v)
+		seat, exists := committee.GetSeat(v)
 		if !exists {
 			// Only track identities that are part of the committee.
-			return
+			continue
 		}
 
 		s.markSeatActive(seat, v, activityTime)
 	}
+
+	return nil
 }
 
-func (s *SeatManager) SetCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
+func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	s.accounts = validators
-	s.committee = s.accounts.SelectCommittee(validators.IDs()...)
+	err := s.committeeStore.Store(epoch, validators)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to set committee for epoch %d", epoch)
+	}
+
+	return nil
 }
 
 func (s *SeatManager) markSeatActive(seat account.SeatIndex, id iotago.AccountID, seatActivityTime time.Time) {

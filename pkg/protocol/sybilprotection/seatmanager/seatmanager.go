@@ -10,18 +10,21 @@ import (
 // SeatManager is the minimal interface for the SeatManager component of the IOTA protocol.
 type SeatManager interface {
 	// RotateCommittee rotates the committee evaluating the given set of candidates to produce the new committee.
-	RotateCommittee(epoch iotago.EpochIndex, candidates *account.Accounts) *account.SeatedAccounts
+	RotateCommittee(epoch iotago.EpochIndex, candidates *account.Accounts) (*account.SeatedAccounts, error)
 
 	// SetCommittee sets the committee for a given slot.
 	// This is used when re-using the same committee for consecutive epochs.
-	SetCommittee(epoch iotago.EpochIndex, committee *account.Accounts)
+	SetCommittee(epoch iotago.EpochIndex, committee *account.Accounts) error
 
-	// ImportCommittee sets the committee for a given slot and marks the whole committee as active.
+	// InitializeCommittee initializes the committee for the current slot by marking whole or a subset of the committee as active.
 	// This is used when initializing committee after node startup (loaded from snapshot or database).
-	ImportCommittee(epoch iotago.EpochIndex, committee *account.Accounts)
+	InitializeCommittee(epoch iotago.EpochIndex) error
 
-	// Committee returns the set of validators that is used to track confirmation.
-	Committee(slot iotago.SlotIndex) *account.SeatedAccounts
+	// CommitteeInSlot returns the set of validators that is used to track confirmation at a given slot.
+	CommitteeInSlot(slot iotago.SlotIndex) (*account.SeatedAccounts, bool)
+
+	// CommitteeInEpoch returns the set of validators that is used to track confirmation in a given epoch.
+	CommitteeInEpoch(epoch iotago.EpochIndex) (*account.SeatedAccounts, bool)
 
 	// OnlineCommittee returns the set of online validators that is used to track acceptance.
 	OnlineCommittee() ds.Set[account.SeatIndex]

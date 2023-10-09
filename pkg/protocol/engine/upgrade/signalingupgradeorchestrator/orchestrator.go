@@ -146,7 +146,7 @@ func (o *Orchestrator) TrackValidationBlock(block *blocks.Block) {
 	}
 	newSignaledBlock := model.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
 
-	committee := o.seatManager.Committee(block.ID().Slot())
+	committee := lo.Return1(o.seatManager.CommitteeInSlot(block.ID().Slot()))
 	seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return

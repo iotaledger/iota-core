@@ -4,6 +4,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -14,7 +15,7 @@ func (t *TestSuite) AssertSybilProtectionCommittee(slot iotago.SlotIndex, expect
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			accounts := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(slot).Accounts().IDs()
+			accounts := lo.Return1(node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)).Accounts().IDs()
 			if !assert.ElementsMatch(t.fakeTesting, expectedAccounts, accounts) {
 				return ierrors.Errorf("AssertSybilProtectionCommittee: %s: expected %s, got %s", node.Name, expectedAccounts, accounts)
 			}

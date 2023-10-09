@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
@@ -737,7 +738,7 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().IssuingTime)
 
-	seat, exists := l.sybilProtection.SeatManager().Committee(block.ID().Slot()).GetSeat(block.ProtocolBlock().IssuerID)
+	seat, exists := lo.Return1(l.sybilProtection.SeatManager().CommitteeInSlot(block.ID().Slot())).GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return
 	}

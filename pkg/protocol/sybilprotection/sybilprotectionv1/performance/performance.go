@@ -48,11 +48,9 @@ func NewTracker(rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.
 	}
 }
 
-func (t *Tracker) RegisterCommittee(epoch iotago.EpochIndex, committee *account.Accounts) error {
-	// clean the candidates cache stored in memory to make room for candidates in the next epoch
+func (t *Tracker) ClearCandidates() {
+	// clean the candidate cache stored in memory to make room for candidates in the next epoch
 	t.nextEpochCommitteeCandidates.Clear()
-
-	return t.committeeStore.Store(epoch, committee)
 }
 
 func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
@@ -60,7 +58,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	defer t.mutex.Unlock()
 
 	validatorBlock, isValidationBlock := block.ValidationBlock()
-	if isValidationBlock {
+	if !isValidationBlock {
 		return
 	}
 
@@ -68,10 +66,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	defer t.performanceFactorsMutex.Unlock()
 	isCommitteeMember, err := t.isCommitteeMember(block.ID().Slot(), block.ProtocolBlock().IssuerID)
 	if err != nil {
-		t.errHandler(ierrors.Errorf("failed to check if account %s is committee member", block.ProtocolBlock().IssuerID))
-		// TODO: panic or return an error?
-
-		return
+		panic(ierrors.Errorf("failed to check if account %s is committee member", block.ProtocolBlock().IssuerID))
 	}
 
 	if isCommitteeMember {
@@ -85,20 +80,27 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 
 	blockEpoch := t.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochFromSlot(block.ID().Slot())
 
+	var rollback bool
 	t.nextEpochCommitteeCandidates.Compute(block.ProtocolBlock().IssuerID, func(currentValue iotago.SlotIndex, exists bool) iotago.SlotIndex {
 		if !exists || currentValue > block.ID().Slot() {
 			committeeCandidatesStore, err := t.committeeCandidatesInEpochFunc(blockEpoch)
 			if err != nil {
+				// TODO: panic when we switch to dPoS
 				t.errHandler(ierrors.Wrapf(err, "error while retrieving candidate storage for epoch %d", blockEpoch))
-				// TODO: panic or return an error?
+
+				// rollback on error if entry did not exist before
+				rollback = !exists
 
 				return currentValue
 			}
 
 			err = committeeCandidatesStore.Set(block.ProtocolBlock().IssuerID[:], block.ID().Slot().MustBytes())
 			if err != nil {
+				// TODO: panic when we switch to dPoS
 				t.errHandler(ierrors.Wrapf(err, "error while updating candidate activity for epoch %d", blockEpoch))
-				// TODO: panic or return an error?
+
+				// rollback on error if entry did not exist before
+				rollback = !exists
 
 				return currentValue
 			}
@@ -108,6 +110,12 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 
 		return currentValue
 	})
+
+	// if there was an error when computing the value,
+	// and it was the first entry for the given issuer, then remove the entry
+	if rollback {
+		t.nextEpochCommitteeCandidates.Delete(block.ProtocolBlock().IssuerID)
+	}
 
 }
 
@@ -147,7 +155,8 @@ func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.
 			return false
 		}
 
-		candidates.Add(accountID)
+		candidates.Add(iotago.AccountID(accountID))
+
 		return true
 	})
 	if err != nil {
@@ -166,6 +175,7 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 	if err != nil {
 		panic(ierrors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
+
 	if c == nil {
 		return nil, false
 	}

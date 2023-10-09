@@ -1,8 +1,6 @@
 package prunable
 
 import (
-	"fmt"
-
 	copydir "github.com/otiai10/copy"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -157,6 +155,10 @@ func (p *Prunable) Rollback(targetSlot iotago.SlotIndex) error {
 		return ierrors.Wrapf(err, "error while rolling back slots in a bucket for epoch %d", targetSlotEpoch)
 	}
 
+	if err := p.rollbackCommitteesCandidates(targetSlotEpoch, targetSlot); err != nil {
+		return ierrors.Wrapf(err, "error while rolling back committee for epoch %d", targetSlotEpoch)
+	}
+
 	// Shut down the prunableSlotStore in order to flush and get consistent state on disk after reopening.
 	p.prunableSlotStore.Shutdown()
 
@@ -168,9 +170,8 @@ func (p *Prunable) Rollback(targetSlot iotago.SlotIndex) error {
 				return ierrors.Wrapf(err, "error while checking if committee for epoch %d should be rolled back", epoch)
 			}
 
-			fmt.Println("rollback committee", shouldRollback, "epoch", epoch, "lastCommittedEpoch", lastCommittedEpoch, "targetSlotEpoch", targetSlotEpoch)
 			if shouldRollback {
-				if err := p.committee.DeleteEpoch(epoch); err != nil {
+				if err = p.committee.DeleteEpoch(epoch); err != nil {
 					return ierrors.Wrapf(err, "error while deleting committee for epoch %d", epoch)
 				}
 			}
@@ -216,4 +217,49 @@ func (p *Prunable) shouldRollbackCommittee(epoch iotago.EpochIndex, targetSlot i
 	}
 
 	return true, nil
+}
+
+func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochIndex, targetSlot iotago.SlotIndex) error {
+	candidatesToRollback := make([]iotago.AccountID, 0)
+
+	candidates, err := p.CommitteeCandidates(targetSlotEpoch)
+	if err != nil {
+		return ierrors.Wrap(err, "failed to get candidates store")
+	}
+
+	var innerErr error
+	if err = candidates.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
+		accountID, _, err := iotago.AccountIDFromBytes(key)
+		if err != nil {
+			innerErr = err
+
+			return false
+		}
+		candidacySlot, _, err := iotago.SlotIndexFromBytes(value)
+		if err != nil {
+			innerErr = err
+
+			return false
+		}
+
+		if candidacySlot < targetSlot {
+			candidatesToRollback = append(candidatesToRollback, accountID)
+		}
+
+		return true
+	}); err != nil {
+		return ierrors.Wrap(err, "failed to collect candidates to rollback")
+	}
+
+	if innerErr != nil {
+		return ierrors.Wrap(innerErr, "failed to iterate through candidates")
+	}
+
+	for _, candidateToRollback := range candidatesToRollback {
+		if err = candidates.Delete(candidateToRollback[:]); err != nil {
+			return ierrors.Wrap(innerErr, "failed to iterate through candidates")
+		}
+	}
+
+	return nil
 }

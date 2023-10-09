@@ -51,7 +51,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.Validator.AccountID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -154,8 +154,8 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.Validator.AccountID)),
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.Validator.AccountID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.

@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/walker"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -98,7 +99,7 @@ func (g *Gadget) isCommitteeValidationBlock(block *blocks.Block) (seat account.S
 	}
 
 	// Only accept blocks for issuers that are part of the committee.
-	return g.seatManager.Committee(block.ID().Slot()).GetSeat(block.ProtocolBlock().IssuerID)
+	return lo.Return1(g.seatManager.CommitteeInSlot(block.ID().Slot())).GetSeat(block.ProtocolBlock().IssuerID)
 }
 
 func anyChildInSet(block *blocks.Block, set ds.Set[iotago.BlockID]) bool {
