@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -20,7 +19,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -51,16 +49,11 @@ type Node struct {
 	Testing *testing.T
 
 	Name      string
-	Validator bool
+	Validator *BlockIssuer
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	blockIssuer *blockfactory.BlockIssuer
-
-	privateKey              ed25519.PrivateKey
-	PubKey                  ed25519.PublicKey
-	AccountID               iotago.AccountID
 	PeerID                  peer.ID
 	protocolParametersHash  iotago.Identifier
 	highestSupportedVersion iotago.Version
@@ -93,15 +86,21 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 	peerID := lo.PanicOnErr(peer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
 	RegisterIDAlias(peerID, name)
 
+	var validatorBlockIssuer *BlockIssuer
+	if validator {
+		validatorBlockIssuer = NewBlockIssuer(t, name, validator)
+	} else {
+		validatorBlockIssuer = nil
+	}
+
 	return &Node{
 		Testing: t,
 
-		Name:       name,
-		Validator:  validator,
-		PubKey:     pub,
-		privateKey: priv,
-		AccountID:  accountID,
-		PeerID:     peerID,
+		Name: name,
+
+		Validator: validatorBlockIssuer,
+
+		PeerID: peerID,
 
 		Partition: partition,
 		Endpoint:  net.JoinWithEndpointID(peerID, partition),
@@ -111,6 +110,10 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 		attachedBlocks: make([]*blocks.Block, 0),
 	}
+}
+
+func (n *Node) IsValidator() bool {
+	return n.Validator != nil
 }
 
 func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[protocol.Protocol]) {
@@ -126,8 +129,6 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 	if n.enableEngineLogging {
 		n.hookLogging(failOnBlockFiltered)
 	}
-
-	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
 	n.ctx, n.ctxCancel = context.WithCancel(context.Background())
 
@@ -414,13 +415,6 @@ func (n *Node) Shutdown() {
 	<-stopped
 }
 
-func (n *Node) CopyIdentityFromNode(otherNode *Node) {
-	n.AccountID = otherNode.AccountID
-	n.PubKey = otherNode.PubKey
-	n.privateKey = otherNode.privateKey
-	n.Validator = otherNode.Validator
-}
-
 func (n *Node) ProtocolParametersHash() iotago.Identifier {
 	if n.protocolParametersHash == iotago.EmptyIdentifier {
 		return lo.PanicOnErr(n.Protocol.CurrentAPI().ProtocolParameters().Hash())
@@ -443,86 +437,6 @@ func (n *Node) HighestSupportedVersion() iotago.Version {
 
 func (n *Node) SetHighestSupportedVersion(version iotago.Version) {
 	n.highestSupportedVersion = version
-}
-
-func (n *Node) CreateValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
-	modelBlock, err := n.blockIssuer.CreateValidationBlock(ctx, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), opts...)
-	require.NoError(n.Testing, err)
-
-	modelBlock.ID().RegisterAlias(alias)
-
-	return blocks.NewBlock(modelBlock)
-}
-
-func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BasicBlockParams]) *blocks.Block {
-	modelBlock, err := n.blockIssuer.CreateBlock(ctx, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), opts...)
-	require.NoError(n.Testing, err)
-
-	modelBlock.ID().RegisterAlias(alias)
-
-	return blocks.NewBlock(modelBlock)
-}
-
-func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BasicBlockParams]) *blocks.Block {
-	block := n.CreateBlock(ctx, alias, opts...)
-
-	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, alias)
-
-	if n.enableEngineLogging {
-		fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
-	}
-
-	return block
-}
-
-func (n *Node) IssueExistingBlock(block *blocks.Block) {
-	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, block.ID().Alias())
-
-	if n.enableEngineLogging {
-		fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
-	}
-}
-
-func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
-	block := n.CreateValidationBlock(ctx, alias, opts...)
-
-	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
-
-	if n.enableEngineLogging {
-		fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
-	}
-
-	return block
-}
-
-func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup, startSlot iotago.SlotIndex) {
-	issuingTime := n.Protocol.APIForSlot(startSlot).TimeProvider().SlotStartTime(startSlot)
-	start := time.Now()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		fmt.Println(n.Name, "> Starting activity")
-		var counter int
-		for {
-			if ctx.Err() != nil {
-				fmt.Println(n.Name, "> Stopped activity due to canceled context:", ctx.Err())
-				return
-			}
-
-			blockAlias := fmt.Sprintf("%s-activity.%d", n.Name, counter)
-			timeOffset := time.Since(start)
-			n.IssueValidationBlock(ctx, blockAlias,
-				blockfactory.WithValidationBlockHeaderOptions(
-					blockfactory.WithIssuingTime(issuingTime.Add(timeOffset)),
-				),
-			)
-
-			counter++
-			time.Sleep(1 * time.Second)
-		}
-	}()
 }
 
 func (n *Node) ForkDetectedCount() int {

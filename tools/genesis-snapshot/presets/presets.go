@@ -30,7 +30,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 		),
 	),
 	snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
-		iotago.EmptyBlockID(): iotago.NewEmptyCommitment(3).MustID(),
+		iotago.EmptyBlockID: iotago.NewEmptyCommitment(3).MustID(),
 	}),
 }
 

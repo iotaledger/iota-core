@@ -45,10 +45,10 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	evictionState := eviction.NewState(mapdb.NewMapDB(), func(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
 		return slotstore.NewStore(slot, mapdb.NewMapDB(),
-			iotago.SlotIdentifier.Bytes,
-			iotago.SlotIdentifierFromBytes,
-			iotago.SlotIdentifier.Bytes,
-			iotago.SlotIdentifierFromBytes,
+			iotago.BlockID.Bytes,
+			iotago.BlockIDFromBytes,
+			iotago.CommitmentID.Bytes,
+			iotago.CommitmentIDFromBytes,
 		), nil
 	})
 
@@ -57,7 +57,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t.Events = instance.Events()
 	t.Instance = instance
 
-	genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID(), time.Unix(tpkg.TestAPI.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
+	genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID(), time.Unix(tpkg.TestAPI.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
 	t.blocks.Set("Genesis", genesisBlock)
 	genesisBlock.ID().RegisterAlias("Genesis")
 	evictionState.AddRootBlock(genesisBlock.ID(), genesisBlock.SlotCommitmentID())

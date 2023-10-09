@@ -132,7 +132,7 @@ func (t *TestFramework) AttachTransaction(signedTransactionAlias, transactionAli
 	transaction, transactionExists := t.transactionByAlias[transactionAlias]
 	require.True(t.test, transactionExists, "transaction with alias '%s' does not exist", transactionAlias)
 
-	t.blockIDsByAlias[blockAlias] = iotago.SlotIdentifierRepresentingData(slot, []byte(blockAlias))
+	t.blockIDsByAlias[blockAlias] = iotago.BlockIDRepresentingData(slot, []byte(blockAlias))
 	t.blockIDsByAlias[blockAlias].RegisterAlias(blockAlias)
 
 	if _, err := t.Instance.AttachSignedTransaction(signedTransaction, transaction, t.blockIDsByAlias[blockAlias]); err != nil {

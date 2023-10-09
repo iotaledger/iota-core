@@ -49,6 +49,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	node6 := ts.AddValidatorNode("node6")
 	node7 := ts.AddValidatorNode("node7")
 	node8 := ts.AddNode("node8")
+	ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
 
 	const expectedCommittedSlotAfterPartitionMerge = 18
 	nodesP1 := []*mock.Node{node0, node1, node2, node3, node4, node5}
@@ -59,8 +60,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
 
 			for _, node := range append(nodesP1, nodesP2...) {
-				if node.Validator {
-					poa.AddAccount(node.AccountID, node.Name)
+				if node.IsValidator() {
+					poa.AddAccount(node.Validator.AccountID, node.Name)
 				}
 			}
 			poa.SetOnline("node0", "node1", "node2", "node3", "node4")
@@ -111,24 +112,24 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	node8.Protocol.SetLogLevel(log.LevelDebug)
 
 	expectedCommittee := []iotago.AccountID{
-		node0.AccountID,
-		node1.AccountID,
-		node2.AccountID,
-		node3.AccountID,
-		node4.AccountID,
-		node6.AccountID,
-		node7.AccountID,
+		node0.Validator.AccountID,
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
+		node3.Validator.AccountID,
+		node4.Validator.AccountID,
+		node6.Validator.AccountID,
+		node7.Validator.AccountID,
 	}
 	expectedP1OnlineCommittee := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node4.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node4.Validator.AccountID)),
 	}
 	expectedP2OnlineCommittee := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node6.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node7.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node6.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node7.Validator.AccountID)),
 	}
 	expectedOnlineCommittee := append(expectedP1OnlineCommittee, expectedP2OnlineCommittee...)
 
@@ -174,7 +175,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		for _, slot := range []iotago.SlotIndex{4, 5, 6, 7, 8, 9, 10, 11} {
 			var attestationBlocks []*blocks.Block
 			for _, node := range ts.Nodes() {
-				if node.Validator {
+				if node.IsValidator() {
 					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", slot, node.Name)))
 				}
 			}
@@ -229,7 +230,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		for _, slot := range []iotago.SlotIndex{12, 13, 14, 15} {
 			var attestationBlocks []*blocks.Block
 			for _, node := range nodesP1 {
-				if node.Validator {
+				if node.IsValidator() {
 					if slot <= 13 {
 						attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", slot, node.Name)))
 					} else {
@@ -240,7 +241,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 			// We carry these attestations forward with the window even though these nodes didn't issue in P1.
 			for _, node := range nodesP2 {
-				if node.Validator {
+				if node.IsValidator() {
 					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", lo.Min(slot, 13), node.Name)))
 				}
 			}
@@ -251,7 +252,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		for _, slot := range []iotago.SlotIndex{16, 17, 18} {
 			var attestationBlocks []*blocks.Block
 			for _, node := range nodesP1 {
-				if node.Validator {
+				if node.IsValidator() {
 					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P1:%d.3-%s", slot, node.Name)))
 				}
 			}
@@ -283,7 +284,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		for _, slot := range []iotago.SlotIndex{12, 13, 14, 15} {
 			var attestationBlocks []*blocks.Block
 			for _, node := range nodesP2 {
-				if node.Validator {
+				if node.IsValidator() {
 					if slot <= 13 {
 						attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", slot, node.Name)))
 					} else {
@@ -294,7 +295,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 			// We carry these attestations forward with the window even though these nodes didn't issue in P1.
 			for _, node := range nodesP1 {
-				if node.Validator {
+				if node.IsValidator() {
 					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", lo.Min(slot, 13), node.Name)))
 				}
 			}
@@ -305,7 +306,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		for _, slot := range []iotago.SlotIndex{16, 17, 18} {
 			var attestationBlocks []*blocks.Block
 			for _, node := range nodesP2 {
-				if node.Validator {
+				if node.IsValidator() {
 					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P2:%d.3-%s", slot, node.Name)))
 				}
 			}
@@ -338,16 +339,16 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		wg := &sync.WaitGroup{}
 
 		// Issue blocks on both partitions after merging the networks.
-		node0.IssueActivity(ctxP1, wg, 21)
-		node1.IssueActivity(ctxP1, wg, 21)
-		node2.IssueActivity(ctxP1, wg, 21)
-		node3.IssueActivity(ctxP1, wg, 21)
-		node4.IssueActivity(ctxP1, wg, 21)
-		node5.IssueActivity(ctxP1, wg, 21)
+		node0.Validator.IssueActivity(ctxP1, wg, 21, node0)
+		node1.Validator.IssueActivity(ctxP1, wg, 21, node1)
+		node2.Validator.IssueActivity(ctxP1, wg, 21, node2)
+		node3.Validator.IssueActivity(ctxP1, wg, 21, node3)
+		node4.Validator.IssueActivity(ctxP1, wg, 21, node4)
+		//node5.Validator.IssueActivity(ctxP1, wg, 21, node5)
 
-		node6.IssueActivity(ctxP2, wg, 21)
-		node7.IssueActivity(ctxP2, wg, 21)
-		node8.IssueActivity(ctxP2, wg, 21)
+		node6.Validator.IssueActivity(ctxP2, wg, 21, node6)
+		node7.Validator.IssueActivity(ctxP2, wg, 21, node7)
+		//node8.Validator.IssueActivity(ctxP2, wg, 21, node8)
 
 		// P1 finalized until slot 18. We do not expect any forks here because our CW is higher than the other partition's.
 		ts.AssertForkDetectedCount(0, nodesP1...)

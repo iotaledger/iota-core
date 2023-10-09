@@ -42,7 +42,7 @@ func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) *T
 		}
 
 		rootBlocksRetriever := func() iotago.BlockIDs {
-			return iotago.BlockIDs{iotago.EmptyBlockID()}
+			return iotago.BlockIDs{iotago.EmptyBlockID}
 		}
 
 		t.TipManager = tipmanagertests.NewTestFramework(test)

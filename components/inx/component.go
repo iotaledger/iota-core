@@ -8,7 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/iota-core/components/protocol"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
@@ -22,22 +22,20 @@ func init() {
 		IsEnabled: func(c *dig.Container) bool {
 			return ParamsINX.Enabled
 		},
-		Provide:   provide,
-		Configure: configure,
-		Run:       run,
+		Provide: provide,
+		Run:     run,
 	}
 }
 
 var (
-	Component          *app.Component
-	deps               dependencies
-	blockIssuerAccount blockfactory.Account
+	Component *app.Component
+	deps      dependencies
 )
 
 type dependencies struct {
 	dig.In
 	Protocol         *protocolpkg.Protocol
-	BlockIssuer      *blockfactory.BlockIssuer
+	BlockHandler     *blockhandler.BlockHandler
 	Echo             *echo.Echo `optional:"true"`
 	RestRouteManager *restapipkg.RestRouteManager
 	INXServer        *Server
@@ -50,12 +48,6 @@ func provide(c *dig.Container) error {
 	}); err != nil {
 		Component.LogPanic(err)
 	}
-
-	return nil
-}
-
-func configure() error {
-	blockIssuerAccount = blockfactory.AccountFromParams(ParamsINX.BlockIssuerAccount, ParamsINX.BlockIssuerPrivateKey)
 
 	return nil
 }

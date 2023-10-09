@@ -57,7 +57,7 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 		search := c.Param("search")
 		result := &SearchResult{}
 
-		blockID, err := iotago.SlotIdentifierFromHexString(search)
+		blockID, err := iotago.BlockIDFromHexString(search)
 		if err != nil {
 			return ierrors.Wrapf(ErrInvalidParameter, "search ID %s", search)
 		}
