@@ -11,9 +11,6 @@ func issueValidatorBlock(ctx context.Context) {
 	// Get the main engine instance in case it changes mid-execution.
 	engineInstance := deps.Protocol.MainEngineInstance()
 
-	// Get the latest commitment from the engine before to avoid race conditions if something is committed after we fix block issuing time.
-	latestCommitment := engineInstance.Storage.Settings().LatestCommitment()
-
 	blockIssuingTime := time.Now()
 	nextBroadcast := blockIssuingTime.Add(ParamsValidator.CommitteeBroadcastInterval)
 
@@ -39,7 +36,6 @@ func issueValidatorBlock(ctx context.Context) {
 		validatorAccount,
 		blockfactory.WithValidationBlockHeaderOptions(
 			blockfactory.WithIssuingTime(blockIssuingTime),
-			blockfactory.WithSlotCommitment(latestCommitment.Commitment()),
 		),
 		blockfactory.WithProtocolParametersHash(protocolParametersHash),
 		blockfactory.WithHighestSupportedVersion(deps.Protocol.LatestAPI().Version()),
@@ -63,5 +59,4 @@ func issueValidatorBlock(ctx context.Context) {
 	}
 
 	Component.LogDebugf("Issued validator block: %s - commitment %s %d - latest finalized slot %d", modelBlock.ID(), modelBlock.ProtocolBlock().SlotCommitmentID, modelBlock.ProtocolBlock().SlotCommitmentID.Slot(), modelBlock.ProtocolBlock().LatestFinalizedSlot)
-
 }
