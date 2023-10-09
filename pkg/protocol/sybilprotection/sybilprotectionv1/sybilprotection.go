@@ -62,7 +62,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 
 					latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
 					latestCommittedEpoch := o.apiProvider.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot)
-					o.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.ValidatorPerformances, latestCommittedEpoch, e, o.errHandler)
+					o.performanceTracker = performance.NewTracker(e.Storage.RewardsForEpoch, e.Storage.PoolStats(), e.Storage.Committee(), e.Storage.CommitteeCandidates, e.Storage.ValidatorPerformances, latestCommittedEpoch, e, o.errHandler)
 					o.lastCommittedSlot = latestCommittedSlot
 
 					if o.optsInitialCommittee != nil {
@@ -81,15 +81,14 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 
 						currentEpoch := e.CurrentAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
 
+						// TODO: it should have its own storage with committee because committee might change from slot to slot
 						committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 						if !exists {
 							panic("failed to load committee for last finalized slot to initialize sybil protection")
 						}
 						o.seatManager.ImportCommittee(currentEpoch, committee)
-						fmt.Println("committee import", committee.TotalStake(), currentEpoch)
 						if nextCommittee, nextCommitteeExists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch + 1); nextCommitteeExists {
 							o.seatManager.ImportCommittee(currentEpoch+1, nextCommittee)
-							fmt.Println("next committee", nextCommittee.TotalStake(), currentEpoch+1)
 						}
 
 						o.TriggerInitialized()
@@ -108,8 +107,33 @@ func (o *SybilProtection) Shutdown() {
 	o.TriggerStopped()
 }
 
-func (o *SybilProtection) TrackValidationBlock(block *blocks.Block) {
-	o.performanceTracker.TrackValidationBlock(block)
+func (o *SybilProtection) TrackBlock(block *blocks.Block) {
+	accountData, exists, err := o.ledger.Account(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Slot())
+	if err != nil || !exists {
+		return
+	}
+
+	blockEpoch := o.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(block.ID().Slot())
+
+	// if the block is issued before the stake end epoch, then it's not a valid validator or candidate block
+	if accountData.StakeEndEpoch < blockEpoch {
+		return
+	}
+
+	if _, isValidationBlock := block.ValidationBlock(); isValidationBlock {
+		o.performanceTracker.TrackValidationBlock(block)
+
+		// TODO: comment the return if we want validator blocks to not serve as candidate blocks
+		//return
+	}
+
+	// if a candidate block is issued in the stake end epoch,
+	// then don't consider it because the validator can't be part of the committee in the next epoch
+	if accountData.StakeEndEpoch == blockEpoch {
+		return
+	}
+
+	o.performanceTracker.TrackCandidateBlock(block)
 }
 
 func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewardsRoot iotago.Identifier, err error) {
@@ -136,7 +160,6 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 			}
 
 			committee.SetReused()
-			fmt.Println("reuse committee", currentEpoch, "stake", committee.TotalValidatorStake())
 			o.seatManager.SetCommittee(nextEpoch, committee)
 
 			o.events.CommitteeSelected.Trigger(committee, nextEpoch)
@@ -252,7 +275,6 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 	if slot+apiForSlot.ProtocolParameters().EpochNearingThreshold() == epochEndSlot &&
 		epochEndSlot > o.lastCommittedSlot+apiForSlot.ProtocolParameters().MaxCommittableAge() {
 		newCommittee := o.selectNewCommittee(slot)
-		fmt.Println("new committee selection finalization", epoch, newCommittee.TotalStake(), newCommittee.TotalValidatorStake())
 		o.events.CommitteeSelected.Trigger(newCommittee, epoch+1)
 	}
 }
@@ -260,6 +282,7 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 // IsCandidateActive returns true if the given validator is currently active.
 func (o *SybilProtection) IsCandidateActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) bool {
 	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+
 	return activeCandidates.Has(validatorID)
 }
 

@@ -20,6 +20,7 @@ const (
 	slotPrefixUpgradeSignals
 	slotPrefixRoots
 	slotPrefixRetainer
+	epochPrefixCommitteeCandidates
 )
 
 func (p *Prunable) getKVStoreFromSlot(slot iotago.SlotIndex, prefix kvstore.Realm) (kvstore.KVStore, error) {
@@ -48,6 +49,10 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.Bl
 		iotago.SlotIdentifierFromBytes,
 		iotago.SlotIdentifier.Bytes, iotago.SlotIdentifierFromBytes,
 	), nil
+}
+
+func (p *Prunable) CommitteeCandidates(epoch iotago.EpochIndex) (kvstore.KVStore, error) {
+	return p.prunableSlotStore.Get(epoch, kvstore.Realm{epochPrefixCommitteeCandidates})
 }
 
 func (p *Prunable) Attestations(slot iotago.SlotIndex) (kvstore.KVStore, error) {

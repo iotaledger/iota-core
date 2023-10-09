@@ -1,6 +1,8 @@
 package poa
 
 import (
+	"bytes"
+	"sort"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -15,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -26,6 +29,7 @@ type SeatManager struct {
 	workers          *workerpool.Group
 	accounts         *account.Accounts
 	committee        *account.SeatedAccounts
+	committeeStore   *epochstore.Store[*account.Accounts]
 	onlineCommittee  ds.Set[account.SeatIndex]
 	inactivityQueue  timed.PriorityQueue[account.SeatIndex]
 	lastActivities   *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
@@ -33,19 +37,21 @@ type SeatManager struct {
 	activityMutex    syncutils.RWMutex
 	committeeMutex   syncutils.RWMutex
 
+	optsSeatCount              uint32
 	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID
 
 	module.Module
 }
 
-// NewProvider returns a new sybil protection provider that uses the ProofOfAuthority module.
-func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.Engine, seatmanager.SeatManager] {
+// NewProvider returns a new sybil protection provider that uses the ProofOfStake module.
+func NewProvider(committeeStore *epochstore.Store[*account.Accounts], opts ...options.Option[SeatManager]) module.Provider[*engine.Engine, seatmanager.SeatManager] {
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
 		return options.Apply(
 			&SeatManager{
 				events:          seatmanager.NewEvents(),
 				workers:         e.Workers.CreateGroup("SeatManager"),
+				committeeStore:  committeeStore,
 				accounts:        account.NewAccounts(),
 				onlineCommittee: ds.NewSet[account.SeatIndex](),
 				inactivityQueue: timed.NewPriorityQueue[account.SeatIndex](true),
@@ -57,6 +63,7 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 				e.HookConstructed(func() {
 					s.clock = e.Clock
+
 					s.TriggerConstructed()
 
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
@@ -77,20 +84,53 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 var _ seatmanager.SeatManager = &SeatManager{}
 
-func (s *SeatManager) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *account.SeatedAccounts {
+func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates *account.Accounts) *account.SeatedAccounts {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
-	// we do nothing on PoA, we keep the same accounts and committee
+	candidateAccountIDs := make([]iotago.AccountID, 0)
+	candidatePools := make([]*account.Pool, 0)
+	candidates.ForEach(func(id iotago.AccountID, pool *account.Pool) bool {
+		candidatePools = append(candidatePools, pool)
+		candidateAccountIDs = append(candidateAccountIDs, id)
+
+		return true
+	})
+
+	sort.Slice(candidateAccountIDs, func(i, j int) bool {
+		if candidatePools[i].PoolStake != candidatePools[j].PoolStake {
+			return candidatePools[i].PoolStake < candidatePools[j].PoolStake
+		}
+
+		if candidatePools[i].ValidatorStake != candidatePools[j].ValidatorStake {
+			return candidatePools[i].ValidatorStake < candidatePools[j].ValidatorStake
+		}
+
+		// TODO: add more tie-breaking
+
+		// two candidates never have the same account ID because they come in a map
+		return bytes.Compare(candidateAccountIDs[i][:], candidateAccountIDs[j][:]) < 0
+
+	})
+
+	s.committee = candidates.SelectCommittee(candidateAccountIDs[:s.optsSeatCount]...)
+
+	err := s.committeeStore.Store(epoch, s.committee.Accounts())
+	if err != nil {
+		// TODO: panic?w
+		return nil
+	}
+
 	return s.committee
 }
+
+// TODO: does that method make sense? this component does not have any committee storage so it has no knowledge of past committees.
 
 // Committee returns the set of validators selected to be part of the committee.
 func (s *SeatManager) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
-	// Note: we have PoA so our committee do not rotate right now
 	return s.committee
 }
 

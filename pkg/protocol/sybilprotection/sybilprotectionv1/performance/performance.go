@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -18,12 +18,13 @@ import (
 )
 
 type Tracker struct {
-	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error)
-	poolStatsStore           *epochstore.Store[*model.PoolsStats]
-	committeeStore           *epochstore.Store[*account.Accounts]
-
-	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
-	latestAppliedEpoch        iotago.EpochIndex
+	rewardsStorePerEpochFunc       func(epoch iotago.EpochIndex) (kvstore.KVStore, error)
+	poolStatsStore                 *epochstore.Store[*model.PoolsStats]
+	committeeStore                 *epochstore.Store[*account.Accounts]
+	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error)
+	nextEpochCommitteeCandidates   *shrinkingmap.ShrinkingMap[iotago.AccountID, iotago.SlotIndex]
+	validatorPerformancesFunc      func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
+	latestAppliedEpoch             iotago.EpochIndex
 
 	apiProvider iotago.APIProvider
 
@@ -33,44 +34,42 @@ type Tracker struct {
 	mutex                   syncutils.RWMutex
 }
 
-func NewTracker(
-	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error),
-	poolStatsStore *epochstore.Store[*model.PoolsStats],
-	committeeStore *epochstore.Store[*account.Accounts],
-	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
-	latestAppliedEpoch iotago.EpochIndex,
-	apiProvider iotago.APIProvider,
-	errHandler func(error),
-) *Tracker {
+func NewTracker(rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error), poolStatsStore *epochstore.Store[*model.PoolsStats], committeeStore *epochstore.Store[*account.Accounts], committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error), validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error), latestAppliedEpoch iotago.EpochIndex, apiProvider iotago.APIProvider, errHandler func(error)) *Tracker {
 	return &Tracker{
-		rewardsStorePerEpochFunc:  rewardsStorePerEpochFunc,
-		poolStatsStore:            poolStatsStore,
-		committeeStore:            committeeStore,
-		validatorPerformancesFunc: validatorPerformancesFunc,
-		latestAppliedEpoch:        latestAppliedEpoch,
-		apiProvider:               apiProvider,
-		errHandler:                errHandler,
+		nextEpochCommitteeCandidates:   shrinkingmap.New[iotago.AccountID, iotago.SlotIndex](),
+		rewardsStorePerEpochFunc:       rewardsStorePerEpochFunc,
+		poolStatsStore:                 poolStatsStore,
+		committeeStore:                 committeeStore,
+		committeeCandidatesInEpochFunc: committeeCandidatesInEpochFunc,
+		validatorPerformancesFunc:      validatorPerformancesFunc,
+		latestAppliedEpoch:             latestAppliedEpoch,
+		apiProvider:                    apiProvider,
+		errHandler:                     errHandler,
 	}
 }
 
 func (t *Tracker) RegisterCommittee(epoch iotago.EpochIndex, committee *account.Accounts) error {
+	// clean the candidates cache stored in memory to make room for candidates in the next epoch
+	t.nextEpochCommitteeCandidates.Clear()
+
 	return t.committeeStore.Store(epoch, committee)
 }
 
 func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
-	validatorBlock, isValidationBlock := block.ValidationBlock()
-	if !isValidationBlock {
-		return
-	}
-
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
+
+	validatorBlock, isValidationBlock := block.ValidationBlock()
+	if isValidationBlock {
+		return
+	}
 
 	t.performanceFactorsMutex.Lock()
 	defer t.performanceFactorsMutex.Unlock()
 	isCommitteeMember, err := t.isCommitteeMember(block.ID().Slot(), block.ProtocolBlock().IssuerID)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to check if account %s is committee member", block.ProtocolBlock().IssuerID))
+		// TODO: panic or return an error?
 
 		return
 	}
@@ -80,35 +79,86 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	}
 }
 
-func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.AccountID] {
-	// TODO: to be implemented for 1.1, for now we just pick previous committee
+func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 
-	eligible := ds.NewSet[iotago.AccountID]()
+	blockEpoch := t.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochFromSlot(block.ID().Slot())
 
-	lo.PanicOnErr(t.committeeStore.Load(epoch - 1)).ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
-		eligible.Add(accountID)
+	t.nextEpochCommitteeCandidates.Compute(block.ProtocolBlock().IssuerID, func(currentValue iotago.SlotIndex, exists bool) iotago.SlotIndex {
+		if !exists || currentValue > block.ID().Slot() {
+			committeeCandidatesStore, err := t.committeeCandidatesInEpochFunc(blockEpoch)
+			if err != nil {
+				t.errHandler(ierrors.Wrapf(err, "error while retrieving candidate storage for epoch %d", blockEpoch))
+				// TODO: panic or return an error?
 
-		return true
+				return currentValue
+			}
+
+			err = committeeCandidatesStore.Set(block.ProtocolBlock().IssuerID[:], block.ID().Slot().MustBytes())
+			if err != nil {
+				t.errHandler(ierrors.Wrapf(err, "error while updating candidate activity for epoch %d", blockEpoch))
+				// TODO: panic or return an error?
+
+				return currentValue
+			}
+
+			return block.ID().Slot()
+		}
+
+		return currentValue
 	})
 
-	return eligible
+}
 
-	//epochStart := t.apiProvider.APIForEpoch(epoch).TimeProvider().EpochStart(epoch)
-	//registeredStore := t.registeredValidatorsFunc(epochStart)
-	//eligible := ds.NewSet[iotago.AccountID]()
-	//registeredStore.ForEach(func(accountID iotago.AccountID, a *prunable.RegisteredValidatorActivity) bool {
-	//	if a.Active {
-	//		eligible.Add(accountID)
-	//	}
-	//	return true
-	//}
+func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.AccountID] {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	return t.getValidatorCandidates(epoch)
 }
 
 // ValidatorCandidates returns the registered validator candidates for the given epoch.
-func (t *Tracker) ValidatorCandidates(_ iotago.EpochIndex) ds.Set[iotago.AccountID] {
-	// TODO: we should choose candidates we tracked performance for no matter if they were active
+func (t *Tracker) ValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.AccountID] {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
 
-	return ds.NewSet[iotago.AccountID]()
+	return t.getValidatorCandidates(epoch)
+}
+
+func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.AccountID] {
+	// we store candidates in the store for the epoch of their activity, but the passed argument points to the target epoch,
+	// so it's necessary to subtract 1 epoch from the passed value
+	candidateStore, err := t.committeeCandidatesInEpochFunc(epoch - 1)
+	if err != nil {
+		// TODO: panic or return an error?
+		t.errHandler(ierrors.Wrapf(err, "error while retrieving candidates for epoch %d", epoch))
+
+		return nil
+	}
+
+	candidates := ds.NewSet[iotago.AccountID]()
+	err = candidateStore.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
+		accountID, _, err := iotago.IdentifierFromBytes(key)
+		if err != nil {
+			t.errHandler(ierrors.Wrapf(err, "error while  for epoch %d", epoch))
+			// TODO: panic or return an error?
+
+			return false
+		}
+
+		candidates.Add(accountID)
+		return true
+	})
+	if err != nil {
+		// TODO: panic or return an error?
+
+		t.errHandler(ierrors.Wrapf(err, "error while retrieving candidates for epoch %d", epoch))
+
+		return nil
+	}
+
+	return candidates
 }
 
 func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
@@ -246,6 +296,7 @@ func (t *Tracker) isCommitteeMember(slot iotago.SlotIndex, accountID iotago.Acco
 	return committee.Has(accountID), nil
 }
 
+// TODO: should errors in this method be only handled by the errHandler and not result in a panic or some more radical result?
 func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.ValidationBlock, block *blocks.Block) {
 	validatorPerformances, err := t.validatorPerformancesFunc(block.ID().Slot())
 	if err != nil {
