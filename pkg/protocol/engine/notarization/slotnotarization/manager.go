@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -38,6 +39,8 @@ type Manager struct {
 	acceptedTimeFunc  func() time.Time
 	minCommittableAge iotago.SlotIndex
 	apiProvider       iotago.APIProvider
+
+	commitmentMutex syncutils.Mutex
 
 	module.Module
 }
@@ -164,6 +167,9 @@ func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool
 }
 
 func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, error) {
+	m.commitmentMutex.Lock()
+	defer m.commitmentMutex.Unlock()
+
 	latestCommitment := m.storage.Settings().LatestCommitment()
 	if slot != latestCommitment.Slot()+1 {
 		return nil, ierrors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", slot, latestCommitment.Slot())
