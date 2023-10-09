@@ -10,10 +10,11 @@ import (
 )
 
 var (
-	ErrFailPostTransaction = ierrors.New("failed to post transaction")
+	ErrFailPostBlock       = ierrors.New("failed to post block")
 	ErrFailSendDataBlock   = ierrors.New("failed to send a data block")
 	ErrFailGetReferences   = ierrors.New("failed to get references")
 	ErrTransactionIsNil    = ierrors.New("provided transaction is nil")
+	ErrBlockIsNil          = ierrors.New("provided block is nil")
 	ErrFailToPrepareBatch  = ierrors.New("custom conflict batch could not be prepared")
 	ErrInsufficientClients = ierrors.New("insufficient clients to send conflicts")
 	ErrInputsNotSolid      = ierrors.New("not all inputs are solid")

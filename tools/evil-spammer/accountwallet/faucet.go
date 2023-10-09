@@ -24,20 +24,12 @@ func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago
 		return nil, err
 	}
 
-	issuerResp, err := a.client.GetBlockIssuance()
+	issuerResp, congestionResp, err := a.requestBlockData()
 	if err != nil {
-		log.Errorf("failed to get block issuance: %s", err)
-
-		return nil, err
-	}
-	congestionResp, err := a.client.GetCongestion(a.faucet.account.ID())
-	if err != nil {
-		log.Errorf("failed to get congestion: %s", err)
-
 		return nil, err
 	}
 
-	signedBlock, err := a.createBlock(issuerResp, congestionResp, signedTx)
+	signedBlock, err := a.createBlock(issuerResp, congestionResp, signedTx, a.faucet.account)
 	if err != nil {
 		log.Errorf("failed to create block: %s", err)
 
@@ -69,7 +61,49 @@ func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago
 	}, nil
 }
 
-func (a *AccountWallet) createBlock(issuerResp *apimodels.IssuanceBlockHeaderResponse, congestionResp *apimodels.CongestionResponse, payload iotago.Payload) (*iotago.ProtocolBlock, error) {
+func (a *AccountWallet) requestBlockData() (*apimodels.IssuanceBlockHeaderResponse, *apimodels.CongestionResponse, error) {
+	issuerResp, err := a.client.GetBlockIssuance()
+	if err != nil {
+		log.Errorf("failed to get block issuance: %s", err)
+
+		return nil, nil, err
+	}
+
+	congestionResp, err := a.client.GetCongestion(a.faucet.account.ID())
+	if err != nil {
+		log.Errorf("failed to get congestion: %s", err)
+
+		return nil, nil, err
+	}
+
+	return issuerResp, congestionResp, nil
+}
+
+func (a *AccountWallet) PostBlock(clt models.Client, payload iotago.Payload, issuer blockfactory.Account) error {
+	issuerResp, congestionResp, err := a.requestBlockData()
+	if err != nil {
+		return err
+	}
+
+	signedBlock, err := a.createBlock(issuerResp, congestionResp, payload, issuer)
+	if err != nil {
+		log.Errorf("failed to create block: %s", err)
+
+		return err
+	}
+
+	_, err = clt.PostBlock(signedBlock)
+	if err != nil {
+		log.Errorf("failed to post block: %s", err)
+
+		return err
+	}
+
+	return nil
+
+}
+
+func (a *AccountWallet) createBlock(issuerResp *apimodels.IssuanceBlockHeaderResponse, congestionResp *apimodels.CongestionResponse, payload iotago.Payload, issuer blockfactory.Account) (*iotago.ProtocolBlock, error) {
 	commitmentID, err := issuerResp.Commitment.ID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get commitment ID: %w", err)
@@ -86,7 +120,7 @@ func (a *AccountWallet) createBlock(issuerResp *apimodels.IssuanceBlockHeaderRes
 	blockBuilder.ShallowLikeParents(issuerResp.ShallowLikeParents)
 	blockBuilder.Payload(payload)
 	blockBuilder.MaxBurnedMana(congestionResp.ReferenceManaCost)
-	blockBuilder.Sign(a.faucet.account.ID(), a.faucet.account.PrivateKey())
+	blockBuilder.Sign(issuer.ID(), issuer.PrivateKey())
 
 	blk, err := blockBuilder.Build()
 	if err != nil {

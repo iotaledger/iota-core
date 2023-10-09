@@ -161,8 +161,6 @@ func (c *WebClients) RemoveClient(url string) {
 type Client interface {
 	// URL returns a client API url.
 	URL() (cltID string)
-	// PostTransaction sends a transaction to the Tangle via a given client.
-	PostTransaction(tx *iotago.SignedTransaction) (iotago.BlockID, error)
 	// PostBlock sends a block to the Tangle via a given client.
 	PostBlock(block *iotago.ProtocolBlock) (iotago.BlockID, error)
 	// PostData sends the given data (payload) by creating a block in the backend.
@@ -219,26 +217,6 @@ func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
 	}, opts, func(w *WebClient) {
 		w.client, _ = nodeclient.New(w.url)
 	})
-}
-
-// PostTransaction sends a transaction to the Tangle via a given client.
-func (c *WebClient) PostTransaction(tx *iotago.SignedTransaction) (blockID iotago.BlockID, err error) {
-	blockBuilder := builder.NewBasicBlockBuilder(c.client.CurrentAPI())
-
-	blockBuilder.Payload(tx)
-	blockBuilder.IssuingTime(time.Time{})
-
-	blk, err := blockBuilder.Build()
-	if err != nil {
-		return iotago.EmptyBlockID(), err
-	}
-
-	id, err := c.client.SubmitBlock(context.Background(), blk)
-	if err != nil {
-		return
-	}
-
-	return id, nil
 }
 
 func (c *WebClient) PostBlock(block *iotago.ProtocolBlock) (blockID iotago.BlockID, err error) {

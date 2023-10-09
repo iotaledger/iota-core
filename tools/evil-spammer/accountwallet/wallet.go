@@ -276,10 +276,7 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 		return ierrors.Wrap(err, "failed to build transaction")
 	}
 
-	_, err = a.client.PostTransaction(tx)
-	if err != nil {
-		return ierrors.Wrap(err, "failed to post transaction")
-	}
+	// TODO createa and post block
 
 	// remove account from wallet
 	delete(a.accountsAliases, alias)

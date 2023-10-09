@@ -9,7 +9,6 @@ import (
 	appLogger "github.com/iotaledger/hive.go/app/logger"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
@@ -232,50 +231,35 @@ func (s *Spammer) StopSpamming() {
 	s.shutdown <- types.Void
 }
 
-// PostTransaction use provided client to issue a transaction. It chooses API method based on Spammer options. Counts errors,
-// counts transactions and provides debug logs.
-func (s *Spammer) PostTransaction(signedTx *iotago.SignedTransaction, clt models.Client) {
-	if signedTx == nil {
-		s.log.Debug(ErrTransactionIsNil)
-		s.ErrCounter.CountError(ErrTransactionIsNil)
+func (s *Spammer) PrepareAndPostBlock(payload iotago.Payload, clt models.Client) {
+	if block == nil {
+		s.log.Debug(ErrBlockIsNil)
+		s.ErrCounter.CountError(ErrBlockIsNil)
 
 		return
 	}
 
-	txID := lo.PanicOnErr(signedTx.Transaction.ID())
-	allSolid := s.handleSolidityForReuseOutputs(clt, signedTx)
-	if !allSolid {
-		s.log.Debug(ErrInputsNotSolid)
-		s.ErrCounter.CountError(ierrors.Wrapf(ErrInputsNotSolid, "txID: %s", txID.ToHex()))
-
-		return
-	}
-
-	blockID, err := clt.PostTransaction(signedTx)
+	s.EvilWallet.
+		_, err := clt.PostBlock(block)
 	if err != nil {
-		s.log.Debug(ierrors.Wrapf(ErrFailPostTransaction, err.Error()))
-		s.ErrCounter.CountError(ierrors.Wrapf(ErrFailPostTransaction, err.Error()))
+		s.log.Debug(ierrors.Wrapf(ErrFailPostBlock, err.Error()))
+		s.ErrCounter.CountError(ierrors.Wrapf(ErrFailPostBlock, err.Error()))
 
 		return
 	}
-	if s.EvilScenario.OutputWallet.Type() == evilwallet.Reuse {
-		var outputIDs iotago.OutputIDs
-		for index := range signedTx.Transaction.Outputs {
-			outputIDs = append(outputIDs, iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(index)))
+
+	// reuse outputs
+	if payload.PayloadType() == iotago.PayloadSignedTransaction {
+		if s.EvilScenario.OutputWallet.Type() == evilwallet.Reuse {
+			var outputIDs iotago.OutputIDs
+			for index := range signedTx.Transaction.Outputs {
+				outputIDs = append(outputIDs, iotago.OutputIDFromTransactionIDAndIndex(txID, uint16(index)))
+			}
+			s.EvilWallet.SetTxOutputsSolid(outputIDs, clt.URL())
 		}
-		s.EvilWallet.SetTxOutputsSolid(outputIDs, clt.URL())
 	}
-
 	count := s.State.txSent.Add(1)
-	s.log.Debugf("%s: Last transaction sent, ID: %s, txCount: %d", blockID.ToHex(), txID.ToHex(), count)
-}
-
-func (s *Spammer) handleSolidityForReuseOutputs(_ models.Client, _ *iotago.SignedTransaction) (ok bool) {
-	// ok = s.EvilWallet.AwaitInputsSolidity(tx.SignedTransaction().Inputs(), clt)
-	// if s.EvilScenario.OutputWallet.Type() == wallet.Reuse {
-	// 	s.EvilWallet.AddReuseOutputsToThePool(tx.SignedTransaction().Outputs())
-	// }
-	return true
+	s.log.Debugf("Last block sent, ID: %s, txCount: %d", blockID.ToHex(), count)
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
