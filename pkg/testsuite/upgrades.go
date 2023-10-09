@@ -14,7 +14,7 @@ func (t *TestSuite) AssertEpochVersions(epochVersions map[iotago.Version]iotago.
 		t.Eventually(func() error {
 
 			for version, expectedEpoch := range epochVersions {
-				epochForVersion, exists := node.Protocol.MainEngineInstance().Storage.Settings().APIProvider().EpochForVersion(version)
+				epochForVersion, exists := node.Protocol.MainEngine.Get().Storage.Settings().APIProvider().EpochForVersion(version)
 				if !exists {
 					return ierrors.Errorf("AssertEpochVersions: %s: version %d not found", node.Name, version)
 				}
@@ -36,7 +36,7 @@ func (t *TestSuite) AssertVersionAndProtocolParameters(versionsAndProtocolParame
 		t.Eventually(func() error {
 
 			for version, expectedProtocolParameters := range versionsAndProtocolParameters {
-				protocolParameters := node.Protocol.MainEngineInstance().Storage.Settings().APIProvider().ProtocolParameters(version)
+				protocolParameters := node.Protocol.MainEngine.Get().Storage.Settings().APIProvider().ProtocolParameters(version)
 
 				if expectedProtocolParameters == nil {
 					if protocolParameters != nil {
@@ -71,7 +71,7 @@ func (t *TestSuite) AssertVersionAndProtocolParametersHashes(versionsAndProtocol
 		t.Eventually(func() error {
 
 			for version, expectedProtocolParametersHash := range versionsAndProtocolParametersHashes {
-				protocolParametersHash := node.Protocol.MainEngineInstance().Storage.Settings().APIProvider().ProtocolParametersHash(version)
+				protocolParametersHash := node.Protocol.MainEngine.Get().Storage.Settings().APIProvider().ProtocolParametersHash(version)
 
 				if expectedProtocolParametersHash == iotago.EmptyIdentifier {
 					if protocolParametersHash != iotago.EmptyIdentifier {

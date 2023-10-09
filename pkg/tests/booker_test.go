@@ -242,7 +242,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		node2.Validator.AccountID,
 	}, ts.Nodes()...)
 
-	genesisCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(0)).Commitment()
+	genesisCommitment := lo.PanicOnErr(node1.Protocol.MainEngine.Get().Storage.Commitments().Load(0)).Commitment()
 
 	// Create and issue double spends
 	{
@@ -347,7 +347,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		)
 	}
 
-	commitment1 := lo.PanicOnErr(node2.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
+	commitment1 := lo.PanicOnErr(node2.Protocol.MainEngine.Get().Storage.Commitments().Load(1)).Commitment()
 
 	// This should be booked on the rejected tx1 conflict
 	tx4 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx4", 1, "tx1:0"))
@@ -494,7 +494,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		node2.Validator.AccountID,
 	}, ts.Nodes()...)
 
-	genesisCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(0)).Commitment()
+	genesisCommitment := lo.PanicOnErr(node1.Protocol.MainEngine.Get().Storage.Commitments().Load(0)).Commitment()
 
 	// Create and issue double spends
 	{
@@ -575,7 +575,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		)
 	}
 
-	commitment1 := lo.PanicOnErr(node2.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
+	commitment1 := lo.PanicOnErr(node2.Protocol.MainEngine.Get().Storage.Commitments().Load(1)).Commitment()
 
 	// Issue a block booked on a pending conflict on node2
 	{

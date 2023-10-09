@@ -11,7 +11,7 @@ import (
 
 func issueValidatorBlock(ctx context.Context) {
 	// Get the main engine instance in case it changes mid-execution.
-	engineInstance := deps.Protocol.MainEngineInstance()
+	engineInstance := deps.Protocol.MainEngine.Get()
 
 	// Get the latest commitment from the engine before to avoid race conditions if something is committed after we fix block issuing time.
 	latestCommitment := engineInstance.Storage.Settings().LatestCommitment()

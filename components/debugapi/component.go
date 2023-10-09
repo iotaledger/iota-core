@@ -153,7 +153,7 @@ func configure() error {
 			return err
 		}
 
-		if block, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID); exists && block.ProtocolBlock() != nil {
+		if block, exists := deps.Protocol.MainEngine.Get().BlockCache.Block(blockID); exists && block.ProtocolBlock() != nil {
 			response := BlockMetadataResponseFromBlock(block)
 
 			return httpserver.JSONResponse(c, http.StatusOK, response)

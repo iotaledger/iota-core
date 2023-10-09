@@ -21,7 +21,7 @@ type RoutesResponse struct {
 func setupRoutes() {
 
 	deps.Echo.GET(nodeAPIHealthRoute, func(c echo.Context) error {
-		if deps.Protocol.MainEngineInstance().SyncManager.IsNodeSynced() {
+		if deps.Protocol.MainEngine.Get().SyncManager.IsNodeSynced() {
 			return c.NoContent(http.StatusOK)
 		}
 

@@ -20,7 +20,7 @@ func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
 }
 
 func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
+	commitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(index)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to load commitment: %d", index)
 	}
@@ -29,7 +29,7 @@ func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {
 }
 
 func getUTXOChanges(index iotago.SlotIndex) (*apimodels.UTXOChangesResponse, error) {
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(index)
+	diffs, err := deps.Protocol.MainEngine.Get().Ledger.SlotDiffs(index)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get slot diffs: %d", index)
 	}

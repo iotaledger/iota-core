@@ -29,7 +29,7 @@ func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (
 		commitmentIndex = req.GetCommitmentId().Unwrap().Slot()
 	}
 
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentIndex)
+	commitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(commitmentIndex)
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return nil, status.Errorf(codes.NotFound, "commitment index %d not found", req.GetCommitmentIndex())

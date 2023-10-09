@@ -178,7 +178,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 }
 
 func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
-	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
+	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngine.Get() != instance, "Candidate", "Main"), instance.Name()[:8])
 	events := instance.Events
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {

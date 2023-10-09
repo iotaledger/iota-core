@@ -18,7 +18,7 @@ import (
 
 func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlock, error) {
 	blkID := blockID.Unwrap()
-	block, exists := deps.Protocol.MainEngineInstance().Block(blkID) // block +1
+	block, exists := deps.Protocol.MainEngine.Get().Block(blkID) // block +1
 	if !exists {
 		return nil, status.Errorf(codes.NotFound, "block %s not found", blkID.ToHex())
 	}
@@ -148,7 +148,7 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (
 }
 
 func getINXBlockMetadata(blockID iotago.BlockID) (*inx.BlockMetadata, error) {
-	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.MainEngine.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Errorf("failed to get BlockMetadata: %v", err)
 	}

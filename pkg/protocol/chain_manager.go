@@ -114,10 +114,6 @@ func (c *ChainManager) Commitment(commitmentID iotago.CommitmentID, requestMissi
 	return commitmentRequest.Result(), nil
 }
 
-func (c *ChainManager) MainEngineInstance() *engine.Engine {
-	return c.protocol.EngineManager.MainEngine.Get()
-}
-
 func (c *ChainManager) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
 	return c.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
 		mutations.AddedElements().Range(callback)

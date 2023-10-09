@@ -46,7 +46,7 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps metricsTrackerDeps) *MetricsTracker {
-		m := New(deps.Protocol.MainEngineInstance().SyncManager.IsBootstrapped)
+		m := New(deps.Protocol.MainEngine.Get().SyncManager.IsBootstrapped)
 
 		return m
 	}); err != nil {

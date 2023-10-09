@@ -15,7 +15,7 @@ import (
 )
 
 func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
-	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.MainEngine.Get().SyncManager.LatestCommitment()
 
 	l := &inx.LedgerOutput{
 		OutputId:    inx.NewOutputId(o.OutputID()),
@@ -29,7 +29,7 @@ func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
 
 	includedSlotIndex := o.SlotBooked()
 	if includedSlotIndex <= latestCommitment.Slot() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
+		includedCommitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
 		}
@@ -51,10 +51,10 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 		SlotSpent:          uint64(s.SlotIndexSpent()),
 	}
 
-	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.MainEngine.Get().SyncManager.LatestCommitment()
 	spentSlotIndex := s.SlotIndexSpent()
 	if spentSlotIndex <= latestCommitment.Slot() {
-		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
+		spentCommitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(spentSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
 		}
@@ -117,7 +117,7 @@ func NewLedgerUpdateBatchOperationConsumed(spent *utxoledger.Spent) (*inx.Ledger
 }
 
 func (s *Server) ReadOutput(_ context.Context, id *inx.OutputId) (*inx.OutputResponse, error) {
-	engine := deps.Protocol.MainEngineInstance()
+	engine := deps.Protocol.MainEngine.Get()
 
 	latestCommitment := engine.Storage.Settings().LatestCommitment()
 
@@ -156,7 +156,7 @@ func (s *Server) ReadOutput(_ context.Context, id *inx.OutputId) (*inx.OutputRes
 }
 
 func (s *Server) ReadUnspentOutputs(_ *inx.NoParams, srv inx.INX_ReadUnspentOutputsServer) error {
-	engine := deps.Protocol.MainEngineInstance()
+	engine := deps.Protocol.MainEngine.Get()
 	latestCommitment := engine.Storage.Settings().LatestCommitment()
 
 	var innerErr error
@@ -229,7 +229,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	sendStateDiffsRange := func(startIndex iotago.SlotIndex, endIndex iotago.SlotIndex) error {
 		for currentIndex := startIndex; currentIndex <= endIndex; currentIndex++ {
-			stateDiff, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(currentIndex)
+			stateDiff, err := deps.Protocol.MainEngine.Get().Ledger.SlotDiffs(currentIndex)
 			if err != nil {
 				return status.Errorf(codes.NotFound, "ledger update for milestoneIndex %d not found", currentIndex)
 			}
@@ -251,7 +251,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 			return 0, nil
 		}
 
-		latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+		latestCommitment := deps.Protocol.MainEngine.Get().SyncManager.LatestCommitment()
 
 		if startIndex > latestCommitment.Slot() {
 			// no need to send previous milestone diffs
@@ -259,7 +259,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		}
 
 		// Stream all available milestone diffs first
-		pruningIndex := deps.Protocol.MainEngineInstance().SyncManager.LatestFinalizedSlot()
+		pruningIndex := deps.Protocol.MainEngine.Get().SyncManager.LatestFinalizedSlot()
 		if startIndex <= pruningIndex {
 			return 0, status.Errorf(codes.InvalidArgument, "given startMilestoneIndex %d is older than the current pruningIndex %d", startIndex, pruningIndex)
 		}
