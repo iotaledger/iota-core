@@ -75,8 +75,8 @@ func (m *Manager) trackerStorage(index iotago.SlotIndex) (*kvstore.TypedStore[io
 	api := m.apiProvider.APIForSlot(index)
 
 	return kvstore.NewTypedStore[iotago.AccountID, *iotago.Attestation](trackerStorage,
-		iotago.Identifier.Bytes,
-		iotago.IdentifierFromBytes,
+		iotago.AccountID.Bytes,
+		iotago.AccountIDFromBytes,
 		func(v *iotago.Attestation) ([]byte, error) {
 			return api.Encode(v)
 		},
@@ -100,8 +100,8 @@ func (m *Manager) attestationsForSlot(index iotago.SlotIndex) (ads.Map[iotago.Ac
 	}
 
 	return ads.NewMap(attestationsStorage,
-		iotago.Identifier.Bytes,
-		iotago.IdentifierFromBytes,
+		iotago.AccountID.Bytes,
+		iotago.AccountIDFromBytes,
 		(*iotago.Attestation).Bytes,
 		iotago.AttestationFromBytes(m.apiProvider),
 	), nil

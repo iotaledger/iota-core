@@ -1,6 +1,7 @@
 package conflictdagv1
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -207,7 +208,7 @@ func assertSortedConflictsOrder(t *testing.T, sortedConflicts SortedConflictSet,
 		currentAlias := aliases[0]
 		aliases = aliases[1:]
 
-		require.Equal(t, currentAlias, c.ID.String())
+		require.Equal(t, fmt.Sprintf("TransactionID(%s)", currentAlias), c.ID.String())
 
 		return nil
 	}, true))
