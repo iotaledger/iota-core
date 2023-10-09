@@ -24,8 +24,8 @@ type Chain struct {
 	VerifiedWeight           reactive.Variable[uint64]
 	SyncThreshold            reactive.Variable[iotago.SlotIndex]
 	WarpSyncThreshold        reactive.Variable[iotago.SlotIndex]
-	CheckAttestations        reactive.Variable[bool]
-	SpawnEngine              reactive.Variable[bool]
+	VerifyAttestations       reactive.Variable[bool]
+	VerifyState              reactive.Variable[bool]
 	Engine                   reactive.Variable[*engine.Engine]
 	IsSolid                  reactive.Event
 	IsEvicted                reactive.Event
@@ -45,12 +45,12 @@ func NewChain(logger log.Logger) *Chain {
 		LatestCommitment:         reactive.NewVariable[*Commitment](),
 		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
 		LatestVerifiedCommitment: reactive.NewVariable[*Commitment](),
-		CheckAttestations:        reactive.NewVariable[bool](),
+		VerifyAttestations:       reactive.NewVariable[bool](),
 		IsEvicted:                reactive.NewEvent(),
 
 		commitments:   shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 		parentEngine:  reactive.NewVariable[*engine.Engine](),
-		SpawnEngine:   reactive.NewVariable[bool](),
+		VerifyState:   reactive.NewVariable[bool](),
 		SpawnedEngine: reactive.NewVariable[*engine.Engine](),
 	}
 
@@ -116,8 +116,8 @@ func NewChain(logger log.Logger) *Chain {
 		c.VerifiedWeight.LogUpdates(entityLogger, log.LevelTrace, "VerifiedWeight")
 		c.LatestCommitment.LogUpdates(entityLogger, log.LevelTrace, "LatestCommitment", (*Commitment).LogName)
 		c.LatestVerifiedCommitment.LogUpdates(entityLogger, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
-		c.CheckAttestations.LogUpdates(entityLogger, log.LevelTrace, "CheckAttestations")
-		c.SpawnEngine.LogUpdates(entityLogger, log.LevelDebug, "SpawnEngine")
+		c.VerifyAttestations.LogUpdates(entityLogger, log.LevelTrace, "VerifyAttestations")
+		c.VerifyState.LogUpdates(entityLogger, log.LevelDebug, "VerifyState")
 	})
 
 	return c
@@ -152,7 +152,7 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
 
 	success = true
 	for _, chain := range append([]*Chain{c}, c.ChildChains.ToSlice()...) {
-		if targetSlot := block.ID().Slot(); chain.SpawnEngine.Get() && chain.earliestUncommittedSlot() <= targetSlot {
+		if targetSlot := block.ID().Slot(); chain.VerifyState.Get() && chain.earliestUncommittedSlot() <= targetSlot {
 			if targetEngine := chain.SpawnedEngine.Get(); targetEngine != nil && targetSlot < c.SyncThreshold.Get() {
 				targetEngine.ProcessBlockFromPeer(block, src)
 			} else {

@@ -164,7 +164,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
 	}
 
-	newEngine, err := node3.Protocol.EngineManager.ForkEngineAtSlot(13)
+	newEngine, err := node3.Protocol.EngineManager.ForkAtSlot(13)
 	require.NoError(t, err)
 
 	// Assert state of the forked engine after rollback.
@@ -350,7 +350,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
 	}
 
-	newEngine, err := node3.Protocol.EngineManager.ForkEngineAtSlot(13)
+	newEngine, err := node3.Protocol.EngineManager.ForkAtSlot(13)
 	require.NoError(t, err)
 
 	// Assert state of the forked engine after rollback.
@@ -536,7 +536,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
 	}
 
-	newEngine, err := node3.Protocol.EngineManager.ForkEngineAtSlot(15)
+	newEngine, err := node3.Protocol.EngineManager.ForkAtSlot(15)
 	require.NoError(t, err)
 
 	// Assert state of the forked engine after rollback.
@@ -722,7 +722,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
 	}
 
-	newEngine, err := node3.Protocol.EngineManager.ForkEngineAtSlot(9)
+	newEngine, err := node3.Protocol.EngineManager.ForkAtSlot(9)
 	require.NoError(t, err)
 
 	// Assert state of the forked engine after rollback.

@@ -131,7 +131,7 @@ func (c *ChainManager) initMainChain() {
 
 	c.protocol.LogDebug("new chain created", "name", mainChain.LogName(), "forkingPoint", "<snapshot>")
 
-	mainChain.SpawnEngine.Set(true)
+	mainChain.VerifyState.Set(true)
 	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
 	c.MainChain.Set(mainChain)
@@ -159,22 +159,28 @@ func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent 
 func (c *ChainManager) initChainSwitching() {
 	c.HeaviestChain.OnUpdate(func(prevHeaviestChain, heaviestChain *Chain) {
 		if prevHeaviestChain != nil {
-			prevHeaviestChain.CheckAttestations.Set(false)
+			prevHeaviestChain.VerifyAttestations.Set(false)
 		}
 
-		if !heaviestChain.SpawnEngine.Get() {
-			heaviestChain.CheckAttestations.Set(true)
+		if !heaviestChain.VerifyState.Get() {
+			heaviestChain.VerifyAttestations.Set(true)
 		}
 	})
 
 	c.HeaviestAttestedChain.OnUpdate(func(_, heaviestAttestedChain *Chain) {
-		heaviestAttestedChain.CheckAttestations.Set(false)
-		heaviestAttestedChain.SpawnEngine.Set(true)
+		heaviestAttestedChain.VerifyAttestations.Set(false)
+		heaviestAttestedChain.VerifyState.Set(true)
 	})
 
 	c.HeaviestVerifiedChain.OnUpdate(func(_, heaviestVerifiedChain *Chain) {
 		heaviestVerifiedChain.LatestVerifiedCommitment.OnUpdate(func(_, latestVerifiedCommitment *Commitment) {
-			if forkingPoint := heaviestVerifiedChain.ForkingPoint.Get(); latestVerifiedCommitment != nil && forkingPoint != nil && latestVerifiedCommitment.ID().Slot()-forkingPoint.ID().Slot() > c.protocol.options.ChainSwitchingThreshold {
+			forkingPoint := heaviestVerifiedChain.ForkingPoint.Get()
+			if forkingPoint == nil || latestVerifiedCommitment == nil {
+				return
+			}
+
+			distanceFromForkingPoint := latestVerifiedCommitment.ID().Slot() - forkingPoint.ID().Slot()
+			if distanceFromForkingPoint > c.protocol.Options.ChainSwitchingThreshold {
 				c.MainChain.Set(heaviestVerifiedChain)
 			}
 		})

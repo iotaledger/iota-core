@@ -119,9 +119,9 @@ func NewCommitment(commitment *model.Commitment, logger log.Logger) *Commitment 
 		}
 
 		withinContext(func() (unsubscribe func()) {
-			requestAttestations := reactive.NewDerivedVariable2(func(requestAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
-				return requestAttestations && isDirectlyAboveLatestAttestedCommitment
-			}, chain.CheckAttestations, c.isDirectlyAboveLatestAttestedCommitment)
+			requestAttestations := reactive.NewDerivedVariable2(func(verifyAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
+				return verifyAttestations && isDirectlyAboveLatestAttestedCommitment
+			}, chain.VerifyAttestations, c.isDirectlyAboveLatestAttestedCommitment)
 
 			c.RequestAttestations.InheritFrom(requestAttestations)
 

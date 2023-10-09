@@ -37,7 +37,7 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 
 	protocol.HookConstructed(func() {
 		protocol.OnChainCreated(func(chain *Chain) {
-			chain.CheckAttestations.OnUpdate(func(_, requestAttestations bool) {
+			chain.VerifyAttestations.OnUpdate(func(_, requestAttestations bool) {
 				forkingPoint := chain.ForkingPoint.Get()
 
 				if requestAttestations {
