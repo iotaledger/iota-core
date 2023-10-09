@@ -32,17 +32,16 @@ type Protocol struct {
 	*EngineManager
 	*APIProvider
 
-	log.Logger
-	module.Module
+	*module.ReactiveModule
 }
 
 // New creates a new protocol instance.
 func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
 	return options.Apply(&Protocol{
-		Events:  NewEvents(),
-		Workers: workers,
-		Logger:  logger,
-		Options: NewDefaultOptions(),
+		Events:         NewEvents(),
+		Workers:        workers,
+		Options:        NewDefaultOptions(),
+		ReactiveModule: module.NewReactiveModule(logger),
 	}, opts, func(p *Protocol) {
 		p.Network = core.NewProtocol(networkEndpoint, workers.CreatePool("NetworkProtocol"), p)
 		p.BlocksProtocol = NewBlocksProtocol(p)
@@ -53,7 +52,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		p.EngineManager = NewEngineManager(p)
 		p.APIProvider = NewAPIProvider(p)
 
-		p.HookInitialized(func() {
+		p.Initialized.OnTrigger(func() {
 			unsubscribeFromNetwork := lo.Batch(
 				p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
 				p.Network.OnBlockReceived(p.BlocksProtocol.ProcessResponse),
@@ -66,7 +65,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 				p.Network.OnWarpSyncRequestReceived(p.WarpSyncProtocol.ProcessRequest),
 			)
 
-			p.HookShutdown(func() {
+			p.Shutdown.OnTrigger(func() {
 				unsubscribeFromNetwork()
 
 				p.BlocksProtocol.Shutdown()
@@ -74,10 +73,12 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 				p.AttestationsProtocol.Shutdown()
 				p.WarpSyncProtocol.Shutdown()
 				p.Network.Shutdown()
-				p.EngineManager.Shutdown()
+				p.EngineManager.shutdown()
 			})
 		})
-	}, (*Protocol).TriggerConstructed)
+
+		p.Constructed.Trigger()
+	})
 }
 
 // IssueBlock issues a block to the node.
@@ -89,30 +90,25 @@ func (p *Protocol) IssueBlock(block *model.Block) error {
 
 // Run starts the protocol.
 func (p *Protocol) Run(ctx context.Context) error {
-	p.TriggerInitialized()
+	p.waitEngineInitialized()
+
+	p.Initialized.Trigger()
 
 	<-ctx.Done()
 
-	p.TriggerShutdown()
-	p.TriggerStopped()
-
+	p.Shutdown.Trigger()
 	p.Workers.Shutdown()
+	p.Stopped.Trigger()
 
 	return ctx.Err()
 }
 
-// TriggerInitialized overrides the Module.TriggerInitialized method to only trigger once the main chain and engine were
-// initialized.
-func (p *Protocol) TriggerInitialized() {
-	var waitEngineInitialized sync.WaitGroup
+func (p *Protocol) waitEngineInitialized() {
+	var waitInitialized sync.WaitGroup
 
-	waitEngineInitialized.Add(1)
-	p.MainChain.OnUpdateOnce(func(_, mainChain *Chain) {
-		mainChain.Engine.OnUpdateOnce(func(_, engine *engine.Engine) {
-			engine.HookInitialized(waitEngineInitialized.Done)
-		})
+	waitInitialized.Add(1)
+	p.MainEngine.OnUpdateOnce(func(_, engine *engine.Engine) {
+		engine.HookInitialized(waitInitialized.Done)
 	})
-	waitEngineInitialized.Wait()
-
-	p.Module.TriggerInitialized()
+	waitInitialized.Wait()
 }

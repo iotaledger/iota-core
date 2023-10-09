@@ -31,7 +31,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 		droppedBlocksBuffer: buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]](20, 100),
 	}
 
-	protocol.HookConstructed(func() {
+	protocol.Constructed.OnTrigger(func() {
 		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
 			commitment.InSyncRange.OnUpdate(func(_, inSyncRange bool) {
 				if inSyncRange {

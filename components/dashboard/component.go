@@ -150,7 +150,7 @@ func currentNodeStatus() *nodestatus {
 		LastPauseGC:  m.PauseNs[(m.NumGC+255)%256],
 	}
 	// get TangleTime
-	cl := deps.Protocol.MainEngineInstance().Clock
+	cl := deps.Protocol.MainEngine.Get().Clock
 	syncStatus := deps.Protocol.MainEngineInstance().SyncManager.SyncStatus()
 
 	status.TangleTime = tangleTime{

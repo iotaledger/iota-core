@@ -8,7 +8,7 @@ require (
 	github.com/iotaledger/hive.go/crypto v0.0.0-20231005142627-86973b2edb3b
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20231005142627-86973b2edb3b
 	github.com/iotaledger/hive.go/lo v0.0.0-20231005142627-86973b2edb3b
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231005142627-86973b2edb3b
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231009180217-9dd2605b54cf
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 	github.com/iotaledger/iota.go/v4 v4.0.0-20231005184534-62e6761a7b7c
 	github.com/mr-tron/base58 v1.2.0

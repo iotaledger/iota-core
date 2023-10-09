@@ -293,12 +293,12 @@ github.com/iotaledger/hive.go/kvstore v0.0.0-20230928074706-d58e32f86729 h1:XCYv
 github.com/iotaledger/hive.go/kvstore v0.0.0-20230928074706-d58e32f86729/go.mod h1:DeP4JF4N995LteD0+/o7NsW1bO5IXURIJ27A69Ca5+Y=
 github.com/iotaledger/hive.go/lo v0.0.0-20231005142627-86973b2edb3b h1:UnWVwiVj/BceDDL9J/nCAVRlUDVnbTsCf7PI4lWrdfU=
 github.com/iotaledger/hive.go/lo v0.0.0-20231005142627-86973b2edb3b/go.mod h1:4oKCdMEhHMLCudBz79kuvJmgSY/DhfVePNIyJhew/80=
-github.com/iotaledger/hive.go/log v0.0.0-20231005142627-86973b2edb3b h1:h/lhy72RqsNBrMyh2/vQmGiC7w/NxReajpTX4oe56tI=
-github.com/iotaledger/hive.go/log v0.0.0-20231005142627-86973b2edb3b/go.mod h1:UF7PzlWdZ2H0Hkxrt4AgJmNVeMXUJzw4RwbHpib1DB0=
+github.com/iotaledger/hive.go/log v0.0.0-20231009161204-3b7699bf3ba2 h1:rrhdEp/FxX4I/NPNLuRD4nkddBoXHPD3XzK2eGh79NQ=
+github.com/iotaledger/hive.go/log v0.0.0-20231009161204-3b7699bf3ba2/go.mod h1:UF7PzlWdZ2H0Hkxrt4AgJmNVeMXUJzw4RwbHpib1DB0=
 github.com/iotaledger/hive.go/logger v0.0.0-20231005142627-86973b2edb3b h1:fYJ2yrb9cYyoLzlEIxLsdPSSufxh0Xw/AoawlGdpdU8=
 github.com/iotaledger/hive.go/logger v0.0.0-20231005142627-86973b2edb3b/go.mod h1:sxqWRdZ1OOxwkxVczuGcW034Mpt2vFh5ebJHO++ZYeI=
-github.com/iotaledger/hive.go/runtime v0.0.0-20231005142627-86973b2edb3b h1:skHzoSAI2TNmoJwgW7/aq/Il3JZ5Fa9D5d9U41oWKYg=
-github.com/iotaledger/hive.go/runtime v0.0.0-20231005142627-86973b2edb3b/go.mod h1:fXVyQ1MAwxe/EmjAnG8WcQqbzGk9EW/FsJ/n16H/f/w=
+github.com/iotaledger/hive.go/runtime v0.0.0-20231009180217-9dd2605b54cf h1:QpWPyH389go/w5HrsnOZiHnQBPygWwBDZr5ejZtDDYo=
+github.com/iotaledger/hive.go/runtime v0.0.0-20231009180217-9dd2605b54cf/go.mod h1:dJeQBt3UjsoRSm2yKiw80vDDgPBtIkun7N16ETmVhl4=
 github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231005142627-86973b2edb3b h1:6anjtWbaCszD5h43psnE8lsgIM0etpjr62ZlN59t0H8=
 github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231005142627-86973b2edb3b/go.mod h1:IJgaaxbgKCsNat18jlJJEAxCY2oVYR3F30B+M4vJ89I=
 github.com/iotaledger/hive.go/stringify v0.0.0-20231005142627-86973b2edb3b h1:cc9VsDzLxPAaC8fj96EA1bJxbmrEZndJV+3SmG+HHOs=

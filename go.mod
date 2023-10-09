@@ -20,8 +20,9 @@ require (
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20231005142627-86973b2edb3b
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230928074706-d58e32f86729
 	github.com/iotaledger/hive.go/lo v0.0.0-20231005142627-86973b2edb3b
+	github.com/iotaledger/hive.go/log v0.0.0-20231009161204-3b7699bf3ba2
 	github.com/iotaledger/hive.go/logger v0.0.0-20231005142627-86973b2edb3b
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231005142627-86973b2edb3b
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231009180217-9dd2605b54cf
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231005142627-86973b2edb3b
 	github.com/iotaledger/hive.go/stringify v0.0.0-20231005142627-86973b2edb3b
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231005192108-08a985c2e217
@@ -89,7 +90,6 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/hive.go/log v0.0.0-20231005142627-86973b2edb3b // indirect
 	github.com/ipfs/boxo v0.10.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect

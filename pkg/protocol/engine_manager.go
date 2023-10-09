@@ -56,7 +56,7 @@ func NewEngineManager(protocol *Protocol) *EngineManager {
 		}
 	})
 
-	protocol.HookConstructed(e.injectEngineInstances)
+	protocol.Constructed.OnTrigger(e.injectEngineInstances)
 
 	return e
 }
@@ -169,7 +169,7 @@ func (e *EngineManager) CleanupCandidates() error {
 	return nil
 }
 
-func (e *EngineManager) Shutdown() {
+func (e *EngineManager) shutdown() {
 	e.worker.Shutdown(true)
 }
 

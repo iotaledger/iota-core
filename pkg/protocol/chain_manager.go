@@ -44,7 +44,7 @@ func newChainManager(protocol *Protocol) *ChainManager {
 	c.HeaviestChain.LogUpdates(c.protocol, log.LevelTrace, "Unchecked Heavier Chain", (*Chain).LogName)
 	c.HeaviestAttestedChain.LogUpdates(c.protocol, log.LevelTrace, "Attested Heavier Chain", (*Chain).LogName)
 
-	protocol.HookConstructed(func() {
+	protocol.Constructed.OnTrigger(func() {
 		trackHeaviestChain := func(chainVariable reactive.Variable[*Chain], getWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
 			return getWeightVariable(candidate).OnUpdate(func(_, newChainWeight uint64) {
 				if heaviestChain := c.HeaviestVerifiedChain.Get(); heaviestChain != nil && newChainWeight < heaviestChain.VerifiedWeight.Get() {
@@ -115,7 +115,7 @@ func (c *ChainManager) Commitment(commitmentID iotago.CommitmentID, requestMissi
 }
 
 func (c *ChainManager) MainEngineInstance() *engine.Engine {
-	return c.MainChain.Get().Engine.Get()
+	return c.protocol.EngineManager.MainEngine.Get()
 }
 
 func (c *ChainManager) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
