@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -293,8 +292,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 					),
 				)
 				ts.Wait()
-
-				nodeC1.Protocol.SetLogLevel(log.LevelDebug)
 
 				// Everything that was accepted before shutting down should be available on disk (verifying that restoring the block cache from disk works).
 				ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13.0", "13.1", "13.2", "13.3"), true, ts.Nodes("nodeC-restarted")...)
