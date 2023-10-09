@@ -107,8 +107,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	node4.Protocol.SetLogLevel(log.LevelInfo)
 	node5.Protocol.SetLogLevel(log.LevelInfo)
 	node6.Protocol.SetLogLevel(log.LevelDebug)
-	node7.Protocol.SetLogLevel(log.LevelInfo)
-	node8.Protocol.SetLogLevel(log.LevelInfo)
+	node7.Protocol.SetLogLevel(log.LevelDebug)
+	node8.Protocol.SetLogLevel(log.LevelDebug)
 
 	expectedCommittee := []iotago.AccountID{
 		node0.AccountID,
