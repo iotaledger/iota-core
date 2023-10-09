@@ -214,7 +214,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		return ierrors.Errorf("failed to get target engine for %s", commitmentID)
 	}
 
-	// Make sure that already evicted commitments are not processed. This might happen if there's a lot of slots to process ]
+	// Make sure that already evicted commitments are not processed. This might happen if there's a lot of slots to process
 	// and old responses are still in the task queue.
 	if loadedCommitment, err := targetEngine.Storage.Commitments().Load(commitmentID.Slot()); err == nil && loadedCommitment.ID() == commitmentID {
 		return nil
@@ -259,9 +259,9 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		if err := b.protocol.EngineManager.SetActiveInstance(newEngine); err != nil {
 			return ierrors.Wrap(err, "failed to set active engine instance")
 		}
-		//
+
 		b.protocol.linkToEngine(newEngine)
-		//
+
 		b.protocol.mainEngine.Shutdown()
 		b.protocol.mainEngine = newEngine
 		targetEngine = newEngine
@@ -329,6 +329,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 	for _, blockID := range blockIDs {
 		block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
 		if block == nil { // this should never happen as we're requesting the blocks for this slot so it can't be evicted.
+			b.protocol.HandleError(ierrors.Errorf("failed to get block %s", blockID))
 			continue
 		}
 

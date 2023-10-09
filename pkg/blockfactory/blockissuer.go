@@ -75,7 +75,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, issuerAccount A
 
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		var err error
-		blockParams.BlockHeader.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime))
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime))
 		if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
 			commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime)
 			if err != nil {
@@ -182,7 +182,7 @@ func (i *BlockIssuer) CreateBlock(ctx context.Context, issuerAccount Account, op
 
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		var err error
-		blockParams.BlockHeader.SlotCommitment, err = i.getCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime))
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(i.protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime))
 		if err != nil {
 			return nil, ierrors.Wrap(err, "error getting commitment")
 		}
@@ -440,7 +440,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, issu
 	return nil
 }
 
-func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
+func (i *BlockIssuer) getAddressableCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
 	protoParams := i.protocol.CurrentAPI().ProtocolParameters()
 	commitment := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 

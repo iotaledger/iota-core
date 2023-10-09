@@ -178,8 +178,15 @@ func (m *MemPool[VoteRank]) TransactionMetadataByAttachment(blockID iotago.Block
 
 // StateDiff returns the state diff for the given slot.
 func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) (mempool.StateDiff, error) {
-	if stateDiff, exists := m.stateDiffs.Get(slot); exists {
-		return stateDiff, nil
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
+	return m.stateDiff(slot)
+}
+
+func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error) {
+	if m.lastEvictedSlot >= slot {
+		return nil, ierrors.Errorf("slot %d is older than last evicted slot %d", slot, m.lastEvictedSlot)
 	}
 
 	kv, err := m.mutationsFunc(slot)
@@ -187,7 +194,7 @@ func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) (mempool.StateDiff,
 		return nil, ierrors.Wrapf(err, "failed to get state diff for slot %d", slot)
 	}
 
-	return NewStateDiff(slot, kv), nil
+	return lo.Return1(m.stateDiffs.GetOrCreate(slot, func() *StateDiff { return NewStateDiff(slot, kv) })), nil
 }
 
 // Evict evicts the slot with the given slot from the MemPool.
@@ -438,22 +445,9 @@ func (m *MemPool[VoteRank]) setup() {
 	})
 }
 
-func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error) {
-	if m.lastEvictedSlot >= slot {
-		return nil, ierrors.Errorf("slot %d is older than last evicted slot %d", slot, m.lastEvictedSlot)
-	}
-
-	kv, err := m.mutationsFunc(slot)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get state diff for slot %d", slot)
-	}
-
-	return lo.Return1(m.stateDiffs.GetOrCreate(slot, func() *StateDiff { return NewStateDiff(slot, kv) })), nil
-}
-
 func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
-		// Transactions can only become accepted if there is at least one attachment is included.
+		// Transactions can only become accepted if there is at least one attachment included.
 		if slot := transaction.EarliestIncludedAttachment().Slot(); slot != 0 {
 			stateDiff, err := m.stateDiff(slot)
 			if err != nil {

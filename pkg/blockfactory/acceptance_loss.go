@@ -11,7 +11,7 @@ func (i *BlockIssuer) reviveChain(issuingTime time.Time) (*iotago.Commitment, io
 	lastCommittedSlot := i.protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot()
 	apiForSlot := i.protocol.APIForSlot(lastCommittedSlot)
 
-	// Get a parent from the last committed slot.
+	// Get a rootblock as recent as possible for the parent.
 	parentBlockID := iotago.EmptyBlockID()
 	for rootBlock := range i.protocol.MainEngineInstance().EvictionState.ActiveRootBlocks() {
 		if rootBlock.Slot() > parentBlockID.Slot() {
@@ -39,7 +39,7 @@ func (i *BlockIssuer) reviveChain(issuingTime time.Time) (*iotago.Commitment, io
 
 	commitment, err := i.protocol.MainEngineInstance().Storage.Commitments().Load(commitUntilSlot)
 	if err != nil {
-		return nil, iotago.EmptyBlockID(), ierrors.Wrapf(err, "failed to load commitment for slot %d", commitUntilSlot)
+		return nil, iotago.EmptyBlockID(), ierrors.Wrapf(err, "failed to commit until slot %d to revive chain", commitUntilSlot)
 	}
 
 	return commitment.Commitment(), parentBlockID, nil

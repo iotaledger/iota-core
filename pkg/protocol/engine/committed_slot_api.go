@@ -86,8 +86,8 @@ func (c *CommittedSlotAPI) TransactionIDs() (iotago.TransactionIDs, error) {
 	set := ads.NewSet(store, iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
 	transactionIDs := make(iotago.TransactionIDs, 0, set.Size())
 
-	if err = set.Stream(func(key iotago.TransactionID) error {
-		transactionIDs = append(transactionIDs, key)
+	if err = set.Stream(func(txID iotago.TransactionID) error {
+		transactionIDs = append(transactionIDs, txID)
 		return nil
 	}); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to iterate over mutations of slot %d", c.CommitmentID.Slot())
