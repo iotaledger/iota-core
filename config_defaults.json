@@ -116,12 +116,6 @@
       "useMetricPrefix": false
     }
   },
-  "blockIssuer": {
-    "enabled": true,
-    "tipSelectionTimeout": "10s",
-    "tipSelectionRetryInterval": "200ms",
-    "rateSetterEnabled": false
-  },
   "validator": {
     "enabled": false,
     "committeeBroadcastInterval": "500ms",
