@@ -14,15 +14,15 @@ var Config = Params{}
 
 var identityConfigJSON = `{
   "docker": {
-    "peer_master": [
+    "validator-1": [
       "8q491c3YWjbPwLmF2WD95YmCgh61j2kenCKHfGfByoWi",
       "http://localhost:8080"
     ],
-    "peer_master2": [
+    "validator-2": [
       "4ata8GcTRMJ5sSv2jQJWmSYYTHct748p3tXmCFYm7wjA",
       "http://localhost:8070"
     ],
-    "faucet": [
+    "validator-3": [
       "3YX6e7AL28hHihZewKdq6CMkEYVsTJBLgRiprUNiNq5E",
       "http://localhost:8090"
     ]

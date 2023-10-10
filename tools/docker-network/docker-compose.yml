@@ -4,7 +4,7 @@ x-build-iota-core: &iota-core_build
   context: ${DOCKER_BUILD_CONTEXT:-../../}
   dockerfile: ${DOCKERFILE_PATH:-./Dockerfile}
 services:
-  peer_master:
+  validator-1:
     build: *iota-core_build
     stop_grace_period: 1m
     command: >
@@ -32,13 +32,13 @@ services:
     image: iotaledger/inx-indexer:2.0-alpha
     stop_grace_period: 1m
     command:
-      - "--inx.address=peer_master:9029"
+      - "--inx.address=validator-1:9029"
       - "--restAPI.bindAddress=inx-indexer:9091"
     networks:
       - iota-core
 
-  peer_master2:
-    image: docker-network-peer_master:latest
+  validator-2:
+    image: docker-network-validator-1:latest
     stop_grace_period: 1m
     command: >
       ${COMMON_CONFIG}
@@ -61,8 +61,8 @@ services:
     networks:
       - iota-core
 
-  faucet:
-    image: docker-network-peer_master:latest
+  validator-3:
+    image: docker-network-validator-1:latest
     stop_grace_period: 1m
     command: >
       ${COMMON_CONFIG}
@@ -84,8 +84,8 @@ services:
     networks:
       - iota-core
 
-  peer_nomana:
-    image: docker-network-peer_master:latest
+  node-1:
+    image: docker-network-validator-1:latest
     stop_grace_period: 1m
     command: >
       ${COMMON_CONFIG}
@@ -104,8 +104,8 @@ services:
     networks:
       - iota-core
 
-  peer_nomana2:
-    image: docker-network-peer_master:latest
+  node-2:
+    image: docker-network-validator-1:latest
     stop_grace_period: 1m
     command: >
       ${COMMON_CONFIG}
@@ -138,7 +138,7 @@ services:
     networks:
       - iota-core
     depends_on:
-      - peer_master
+      - validator-1
 
   grafana:
     image: grafana/grafana:9.5.6
