@@ -254,7 +254,7 @@ func (p *Protocol) initChainManager() {
 		}
 	})
 
-	wpForking := p.Workers.CreatePool("Protocol.Forking", 1) // Using just 1 worker to avoid contention
+	wpForking := p.Workers.CreatePool("Protocol.Forking", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
 	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wpForking))
 }
 

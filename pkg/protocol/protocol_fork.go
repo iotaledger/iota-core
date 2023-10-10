@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -97,7 +98,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 	// Attach the engine block requests to the protocol and detach as soon as we switch to that engine
 	detachRequestBlocks := candidateEngineInstance.Events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
 		p.networkProtocol.RequestBlock(blockID)
-	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("CandidateBlockRequester", 2))).Unhook
+	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("CandidateBlockRequester", workerpool.WithWorkerCount(2)))).Unhook
 
 	var detachProcessCommitment, detachMainEngineSwitched func()
 	candidateEngineTimeoutTimer := time.NewTimer(10 * time.Minute)
@@ -136,7 +137,7 @@ func (p *Protocol) onForkDetected(fork *chainmanager.Fork) {
 			commitment.CumulativeWeight() > p.MainEngineInstance().Storage.Settings().LatestCommitment().CumulativeWeight() {
 			p.switchEngines()
 		}
-	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("ProcessCandidateCommitment", 1))).Unhook
+	}, event.WithWorkerPool(candidateEngineInstance.Workers.CreatePool("ProcessCandidateCommitment", workerpool.WithWorkerCount(1)))).Unhook
 
 	// Clean up events when we switch to the candidate engine.
 	detachMainEngineSwitched = p.Events.MainEngineSwitched.Hook(func(_ *engine.Engine) {
@@ -206,7 +207,7 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 		ch <- result
 	}
 
-	wp := p.Workers.CreatePool("AttestationsVerifier", 1)
+	wp := p.Workers.CreatePool("AttestationsVerifier", workerpool.WithWorkerCount(1))
 	unhook := p.Events.Network.AttestationsReceived.Hook(
 		verifyCommitmentFunc,
 		event.WithWorkerPool(wp),
