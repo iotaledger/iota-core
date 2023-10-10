@@ -73,7 +73,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 				p.AttestationsProtocol.Shutdown()
 				p.WarpSyncProtocol.Shutdown()
 				p.Network.Shutdown()
-				p.EngineManager.shutdown()
+				p.EngineManager.Shutdown.Trigger()
 			})
 		})
 

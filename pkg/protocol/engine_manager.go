@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
+	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
@@ -26,37 +27,38 @@ type EngineManager struct {
 	protocol  *Protocol
 	worker    *workerpool.WorkerPool
 	directory *utils.Directory
+
+	*module.ReactiveModule
 }
 
 func NewEngineManager(protocol *Protocol) *EngineManager {
 	e := &EngineManager{
-		MainEngine: reactive.NewVariable[*engine.Engine](),
-		protocol:   protocol,
-		worker:     protocol.Workers.CreatePool("EngineManager", 1),
-		directory:  utils.NewDirectory(protocol.Options.BaseDirectory),
+		MainEngine:     reactive.NewVariable[*engine.Engine](),
+		ReactiveModule: protocol.NewReactiveSubModule("Engines"),
+		protocol:       protocol,
+		worker:         protocol.Workers.CreatePool("Engines", 1),
+		directory:      utils.NewDirectory(protocol.Options.BaseDirectory),
 	}
 
-	protocol.MainChain.OnUpdateWithContext(func(_, mainChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
-		unsubscribeOnUpdate(func() (unsubscribe func()) {
-			return e.MainEngine.InheritFrom(mainChain.SpawnedEngine)
+	protocol.Constructed.OnTrigger(func() {
+		unsubscribe := lo.Batch(
+			e.syncMainEngineFromMainChain(),
+			e.syncMainEngineInfoFile(),
+			e.injectEngineInstances(),
+		)
+
+		e.Shutdown.OnTrigger(func() {
+			unsubscribe()
+
+			e.worker.Shutdown(true).ShutdownComplete.Wait()
+
+			e.Stopped.Trigger()
 		})
+
+		e.Initialized.Trigger()
 	})
 
-	protocol.MainChain.OnUpdate(func(_, mainChain *Chain) {
-		e.MainEngine.InheritFrom(mainChain.SpawnedEngine)
-	})
-
-	e.MainEngine.OnUpdate(func(_, mainEngine *engine.Engine) {
-		err := ioutils.WriteJSONToFile(e.infoFilePath(), &engineInfo{
-			Name: filepath.Base(mainEngine.Storage.Directory()),
-		}, 0o644)
-
-		if err != nil {
-			panic(ierrors.Wrap(err, "unable to write engine info file"))
-		}
-	})
-
-	protocol.Constructed.OnTrigger(e.injectEngineInstances)
+	e.Constructed.Trigger()
 
 	return e
 }
@@ -169,10 +171,6 @@ func (e *EngineManager) CleanupCandidates() error {
 	return nil
 }
 
-func (e *EngineManager) shutdown() {
-	e.worker.Shutdown(true)
-}
-
 func (e *EngineManager) infoFilePath() string {
 	return e.directory.Path(engineInfoFile)
 }
@@ -195,8 +193,24 @@ func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storag
 	return engine.New(e.protocol.Workers.CreateGroup(engineAlias), errorHandler, storage, e.protocol.Options.FilterProvider, e.protocol.Options.CommitmentFilterProvider, e.protocol.Options.BlockDAGProvider, e.protocol.Options.BookerProvider, e.protocol.Options.ClockProvider, e.protocol.Options.BlockGadgetProvider, e.protocol.Options.SlotGadgetProvider, e.protocol.Options.SybilProtectionProvider, e.protocol.Options.NotarizationProvider, e.protocol.Options.AttestationProvider, e.protocol.Options.LedgerProvider, e.protocol.Options.SchedulerProvider, e.protocol.Options.TipManagerProvider, e.protocol.Options.TipSelectionProvider, e.protocol.Options.RetainerProvider, e.protocol.Options.UpgradeOrchestratorProvider, e.protocol.Options.SyncManagerProvider, e.protocol.Options.EngineOptions...)
 }
 
-func (e *EngineManager) injectEngineInstances() {
-	e.protocol.OnChainCreated(func(chain *Chain) {
+func (e *EngineManager) syncMainEngineFromMainChain() (unsubscribe func()) {
+	return e.protocol.MainChain.OnUpdateWithContext(func(_, mainChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+		unsubscribeOnUpdate(func() func() {
+			return e.MainEngine.InheritFrom(mainChain.SpawnedEngine)
+		})
+	})
+}
+
+func (e *EngineManager) syncMainEngineInfoFile() (unsubscribe func()) {
+	return e.MainEngine.OnUpdate(func(_, mainEngine *engine.Engine) {
+		if err := ioutils.WriteJSONToFile(e.infoFilePath(), &engineInfo{Name: filepath.Base(mainEngine.Storage.Directory())}, 0o644); err != nil {
+			e.LogError("unable to write engine info file", "err", err)
+		}
+	})
+}
+
+func (e *EngineManager) injectEngineInstances() (unsubscribe func()) {
+	return e.protocol.OnChainCreated(func(chain *Chain) {
 		chain.VerifyState.OnUpdate(func(_, instantiate bool) {
 			e.worker.Submit(func() {
 				if !instantiate {
@@ -212,7 +226,7 @@ func (e *EngineManager) injectEngineInstances() {
 
 					return e.ForkAtSlot(chain.ForkingPoint.Get().Slot() - 1)
 				}(); err != nil {
-					panic(ierrors.Wrap(err, "failed to create new engine instance"))
+					e.LogError("failed to create new engine instance", "err", err)
 				} else {
 					e.protocol.Network.OnShutdown(newEngine.Shutdown)
 
