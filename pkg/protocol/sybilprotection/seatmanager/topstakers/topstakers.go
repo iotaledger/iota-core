@@ -1,4 +1,4 @@
-package poa
+package topstakers
 
 import (
 	"bytes"
@@ -8,15 +8,14 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/timed"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -27,8 +26,6 @@ type SeatManager struct {
 	apiProvider iotago.APIProvider
 	events      *seatmanager.Events
 
-	clock            clock.Clock
-	workers          *workerpool.Group
 	committeeStore   *epochstore.Store[*account.Accounts]
 	onlineCommittee  ds.Set[account.SeatIndex]
 	inactivityQueue  timed.PriorityQueue[account.SeatIndex]
@@ -51,7 +48,6 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 			&SeatManager{
 				apiProvider:     e,
 				events:          seatmanager.NewEvents(),
-				workers:         e.Workers.CreateGroup("SeatManager"),
 				committeeStore:  e.Storage.Committee(),
 				onlineCommittee: ds.NewSet[account.SeatIndex](),
 				inactivityQueue: timed.NewPriorityQueue[account.SeatIndex](true),
@@ -62,8 +58,6 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				e.Events.SeatManager.LinkTo(s.events)
 
 				e.HookConstructed(func() {
-					s.clock = e.Clock
-
 					s.TriggerConstructed()
 
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
@@ -93,31 +87,36 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates *accou
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
-	candidateAccountIDs := make([]iotago.AccountID, 0)
-	candidatePools := make([]*account.Pool, 0)
+	type poolWithAccountID struct {
+		accountID iotago.AccountID
+		pool      *account.Pool
+	}
+
+	candidatePools := make([]*poolWithAccountID, 0)
 	candidates.ForEach(func(id iotago.AccountID, pool *account.Pool) bool {
-		candidatePools = append(candidatePools, pool)
-		candidateAccountIDs = append(candidateAccountIDs, id)
+		candidatePools = append(candidatePools, &poolWithAccountID{pool: pool, accountID: id})
 
 		return true
 	})
 
-	sort.Slice(candidateAccountIDs, func(i, j int) bool {
-		if candidatePools[i].PoolStake != candidatePools[j].PoolStake {
-			return candidatePools[i].PoolStake < candidatePools[j].PoolStake
+	sort.Slice(candidatePools, func(i, j int) bool {
+		if candidatePools[i].pool.PoolStake != candidatePools[j].pool.PoolStake {
+			return candidatePools[i].pool.PoolStake > candidatePools[j].pool.PoolStake
 		}
 
-		if candidatePools[i].ValidatorStake != candidatePools[j].ValidatorStake {
-			return candidatePools[i].ValidatorStake < candidatePools[j].ValidatorStake
+		if candidatePools[i].pool.ValidatorStake != candidatePools[j].pool.ValidatorStake {
+			return candidatePools[i].pool.ValidatorStake > candidatePools[j].pool.ValidatorStake
 		}
 
 		// TODO: add more tie-breaking
 
 		// two candidates never have the same account ID because they come in a map
-		return bytes.Compare(candidateAccountIDs[i][:], candidateAccountIDs[j][:]) < 0
+		return bytes.Compare(candidatePools[i].accountID[:], candidatePools[j].accountID[:]) > 0
 	})
 
-	committee := candidates.SelectCommittee(candidateAccountIDs[:s.optsSeatCount]...)
+	committee := candidates.SelectCommittee(lo.Map(candidatePools[:s.optsSeatCount], func(poolWithID *poolWithAccountID) iotago.AccountID {
+		return poolWithID.accountID
+	})...)
 
 	err := s.committeeStore.Store(epoch, committee.Accounts())
 	if err != nil {
@@ -173,10 +172,9 @@ func (s *SeatManager) SeatCount() int {
 
 func (s *SeatManager) Shutdown() {
 	s.TriggerStopped()
-	s.workers.Shutdown()
 }
 
-func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex) error {
+func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime time.Time) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
@@ -193,8 +191,6 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex) error {
 	}
 
 	for _, v := range onlineValidators {
-		activityTime := s.clock.Accepted().RelativeTime()
-
 		seat, exists := committee.GetSeat(v)
 		if !exists {
 			// Only track identities that are part of the committee.
@@ -210,6 +206,10 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex) error {
 func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
+
+	if validators.Size() != int(s.optsSeatCount) {
+		return ierrors.Errorf("invalid number of validators: %d, expected: %d", validators.Size(), s.optsSeatCount)
+	}
 
 	err := s.committeeStore.Store(epoch, validators)
 	if err != nil {

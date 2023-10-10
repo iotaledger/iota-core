@@ -77,7 +77,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 					e.HookInitialized(func() {
 						// Mark the committee for the last committed slot as active.
 						currentEpoch := e.CurrentAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
-						err := o.seatManager.InitializeCommittee(currentEpoch)
+						err := o.seatManager.InitializeCommittee(currentEpoch, e.Clock.Accepted().RelativeTime())
 						if err != nil {
 							panic(ierrors.Wrap(err, "error while initializing committee"))
 						}

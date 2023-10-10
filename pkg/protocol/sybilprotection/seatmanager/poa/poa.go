@@ -10,11 +10,9 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/timed"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -25,8 +23,6 @@ type SeatManager struct {
 	events      *seatmanager.Events
 	apiProvider iotago.APIProvider
 
-	clock            clock.Clock
-	workers          *workerpool.Group
 	accounts         *account.Accounts
 	committee        *account.SeatedAccounts
 	committeeStore   *epochstore.Store[*account.Accounts]
@@ -50,7 +46,6 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 			&SeatManager{
 				events:          seatmanager.NewEvents(),
 				apiProvider:     e,
-				workers:         e.Workers.CreateGroup("SeatManager"),
 				committeeStore:  e.Storage.Committee(),
 				accounts:        account.NewAccounts(),
 				onlineCommittee: ds.NewSet[account.SeatIndex](),
@@ -62,7 +57,6 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				e.Events.SeatManager.LinkTo(s.events)
 
 				e.HookConstructed(func() {
-					s.clock = e.Clock
 					s.TriggerConstructed()
 
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
@@ -146,10 +140,9 @@ func (s *SeatManager) SeatCount() int {
 
 func (s *SeatManager) Shutdown() {
 	s.TriggerStopped()
-	s.workers.Shutdown()
 }
 
-func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex) error {
+func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime time.Time) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
@@ -167,8 +160,6 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex) error {
 	}
 
 	for _, v := range onlineValidators {
-		activityTime := s.clock.Accepted().RelativeTime()
-
 		seat, exists := s.committee.GetSeat(v)
 		if !exists {
 			// Only track identities that are part of the committee.

@@ -1,4 +1,4 @@
-package poa
+package topstakers
 
 import (
 	"time"

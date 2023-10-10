@@ -1,6 +1,8 @@
 package seatmanager
 
 import (
+	"time"
+
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -18,7 +20,7 @@ type SeatManager interface {
 
 	// InitializeCommittee initializes the committee for the current slot by marking whole or a subset of the committee as active.
 	// This is used when initializing committee after node startup (loaded from snapshot or database).
-	InitializeCommittee(epoch iotago.EpochIndex) error
+	InitializeCommittee(epoch iotago.EpochIndex, activityTime time.Time) error
 
 	// CommitteeInSlot returns the set of validators that is used to track confirmation at a given slot.
 	CommitteeInSlot(slot iotago.SlotIndex) (*account.SeatedAccounts, bool)

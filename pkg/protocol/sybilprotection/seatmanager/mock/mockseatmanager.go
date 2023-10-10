@@ -2,6 +2,7 @@ package mock
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -144,7 +145,7 @@ func (m *ManualPOA) SetCommittee(epoch iotago.EpochIndex, validators *account.Ac
 	return nil
 }
 
-func (m *ManualPOA) InitializeCommittee(_ iotago.EpochIndex) error {
+func (m *ManualPOA) InitializeCommittee(_ iotago.EpochIndex, _ time.Time) error {
 	return nil
 }
 
