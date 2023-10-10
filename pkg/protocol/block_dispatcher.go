@@ -52,8 +52,8 @@ type BlockDispatcher struct {
 func NewBlockDispatcher(protocol *Protocol, opts ...options.Option[BlockDispatcher]) *BlockDispatcher {
 	return options.Apply(&BlockDispatcher{
 		protocol:                  protocol,
-		dispatchWorkers:           protocol.Workers.CreatePool("BlockDispatcher.Dispatch"),
-		warpSyncWorkers:           protocol.Workers.CreatePool("BlockDispatcher.WarpSync", 1),
+		dispatchWorkers:           protocol.Workers.CreatePool("BlockDispatcher.Dispatch", workerpool.WithCancelPendingTasksOnShutdown(true)),
+		warpSyncWorkers:           protocol.Workers.CreatePool("BlockDispatcher.WarpSync", workerpool.WithWorkerCount(1), workerpool.WithCancelPendingTasksOnShutdown(true)),
 		unsolidCommitmentBlocks:   buffer.NewUnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]](20, 100),
 		pendingWarpSyncRequests:   eventticker.New[iotago.SlotIndex, iotago.CommitmentID](eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](WarpSyncRetryInterval)),
 		processedWarpSyncRequests: ds.NewSet[iotago.CommitmentID](),
@@ -440,8 +440,8 @@ func (b *BlockDispatcher) shutdown() {
 		if !isShutdown {
 			b.pendingWarpSyncRequests.Shutdown()
 
-			b.dispatchWorkers.Shutdown(true).ShutdownComplete.Wait()
-			b.warpSyncWorkers.Shutdown(true).ShutdownComplete.Wait()
+			b.dispatchWorkers.Shutdown().ShutdownComplete.Wait()
+			b.warpSyncWorkers.Shutdown().ShutdownComplete.Wait()
 		}
 
 		return true

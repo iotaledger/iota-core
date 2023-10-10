@@ -45,7 +45,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 		b := New(e.Workers.CreateGroup("BlockDAG"), e, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
-			wp := b.workers.CreatePool("BlockDAG.Attach", 2)
+			wp := b.workers.CreatePool("BlockDAG.Attach", workerpool.WithWorkerCount(2))
 
 			e.Events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
