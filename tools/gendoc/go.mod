@@ -5,7 +5,7 @@ go 1.21
 replace github.com/iotaledger/iota-core => ../../
 
 require (
-	github.com/iotaledger/hive.go/app v0.0.0-20231005142627-86973b2edb3b
+	github.com/iotaledger/hive.go/app v0.0.0-20231010083704-a2a91fb9e0ab
 	github.com/iotaledger/hive.go/apputils v0.0.0-20230829152614-7afc7a4d89b3
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 )
@@ -67,7 +67,7 @@ require (
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20230928074706-d58e32f86729 // indirect
 	github.com/iotaledger/hive.go/lo v0.0.0-20231005142627-86973b2edb3b // indirect
 	github.com/iotaledger/hive.go/logger v0.0.0-20231005142627-86973b2edb3b // indirect
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231005142627-86973b2edb3b // indirect
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231010083704-a2a91fb9e0ab // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231005142627-86973b2edb3b // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20231005142627-86973b2edb3b // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231005192108-08a985c2e217 // indirect

@@ -12,7 +12,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/iotaledger/hive.go/ads v0.0.0-20230928074706-d58e32f86729
-	github.com/iotaledger/hive.go/app v0.0.0-20231005142627-86973b2edb3b
+	github.com/iotaledger/hive.go/app v0.0.0-20231010083704-a2a91fb9e0ab
 	github.com/iotaledger/hive.go/constraints v0.0.0-20231005142627-86973b2edb3b
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231005142627-86973b2edb3b
 	github.com/iotaledger/hive.go/crypto v0.0.0-20231005142627-86973b2edb3b

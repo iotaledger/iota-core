@@ -277,8 +277,8 @@ github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 h1:dTrD7X2PT
 github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7/go.mod h1:ZRdPu684P0fQ1z8sXz4dj9H5LWHhz4a9oCtvjunkSrw=
 github.com/iotaledger/hive.go/ads v0.0.0-20230928074706-d58e32f86729 h1:HHxgNhbtD6WDCwSQBbPrQe8c4ZNjNi0KcgCJo0nm9bY=
 github.com/iotaledger/hive.go/ads v0.0.0-20230928074706-d58e32f86729/go.mod h1:IAWZ/5It5P8B41mWyJXJVcG0vuikVRaTFKQnr2D2q+c=
-github.com/iotaledger/hive.go/app v0.0.0-20231005142627-86973b2edb3b h1:OQ/4K7+2YMMuc2V7oTTpErHYWAwBw7exkQ1UdQUNH1U=
-github.com/iotaledger/hive.go/app v0.0.0-20231005142627-86973b2edb3b/go.mod h1:eiZgbcwTDZ7d9hEait2EAwAhixWhceW4MXmuVk2EcEw=
+github.com/iotaledger/hive.go/app v0.0.0-20231010083704-a2a91fb9e0ab h1:ePgcMl1XOXoF4kNfwMGn63GXZSihv+Z2t1GWLKqkGOw=
+github.com/iotaledger/hive.go/app v0.0.0-20231010083704-a2a91fb9e0ab/go.mod h1:eiZgbcwTDZ7d9hEait2EAwAhixWhceW4MXmuVk2EcEw=
 github.com/iotaledger/hive.go/constraints v0.0.0-20231005142627-86973b2edb3b h1:8FdKoB755PjCL1aHTi+2rPt9lCUS4B2wg2fNKykw5dc=
 github.com/iotaledger/hive.go/constraints v0.0.0-20231005142627-86973b2edb3b/go.mod h1:dOBOM2s4se3HcWefPe8sQLUalGXJ8yVXw58oK8jke3s=
 github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231005142627-86973b2edb3b h1:gQ+Wqg8h/LRpgX3CsmaOZYdMIBVL4fAPIrZbmA6Wn3Q=
