@@ -406,7 +406,7 @@ func (e *Engine) SetChainID(chainID iotago.CommitmentID) {
 }
 
 func (e *Engine) acceptanceHandler() {
-	wp := e.Workers.CreatePool("BlockAccepted", 1)
+	wp := e.Workers.CreatePool("BlockAccepted", workerpool.WithWorkerCount(1))
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		e.Ledger.TrackBlock(block)
@@ -418,7 +418,7 @@ func (e *Engine) acceptanceHandler() {
 }
 
 func (e *Engine) setupBlockStorage() {
-	wp := e.Workers.CreatePool("BlockStorage", 1) // Using just 1 worker to avoid contention
+	wp := e.Workers.CreatePool("BlockStorage", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		store, err := e.Storage.Blocks(block.ID().Slot())
@@ -436,7 +436,7 @@ func (e *Engine) setupBlockStorage() {
 func (e *Engine) setupEvictionState() {
 	e.Events.EvictionState.LinkTo(e.EvictionState.Events)
 
-	wp := e.Workers.CreatePool("EvictionState", 1) // Using just 1 worker to avoid contention
+	wp := e.Workers.CreatePool("EvictionState", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		block.ForEachParent(func(parent iotago.Parent) {
@@ -465,7 +465,7 @@ func (e *Engine) setupBlockRequester() {
 
 	e.Events.EvictionState.SlotEvicted.Hook(e.BlockRequester.EvictUntil)
 
-	wp := e.Workers.CreatePool("BlockMissingAttachFromStorage", 1)
+	wp := e.Workers.CreatePool("BlockMissingAttachFromStorage", workerpool.WithWorkerCount(1))
 	// We need to hook to make sure that the request is created before the block arrives to avoid a race condition
 	// where we try to delete the request again before it is created. Thus, continuing to request forever.
 	e.Events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
@@ -488,7 +488,7 @@ func (e *Engine) setupBlockRequester() {
 	})
 	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
 		e.BlockRequester.StopTicker(block.ID())
-	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", 1))) // Using just 1 worker to avoid contention
+	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", workerpool.WithWorkerCount(1)))) // Using just 1 worker to avoid contention
 }
 
 func (e *Engine) setupPruning() {
@@ -496,7 +496,7 @@ func (e *Engine) setupPruning() {
 		if err := e.Storage.TryPrune(); err != nil {
 			e.errorHandler(ierrors.Wrapf(err, "failed to prune storage at slot %d", slot))
 		}
-	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", 1)))
+	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", workerpool.WithWorkerCount(1))))
 }
 
 // EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
