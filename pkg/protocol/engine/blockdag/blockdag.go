@@ -16,8 +16,5 @@ type BlockDAG interface {
 	// without requesting it.
 	GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Block, requested bool)
 
-	// SetInvalid marks a Block as invalid.
-	SetInvalid(block *blocks.Block, reason error) (wasUpdated bool)
-
 	module.Interface
 }

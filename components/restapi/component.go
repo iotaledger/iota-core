@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/jwt"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
@@ -95,6 +96,12 @@ func provide(c *dig.Container) error {
 
 	if err := c.Provide(func(deps proxyDeps) *restapi.RestRouteManager {
 		return restapi.NewRestRouteManager(deps.Echo)
+	}); err != nil {
+		Component.LogPanic(err)
+	}
+
+	if err := c.Provide(func(deps dependencies) *blockhandler.BlockHandler {
+		return blockhandler.New(deps.Protocol)
 	}); err != nil {
 		Component.LogPanic(err)
 	}

@@ -58,3 +58,12 @@ func (g *Gadget) shouldAccept(block *blocks.Block) bool {
 
 	return votes.IsThresholdReached(blockSeats, onlineCommitteeTotalSeats, g.optsAcceptanceThreshold)
 }
+
+func (g *Gadget) SetAccepted(block *blocks.Block) bool {
+	if block.SetAccepted() {
+		g.events.BlockAccepted.Trigger(block)
+		return true
+	}
+
+	return false
+}

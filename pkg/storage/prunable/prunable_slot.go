@@ -14,6 +14,7 @@ import (
 const (
 	slotPrefixBlocks byte = iota
 	slotPrefixRootBlocks
+	slotPrefixMutations
 	slotPrefixAttestations
 	slotPrefixAccountDiffs
 	slotPrefixPerformanceFactors
@@ -49,6 +50,10 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.Bl
 		iotago.CommitmentID.Bytes,
 		iotago.CommitmentIDFromBytes,
 	), nil
+}
+
+func (p *Prunable) Mutations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
+	return p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixMutations})
 }
 
 func (p *Prunable) Attestations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
