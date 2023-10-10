@@ -243,7 +243,7 @@ func (l *Ledger) outputFromState(state mempool.State) *utxoledger.Output {
 			if exists {
 				earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
 
-				return utxoledger.CreateOutput(l.apiProvider, output.OutputID(), earliestAttachment, earliestAttachment.Slot(), output.Output())
+				return output.CopyWithBlockIDAndSlotBooked(earliestAttachment, earliestAttachment.Slot())
 			}
 		}
 
@@ -628,7 +628,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 					return err
 				}
 
-				output := utxoledger.CreateOutput(l.apiProvider, typedOutput.OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Slot(), typedOutput.Output())
+				output := typedOutput.CopyWithBlockIDAndSlotBooked(txWithMeta.EarliestIncludedAttachment(), stateDiff.Slot())
 				outputs = append(outputs, output)
 
 				return nil

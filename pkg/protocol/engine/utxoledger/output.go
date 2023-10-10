@@ -37,6 +37,10 @@ type Output struct {
 	encodedOutput []byte
 	outputOnce    sync.Once
 	output        iotago.Output
+
+	encodedProof []byte
+	proofOnce    sync.Once
+	outputProof  *iotago.OutputIDProof
 }
 
 func (o *Output) StateID() iotago.Identifier {
@@ -89,8 +93,27 @@ func (o *Output) Output() iotago.Output {
 	return o.output
 }
 
+func (o *Output) OutputIDProof() *iotago.OutputIDProof {
+	o.proofOnce.Do(func() {
+		if o.outputProof == nil {
+			api := o.apiProvider.APIForSlot(o.blockID.Slot())
+			proof, _, err := iotago.OutputIDProofFromBytes(api)(o.encodedProof)
+			if err != nil {
+				panic(err)
+			}
+			o.outputProof = proof
+		}
+	})
+
+	return o.outputProof
+}
+
 func (o *Output) Bytes() []byte {
 	return o.encodedOutput
+}
+
+func (o *Output) ProofBytes() []byte {
+	return o.encodedProof
 }
 
 func (o *Output) BaseTokenAmount() iotago.BaseToken {
@@ -112,47 +135,59 @@ func (o Outputs) ToOutputSet() iotago.OutputSet {
 	return outputSet
 }
 
-func CreateOutput(apiProvider iotago.APIProvider, outputID iotago.OutputID, blockID iotago.BlockID, slotBooked iotago.SlotIndex, output iotago.Output, outputBytes ...[]byte) *Output {
-	var encodedOutput []byte
-	if len(outputBytes) == 0 {
-		var err error
-		encodedOutput, err = apiProvider.APIForSlot(blockID.Slot()).Encode(output)
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		encodedOutput = outputBytes[0]
-	}
+func NewOutput(apiProvider iotago.APIProvider,
+	outputID iotago.OutputID,
+	blockID iotago.BlockID,
+	slotBooked iotago.SlotIndex,
+	output iotago.Output,
+	outputBytes []byte,
+	outputProof *iotago.OutputIDProof,
+	outputProofBytes []byte,
+) *Output {
 
 	o := &Output{
 		apiProvider:   apiProvider,
 		outputID:      outputID,
 		blockID:       blockID,
 		slotBooked:    slotBooked,
-		encodedOutput: encodedOutput,
+		encodedOutput: outputBytes,
+		encodedProof:  outputProofBytes,
 	}
 
 	o.outputOnce.Do(func() {
 		o.output = output
 	})
 
+	o.proofOnce.Do(func() {
+		o.outputProof = outputProof
+	})
+
 	return o
 }
 
-func NewOutput(apiProvider iotago.APIProvider, blockID iotago.BlockID, slotBooked iotago.SlotIndex, transaction *iotago.Transaction, index uint16) (*Output, error) {
-	txID, err := transaction.ID()
+func CreateOutput(apiProvider iotago.APIProvider,
+	outputID iotago.OutputID,
+	blockID iotago.BlockID,
+	slotBooked iotago.SlotIndex,
+	output iotago.Output,
+	outputProof *iotago.OutputIDProof,
+) *Output {
+
+	encodedOutput, err := apiProvider.APIForSlot(blockID.Slot()).Encode(output)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	var output iotago.Output
-	if len(transaction.Outputs) <= int(index) {
-		return nil, ierrors.New("output not found")
+	encodedProof, err := outputProof.Bytes()
+	if err != nil {
+		panic(err)
 	}
-	output = transaction.Outputs[int(index)]
-	outputID := iotago.OutputIDFromTransactionIDAndIndex(txID, index)
 
-	return CreateOutput(apiProvider, outputID, blockID, slotBooked, output), nil
+	return NewOutput(apiProvider, outputID, blockID, slotBooked, output, encodedOutput, outputProof, encodedProof)
+}
+
+func (o *Output) CopyWithBlockIDAndSlotBooked(blockID iotago.BlockID, slotBooked iotago.SlotIndex) *Output {
+	return NewOutput(o.apiProvider, o.outputID, blockID, slotBooked, o.Output(), o.encodedOutput, o.outputProof, o.encodedProof)
 }
 
 // - kvStorable
@@ -173,7 +208,12 @@ func (o *Output) KVStorableValue() (value []byte) {
 	ms := marshalutil.New()
 	ms.WriteBytes(o.blockID[:])             // BlockIDLength bytes
 	ms.WriteBytes(o.slotBooked.MustBytes()) // 4 bytes
+
+	ms.WriteUint32(uint32(len(o.encodedOutput))) // 4 bytes
 	ms.WriteBytes(o.encodedOutput)
+
+	ms.WriteUint32(uint32(len(o.encodedProof))) // 4 bytes
+	ms.WriteBytes(o.encodedProof)
 
 	return ms.Bytes()
 }
@@ -207,7 +247,27 @@ func (o *Output) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
 		return err
 	}
 
-	o.encodedOutput = valueUtil.ReadRemainingBytes()
+	// Read Output
+	outputLen, err := valueUtil.ReadUint32()
+	if err != nil {
+		return err
+	}
+
+	o.encodedOutput, err = valueUtil.ReadBytes(int(outputLen))
+	if err != nil {
+		return err
+	}
+
+	// Read Output proof
+	proofLen, err := valueUtil.ReadUint32()
+	if err != nil {
+		return err
+	}
+
+	o.encodedProof, err = valueUtil.ReadBytes(int(proofLen))
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
