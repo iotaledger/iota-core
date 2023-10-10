@@ -623,8 +623,8 @@ func (b *Block) String() string {
 
 	builder := stringify.NewStructBuilder("Engine.Block", stringify.NewStructField("id", b.id()))
 	builder.AddField(stringify.NewStructField("Missing", b.missing))
-	builder.AddField(stringify.NewStructField("Solid", b.solid))
-	builder.AddField(stringify.NewStructField("Invalid", b.invalid))
+	builder.AddField(stringify.NewStructField("Solid", b.solid.Get()))
+	builder.AddField(stringify.NewStructField("Invalid", b.invalid.Get()))
 	builder.AddField(stringify.NewStructField("Booked", b.booked.Get()))
 	builder.AddField(stringify.NewStructField("Witnesses", b.witnesses))
 	builder.AddField(stringify.NewStructField("PreAccepted", b.preAccepted))
