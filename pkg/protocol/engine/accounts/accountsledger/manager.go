@@ -60,8 +60,8 @@ func New(
 		blockBurns:                    shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
 		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *model.SignaledBlock](),
 		accountsTree: ads.NewMap(accountsStore,
-			iotago.Identifier.Bytes,
-			iotago.IdentifierFromBytes,
+			iotago.AccountID.Bytes,
+			iotago.AccountIDFromBytes,
 			(*accounts.AccountData).Bytes,
 			func(bytes []byte) (object *accounts.AccountData, consumed int, err error) {
 				a := new(accounts.AccountData)

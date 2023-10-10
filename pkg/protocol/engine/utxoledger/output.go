@@ -171,7 +171,7 @@ func (o *Output) KVStorableKey() (key []byte) {
 
 func (o *Output) KVStorableValue() (value []byte) {
 	ms := marshalutil.New()
-	ms.WriteBytes(o.blockID[:])             // SlotIdentifierLength bytes
+	ms.WriteBytes(o.blockID[:])             // BlockIDLength bytes
 	ms.WriteBytes(o.slotBooked.MustBytes()) // 4 bytes
 	ms.WriteBytes(o.encodedOutput)
 

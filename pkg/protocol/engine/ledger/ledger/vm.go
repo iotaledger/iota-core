@@ -173,7 +173,7 @@ func (v *VM) Execute(executionContext context.Context, transaction mempool.Trans
 		outputs = append(outputs, utxoledger.CreateOutput(
 			v.ledger.apiProvider,
 			iotago.OutputIDFromTransactionIDAndIndex(transactionID, uint16(index)),
-			iotago.EmptyBlockID(),
+			iotago.EmptyBlockID,
 			0,
 			output,
 		))

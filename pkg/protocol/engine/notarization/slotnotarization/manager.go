@@ -57,7 +57,7 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 			m.attestation = e.Attestations
 			m.upgradeOrchestrator = e.UpgradeOrchestrator
 
-			wpBlocks := m.workers.CreatePool("Blocks", 1) // Using just 1 worker to avoid contention
+			wpBlocks := m.workers.CreatePool("Blocks", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
 
 			e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
 				if err := m.notarizeAcceptedBlock(block); err != nil {

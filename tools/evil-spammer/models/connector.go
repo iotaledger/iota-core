@@ -239,7 +239,7 @@ func (c *WebClient) PostData(data []byte) (blkID string, err error) {
 
 	blk, err := blockBuilder.Build()
 	if err != nil {
-		return iotago.EmptyBlockID().ToHex(), err
+		return iotago.EmptyBlockID.ToHex(), err
 	}
 
 	id, err := c.client.SubmitBlock(context.Background(), blk)
