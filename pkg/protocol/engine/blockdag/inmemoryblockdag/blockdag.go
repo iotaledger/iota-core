@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/buffer"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -34,8 +33,6 @@ type BlockDAG struct {
 
 	blockCache *blocks.Blocks
 
-	solidifierMutex syncutils.RWMutex
-
 	workers      *workerpool.Group
 	errorHandler func(error)
 	apiProvider  iotago.APIProvider
@@ -57,12 +54,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 			}, event.WithWorkerPool(wp))
 
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-				unsolidBlocks := b.uncommittedSlotBlocks.GetValuesAndEvict(commitment.ID())
-
-				b.solidifierMutex.RLock()
-				defer b.solidifierMutex.RUnlock()
-
-				for _, block := range unsolidBlocks {
+				for _, block := range b.uncommittedSlotBlocks.GetValuesAndEvict(commitment.ID()) {
 					b.setupBlock(block)
 				}
 			}, event.WithWorkerPool(wp))
@@ -138,9 +130,6 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 		}) {
 			return
 		}
-
-		b.solidifierMutex.RLock()
-		defer b.solidifierMutex.RUnlock()
 
 		b.setupBlock(block)
 	}

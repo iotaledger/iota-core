@@ -124,7 +124,9 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 	block.ForEachParent(func(parent iotago.Parent) {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
-			panic("cannot setup block without existing parent")
+			b.errorHandler(ierrors.Errorf("cannot setup block %s without existing parent %s", block.ID(), parent.ID))
+
+			return
 		}
 
 		parentBlock.Booked().OnUpdateOnce(func(_, _ bool) {
