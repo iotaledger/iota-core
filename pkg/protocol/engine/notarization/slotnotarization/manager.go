@@ -26,8 +26,9 @@ type Manager struct {
 	events        *notarization.Events
 	slotMutations *SlotMutations
 
-	workers      *workerpool.Group
-	errorHandler func(error)
+	workers                      *workerpool.Group
+	errorHandler                 func(error)
+	acceptedBlockProcessedDetach func()
 
 	attestation         attestation.Attestations
 	ledger              ledger.Ledger
@@ -62,14 +63,14 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 
 			wpBlocks := m.workers.CreatePool("Blocks", 1) // Using just 1 worker to avoid contention
 
-			e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
+			m.acceptedBlockProcessedDetach = e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
 				if err := m.notarizeAcceptedBlock(block); err != nil {
 					m.errorHandler(ierrors.Wrapf(err, "failed to add accepted block %s to slot", block.ID()))
 				}
 				m.tryCommitUntil(block.ID().Slot())
 
 				block.SetNotarized()
-			}, event.WithWorkerPool(wpBlocks))
+			}, event.WithWorkerPool(wpBlocks)).Unhook
 
 			e.Events.Notarization.LinkTo(m.events)
 
@@ -93,6 +94,10 @@ func NewManager(minCommittableAge iotago.SlotIndex, workers *workerpool.Group, e
 
 func (m *Manager) Shutdown() {
 	m.TriggerStopped()
+	// Alternative 2
+	if m.acceptedBlockProcessedDetach != nil {
+		m.acceptedBlockProcessedDetach()
+	}
 	m.workers.Shutdown()
 }
 
