@@ -8,12 +8,12 @@ import (
 )
 
 func (a *AccountWallet) CreateAccount(params *CreateAccountParams) (iotago.AccountID, error) {
-	accountOutput, err := a.getFunds(params.Amount, iotago.AddressImplicitAccountCreation)
+	implicitAccountOutput, privateKey, err := a.getFunds(params.Amount, iotago.AddressImplicitAccountCreation)
 	if err != nil {
-		return iotago.EmptyAccountID(), ierrors.Wrap(err, "Failed to create account")
+		return iotago.EmptyAccountID, ierrors.Wrap(err, "Failed to create account")
 	}
 
-	accountID := a.registerAccount(params.Alias, accountOutput.OutputID, a.latestUsedIndex)
+	accountID := a.registerAccount(params.Alias, implicitAccountOutput.OutputID, a.latestUsedIndex, privateKey)
 
 	fmt.Printf("Created account %s with %d tokens\n", accountID.ToHex(), params.Amount)
 
@@ -28,7 +28,7 @@ func (a *AccountWallet) ListAccount() error {
 	fmt.Printf("%-10s \t%-33s\n\n", "Alias", "AccountID")
 	for _, accData := range a.accountsAliases {
 		fmt.Printf("%-10s \t", accData.Alias)
-		fmt.Printf("%-33s ", accData.AccountID.ToHex())
+		fmt.Printf("%-33s ", accData.Account.ID().ToHex())
 		fmt.Printf("\n")
 	}
 

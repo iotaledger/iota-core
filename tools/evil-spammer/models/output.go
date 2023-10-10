@@ -1,6 +1,7 @@
 package models
 
 import (
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -31,9 +32,9 @@ const (
 )
 
 type AccountData struct {
-	Alias     string           `serix:"0,lengthPrefixType=uint8"`
-	Status    AccountStatus    `serix:"1"`
-	AccountID iotago.AccountID `serix:"2"`
-	OutputID  iotago.OutputID  `serix:"3"`
-	Index     uint64           `serix:"4"`
+	Alias    string               `serix:"0,lengthPrefixType=uint8"`
+	Status   AccountStatus        `serix:"1"`
+	Account  blockhandler.Account `serix:"2"`
+	OutputID iotago.OutputID      `serix:"3"`
+	Index    uint64               `serix:"4"`
 }

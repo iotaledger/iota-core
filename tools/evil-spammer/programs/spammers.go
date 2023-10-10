@@ -116,6 +116,7 @@ func SpamTransaction(w *evilwallet.EvilWallet, rate int, timeUnit, duration time
 		spammer.WithRateSetter(enableRateSetter),
 		spammer.WithEvilWallet(w),
 		spammer.WithEvilScenario(scenarioTx),
+		spammer.WithAccountAlias(accountAlias),
 	}
 
 	s := spammer.NewSpammer(options...)
@@ -147,6 +148,7 @@ func SpamDoubleSpends(w *evilwallet.EvilWallet, rate, nSpent int, timeUnit, dura
 		spammer.WithRateSetter(enableRateSetter),
 		spammer.WithTimeDelayForDoubleSpend(delayBetweenConflicts),
 		spammer.WithEvilScenario(scenarioDs),
+		spammer.WithAccountAlias(accountAlias),
 	}
 
 	s := spammer.NewSpammer(options...)
@@ -179,6 +181,7 @@ func SpamNestedConflicts(w *evilwallet.EvilWallet, rate int, timeUnit, duration 
 		spammer.WithEvilWallet(w),
 		spammer.WithRateSetter(enableRateSetter),
 		spammer.WithEvilScenario(scenario),
+		spammer.WithAccountAlias(accountAlias),
 	}
 
 	return spammer.NewSpammer(options...)
@@ -196,6 +199,7 @@ func SpamBlocks(w *evilwallet.EvilWallet, rate int, timeUnit, duration time.Dura
 		spammer.WithRateSetter(enableRateSetter),
 		spammer.WithEvilWallet(w),
 		spammer.WithSpammingFunc(spammer.DataSpammingFunction),
+		spammer.WithAccountAlias(accountAlias),
 	}
 
 	return spammer.NewSpammer(options...)
@@ -219,6 +223,7 @@ func SpamAccounts(w *evilwallet.EvilWallet, rate int, timeUnit, duration time.Du
 		spammer.WithEvilWallet(w),
 		spammer.WithSpammingFunc(spammer.AccountSpammingFunction),
 		spammer.WithEvilScenario(scenarioAccount),
+		spammer.WithAccountAlias(accountAlias),
 	}
 
 	return spammer.NewSpammer(options...)

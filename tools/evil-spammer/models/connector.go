@@ -1,4 +1,4 @@
-package wallet
+package models
 
 import (
 	"context"
@@ -159,6 +159,7 @@ func (c *WebClients) RemoveClient(url string) {
 }
 
 type Client interface {
+	Client() *nodeclient.Client
 	// URL returns a client API url.
 	URL() (cltID string)
 	// PostBlock sends a block to the Tangle via a given client.
@@ -183,6 +184,10 @@ type Client interface {
 type WebClient struct {
 	client *nodeclient.Client
 	url    string
+}
+
+func (c *WebClient) Client() *nodeclient.Client {
+	return c.client
 }
 
 func (c *WebClient) APIForVersion(version iotago.Version) (iotago.API, error) {

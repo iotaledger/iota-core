@@ -32,7 +32,7 @@ var (
 		Scenario:              evilwallet.Scenario1(),
 		DeepSpam:              false,
 		EnableRateSetter:      false,
-		AccountAlias:          "faucet",
+		AccountAlias:          accountwallet.FaucetAccountAlias,
 	}
 
 	quickTestParams = programs.QuickTestParams{
@@ -53,7 +53,7 @@ var (
 	// 	TimeUnit:       time.Second,
 	// 	NetworkAlias:   "docker",
 	// 	SpammerAlias:   "peer_master",
-	// 	ValidAlias:     "faucet",
+	// 	ValidAlias:     accountwallet.FaucetAccountAlias,
 	// 	CommitmentType: "latest",
 	// 	ForkAfter:      10,
 	// }

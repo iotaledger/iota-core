@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/accountwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
@@ -54,14 +55,15 @@ const (
 // Not mandatory options, if not provided spammer will use default settings:
 // WithSpamDetails, WithEvilWallet, WithErrorCounter, WithLogTickerInterval.
 type Spammer struct {
-	SpamDetails     *SpamDetails
-	State           *State
-	UseRateSetter   bool
-	SpamType        SpamType
-	Clients         models.Connector
-	EvilWallet      *evilwallet.EvilWallet
-	EvilScenario    *evilwallet.EvilScenario
-	IdentityManager *IdentityManager
+	SpamDetails        *SpamDetails
+	State              *State
+	UseRateSetter      bool
+	SpamType           SpamType
+	IssuerAccountAlias string
+	Clients            models.Connector
+	EvilWallet         *evilwallet.EvilWallet
+	EvilScenario       *evilwallet.EvilScenario
+	IdentityManager    *IdentityManager
 	// CommitmentManager *CommitmentManager
 	ErrCounter *ErrorCounter
 
@@ -88,12 +90,13 @@ func NewSpammer(options ...Options) *Spammer {
 		logTickTime:   time.Second * 30,
 	}
 	s := &Spammer{
-		SpamDetails:     &SpamDetails{},
-		spamFunc:        CustomConflictSpammingFunc,
-		State:           state,
-		SpamType:        SpamEvilWallet,
-		EvilScenario:    evilwallet.NewEvilScenario(),
-		IdentityManager: NewIdentityManager(),
+		SpamDetails:        &SpamDetails{},
+		spamFunc:           CustomConflictSpammingFunc,
+		State:              state,
+		SpamType:           SpamEvilWallet,
+		IssuerAccountAlias: accountwallet.FaucetAccountAlias,
+		EvilScenario:       evilwallet.NewEvilScenario(),
+		IdentityManager:    NewIdentityManager(),
 		// CommitmentManager: NewCommitmentManager(),
 		UseRateSetter:  true,
 		done:           make(chan bool),
@@ -232,18 +235,36 @@ func (s *Spammer) StopSpamming() {
 }
 
 func (s *Spammer) PrepareAndPostBlock(payload iotago.Payload, clt models.Client) {
-	if block == nil {
-		s.log.Debug(ErrBlockIsNil)
-		s.ErrCounter.CountError(ErrBlockIsNil)
+	if payload == nil {
+		s.log.Debug(ErrPayloadIsNil)
+		s.ErrCounter.CountError(ErrPayloadIsNil)
+
+		return
+	}
+	issuerAccount, err := s.EvilWallet.GetAccount(s.IssuerAccountAlias)
+	if err != nil {
+		s.log.Debug(ierrors.Wrapf(ErrFailGetAccount, err.Error()))
+		s.ErrCounter.CountError(ierrors.Wrapf(ErrFailGetAccount, err.Error()))
+
+		return
+	}
+	blockID, err := s.EvilWallet.PrepareAndPostBlock(clt, payload, issuerAccount)
+	if err != nil {
+		s.log.Debug(ierrors.Wrapf(ErrFailPostBlock, err.Error()))
+		s.ErrCounter.CountError(ierrors.Wrapf(ErrFailPostBlock, err.Error()))
 
 		return
 	}
 
-	s.EvilWallet.
-		_, err := clt.PostBlock(block)
+	if payload.PayloadType() != iotago.PayloadSignedTransaction {
+		return
+	}
+
+	signedTx := payload.(*iotago.SignedTransaction)
+	txID, err := signedTx.Transaction.ID()
 	if err != nil {
-		s.log.Debug(ierrors.Wrapf(ErrFailPostBlock, err.Error()))
-		s.ErrCounter.CountError(ierrors.Wrapf(ErrFailPostBlock, err.Error()))
+		s.log.Debug(ierrors.Wrapf(ErrTransactionInvalid, err.Error()))
+		s.ErrCounter.CountError(ierrors.Wrapf(ErrTransactionInvalid, err.Error()))
 
 		return
 	}

@@ -1,6 +1,7 @@
 package accountwallet
 
 import (
+	"crypto/ed25519"
 	"os"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/timeutil"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/logger"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
@@ -79,6 +81,13 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 		w.client = models.NewWebClient(w.optsClientBindAddress)
 		w.api = w.client.CurrentAPI()
 		w.faucet = newFaucet(w.client, w.optsFaucetParams)
+		w.accountsAliases[FaucetAccountAlias] = &models.AccountData{
+			Alias:    FaucetAccountAlias,
+			Status:   models.AccountReady,
+			OutputID: iotago.EmptyOutputID,
+			Index:    0,
+			Account:  w.faucet.account,
+		}
 	})
 }
 
@@ -152,14 +161,16 @@ func (a *AccountWallet) readAccountsStateFile() (map[string]*models.AccountData,
 	return a.accountsAliases, nil
 }
 
-func (a *AccountWallet) registerAccount(alias string, outputID iotago.OutputID, index uint64) iotago.AccountID {
+func (a *AccountWallet) registerAccount(alias string, outputID iotago.OutputID, index uint64, privKey ed25519.PrivateKey) iotago.AccountID {
 	accountID := iotago.AccountIDFromOutputID(outputID)
+	account := blockhandler.NewEd25519Account(accountID, privKey)
+
 	a.accountsAliases[alias] = &models.AccountData{
-		Alias:     alias,
-		AccountID: accountID,
-		Status:    models.AccountPending,
-		OutputID:  outputID,
-		Index:     index,
+		Alias:    alias,
+		Account:  account,
+		Status:   models.AccountPending,
+		OutputID: outputID,
+		Index:    index,
 	}
 
 	return accountID
@@ -181,7 +192,7 @@ func (a *AccountWallet) updateAccountStatus(alias string, status models.AccountS
 	return accData, true
 }
 
-func (a *AccountWallet) getAccount(alias string) (*models.AccountData, error) {
+func (a *AccountWallet) GetReadyAccount(alias string) (*models.AccountData, error) {
 	accData, exists := a.accountsAliases[alias]
 	if !exists {
 		return nil, ierrors.Errorf("account with alias %s does not exist", alias)
@@ -194,6 +205,15 @@ func (a *AccountWallet) getAccount(alias string) (*models.AccountData, error) {
 	}
 
 	accData, _ = a.updateAccountStatus(alias, models.AccountReady)
+
+	return accData, nil
+}
+
+func (a *AccountWallet) GetAccount(alias string) (*models.AccountData, error) {
+	accData, exists := a.accountsAliases[alias]
+	if !exists {
+		return nil, ierrors.Errorf("account with alias %s does not exist", alias)
+	}
 
 	return accData, nil
 }
@@ -229,23 +249,23 @@ func (a *AccountWallet) isAccountReady(accData *models.AccountData) bool {
 	return true
 }
 
-func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) (*models.Output, error) {
+func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) (*models.Output, ed25519.PrivateKey, error) {
 	hdWallet := mock.NewHDWallet("", a.seed[:], a.latestUsedIndex+1)
-
+	privKey, _ := hdWallet.KeyPair()
 	receiverAddr := hdWallet.Address(addressType)
 	createdOutput, err := a.RequestFaucetFunds(a.client, receiverAddr, iotago.BaseToken(amount))
 	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to request funds from Faucet")
+		return nil, nil, ierrors.Wrap(err, "failed to request funds from Faucet")
 	}
 
 	a.latestUsedIndex++
 	createdOutput.Index = a.latestUsedIndex
 
-	return createdOutput, nil
+	return createdOutput, privKey, nil
 }
 
 func (a *AccountWallet) destroyAccount(alias string) error {
-	accData, err := a.getAccount(alias)
+	accData, err := a.GetAccount(alias)
 	if err != nil {
 		return err
 	}
@@ -258,7 +278,7 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 
 	txBuilder := builder.NewTransactionBuilder(a.api)
 	txBuilder.AddInput(&builder.TxInput{
-		UnlockTarget: a.accountsAliases[alias].AccountID.ToAddress(),
+		UnlockTarget: a.accountsAliases[alias].Account.ID().ToAddress(),
 		InputID:      accData.OutputID,
 		Input:        accountOutput,
 	})
@@ -273,10 +293,13 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 
 	tx, err := txBuilder.Build(hdWallet.AddressSigner())
 	if err != nil {
-		return ierrors.Wrap(err, "failed to build transaction")
+		return ierrors.Wrapf(err, "failed to build transaction for account alias destruction %s", alias)
 	}
 
-	// TODO createa and post block
+	blockID, err := a.PostWithBlock(a.client, tx, a.faucet.account)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to post block with ID %s", blockID)
+	}
 
 	// remove account from wallet
 	delete(a.accountsAliases, alias)

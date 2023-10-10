@@ -1,7 +1,6 @@
 package evilwallet
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/accountwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -105,9 +105,22 @@ func (e *EvilWallet) RemoveClient(clientURL string) {
 	e.connector.RemoveClient(clientURL)
 }
 
-func (e *EvilWallet) CreateBlock() *iotago.ProtocolBlock {
-	e.accWallet.PostBlock(clt, tx, issuer)
+func (e *EvilWallet) GetAccount(alias string) (blockhandler.Account, error) {
+	account, err := e.accWallet.GetAccount(alias)
+	if err != nil {
+		return nil, err
+	}
 
+	return account.Account, nil
+}
+
+func (e *EvilWallet) PrepareAndPostBlock(clt models.Client, payload iotago.Payload, issuer blockhandler.Account) (iotago.BlockID, error) {
+	blockID, err := e.accWallet.PostWithBlock(clt, payload, issuer)
+	if err != nil {
+		return iotago.EmptyBlockID, err
+	}
+
+	return blockID, nil
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -233,9 +246,13 @@ func (e *EvilWallet) splitOutputs(splitOutput *models.Output, inputWallet, outpu
 		return iotago.TransactionID{}, err
 	}
 
-	_, err = e.connector.GetClient().PostTransaction(signedTx)
+	faucetAccount, err := e.accWallet.GetAccount(accountwallet.FaucetAccountAlias)
 	if err != nil {
-		fmt.Println(err)
+		return iotago.TransactionID{}, err
+	}
+
+	_, err = e.PrepareAndPostBlock(e.connector.GetClient(), signedTx, faucetAccount.Account)
+	if err != nil {
 		return iotago.TransactionID{}, err
 	}
 

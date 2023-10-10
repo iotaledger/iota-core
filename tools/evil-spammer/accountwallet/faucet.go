@@ -8,13 +8,15 @@ import (
 	"github.com/mr-tron/base58"
 
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
+
+const FaucetAccountAlias = "faucet"
 
 func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago.Address, amount iotago.BaseToken) (*models.Output, error) {
 	signedTx, err := a.faucet.prepareFaucetRequest(receiveAddr, amount)
@@ -24,21 +26,9 @@ func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago
 		return nil, err
 	}
 
-	issuerResp, congestionResp, err := a.requestBlockData()
-	if err != nil {
-		return nil, err
-	}
-
-	signedBlock, err := a.createBlock(issuerResp, congestionResp, signedTx, a.faucet.account)
+	_, err = a.PostWithBlock(clt, signedTx, a.faucet.account)
 	if err != nil {
 		log.Errorf("failed to create block: %s", err)
-
-		return nil, err
-	}
-
-	_, err = clt.PostBlock(signedBlock)
-	if err != nil {
-		log.Errorf("failed to post block: %s", err)
 
 		return nil, err
 	}
@@ -61,65 +51,37 @@ func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago
 	}, nil
 }
 
-func (a *AccountWallet) requestBlockData() (*apimodels.IssuanceBlockHeaderResponse, *apimodels.CongestionResponse, error) {
-	issuerResp, err := a.client.GetBlockIssuance()
-	if err != nil {
-		log.Errorf("failed to get block issuance: %s", err)
-
-		return nil, nil, err
-	}
-
-	congestionResp, err := a.client.GetCongestion(a.faucet.account.ID())
-	if err != nil {
-		log.Errorf("failed to get congestion: %s", err)
-
-		return nil, nil, err
-	}
-
-	return issuerResp, congestionResp, nil
-}
-
-func (a *AccountWallet) PostBlock(clt models.Client, payload iotago.Payload, issuer blockfactory.Account) error {
-	issuerResp, congestionResp, err := a.requestBlockData()
-	if err != nil {
-		return err
-	}
-
-	signedBlock, err := a.createBlock(issuerResp, congestionResp, payload, issuer)
+func (a *AccountWallet) PostWithBlock(clt models.Client, payload iotago.Payload, issuer blockhandler.Account) (iotago.BlockID, error) {
+	signedBlock, err := a.CreateBlock(clt.Client(), payload, issuer)
 	if err != nil {
 		log.Errorf("failed to create block: %s", err)
 
-		return err
+		return iotago.EmptyBlockID, err
 	}
 
 	_, err = clt.PostBlock(signedBlock)
 	if err != nil {
 		log.Errorf("failed to post block: %s", err)
 
-		return err
+		return iotago.EmptyBlockID, err
 	}
 
-	return nil
+	blockID, err := signedBlock.ID()
+	if err != nil {
+		log.Errorf("failed to get block id: %s", err)
+
+		return iotago.EmptyBlockID, err
+	}
+
+	return blockID, nil
 
 }
 
-func (a *AccountWallet) createBlock(issuerResp *apimodels.IssuanceBlockHeaderResponse, congestionResp *apimodels.CongestionResponse, payload iotago.Payload, issuer blockfactory.Account) (*iotago.ProtocolBlock, error) {
-	commitmentID, err := issuerResp.Commitment.ID()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get commitment ID: %w", err)
-	}
-
+func (a *AccountWallet) CreateBlock(clt *nodeclient.Client, payload iotago.Payload, issuer blockhandler.Account) (*iotago.ProtocolBlock, error) {
 	blockBuilder := builder.NewBasicBlockBuilder(a.api)
-	blockBuilder.SlotCommitmentID(commitmentID)
-	blockBuilder.LatestFinalizedSlot(issuerResp.LatestFinalizedSlot)
-	blockBuilder.IssuingTime(time.Now())
-	blockBuilder.StrongParents(issuerResp.StrongParents)
-	fmt.Printf("WeakParents len: %v\n", len(issuerResp.WeakParents))
-	blockBuilder.WeakParents(issuerResp.WeakParents)
-	fmt.Printf("ShallowLikeParents len: %v\n", len(issuerResp.ShallowLikeParents))
-	blockBuilder.ShallowLikeParents(issuerResp.ShallowLikeParents)
+	blockBuilder.RequestNodeBuildData(clt, issuer.ID())
+
 	blockBuilder.Payload(payload)
-	blockBuilder.MaxBurnedMana(congestionResp.ReferenceManaCost)
 	blockBuilder.Sign(issuer.ID(), issuer.PrivateKey())
 
 	blk, err := blockBuilder.Build()
@@ -139,7 +101,7 @@ type faucetParams struct {
 
 type faucet struct {
 	unspentOutput   *models.Output
-	account         blockfactory.Account
+	account         blockhandler.Account
 	genesisHdWallet *mock.HDWallet
 
 	clt models.Client
@@ -151,7 +113,7 @@ func newFaucet(clt models.Client, faucetParams *faucetParams) *faucet {
 	//get Faucet output and amount
 	var faucetAmount iotago.BaseToken
 
-	faucetUnspentOutputID, err := iotago.OutputIDFromHex(faucetParams.latestUsedOutputID)
+	faucetUnspentOutputID, err := iotago.OutputIDFromHexString(faucetParams.latestUsedOutputID)
 	if err != nil {
 		log.Warnf("Cannot parse faucet output id from config: %v", err)
 	}
@@ -174,7 +136,7 @@ func newFaucet(clt models.Client, faucetParams *faucetParams) *faucet {
 
 	f := &faucet{
 		clt:             clt,
-		account:         blockfactory.AccountFromParams(faucetParams.faucetAccountID, faucetParams.faucetPrivateKey),
+		account:         blockhandler.AccountFromParams(faucetParams.faucetAccountID, faucetParams.faucetPrivateKey),
 		genesisHdWallet: mock.NewHDWallet("", genesisSeed, 0),
 	}
 

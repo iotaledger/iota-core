@@ -57,7 +57,7 @@ func CustomConflictSpammingFunc(s *Spammer) {
 				//nolint:gosec
 				time.Sleep(time.Duration(rand.Float64()*100) * time.Millisecond)
 
-				s.PostBlock(tx, clt)
+				s.PrepareAndPostBlock(tx, clt)
 			}(clients[i], tx)
 		}
 		wg.Wait()
@@ -75,14 +75,7 @@ func AccountSpammingFunction(s *Spammer) {
 		s.log.Debugf(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()).Error())
 		s.ErrCounter.CountError(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()))
 	}
-	blk, err := s.EvilWallet.PrepareBlock(tx, clt)
-	if err != nil {
-		s.ErrCounter.CountError(ierrors.Wrap(ErrFailPrepareBlock, err.Error()))
-
-		return
-	}
-
-	s.PostBlock(blk, tx, clt)
+	s.PrepareAndPostBlock(tx, clt)
 
 	s.State.batchPrepared.Add(1)
 	s.EvilWallet.ClearAliases(aliases)

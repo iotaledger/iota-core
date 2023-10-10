@@ -51,7 +51,8 @@ type EvilScenario struct {
 	// if not provided evil wallet will use Reuse wallet if any is available. Accepts only RestrictedReuse wallet type.
 	RestrictedInputWallet *Wallet
 	// used together with scenario ID to create a prefix for distinct batch alias creation
-	BatchesCreated     *atomic.Uint64
+	BatchesCreated *atomic.Uint64
+	// used to determine how many clients are needed to run this scenario, some double spends need more than one client to pass the filter
 	NumOfClientsNeeded int
 }
 
