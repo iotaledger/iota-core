@@ -36,6 +36,19 @@ var Base = []options.Option[snapshotcreator.Options]{
 
 var Docker = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithFilePath("docker-network.snapshot"),
+	snapshotcreator.WithBasicOutputs(
+		/*
+			ed25519 private key:  de52b9964dda96564e9fab362ab16c2669c715c6a2a853bece8a25fc58c599755b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737
+			ed25519 public key:   5b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737
+			ed25519 address:      2f64f9d179991f50542b01e034fa043b195403875b8677efaf196b41c88803d0
+			bech32 address:       rms1qqhkf7w30xv375z59vq7qd86qsa3j4qrsadcval04uvkkswg3qpaqf4hga2
+		*/
+		snapshotcreator.BasicOutputDetails{
+			Address: lo.Return2(iotago.ParseBech32("rms1qqhkf7w30xv375z59vq7qd86qsa3j4qrsadcval04uvkkswg3qpaqf4hga2")),
+			Amount:  5_000_000_000,
+			Mana:    10_000_000,
+		},
+	),
 	snapshotcreator.WithAccounts(
 		snapshotcreator.AccountDetails{ // validator-1
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b"))),
