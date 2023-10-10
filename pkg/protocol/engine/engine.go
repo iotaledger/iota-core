@@ -465,7 +465,7 @@ func (e *Engine) setupBlockRequester() {
 
 	e.Events.EvictionState.SlotEvicted.Hook(e.BlockRequester.EvictUntil)
 
-	wp := e.Workers.CreatePool("BlockMissingAttachFromStorage", 1)
+	wp := e.Workers.CreatePool("BlockMissingAttachFromStorage", workerpool.WithWorkerCount(1))
 	// We need to hook to make sure that the request is created before the block arrives to avoid a race condition
 	// where we try to delete the request again before it is created. Thus, continuing to request forever.
 	e.Events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
