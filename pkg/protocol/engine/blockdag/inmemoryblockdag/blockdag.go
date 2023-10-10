@@ -52,7 +52,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 		b := New(e.Workers.CreateGroup("BlockDAG"), e, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
-			wp := b.workers.CreatePool("BlockDAG.Attach", 2)
+			wp := b.workers.CreatePool("BlockDAG.Attach", workerpool.WithWorkerCount(2))
 
 			e.Events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
@@ -91,7 +91,7 @@ func New(workers *workerpool.Group, apiProvider iotago.APIProvider, evictionStat
 		evictionState:         evictionState,
 		blockCache:            blockCache,
 		workers:               workers,
-		workerPool:            workers.CreatePool("Solidifier", 2),
+		workerPool:            workers.CreatePool("Solidifier", workerpool.WithWorkerCount(2)),
 		errorHandler:          errorHandler,
 		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](int(apiProvider.CurrentAPI().ProtocolParameters().MaxCommittableAge()) * 2),
 	}, opts,

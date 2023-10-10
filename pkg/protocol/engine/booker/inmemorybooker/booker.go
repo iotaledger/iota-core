@@ -81,7 +81,7 @@ func New(workers *workerpool.Group, apiProvider iotago.APIProvider, blockCache *
 		errorHandler: errorHandler,
 	}, opts, func(b *Booker) {
 		b.bookingOrder = causalorder.New(
-			workers.CreatePool("BookingOrder", 2),
+			workers.CreatePool("BookingOrder", workerpool.WithWorkerCount(2)),
 			blockCache.Block,
 			(*blocks.Block).IsBooked,
 			b.book,

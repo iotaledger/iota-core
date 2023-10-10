@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -35,7 +36,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
 		g := New(e.BlockCache, e.SybilProtection.SeatManager(), opts...)
 
-		wp := e.Workers.CreatePool("ThresholdBlockGadget", 1)
+		wp := e.Workers.CreatePool("ThresholdBlockGadget", workerpool.WithWorkerCount(1))
 		e.Events.Booker.BlockBooked.Hook(g.TrackWitnessWeight, event.WithWorkerPool(wp))
 
 		e.Events.BlockGadget.LinkTo(g.events)

@@ -55,7 +55,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				g.seatManager = e.SybilProtection.SeatManager()
 				g.TriggerConstructed()
 
-				e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes, event.WithWorkerPool(g.workers.CreatePool("TrackAndRefresh", 1))) // Using just 1 worker to avoid contention
+				e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes, event.WithWorkerPool(g.workers.CreatePool("TrackAndRefresh", workerpool.WithWorkerCount(1)))) // Using just 1 worker to avoid contention
 			})
 
 			g.storeLastFinalizedSlotFunc = func(slot iotago.SlotIndex) {

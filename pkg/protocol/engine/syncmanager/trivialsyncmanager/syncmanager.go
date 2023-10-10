@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -55,7 +56,7 @@ type SyncManager struct {
 func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.Engine, syncmanager.SyncManager] {
 	return module.Provide(func(e *engine.Engine) syncmanager.SyncManager {
 		s := New(e, e.Storage.Settings().LatestCommitment(), e.Storage.Settings().LatestFinalizedSlot(), opts...)
-		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("SyncManager", 1))
+		asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("SyncManager", workerpool.WithWorkerCount(1)))
 
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
 			if s.updateLastAcceptedBlock(b.ID()) {
