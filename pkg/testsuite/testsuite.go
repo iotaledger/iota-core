@@ -350,7 +350,6 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 		amount = optAmount[0]
 	}
 	if amount > 0 && validator {
-		fmt.Println("add validator ", node.Validator.AccountID)
 		accountDetails := snapshotcreator.AccountDetails{
 			Address:              iotago.Ed25519AddressFromPubKey(node.Validator.PublicKey),
 			Amount:               amount,

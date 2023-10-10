@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -114,9 +113,12 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates *accou
 		return bytes.Compare(candidatePools[i].accountID[:], candidatePools[j].accountID[:]) > 0
 	})
 
-	committee := candidates.SelectCommittee(lo.Map(candidatePools[:s.optsSeatCount], func(poolWithID *poolWithAccountID) iotago.AccountID {
-		return poolWithID.accountID
-	})...)
+	// Create new Accounts instance that only included validators selected to be part of the committee.
+	accounts := account.NewAccounts()
+	for _, candidatePool := range candidatePools[:s.optsSeatCount] {
+		accounts.Set(candidatePool.accountID, candidatePool.pool)
+	}
+	committee := accounts.SelectCommittee(accounts.IDs()...)
 
 	err := s.committeeStore.Store(epoch, committee.Accounts())
 	if err != nil {

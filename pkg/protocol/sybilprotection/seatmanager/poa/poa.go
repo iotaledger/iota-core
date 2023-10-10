@@ -82,9 +82,15 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 var _ seatmanager.SeatManager = &SeatManager{}
 
-func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, _ *account.Accounts) (*account.SeatedAccounts, error) {
+func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, validators *account.Accounts) (*account.SeatedAccounts, error) {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
+
+	// if committee is not set, then set it according to passed validators (used for creating a snapshot)
+	if s.accounts.Size() == 0 || s.committee == nil {
+		s.accounts = validators
+		s.committee = s.accounts.SelectCommittee(validators.IDs()...)
+	}
 
 	err := s.committeeStore.Store(epoch, s.committee.Accounts())
 	if err != nil {

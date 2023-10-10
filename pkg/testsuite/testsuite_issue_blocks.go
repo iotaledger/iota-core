@@ -294,13 +294,21 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 		// preacceptance of nextBlockSlot
 		for _, node := range activeValidators {
 			require.True(t.Testing, node.IsValidator(), "node: %s: is not a validator node", node.Name)
-			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex, node.Name)
-			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			committeeAtBlockSlot, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(nextBlockSlot)
+			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, nextBlockSlot)
+			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
+				blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex, node.Name)
+				tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			}
 		}
 		// acceptance of nextBlockSlot
 		for _, node := range activeValidators {
-			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
-			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			committeeAtBlockSlot, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(nextBlockSlot)
+			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, nextBlockSlot)
+			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
+				blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
+				tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			}
 		}
 		if nextBlockSlot == slot+t.optsMinCommittableAge {
 			break

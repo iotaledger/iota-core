@@ -66,7 +66,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 					o.lastCommittedSlot = latestCommittedSlot
 
 					if o.optsInitialCommittee != nil {
-						if err := o.seatManager.SetCommittee(0, o.optsInitialCommittee); err != nil {
+						if _, err := o.seatManager.RotateCommittee(0, o.optsInitialCommittee); err != nil {
 							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
 						}
 					}
