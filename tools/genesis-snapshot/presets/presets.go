@@ -1,6 +1,8 @@
 package presets
 
 import (
+	"time"
+
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
@@ -94,7 +96,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("docker", "rms"),
 			iotago.WithSupplyOptions(10_000_000_000, 1, 1, 10, 100, 100, 100),
-			iotago.WithTimeProviderOptions(1696908344, 10, 13),
+			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
 			iotago.WithLivenessOptions(30, 30, 7, 14, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
 			iotago.WithCongestionControlOptions(500, 500, 500, 800000, 500000, 100000, 1000, 100),
