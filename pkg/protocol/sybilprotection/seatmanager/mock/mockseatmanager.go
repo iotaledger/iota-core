@@ -10,12 +10,15 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type ManualPOA struct {
-	events    *seatmanager.Events
+	events         *seatmanager.Events
+	committeeStore *epochstore.Store[*account.Accounts]
+
 	accounts  *account.Accounts
 	committee *account.SeatedAccounts
 	online    ds.Set[account.SeatIndex]
@@ -24,12 +27,13 @@ type ManualPOA struct {
 	module.Module
 }
 
-func NewManualPOA() *ManualPOA {
+func NewManualPOA(committeeStore *epochstore.Store[*account.Accounts]) *ManualPOA {
 	m := &ManualPOA{
-		events:   seatmanager.NewEvents(),
-		accounts: account.NewAccounts(),
-		online:   ds.NewSet[account.SeatIndex](),
-		aliases:  shrinkingmap.New[string, iotago.AccountID](),
+		events:         seatmanager.NewEvents(),
+		committeeStore: committeeStore,
+		accounts:       account.NewAccounts(),
+		online:         ds.NewSet[account.SeatIndex](),
+		aliases:        shrinkingmap.New[string, iotago.AccountID](),
 	}
 	m.committee = m.accounts.SelectCommittee()
 
@@ -38,7 +42,7 @@ func NewManualPOA() *ManualPOA {
 
 func NewManualPOAProvider() module.Provider[*engine.Engine, seatmanager.SeatManager] {
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
-		poa := NewManualPOA()
+		poa := NewManualPOA(e.Storage.Committee())
 		e.Events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 			poa.events.BlockProcessed.Trigger(block)
 		})
@@ -55,6 +59,9 @@ func (m *ManualPOA) AddRandomAccount(alias string) iotago.AccountID {
 	m.accounts.Set(id, &account.Pool{}) // We don't care about pools with PoA
 	m.aliases.Set(alias, id)
 	m.committee.Set(account.SeatIndex(m.committee.SeatCount()), id)
+	if err := m.committeeStore.Store(0, m.accounts); err != nil {
+		panic(err)
+	}
 
 	return id
 }
@@ -63,6 +70,9 @@ func (m *ManualPOA) AddAccount(id iotago.AccountID, alias string) iotago.Account
 	m.accounts.Set(id, &account.Pool{}) // We don't care about pools with PoA
 	m.aliases.Set(alias, id)
 	m.committee.Set(account.SeatIndex(m.committee.SeatCount()), id)
+	if err := m.committeeStore.Store(0, m.accounts); err != nil {
+		panic(err)
+	}
 
 	return id
 }
@@ -116,13 +126,20 @@ func (m *ManualPOA) SeatCount() int {
 	return m.committee.SeatCount()
 }
 
-func (m *ManualPOA) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) (*account.SeatedAccounts, error) {
+func (m *ManualPOA) RotateCommittee(epoch iotago.EpochIndex, _ *account.Accounts) (*account.SeatedAccounts, error) {
+	if err := m.committeeStore.Store(epoch, m.accounts); err != nil {
+		panic(err)
+	}
+
 	return m.committee, nil
 }
 
-func (m *ManualPOA) SetCommittee(_ iotago.EpochIndex, validators *account.Accounts) error {
+func (m *ManualPOA) SetCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
 	m.accounts = validators
 	m.committee = m.accounts.SelectCommittee(validators.IDs()...)
+	if err := m.committeeStore.Store(epoch, m.accounts); err != nil {
+		panic(err)
+	}
 
 	return nil
 }

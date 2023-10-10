@@ -58,7 +58,6 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 			return poa
 		})
 	}
-
 	nodeOptions := make(map[string][]options.Option[protocol.Protocol])
 	for _, node := range ts.Nodes() {
 		nodeOptions[node.Name] = []options.Option[protocol.Protocol]{

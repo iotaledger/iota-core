@@ -235,6 +235,7 @@ func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochInde
 
 			return false
 		}
+
 		candidacySlot, _, err := iotago.SlotIndexFromBytes(value)
 		if err != nil {
 			innerErr = err
@@ -257,7 +258,7 @@ func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochInde
 
 	for _, candidateToRollback := range candidatesToRollback {
 		if err = candidates.Delete(candidateToRollback[:]); err != nil {
-			return ierrors.Wrap(innerErr, "failed to iterate through candidates")
+			return ierrors.Wrapf(innerErr, "failed to rollback candidate %s", candidateToRollback)
 		}
 	}
 

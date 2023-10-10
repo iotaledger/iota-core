@@ -350,6 +350,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 		amount = optAmount[0]
 	}
 	if amount > 0 && validator {
+		fmt.Println("add validator ", node.Validator.AccountID)
 		accountDetails := snapshotcreator.AccountDetails{
 			Address:              iotago.Ed25519AddressFromPubKey(node.Validator.PublicKey),
 			Amount:               amount,
@@ -357,11 +358,10 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.Validator.PublicKey)),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
-		}
-		if validator {
-			accountDetails.StakedAmount = accountDetails.Amount
-			accountDetails.StakingEpochEnd = iotago.MaxEpochIndex
-			accountDetails.FixedCost = iotago.Mana(0)
+			StakedAmount:         amount,
+			StakingEpochEnd:      iotago.MaxEpochIndex,
+			FixedCost:            iotago.Mana(0),
+			AccountID:            node.Validator.AccountID,
 		}
 
 		t.optsAccounts = append(t.optsAccounts, accountDetails)

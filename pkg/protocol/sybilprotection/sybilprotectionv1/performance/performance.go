@@ -147,7 +147,7 @@ func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.
 
 	candidates := ds.NewSet[iotago.AccountID]()
 	err = candidateStore.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
-		accountID, _, err := iotago.IdentifierFromBytes(key)
+		accountID, _, err := iotago.AccountIDFromBytes(key)
 		if err != nil {
 			t.errHandler(ierrors.Wrapf(err, "error while  for epoch %d", epoch))
 			// TODO: panic or return an error?
@@ -155,7 +155,7 @@ func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.
 			return false
 		}
 
-		candidates.Add(iotago.AccountID(accountID))
+		candidates.Add(accountID)
 
 		return true
 	})

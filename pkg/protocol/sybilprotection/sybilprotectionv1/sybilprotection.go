@@ -213,7 +213,7 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) (committeeRoot iotago.Identifier, err error) {
 	committee, exists := o.performanceTracker.LoadCommitteeForEpoch(targetCommitteeEpoch)
 	if !exists {
-		return iotago.Identifier{}, ierrors.Wrapf(err, "committee for a finished epoch %d not found", targetCommitteeEpoch)
+		return iotago.Identifier{}, ierrors.Wrapf(err, "committee for an epoch %d not found", targetCommitteeEpoch)
 	}
 
 	committeeTree := ads.NewSet(
@@ -366,7 +366,7 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 			return err
 		}
 		if !exists {
-			o.errHandler(ierrors.Errorf("account of committee candidate does not exist: %s", candidate))
+			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
 		}
 
 		weightedCandidates.Set(candidate, &account.Pool{
@@ -377,6 +377,7 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 
 		return nil
 	}); err != nil {
+		// TODO: panic?
 		o.errHandler(err)
 	}
 
