@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -25,7 +24,7 @@ type TransactionFramework struct {
 	transactions       map[string]*iotago.Transaction
 }
 
-func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, accounts ...snapshotcreator.AccountDetails) *TransactionFramework {
+func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte) *TransactionFramework {
 	tf := &TransactionFramework{
 		apiProvider:        protocol,
 		states:             make(map[string]*utxoledger.Output),
@@ -35,10 +34,12 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, ac
 		wallet: mock.NewHDWallet("genesis", genesisSeed, 0),
 	}
 
-	protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
+	if err := protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
 		tf.states[fmt.Sprintf("Genesis:%d", output.OutputID().Index())] = output
 		return true
-	})
+	}); err != nil {
+		panic(err)
+	}
 
 	if len(tf.states) == 0 {
 		panic("no genesis outputs found")
