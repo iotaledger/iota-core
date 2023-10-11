@@ -4,12 +4,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/accountwallet"
+	evillogger "github.com/iotaledger/iota-core/tools/evil-spammer/logger"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -45,6 +49,7 @@ type EvilWallet struct {
 	aliasManager  *AliasManager
 
 	optsClientURLs []string
+	log            *logger.Logger
 }
 
 // NewEvilWallet creates an EvilWallet instance.
@@ -53,10 +58,11 @@ func NewEvilWallet(opts ...options.Option[EvilWallet]) *EvilWallet {
 		wallets:        NewWallets(),
 		aliasManager:   NewAliasManager(),
 		optsClientURLs: defaultClientsURLs,
+		log:            evillogger.New("EvilWallet"),
 	}, opts, func(w *EvilWallet) {
 		connector := models.NewWebClients(w.optsClientURLs)
 		w.connector = connector
-		w.outputManager = NewOutputManager(connector, w.wallets)
+		w.outputManager = NewOutputManager(connector, w.wallets, w.log)
 
 	})
 }
@@ -142,6 +148,8 @@ func (e *EvilWallet) RequestFundsFromFaucet(options ...FaucetRequestOption) (ini
 		e.aliasManager.AddInputAlias(output, buildOptions.outputAliasName)
 	}
 
+	log.Debug("Funds requested succesfully")
+
 	return
 }
 
@@ -179,7 +187,7 @@ func (e *EvilWallet) RequestFreshBigFaucetWallet() error {
 
 	txIDs := make(iotago.TransactionIDs, 0)
 	// TODO: calculate the exact number of required funds so we don't run out after a while
-	for i := 0; i < 300; i++ {
+	for i := 0; i < 1; i++ {
 		txID, err := e.requestAndSplitFaucetFunds(initWallet, receiveWallet)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to request big funds from faucet")
@@ -217,6 +225,8 @@ func (e *EvilWallet) requestAndSplitFaucetFunds(initWallet, receiveWallet *Walle
 	if err != nil {
 		return iotago.TransactionID{}, err
 	}
+
+	e.log.Debugf("Faucet funds received, continue spliting output: %s", splitOutput.OutputID.ToHex())
 	// first split 1 to FaucetRequestSplitNumber outputs
 	return e.splitOutputs(splitOutput, initWallet, receiveWallet)
 }
@@ -259,7 +269,11 @@ func (e *EvilWallet) splitOutputs(splitOutput *models.Output, inputWallet, outpu
 		return iotago.TransactionID{}, err
 	}
 
-	return lo.PanicOnErr(signedTx.Transaction.ID()), nil
+	txID := lo.PanicOnErr(signedTx.Transaction.ID())
+
+	e.log.Debugf("Splitting output %s finished with tx: %s", splitOutput.OutputID.ToHex(), txID.ToHex())
+
+	return txID, nil
 }
 
 func (e *EvilWallet) handleInputOutputDuringSplitOutputs(splitOutput *models.Output, splitNumber int, receiveWallet *Wallet) (input *models.Output, outputs []*OutputOption) {

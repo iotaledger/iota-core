@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -26,17 +27,20 @@ type OutputManager struct {
 	// stores solid outputs per node
 	issuerSolidOutIDMap map[string]map[iotago.OutputID]types.Empty
 
+	log *logger.Logger
+
 	syncutils.RWMutex
 }
 
 // NewOutputManager creates an OutputManager instance.
-func NewOutputManager(connector models.Connector, wallets *Wallets) *OutputManager {
+func NewOutputManager(connector models.Connector, wallets *Wallets, log *logger.Logger) *OutputManager {
 	return &OutputManager{
 		connector:           connector,
 		wallets:             wallets,
 		outputIDWalletMap:   make(map[string]*Wallet),
 		outputIDAddrMap:     make(map[string]string),
 		issuerSolidOutIDMap: make(map[string]map[iotago.OutputID]types.Empty),
+		log:                 log,
 	}
 }
 
@@ -271,6 +275,8 @@ func (o *OutputManager) AwaitTransactionsConfirmation(txIDs ...iotago.Transactio
 	wg := sync.WaitGroup{}
 	semaphore := make(chan bool, 1)
 
+	o.log.Debugf("Awaiting confirmation of %d transactions", len(txIDs))
+
 	for _, txID := range txIDs {
 		wg.Add(1)
 		go func(txID iotago.TransactionID) {
@@ -303,6 +309,8 @@ func (o *OutputManager) AwaitTransactionToBeAccepted(txID iotago.TransactionID, 
 	if !accepted {
 		return ierrors.Errorf("transaction %s not accepted in time", txID)
 	}
+
+	o.log.Debugf("Transaction %s accepted", txID)
 
 	return nil
 }
