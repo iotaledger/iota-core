@@ -35,7 +35,7 @@ func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Optio
 
 func WithProtocolParametersOptions(protocolParameterOptions ...options.Option[iotago.V3ProtocolParameters]) options.Option[TestSuite] {
 	return func(t *TestSuite) {
-		t.optsProtocolParameterOptions = protocolParameterOptions
+		t.ProtocolParameterOptions = protocolParameterOptions
 	}
 }
 
