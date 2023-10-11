@@ -243,7 +243,7 @@ func (l *Ledger) outputFromState(state mempool.State) *utxoledger.Output {
 			if exists {
 				earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
 
-				return utxoledger.CreateOutput(l.apiProvider, output.OutputID(), earliestAttachment, earliestAttachment.Slot(), output.Output())
+				return output.CopyWithBlockIDAndSlotBooked(earliestAttachment, earliestAttachment.Slot())
 			}
 		}
 
@@ -254,12 +254,13 @@ func (l *Ledger) outputFromState(state mempool.State) *utxoledger.Output {
 }
 
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
-	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
-	if err != nil {
+	if output, spent, err := l.OutputOrSpent(outputID); err != nil {
 		return nil, err
+	} else if spent != nil {
+		return spent.Output(), nil
+	} else {
+		return output, nil
 	}
-
-	return l.outputFromState(stateWithMetadata.State()), nil
 }
 
 func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *utxoledger.Spent, error) {
@@ -590,7 +591,7 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 	return createdAccounts, consumedAccounts, destroyedAccounts, nil
 }
 
-func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spends utxoledger.Spents, outputs utxoledger.Outputs, accountDiffs map[iotago.AccountID]*model.AccountDiff, err error) {
+func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spents utxoledger.Spents, outputs utxoledger.Outputs, accountDiffs map[iotago.AccountID]*model.AccountDiff, err error) {
 	accountDiffs = make(map[iotago.AccountID]*model.AccountDiff)
 
 	stateDiff.ExecutedTransactions().ForEach(func(txID iotago.TransactionID, txWithMeta mempool.TransactionMetadata) bool {
@@ -610,14 +611,13 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 		{
 			// input side
 			for _, inputRef := range inputRefs {
-				inputState, outputErr := l.Output(inputRef.OutputID())
-				if outputErr != nil {
+				stateWithMetadata, stateError := l.memPool.StateMetadata(inputRef)
+				if stateError != nil {
 					err = ierrors.Errorf("failed to retrieve outputs of %s: %w", txID, errInput)
 					return false
 				}
-
-				spend := utxoledger.NewSpent(inputState, txWithMeta.ID(), stateDiff.Slot())
-				spends = append(spends, spend)
+				spent := utxoledger.NewSpent(l.outputFromState(stateWithMetadata.State()), txWithMeta.ID(), stateDiff.Slot())
+				spents = append(spents, spent)
 			}
 
 			// output side
@@ -628,7 +628,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 					return err
 				}
 
-				output := utxoledger.CreateOutput(l.apiProvider, typedOutput.OutputID(), txWithMeta.EarliestIncludedAttachment(), stateDiff.Slot(), typedOutput.Output())
+				output := typedOutput.CopyWithBlockIDAndSlotBooked(txWithMeta.EarliestIncludedAttachment(), stateDiff.Slot())
 				outputs = append(outputs, output)
 
 				return nil
@@ -670,7 +670,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 		return true
 	})
 
-	return spends, outputs, accountDiffs, nil
+	return spents, outputs, accountDiffs, nil
 }
 
 func (l *Ledger) resolveAccountOutput(accountID iotago.AccountID, slot iotago.SlotIndex) (*utxoledger.Output, error) {
