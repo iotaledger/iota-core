@@ -25,10 +25,10 @@ const (
 	FaucetRequestSplitNumber                  = 100
 	faucetTokensPerRequest   iotago.BaseToken = 1_000_000
 
-	waitForConfirmation   = 150 * time.Second
-	waitForSolidification = 150 * time.Second
+	waitForConfirmation   = 15 * time.Second
+	waitForSolidification = 10 * time.Second
 
-	awaitConfirmationSleep   = 3 * time.Second
+	awaitConfirmationSleep   = 2 * time.Second
 	awaitSolidificationSleep = time.Millisecond * 500
 )
 
@@ -241,7 +241,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *models.Output
 	}
 
 	// update wallet with newly created output
-	e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, output.OutputID, output.OutputStruct)
+	e.outputManager.createOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, output.OutputID, output.OutputStruct)
 
 	return output, nil
 }

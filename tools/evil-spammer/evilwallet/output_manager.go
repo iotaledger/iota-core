@@ -13,8 +13,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-var (
-	awaitOutputToBeConfirmed = 150 * time.Second
+const (
+	awaitOutputToBeConfirmed = 10 * time.Second
 )
 
 // OutputManager keeps track of the output statuses.
@@ -126,9 +126,9 @@ func (o *OutputManager) Track(outputIDs ...iotago.OutputID) (allConfirmed bool) 
 	return !unconfirmedOutputFound.Load()
 }
 
-// CreateOutputFromAddress creates output, retrieves outputID, and adds it to the wallet.
+// createOutputFromAddress creates output, retrieves outputID, and adds it to the wallet.
 // Provided address should be generated from provided wallet. Considers only first output found on address.
-func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519Address, balance iotago.BaseToken, outputID iotago.OutputID, outputStruct iotago.Output) *models.Output {
+func (o *OutputManager) createOutputFromAddress(w *Wallet, addr *iotago.Ed25519Address, balance iotago.BaseToken, outputID iotago.OutputID, outputStruct iotago.Output) *models.Output {
 	index := w.AddrIndexMap(addr.String())
 	out := &models.Output{
 		Address:      addr,
@@ -300,8 +300,9 @@ func (o *OutputManager) AwaitTransactionToBeAccepted(txID iotago.TransactionID, 
 	clt := o.connector.GetClient()
 	var accepted bool
 	for ; time.Since(s) < waitFor; time.Sleep(awaitConfirmationSleep) {
-		// TODO: need to change to pending for now
-		if confirmationState := clt.GetTransactionConfirmationState(txID); confirmationState == "confirmed" || confirmationState == "finalized" {
+		confirmationState := clt.GetTransactionConfirmationState(txID)
+		o.log.Debugf("Tx %s confirmationState: %s", txID.ToHex(), confirmationState)
+		if confirmationState == "confirmed" || confirmationState == "finalized" {
 			accepted = true
 			break
 		}
