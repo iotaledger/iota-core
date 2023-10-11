@@ -230,6 +230,9 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *models.Output
 		return nil, ierrors.Wrap(err, "failed to request funds from faucet")
 	}
 
+	// update wallet with newly created output
+	e.outputManager.CreateOutputFromAddress(wallet, receiveAddr, faucetTokensPerRequest, output.OutputID, output.OutputStruct)
+
 	return output, nil
 }
 
