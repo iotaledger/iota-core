@@ -149,6 +149,8 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 
 func (n *Node) hookEvents() {
 	n.Protocol.HeaviestAttestedChain.OnUpdate(func(prevHeaviestAttestedChain, heaviestAttestedChain *protocol.Chain) {
+		fmt.Println(n.Name, " > HeaviestAttestedChain.OnUpdate", heaviestAttestedChain)
+
 		if prevHeaviestAttestedChain != nil {
 			n.forkDetectedCount.Add(1)
 
@@ -177,8 +179,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	})
 }
 
-func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
-	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngine.Get() != instance, "Candidate", "Main"), instance.Name()[:8])
+func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engine.Engine, engineName string) {
 	events := instance.Events
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
@@ -298,7 +299,7 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 			require.NoError(n.Testing, err)
 		}
 
-		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks, roots, attestationBlockIDs)
+		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s Accepted Blocks: %s\n %s\n Attestations: %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks, roots, attestationBlockIDs)
 	})
 
 	events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
@@ -391,6 +392,12 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 			fmt.Printf("%s > [%s] MemPool.TransactionPending: %s\n", n.Name, engineName, transactionMetadata.ID())
 		})
 	})
+}
+
+func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
+	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngine.Get() != instance, "Candidate", "Main"), instance.Name()[:8])
+
+	n.attachEngineLogsWithName(failOnBlockFiltered, instance, engineName)
 }
 
 func (n *Node) Wait() {

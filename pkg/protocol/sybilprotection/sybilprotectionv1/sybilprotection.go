@@ -136,7 +136,6 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 			}
 
 			committee.SetReused()
-			fmt.Println("reuse committee", currentEpoch, "stake", committee.TotalValidatorStake())
 			o.seatManager.SetCommittee(nextEpoch, committee)
 
 			o.events.CommitteeSelected.Trigger(committee, nextEpoch)

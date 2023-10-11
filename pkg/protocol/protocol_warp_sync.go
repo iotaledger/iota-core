@@ -57,15 +57,15 @@ func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 	})
 }
 
-func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDs iotago.BlockIDs, roots *iotago.Roots, to peer.ID) {
+func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDs iotago.BlockIDs, roots *iotago.Roots, transactionIDs iotago.TransactionIDs, to peer.ID) {
 	w.workerPool.Submit(func() {
-		w.protocol.Network.SendWarpSyncResponse(commitment.ID(), blockIDs, roots.TangleProof(), to)
+		w.protocol.Network.SendWarpSyncResponse(commitment.ID(), blockIDs, roots.TangleProof(), transactionIDs, roots.MutationProof(), to)
 
 		w.LogTrace("sent response", "commitment", commitment.LogName(), "toPeer", to)
 	})
 }
 
-func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
+func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	w.workerPool.Submit(func() {
 		commitment, err := w.protocol.Commitment(commitmentID)
 		if err != nil {
@@ -164,7 +164,14 @@ func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from
 			return
 		}
 
-		w.SendResponse(commitment, blockIDs, roots, from)
+		transactionIDs, err := committedSlot.TransactionIDs()
+		if err != nil {
+			w.LogTrace("failed to get transaction ids for warp-sync request", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from, "err", err)
+
+			return
+		}
+
+		w.SendResponse(commitment, blockIDs, roots, transactionIDs, from)
 	})
 }
 

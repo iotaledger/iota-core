@@ -53,7 +53,7 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 
 	var lastUpdateTimer *time.Timer
 	coolDownDuration := time.Duration(req.GetCooldownInMilliseconds()) * time.Millisecond
-	wp := workerpool.New("ListenToNodeStatus", workerCount)
+	wp := workerpool.New("ListenToNodeStatus", workerpool.WithWorkerCount(workerCount))
 
 	onUpdate := func(status *syncmanager.SyncStatus) {
 		if lastUpdateTimer != nil {

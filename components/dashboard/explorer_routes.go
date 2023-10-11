@@ -118,7 +118,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 		SolidificationTimestamp: 0,
 		IssuanceTimestamp:       iotaBlk.IssuingTime.Unix(),
 		SequenceNumber:          0,
-		IssuerID:                iotaBlk.IssuerID.String(),
+		IssuerID:                iotaBlk.IssuerID.ToHex(),
 		Signature:               hexutil.EncodeHex(sigBytes),
 		StrongParents:           iotaBlk.Block.StrongParentIDs().ToHex(),
 		WeakParents:             iotaBlk.Block.WeakParentIDs().ToHex(),
@@ -164,16 +164,16 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 		t.Scheduled = cachedBlock.IsScheduled()
 		t.ObjectivelyInvalid = cachedBlock.IsInvalid()
 		t.StrongChildren = lo.Map(cachedBlock.StrongChildren(), func(childBlock *blocks.Block) string {
-			return childBlock.ID().String()
+			return childBlock.ID().ToHex()
 		})
 		t.WeakChildren = lo.Map(cachedBlock.WeakChildren(), func(childBlock *blocks.Block) string {
-			return childBlock.ID().String()
+			return childBlock.ID().ToHex()
 		})
 		t.LikedInsteadChildren = lo.Map(cachedBlock.ShallowLikeChildren(), func(childBlock *blocks.Block) string {
-			return childBlock.ID().String()
+			return childBlock.ID().ToHex()
 		})
 		t.ConflictIDs = lo.Map(cachedBlock.ConflictIDs().ToSlice(), func(conflictID iotago.TransactionID) string {
-			return conflictID.String()
+			return conflictID.ToHex()
 		})
 	} else {
 		switch metadata.BlockState {

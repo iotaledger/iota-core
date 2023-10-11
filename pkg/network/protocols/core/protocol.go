@@ -134,7 +134,7 @@ func (p *Protocol) OnAttestationsRequestReceived(callback func(commitmentID iota
 	return p.Events.AttestationsRequestReceived.Hook(callback).Unhook
 }
 
-func (p *Protocol) OnWarpSyncResponseReceived(callback func(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], src peer.ID)) (unsubscribe func()) {
+func (p *Protocol) OnWarpSyncResponseReceived(callback func(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], src peer.ID)) (unsubscribe func()) {
 	return p.Events.WarpSyncResponseReceived.Hook(callback).Unhook
 }
 
@@ -180,7 +180,7 @@ func (p *Protocol) handlePacket(nbr peer.ID, packet proto.Message) (err error) {
 	case *nwmodels.Packet_WarpSyncRequest:
 		p.handleWarpSyncRequest(packetBody.WarpSyncRequest.GetCommitmentId(), nbr)
 	case *nwmodels.Packet_WarpSyncResponse:
-		p.handleWarpSyncResponse(packetBody.WarpSyncResponse.GetCommitmentId(), packetBody.WarpSyncResponse.GetBlockIds(), packetBody.WarpSyncResponse.GetMerkleProof(), nbr)
+		p.handleWarpSyncResponse(packetBody.WarpSyncResponse.GetCommitmentId(), packetBody.WarpSyncResponse.GetBlockIds(), packetBody.WarpSyncResponse.GetTangleMerkleProof(), packetBody.WarpSyncResponse.GetTransactionIds(), packetBody.WarpSyncResponse.GetMutationsMerkleProof(), nbr)
 	default:
 		return ierrors.Errorf("unsupported packet; packet=%+v, packetBody=%T-%+v", packet, packetBody, packetBody)
 	}

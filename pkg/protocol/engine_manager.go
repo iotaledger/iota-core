@@ -36,7 +36,7 @@ func NewEngineManager(protocol *Protocol) *EngineManager {
 		MainEngine:     reactive.NewVariable[*engine.Engine](),
 		ReactiveModule: protocol.NewReactiveSubModule("Engines"),
 		protocol:       protocol,
-		worker:         protocol.Workers.CreatePool("Engines", 1),
+		worker:         protocol.Workers.CreatePool("Engines", workerpool.WithWorkerCount(1)),
 		directory:      utils.NewDirectory(protocol.Options.BaseDirectory),
 	}
 
@@ -50,7 +50,7 @@ func NewEngineManager(protocol *Protocol) *EngineManager {
 		e.Shutdown.OnTrigger(func() {
 			unsubscribe()
 
-			e.worker.Shutdown(true).ShutdownComplete.Wait()
+			e.worker.Shutdown().ShutdownComplete.Wait()
 
 			e.Stopped.Trigger()
 		})

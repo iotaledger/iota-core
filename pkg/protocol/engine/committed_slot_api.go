@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -72,4 +73,27 @@ func (c *CommittedSlotAPI) BlockIDs() (blockIDs iotago.BlockIDs, err error) {
 	}
 
 	return blockIDs, nil
+}
+
+func (c *CommittedSlotAPI) TransactionIDs() (iotago.TransactionIDs, error) {
+	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
+		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
+	}
+
+	store, err := c.engine.Storage.Mutations(c.CommitmentID.Slot())
+	if err != nil {
+		return nil, ierrors.Errorf("failed to get mutations of slot index %d", c.CommitmentID.Slot())
+	}
+
+	set := ads.NewSet(store, iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
+	transactionIDs := make(iotago.TransactionIDs, 0, set.Size())
+
+	if err = set.Stream(func(txID iotago.TransactionID) error {
+		transactionIDs = append(transactionIDs, txID)
+		return nil
+	}); err != nil {
+		return nil, ierrors.Wrapf(err, "failed to iterate over mutations of slot %d", c.CommitmentID.Slot())
+	}
+
+	return transactionIDs, nil
 }

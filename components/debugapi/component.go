@@ -112,7 +112,7 @@ func configure() error {
 			}
 		}
 
-	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", 1)))
+	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", workerpool.WithWorkerCount(1))))
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
 		if err := storeTransactionsPerSlot(scd); err != nil {

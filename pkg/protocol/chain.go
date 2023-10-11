@@ -45,6 +45,7 @@ func NewChain(logger log.Logger) *Chain {
 		LatestCommitment:         reactive.NewVariable[*Commitment](),
 		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
 		LatestVerifiedCommitment: reactive.NewVariable[*Commitment](),
+		AttestedWeight:           reactive.NewVariable[uint64](),
 		VerifyAttestations:       reactive.NewVariable[bool](),
 		IsEvicted:                reactive.NewEvent(),
 
@@ -54,8 +55,13 @@ func NewChain(logger log.Logger) *Chain {
 		SpawnedEngine: reactive.NewVariable[*engine.Engine](),
 	}
 
+	c.LatestAttestedCommitment.OnUpdateWithContext(func(_, latestAttestedCommitment *Commitment, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
+		withinContext(func() (unsubscribe func()) {
+			return latestAttestedCommitment.CumulativeAttestedWeight.OnUpdate(func(_, newValue uint64) { c.AttestedWeight.Set(newValue) })
+		})
+	})
+
 	c.ClaimedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.LatestCommitment)
-	c.AttestedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeAttestedWeight, c.LatestAttestedCommitment)
 	c.VerifiedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.LatestVerifiedCommitment)
 
 	c.WarpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {

@@ -68,7 +68,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
 
-			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, l.apiProvider, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, e.Workers.CreateGroup("MemPool"), l.conflictDAG, l.apiProvider, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput, l.accountsLedger.Account)
@@ -148,7 +148,10 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 		panic(ierrors.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex+1, slot))
 	}
 
-	stateDiff := l.memPool.StateDiff(slot)
+	stateDiff, err := l.memPool.StateDiff(slot)
+	if err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to retrieve state diff for slot %d: %w", slot, err)
+	}
 
 	// collect outputs and allotments from the "uncompacted" stateDiff
 	// outputs need to be processed in the "uncompacted" version of the state diff, as we need to be able to store
@@ -231,51 +234,58 @@ func (l *Ledger) PastAccounts(accountIDs iotago.AccountIDs, targetIndex iotago.S
 	return l.accountsLedger.PastAccounts(accountIDs, targetIndex)
 }
 
+func (l *Ledger) outputFromState(state mempool.State) *utxoledger.Output {
+	switch output := state.(type) {
+	case *utxoledger.Output:
+		// If this output was not booked yet, then it came directly from the mempool, so we need to set the earliest attachment and the booking slot
+		if output.SlotBooked() == 0 {
+			txWithMetadata, exists := l.memPool.TransactionMetadata(output.OutputID().TransactionID())
+			if exists {
+				earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
+
+				return utxoledger.CreateOutput(l.apiProvider, output.OutputID(), earliestAttachment, earliestAttachment.Slot(), output.Output())
+			}
+		}
+
+		return output
+	default:
+		panic("unexpected State type")
+	}
+}
+
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
 	if err != nil {
 		return nil, err
 	}
 
-	switch castState := stateWithMetadata.State().(type) {
-	case *utxoledger.Output:
-		if castState.SlotBooked() == 0 {
-			txWithMetadata, exists := l.memPool.TransactionMetadata(outputID.TransactionID())
-			if exists {
-				earliestAttachment := txWithMetadata.EarliestIncludedAttachment()
-
-				return utxoledger.CreateOutput(l.apiProvider, castState.OutputID(), earliestAttachment, earliestAttachment.Slot(), castState.Output()), nil
-			}
-		}
-
-		return castState, nil
-	default:
-		panic("unexpected State type")
-	}
+	return l.outputFromState(stateWithMetadata.State()), nil
 }
 
 func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *utxoledger.Spent, error) {
-	l.utxoLedger.ReadLockLedger()
-
-	unspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(outputID)
+	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
 	if err != nil {
-		l.utxoLedger.ReadUnlockLedger()
+		if ierrors.Is(iotago.ErrInputAlreadySpent, err) {
+			l.utxoLedger.ReadLockLedger()
+			defer l.utxoLedger.ReadUnlockLedger()
+
+			spent, err := l.utxoLedger.ReadSpentForOutputIDWithoutLocking(outputID)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			return nil, spent, err
+		}
+
 		return nil, nil, err
 	}
 
-	if !unspent {
-		spent, err := l.utxoLedger.ReadSpentForOutputIDWithoutLocking(outputID)
-		l.utxoLedger.ReadUnlockLedger()
-
-		return nil, spent, err
+	spender, spent := stateWithMetadata.AcceptedSpender()
+	if spent {
+		return nil, utxoledger.NewSpent(l.outputFromState(stateWithMetadata.State()), spender.ID(), spender.ID().Slot()), nil
 	}
 
-	l.utxoLedger.ReadUnlockLedger()
-
-	// l.Output might read-lock the ledger again if the mem-pool needs to resolve the output, so we cannot be in a locked state
-	output, err := l.Output(outputID)
-
-	return output, nil, err
+	return l.outputFromState(stateWithMetadata.State()), nil, nil
 }
 
 func (l *Ledger) ForEachUnspentOutput(consumer func(output *utxoledger.Output) bool) error {
