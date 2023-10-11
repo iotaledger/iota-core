@@ -44,8 +44,7 @@ github.com/iotaledger/hive.go/kvstore v0.0.0-20231010133617-cdbd5387e2af h1:OY1j
 github.com/iotaledger/hive.go/kvstore v0.0.0-20231010133617-cdbd5387e2af/go.mod h1:DeP4JF4N995LteD0+/o7NsW1bO5IXURIJ27A69Ca5+Y=
 github.com/iotaledger/hive.go/lo v0.0.0-20231010133617-cdbd5387e2af h1:Td8RUNAWcxU9N8pKiIemaaf16QSHld8BhiGPYyiFVWA=
 github.com/iotaledger/hive.go/lo v0.0.0-20231010133617-cdbd5387e2af/go.mod h1:4oKCdMEhHMLCudBz79kuvJmgSY/DhfVePNIyJhew/80=
-github.com/iotaledger/hive.go/log v0.0.0-20231009161204-3b7699bf3ba2 h1:rrhdEp/FxX4I/NPNLuRD4nkddBoXHPD3XzK2eGh79NQ=
-github.com/iotaledger/hive.go/log v0.0.0-20231009161204-3b7699bf3ba2/go.mod h1:UF7PzlWdZ2H0Hkxrt4AgJmNVeMXUJzw4RwbHpib1DB0=
+github.com/iotaledger/hive.go/log v0.0.0-20231010133617-cdbd5387e2af h1:t5a+O3WDM7rK/jXDvBwwlKXK7JHCxP2jR9eh03RaIuo=
 github.com/iotaledger/hive.go/log v0.0.0-20231010133617-cdbd5387e2af/go.mod h1:UF7PzlWdZ2H0Hkxrt4AgJmNVeMXUJzw4RwbHpib1DB0=
 github.com/iotaledger/hive.go/runtime v0.0.0-20231010133617-cdbd5387e2af h1:0QOowMPuOTihsjmd+RJnv6rU2SZeKYb29R4yCCElk24=
 github.com/iotaledger/hive.go/runtime v0.0.0-20231010133617-cdbd5387e2af/go.mod h1:dJeQBt3UjsoRSm2yKiw80vDDgPBtIkun7N16ETmVhl4=

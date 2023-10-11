@@ -43,8 +43,8 @@ type TestSuite struct {
 	snapshotPath string
 	blocks       *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 
-	API                          iotago.API
-	optsProtocolParameterOptions []options.Option[iotago.V3ProtocolParameters]
+	API                      iotago.API
+	ProtocolParameterOptions []options.Option[iotago.V3ProtocolParameters]
 
 	optsAccounts        []snapshotcreator.AccountDetails
 	optsSnapshotOptions []options.Option[snapshotcreator.Options]
@@ -116,7 +116,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			),
 		}
 
-		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(append(defaultProtocolParameters, t.optsProtocolParameterOptions...)...))
+		t.ProtocolParameterOptions = append(defaultProtocolParameters, t.ProtocolParameterOptions...)
+		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(t.ProtocolParameterOptions...))
 
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(), time.Unix(t.API.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
