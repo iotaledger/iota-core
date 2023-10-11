@@ -28,15 +28,6 @@ services:
     networks:
       - iota-core
 
-  inx-indexer:
-    image: iotaledger/inx-indexer:2.0-alpha
-    stop_grace_period: 1m
-    command:
-      - "--inx.address=validator-1:9029"
-      - "--restAPI.bindAddress=inx-indexer:9091"
-    networks:
-      - iota-core
-
   validator-2:
     image: docker-network-validator-1:latest
     stop_grace_period: 1m
@@ -57,7 +48,6 @@ services:
       - "8071:8081/tcp" # dashboard
       - "6071:6061/tcp" # pprof
       - "9029:9029/tcp" # inx
-
     networks:
       - iota-core
 
@@ -121,7 +111,57 @@ services:
       - "8031:8081/tcp" # dashboard
       - "6031:6061/tcp" # pprof
       - "9039:9029/tcp" # inx
+    networks:
+      - iota-core
 
+  inx-indexer:
+    image: iotaledger/inx-indexer:2.0-alpha
+    stop_grace_period: 1m
+    depends_on:
+      validator-1:
+        condition: service_started
+    command:
+      - "--inx.address=validator-1:9029"
+      - "--restAPI.bindAddress=inx-indexer:9091"
+    networks:
+      - iota-core
+
+  inx-blockissuer:
+    image: iotaledger/inx-blockissuer:1.0-alpha
+    stop_grace_period: 1m
+    depends_on:
+      validator-1:
+        condition: service_started
+      inx-indexer:
+        condition: service_started
+    restart: on-failure
+    environment:
+      - "BLOCKISSUER_PRV_KEY=432c624ca3260f910df35008d5c740593b222f1e196e6cdb8cd1ad080f0d4e33997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270"
+    command:
+      - "--inx.address=validator-1:9029"
+      - "--restAPI.bindAddress=inx-blockissuer:9086"
+      - "--blockIssuer.accountAddress=rms1prkursay9fs2qjmfctamd6yxg9x8r3ry47786x0mvwek4qr9xd9d5c6gkun"
+    networks:
+      - iota-core
+
+  inx-faucet:
+    image: iotaledger/inx-faucet:2.0-alpha
+    stop_grace_period: 1m
+    depends_on:
+      validator-1:
+        condition: service_started
+      inx-indexer:
+        condition: service_started
+      inx-blockissuer:
+        condition: service_started
+    restart: on-failure
+    environment:
+      - "FAUCET_PRV_KEY=de52b9964dda96564e9fab362ab16c2669c715c6a2a853bece8a25fc58c599755b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737"
+    command:
+      - "--inx.address=validator-1:9029"
+      - "--faucet.bindAddress=inx-faucet:8091"
+    ports:
+      - "8088:8091/tcp" # faucet frontend
     networks:
       - iota-core
 

@@ -38,6 +38,8 @@ var Docker = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithFilePath("docker-network.snapshot"),
 	snapshotcreator.WithBasicOutputs(
 		/*
+			inx-faucet
+
 			ed25519 private key:  de52b9964dda96564e9fab362ab16c2669c715c6a2a853bece8a25fc58c599755b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737
 			ed25519 public key:   5b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737
 			ed25519 address:      2f64f9d179991f50542b01e034fa043b195403875b8677efaf196b41c88803d0
@@ -86,11 +88,19 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			StakedAmount:         testsuite.MinValidatorAccountAmount,
 			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
 		},
-		snapshotcreator.AccountDetails{ // inx-blockissuer
-			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xa54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39"))),
-			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xa54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39"))),
+		snapshotcreator.AccountDetails{
+			/*
+				inx-blockissuer
+
+				ed25519 private key:  432c624ca3260f910df35008d5c740593b222f1e196e6cdb8cd1ad080f0d4e33997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270
+				ed25519 public key:   997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270
+				ed25519 address:      edc1c3a42a60a04b69c2fbb6e886414c71c464afbc7d19fb63b36a8065334ada
+				bech32 address:       rms1prkursay9fs2qjmfctamd6yxg9x8r3ry47786x0mvwek4qr9xd9d5c6gkun
+			*/
+			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270"))),
+			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270"))),
 			Amount:               testsuite.MinIssuerAccountAmount,
-			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0xa54fafa44a88e4a6a37796526ea884f613a24d84337871226eb6360f022d8b39")))),
+			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
 			Mana:                 iotago.Mana(testsuite.MinIssuerAccountAmount),
