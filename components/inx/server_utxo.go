@@ -18,10 +18,9 @@ func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
 	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
 	l := &inx.LedgerOutput{
-		OutputId:    inx.NewOutputId(o.OutputID()),
-		BlockId:     inx.NewBlockId(o.BlockID()),
-		SlotBooked:  uint64(o.SlotBooked()),
-		SlotCreated: uint64(o.SlotCreated()),
+		OutputId:   inx.NewOutputId(o.OutputID()),
+		BlockId:    inx.NewBlockId(o.BlockID()),
+		SlotBooked: uint32(o.SlotBooked()),
 		Output: &inx.RawOutput{
 			Data: o.Bytes(),
 		},
@@ -48,11 +47,11 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 	l := &inx.LedgerSpent{
 		Output:             output,
 		TransactionIdSpent: inx.NewTransactionId(s.TransactionIDSpent()),
-		SlotSpent:          uint64(s.SlotIndexSpent()),
+		SlotSpent:          uint32(s.SlotSpent()),
 	}
 
 	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
-	spentSlotIndex := s.SlotIndexSpent()
+	spentSlotIndex := s.SlotSpent()
 	if spentSlotIndex <= latestCommitment.Slot() {
 		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
 		if err != nil {
@@ -64,11 +63,11 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 	return l, nil
 }
 
-func NewLedgerUpdateBatchBegin(index iotago.SlotIndex, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
+func NewLedgerUpdateBatchBegin(slot iotago.SlotIndex, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
 	return &inx.LedgerUpdate{
 		Op: &inx.LedgerUpdate_BatchMarker{
 			BatchMarker: &inx.LedgerUpdate_Marker{
-				Slot:          uint64(index),
+				Slot:          uint32(slot),
 				MarkerType:    inx.LedgerUpdate_Marker_BEGIN,
 				CreatedCount:  uint32(newOutputsCount),
 				ConsumedCount: uint32(newSpentsCount),
@@ -77,11 +76,11 @@ func NewLedgerUpdateBatchBegin(index iotago.SlotIndex, newOutputsCount int, newS
 	}
 }
 
-func NewLedgerUpdateBatchEnd(index iotago.SlotIndex, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
+func NewLedgerUpdateBatchEnd(slot iotago.SlotIndex, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
 	return &inx.LedgerUpdate{
 		Op: &inx.LedgerUpdate_BatchMarker{
 			BatchMarker: &inx.LedgerUpdate_Marker{
-				Slot:          uint64(index),
+				Slot:          uint32(slot),
 				MarkerType:    inx.LedgerUpdate_Marker_END,
 				CreatedCount:  uint32(newOutputsCount),
 				ConsumedCount: uint32(newSpentsCount),
