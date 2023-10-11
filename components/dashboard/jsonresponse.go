@@ -118,14 +118,13 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 
 // Transaction represents the JSON model of a iotago.SignedTransaction.
 type Transaction struct {
-	TransactionID    string                  `json:"txId"`
-	NetworkID        iotago.NetworkID        `json:"networkId"`
-	CreationSlot     iotago.SlotIndex        `json:"creationSlot"`
-	Inputs           []*Input                `json:"inputs"`
-	InputsCommitment iotago.InputsCommitment `json:"inputsCommitment"`
-	Outputs          []*Output               `json:"outputs"`
-	Unlocks          []*UnlockBlock          `json:"unlocks"`
-	Payload          []byte                  `json:"payload"`
+	TransactionID string           `json:"txId"`
+	NetworkID     iotago.NetworkID `json:"networkId"`
+	CreationSlot  iotago.SlotIndex `json:"creationSlot"`
+	Inputs        []*Input         `json:"inputs"`
+	Outputs       []*Output        `json:"outputs"`
+	Unlocks       []*UnlockBlock   `json:"unlocks"`
+	Payload       []byte           `json:"payload"`
 }
 
 // NewTransaction returns a Transaction from the given iotago.SignedTransaction.

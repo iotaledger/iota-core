@@ -223,7 +223,7 @@ func (e *EvilWallet) RequestFreshFaucetWallet() error {
 func (e *EvilWallet) requestAndSplitFaucetFunds(initWallet, receiveWallet *Wallet) (txID iotago.TransactionID, err error) {
 	splitOutput, err := e.requestFaucetFunds(initWallet)
 	if err != nil {
-		return iotago.TransactionID{}, err
+		return iotago.EmptyTransactionID, err
 	}
 
 	e.log.Debugf("Faucet funds received, continue spliting output: %s", splitOutput.OutputID.ToHex())
@@ -249,14 +249,14 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *models.Output
 // splitOutputs splits faucet input to 100 outputs.
 func (e *EvilWallet) splitOutputs(splitOutput *models.Output, inputWallet, outputWallet *Wallet) (iotago.TransactionID, error) {
 	if inputWallet.IsEmpty() {
-		return iotago.TransactionID{}, ierrors.New("inputWallet is empty")
+		return iotago.EmptyTransactionID, ierrors.New("inputWallet is empty")
 	}
 
 	input, outputs := e.handleInputOutputDuringSplitOutputs(splitOutput, FaucetRequestSplitNumber, outputWallet)
 
 	signedTx, err := e.CreateTransaction(WithInputs(input), WithOutputs(outputs), WithIssuer(inputWallet), WithOutputWallet(outputWallet))
 	if err != nil {
-		return iotago.TransactionID{}, err
+		return iotago.EmptyTransactionID, err
 	}
 
 	faucetAccount, err := e.accWallet.GetAccount(accountwallet.FaucetAccountAlias)
