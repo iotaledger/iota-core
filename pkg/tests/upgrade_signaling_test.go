@@ -29,13 +29,20 @@ import (
 
 func Test_Upgrade_Signaling(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(6),
-		testsuite.WithEpochNearingThreshold(2),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				6,
+				2,
+			),
+		),
 	)
 	defer ts.Shutdown()
 
