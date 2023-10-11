@@ -97,10 +97,16 @@ func (a *AccountWallet) LastFaucetUnspentOutputID() iotago.OutputID {
 
 // toAccountStateFile write account states to file.
 func (a *AccountWallet) toAccountStateFile() error {
-	accounts := make([]*models.AccountData, 0)
+	accounts := make([]*models.AccountState, 0)
 
 	for _, acc := range a.accountsAliases {
-		accounts = append(accounts, acc)
+		accounts = append(accounts, &models.AccountState{
+			Alias:      acc.Alias,
+			AccountID:  acc.Account.ID(),
+			PrivateKey: acc.Account.PrivateKey(),
+			OutputID:   acc.OutputID,
+			Index:      acc.Index,
+		})
 	}
 
 	stateBytes, err := a.api.Encode(&StateData{
@@ -147,18 +153,18 @@ func (a *AccountWallet) fromAccountStateFile() error {
 
 	// account data
 	for _, acc := range data.AccountsData {
-		a.accountsAliases[acc.Alias] = acc
+		a.accountsAliases[acc.Alias] = &models.AccountData{
+			Alias:    acc.Alias,
+			Account:  blockhandler.NewEd25519Account(acc.AccountID, acc.PrivateKey),
+			OutputID: acc.OutputID,
+			Index:    acc.Index,
+		}
+		if acc.Alias == FaucetAccountAlias {
+			a.accountsAliases[acc.Alias].Status = models.AccountReady
+		}
 	}
 
 	return nil
-}
-
-func (a *AccountWallet) readAccountsStateFile() (map[string]*models.AccountData, error) {
-	err := a.fromAccountStateFile()
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to load wallet from file")
-	}
-	return a.accountsAliases, nil
 }
 
 func (a *AccountWallet) registerAccount(alias string, outputID iotago.OutputID, index uint64, privKey ed25519.PrivateKey) iotago.AccountID {

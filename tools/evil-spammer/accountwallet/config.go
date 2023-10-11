@@ -220,9 +220,9 @@ func (a *NoAccountParams) Type() AccountOperation {
 }
 
 type StateData struct {
-	Seed          string                `serix:"0,mapKey=seed,lengthPrefixType=uint8"`
-	LastUsedIndex uint64                `serix:"1,mapKey=lastUsedIndex"`
-	AccountsData  []*models.AccountData `serix:"2,mapKey=accounts,lengthPrefixType=uint8"`
+	Seed          string                 `serix:"0,mapKey=seed,lengthPrefixType=uint8"`
+	LastUsedIndex uint64                 `serix:"1,mapKey=lastUsedIndex"`
+	AccountsData  []*models.AccountState `serix:"2,mapKey=accounts,lengthPrefixType=uint8"`
 }
 
 var genesisTransactionID = iotago.TransactionIDRepresentingData(0, []byte("genesis"))

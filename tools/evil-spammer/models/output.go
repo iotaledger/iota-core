@@ -1,6 +1,8 @@
 package models
 
 import (
+	"crypto/ed25519"
+
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -32,9 +34,17 @@ const (
 )
 
 type AccountData struct {
-	Alias    string               `serix:"0,lengthPrefixType=uint8"`
-	Status   AccountStatus        `serix:"1"`
-	Account  blockhandler.Account `serix:"2"`
-	OutputID iotago.OutputID      `serix:"3"`
-	Index    uint64               `serix:"4"`
+	Alias    string
+	Status   AccountStatus
+	Account  blockhandler.Account
+	OutputID iotago.OutputID
+	Index    uint64
+}
+
+type AccountState struct {
+	Alias      string             `serix:"0,lengthPrefixType=uint8"`
+	AccountID  iotago.AccountID   `serix:"2"`
+	PrivateKey ed25519.PrivateKey `serix:"3,lengthPrefixType=uint64"`
+	OutputID   iotago.OutputID    `serix:"4"`
+	Index      uint64             `serix:"5"`
 }
