@@ -106,7 +106,9 @@ func parseBasicSpamFlags() {
 	customSpamParams.DeepSpam = *deepSpam
 	customSpamParams.TimeUnit = *timeunit
 	customSpamParams.DelayBetweenConflicts = *delayBetweenConflicts
-	customSpamParams.AccountAlias = *account
+	if *account != "" {
+		customSpamParams.AccountAlias = *account
+	}
 
 	// fill in unused parameter: blkNum or duration with zeros
 	if *duration == "" && *blkNum != "" {
