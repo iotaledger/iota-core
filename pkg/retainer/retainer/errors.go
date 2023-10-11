@@ -36,7 +36,6 @@ var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	iotago.ErrTimelockNotExpired:           apimodels.TxFailureConfiguredTimelockNotYetExpired,
 	iotago.ErrReturnAmountNotFulFilled:     apimodels.TxFailureReturnAmountNotFulfilled,
 	iotago.ErrInvalidInputUnlock:           apimodels.TxFailureInputUnlockInvalid,
-	iotago.ErrInvalidInputsCommitment:      apimodels.TxFailureInputsCommitmentInvalid,
 	iotago.ErrSenderFeatureNotUnlocked:     apimodels.TxFailureSenderNotUnlocked,
 	iotago.ErrChainTransitionInvalid:       apimodels.TxFailureChainStateTransitionInvalid,
 	iotago.ErrInputOutputManaMismatch:      apimodels.TxFailureManaAmountInvalid,
