@@ -2,7 +2,7 @@ module github.com/iotaledger/iota-core
 
 go 1.21
 
-replace github.com/goccy/go-graphviz => github.com/mranney-dd/go-graphviz v0.0.0-20230707134512-55e1cb640211
+replace github.com/goccy/go-graphviz => github.com/alexsporn/go-graphviz v0.0.0-20231011102718-04f10f0a9b59
 
 require (
 	github.com/goccy/go-graphviz v0.1.1
