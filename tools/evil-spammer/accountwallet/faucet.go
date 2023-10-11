@@ -1,12 +1,14 @@
 package accountwallet
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/mr-tron/base58"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -79,7 +81,30 @@ func (a *AccountWallet) PostWithBlock(clt models.Client, payload iotago.Payload,
 
 func (a *AccountWallet) CreateBlock(clt *nodeclient.Client, payload iotago.Payload, issuer blockhandler.Account) (*iotago.ProtocolBlock, error) {
 	blockBuilder := builder.NewBasicBlockBuilder(a.api)
-	blockBuilder.RequestNodeBuildData(clt, issuer.ID())
+
+	congestionResp, err := clt.Congestion(context.Background(), issuer.ID())
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get congestion data for issuer %s", issuer.ID().ToHex())
+	}
+	// TODO: modify block issuance api to indicate the slot index for commitment, to make sure it maches with congestion response
+	issuerResp, err := clt.BlockIssuance(context.Background())
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to get block issuance data")
+	}
+
+	commitmentID, err := issuerResp.Commitment.ID()
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to get commitment id")
+	}
+
+	blockBuilder.ProtocolVersion(clt.CurrentAPI().ProtocolParameters().Version())
+	blockBuilder.SlotCommitmentID(commitmentID)
+	blockBuilder.LatestFinalizedSlot(issuerResp.LatestFinalizedSlot)
+	blockBuilder.IssuingTime(time.Now())
+	blockBuilder.StrongParents(issuerResp.StrongParents)
+	blockBuilder.WeakParents(issuerResp.WeakParents)
+	blockBuilder.ShallowLikeParents(issuerResp.ShallowLikeParents)
+	blockBuilder.MaxBurnedMana(congestionResp.ReferenceManaCost)
 
 	blockBuilder.Payload(payload)
 	blockBuilder.Sign(issuer.ID(), issuer.PrivateKey())
