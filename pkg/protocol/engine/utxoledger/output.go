@@ -83,7 +83,7 @@ func (o *Output) Output() iotago.Output {
 	o.outputOnce.Do(func() {
 		if o.output == nil {
 			var decoded iotago.TxEssenceOutput
-			if _, err := o.apiProvider.APIForSlot(o.blockID.Slot()).Decode(o.encodedOutput, &decoded); err != nil {
+			if _, err := o.apiProvider.APIForSlot(o.outputID.CreationSlot()).Decode(o.encodedOutput, &decoded); err != nil {
 				panic(err)
 			}
 			o.output = decoded
