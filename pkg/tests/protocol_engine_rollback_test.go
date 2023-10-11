@@ -762,7 +762,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 			require.Len(t, committeeEpoch.IDs(), 4)
 		}
 
-		// Commmittee for the future epoch does not exist.
+		// Committee for the future epoch does not exist.
 		committeeEpoch2, err := newEngine.Storage.Committee().Load(2)
 		require.NoError(t, err)
 		require.Nil(t, committeeEpoch2)

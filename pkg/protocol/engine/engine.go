@@ -71,9 +71,8 @@ type Engine struct {
 
 	BlockCache *blocks.Blocks
 
-	startupAvailableBlocksWindow iotago.SlotIndex
-	chainID                      iotago.CommitmentID
-	mutex                        syncutils.RWMutex
+	chainID iotago.CommitmentID
+	mutex   syncutils.RWMutex
 
 	optsSnapshotPath     string
 	optsEntryPointsDepth int
@@ -207,10 +206,6 @@ func New(
 				if err := e.UpgradeOrchestrator.RestoreFromDisk(e.Storage.Settings().LatestCommitment().Slot()); err != nil {
 					panic(ierrors.Wrap(err, "failed to restore upgrade orchestrator from disk"))
 				}
-
-				// When we start from disk we potentially have previously accepted blocks in window (latestCommitment, latestCommitment + maxCommittableAge]
-				// on disk. We store this information that we can load blocks instead of requesting them again.
-				e.startupAvailableBlocksWindow = e.Storage.Settings().LatestCommitment().Slot() + e.CurrentAPI().ProtocolParameters().MaxCommittableAge()
 			}
 		},
 		func(e *Engine) {
@@ -259,11 +254,6 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	cachedBlock, exists := e.BlockCache.Block(id)
 	if exists && !cachedBlock.IsRootBlock() {
 		return cachedBlock.ModelBlock(), !cachedBlock.IsMissing()
-	}
-
-	// The block should've been in the block cache, so there's no need to check the storage.
-	if !exists && id.Slot() > e.startupAvailableBlocksWindow && id.Slot() > e.Storage.Settings().LatestCommitment().Slot() {
-		return nil, false
 	}
 
 	s, err := e.Storage.Blocks(id.Slot())
@@ -465,25 +455,9 @@ func (e *Engine) setupBlockRequester() {
 
 	e.Events.EvictionState.SlotEvicted.Hook(e.BlockRequester.EvictUntil)
 
-	wp := e.Workers.CreatePool("BlockMissingAttachFromStorage", workerpool.WithWorkerCount(1))
 	// We need to hook to make sure that the request is created before the block arrives to avoid a race condition
 	// where we try to delete the request again before it is created. Thus, continuing to request forever.
 	e.Events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
-		if block.ID().Slot() < e.startupAvailableBlocksWindow {
-			// We shortcut requesting blocks that are in the storage in case we did shut down and restart.
-			// We can safely ignore all errors.
-			if blockStorage, err := e.Storage.Blocks(block.ID().Slot()); err == nil {
-				if storedBlock, _ := blockStorage.Load(block.ID()); storedBlock != nil {
-					// We need to attach the block to the DAG in a separate worker pool to avoid a deadlock with the block cache
-					// as the BlockMissing event is triggered within a GetOrCreate call.
-					wp.Submit(func() {
-						_, _, _ = e.BlockDAG.Attach(storedBlock)
-					})
-
-					return
-				}
-			}
-		}
 		e.BlockRequester.StartTicker(block.ID())
 	})
 	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
@@ -518,7 +492,7 @@ func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (ear
 
 	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentSlot)
 	if err != nil {
-		panic(fmt.Sprintln("could not load earliest commitment after engine initialization", err))
+		panic(fmt.Sprintf("could not load earliest commitment %d after engine initialization: %s", earliestRootCommitmentSlot, err))
 	}
 
 	return rootCommitment

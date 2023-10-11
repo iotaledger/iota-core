@@ -363,6 +363,15 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) AcceptanceState(conflict
 	return lowestObservedState
 }
 
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) SetAccepted(conflictID ConflictID) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	if conflict, exists := c.conflictsByID.Get(conflictID); exists {
+		conflict.setAcceptanceState(acceptance.Accepted)
+	}
+}
+
 // UnacceptedConflicts takes a set of ConflictIDs and removes all the accepted Conflicts (leaving only the
 // pending or rejected ones behind).
 func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UnacceptedConflicts(conflictIDs ds.Set[ConflictID]) ds.Set[ConflictID] {

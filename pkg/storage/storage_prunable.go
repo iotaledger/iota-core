@@ -37,6 +37,10 @@ func (s *Storage) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.Blo
 	return s.prunable.RootBlocks(slot)
 }
 
+func (s *Storage) Mutations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
+	return s.prunable.Mutations(slot)
+}
+
 func (s *Storage) Attestations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
 	return s.prunable.Attestations(slot)
 }

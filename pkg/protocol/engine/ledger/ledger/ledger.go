@@ -68,7 +68,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
 
-			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Workers.CreateGroup("MemPool"), l.conflictDAG, l.apiProvider, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, e.Workers.CreateGroup("MemPool"), l.conflictDAG, l.apiProvider, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput, l.accountsLedger.Account)
@@ -148,7 +148,10 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 		panic(ierrors.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex+1, slot))
 	}
 
-	stateDiff := l.memPool.StateDiff(slot)
+	stateDiff, err := l.memPool.StateDiff(slot)
+	if err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to retrieve state diff for slot %d: %w", slot, err)
+	}
 
 	// collect outputs and allotments from the "uncompacted" stateDiff
 	// outputs need to be processed in the "uncompacted" version of the state diff, as we need to be able to store

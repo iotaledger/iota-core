@@ -83,6 +83,15 @@ func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing .
 	return lo.Return1(m.acceptedBlocksBySlot.Get(index))
 }
 
+func (m *SlotMutations) AcceptedBlocksCount(index iotago.SlotIndex) int {
+	acceptedBlocks, exists := m.acceptedBlocksBySlot.Get(index)
+	if !exists {
+		return 0
+	}
+
+	return acceptedBlocks.Size()
+}
+
 // evictUntil removes all data for slots that are older than the given slot.
 func (m *SlotMutations) evictUntil(index iotago.SlotIndex) {
 	for i := m.latestCommittedIndex + 1; i <= index; i++ {
