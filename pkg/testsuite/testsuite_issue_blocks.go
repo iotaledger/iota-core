@@ -184,7 +184,8 @@ func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, ro
 		require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
 		var b *blocks.Block
-		if blockIssuers[index].Validator {
+		// Only issue validator blocks if account has staking feature and is part of committee.
+		if blockIssuers[index].Validator && lo.Return1(node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)).HasAccount(node.Validator.AccountID) {
 			blockHeaderOptions := append(issuingOptionsCopy[node.Name], mock.WithIssuingTime(issuingTime))
 			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)
 			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node)
@@ -310,9 +311,15 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 				tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
 			}
 		}
+
+		for _, node := range activeValidators {
+			t.AssertLatestCommitmentSlotIndex(nextBlockSlot-t.optsMinCommittableAge, node)
+		}
+
 		if nextBlockSlot == slot+t.optsMinCommittableAge {
 			break
 		}
+
 		nextBlockSlot = lo.Min(slot+t.optsMinCommittableAge, nextBlockSlot+t.optsMinCommittableAge)
 		chainIndex += 2
 	}

@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -10,12 +9,18 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/topstakers"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
-	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func Test_TopStakersRotation(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
+		testsuite.WithLivenessThresholdLowerBound(10),
+		testsuite.WithLivenessThresholdUpperBound(10),
+		testsuite.WithMinCommittableAge(3),
+		testsuite.WithMaxCommittableAge(4),
+		testsuite.WithEpochNearingThreshold(5),
+		testsuite.WithSlotsPerEpochExponent(4),
+		testsuite.WithGenesisTimestampOffset(100*10),
 		testsuite.WithSnapshotOptions(
 			snapshotcreator.WithSeatManagerProvider(
 				topstakers.NewProvider(
@@ -23,18 +28,16 @@ func Test_TopStakersRotation(t *testing.T) {
 				),
 			),
 		),
-		testsuite.WithGenesisTimestampOffset(100*10),
 	)
 	defer ts.Shutdown()
 
-	_ = ts.AddValidatorNode("node1", 1_000_002)
-	_ = ts.AddValidatorNode("node2", 1_000_001)
-	node3 := ts.AddValidatorNode("node3", 1_000_000)
-	node4 := ts.AddValidatorNode("node4")
-	node5 := ts.AddValidatorNode("node5")
-	node6 := ts.AddValidatorNode("node6")
+	ts.AddValidatorNode("node1", 1_000_002)
+	ts.AddValidatorNode("node2", 1_000_001)
+	ts.AddValidatorNode("node3", 1_000_000)
+	ts.AddValidatorNode("node4")
+	ts.AddValidatorNode("node5")
+	ts.AddValidatorNode("node6")
 
-	blockIssuer := ts.AddBasicBlockIssuer("default")
 	nodeOptions := make(map[string][]options.Option[protocol.Protocol])
 
 	for _, node := range ts.Nodes() {
@@ -61,25 +64,9 @@ func Test_TopStakersRotation(t *testing.T) {
 	}
 
 	// TODO: replace with CandidacyPayload
-	ts.IssuePayloadWithOptions("block1", blockIssuer, node6, &iotago.TaggedData{
-		Tag:  nil,
-		Data: nil,
-	}, mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(1)))
+	//pointOfNoReturn := ts.API.TimeProvider().EpochEnd(0) - ts.API.ProtocolParameters().MaxCommittableAge()
+	ts.IssueBlocksAtSlots("candidate:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}, 4, "Genesis", ts.Nodes(), true, nil)
+	//ts.IssueBlocksAtSlots("commit:", []iotago.SlotIndex{pointOfNoReturn - 1, pointOfNoReturn, pointOfNoReturn + 1}, 4, "candidate:9", ts.Nodes("node1", "node2", "node3"), true, nil)
 
-	ts.IssuePayloadWithOptions("block2", blockIssuer, node5, &iotago.TaggedData{
-		Tag:  nil,
-		Data: nil,
-	}, mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(1)))
-
-	ts.IssuePayloadWithOptions("block3", blockIssuer, node4, &iotago.TaggedData{
-		Tag:  nil,
-		Data: nil,
-	}, mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(1)))
-
-	ts.IssuePayloadWithOptions("block4", blockIssuer, node3, &iotago.TaggedData{
-		Tag:  nil,
-		Data: nil,
-	}, mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(1)))
-	fmt.Println("commit until", ts.API.TimeProvider().EpochEnd(0)-ts.API.ProtocolParameters().EpochNearingThreshold())
-	ts.CommitUntilSlot(ts.API.TimeProvider().EpochEnd(0)-ts.API.ProtocolParameters().EpochNearingThreshold(), ts.Block("block4"))
+	ts.AssertLatestFinalizedSlot(13, ts.Nodes()...)
 }
