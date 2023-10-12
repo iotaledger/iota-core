@@ -30,7 +30,7 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-				deps.Collector.Update(commitmentsNamespace, latestCommitment, float64(details.Commitment.ID().Slot()), details.Commitment.ID().String())
+				deps.Collector.Update(commitmentsNamespace, latestCommitment, float64(details.Commitment.ID().Slot()), "C "+details.Commitment.ID().ToHex())
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
 	)),

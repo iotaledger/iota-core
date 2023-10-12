@@ -8,16 +8,16 @@ replace github.com/iotaledger/iota-core/tools/genesis-snapshot => ../genesis-sna
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
-	github.com/iotaledger/hive.go/app v0.0.0-20231005142627-86973b2edb3b
-	github.com/iotaledger/hive.go/crypto v0.0.0-20231005142627-86973b2edb3b
-	github.com/iotaledger/hive.go/ds v0.0.0-20231005142627-86973b2edb3b
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20231005142627-86973b2edb3b
-	github.com/iotaledger/hive.go/lo v0.0.0-20231005142627-86973b2edb3b
-	github.com/iotaledger/hive.go/logger v0.0.0-20231005142627-86973b2edb3b
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231005142627-86973b2edb3b
+	github.com/iotaledger/hive.go/app v0.0.0-20231010133617-cdbd5387e2af
+	github.com/iotaledger/hive.go/crypto v0.0.0-20231010133617-cdbd5387e2af
+	github.com/iotaledger/hive.go/ds v0.0.0-20231010133617-cdbd5387e2af
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20231010133617-cdbd5387e2af
+	github.com/iotaledger/hive.go/lo v0.0.0-20231010133617-cdbd5387e2af
+	github.com/iotaledger/hive.go/logger v0.0.0-20231010133617-cdbd5387e2af
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231010133617-cdbd5387e2af
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231005184534-62e6761a7b7c
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231011161154-7004432004e1
 	github.com/mr-tron/base58 v1.2.0
 	go.uber.org/atomic v1.11.0
 )
@@ -37,12 +37,13 @@ require (
 	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/hive.go/ads v0.0.0-20230928074706-d58e32f86729 // indirect
-	github.com/iotaledger/hive.go/constraints v0.0.0-20231005142627-86973b2edb3b // indirect
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231005142627-86973b2edb3b // indirect
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20230928074706-d58e32f86729 // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231005142627-86973b2edb3b // indirect
-	github.com/iotaledger/hive.go/stringify v0.0.0-20231005142627-86973b2edb3b // indirect
+	github.com/iotaledger/hive.go/ads v0.0.0-20231010133617-cdbd5387e2af // indirect
+	github.com/iotaledger/hive.go/constraints v0.0.0-20231010133617-cdbd5387e2af // indirect
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231010133617-cdbd5387e2af // indirect
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20231010133617-cdbd5387e2af // indirect
+	github.com/iotaledger/hive.go/log v0.0.0-20231010133617-cdbd5387e2af // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231010133617-cdbd5387e2af // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20231010133617-cdbd5387e2af // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
@@ -64,7 +65,7 @@ require (
 	github.com/multiformats/go-multicodec v0.9.0 // indirect
 	github.com/multiformats/go-multihash v0.2.3 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
-	github.com/otiai10/copy v1.12.0 // indirect
+	github.com/otiai10/copy v1.14.0 // indirect
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
 	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
 	github.com/petermattis/goid v0.0.0-20230904192822-1876fd5063bc // indirect
@@ -81,8 +82,8 @@ require (
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63 // indirect
-	golang.org/x/net v0.15.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/sync v0.4.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect

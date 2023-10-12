@@ -181,17 +181,25 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
-	//events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
+	events.Network.WarpSyncResponseReceived.Hook(func(id iotago.CommitmentID, ds iotago.BlockIDs, m *merklehasher.Proof[iotago.Identifier], ds2 iotago.TransactionIDs, m2 *merklehasher.Proof[iotago.Identifier], id2 peer.ID) {
+		fmt.Printf("%s > Network.WarpSyncResponseReceived: from %s %s\n", n.Name, id2, id)
+	})
+
+	events.Network.WarpSyncRequestReceived.Hook(func(id iotago.CommitmentID, id2 peer.ID) {
+		fmt.Printf("%s > Network.WarpSyncRequestReceived: from %s %s\n", n.Name, id2, id)
+	})
+
+	// events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
 	//	fmt.Printf("%s > ChainManager.CommitmentBelowRoot: %s\n", n.Name, commitmentID)
-	//})
+	// })
 
 	events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
 	})
 
-	//events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+	// events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
 	//	fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
-	//})
+	// })
 
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
 		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
@@ -203,6 +211,12 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
 	})
 
+	events.MainEngineRestarted.Hook(func(e *engine.Engine) {
+		fmt.Printf("%s > MainEngineRestarted: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
+
+		n.attachEngineLogsWithName(failOnBlockFiltered, e, fmt.Sprintf("Main2 - %s", e.Name()[:8]))
+	})
+
 	events.Network.Error.Hook(func(err error, id peer.ID) {
 		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
 	})
@@ -212,8 +226,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	})
 }
 
-func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
-	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
+func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engine.Engine, engineName string) {
 	events := instance.Events
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
@@ -333,7 +346,7 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 			require.NoError(n.Testing, err)
 		}
 
-		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks, roots, attestationBlockIDs)
+		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s Accepted Blocks: %s\n %s\n Attestations: %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks, roots, attestationBlockIDs)
 	})
 
 	events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
@@ -430,6 +443,12 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 			fmt.Printf("%s > [%s] MemPool.TransactionPending: %s\n", n.Name, engineName, transactionMetadata.ID())
 		})
 	})
+}
+
+func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
+	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
+
+	n.attachEngineLogsWithName(failOnBlockFiltered, instance, engineName)
 }
 
 func (n *Node) Wait() {

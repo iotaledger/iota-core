@@ -25,11 +25,11 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 
 	return &inx.NodeStatus{
 		IsHealthy:                   status.NodeSynced,
-		LastAcceptedBlockSlot:       uint64(status.LastAcceptedBlockSlot),
-		LastConfirmedBlockSlot:      uint64(status.LastConfirmedBlockSlot),
+		LastAcceptedBlockSlot:       uint32(status.LastAcceptedBlockSlot),
+		LastConfirmedBlockSlot:      uint32(status.LastConfirmedBlockSlot),
 		LatestCommitment:            inxCommitment(status.LatestCommitment),
 		LatestFinalizedCommitmentId: inx.NewCommitmentId(finalizedCommitmentID),
-		PruningEpoch:                uint64(status.LastPrunedEpoch),
+		PruningEpoch:                uint32(status.LastPrunedEpoch),
 	}
 }
 
@@ -53,7 +53,7 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 
 	var lastUpdateTimer *time.Timer
 	coolDownDuration := time.Duration(req.GetCooldownInMilliseconds()) * time.Millisecond
-	wp := workerpool.New("ListenToNodeStatus", workerCount)
+	wp := workerpool.New("ListenToNodeStatus", workerpool.WithWorkerCount(workerCount))
 
 	onUpdate := func(status *syncmanager.SyncStatus) {
 		if lastUpdateTimer != nil {

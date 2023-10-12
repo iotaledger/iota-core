@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -34,11 +36,15 @@ func TestMemPoolV1_InterfaceWithForkingEverything(t *testing.T) {
 func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	workers := workerpool.NewGroup(t.Name())
 
-	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
+	mutationsFunc := func(index iotago.SlotIndex) (kvstore.KVStore, error) {
+		return mapdb.NewMapDB(), nil
+	}
+
+	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](func() int { return 0 })
 	memPoolInstance := New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference)
-	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {})
+	}, mutationsFunc, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {})
 
 	tf := mempooltests.NewTestFramework(t, memPoolInstance, conflictDAG, ledgerState, workers)
 
@@ -138,21 +144,29 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	workers := workerpool.NewGroup(t.Name())
 
-	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
+	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
+
+	mutationsFunc := func(index iotago.SlotIndex) (kvstore.KVStore, error) {
+		return mapdb.NewMapDB(), nil
+	}
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference)
-	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}), conflictDAG, ledgerState, workers)
+	}, mutationsFunc, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}), conflictDAG, ledgerState, workers)
 }
 
 func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 	workers := workerpool.NewGroup(t.Name())
 
-	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
+	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
+
+	mutationsFunc := func(index iotago.SlotIndex) (kvstore.KVStore, error) {
+		return mapdb.NewMapDB(), nil
+	}
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference)
-	}, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}, WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
+	}, mutationsFunc, workers, conflictDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}, WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
 }

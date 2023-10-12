@@ -35,7 +35,7 @@ func (s *Server) ReadBlockMetadata(_ context.Context, blockID *inx.BlockId) (*in
 func (s *Server) ListenToBlocks(_ *inx.NoParams, srv inx.INX_ListenToBlocksServer) error {
 	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
 
-	wp := workerpool.New("ListenToBlocks", workerCount).Start()
+	wp := workerpool.New("ListenToBlocks", workerpool.WithWorkerCount(workerCount)).Start()
 
 	unhook := deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
@@ -60,7 +60,7 @@ func (s *Server) ListenToBlocks(_ *inx.NoParams, srv inx.INX_ListenToBlocksServe
 func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcceptedBlocksServer) error {
 	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
 
-	wp := workerpool.New("ListenToAcceptedBlocks", workerCount).Start()
+	wp := workerpool.New("ListenToAcceptedBlocks", workerpool.WithWorkerCount(workerCount)).Start()
 
 	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		payload, err := getINXBlockMetadata(block.ID())
@@ -90,7 +90,7 @@ func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcc
 func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToConfirmedBlocksServer) error {
 	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
 
-	wp := workerpool.New("ListenToConfirmedBlocks", workerCount).Start()
+	wp := workerpool.New("ListenToConfirmedBlocks", workerpool.WithWorkerCount(workerCount)).Start()
 
 	unhook := deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 		payload, err := getINXBlockMetadata(block.ID())

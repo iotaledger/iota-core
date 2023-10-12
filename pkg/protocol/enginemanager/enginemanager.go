@@ -139,6 +139,18 @@ func (e *EngineManager) LoadActiveEngine(snapshotPath string) (*engine.Engine, e
 		if exists, isDirectory, err := ioutils.PathExists(e.directory.Path(info.Name)); err == nil && exists && isDirectory {
 			// Load previous engine as active
 			e.activeInstance = e.loadEngineInstanceFromSnapshot(info.Name, snapshotPath)
+
+			// Clear the storage of the active instance to be consistent with the latest committed slot.
+			// Everything after the latest committed slot is pruned to ensure a consistent state (e.g. accepted blocks).
+			targetSlot := e.activeInstance.Storage.Settings().LatestCommitment().Slot()
+			if err := e.rollbackStorage(e.activeInstance.Storage, targetSlot); err != nil {
+				return nil, ierrors.Wrapf(err, "failed to rollback storage to slot %d", targetSlot)
+			}
+
+			// Rollback attestations already on created engine instance, because this action modifies the in-memory storage.
+			if err := e.activeInstance.Attestations.Rollback(targetSlot); err != nil {
+				return nil, ierrors.Wrap(err, "error while rolling back attestations storage on candidate engine")
+			}
 		}
 	}
 
@@ -247,41 +259,8 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 		return nil, ierrors.Wrapf(err, "failed to copy storage from active engine instance (%s) to new engine instance (%s)", e.activeInstance.Storage.Directory(), e.directory.Path(engineAlias))
 	}
 
-	// Remove commitments that after forking point.
-	latestCommitment := newStorage.Settings().LatestCommitment()
-	if err := newStorage.Commitments().Rollback(index, latestCommitment.Slot()); err != nil {
-		return nil, ierrors.Wrap(err, "failed to rollback commitments")
-	}
-	// Create temporary components and rollback their permanent state, which will be reflected on disk.
-	evictionState := eviction.NewState(newStorage.LatestNonEmptySlot(), newStorage.RootBlocks)
-	evictionState.Initialize(latestCommitment.Slot())
-
-	blockCache := blocks.New(evictionState, newStorage.Settings().APIProvider())
-	accountsManager := accountsledger.New(newStorage.Settings().APIProvider(), blockCache.Block, newStorage.AccountDiffs, newStorage.Accounts())
-
-	accountsManager.SetLatestCommittedSlot(latestCommitment.Slot())
-	if err := accountsManager.Rollback(index); err != nil {
-		return nil, ierrors.Wrap(err, "failed to rollback accounts manager")
-	}
-
-	if err := evictionState.Rollback(newStorage.Settings().LatestFinalizedSlot(), index); err != nil {
-		return nil, ierrors.Wrap(err, "failed to rollback eviction state")
-	}
-	if err := newStorage.Ledger().Rollback(index); err != nil {
-		return nil, err
-	}
-
-	targetCommitment, err := newStorage.Commitments().Load(index)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "error while retrieving commitment for target index %d", index)
-	}
-
-	if err := newStorage.Settings().Rollback(targetCommitment); err != nil {
-		return nil, err
-	}
-
-	if err := newStorage.RollbackPrunable(index); err != nil {
-		return nil, err
+	if err := e.rollbackStorage(newStorage, index); err != nil {
+		return nil, ierrors.Wrapf(err, "failed to rollback storage to slot %d", index)
 	}
 
 	candidateEngine := e.loadEngineInstanceWithStorage(engineAlias, newStorage)
@@ -292,6 +271,73 @@ func (e *EngineManager) ForkEngineAtSlot(index iotago.SlotIndex) (*engine.Engine
 	}
 
 	return candidateEngine, nil
+}
+
+func (e *EngineManager) rollbackStorage(newStorage *storage.Storage, slot iotago.SlotIndex) error {
+	// Remove commitments that after forking point.
+	latestCommitment := newStorage.Settings().LatestCommitment()
+	if err := newStorage.Commitments().Rollback(slot, latestCommitment.Slot()); err != nil {
+		return ierrors.Wrap(err, "failed to rollback commitments")
+	}
+	// Create temporary components and rollback their permanent state, which will be reflected on disk.
+	evictionState := eviction.NewState(newStorage.LatestNonEmptySlot(), newStorage.RootBlocks)
+	evictionState.Initialize(latestCommitment.Slot())
+
+	blockCache := blocks.New(evictionState, newStorage.Settings().APIProvider())
+	accountsManager := accountsledger.New(newStorage.Settings().APIProvider(), blockCache.Block, newStorage.AccountDiffs, newStorage.Accounts())
+
+	accountsManager.SetLatestCommittedSlot(latestCommitment.Slot())
+	if err := accountsManager.Rollback(slot); err != nil {
+		return ierrors.Wrap(err, "failed to rollback accounts manager")
+	}
+
+	if err := evictionState.Rollback(newStorage.Settings().LatestFinalizedSlot(), slot); err != nil {
+		return ierrors.Wrap(err, "failed to rollback eviction state")
+	}
+	if err := newStorage.Ledger().Rollback(slot); err != nil {
+		return ierrors.Wrapf(err, "failed to rollback ledger to slot %d", slot)
+	}
+
+	targetCommitment, err := newStorage.Commitments().Load(slot)
+	if err != nil {
+		return ierrors.Wrapf(err, "error while retrieving commitment for target slot %d", slot)
+	}
+
+	if err := newStorage.Settings().Rollback(targetCommitment); err != nil {
+		return ierrors.Wrap(err, "failed to rollback settings")
+	}
+
+	if err := newStorage.RollbackPrunable(slot); err != nil {
+		return ierrors.Wrap(err, "failed to rollback prunable data")
+	}
+
+	return nil
+}
+
+func (e *EngineManager) RollbackEngine(slot iotago.SlotIndex) (*engine.Engine, error) {
+	engineAlias := e.activeInstance.Name()
+	errorHandler := func(err error) {
+		e.errorHandler(ierrors.Wrapf(err, "engine (%s)", engineAlias[0:8]))
+	}
+
+	dir := e.activeInstance.Storage.Directory()
+	e.activeInstance.Shutdown()
+
+	newStorage := storage.Create(dir, e.dbVersion, errorHandler, e.storageOptions...)
+
+	if err := e.rollbackStorage(newStorage, slot); err != nil {
+		return nil, ierrors.Wrapf(err, "failed to rollback storage to slot %d", slot)
+	}
+
+	newEngine := e.loadEngineInstanceWithStorage(engineAlias, newStorage)
+
+	// Rollback attestations already on created engine instance, because this action modifies the in-memory storage.
+	if err := newEngine.Attestations.Rollback(slot); err != nil {
+		return nil, ierrors.Wrap(err, "error while rolling back attestations storage on candidate engine")
+	}
+
+	return newEngine, nil
+
 }
 
 func (e *EngineManager) OnEngineCreated(handler func(*engine.Engine)) (unsubscribe func()) {

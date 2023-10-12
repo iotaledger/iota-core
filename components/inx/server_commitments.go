@@ -23,16 +23,16 @@ func inxCommitment(commitment *model.Commitment) *inx.Commitment {
 }
 
 func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (*inx.Commitment, error) {
-	commitmentIndex := iotago.SlotIndex(req.GetCommitmentIndex())
+	commitmentSlot := iotago.SlotIndex(req.GetCommitmentSlot())
 
 	if req.GetCommitmentId() != nil {
-		commitmentIndex = req.GetCommitmentId().Unwrap().Slot()
+		commitmentSlot = req.GetCommitmentId().Unwrap().Slot()
 	}
 
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentIndex)
+	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentSlot)
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return nil, status.Errorf(codes.NotFound, "commitment index %d not found", req.GetCommitmentIndex())
+			return nil, status.Errorf(codes.NotFound, "commitment slot %d not found", req.GetCommitmentSlot())
 		}
 
 		return nil, err

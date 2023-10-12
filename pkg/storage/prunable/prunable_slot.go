@@ -14,6 +14,7 @@ import (
 const (
 	slotPrefixBlocks byte = iota
 	slotPrefixRootBlocks
+	slotPrefixMutations
 	slotPrefixAttestations
 	slotPrefixAccountDiffs
 	slotPrefixPerformanceFactors
@@ -55,6 +56,10 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.Bl
 func (p *Prunable) CommitteeCandidates(epoch iotago.EpochIndex) (kvstore.KVStore, error) {
 	// Slot 0 does not exist, but we need to add it to the prefix to avoid random clashes with other keys.
 	return p.prunableSlotStore.Get(epoch, byteutils.ConcatBytes(iotago.SlotIndex(0).MustBytes(), kvstore.Realm{epochPrefixCommitteeCandidates}))
+}
+
+func (p *Prunable) Mutations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
+	return p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixMutations})
 }
 
 func (p *Prunable) Attestations(slot iotago.SlotIndex) (kvstore.KVStore, error) {

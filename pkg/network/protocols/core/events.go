@@ -17,7 +17,7 @@ type Events struct {
 	AttestationsReceived          *event.Event4[*model.Commitment, []*iotago.Attestation, *merklehasher.Proof[iotago.Identifier], peer.ID]
 	AttestationsRequestReceived   *event.Event2[iotago.CommitmentID, peer.ID]
 	WarpSyncRequestReceived       *event.Event2[iotago.CommitmentID, peer.ID]
-	WarpSyncResponseReceived      *event.Event4[iotago.CommitmentID, iotago.BlockIDs, *merklehasher.Proof[iotago.Identifier], peer.ID]
+	WarpSyncResponseReceived      *event.Event6[iotago.CommitmentID, iotago.BlockIDs, *merklehasher.Proof[iotago.Identifier], iotago.TransactionIDs, *merklehasher.Proof[iotago.Identifier], peer.ID]
 	Error                         *event.Event2[error, peer.ID]
 
 	event.Group[Events, *Events]
@@ -33,7 +33,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		AttestationsReceived:          event.New4[*model.Commitment, []*iotago.Attestation, *merklehasher.Proof[iotago.Identifier], peer.ID](),
 		AttestationsRequestReceived:   event.New2[iotago.CommitmentID, peer.ID](),
 		WarpSyncRequestReceived:       event.New2[iotago.CommitmentID, peer.ID](),
-		WarpSyncResponseReceived:      event.New4[iotago.CommitmentID, iotago.BlockIDs, *merklehasher.Proof[iotago.Identifier], peer.ID](),
+		WarpSyncResponseReceived:      event.New6[iotago.CommitmentID, iotago.BlockIDs, *merklehasher.Proof[iotago.Identifier], iotago.TransactionIDs, *merklehasher.Proof[iotago.Identifier], peer.ID](),
 		Error:                         event.New2[error, peer.ID](),
 	}
 })

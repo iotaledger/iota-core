@@ -58,7 +58,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			e.Storage.Settings().LatestFinalizedSlot,
 			e.ErrorHandler("retainer"))
 
-		asyncOpt := event.WithWorkerPool(r.workers.CreatePool("Retainer", 1))
+		asyncOpt := event.WithWorkerPool(r.workers.CreatePool("Retainer", workerpool.WithWorkerCount(1)))
 
 		e.Events.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
 			if err := r.onBlockAttached(b.ID()); err != nil {

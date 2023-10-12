@@ -65,7 +65,8 @@ func (t *TestSuite) CreateBasicBlock(alias string, blockIssuer *mock.BlockIssuer
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := blockIssuer.CreateBasicBlock(context.Background(), alias, node, blockOpts...)
+	block, err := blockIssuer.CreateBasicBlock(context.Background(), alias, node, blockOpts...)
+	require.NoError(t.Testing, err)
 
 	t.registerBlock(alias, block)
 }

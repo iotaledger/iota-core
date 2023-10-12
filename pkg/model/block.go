@@ -62,12 +62,27 @@ func BlockFromBytes(data []byte, apiProvider iotago.APIProvider) (*Block, error)
 	return newBlock(blockID, iotaBlock, data)
 }
 
+func BlockFromBytesFunc(apiProvider iotago.APIProvider) func(data []byte) (*Block, int, error) {
+	return func(data []byte) (*Block, int, error) {
+		block, err := BlockFromBytes(data, apiProvider)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		return block, len(data), nil
+	}
+}
+
 func (blk *Block) ID() iotago.BlockID {
 	return blk.blockID
 }
 
 func (blk *Block) Data() []byte {
 	return blk.data
+}
+
+func (blk *Block) Bytes() ([]byte, error) {
+	return blk.data, nil
 }
 
 func (blk *Block) ProtocolBlock() *iotago.ProtocolBlock {

@@ -210,6 +210,10 @@ func (p *Prunable) shouldRollbackCommittee(epoch iotago.EpochIndex, targetSlot i
 				return false, err
 			}
 
+			if committee == nil {
+				return false, nil
+			}
+
 			return committee.IsReused(), nil
 		}
 
