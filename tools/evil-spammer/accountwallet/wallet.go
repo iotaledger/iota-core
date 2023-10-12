@@ -35,6 +35,7 @@ func Run(config *Configuration) (*AccountWallet, error) {
 		genesisSeed:        config.GenesisSeed,
 		faucetPrivateKey:   config.BlockIssuerPrivateKey,
 		faucetAccountID:    config.AccountID,
+		genesisOutputID:    config.GenesisOutputID,
 	}))
 
 	wallet := NewAccountWallet(opts...)

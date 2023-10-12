@@ -66,6 +66,7 @@ type Configuration struct {
 	BindAddress              string `json:"bindAddress,omitempty"`
 	AccountStatesFile        string `json:"accountStatesFile,omitempty"`
 	GenesisSeed              string `json:"genesisSeed,omitempty"`
+	GenesisOutputID          string `json:"genesisOutputID,omitempty"`
 	LastFauctUnspentOutputID string `json:"lastFaucetUnspentOutputID,omitempty"`
 	BlockIssuerPrivateKey    string `json:"blockIssuerPrivateKey,omitempty"`
 	AccountID                string `json:"accountID,omitempty"`
@@ -81,8 +82,9 @@ var (
 	dockerAccountConfigJSON = `{
 	"bindAddress": "http://localhost:8080",
 	"accountStatesFile": "wallet.dat",
-	"lastFaucetUnspentOutputID": "",
+	"lastFaucetUnspentOutputID": "0x2ee87e6c33a99118c381310b3a2df78234837fdfd3aac4bcde0c32456eaff349000000000000",
 	"genesisSeed": "7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih",
+ 	"genesisOutputID": "0x2ee87e6c33a99118c381310b3a2df78234837fdfd3aac4bcde0c32456eaff349000000000000",
 	"blockIssuerPrivateKey": "db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648",
 	"accountID": "0x6aee704f25558e8aa7630fed0121da53074188abc423b3c5810f80be4936eb6e"}`
 )
@@ -224,5 +226,3 @@ type StateData struct {
 	LastUsedIndex uint64                 `serix:"1,mapKey=lastUsedIndex"`
 	AccountsData  []*models.AccountState `serix:"2,mapKey=accounts,lengthPrefixType=uint8"`
 }
-
-var genesisTransactionID = iotago.TransactionIDRepresentingData(0, []byte("genesis"))

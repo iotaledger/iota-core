@@ -8,6 +8,7 @@ import (
 
 	"github.com/mr-tron/base58"
 
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
@@ -18,7 +19,9 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
-const FaucetAccountAlias = "faucet"
+const (
+	FaucetAccountAlias = "faucet"
+)
 
 func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago.Address, amount iotago.BaseToken) (*models.Output, error) {
 	signedTx, err := a.faucet.prepareFaucetRequest(receiveAddr, amount)
@@ -79,6 +82,7 @@ func (a *AccountWallet) PostWithBlock(clt models.Client, payload iotago.Payload,
 
 }
 
+// TODO: create validation blocks too
 func (a *AccountWallet) CreateBlock(clt *nodeclient.Client, payload iotago.Payload, issuer blockhandler.Account) (*iotago.ProtocolBlock, error) {
 	blockBuilder := builder.NewBasicBlockBuilder(a.api)
 
@@ -122,6 +126,7 @@ type faucetParams struct {
 	faucetPrivateKey   string
 	faucetAccountID    string
 	genesisSeed        string
+	genesisOutputID    string
 }
 
 type faucet struct {
@@ -148,11 +153,15 @@ func newFaucet(clt models.Client, faucetParams *faucetParams) *faucet {
 		faucetAmount = faucetOutput.BaseTokenAmount()
 	} else {
 		// use the genesis output ID instead, if we relaunch the docker network
-		faucetUnspentOutputID = iotago.OutputIDFromTransactionIDAndIndex(genesisTransactionID, 0)
-		faucetOutput = clt.GetOutput(faucetUnspentOutputID)
-		if faucetOutput != nil {
-			faucetAmount = faucetOutput.BaseTokenAmount()
+		faucetUnspentOutputID, err = iotago.OutputIDFromHexString(faucetParams.genesisOutputID)
+		if err != nil {
+			panic("cannot parse genesis output id, please update config file with genesis OutputID created in the snapshot")
 		}
+		faucetOutput = clt.GetOutput(faucetUnspentOutputID)
+		if faucetOutput == nil {
+			panic("cannot find faucet output")
+		}
+		faucetAmount = faucetOutput.BaseTokenAmount()
 	}
 	genesisSeed, err := base58.Decode(faucetParams.genesisSeed)
 	if err != nil {
@@ -178,7 +187,10 @@ func newFaucet(clt models.Client, faucetParams *faucetParams) *faucet {
 }
 
 func (f *faucet) prepareFaucetRequest(receiveAddr iotago.Address, amount iotago.BaseToken) (*iotago.SignedTransaction, error) {
-	remainderAmount := f.unspentOutput.Balance - amount
+	remainderAmount, err := safemath.SafeSub(f.unspentOutput.Balance, amount)
+	if err != nil {
+		panic(err)
+	}
 
 	signedTx, err := f.createFaucetTransaction(receiveAddr, amount, remainderAmount)
 	if err != nil {
@@ -227,7 +239,9 @@ func (f *faucet) createFaucetTransaction(receiveAddr iotago.Address, amount iota
 
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("Faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
 	txBuilder.SetCreationSlot(f.clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
-
+	// TODO: if we want to test allotting exactly the same amount as for burning mana we need to update and join tx and block creation brocess
+	// txBuilder.AllotRequiredManaAndStoreRemainingManaInOutput()
+	// BuildAndSwapToBlockBuilder
 	signedTx, err := txBuilder.Build(f.genesisHdWallet.AddressSigner())
 	if err != nil {
 		log.Errorf("failed to build transaction: %s", err)
