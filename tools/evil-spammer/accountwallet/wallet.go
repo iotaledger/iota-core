@@ -101,13 +101,7 @@ func (a *AccountWallet) toAccountStateFile() error {
 	accounts := make([]*models.AccountState, 0)
 
 	for _, acc := range a.accountsAliases {
-		accounts = append(accounts, &models.AccountState{
-			Alias:      acc.Alias,
-			AccountID:  acc.Account.ID(),
-			PrivateKey: acc.Account.PrivateKey(),
-			OutputID:   acc.OutputID,
-			Index:      acc.Index,
-		})
+		accounts = append(accounts, models.AccountStateFromAccountData(acc))
 	}
 
 	stateBytes, err := a.api.Encode(&StateData{
@@ -154,12 +148,7 @@ func (a *AccountWallet) fromAccountStateFile() error {
 
 	// account data
 	for _, acc := range data.AccountsData {
-		a.accountsAliases[acc.Alias] = &models.AccountData{
-			Alias:    acc.Alias,
-			Account:  blockhandler.NewEd25519Account(acc.AccountID, acc.PrivateKey),
-			OutputID: acc.OutputID,
-			Index:    acc.Index,
-		}
+		a.accountsAliases[acc.Alias] = acc.ToAccountData()
 		if acc.Alias == FaucetAccountAlias {
 			a.accountsAliases[acc.Alias].Status = models.AccountReady
 		}

@@ -48,3 +48,22 @@ type AccountState struct {
 	OutputID   iotago.OutputID    `serix:"4"`
 	Index      uint64             `serix:"5"`
 }
+
+func AccountStateFromAccountData(acc *AccountData) *AccountState {
+	return &AccountState{
+		Alias:      acc.Alias,
+		AccountID:  acc.Account.ID(),
+		PrivateKey: acc.Account.PrivateKey(),
+		OutputID:   acc.OutputID,
+		Index:      acc.Index,
+	}
+}
+
+func (a *AccountState) ToAccountData() *AccountData {
+	return &AccountData{
+		Alias:    a.Alias,
+		Account:  blockhandler.NewEd25519Account(a.AccountID, a.PrivateKey),
+		OutputID: a.OutputID,
+		Index:    a.Index,
+	}
+}
