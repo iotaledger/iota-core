@@ -312,7 +312,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 	}
 
 	// Issue up to slot 11 - just before committee selection for the next epoch.
-	// Committee will be reused at slot 10 is finalized or slot 12 is committed, whichever happens first.
+	// Committee will be reused when slot 10 is finalized or slot 12 is committed, whichever happens first.
 	{
 		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, nil)
 
