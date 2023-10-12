@@ -17,21 +17,41 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 const (
 	FaucetAccountAlias = "faucet"
 )
 
+func (a *AccountWallet) RequestBlockBuiltData(clt *nodeclient.Client, issuerID iotago.AccountID) (*apimodels.CongestionResponse, *apimodels.IssuanceBlockHeaderResponse, iotago.Version, error) {
+	congestionResp, err := clt.Congestion(context.Background(), issuerID)
+	if err != nil {
+		return nil, nil, 0, ierrors.Wrapf(err, "failed to get congestion data for issuer %s", issuerID.ToHex())
+	}
+
+	issuerResp, err := clt.BlockIssuance(context.Background())
+	if err != nil {
+		return nil, nil, 0, ierrors.Wrap(err, "failed to get block issuance data")
+	}
+
+	return congestionResp, issuerResp, clt.CurrentAPI().Version(), nil
+}
+
 func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago.Address, amount iotago.BaseToken) (*models.Output, error) {
-	signedTx, err := a.faucet.prepareFaucetRequest(receiveAddr, amount)
+	congestionResp, issuerResp, version, err := a.RequestBlockBuiltData(clt.Client(), a.faucet.account.ID())
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get block built data for issuer %s", a.faucet.account.ID().ToHex())
+	}
+
+	signedTx, err := a.faucet.prepareFaucetRequest(receiveAddr, amount, congestionResp.ReferenceManaCost)
 	if err != nil {
 		log.Errorf("failed to prepare faucet request: %s", err)
 
 		return nil, err
 	}
 
-	_, err = a.PostWithBlock(clt, signedTx, a.faucet.account)
+	_, err = a.PostWithBlock(clt, signedTx, a.faucet.account, congestionResp, issuerResp, version)
 	if err != nil {
 		log.Errorf("failed to create block: %s", err)
 
@@ -56,8 +76,8 @@ func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago
 	}, nil
 }
 
-func (a *AccountWallet) PostWithBlock(clt models.Client, payload iotago.Payload, issuer blockhandler.Account) (iotago.BlockID, error) {
-	signedBlock, err := a.CreateBlock(clt.Client(), payload, issuer)
+func (a *AccountWallet) PostWithBlock(clt models.Client, payload iotago.Payload, issuer blockhandler.Account, congestionResp *apimodels.CongestionResponse, issuerResp *apimodels.IssuanceBlockHeaderResponse, version iotago.Version) (iotago.BlockID, error) {
+	signedBlock, err := a.CreateBlock(payload, issuer, congestionResp, issuerResp, version)
 	if err != nil {
 		log.Errorf("failed to create block: %s", err)
 
@@ -82,24 +102,15 @@ func (a *AccountWallet) PostWithBlock(clt models.Client, payload iotago.Payload,
 
 }
 
-func (a *AccountWallet) CreateBlock(clt *nodeclient.Client, payload iotago.Payload, issuer blockhandler.Account) (*iotago.ProtocolBlock, error) {
+func (a *AccountWallet) CreateBlock(payload iotago.Payload, issuer blockhandler.Account, congestionResp *apimodels.CongestionResponse, issuerResp *apimodels.IssuanceBlockHeaderResponse, version iotago.Version) (*iotago.ProtocolBlock, error) {
 	blockBuilder := builder.NewBasicBlockBuilder(a.api)
-
-	congestionResp, err := clt.Congestion(context.Background(), issuer.ID())
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get congestion data for issuer %s", issuer.ID().ToHex())
-	}
-	issuerResp, err := clt.BlockIssuance(context.Background())
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to get block issuance data")
-	}
 
 	commitmentID, err := issuerResp.Commitment.ID()
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to get commitment id")
 	}
 
-	blockBuilder.ProtocolVersion(clt.CurrentAPI().ProtocolParameters().Version())
+	blockBuilder.ProtocolVersion(version)
 	blockBuilder.SlotCommitmentID(commitmentID)
 	blockBuilder.LatestFinalizedSlot(issuerResp.LatestFinalizedSlot)
 	blockBuilder.IssuingTime(time.Now())
@@ -184,21 +195,31 @@ func newFaucet(clt models.Client, faucetParams *faucetParams) *faucet {
 	return f
 }
 
-func (f *faucet) prepareFaucetRequest(receiveAddr iotago.Address, amount iotago.BaseToken) (*iotago.SignedTransaction, error) {
+func (f *faucet) prepareFaucetRequest(receiveAddr iotago.Address, amount iotago.BaseToken, rmc iotago.Mana) (*iotago.SignedTransaction, error) {
 	remainderAmount, err := safemath.SafeSub(f.unspentOutput.Balance, amount)
 	if err != nil {
 		panic(err)
 	}
 
-	signedTx, err := f.createFaucetTransaction(receiveAddr, amount, remainderAmount)
+	txBuilder, remainderIndex, err := f.createFaucetTransactionNoManaHandling(receiveAddr, amount, remainderAmount)
 	if err != nil {
+		return nil, err
+	}
+
+	// faucet will allot exact mana to be burnt, rest of the mana is alloted to faucet output remainder
+	txBuilder.AllotRequiredManaAndStoreRemainingManaInOutput(txBuilder.CreationSlot(), rmc, f.account.ID(), remainderIndex)
+
+	signedTx, err := txBuilder.Build(f.genesisHdWallet.AddressSigner())
+	if err != nil {
+		log.Errorf("failed to build transaction: %s", err)
+
 		return nil, err
 	}
 
 	return signedTx, nil
 }
 
-func (f *faucet) createFaucetTransaction(receiveAddr iotago.Address, amount iotago.BaseToken, remainderAmount iotago.BaseToken) (*iotago.SignedTransaction, error) {
+func (f *faucet) createFaucetTransactionNoManaHandling(receiveAddr iotago.Address, amount iotago.BaseToken, remainderAmount iotago.BaseToken) (*builder.TransactionBuilder, int, error) {
 	txBuilder := builder.NewTransactionBuilder(f.clt.CurrentAPI())
 
 	txBuilder.AddInput(&builder.TxInput{
@@ -222,26 +243,21 @@ func (f *faucet) createFaucetTransaction(receiveAddr iotago.Address, amount iota
 		if err != nil {
 			log.Errorf("failed to build account output: %s", err)
 
-			return nil, err
+			return nil, 0, err
 		}
 		txBuilder.AddOutput(output)
 	}
 
 	// remainder output
+	remainderIndex := 1
 	txBuilder.AddOutput(&iotago.BasicOutput{
 		Amount: remainderAmount,
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: f.genesisHdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)},
 		},
 	})
-
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("Faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
 	txBuilder.SetCreationSlot(f.clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
-	signedTx, err := txBuilder.Build(f.genesisHdWallet.AddressSigner())
-	if err != nil {
-		log.Errorf("failed to build transaction: %s", err)
 
-		return nil, err
-	}
-	return signedTx, err
+	return txBuilder, remainderIndex, nil
 }

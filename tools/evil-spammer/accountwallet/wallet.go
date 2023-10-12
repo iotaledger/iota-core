@@ -292,7 +292,12 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 		return ierrors.Wrapf(err, "failed to build transaction for account alias destruction %s", alias)
 	}
 
-	blockID, err := a.PostWithBlock(a.client, tx, a.faucet.account)
+	congestionResp, issuerResp, version, err := a.RequestBlockBuiltData(a.client.Client(), a.faucet.account.ID())
+	if err != nil {
+		return ierrors.Wrap(err, "failed to request block built data for the faucet account")
+	}
+
+	blockID, err := a.PostWithBlock(a.client, tx, a.faucet.account, congestionResp, issuerResp, version)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to post block with ID %s", blockID)
 	}
