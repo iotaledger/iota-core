@@ -26,7 +26,6 @@ export class TransactionPayload {
     networkId: number;
     creationSlot: number;
     inputs: Array<Input>;
-    inputsCommitment: string;
     outputs: Array<Output>;
     payload: any;
     unlocks: Array<UnlockBlock>;
