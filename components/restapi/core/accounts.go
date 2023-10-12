@@ -42,7 +42,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	}
 
 	return &apimodels.CongestionResponse{
-		SlotIndex:            slot,
+		Slot:                 slot,
 		Ready:                deps.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(accountID),
 		ReferenceManaCost:    rmc,
 		BlockIssuanceCredits: acc.Credits.Value,

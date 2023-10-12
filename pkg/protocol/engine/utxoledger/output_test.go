@@ -43,7 +43,7 @@ func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Out
 	require.True(t, has)
 
 	// Spent it with a slot.
-	require.NoError(t, manager.ApplyDiff(spent.SlotIndexSpent(), utxoledger.Outputs{}, utxoledger.Spents{spent}))
+	require.NoError(t, manager.ApplyDiff(spent.SlotSpent(), utxoledger.Outputs{}, utxoledger.Spents{spent}))
 
 	// Read Spent from DB and compare
 	readSpent, err := manager.ReadSpentForOutputIDWithoutLocking(outputID)
@@ -61,7 +61,7 @@ func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Out
 	require.False(t, has)
 
 	// Rollback milestone
-	require.NoError(t, manager.RollbackDiff(spent.SlotIndexSpent(), utxoledger.Outputs{}, utxoledger.Spents{spent}))
+	require.NoError(t, manager.RollbackDiff(spent.SlotSpent(), utxoledger.Outputs{}, utxoledger.Spents{spent}))
 
 	// Verify that it is unspent
 	unspent, err = manager.IsOutputIDUnspentWithoutLocking(outputID)
@@ -182,7 +182,7 @@ func TestBasicOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) {
 				Address: address,
 			},
 			&iotago.TimelockUnlockCondition{
-				SlotIndex: timeLockUnlockSlot,
+				Slot: timeLockUnlockSlot,
 			},
 		},
 		Features: iotago.BasicOutputFeatures{
@@ -259,7 +259,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 				Address: address.ToAddress(),
 			},
 			&iotago.ExpirationUnlockCondition{
-				SlotIndex:     expirationUnlockSlot,
+				Slot:          expirationUnlockSlot,
 				ReturnAddress: issuerAddress,
 			},
 		},

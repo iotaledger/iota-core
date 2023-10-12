@@ -25,11 +25,11 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 
 	return &inx.NodeStatus{
 		IsHealthy:                   status.NodeSynced,
-		LastAcceptedBlockSlot:       uint64(status.LastAcceptedBlockSlot),
-		LastConfirmedBlockSlot:      uint64(status.LastConfirmedBlockSlot),
+		LastAcceptedBlockSlot:       uint32(status.LastAcceptedBlockSlot),
+		LastConfirmedBlockSlot:      uint32(status.LastConfirmedBlockSlot),
 		LatestCommitment:            inxCommitment(status.LatestCommitment),
 		LatestFinalizedCommitmentId: inx.NewCommitmentId(finalizedCommitmentID),
-		PruningEpoch:                uint64(status.LastPrunedEpoch),
+		PruningEpoch:                uint32(status.LastPrunedEpoch),
 	}
 }
 

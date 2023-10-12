@@ -125,7 +125,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 		resp.IncludedCommitmentID = includedCommitment.ID()
 	}
 
-	spentSlotIndex := spent.SlotIndexSpent()
+	spentSlotIndex := spent.SlotSpent()
 	if spentSlotIndex <= latestCommitment.Slot() {
 		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
 		if err != nil {
