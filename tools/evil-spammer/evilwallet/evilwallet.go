@@ -664,7 +664,11 @@ func (e *EvilWallet) makeTransaction(inputs []*models.Output, outputs iotago.Out
 		inputPrivateKey, _ := wallet.KeyPair(index)
 		walletKeys[i] = iotago.AddressKeys{Address: addr, Keys: inputPrivateKey}
 	}
-	txBuilder.SetCreationSlot(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
+	targetSlot := clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now())
+	txBuilder.SetCreationSlot(targetSlot)
+	// allot all mana to the faucet output
+	// TODO; request block issuer data and congestion, make the same data is used for block issuance
+	txBuilder.AllotAllMana(targetSlot, rmc, blockIssuerAccountID)
 
 	return txBuilder.Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 }
