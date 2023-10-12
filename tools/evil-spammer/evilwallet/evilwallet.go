@@ -186,7 +186,6 @@ func (e *EvilWallet) RequestFreshBigFaucetWallet() error {
 	receiveWallet := e.NewWallet(Fresh)
 
 	txIDs := make(iotago.TransactionIDs, 0)
-	// TODO: calculate the exact number of required funds so we don't run out after a while
 	for i := 0; i < 1; i++ {
 		txID, err := e.requestAndSplitFaucetFunds(initWallet, receiveWallet)
 		if err != nil {

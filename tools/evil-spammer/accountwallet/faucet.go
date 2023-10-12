@@ -82,7 +82,6 @@ func (a *AccountWallet) PostWithBlock(clt models.Client, payload iotago.Payload,
 
 }
 
-// TODO: create validation blocks too
 func (a *AccountWallet) CreateBlock(clt *nodeclient.Client, payload iotago.Payload, issuer blockhandler.Account) (*iotago.ProtocolBlock, error) {
 	blockBuilder := builder.NewBasicBlockBuilder(a.api)
 
@@ -90,7 +89,6 @@ func (a *AccountWallet) CreateBlock(clt *nodeclient.Client, payload iotago.Paylo
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get congestion data for issuer %s", issuer.ID().ToHex())
 	}
-	// TODO: modify block issuance api to indicate the slot index for commitment, to make sure it maches with congestion response
 	issuerResp, err := clt.BlockIssuance(context.Background())
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to get block issuance data")
@@ -239,9 +237,6 @@ func (f *faucet) createFaucetTransaction(receiveAddr iotago.Address, amount iota
 
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("Faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
 	txBuilder.SetCreationSlot(f.clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
-	// TODO: if we want to test allotting exactly the same amount as for burning mana we need to update and join tx and block creation brocess
-	// txBuilder.AllotRequiredManaAndStoreRemainingManaInOutput()
-	// BuildAndSwapToBlockBuilder
 	signedTx, err := txBuilder.Build(f.genesisHdWallet.AddressSigner())
 	if err != nil {
 		log.Errorf("failed to build transaction: %s", err)
