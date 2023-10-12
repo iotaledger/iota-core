@@ -136,7 +136,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(9),
 			testsuite.WithEqualStoredCommitmentAtIndex(9),
 			testsuite.WithLatestCommitmentCumulativeWeight(28), // 7 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(9), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommitteeFull...),
 			testsuite.WithEvictedSlot(9),
 		)
@@ -162,7 +162,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(14),
 			testsuite.WithEqualStoredCommitmentAtIndex(14),
 			testsuite.WithLatestCommitmentCumulativeWeight(48), // 7 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(14, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(14), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommitteeFull...),
 			testsuite.WithEvictedSlot(14),
 		)
@@ -321,7 +321,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(9),
 			testsuite.WithEqualStoredCommitmentAtIndex(9),
 			testsuite.WithLatestCommitmentCumulativeWeight(28), // 7 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(9), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommitteeFull...),
 			testsuite.WithEvictedSlot(9),
 		)
@@ -354,7 +354,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(14),
 			testsuite.WithEqualStoredCommitmentAtIndex(14),
 			testsuite.WithLatestCommitmentCumulativeWeight(44), // 7 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(14, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(14), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommitteeHalf...),
 			testsuite.WithEvictedSlot(14),
 		)
@@ -513,7 +513,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(9),
 			testsuite.WithEqualStoredCommitmentAtIndex(9),
 			testsuite.WithLatestCommitmentCumulativeWeight(28), // 7 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(9), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommitteeFull...),
 			testsuite.WithEvictedSlot(9),
 		)
@@ -546,7 +546,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(17),
 			testsuite.WithEqualStoredCommitmentAtIndex(17),
 			testsuite.WithLatestCommitmentCumulativeWeight(50), // 7 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(17, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(17), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommitteeHalf...),
 			testsuite.WithEvictedSlot(17),
 		)
@@ -705,7 +705,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 			testsuite.WithLatestCommitmentSlotIndex(9),
 			testsuite.WithEqualStoredCommitmentAtIndex(9),
 			testsuite.WithLatestCommitmentCumulativeWeight(28), // 7 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(9, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(9), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommitteeFull...),
 			testsuite.WithEvictedSlot(9),
 		)
@@ -738,7 +738,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 			testsuite.WithLatestCommitmentSlotIndex(13),
 			testsuite.WithEqualStoredCommitmentAtIndex(13),
 			testsuite.WithLatestCommitmentCumulativeWeight(42), // 7 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(13, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(13), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommitteeHalf...),
 			testsuite.WithEvictedSlot(13),
 		)

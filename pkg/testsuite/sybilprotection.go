@@ -10,12 +10,12 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertSybilProtectionCommittee(slot iotago.SlotIndex, expectedAccounts []iotago.AccountID, nodes ...*mock.Node) {
+func (t *TestSuite) AssertSybilProtectionCommittee(epoch iotago.EpochIndex, expectedAccounts []iotago.AccountID, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			accounts := lo.Return1(node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)).Accounts().IDs()
+			accounts := lo.Return1(node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInEpoch(epoch)).Accounts().IDs()
 			if !assert.ElementsMatch(t.fakeTesting, expectedAccounts, accounts) {
 				return ierrors.Errorf("AssertSybilProtectionCommittee: %s: expected %s, got %s", node.Name, expectedAccounts, accounts)
 			}

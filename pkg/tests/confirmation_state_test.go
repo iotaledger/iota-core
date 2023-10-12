@@ -153,7 +153,7 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(2),
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
-			testsuite.WithSybilProtectionCommittee(slot2CommittableSlot, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(slot2CommittableSlot), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(
 				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
 				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),
@@ -193,7 +193,7 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(0),
 			testsuite.WithLatestCommitmentSlotIndex(2),
 			testsuite.WithEqualStoredCommitmentAtIndex(2),
-			testsuite.WithSybilProtectionCommittee(slot3CommittableSlot, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(slot3CommittableSlot), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(
 				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
 				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),
@@ -248,7 +248,7 @@ func TestConfirmationFlags(t *testing.T) {
 			testsuite.WithLatestFinalizedSlot(1),
 			testsuite.WithLatestCommitmentSlotIndex(3),
 			testsuite.WithEqualStoredCommitmentAtIndex(3),
-			testsuite.WithSybilProtectionCommittee(slot4CommittableSlot, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(slot4CommittableSlot), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(
 				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
 				lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),

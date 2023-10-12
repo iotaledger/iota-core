@@ -62,6 +62,11 @@ func Test_TopStakersRotation(t *testing.T) {
 			),
 		)}
 	}
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		ts.Node("node1").Validator.AccountID,
+		ts.Node("node2").Validator.AccountID,
+		ts.Node("node3").Validator.AccountID,
+	}, ts.Nodes()...)
 
 	// TODO: replace with CandidacyPayload
 	//pointOfNoReturn := ts.API.TimeProvider().EpochEnd(0) - ts.API.ProtocolParameters().MaxCommittableAge()
@@ -69,4 +74,9 @@ func Test_TopStakersRotation(t *testing.T) {
 	//ts.IssueBlocksAtSlots("commit:", []iotago.SlotIndex{pointOfNoReturn - 1, pointOfNoReturn, pointOfNoReturn + 1}, 4, "candidate:9", ts.Nodes("node1", "node2", "node3"), true, nil)
 
 	ts.AssertLatestFinalizedSlot(13, ts.Nodes()...)
+	ts.AssertSybilProtectionCommittee(1, []iotago.AccountID{
+		ts.Node("node4").Validator.AccountID,
+		ts.Node("node5").Validator.AccountID,
+		ts.Node("node6").Validator.AccountID,
+	}, ts.Nodes()...)
 }

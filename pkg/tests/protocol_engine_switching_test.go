@@ -163,7 +163,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(11),
 			testsuite.WithEqualStoredCommitmentAtIndex(11),
 			testsuite.WithLatestCommitmentCumulativeWeight(56), // 7 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(11), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 		)
@@ -218,7 +218,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(18),
 			testsuite.WithEqualStoredCommitmentAtIndex(18),
 			testsuite.WithLatestCommitmentCumulativeWeight(99), // 56 + slot 12-15=7 + 5 for each slot starting from 16
-			testsuite.WithSybilProtectionCommittee(18, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(18), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedP1OnlineCommittee...),
 			testsuite.WithEvictedSlot(18),
 		)
@@ -272,7 +272,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(18),
 			testsuite.WithEqualStoredCommitmentAtIndex(18),
 			testsuite.WithLatestCommitmentCumulativeWeight(90), // 56 + slot 12-15=7 + 2 for each slot starting from 16
-			testsuite.WithSybilProtectionCommittee(18, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(18), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedP2OnlineCommittee...),
 			testsuite.WithEvictedSlot(18),
 		)

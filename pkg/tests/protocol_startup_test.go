@@ -208,7 +208,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(5),
 			testsuite.WithEqualStoredCommitmentAtIndex(5),
 			testsuite.WithLatestCommitmentCumulativeWeight(4), // 2 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(5, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(5), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(5),
 			testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
@@ -256,7 +256,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(11),
 			testsuite.WithEqualStoredCommitmentAtIndex(11),
 			testsuite.WithLatestCommitmentCumulativeWeight(16), // 2 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(11), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 			testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
@@ -340,7 +340,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				testsuite.WithLatestCommitmentSlotIndex(11),
 				testsuite.WithEqualStoredCommitmentAtIndex(11),
 				testsuite.WithLatestCommitmentCumulativeWeight(16), // 2 for each slot starting from 4
-				testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
+				testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(11), expectedCommittee),
 				testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 				testsuite.WithEvictedSlot(11),
 				testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
@@ -396,7 +396,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(37),
 			testsuite.WithEqualStoredCommitmentAtIndex(37),
 			testsuite.WithLatestCommitmentCumulativeWeight(68), // 2 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(37, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(37), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(37),
 			testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
