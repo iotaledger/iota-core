@@ -471,7 +471,7 @@ func (n *Node) Shutdown() {
 
 func (n *Node) ProtocolParametersHash() iotago.Identifier {
 	if n.protocolParametersHash == iotago.EmptyIdentifier {
-		return lo.PanicOnErr(n.Protocol.CurrentAPI().ProtocolParameters().Hash())
+		return lo.PanicOnErr(n.Protocol.LatestAPI().ProtocolParameters().Hash())
 	}
 
 	return n.protocolParametersHash
