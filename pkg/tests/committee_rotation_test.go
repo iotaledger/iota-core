@@ -14,13 +14,20 @@ import (
 
 func Test_TopStakersRotation(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(3),
-		testsuite.WithMaxCommittableAge(4),
-		testsuite.WithEpochNearingThreshold(5),
-		testsuite.WithSlotsPerEpochExponent(4),
-		testsuite.WithGenesisTimestampOffset(100*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				4,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				3,
+				4,
+				5,
+			),
+		),
 		testsuite.WithSnapshotOptions(
 			snapshotcreator.WithSeatManagerProvider(
 				topstakers.NewProvider(
