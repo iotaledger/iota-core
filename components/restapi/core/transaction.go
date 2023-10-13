@@ -22,8 +22,7 @@ func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
 
 func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockID, error) {
 	// Get the first output of that transaction (using index 0)
-	outputID := iotago.OutputID{}
-	copy(outputID[:], transactionID[:])
+	outputID := iotago.OutputIDFromTransactionIDAndIndex(transactionID, 0)
 
 	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
