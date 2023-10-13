@@ -23,6 +23,8 @@ type Options struct {
 	outputBatchAliases map[string]types.Empty
 	reuse              bool
 	issuingTime        time.Time
+	allotmentStrategy  models.AllotmentStrategy
+	issuerAccountID    iotago.AccountID
 	// maps input alias to desired output type, used to create account output types
 	specialOutputTypes map[string]iotago.OutputType
 }
@@ -163,8 +165,15 @@ func WithOutputs(outputsOptions []*OutputOption) Option {
 	}
 }
 
-// WithIssuer returns a BlockOption that is used to define the inputWallet of the Block.
-func WithIssuer(issuer *Wallet) Option {
+func WithIssuanceStrategy(strategy models.AllotmentStrategy, issuerID iotago.AccountID) Option {
+	return func(options *Options) {
+		options.allotmentStrategy = strategy
+		options.issuerAccountID = issuerID
+	}
+}
+
+// WithInputWallet returns a BlockOption that is used to define the inputWallet of the Block.
+func WithInputWallet(issuer *Wallet) Option {
 	return func(options *Options) {
 		options.inputWallet = issuer
 	}

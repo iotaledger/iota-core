@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 // Input contains details of an input.
@@ -66,4 +67,22 @@ func (a *AccountState) ToAccountData() *AccountData {
 		OutputID: a.OutputID,
 		Index:    a.Index,
 	}
+}
+
+type TransactionIssuanceData struct {
+	Transaction        *iotago.SignedTransaction
+	CongestionResponse *apimodels.CongestionResponse
+}
+
+type AllotmentStrategy uint8
+
+const (
+	AllotmentStrategyNone AllotmentStrategy = iota
+	AllotmentStrategyMinCost
+	AllotmentStrategyAll
+)
+
+type IssuancePaymentStrategy struct {
+	AllotmentStrategy AllotmentStrategy
+	IssuerAlias       string
 }
