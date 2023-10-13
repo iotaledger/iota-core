@@ -33,6 +33,11 @@ var (
 	ErrBlockTooRecent                         = ierrors.New("block is too recent compared to latest commitment")
 )
 
+// TODO: make sure an honest validator does not issue blocks within the same slot ratification period in two conflicting chains.
+//  - this can be achieved by remembering the last issued block together with the engine name/chain.
+//  - if the engine name/chain is the same we can always issue a block.
+//  - if the engine name/chain is different we need to make sure to wait "slot ratification" slots.
+
 // BlockIssuer contains logic to create and issue blocks signed by the given account.
 type BlockIssuer struct {
 	Testing *testing.T
@@ -112,6 +117,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 	}
 
 	if blockParams.BlockHeader.References == nil {
+		// TODO: change this to get references for validator block
 		references, err := i.getReferences(ctx, nil, node, blockParams.BlockHeader.ParentsCount)
 		require.NoError(i.Testing, err)
 
@@ -397,6 +403,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	case *iotago.ValidationBlock:
 		//nolint:revive,staticcheck //temporarily disable
 		if len(iotaBlock.Parents()) == 0 {
+			// TODO: implement tipselection for validator blocks
 		}
 	}
 
