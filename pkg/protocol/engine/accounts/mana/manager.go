@@ -66,7 +66,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		}
 		totalMana, err := safemath.SafeAdd(output.StoredMana(), decayedBIC)
 		if err != nil {
-			return 0, ierrors.Wrapf(err, "overflow when adding stored mana and decayed BIC for account %s", accountID)
+			return 0, ierrors.Wrapf(err, "overflow when adding stored mana (%d) and decayed BIC (%d) for account %s", output.StoredMana(), decayedBIC, accountID)
 		}
 
 		mana = accounts.NewMana(totalMana, excessBaseTokens, output.SlotCreated())

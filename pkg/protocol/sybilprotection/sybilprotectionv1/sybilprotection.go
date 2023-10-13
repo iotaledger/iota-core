@@ -131,7 +131,9 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 		return
 	}
 
-	o.performanceTracker.TrackCandidateBlock(block)
+	if block.Payload().PayloadType() == iotago.PayloadCandidacyAnnouncement {
+		o.performanceTracker.TrackCandidateBlock(block)
+	}
 }
 
 func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewardsRoot iotago.Identifier, err error) {
@@ -312,6 +314,7 @@ func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.
 }
 
 // OrderedRegisteredCandidateValidatorsList returns the currently known list of registered validator candidates for the given epoch.
+// TODO: should a method that returns apimodels be part of SybilProtection?
 func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error) {
 	candidates := o.performanceTracker.ValidatorCandidates(epoch)
 	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)

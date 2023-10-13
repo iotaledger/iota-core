@@ -615,7 +615,7 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) err
 func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds Deficit, slot iotago.SlotIndex) error {
 	quantum, err := s.quantumFunc(issuerID, slot)
 	if err != nil {
-		return err
+		return ierrors.Wrap(err, "failed to retrieve quantum")
 	}
 
 	delta, err := safemath.SafeMul(quantum, rounds)

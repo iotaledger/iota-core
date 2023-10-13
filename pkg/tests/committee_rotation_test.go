@@ -31,12 +31,12 @@ func Test_TopStakersRotation(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
-	ts.AddValidatorNode("node1", 1_000_002)
-	ts.AddValidatorNode("node2", 1_000_001)
-	ts.AddValidatorNode("node3", 1_000_000)
-	ts.AddValidatorNode("node4")
-	ts.AddValidatorNode("node5")
-	ts.AddValidatorNode("node6")
+	ts.AddValidatorNode("node1", 1_000_006)
+	ts.AddValidatorNode("node2", 1_000_005)
+	ts.AddValidatorNode("node3", 1_000_004)
+	ts.AddValidatorNode("node4", 1_000_003)
+	ts.AddValidatorNode("node5", 1_000_002)
+	ts.AddValidatorNode("node6", 1_000_001)
 
 	nodeOptions := make(map[string][]options.Option[protocol.Protocol])
 
@@ -68,15 +68,41 @@ func Test_TopStakersRotation(t *testing.T) {
 		ts.Node("node3").Validator.AccountID,
 	}, ts.Nodes()...)
 
-	// TODO: replace with CandidacyPayload
-	//pointOfNoReturn := ts.API.TimeProvider().EpochEnd(0) - ts.API.ProtocolParameters().MaxCommittableAge()
-	ts.IssueBlocksAtSlots("candidate:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}, 4, "Genesis", ts.Nodes(), true, nil)
-	//ts.IssueBlocksAtSlots("commit:", []iotago.SlotIndex{pointOfNoReturn - 1, pointOfNoReturn, pointOfNoReturn + 1}, 4, "candidate:9", ts.Nodes("node1", "node2", "node3"), true, nil)
+	ts.IssueBlocksAtSlots("wave-1:", []iotago.SlotIndex{1, 2, 3, 4}, 4, "Genesis", ts.Nodes(), true, nil)
 
-	ts.AssertLatestFinalizedSlot(13, ts.Nodes()...)
-	ts.AssertSybilProtectionCommittee(1, []iotago.AccountID{
+	ts.IssueCandidacyAnnouncementInSlot("node1-candidacy:1", 4, "wave-1:4.3", ts.Node("node1"))
+	ts.IssueCandidacyAnnouncementInSlot("node4-candidacy:1", 5, "node1-candidacy:1", ts.Node("node4"))
+
+	ts.IssueBlocksAtSlots("wave-2:", []iotago.SlotIndex{5, 6, 7, 8, 9}, 4, "node4-candidacy:1", ts.Nodes(), true, nil)
+
+	ts.IssueCandidacyAnnouncementInSlot("node4-candidacy:2", 9, "wave-2:9.3", ts.Node("node4"))
+	ts.IssueCandidacyAnnouncementInSlot("node5-candidacy:1", 9, "node4-candidacy:2", ts.Node("node5"))
+
+	// This candidacy should be considered as it's announced at the last possible slot.
+	ts.IssueCandidacyAnnouncementInSlot("node6-candidacy:1", 10, "node5-candidacy:1", ts.Node("node6"))
+
+	ts.IssueBlocksAtSlots("wave-3:", []iotago.SlotIndex{10}, 4, "node6-candidacy:1", ts.Nodes(), true, nil)
+
+	// Those candidacies should not be considered as they're issued after EpochNearingThreshold (slot 10).
+	ts.IssueCandidacyAnnouncementInSlot("node2-candidacy:1", 11, "wave-3:10.3", ts.Node("node2"))
+	ts.IssueCandidacyAnnouncementInSlot("node3-candidacy:1", 11, "node2-candidacy:1", ts.Node("node3"))
+	ts.IssueCandidacyAnnouncementInSlot("node4-candidacy:3", 11, "node3-candidacy:1", ts.Node("node3"))
+	ts.IssueCandidacyAnnouncementInSlot("node5-candidacy:2", 11, "node4-candidacy:3", ts.Node("node3"))
+
+	// Assert that only candidates that issued before slot 11 are considered.
+	ts.AssertSybilProtectionCandidates(1, []iotago.AccountID{
+		ts.Node("node1").Validator.AccountID,
 		ts.Node("node4").Validator.AccountID,
 		ts.Node("node5").Validator.AccountID,
 		ts.Node("node6").Validator.AccountID,
+	}, ts.Nodes()...)
+
+	ts.IssueBlocksAtSlots("wave-4:", []iotago.SlotIndex{11, 12, 13, 14, 15, 16, 17}, 4, "node5-candidacy:2", ts.Nodes(), true, nil)
+
+	ts.AssertLatestFinalizedSlot(13, ts.Nodes()...)
+	ts.AssertSybilProtectionCommittee(1, []iotago.AccountID{
+		ts.Node("node1").Validator.AccountID,
+		ts.Node("node4").Validator.AccountID,
+		ts.Node("node5").Validator.AccountID,
 	}, ts.Nodes()...)
 }

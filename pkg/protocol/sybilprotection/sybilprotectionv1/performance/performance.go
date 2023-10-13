@@ -80,6 +80,10 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 
 	blockEpoch := t.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochFromSlot(block.ID().Slot())
 
+	if block.Payload().PayloadType() != iotago.PayloadCandidacyAnnouncement {
+		return
+	}
+
 	var rollback bool
 	t.nextEpochCommitteeCandidates.Compute(block.ProtocolBlock().IssuerID, func(currentValue iotago.SlotIndex, exists bool) iotago.SlotIndex {
 		if !exists || currentValue > block.ID().Slot() {
