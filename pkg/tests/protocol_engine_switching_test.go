@@ -28,13 +28,20 @@ import (
 
 func TestProtocol_EngineSwitching(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(4),
-		testsuite.WithEpochNearingThreshold(2),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				4,
+				2,
+			),
+		),
 
 		testsuite.WithWaitFor(15*time.Second),
 	)
@@ -340,11 +347,11 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		node2.Validator.IssueActivity(ctxP1, wg, 21, node2)
 		node3.Validator.IssueActivity(ctxP1, wg, 21, node3)
 		node4.Validator.IssueActivity(ctxP1, wg, 21, node4)
-		//node5.Validator.IssueActivity(ctxP1, wg, 21, node5)
+		// node5.Validator.IssueActivity(ctxP1, wg, 21, node5)
 
 		node6.Validator.IssueActivity(ctxP2, wg, 21, node6)
 		node7.Validator.IssueActivity(ctxP2, wg, 21, node7)
-		//node8.Validator.IssueActivity(ctxP2, wg, 21, node8)
+		// node8.Validator.IssueActivity(ctxP2, wg, 21, node8)
 
 		// P1 finalized until slot 18. We do not expect any forks here because our CW is higher than the other partition's.
 		ts.AssertForkDetectedCount(0, nodesP1...)
