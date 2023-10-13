@@ -305,7 +305,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 	if latestCommittedSlot >= slot {
 		return parent
 	}
-	nextBlockSlot := lo.Min(slot+t.optsMinCommittableAge, latestCommittedSlot+t.optsMinCommittableAge)
+	nextBlockSlot := lo.Min(slot+t.API.ProtocolParameters().MinCommittableAge(), latestCommittedSlot+t.API.ProtocolParameters().MinCommittableAge())
 	tip := parent
 	chainIndex := 0
 	for {
@@ -330,14 +330,14 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 		}
 
 		for _, node := range activeValidators {
-			t.AssertLatestCommitmentSlotIndex(nextBlockSlot-t.optsMinCommittableAge, node)
+			t.AssertLatestCommitmentSlotIndex(nextBlockSlot-t.API.ProtocolParameters().MinCommittableAge(), node)
 		}
 
-		if nextBlockSlot == slot+t.optsMinCommittableAge {
+		if nextBlockSlot == slot+t.API.ProtocolParameters().MinCommittableAge() {
 			break
 		}
 
-		nextBlockSlot = lo.Min(slot+t.optsMinCommittableAge, nextBlockSlot+t.optsMinCommittableAge)
+		nextBlockSlot = lo.Min(slot+t.API.ProtocolParameters().MinCommittableAge(), nextBlockSlot+t.API.ProtocolParameters().MinCommittableAge())
 		chainIndex += 2
 	}
 

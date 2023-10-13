@@ -34,9 +34,20 @@ func Test_TransitionAccount(t *testing.T) {
 		// On Validator nodes it's unlimited (MaxInt64).
 		BlockIssuanceCredits: iotago.BlockIssuanceCredits(123),
 	}),
-		testsuite.WithGenesisTimestampOffset(100*10),
-		testsuite.WithMaxCommittableAge(100),
-		testsuite.WithSlotsPerEpochExponent(8),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				8,
+			),
+			iotago.WithLivenessOptions(
+				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
+				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
+				testsuite.DefaultMinCommittableAge,
+				100,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
 	)
 	defer ts.Shutdown()
 
