@@ -196,7 +196,9 @@ func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams, node *Node) (i
 		return node.Protocol.APIForVersion(*blockParams.ProtocolVersion)
 	}
 
-	return node.Protocol.CurrentAPI(), nil
+	slot := node.Protocol.LatestAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime)
+
+	return node.Protocol.APIForSlot(slot), nil
 }
 
 // CreateBlock creates a new block with the options.
