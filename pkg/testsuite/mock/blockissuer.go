@@ -186,7 +186,9 @@ func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, no
 
 	require.NoError(i.Testing, i.IssueBlock(block.ModelBlock(), node))
 
-	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
+	validationBlock, _ := block.ValidationBlock()
+
+	fmt.Printf("Issued ValidationBlock: %s - slot %d - commitment %s %d - latest finalized slot %d - version: %d - highestSupportedVersion: %d, hash: %s\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot, block.ProtocolBlock().ProtocolVersion, validationBlock.HighestSupportedVersion, validationBlock.ProtocolParametersHash)
 
 	return block
 }
@@ -363,12 +365,12 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	// if anything changes, need to make a new signature
 	var resign bool
 
-	apiForVesion, err := node.Protocol.APIForVersion(iotaBlock.ProtocolVersion)
+	apiForVersion, err := node.Protocol.APIForVersion(iotaBlock.ProtocolVersion)
 	if err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
 	}
 
-	protoParams := apiForVesion.ProtocolParameters()
+	protoParams := apiForVersion.ProtocolParameters()
 
 	if iotaBlock.NetworkID == 0 {
 		iotaBlock.NetworkID = protoParams.NetworkID()
@@ -423,7 +425,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
-		rmcSlot, err := safemath.SafeSub(apiForVesion.TimeProvider().SlotFromTime(iotaBlock.IssuingTime), apiForVesion.ProtocolParameters().MaxCommittableAge())
+		rmcSlot, err := safemath.SafeSub(apiForVersion.TimeProvider().SlotFromTime(iotaBlock.IssuingTime), apiForVersion.ProtocolParameters().MaxCommittableAge())
 		if err != nil {
 			rmcSlot = 0
 		}
@@ -433,7 +435,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		}
 
 		// only set the burned Mana as the last step before signing, so workscore calculation is correct.
-		basicBlock.MaxBurnedMana, err = basicBlock.ManaCost(rmc, apiForVesion.ProtocolParameters().WorkScoreStructure())
+		basicBlock.MaxBurnedMana, err = basicBlock.ManaCost(rmc, apiForVersion.ProtocolParameters().WorkScoreStructure())
 		if err != nil {
 			return iotago.EmptyBlockID, ierrors.Wrapf(err, "could not calculate Mana cost for block")
 		}
