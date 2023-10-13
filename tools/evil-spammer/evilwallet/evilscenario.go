@@ -8,7 +8,6 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ds/types"
-	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -55,8 +54,6 @@ type EvilScenario struct {
 	BatchesCreated *atomic.Uint64
 	// used to determine how many clients are needed to run this scenario, some double spends need more than one client to pass the filter
 	NumOfClientsNeeded int
-	// used to indicate if and how to include allotment into a transaction.
-	IssuancePaymentStrategy *models.IssuancePaymentStrategy
 }
 
 func NewEvilScenario(options ...ScenarioOption) *EvilScenario {
@@ -66,9 +63,6 @@ func NewEvilScenario(options ...ScenarioOption) *EvilScenario {
 		OutputType:     iotago.OutputBasic,
 		OutputWallet:   NewWallet(),
 		BatchesCreated: atomic.NewUint64(0),
-		IssuancePaymentStrategy: &models.IssuancePaymentStrategy{
-			AllotmentStrategy: models.AllotmentStrategyNone,
-		},
 	}
 
 	for _, option := range options {

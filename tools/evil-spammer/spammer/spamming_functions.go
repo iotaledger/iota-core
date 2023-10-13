@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func DataSpammingFunction(s *Spammer) {
@@ -14,25 +15,23 @@ func DataSpammingFunction(s *Spammer) {
 	// sleep randomly to avoid issuing blocks in different goroutines at once
 	//nolint:gosec
 	time.Sleep(time.Duration(rand.Float64()*20) * time.Millisecond)
-	// if err := wallet.RateSetterSleep(clt, s.UseRateSetter); err != nil {
-	// 	s.ErrCounter.CountError(err)
-	// }
-	blkID, err := clt.PostData([]byte("SPAM"))
-	if err != nil {
-		s.ErrCounter.CountError(ErrFailSendDataBlock)
-		s.log.Error(err)
-	}
 
-	count := s.State.txSent.Add(1)
-	if count%int64(s.SpamDetails.Rate*2) == 0 {
-		s.log.Debugf("Last sent block, ID: %s; blkCount: %d", blkID, count)
-	}
+	s.PrepareAndPostBlock(&models.PayloadIssuanceData{
+		Payload: &iotago.TaggedData{
+			Tag: []byte("SPAM"),
+		},
+	}, s.IssuerAlias, clt)
+
 	s.State.batchPrepared.Add(1)
 	s.CheckIfAllSent()
 }
 
 func CustomConflictSpammingFunc(s *Spammer) {
-	conflictBatch, aliases, err := s.EvilWallet.PrepareCustomConflictsSpam(s.EvilScenario)
+	conflictBatch, aliases, err := s.EvilWallet.PrepareCustomConflictsSpam(s.EvilScenario, &models.IssuancePaymentStrategy{
+		AllotmentStrategy: models.AllotmentStrategyAll,
+		IssuerAlias:       s.IssuerAlias,
+	})
+
 	if err != nil {
 		s.log.Debugf(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()).Error())
 		s.ErrCounter.CountError(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()))
@@ -49,14 +48,14 @@ func CustomConflictSpammingFunc(s *Spammer) {
 		wg := sync.WaitGroup{}
 		for i, txData := range txsData {
 			wg.Add(1)
-			go func(clt models.Client, tx *models.TransactionIssuanceData) {
+			go func(clt models.Client, tx *models.PayloadIssuanceData) {
 				defer wg.Done()
 
 				// sleep randomly to avoid issuing blocks in different goroutines at once
 				//nolint:gosec
 				time.Sleep(time.Duration(rand.Float64()*100) * time.Millisecond)
 
-				s.PrepareAndPostBlock(tx, s.EvilScenario.IssuancePaymentStrategy.IssuerAlias, clt)
+				s.PrepareAndPostBlock(tx, s.IssuerAlias, clt)
 			}(clients[i], txData)
 		}
 		wg.Wait()
@@ -69,12 +68,15 @@ func CustomConflictSpammingFunc(s *Spammer) {
 func AccountSpammingFunction(s *Spammer) {
 	clt := s.Clients.GetClient()
 	// update scenario
-	txData, aliases, err := s.EvilWallet.PrepareAccountSpam(s.EvilScenario)
+	txData, aliases, err := s.EvilWallet.PrepareAccountSpam(s.EvilScenario, &models.IssuancePaymentStrategy{
+		AllotmentStrategy: models.AllotmentStrategyAll,
+		IssuerAlias:       s.IssuerAlias,
+	})
 	if err != nil {
 		s.log.Debugf(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()).Error())
 		s.ErrCounter.CountError(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()))
 	}
-	s.PrepareAndPostBlock(txData, s.EvilScenario.IssuancePaymentStrategy.IssuerAlias, clt)
+	s.PrepareAndPostBlock(txData, s.IssuerAlias, clt)
 
 	s.State.batchPrepared.Add(1)
 	s.EvilWallet.ClearAliases(aliases)

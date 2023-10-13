@@ -69,8 +69,8 @@ func (a *AccountState) ToAccountData() *AccountData {
 	}
 }
 
-type TransactionIssuanceData struct {
-	Transaction        *iotago.SignedTransaction
+type PayloadIssuanceData struct {
+	Payload            iotago.Payload
 	CongestionResponse *apimodels.CongestionResponse
 }
 
