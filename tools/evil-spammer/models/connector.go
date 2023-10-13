@@ -176,6 +176,8 @@ type Client interface {
 	GetTransaction(txID iotago.TransactionID) (resp *iotago.SignedTransaction, err error)
 	// GetBlockIssuance returns the latest commitment and data needed to create a new block.
 	GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error)
+	// GetCongestion returns congestion data such as rmc or issuing readiness.
+	GetCongestion(id iotago.AccountID) (resp *apimodels.CongestionResponse, err error)
 
 	iotago.APIProvider
 }

@@ -7,7 +7,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func DataSpammingFunction(s *Spammer) {
@@ -39,26 +38,26 @@ func CustomConflictSpammingFunc(s *Spammer) {
 		s.ErrCounter.CountError(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()))
 	}
 
-	for _, txs := range conflictBatch {
-		clients := s.Clients.GetClients(len(txs))
-		if len(txs) > len(clients) {
+	for _, txsData := range conflictBatch {
+		clients := s.Clients.GetClients(len(txsData))
+		if len(txsData) > len(clients) {
 			s.log.Debug(ErrFailToPrepareBatch)
 			s.ErrCounter.CountError(ErrInsufficientClients)
 		}
 
 		// send transactions in parallel
 		wg := sync.WaitGroup{}
-		for i, tx := range txs {
+		for i, txData := range txsData {
 			wg.Add(1)
-			go func(clt models.Client, tx *iotago.SignedTransaction) {
+			go func(clt models.Client, tx *models.TransactionIssuanceData) {
 				defer wg.Done()
 
 				// sleep randomly to avoid issuing blocks in different goroutines at once
 				//nolint:gosec
 				time.Sleep(time.Duration(rand.Float64()*100) * time.Millisecond)
 
-				s.PrepareAndPostBlock(tx, clt)
-			}(clients[i], tx)
+				s.PrepareAndPostBlock(tx, s.EvilScenario.IssuancePaymentStrategy.IssuerAlias, clt)
+			}(clients[i], txData)
 		}
 		wg.Wait()
 	}
@@ -70,12 +69,12 @@ func CustomConflictSpammingFunc(s *Spammer) {
 func AccountSpammingFunction(s *Spammer) {
 	clt := s.Clients.GetClient()
 	// update scenario
-	tx, aliases, err := s.EvilWallet.PrepareAccountSpam(s.EvilScenario)
+	txData, aliases, err := s.EvilWallet.PrepareAccountSpam(s.EvilScenario)
 	if err != nil {
 		s.log.Debugf(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()).Error())
 		s.ErrCounter.CountError(ierrors.Wrap(ErrFailToPrepareBatch, err.Error()))
 	}
-	s.PrepareAndPostBlock(tx, clt)
+	s.PrepareAndPostBlock(txData, s.EvilScenario.IssuancePaymentStrategy.IssuerAlias, clt)
 
 	s.State.batchPrepared.Add(1)
 	s.EvilWallet.ClearAliases(aliases)

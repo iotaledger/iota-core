@@ -64,7 +64,7 @@ func WithSpammingFunc(spammerFunc func(s *Spammer)) Options {
 // WithAccountAlias sets the alias of the account that will be used to pay with mana for sent blocks.
 func WithAccountAlias(alias string) Options {
 	return func(s *Spammer) {
-		s.IssuerAccountAlias = alias
+		// TODO add param for allotment strategy
 	}
 }
 
