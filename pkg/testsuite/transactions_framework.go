@@ -27,11 +27,6 @@ type TransactionFramework struct {
 }
 
 func NewTransactionFramework(t *testing.T, protocol *protocol.Protocol, genesisSeed []byte, accounts ...snapshotcreator.AccountDetails) *TransactionFramework {
-	// The genesis output is on index 0 of the genesis TX
-	genesisOutput, err := protocol.MainEngineInstance().Ledger.Output(iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 0))
-	if err != nil {
-		panic(err)
-	}
 
 	tf := &TransactionFramework{
 		apiProvider:        protocol,

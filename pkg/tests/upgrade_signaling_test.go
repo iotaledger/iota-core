@@ -22,7 +22,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
-	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
