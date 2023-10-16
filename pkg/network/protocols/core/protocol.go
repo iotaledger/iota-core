@@ -127,7 +127,7 @@ func (p *Protocol) handlePacket(nbr peer.ID, packet proto.Message) (err error) {
 	case *nwmodels.Packet_WarpSyncRequest:
 		p.handleWarpSyncRequest(packetBody.WarpSyncRequest.GetCommitmentId(), nbr)
 	case *nwmodels.Packet_WarpSyncResponse:
-		p.handleWarpSyncResponse(packetBody.WarpSyncResponse.GetCommitmentId(), packetBody.WarpSyncResponse.GetBlockIds(), packetBody.WarpSyncResponse.GetMerkleProof(), nbr)
+		p.handleWarpSyncResponse(packetBody.WarpSyncResponse.GetCommitmentId(), packetBody.WarpSyncResponse.GetBlockIds(), packetBody.WarpSyncResponse.GetTangleMerkleProof(), packetBody.WarpSyncResponse.GetTransactionIds(), packetBody.WarpSyncResponse.GetMutationsMerkleProof(), nbr)
 	default:
 		return ierrors.Errorf("unsupported packet; packet=%+v, packetBody=%T-%+v", packet, packetBody, packetBody)
 	}

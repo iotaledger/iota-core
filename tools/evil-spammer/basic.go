@@ -29,7 +29,7 @@ type CustomSpamParams struct {
 func CustomSpam(params *CustomSpamParams) {
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 0)
 	if params.config.LastFaucetUnspentOutputID != "" {
-		outputID, _ = iotago.OutputIDFromHex(params.config.LastFaucetUnspentOutputID)
+		outputID, _ = iotago.OutputIDFromHexString(params.config.LastFaucetUnspentOutputID)
 	}
 
 	w := wallet.NewEvilWallet(wallet.WithClients(params.ClientURLs...), wallet.WithFaucetOutputID(outputID))

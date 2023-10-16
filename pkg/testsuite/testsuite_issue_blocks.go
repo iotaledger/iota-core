@@ -65,7 +65,8 @@ func (t *TestSuite) CreateBasicBlock(alias string, blockIssuer *mock.BlockIssuer
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := blockIssuer.CreateBasicBlock(context.Background(), alias, node, blockOpts...)
+	block, err := blockIssuer.CreateBasicBlock(context.Background(), alias, node, blockOpts...)
+	require.NoError(t.Testing, err)
 
 	t.registerBlock(alias, block)
 }
@@ -287,7 +288,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 	if latestCommittedSlot >= slot {
 		return parent
 	}
-	nextBlockSlot := lo.Min(slot+t.optsMinCommittableAge, latestCommittedSlot+t.optsMinCommittableAge)
+	nextBlockSlot := lo.Min(slot+t.API.ProtocolParameters().MinCommittableAge(), latestCommittedSlot+t.API.ProtocolParameters().MinCommittableAge())
 	tip := parent
 	chainIndex := 0
 	for {
@@ -302,10 +303,10 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
 			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
 		}
-		if nextBlockSlot == slot+t.optsMinCommittableAge {
+		if nextBlockSlot == slot+t.API.ProtocolParameters().MinCommittableAge() {
 			break
 		}
-		nextBlockSlot = lo.Min(slot+t.optsMinCommittableAge, nextBlockSlot+t.optsMinCommittableAge)
+		nextBlockSlot = lo.Min(slot+t.API.ProtocolParameters().MinCommittableAge(), nextBlockSlot+t.API.ProtocolParameters().MinCommittableAge())
 		chainIndex += 2
 	}
 

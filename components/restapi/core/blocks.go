@@ -86,25 +86,13 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 
 	switch mimeType {
 	case echo.MIMEApplicationJSON:
-		// Do not validate here, the parents might need to be set
-
-		iotaBlock, _, err = iotago.ProtocolBlockFromBytes(deps.Protocol)(bytes)
-		if err != nil {
+		if err := deps.Protocol.CurrentAPI().JSONDecode(bytes, iotaBlock, serix.WithValidation()); err != nil {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 
 	case httpserver.MIMEApplicationVendorIOTASerializerV2:
-		version, _, err := iotago.VersionFromBytes(bytes)
+		iotaBlock, _, err = iotago.ProtocolBlockFromBytes(deps.Protocol)(bytes)
 		if err != nil {
-			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
-		}
-
-		apiForVersion, err := deps.Protocol.APIForVersion(version)
-		if err != nil {
-			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
-		}
-
-		if _, err := apiForVersion.Decode(bytes, iotaBlock, serix.WithValidation()); err != nil {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 

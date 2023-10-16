@@ -30,6 +30,7 @@ var (
 	ErrBlockAttacherInvalidBlock              = ierrors.New("invalid block")
 	ErrBlockAttacherAttachingNotPossible      = ierrors.New("attaching not possible")
 	ErrBlockAttacherIncompleteBlockNotAllowed = ierrors.New("incomplete block is not allowed on this node")
+	ErrBlockTooRecent                         = ierrors.New("block is too recent compared to latest commitment")
 )
 
 // TODO: make sure an honest validator does not issue blocks within the same slot ratification period in two conflicting chains.
@@ -90,8 +91,30 @@ func (i *BlockIssuer) Shutdown() {
 	i.workerPool.ShutdownComplete.Wait()
 }
 
-func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, issuerAccount Account, node *Node, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
+func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, issuerAccount Account, node *Node, opts ...options.Option[ValidatorBlockParams]) (*blocks.Block, error) {
 	blockParams := options.Apply(&ValidatorBlockParams{}, opts)
+
+	if blockParams.BlockHeader.IssuingTime == nil {
+		issuingTime := time.Now().UTC()
+		blockParams.BlockHeader.IssuingTime = &issuingTime
+	}
+
+	if blockParams.BlockHeader.SlotCommitment == nil {
+		var err error
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime), node)
+		if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
+			commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime, node)
+			if err != nil {
+				return nil, ierrors.Wrap(err, "failed to revive chain")
+			}
+			blockParams.BlockHeader.SlotCommitment = commitment
+			blockParams.BlockHeader.References = make(model.ParentReferences)
+			blockParams.BlockHeader.References[iotago.StrongParentType] = []iotago.BlockID{parentID}
+
+		} else if err != nil {
+			return nil, ierrors.Wrap(err, "error getting commitment")
+		}
+	}
 
 	if blockParams.BlockHeader.References == nil {
 		// TODO: change this to get references for validator block
@@ -154,11 +177,12 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 
 	modelBlock.ID().RegisterAlias(alias)
 
-	return blocks.NewBlock(modelBlock)
+	return blocks.NewBlock(modelBlock), nil
 }
 
 func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
-	block := i.CreateValidationBlock(ctx, alias, NewEd25519Account(i.AccountID, i.privateKey), node, opts...)
+	block, err := i.CreateValidationBlock(ctx, alias, NewEd25519Account(i.AccountID, i.privateKey), node, opts...)
+	require.NoError(i.Testing, err)
 
 	require.NoError(i.Testing, i.IssueBlock(block.ModelBlock(), node))
 
@@ -176,8 +200,21 @@ func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams, node *Node) (i
 }
 
 // CreateBlock creates a new block with the options.
-func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[BasicBlockParams]) *blocks.Block {
+func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[BasicBlockParams]) (*blocks.Block, error) {
 	blockParams := options.Apply(&BasicBlockParams{}, opts)
+
+	if blockParams.BlockHeader.IssuingTime == nil {
+		issuingTime := time.Now().UTC()
+		blockParams.BlockHeader.IssuingTime = &issuingTime
+	}
+
+	if blockParams.BlockHeader.SlotCommitment == nil {
+		var err error
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime), node)
+		if err != nil {
+			return nil, ierrors.Wrap(err, "error getting commitment")
+		}
+	}
 
 	if blockParams.BlockHeader.References == nil {
 		references, err := i.getReferences(ctx, blockParams.Payload, node, blockParams.BlockHeader.ParentsCount)
@@ -233,11 +270,12 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *
 
 	modelBlock.ID().RegisterAlias(alias)
 
-	return blocks.NewBlock(modelBlock)
+	return blocks.NewBlock(modelBlock), err
 }
 
 func (i *BlockIssuer) IssueBasicBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[BasicBlockParams]) *blocks.Block {
-	block := i.CreateBasicBlock(ctx, alias, node, opts...)
+	block, err := i.CreateBasicBlock(ctx, alias, node, opts...)
+	require.NoError(i.Testing, err)
 
 	require.NoErrorf(i.Testing, i.IssueBlock(block.ModelBlock(), node), "%s > failed to issue block with alias %s", i.Name, alias)
 
@@ -325,7 +363,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 
 	apiForVesion, err := node.Protocol.APIForVersion(iotaBlock.ProtocolVersion)
 	if err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
+		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
 	}
 
 	protoParams := apiForVesion.ProtocolParameters()
@@ -346,14 +384,14 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		switch payload := innerBlock.Payload.(type) {
 		case *iotago.SignedTransaction:
 			if payload.Transaction.NetworkID != protoParams.NetworkID() {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Transaction.NetworkID)
+				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Transaction.NetworkID)
 			}
 		}
 
 		if len(iotaBlock.Parents()) == 0 {
 			references, referencesErr := i.getReferences(ctx, innerBlock.Payload, node)
 			if referencesErr != nil {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %w", referencesErr)
+				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %w", referencesErr)
 			}
 
 			innerBlock.StrongParents = references[iotago.StrongParentType]
@@ -379,7 +417,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	if err = i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Slot(), references, node); err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
+		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
 	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
@@ -389,13 +427,13 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		}
 		rmc, err := node.Protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
 		if err != nil {
-			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
+			return iotago.EmptyBlockID, ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
 		}
 
 		// only set the burned Mana as the last step before signing, so workscore calculation is correct.
 		basicBlock.MaxBurnedMana, err = basicBlock.ManaCost(rmc, apiForVesion.ProtocolParameters().WorkScoreStructure())
 		if err != nil {
-			return iotago.EmptyBlockID(), ierrors.Wrapf(err, "could not calculate Mana cost for block")
+			return iotago.EmptyBlockID, ierrors.Wrapf(err, "could not calculate Mana cost for block")
 		}
 		resign = true
 	}
@@ -407,30 +445,30 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 
 			signature, signatureErr := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(issuerAccount.Address().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
 			if signatureErr != nil {
-				return iotago.EmptyBlockID(), ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
+				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
 			}
 
 			edSig, isEdSig := signature.(*iotago.Ed25519Signature)
 			if !isEdSig {
-				return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherInvalidBlock, "unsupported signature type")
+				return iotago.EmptyBlockID, ierrors.Wrap(ErrBlockAttacherInvalidBlock, "unsupported signature type")
 			}
 
 			iotaBlock.Signature = edSig
 		} else {
-			return iotago.EmptyBlockID(), ierrors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
+			return iotago.EmptyBlockID, ierrors.Wrap(ErrBlockAttacherIncompleteBlockNotAllowed, "signature needed")
 		}
 	}
 
 	modelBlock, err := model.BlockFromBlock(iotaBlock)
 	if err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error serializing block to model block")
+		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
 	if !i.optsRateSetterEnabled || node.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(modelBlock.ProtocolBlock().IssuerID) {
 		i.events.BlockConstructed.Trigger(modelBlock)
 
 		if err = i.IssueBlockAndAwaitEvent(ctx, modelBlock, node, node.Protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
-			return iotago.EmptyBlockID(), ierrors.Wrap(err, "error issuing model block")
+			return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 		}
 	}
 
@@ -445,7 +483,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 
 	if blockParams.SlotCommitment == nil {
 		var err error
-		blockParams.SlotCommitment, err = i.getCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime), node)
+		blockParams.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime), node)
 		if err != nil {
 			return ierrors.Wrap(err, "error getting commitment")
 		}
@@ -469,12 +507,12 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 	return nil
 }
 
-func (i *BlockIssuer) getCommitment(blockSlot iotago.SlotIndex, node *Node) (*iotago.Commitment, error) {
+func (i *BlockIssuer) getAddressableCommitment(blockSlot iotago.SlotIndex, node *Node) (*iotago.Commitment, error) {
 	protoParams := node.Protocol.CurrentAPI().ProtocolParameters()
 	commitment := node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 
 	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {
-		return nil, ierrors.Errorf("can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)
+		return nil, ierrors.Wrapf(ErrBlockTooRecent, "can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)
 	}
 
 	if blockSlot < commitment.Slot+protoParams.MinCommittableAge() {
@@ -524,6 +562,10 @@ func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIn
 func (i *BlockIssuer) IssueBlock(block *model.Block, node *Node) error {
 	if err := node.Protocol.IssueBlock(block); err != nil {
 		return err
+	}
+
+	if _, isValidationBlock := block.ValidationBlock(); isValidationBlock {
+		_ = node.Protocol.MainEngineInstance().Storage.Settings().SetLatestIssuedValidationBlock(block)
 	}
 
 	i.events.BlockIssued.Trigger(block)

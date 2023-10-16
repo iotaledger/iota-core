@@ -79,12 +79,12 @@ func RandOutputID(index ...uint16) iotago.OutputID {
 	}
 
 	var outputID iotago.OutputID
-	_, err := RandomRead(outputID[:iotago.SlotIdentifierLength])
+	_, err := RandomRead(outputID[:iotago.TransactionIDLength])
 	if err != nil {
 		panic(err)
 	}
 
-	binary.LittleEndian.PutUint16(outputID[iotago.SlotIdentifierLength:], idx)
+	binary.LittleEndian.PutUint16(outputID[iotago.TransactionIDLength:], idx)
 
 	return outputID
 }
@@ -98,7 +98,7 @@ func RandBlockID() iotago.BlockID {
 
 func RandTransactionID() iotago.TransactionID {
 	transactionID := iotago.TransactionID{}
-	copy(transactionID[:], RandBytes(iotago.SlotIdentifierLength))
+	copy(transactionID[:], RandBytes(iotago.TransactionIDLength))
 
 	return transactionID
 }
@@ -146,7 +146,9 @@ func RandAddress(addressType iotago.AddressType) iotago.Address {
 }
 
 func RandOutputType() iotago.OutputType {
-	return iotago.OutputType(byte(RandomIntn(3) + 3))
+	outputTypes := []iotago.OutputType{iotago.OutputBasic, iotago.OutputAccount, iotago.OutputFoundry, iotago.OutputNFT, iotago.OutputDelegation}
+
+	return outputTypes[RandomIntn(len(outputTypes)-1)]
 }
 
 func RandOutput(outputType iotago.OutputType) iotago.Output {
@@ -231,6 +233,21 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 			},
 			Features:          iotago.NFTOutputFeatures{},
 			ImmutableFeatures: iotago.NFTOutputImmFeatures{},
+		}
+	case iotago.OutputDelegation:
+		//nolint:forcetypeassert // we already checked the type
+		iotaOutput = &iotago.DelegationOutput{
+			Amount:           amount,
+			DelegatedAmount:  amount,
+			DelegationID:     tpkg.RandDelegationID(),
+			ValidatorAddress: tpkg.RandAccountAddress(),
+			StartEpoch:       tpkg.RandEpoch(),
+			EndEpoch:         iotago.MaxEpochIndex,
+			Conditions: iotago.DelegationOutputUnlockConditions{
+				&iotago.AddressUnlockCondition{
+					Address: address,
+				},
+			},
 		}
 	default:
 		panic("unhandled output type")

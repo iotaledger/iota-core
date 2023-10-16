@@ -170,12 +170,18 @@ func (v *VM) Execute(executionContext context.Context, transaction mempool.Trans
 	}
 
 	for index, output := range createdOutputs {
+		proof, err := iotago.OutputIDProofFromTransaction(stardustTransaction, uint16(index))
+		if err != nil {
+			return nil, err
+		}
+
 		outputs = append(outputs, utxoledger.CreateOutput(
 			v.ledger.apiProvider,
 			iotago.OutputIDFromTransactionIDAndIndex(transactionID, uint16(index)),
-			iotago.EmptyBlockID(),
+			iotago.EmptyBlockID,
 			0,
 			output,
+			proof,
 		))
 	}
 

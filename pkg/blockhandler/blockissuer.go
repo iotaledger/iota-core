@@ -97,11 +97,11 @@ func (i *BlockHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mode
 func (i *BlockHandler) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock) (iotago.BlockID, error) {
 	modelBlock, err := model.BlockFromBlock(iotaBlock)
 	if err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error serializing block to model block")
+		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
 	if err = i.SubmitBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrap(err, "error issuing model block")
+		return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 	}
 
 	return modelBlock.ID(), nil

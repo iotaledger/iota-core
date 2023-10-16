@@ -20,6 +20,8 @@ func (o *Output) SnapshotBytes() []byte {
 	m.WriteUint32(uint32(o.slotBooked))
 	m.WriteUint32(uint32(len(o.encodedOutput)))
 	m.WriteBytes(o.encodedOutput)
+	m.WriteUint32(uint32(len(o.encodedProof)))
+	m.WriteBytes(o.encodedProof)
 
 	return m.Bytes()
 }
@@ -55,7 +57,22 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvid
 		return nil, ierrors.Errorf("invalid LS output address: %w", err)
 	}
 
-	return CreateOutput(apiProvider, outputID, blockID, slotBooked, output, outputBytes), nil
+	var proofLength uint32
+	if err := binary.Read(reader, binary.LittleEndian, &proofLength); err != nil {
+		return nil, ierrors.Errorf("unable to read LS output proof length: %w", err)
+	}
+
+	proofBytes := make([]byte, proofLength)
+	if _, err := io.ReadFull(reader, proofBytes); err != nil {
+		return nil, ierrors.Errorf("unable to read LS output proof bytes: %w", err)
+	}
+
+	proof, _, err := iotago.OutputIDProofFromBytes(apiProvider.APIForSlot(blockID.Slot()))(proofBytes)
+	if err != nil {
+		return nil, ierrors.Errorf("invalid LS output proof: %w", err)
+	}
+
+	return NewOutput(apiProvider, outputID, blockID, slotBooked, output, outputBytes, proof, proofBytes), nil
 }
 
 func (s *Spent) SnapshotBytes() []byte {

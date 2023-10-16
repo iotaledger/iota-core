@@ -1,7 +1,7 @@
 package testsuite
 
 import (
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
@@ -22,7 +22,7 @@ func (t *TestSuite) AssertActiveRootBlocks(expectedBlocks []*blocks.Block, nodes
 		t.Eventually(func() error {
 			activeRootBlocks := node.Protocol.MainEngineInstance().EvictionState.ActiveRootBlocks()
 
-			if !cmp.Equal(expectedRootBlocks, activeRootBlocks) {
+			if !assert.Equal(t.fakeTesting, expectedRootBlocks, activeRootBlocks) {
 				return ierrors.Errorf("AssertActiveRootBlocks: %s: expected %v, got %v", node.Name, expectedRootBlocks, activeRootBlocks)
 			}
 

@@ -1,7 +1,7 @@
 package testsuite
 
 import (
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -28,8 +28,8 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 			return ierrors.Errorf("AssertTransaction: %s: expected ID %s, got %s", node.Name, transactionID, loadedTransactionMetadata.ID())
 		}
 
-		//nolint: forcetypeassert // we are in a test and want to assert it anyway
-		if !cmp.Equal(transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence) {
+		// nolint: forcetypeassert // we are in a test and want to assert it anyway
+		if !assert.Equal(t.fakeTesting, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence) {
 			return ierrors.Errorf("AssertTransaction: %s: expected TransactionEssence %v, got %v", node.Name, transaction.TransactionEssence, loadedTransactionMetadata.Transaction().(*iotago.Transaction).TransactionEssence)
 		}
 
@@ -38,7 +38,7 @@ func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *moc
 			return ierrors.Errorf("AssertTransaction: %s: expected Transaction type %T, got %T", node.Name, transaction, loadedTransactionMetadata.Transaction())
 		}
 
-		if !cmp.Equal(transaction.Outputs, typedTransaction.Outputs) {
+		if !assert.Equal(t.fakeTesting, transaction.Outputs, typedTransaction.Outputs) {
 			return ierrors.Errorf("AssertTransaction: %s: expected Outputs %s, got %s", node.Name, transaction.Outputs, typedTransaction.Outputs)
 		}
 

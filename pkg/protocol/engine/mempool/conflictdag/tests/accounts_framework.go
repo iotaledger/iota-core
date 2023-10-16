@@ -71,7 +71,7 @@ func (f *AccountsTestFramework) CreateID(alias string) iotago.AccountID {
 	}
 
 	hashedAlias := blake2b.Sum256([]byte(alias))
-	validatorID := iotago.IdentifierFromData(hashedAlias[:])
+	validatorID := iotago.AccountIDFromData(hashedAlias[:])
 	validatorID.RegisterAlias(alias)
 
 	f.Instance.Set(validatorID, &account.Pool{}) // we don't care about pools when doing PoA

@@ -1,13 +1,13 @@
 package inmemorybooker
 
 import (
-	"github.com/iotaledger/hive.go/core/causalorder"
+	"sync/atomic"
+
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -20,10 +20,6 @@ import (
 
 type Booker struct {
 	events *booker.Events
-
-	bookingOrder *causalorder.CausalOrder[iotago.SlotIndex, iotago.BlockID, *blocks.Block]
-
-	workers *workerpool.Group
 
 	blockCache *blocks.Blocks
 
@@ -41,7 +37,7 @@ type Booker struct {
 
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
-		b := New(e.Workers.CreateGroup("Booker"), e, e.BlockCache, e.ErrorHandler("booker"), opts...)
+		b := New(e, e.BlockCache, e.ErrorHandler("booker"), opts...)
 		e.HookConstructed(func() {
 			b.ledger = e.Ledger
 			b.ledger.HookConstructed(func() {
@@ -71,37 +67,24 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(workers *workerpool.Group, apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
+func New(apiProvider iotago.APIProvider, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[Booker]) *Booker {
 	return options.Apply(&Booker{
 		events:      booker.NewEvents(),
 		apiProvider: apiProvider,
 
 		blockCache:   blockCache,
-		workers:      workers,
 		errorHandler: errorHandler,
-	}, opts, func(b *Booker) {
-		b.bookingOrder = causalorder.New(
-			workers.CreatePool("BookingOrder", 2),
-			blockCache.Block,
-			(*blocks.Block).IsBooked,
-			b.book,
-			b.markInvalid,
-			(*blocks.Block).Parents,
-			causalorder.WithReferenceValidator[iotago.SlotIndex, iotago.BlockID](b.isReferenceValid),
-		)
-
-		blockCache.Evict.Hook(b.evict)
-	}, (*Booker).TriggerConstructed)
+	}, opts, (*Booker).TriggerConstructed)
 }
 
 var _ booker.Booker = new(Booker)
 
-// Queue checks if payload is solid and then adds the block to a Booker's CausalOrder.
+// Queue checks if payload is solid and then sets up the block to react to its parents.
 func (b *Booker) Queue(block *blocks.Block) error {
 	signedTransactionMetadata, containsTransaction := b.ledger.AttachTransaction(block)
 
 	if !containsTransaction {
-		b.bookingOrder.Queue(block)
+		b.setupBlock(block)
 		return nil
 	}
 
@@ -123,7 +106,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 
 		transactionMetadata.OnBooked(func() {
 			block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs())
-			b.bookingOrder.Queue(block)
+			b.setupBlock(block)
 		})
 	})
 
@@ -132,15 +115,40 @@ func (b *Booker) Queue(block *blocks.Block) error {
 
 func (b *Booker) Shutdown() {
 	b.TriggerStopped()
-	b.workers.Shutdown()
+}
+
+func (b *Booker) setupBlock(block *blocks.Block) {
+	var unbookedParentsCount atomic.Int32
+	unbookedParentsCount.Store(int32(len(block.Parents())))
+
+	block.ForEachParent(func(parent iotago.Parent) {
+		parentBlock, exists := b.blockCache.Block(parent.ID)
+		if !exists {
+			b.errorHandler(ierrors.Errorf("cannot setup block %s without existing parent %s", block.ID(), parent.ID))
+
+			return
+		}
+
+		parentBlock.Booked().OnUpdateOnce(func(_, _ bool) {
+			if unbookedParentsCount.Add(-1) == 0 {
+				if err := b.book(block); err != nil {
+					if block.SetInvalid() {
+						b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "failed to book block"))
+					}
+				}
+			}
+		})
+
+		parentBlock.Invalid().OnUpdateOnce(func(_, _ bool) {
+			if block.SetInvalid() {
+				b.events.BlockInvalid.Trigger(block, ierrors.New("block marked as invalid in Booker"))
+			}
+		})
+	})
 }
 
 func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockID, apimodels.BlockFailureReason)) {
 	b.retainBlockFailure = retainBlockFailure
-}
-
-func (b *Booker) evict(slot iotago.SlotIndex) {
-	b.bookingOrder.EvictUntil(slot)
 }
 
 func (b *Booker) book(block *blocks.Block) error {
@@ -149,7 +157,7 @@ func (b *Booker) book(block *blocks.Block) error {
 		return ierrors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
 	}
 
-	// The block is invalid if it carries a conflict that has been orphaned with respect to its commitment.
+	// The block does not inherit conflicts that have been orphaned with respect to its commitment.
 	for it := conflictsToInherit.Iterator(); it.HasNext(); {
 		conflictID := it.Next()
 
@@ -169,12 +177,6 @@ func (b *Booker) book(block *blocks.Block) error {
 	b.events.BlockBooked.Trigger(block)
 
 	return nil
-}
-
-func (b *Booker) markInvalid(block *blocks.Block, err error) {
-	if block.SetInvalid() {
-		b.events.BlockInvalid.Trigger(block, ierrors.Wrap(err, "block marked as invalid in Booker"))
-	}
 }
 
 func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotago.TransactionID], err error) {
@@ -216,14 +218,4 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 
 	// Only inherit conflicts that are not yet accepted (aka merge to master).
 	return b.conflictDAG.UnacceptedConflicts(conflictIDsToInherit), nil
-}
-
-// isReferenceValid checks if the reference between the child and its parent is valid.
-func (b *Booker) isReferenceValid(child *blocks.Block, parent *blocks.Block) (err error) {
-	if parent.IsInvalid() {
-		b.retainBlockFailure(child.ID(), apimodels.BlockFailureParentInvalid)
-		return ierrors.Errorf("parent %s of child %s is marked as invalid", parent.ID(), child.ID())
-	}
-
-	return nil
 }

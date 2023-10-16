@@ -22,13 +22,20 @@ import (
 
 func Test_BookInCommittedSlot(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(4),
-		testsuite.WithEpochNearingThreshold(2),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				4,
+				2,
+			),
+		),
 	)
 	defer ts.Shutdown()
 
@@ -114,13 +121,20 @@ func Test_BookInCommittedSlot(t *testing.T) {
 
 func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(4),
-		testsuite.WithEpochNearingThreshold(2),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				4,
+				2,
+			),
+		),
 	)
 	defer ts.Shutdown()
 
@@ -293,8 +307,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				)
 				ts.Wait()
 
-				// Everything that was accepted before shutting down should be available on disk (verifying that restoring the block cache from disk works).
-				ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13.0", "13.1", "13.2", "13.3"), true, ts.Nodes("nodeC-restarted")...)
+				// Everything that was accepted before shutting down should be available on disk.
 				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom0, ts.Nodes("nodeC-restarted")...)
 
 				for _, slot := range []iotago.SlotIndex{8, 9, 11} {

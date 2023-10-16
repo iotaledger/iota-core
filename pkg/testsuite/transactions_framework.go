@@ -35,20 +35,22 @@ func NewTransactionFramework(t *testing.T, protocol *protocol.Protocol, genesisS
 
 	tf := &TransactionFramework{
 		apiProvider:        protocol,
-		states:             map[string]*utxoledger.Output{"Genesis:0": genesisOutput},
+		states:             make(map[string]*utxoledger.Output),
 		signedTransactions: make(map[string]*iotago.SignedTransaction),
 		transactions:       make(map[string]*iotago.Transaction),
 
 		GenesisWallet: mock.NewWallet(t, "genesis", genesisSeed),
 	}
 
-	for idx := range accounts {
-		// Genesis TX
-		outputID := iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, uint16(idx+1))
+	if err := protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
+		tf.states[fmt.Sprintf("Genesis:%d", output.OutputID().Index())] = output
+		return true
+	}); err != nil {
+		panic(err)
+	}
 
-		if tf.states[fmt.Sprintf("Genesis:%d", idx+1)], err = protocol.MainEngineInstance().Ledger.Output(outputID); err != nil {
-			panic(err)
-		}
+	if len(tf.states) == 0 {
+		panic("no genesis outputs found")
 	}
 
 	return tf
@@ -64,12 +66,12 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 		clonedOutput := output.Clone()
 		actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
 		if clonedOutput.Type() == iotago.OutputAccount {
-			if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID() {
+			if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID {
 				accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
 			}
 		}
 
-		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID(), currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
+		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput, lo.PanicOnErr(iotago.OutputIDProofFromTransaction(transaction, outputID.Index())))
 	}
 }
 
@@ -228,7 +230,7 @@ func (t *TransactionFramework) CreateDelegationFromInput(signingWallet *mock.Wal
 		DelegatedAmount(input.BaseTokenAmount()),
 		opts).MustBuild()
 
-	if delegationOutput.ValidatorAddress.AccountID() == iotago.EmptyAccountID() ||
+	if delegationOutput.ValidatorAddress.AccountID() == iotago.EmptyAccountID ||
 		delegationOutput.DelegatedAmount == 0 ||
 		delegationOutput.StartEpoch == 0 {
 		panic(fmt.Sprintf("delegation output created incorrectly %+v", delegationOutput))

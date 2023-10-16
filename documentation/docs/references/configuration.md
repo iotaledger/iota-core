@@ -375,29 +375,7 @@ Example:
   }
 ```
 
-## <a id="blockissuer"></a> 10. BlockIssuer
-
-| Name                      | Description                                                             | Type    | Default value |
-| ------------------------- | ----------------------------------------------------------------------- | ------- | ------------- |
-| enabled                   | Whether the BlockIssuer component is enabled                            | boolean | true          |
-| tipSelectionTimeout       | The timeout for tip selection                                           | string  | "10s"         |
-| tipSelectionRetryInterval | The interval for retrying tip selection                                 | string  | "200ms"       |
-| rateSetterEnabled         | Whether the RateSetter should be taken into account when issuing blocks | boolean | false         |
-
-Example:
-
-```json
-  {
-    "blockIssuer": {
-      "enabled": true,
-      "tipSelectionTimeout": "10s",
-      "tipSelectionRetryInterval": "200ms",
-      "rateSetterEnabled": false
-    }
-  }
-```
-
-## <a id="validator"></a> 11. Validator
+## <a id="validator"></a> 10. Validator
 
 | Name                       | Description                                                                                                  | Type    | Default value |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------- |
@@ -425,7 +403,7 @@ Example:
   }
 ```
 
-## <a id="dashboard"></a> 12. Dashboard
+## <a id="dashboard"></a> 11. Dashboard
 
 | Name                              | Description                             | Type    | Default value  |
 | --------------------------------- | --------------------------------------- | ------- | -------------- |
@@ -467,7 +445,7 @@ Example:
   }
 ```
 
-## <a id="metrics"></a> 13. Metrics
+## <a id="metrics"></a> 12. Metrics
 
 | Name            | Description                                          | Type    | Default value  |
 | --------------- | ---------------------------------------------------- | ------- | -------------- |
@@ -491,7 +469,7 @@ Example:
   }
 ```
 
-## <a id="inx"></a> 14. Inx
+## <a id="inx"></a> 13. Inx
 
 | Name        | Description                                            | Type    | Default value    |
 | ----------- | ------------------------------------------------------ | ------- | ---------------- |

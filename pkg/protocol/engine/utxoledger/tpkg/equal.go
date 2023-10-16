@@ -49,7 +49,7 @@ func EqualOutput(t *testing.T, expected *utxoledger.Output, actual *utxoledger.O
 func EqualSpent(t *testing.T, expected *utxoledger.Spent, actual *utxoledger.Spent) {
 	require.Equal(t, expected.OutputID(), actual.OutputID())
 	require.Equal(t, expected.TransactionIDSpent(), actual.TransactionIDSpent())
-	require.Equal(t, expected.SlotIndexSpent(), actual.SlotIndexSpent())
+	require.Equal(t, expected.SlotSpent(), actual.SlotSpent())
 	EqualOutput(t, expected.Output(), actual.Output())
 }
 
