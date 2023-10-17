@@ -321,6 +321,7 @@ func (e *EngineManager) RollbackEngine(slot iotago.SlotIndex) (*engine.Engine, e
 	}
 
 	dir := e.activeInstance.Storage.Directory()
+	e.activeInstance.Shutdown()
 
 	newStorage := storage.Create(dir, e.dbVersion, errorHandler, e.storageOptions...)
 

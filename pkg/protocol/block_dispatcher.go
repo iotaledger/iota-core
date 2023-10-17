@@ -246,7 +246,6 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 	// As we already decided to switch and sync to this chain we should make sure that processing the blocks from the commitment
 	// leads to the verified commitment.
 	if targetEngine.Notarization.AcceptedBlocksCount(commitmentID.Slot()) > 0 {
-		b.protocol.MainEngineInstance().Shutdown()
 		b.protocol.activeEngineMutex.Lock()
 
 		newEngine, err := b.protocol.EngineManager.RollbackEngine(commitmentID.Slot() - 1)
