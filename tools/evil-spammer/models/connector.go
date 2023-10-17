@@ -232,12 +232,7 @@ func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
 }
 
 func (c *WebClient) PostBlock(block *iotago.ProtocolBlock) (blockID iotago.BlockID, err error) {
-	id, err := c.client.SubmitBlock(context.Background(), block)
-	if err != nil {
-		return
-	}
-
-	return id, nil
+	return c.client.SubmitBlock(context.Background(), block)
 }
 
 // PostData sends the given data (payload) by creating a block in the backend.
@@ -316,10 +311,5 @@ func (c *WebClient) GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderRespo
 }
 
 func (c *WebClient) GetCongestion(accountID iotago.AccountID) (resp *apimodels.CongestionResponse, err error) {
-	resp, err = c.client.Congestion(context.Background(), accountID)
-	if err != nil {
-		return
-	}
-
-	return
+	return c.client.Congestion(context.Background(), accountID)
 }
