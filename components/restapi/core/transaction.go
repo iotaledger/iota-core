@@ -22,15 +22,18 @@ func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
 
 func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockID, error) {
 	// Get the first output of that transaction (using index 0)
-	outputID := iotago.OutputID{}
-	copy(outputID[:], transactionID[:])
+	outputID := iotago.OutputIDFromTransactionIDAndIndex(transactionID, 0)
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to get output: %s", outputID.String())
+		return iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to get output: %s", outputID.ToHex())
 	}
 
-	return output.BlockID(), nil
+	if output != nil {
+		return output.BlockID(), nil
+	}
+
+	return spent.BlockID(), nil
 }
 
 func blockByTransactionID(c echo.Context) (*model.Block, error) {
