@@ -1,6 +1,5 @@
 name: Feature network deploy
 on:
-  pull_request:
   push:
     branches:
       - develop
@@ -75,5 +74,4 @@ jobs:
           NETWORK_ENVIRONMENT: '${{ secrets.NETWORK_ENVIRONMENT }}'
           IOTA_CORE_DOCKER_IMAGE_REPO: 'iotaledger/iota-core'
           IOTA_CORE_DOCKER_IMAGE_TAG: 'feature'
-        run: |
-          ./deploy/ansible/run.sh feature.yml
+        run: ./deploy/ansible/run.sh feature.yml
