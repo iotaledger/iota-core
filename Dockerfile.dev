@@ -1,6 +1,6 @@
 ARG WITH_GO_WORK=0
 # https://hub.docker.com/_/golang
-FROM golang:1.21-bullseye AS base
+FROM golang:1.21-bookworm AS base
 
 ARG BUILD_TAGS=rocksdb
 
@@ -57,9 +57,9 @@ RUN mkdir -p /app/data/peerdb
 ############################
 # Runtime Image
 ############################
-# https://console.cloud.google.com/gcr/images/distroless/global/cc-debian11
+# https://console.cloud.google.com/gcr/images/distroless/global/cc-debian12
 # using distroless cc "nonroot" image, which includes everything in the base image (glibc, libssl and openssl)
-FROM gcr.io/distroless/cc-debian11:nonroot
+FROM gcr.io/distroless/cc-debian12:nonroot
 
 # Copy the app dir into distroless image
 COPY --chown=nonroot:nonroot --from=build /app /app
