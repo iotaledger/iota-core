@@ -2,7 +2,6 @@ package accountwallet
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -116,7 +115,7 @@ func (a *AccountWallet) CreateBlock(payload iotago.Payload, issuer blockhandler.
 
 	blk, err := blockBuilder.Build()
 	if err != nil {
-		return nil, fmt.Errorf("failed to build block: %w", err)
+		return nil, ierrors.Errorf("failed to build block: %w", err)
 	}
 
 	return blk, nil
@@ -166,7 +165,7 @@ func newFaucet(clt models.Client, faucetParams *faucetParams) *faucet {
 	}
 	genesisSeed, err := base58.Decode(faucetParams.genesisSeed)
 	if err != nil {
-		fmt.Printf("failed to decode base58 seed, using the default one: %v", err)
+		log.Warnf("failed to decode base58 seed, using the default one: %v", err)
 	}
 
 	f := &faucet{

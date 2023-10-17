@@ -1,7 +1,6 @@
 package evilwallet
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -693,15 +692,12 @@ func (e *EvilWallet) makeTransaction(inputs []*models.Output, outputs iotago.Out
 	txBuilder.SetCreationSlot(targetSlot)
 	// no allotment strategy
 	if congestionResponse == nil {
-		fmt.Printf("Make transaction no allotment\n")
 		return txBuilder.Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 	}
 	switch allotmentStrategy {
 	case models.AllotmentStrategyAll:
-		fmt.Printf("MakeTransaction, issuerAccID %s, congestionResponse %v\n", issuerAccountID.ToHex(), congestionResponse)
 		txBuilder.AllotAllMana(targetSlot, issuerAccountID)
 	case models.AllotmentStrategyMinCost:
-		fmt.Printf("Allot only required\n")
 		txBuilder.AllotRequiredManaAndStoreRemainingManaInOutput(targetSlot, congestionResponse.ReferenceManaCost, issuerAccountID, 0)
 	}
 
