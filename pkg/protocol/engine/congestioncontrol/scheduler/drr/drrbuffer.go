@@ -6,15 +6,11 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 )
-
-// ErrInsufficientMana is returned when the mana is insufficient.
-var ErrInsufficientMana = ierrors.New("insufficient issuer's mana to schedule the block")
 
 // region BufferQueue /////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,6 +61,26 @@ func (b *BufferQueue) IssuerQueue(issuerID iotago.AccountID) *IssuerQueue {
 	return issuerQueue
 }
 
+// IssuerQueueWork returns the total WorkScore of block in the queue for the corresponding issuer.
+func (b *BufferQueue) IssuerQueueWork(issuerID iotago.AccountID) iotago.WorkScore {
+	issuerQueue := b.IssuerQueue(issuerID)
+	if issuerQueue == nil {
+		return 0
+	}
+
+	return issuerQueue.Work()
+}
+
+// IssuerQueueSize returns the number of blocks in the queue for the corresponding issuer.
+func (b *BufferQueue) IssuerQueueBlockCount(issuerID iotago.AccountID) int {
+	issuerQueue := b.IssuerQueue(issuerID)
+	if issuerQueue == nil {
+		return 0
+	}
+
+	return issuerQueue.Size()
+}
+
 func (b *BufferQueue) CreateIssuerQueue(issuerID iotago.AccountID) *IssuerQueue {
 	issuerQueue := NewIssuerQueue(issuerID)
 	b.activeIssuers.Set(issuerID, b.ringInsert(issuerQueue))
@@ -72,24 +88,56 @@ func (b *BufferQueue) CreateIssuerQueue(issuerID iotago.AccountID) *IssuerQueue 
 	return issuerQueue
 }
 
-func (b *BufferQueue) GetIssuerQueue(issuerID iotago.AccountID) (*IssuerQueue, error) {
+func (b *BufferQueue) GetOrCreateIssuerQueue(issuerID iotago.AccountID) (*IssuerQueue, bool) {
 	element, issuerActive := b.activeIssuers.Get(issuerID)
 	if !issuerActive {
-		return nil, ierrors.New("issuer queue does not exist")
+		// create new issuer queue
+		return b.CreateIssuerQueue(issuerID), true
 	}
 	issuerQueue, isIQ := element.Value.(*IssuerQueue)
 	if !isIQ {
-		return nil, ierrors.New("buffer contains elements that are not issuer queues")
+		panic("buffer contains elements that are not issuer queues")
 	}
 
-	// issuer queue exists
-	return issuerQueue, nil
+	return issuerQueue, false
+}
+
+// RemoveIssuerQueue removes all blocks (submitted and ready) for the given issuer and deletes the issuer queue.
+func (b *BufferQueue) RemoveIssuerQueue(issuerID iotago.AccountID) {
+	element, ok := b.activeIssuers.Get(issuerID)
+	if !ok {
+		return
+	}
+	issuerQueue, isIQ := element.Value.(*IssuerQueue)
+	if !isIQ {
+		panic("buffer contains elements that are not issuer queues")
+	}
+	b.size -= issuerQueue.Size()
+
+	b.ringRemove(element)
+	b.activeIssuers.Delete(issuerID)
+}
+
+// RemoveIssuerQueueIfEmpty removes all blocks (submitted and ready) for the given issuer and deletes the issuer queue if it is empty.
+func (b *BufferQueue) RemoveIssuerQueueIfEmpty(issuerID iotago.AccountID) {
+	element, ok := b.activeIssuers.Get(issuerID)
+	if !ok {
+		return
+	}
+	issuerQueue, isIQ := element.Value.(*IssuerQueue)
+	if !isIQ {
+		panic("buffer contains elements that are not issuer queues")
+	}
+
+	if issuerQueue.Size() == 0 {
+		b.ringRemove(element)
+		b.activeIssuers.Delete(issuerID)
+	}
 }
 
 // Submit submits a block. Return blocks dropped from the scheduler to make room for the submitted block.
 // The submitted block can also be returned as dropped if the issuer does not have enough mana.
 func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantumFunc func(iotago.AccountID) Deficit, maxBuffer int) ([]*blocks.Block, bool) {
-
 	// first we submit the block, and if it turns out that the issuer doesn't have enough bandwidth to submit, it will be removed by dropTail
 	if !issuerQueue.Submit(blk) {
 		return nil, false
@@ -103,49 +151,6 @@ func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantu
 	}
 
 	return nil, true
-}
-
-func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) Deficit, maxBuffer int) (droppedBlocks []*blocks.Block) {
-	// remove as many blocks as necessary to stay within max buffer size
-	for b.Size() > maxBuffer {
-		// find the longest mana-scaled queue
-		maxIssuerID := b.longestQueueIssuerID(quantumFunc)
-		if longestQueue := b.IssuerQueue(maxIssuerID); longestQueue != nil {
-			if tail := longestQueue.RemoveTail(); tail != nil {
-				b.size--
-				droppedBlocks = append(droppedBlocks, tail)
-			}
-		}
-	}
-
-	return droppedBlocks
-}
-
-func (b *BufferQueue) longestQueueIssuerID(quantumFunc func(iotago.AccountID) Deficit) iotago.AccountID {
-	start := b.Current()
-	ringStart := b.ring
-	maxScale := math.Inf(-1)
-	var maxIssuerID iotago.AccountID
-	for q := start; ; {
-		if issuerQuantum := quantumFunc(q.IssuerID()); issuerQuantum > 0 {
-			if scale := float64(q.Work()) / float64(issuerQuantum); scale > maxScale {
-				maxScale = scale
-				maxIssuerID = q.IssuerID()
-			}
-		} else if q.Size() > 0 {
-			// if the issuer has no quantum, then this is the max queue size
-			maxIssuerID = q.IssuerID()
-			b.ring = ringStart
-
-			break
-		}
-		q = b.Next()
-		if q == start {
-			break
-		}
-	}
-
-	return maxIssuerID
 }
 
 // Unsubmit removes a block from the submitted blocks.
@@ -213,34 +218,6 @@ func (b *BufferQueue) TotalBlocksCount() (blocksCount int) {
 	return
 }
 
-// InsertIssuer creates a queue for the given issuer and adds it to the list of active issuers.
-func (b *BufferQueue) InsertIssuer(issuerID iotago.AccountID) {
-	_, issuerActive := b.activeIssuers.Get(issuerID)
-	if issuerActive {
-		return
-	}
-
-	issuerQueue := NewIssuerQueue(issuerID)
-	b.activeIssuers.Set(issuerID, b.ringInsert(issuerQueue))
-}
-
-// RemoveIssuer removes all blocks (submitted and ready) for the given issuer.
-func (b *BufferQueue) RemoveIssuer(issuerID iotago.AccountID) {
-	element, ok := b.activeIssuers.Get(issuerID)
-	if !ok {
-		return
-	}
-
-	issuerQueue, isIQ := element.Value.(*IssuerQueue)
-	if !isIQ {
-		return
-	}
-	b.size -= issuerQueue.Size()
-
-	b.ringRemove(element)
-	b.activeIssuers.Delete(issuerID)
-}
-
 // Next returns the next IssuerQueue in round-robin order.
 func (b *BufferQueue) Next() *IssuerQueue {
 	if b.ring != nil {
@@ -299,6 +276,49 @@ func (b *BufferQueue) IssuerIDs() []iotago.AccountID {
 	}
 
 	return issuerIDs
+}
+
+func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) Deficit, maxBuffer int) (droppedBlocks []*blocks.Block) {
+	// remove as many blocks as necessary to stay within max buffer size
+	for b.Size() > maxBuffer {
+		// find the longest mana-scaled queue
+		maxIssuerID := b.longestQueueIssuerID(quantumFunc)
+		if longestQueue := b.IssuerQueue(maxIssuerID); longestQueue != nil {
+			if tail := longestQueue.RemoveTail(); tail != nil {
+				b.size--
+				droppedBlocks = append(droppedBlocks, tail)
+			}
+		}
+	}
+
+	return droppedBlocks
+}
+
+func (b *BufferQueue) longestQueueIssuerID(quantumFunc func(iotago.AccountID) Deficit) iotago.AccountID {
+	start := b.Current()
+	ringStart := b.ring
+	maxScale := math.Inf(-1)
+	var maxIssuerID iotago.AccountID
+	for q := start; ; {
+		if issuerQuantum := quantumFunc(q.IssuerID()); issuerQuantum > 0 {
+			if scale := float64(q.Work()) / float64(issuerQuantum); scale > maxScale {
+				maxScale = scale
+				maxIssuerID = q.IssuerID()
+			}
+		} else if q.Size() > 0 {
+			// if the issuer has no quantum, then this is the max queue size
+			maxIssuerID = q.IssuerID()
+			b.ring = ringStart
+
+			break
+		}
+		q = b.Next()
+		if q == start {
+			break
+		}
+	}
+
+	return maxIssuerID
 }
 
 func (b *BufferQueue) ringRemove(r *ring.Ring) {

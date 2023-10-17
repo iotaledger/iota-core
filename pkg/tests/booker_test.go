@@ -125,7 +125,7 @@ func Test_MultipleAttachments(t *testing.T) {
 	nodeA := ts.AddValidatorNode("nodeA")
 	nodeB := ts.AddValidatorNode("nodeB")
 	blockIssuerA := ts.AddBasicBlockIssuer("blockIssuerA")
-	blockIssuerB := ts.AddBasicBlockIssuer("blockIssuerA")
+	blockIssuerB := ts.AddBasicBlockIssuer("blockIssuerB")
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
