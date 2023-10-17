@@ -93,7 +93,7 @@ func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) 
 	t.CommitmentFilter.ProcessPreFilteredBlock(blocks.NewBlock(modelBlock))
 }
 
-func (t *TestFramework) IssueSignedBlockAtSlot(alias string, slot iotago.SlotIndex, commitmentID iotago.SlotIdentifier, keyPair ed25519.KeyPair) {
+func (t *TestFramework) IssueSignedBlockAtSlot(alias string, slot iotago.SlotIndex, commitmentID iotago.CommitmentID, keyPair ed25519.KeyPair) {
 	apiForSlot := t.apiProvider.APIForSlot(slot)
 
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
@@ -108,7 +108,7 @@ func (t *TestFramework) IssueSignedBlockAtSlot(alias string, slot iotago.SlotInd
 	t.processBlock(alias, block)
 }
 
-func (t *TestFramework) IssueSignedBlockAtSlotWithBurnedMana(alias string, slot iotago.SlotIndex, commitmentID iotago.SlotIdentifier, keyPair ed25519.KeyPair, burnedMana iotago.Mana) {
+func (t *TestFramework) IssueSignedBlockAtSlotWithBurnedMana(alias string, slot iotago.SlotIndex, commitmentID iotago.CommitmentID, keyPair ed25519.KeyPair, burnedMana iotago.Mana) {
 	apiForSlot := t.apiProvider.APIForSlot(slot)
 
 	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])

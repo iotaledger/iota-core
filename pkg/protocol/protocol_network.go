@@ -4,6 +4,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -50,7 +51,7 @@ func (p *Protocol) runNetworkProtocol() {
 		p.networkProtocol.RequestSlotCommitment(commitmentID)
 	}, event.WithWorkerPool(wpCommitments))
 
-	wpAttestations := p.Workers.CreatePool("NetworkEvents.Attestations", 1) // Using just 1 worker to avoid contention
+	wpAttestations := p.Workers.CreatePool("NetworkEvents.Attestations", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
 
 	p.Events.Network.AttestationsRequestReceived.Hook(p.processAttestationsRequest, event.WithWorkerPool(wpAttestations))
 }

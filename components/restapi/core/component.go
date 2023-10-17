@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
@@ -21,101 +21,118 @@ import (
 const (
 	// RouteInfo is the route for getting the node info.
 	// GET returns the node info.
+	// MIMEApplicationJSON => json.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteInfo = "/info"
 
 	// RouteBlockIssuance is the route for getting all needed information for block creation.
 	// GET returns the data needed toa attach block.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteBlockIssuance = "/blocks/issuance"
 
 	// RouteBlock is the route for getting a block by its blockID.
 	// GET returns the block based on the given type in the request "Accept" header.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteBlock = "/blocks/:" + restapipkg.ParameterBlockID
 
 	// RouteBlockMetadata is the route for getting block metadata by its blockID.
 	// GET returns block metadata.
+	// MIMEApplicationJSON => json.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteBlockMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/metadata"
 
-	// RouteBlocks is the route for creating new blocks.
+	// RouteBlocks is the route for sending new blocks.
 	// POST creates a single new block and returns the new block ID.
 	// The block is parsed based on the given type in the request "Content-Type" header.
-	// By providing only the protocolVersion and payload transaction user can POST a transaction.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteBlocks = "/blocks"
 
-	// RouteOutput is the route for getting an output by its outputID (transactionHash + outputIndex).
+	// RouteOutput is the route for getting an output by its outputID (transactionHash + outputIndex). This includes the proof, that the output corresponds to the requested outputID.
 	// GET returns the output based on the given type in the request "Accept" header.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteOutput = "/outputs/:" + restapipkg.ParameterOutputID
 
-	// RouteOutputMetadata is the route for getting output metadata by its outputID (transactionHash + outputIndex) without getting the data again.
+	// RouteOutputMetadata is the route for getting output metadata by its outputID (transactionHash + outputIndex) without getting the output itself again.
 	// GET returns the output metadata.
+	// MIMEApplicationJSON => json.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteOutputMetadata = "/outputs/:" + restapipkg.ParameterOutputID + "/metadata"
+
+	// RouteOutputWithMetadata is the route for getting output, together with its metadata by its outputID (transactionHash + outputIndex).
+	// GET returns the output metadata.
+	// MIMEApplicationJSON => json.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
+	RouteOutputWithMetadata = "/outputs/:" + restapipkg.ParameterOutputID + "/full"
 
 	// RouteTransactionsIncludedBlock is the route for getting the block that was first confirmed for a given transaction ID.
 	// GET returns the block based on the given type in the request "Accept" header.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteTransactionsIncludedBlock = "/transactions/:" + restapipkg.ParameterTransactionID + "/included-block"
 
 	// RouteTransactionsIncludedBlockMetadata is the route for getting the block metadata that was first confirmed in the ledger for a given transaction ID.
 	// GET returns block metadata (including info about "promotion/reattachment needed").
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteTransactionsIncludedBlockMetadata = "/transactions/:" + restapipkg.ParameterTransactionID + "/included-block/metadata"
 
 	// RouteCommitmentByID is the route for getting a slot commitment by its ID.
 	// GET returns the commitment.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteCommitmentByID = "/commitments/:" + restapipkg.ParameterCommitmentID
 
 	// RouteCommitmentByIDUTXOChanges is the route for getting all UTXO changes of a commitment by its ID.
 	// GET returns the output IDs of all UTXO changes.
+	// MIMEApplicationJSON => json.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteCommitmentByIDUTXOChanges = "/commitments/:" + restapipkg.ParameterCommitmentID + "/utxo-changes"
 
 	// RouteCommitmentByIndex is the route for getting a commitment by its Slot.
 	// GET returns the commitment.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteCommitmentByIndex = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex
 
 	// RouteCommitmentByIndexUTXOChanges is the route for getting all UTXO changes of a commitment by its Slot.
 	// GET returns the output IDs of all UTXO changes.
+	// MIMEApplicationJSON => json.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
 	// RouteCongestion is the route for getting the current congestion state and all account related useful details as block issuance credits.
 	// GET returns the congestion state related to the specified account.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
 
 	// RouteValidators is the route for getting informations about the current validators.
 	// GET returns the paginated response with the list of validators.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteValidators = "/validators"
 
 	// RouteValidatorsAccount is the route for getting details about the validator by its accountID.
 	// GET returns the validator details.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterAccountID
 
 	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
 	// Rewards are decayed up to returned epochEnd index.
 	// GET returns the rewards.
+	// MIMEApplicationJSON => json.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteRewards = "/rewards/:" + restapipkg.ParameterOutputID
 
 	// RouteCommittee is the route for getting the current committee.
 	// GET returns the committee.
 	// MIMEApplicationJSON => json.
-	// MIMEVendorIOTASerializer => bytes.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteCommittee = "/committee"
 )
 
@@ -134,8 +151,7 @@ var (
 	Component *app.Component
 	deps      dependencies
 
-	blockIssuerAccount blockfactory.Account
-	features           = []string{}
+	features = []string{}
 )
 
 type dependencies struct {
@@ -144,7 +160,7 @@ type dependencies struct {
 	AppInfo          *app.Info
 	RestRouteManager *restapipkg.RestRouteManager
 	Protocol         *protocolpkg.Protocol
-	BlockIssuer      *blockfactory.BlockIssuer `optional:"true"`
+	BlockHandler     *blockhandler.BlockHandler
 	MetricsTracker   *metricstracker.MetricsTracker
 	BaseToken        *protocol.BaseToken
 }
@@ -156,12 +172,6 @@ func configure() error {
 	}
 
 	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
-
-	if restapi.ParamsRestAPI.AllowIncompleteBlock {
-		AddFeature("allowIncompleteBlock")
-	}
-
-	blockIssuerAccount = blockfactory.AccountFromParams(restapi.ParamsRestAPI.BlockIssuerAccount, restapi.ParamsRestAPI.BlockIssuerPrivateKey)
 
 	routeGroup.GET(RouteInfo, func(c echo.Context) error {
 		resp := info()
@@ -195,7 +205,7 @@ func configure() error {
 		c.Response().Header().Set(echo.HeaderLocation, resp.BlockID.ToHex())
 
 		return httpserver.JSONResponse(c, http.StatusCreated, resp)
-	}, checkNodeSynced(), checkUpcomingUnsupportedProtocolVersion())
+	}, checkNodeSynced())
 
 	routeGroup.GET(RouteBlockIssuance, func(c echo.Context) error {
 		resp, err := blockIssuance(c)
@@ -263,16 +273,25 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteOutput, func(c echo.Context) error {
-		output, err := getOutput(c)
+		resp, err := getOutput(c)
 		if err != nil {
 			return err
 		}
 
-		return responseByHeader(c, output.Output())
+		return responseByHeader(c, resp)
 	})
 
 	routeGroup.GET(RouteOutputMetadata, func(c echo.Context) error {
 		resp, err := getOutputMetadata(c)
+		if err != nil {
+			return err
+		}
+
+		return responseByHeader(c, resp)
+	})
+
+	routeGroup.GET(RouteOutputWithMetadata, func(c echo.Context) error {
+		resp, err := getOutputWithMetadata(c)
 		if err != nil {
 			return err
 		}
@@ -354,19 +373,6 @@ func checkNodeSynced() echo.MiddlewareFunc {
 			if !deps.Protocol.MainEngineInstance().SyncManager.IsNodeSynced() {
 				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
 			}
-
-			return next(c)
-		}
-	}
-}
-
-func checkUpcomingUnsupportedProtocolVersion() echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// todo update with protocol upgrades support
-			// if !deps.ProtocolManager.NextPendingSupported() {
-			//	return ierrors.Wrap(echo.ErrServiceUnavailable, "node does not support the upcoming protocol upgrade")
-			// }
 
 			return next(c)
 		}

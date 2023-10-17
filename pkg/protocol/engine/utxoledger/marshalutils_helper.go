@@ -9,16 +9,16 @@ import (
 func ParseOutputID(ms *marshalutil.MarshalUtil) (iotago.OutputID, error) {
 	bytes, err := ms.ReadBytes(iotago.OutputIDLength)
 	if err != nil {
-		return iotago.OutputID{}, err
+		return iotago.EmptyOutputID, err
 	}
 
 	return iotago.OutputID(bytes), nil
 }
 
 func parseTransactionID(ms *marshalutil.MarshalUtil) (iotago.TransactionID, error) {
-	bytes, err := ms.ReadBytes(iotago.SlotIdentifierLength)
+	bytes, err := ms.ReadBytes(iotago.TransactionIDLength)
 	if err != nil {
-		return iotago.TransactionID{}, err
+		return iotago.EmptyTransactionID, err
 	}
 
 	return iotago.TransactionID(bytes), nil
@@ -27,7 +27,7 @@ func parseTransactionID(ms *marshalutil.MarshalUtil) (iotago.TransactionID, erro
 func ParseBlockID(ms *marshalutil.MarshalUtil) (iotago.BlockID, error) {
 	bytes, err := ms.ReadBytes(iotago.BlockIDLength)
 	if err != nil {
-		return iotago.EmptyBlockID(), err
+		return iotago.EmptyBlockID, err
 	}
 
 	return iotago.BlockID(bytes), nil

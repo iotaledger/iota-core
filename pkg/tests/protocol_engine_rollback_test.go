@@ -17,23 +17,30 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
+	mock2 "github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
-	mock2 "github.com/iotaledger/iota-core/pkg/testsuite/mock"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(3),
-		testsuite.WithEpochNearingThreshold(5),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				3,
+				5,
+			),
+		),
 
 		testsuite.WithWaitFor(15*time.Second),
 	)
@@ -46,11 +53,11 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 
 	poaProvider := func() module.Provider[*engine.Engine, seatmanager.SeatManager] {
 		return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
-			poa := mock.NewManualPOAProvider()(e).(*mock.ManualPOA)
+			poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
 
-			for _, node := range []*mock2.Node{node0, node1, node2, node3} {
-				if node.Validator {
-					poa.AddAccount(node.AccountID, node.Name)
+			for _, node := range []*mock.Node{node0, node1, node2, node3} {
+				if node.IsValidator() {
+					poa.AddAccount(node.Validator.AccountID, node.Name)
 				}
 			}
 			poa.SetOnline("node0", "node1", "node2", "node3")
@@ -92,20 +99,20 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 	// Verify that nodes have the expected states.
 
 	expectedCommittee := []iotago.AccountID{
-		node0.AccountID,
-		node1.AccountID,
-		node2.AccountID,
-		node3.AccountID,
+		node0.Validator.AccountID,
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
+		node3.Validator.AccountID,
 	}
 	expectedOnlineCommitteeFull := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.Validator.AccountID)),
 	}
 
 	for _, node := range ts.Nodes() {
-		node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock.ManualPOA).SetOnline("node0", "node1", "node2", "node3")
+		node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock2.ManualPOA).SetOnline("node0", "node1", "node2", "node3")
 	}
 
 	{
@@ -145,7 +152,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 		for _, slot := range []iotago.SlotIndex{4, 5, 6, 7, 8, 9} {
 			var attestationBlocks []*blocks.Block
 			for _, node := range ts.Nodes() {
-				if node.Validator {
+				if node.IsValidator() {
 					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", slot, node.Name)))
 				}
 			}
@@ -207,13 +214,20 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 
 func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(3),
-		testsuite.WithEpochNearingThreshold(5),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				3,
+				5,
+			),
+		),
 
 		testsuite.WithWaitFor(15*time.Second),
 	)
@@ -226,11 +240,11 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 
 	poaProvider := func() module.Provider[*engine.Engine, seatmanager.SeatManager] {
 		return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
-			poa := mock.NewManualPOAProvider()(e).(*mock.ManualPOA)
+			poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
 
-			for _, node := range []*mock2.Node{node0, node1, node2, node3} {
-				if node.Validator {
-					poa.AddAccount(node.AccountID, node.Name)
+			for _, node := range []*mock.Node{node0, node1, node2, node3} {
+				if node.IsValidator() {
+					poa.AddAccount(node.Validator.AccountID, node.Name)
 				}
 			}
 			poa.SetOnline("node0", "node1", "node2", "node3")
@@ -272,25 +286,25 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 	// Verify that nodes have the expected states.
 
 	expectedCommittee := []iotago.AccountID{
-		node0.AccountID,
-		node1.AccountID,
-		node2.AccountID,
-		node3.AccountID,
+		node0.Validator.AccountID,
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
+		node3.Validator.AccountID,
 	}
 	expectedOnlineCommitteeFull := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.Validator.AccountID)),
 	}
 
 	expectedOnlineCommitteeHalf := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
 	}
 
 	for _, node := range ts.Nodes() {
-		node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock.ManualPOA).SetOnline("node0", "node1", "node2", "node3")
+		node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock2.ManualPOA).SetOnline("node0", "node1", "node2", "node3")
 	}
 
 	{
@@ -330,7 +344,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 		for _, slot := range []iotago.SlotIndex{4, 5, 6, 7, 8, 9} {
 			var attestationBlocks []*blocks.Block
 			for _, node := range ts.Nodes() {
-				if node.Validator {
+				if node.IsValidator() {
 					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", slot, node.Name)))
 				}
 			}
@@ -342,13 +356,13 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 
 	// Update online committee.
 	for _, node := range ts.Nodes() {
-		manualPOA := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock.ManualPOA)
+		manualPOA := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock2.ManualPOA)
 		manualPOA.SetOnline("node0", "node1")
 		manualPOA.SetOffline("node2", "node3")
 	}
 
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16}, 4, "P0:11.3", []*mock2.Node{node0, node1}, true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, nil)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
@@ -399,13 +413,20 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 
 func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(3),
-		testsuite.WithEpochNearingThreshold(5),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				3,
+				5,
+			),
+		),
 
 		testsuite.WithWaitFor(15*time.Second),
 	)
@@ -418,11 +439,11 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 
 	poaProvider := func() module.Provider[*engine.Engine, seatmanager.SeatManager] {
 		return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
-			poa := mock.NewManualPOAProvider()(e).(*mock.ManualPOA)
+			poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
 
-			for _, node := range []*mock2.Node{node0, node1, node2, node3} {
-				if node.Validator {
-					poa.AddAccount(node.AccountID, node.Name)
+			for _, node := range []*mock.Node{node0, node1, node2, node3} {
+				if node.IsValidator() {
+					poa.AddAccount(node.Validator.AccountID, node.Name)
 				}
 			}
 			poa.SetOnline("node0", "node1", "node2", "node3")
@@ -464,25 +485,25 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 	// Verify that nodes have the expected states.
 
 	expectedCommittee := []iotago.AccountID{
-		node0.AccountID,
-		node1.AccountID,
-		node2.AccountID,
-		node3.AccountID,
+		node0.Validator.AccountID,
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
+		node3.Validator.AccountID,
 	}
 	expectedOnlineCommitteeFull := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.Validator.AccountID)),
 	}
 
 	expectedOnlineCommitteeHalf := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
 	}
 
 	for _, node := range ts.Nodes() {
-		node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock.ManualPOA).SetOnline("node0", "node1", "node2", "node3")
+		node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock2.ManualPOA).SetOnline("node0", "node1", "node2", "node3")
 	}
 
 	{
@@ -522,7 +543,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 		for _, slot := range []iotago.SlotIndex{4, 5, 6, 7, 8, 9} {
 			var attestationBlocks []*blocks.Block
 			for _, node := range ts.Nodes() {
-				if node.Validator {
+				if node.IsValidator() {
 					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", slot, node.Name)))
 				}
 			}
@@ -534,13 +555,13 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 
 	// Update online committee.
 	for _, node := range ts.Nodes() {
-		manualPOA := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock.ManualPOA)
+		manualPOA := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock2.ManualPOA)
 		manualPOA.SetOnline("node0", "node1")
 		manualPOA.SetOffline("node2", "node3")
 	}
 
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16, 17, 18, 19}, 4, "P0:11.3", []*mock2.Node{node0, node1}, true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16, 17, 18, 19}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, nil)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
@@ -591,13 +612,20 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 
 func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(3),
-		testsuite.WithEpochNearingThreshold(5),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				3,
+				5,
+			),
+		),
 
 		testsuite.WithWaitFor(15*time.Second),
 	)
@@ -610,11 +638,11 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 
 	poaProvider := func() module.Provider[*engine.Engine, seatmanager.SeatManager] {
 		return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
-			poa := mock.NewManualPOAProvider()(e).(*mock.ManualPOA)
+			poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
 
-			for _, node := range []*mock2.Node{node0, node1, node2, node3} {
-				if node.Validator {
-					poa.AddAccount(node.AccountID, node.Name)
+			for _, node := range []*mock.Node{node0, node1, node2, node3} {
+				if node.IsValidator() {
+					poa.AddAccount(node.Validator.AccountID, node.Name)
 				}
 			}
 			poa.SetOnline("node0", "node1", "node2", "node3")
@@ -656,25 +684,25 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 	// Verify that nodes have the expected states.
 
 	expectedCommittee := []iotago.AccountID{
-		node0.AccountID,
-		node1.AccountID,
-		node2.AccountID,
-		node3.AccountID,
+		node0.Validator.AccountID,
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
+		node3.Validator.AccountID,
 	}
 	expectedOnlineCommitteeFull := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node2.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node3.Validator.AccountID)),
 	}
 
 	expectedOnlineCommitteeHalf := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.AccountID)),
-		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(node0.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
 	}
 
 	for _, node := range ts.Nodes() {
-		node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock.ManualPOA).SetOnline("node0", "node1", "node2", "node3")
+		node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock2.ManualPOA).SetOnline("node0", "node1", "node2", "node3")
 	}
 
 	{
@@ -714,7 +742,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 		for _, slot := range []iotago.SlotIndex{4, 5, 6, 7, 8, 9} {
 			var attestationBlocks []*blocks.Block
 			for _, node := range ts.Nodes() {
-				if node.Validator {
+				if node.IsValidator() {
 					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", slot, node.Name)))
 				}
 			}
@@ -726,13 +754,13 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 
 	// Update online committee.
 	for _, node := range ts.Nodes() {
-		manualPOA := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock.ManualPOA)
+		manualPOA := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().(*mock2.ManualPOA)
 		manualPOA.SetOnline("node0", "node1")
 		manualPOA.SetOffline("node2", "node3")
 	}
 
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15}, 4, "P0:11.3", []*mock2.Node{node0, node1}, true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, nil)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
@@ -762,7 +790,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 			require.Len(t, committeeEpoch.IDs(), 4)
 		}
 
-		// Commmittee for the future epoch does not exist.
+		// Committee for the future epoch does not exist.
 		committeeEpoch2, err := newEngine.Storage.Committee().Load(2)
 		require.NoError(t, err)
 		require.Nil(t, committeeEpoch2)

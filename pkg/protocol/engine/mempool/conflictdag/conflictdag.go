@@ -20,6 +20,7 @@ type ConflictDAG[ConflictID, ResourceID IDType, VoteRank VoteRankType[VoteRank]]
 	ConflictingConflicts(conflictID ConflictID) (conflictingConflicts ds.Set[ConflictID], exists bool)
 	CastVotes(vote *vote.Vote[VoteRank], conflictIDs ds.Set[ConflictID]) error
 	AcceptanceState(conflictIDs ds.Set[ConflictID]) acceptance.State
+	SetAccepted(conflictID ConflictID)
 	UnacceptedConflicts(conflictIDs ds.Set[ConflictID]) ds.Set[ConflictID]
 	AllConflictsSupported(seat account.SeatIndex, conflictIDs ds.Set[ConflictID]) bool
 	EvictConflict(conflictID ConflictID)

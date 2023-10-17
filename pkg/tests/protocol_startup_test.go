@@ -22,13 +22,20 @@ import (
 
 func Test_BookInCommittedSlot(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(4),
-		testsuite.WithEpochNearingThreshold(2),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				4,
+				2,
+			),
+		),
 	)
 	defer ts.Shutdown()
 
@@ -47,11 +54,11 @@ func Test_BookInCommittedSlot(t *testing.T) {
 	ts.Wait()
 
 	expectedCommittee := []iotago.AccountID{
-		nodeA.AccountID,
+		nodeA.Validator.AccountID,
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
+		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.Validator.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -106,7 +113,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 			})
 			ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes()...)
 		}
-		ts.IssueBlockAtSlot("5*", 5, lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(3)).Commitment(), ts.Node("nodeA"), ts.BlockIDsWithPrefix("4.3-")...)
+		ts.IssueValidationBlockAtSlot("5*", 5, lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(3)).Commitment(), ts.Node("nodeA"), ts.BlockIDsWithPrefix("4.3-")...)
 
 		ts.AssertBlocksExist(ts.Blocks("5*"), false, ts.Nodes("nodeA")...)
 	}
@@ -114,19 +121,27 @@ func Test_BookInCommittedSlot(t *testing.T) {
 
 func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(4),
-		testsuite.WithEpochNearingThreshold(2),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				4,
+				2,
+			),
+		),
 	)
 	defer ts.Shutdown()
 
 	nodeA := ts.AddValidatorNode("nodeA")
 	nodeB := ts.AddValidatorNode("nodeB")
 	ts.AddNode("nodeC")
+	ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
 
 	nodeOptions := []options.Option[protocol.Protocol]{
 		protocol.WithStorageOptions(
@@ -148,13 +163,13 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts.Wait()
 
 	expectedCommittee := []iotago.AccountID{
-		nodeA.AccountID,
-		nodeB.AccountID,
+		nodeA.Validator.AccountID,
+		nodeB.Validator.AccountID,
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.AccountID)),
-		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.AccountID)),
+		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeA.Validator.AccountID)),
+		lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(1).GetSeat(nodeB.Validator.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -278,7 +293,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				ts.RemoveNode("nodeC")
 
 				nodeC1 := ts.AddNode("nodeC-restarted")
-				nodeC1.CopyIdentityFromNode(nodeC)
 				nodeC1.Initialize(true,
 					protocol.WithBaseDirectory(ts.Directory.Path(nodeC.Name)),
 					protocol.WithStorageOptions(
@@ -293,8 +307,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				)
 				ts.Wait()
 
-				// Everything that was accepted before shutting down should be available on disk (verifying that restoring the block cache from disk works).
-				ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13.0", "13.1", "13.2", "13.3"), true, ts.Nodes("nodeC-restarted")...)
+				// Everything that was accepted before shutting down should be available on disk.
 				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom0, ts.Nodes("nodeC-restarted")...)
 
 				for _, slot := range []iotago.SlotIndex{8, 9, 11} {
@@ -313,7 +326,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
 
 				nodeD := ts.AddNode("nodeD")
-				nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.
 				nodeD.Initialize(true, append(nodeOptions,
 					protocol.WithSnapshotPath(snapshotPath),
 					protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),
@@ -464,7 +476,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
 
 		nodeD := ts.AddNode("nodeE")
-		nodeD.CopyIdentityFromNode(ts.Node("nodeC-restarted")) // we just want to be able to issue some stuff and don't care about the account for now.
 		nodeD.Initialize(true, append(nodeOptions,
 			protocol.WithSnapshotPath(snapshotPath),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(nodeD.Name)),

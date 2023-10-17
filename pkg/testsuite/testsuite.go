@@ -35,33 +35,21 @@ type TestSuite struct {
 	fakeTesting *testing.T
 	network     *mock.Network
 
-	Directory *utils.Directory
-	nodes     *orderedmap.OrderedMap[string, *mock.Node]
-	running   bool
+	Directory    *utils.Directory
+	nodes        *orderedmap.OrderedMap[string, *mock.Node]
+	blockIssuers *orderedmap.OrderedMap[string, *mock.BlockIssuer]
+	running      bool
 
 	snapshotPath string
 	blocks       *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 
-	API iotago.API
+	API                      iotago.API
+	ProtocolParameterOptions []options.Option[iotago.V3ProtocolParameters]
 
-	optsGenesisTimestampOffset      int64
-	optsLivenessThresholdLowerBound uint16
-	optsLivenessThresholdUpperBound uint16
-	optsMinCommittableAge           iotago.SlotIndex
-	optsMaxCommittableAge           iotago.SlotIndex
-	optsSlotsPerEpochExponent       uint8
-	optsEpochNearingThreshold       iotago.SlotIndex
-	optsRMCMin                      iotago.Mana
-	optsRMCIncrease                 iotago.Mana
-	optsRMCDecrease                 iotago.Mana
-	optsRMCIncreaseThreshold        iotago.WorkScore
-	optsRMCDecreaseThreshold        iotago.WorkScore
-	optsSchedulerRate               iotago.WorkScore
-	optsMaxBufferSize               uint32
-	optsAccounts                    []snapshotcreator.AccountDetails
-	optsSnapshotOptions             []options.Option[snapshotcreator.Options]
-	optsWaitFor                     time.Duration
-	optsTick                        time.Duration
+	optsAccounts        []snapshotcreator.AccountDetails
+	optsSnapshotOptions []options.Option[snapshotcreator.Options]
+	optsWaitFor         time.Duration
+	optsTick            time.Duration
 
 	uniqueBlockTimeCounter              atomic.Int64
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
@@ -71,7 +59,6 @@ type TestSuite struct {
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
-	var schedulerRate iotago.WorkScore = 100000
 	return options.Apply(&TestSuite{
 		Testing:                             testingT,
 		fakeTesting:                         &testing.T{},
@@ -79,70 +66,60 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		network:                             mock.NewNetwork(),
 		Directory:                           utils.NewDirectory(testingT.TempDir()),
 		nodes:                               orderedmap.New[string, *mock.Node](),
+		blockIssuers:                        orderedmap.New[string, *mock.BlockIssuer](),
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
 		automaticTransactionIssuingCounters: *shrinkingmap.New[string, int](),
 
-		optsWaitFor:                     DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
-		optsTick:                        DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
-		optsGenesisTimestampOffset:      0,
-		optsLivenessThresholdLowerBound: 30,
-		optsLivenessThresholdUpperBound: 30,
-		optsMinCommittableAge:           10,
-		optsMaxCommittableAge:           20,
-		optsSlotsPerEpochExponent:       5,
-		optsEpochNearingThreshold:       16,
-		optsRMCMin:                      500,
-		optsRMCIncrease:                 500,
-		optsRMCDecrease:                 500,
-		optsRMCIncreaseThreshold:        8 * schedulerRate,
-		optsRMCDecreaseThreshold:        5 * schedulerRate,
-		optsSchedulerRate:               schedulerRate,
-		optsMaxBufferSize:               100 * iotago.MaxBlockSize,
+		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
-		t.API = iotago.V3API(
-			iotago.NewV3ProtocolParameters(
-				iotago.WithNetworkOptions(
-					testingT.Name(),
-					"rms",
-				),
-				iotago.WithSupplyOptions(
-					1_000_0000,
-					100,
-					1,
-					10,
-					100,
-					100,
-					100,
-				),
-				iotago.WithTimeProviderOptions(
-					time.Now().Truncate(10*time.Second).Unix()-t.optsGenesisTimestampOffset,
-					10,
-					t.optsSlotsPerEpochExponent,
-				),
-				iotago.WithLivenessOptions(
-					t.optsLivenessThresholdLowerBound,
-					t.optsLivenessThresholdUpperBound,
-					t.optsMinCommittableAge,
-					t.optsMaxCommittableAge,
-					t.optsEpochNearingThreshold,
-				),
-				iotago.WithCongestionControlOptions(
-					t.optsRMCMin,
-					t.optsRMCIncrease,
-					t.optsRMCDecrease,
-					t.optsRMCIncreaseThreshold,
-					t.optsRMCDecreaseThreshold,
-					t.optsSchedulerRate,
-					t.optsMaxBufferSize,
-					t.optsMaxBufferSize,
-				),
-				iotago.WithRewardsOptions(10, 8, 8, 31, 1154, 2, 1),
-				iotago.WithStakingOptions(1, 100, 1),
-			),
-		)
 
-		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID(), iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(), time.Unix(t.API.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
+		defaultProtocolParameters := []options.Option[iotago.V3ProtocolParameters]{
+			iotago.WithNetworkOptions(
+				testingT.Name(),
+				"rms",
+			),
+			iotago.WithSupplyOptions(
+				1_000_0000,
+				100,
+				1,
+				10,
+				100,
+				100,
+				100,
+			),
+			iotago.WithRewardsOptions(10, 8, 8, 31, 1154, 2, 1),
+			iotago.WithStakingOptions(1, 100, 1),
+
+			iotago.WithTimeProviderOptions(
+				GenesisTimeWithOffsetBySlots(0, DefaultSlotDurationInSeconds),
+				DefaultSlotDurationInSeconds,
+				DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				DefaultLivenessThresholdLowerBoundInSeconds,
+				DefaultLivenessThresholdUpperBoundInSeconds,
+				DefaultMinCommittableAge,
+				DefaultMaxCommittableAge,
+				DefaultEpochNearingThreshold,
+			),
+			iotago.WithCongestionControlOptions(
+				DefaultMinReferenceManaCost,
+				DefaultRMCIncrease,
+				DefaultRMCDecrease,
+				DefaultRMCIncreaseThreshold,
+				DefaultRMCDecreaseThreshold,
+				DefaultSchedulerRate,
+				DefaultMaxBufferSize,
+				DefaultMaxValBufferSize,
+			),
+		}
+
+		t.ProtocolParameterOptions = append(defaultProtocolParameters, t.ProtocolParameterOptions...)
+		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(t.ProtocolParameterOptions...))
+
+		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(), time.Unix(t.API.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
 
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
@@ -151,7 +128,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			snapshotcreator.WithFilePath(t.snapshotPath),
 			snapshotcreator.WithProtocolParameters(t.API.ProtocolParameters()),
 			snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
-				iotago.EmptyBlockID(): iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(),
+				iotago.EmptyBlockID: iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(),
 			}),
 		}
 		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
@@ -347,12 +324,12 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	if len(optAmount) > 0 {
 		amount = optAmount[0]
 	}
-	if amount > 0 {
+	if amount > 0 && validator {
 		accountDetails := snapshotcreator.AccountDetails{
-			Address:              iotago.Ed25519AddressFromPubKey(node.PubKey),
+			Address:              iotago.Ed25519AddressFromPubKey(node.Validator.PublicKey),
 			Amount:               amount,
 			Mana:                 iotago.Mana(amount),
-			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.PubKey)),
+			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.Validator.PublicKey)),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
 		}
@@ -386,6 +363,37 @@ func (t *TestSuite) AddNode(name string, optAmount ...iotago.BaseToken) *mock.No
 
 func (t *TestSuite) RemoveNode(name string) {
 	t.nodes.Delete(name)
+}
+
+func (t *TestSuite) AddBasicBlockIssuer(name string, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.BlockIssuer {
+	newBlockIssuer := mock.NewBlockIssuer(t.Testing, name, false)
+	t.blockIssuers.Set(name, newBlockIssuer)
+	var bic iotago.BlockIssuanceCredits
+	if len(blockIssuanceCredits) == 0 {
+		bic = iotago.MaxBlockIssuanceCredits / 2
+	} else {
+		bic = blockIssuanceCredits[0]
+	}
+
+	accountDetails := snapshotcreator.AccountDetails{
+		Address:              iotago.Ed25519AddressFromPubKey(newBlockIssuer.PublicKey),
+		Amount:               MinIssuerAccountAmount,
+		Mana:                 iotago.Mana(MinIssuerAccountAmount),
+		IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newBlockIssuer.PublicKey)),
+		ExpirySlot:           iotago.MaxSlotIndex,
+		BlockIssuanceCredits: bic,
+	}
+
+	t.optsAccounts = append(t.optsAccounts, accountDetails)
+
+	return newBlockIssuer
+}
+
+func (t *TestSuite) DefaultBasicBlockIssuer() *mock.BlockIssuer {
+	defaultBasicBlockIssuer, exists := t.blockIssuers.Get("default")
+	require.True(t.Testing, exists, "default block issuer not found")
+
+	return defaultBasicBlockIssuer
 }
 
 func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
@@ -437,7 +445,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 		node.Initialize(failOnBlockFiltered, baseOpts...)
 
 		if t.TransactionFramework == nil {
-			t.TransactionFramework = NewTransactionFramework(node.Protocol, t.genesisSeed[:], t.optsAccounts...)
+			t.TransactionFramework = NewTransactionFramework(node.Protocol, t.genesisSeed[:])
 		}
 
 		return true
@@ -449,7 +457,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 func (t *TestSuite) Validators() []*mock.Node {
 	validators := make([]*mock.Node, 0)
 	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
-		if node.Validator {
+		if node.IsValidator() {
 			validators = append(validators, node)
 		}
 
@@ -457,6 +465,20 @@ func (t *TestSuite) Validators() []*mock.Node {
 	})
 
 	return validators
+}
+
+// BlockIssersForNodes returns a map of block issuers for each node. If the node is a validator, its block issuer is the validator block issuer. Else, it is the block issuer for the test suite.
+func (t *TestSuite) BlockIssuersForNodes(nodes []*mock.Node) []*mock.BlockIssuer {
+	blockIssuers := make([]*mock.BlockIssuer, 0)
+	for _, node := range nodes {
+		if node.IsValidator() {
+			blockIssuers = append(blockIssuers, node.Validator)
+		} else {
+			blockIssuers = append(blockIssuers, t.DefaultBasicBlockIssuer())
+		}
+	}
+
+	return blockIssuers
 }
 
 // Eventually asserts that given condition will be met in opts.waitFor time,
@@ -507,4 +529,8 @@ func (t *TestSuite) SplitIntoPartitions(partitions map[string][]*mock.Node) {
 
 func (t *TestSuite) MergePartitionsToMain(partitions ...string) {
 	t.network.MergePartitionsToMain(partitions...)
+}
+
+func (t *TestSuite) SetAutomaticTransactionIssuingCounters(partition string, newValue int) {
+	t.automaticTransactionIssuingCounters.Set(partition, newValue)
 }

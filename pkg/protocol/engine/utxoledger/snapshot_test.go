@@ -22,23 +22,40 @@ import (
 func TestOutput_SnapshotBytes(t *testing.T) {
 	outputID := utils.RandOutputID(2)
 	blockID := utils.RandBlockID()
+	txID := utils.RandTransactionID()
 	slotBooked := utils.RandSlotIndex()
 	iotaOutput := utils.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, slotBooked, iotaOutput, iotaOutputBytes)
+	proof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txID.Identifier(), txID.Slot(), iotago.TxEssenceOutputs{iotaOutput}, 0)
+	require.NoError(t, err)
+
+	proofBytes, err := proof.Bytes()
+	require.NoError(t, err)
+
+	output := utxoledger.NewOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, slotBooked, iotaOutput, iotaOutputBytes, proof, proofBytes)
 
 	snapshotBytes := output.SnapshotBytes()
 
-	require.Equal(t, outputID[:], snapshotBytes[:iotago.OutputIDLength], "outputID not equal")
-	require.Equal(t, blockID[:], snapshotBytes[iotago.OutputIDLength:iotago.OutputIDLength+iotago.SlotIdentifierLength], "blockID not equal")
-	require.Equal(t, slotBooked, lo.Return1(iotago.SlotIndexFromBytes(snapshotBytes[iotago.OutputIDLength+iotago.SlotIdentifierLength:iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength])), "slotBooked not equal")
-	require.Equal(t, uint32(len(iotaOutputBytes)), binary.LittleEndian.Uint32(snapshotBytes[iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength:iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength+4]), "output bytes length")
-	require.Equal(t, iotaOutputBytes, snapshotBytes[iotago.OutputIDLength+iotago.SlotIdentifierLength+iotago.SlotIndexLength+4:], "output bytes not equal")
+	readOffset := 0
+	require.Equal(t, outputID[:], snapshotBytes[readOffset:readOffset+iotago.OutputIDLength], "outputID not equal")
+	readOffset += iotago.OutputIDLength
+	require.Equal(t, blockID[:], snapshotBytes[readOffset:readOffset+iotago.BlockIDLength], "blockID not equal")
+	readOffset += iotago.BlockIDLength
+	require.Equal(t, slotBooked, lo.Return1(iotago.SlotIndexFromBytes(snapshotBytes[readOffset:readOffset+iotago.SlotIndexLength])), "slotBooked not equal")
+	readOffset += iotago.SlotIndexLength
+	require.Equal(t, uint32(len(iotaOutputBytes)), binary.LittleEndian.Uint32(snapshotBytes[readOffset:readOffset+4]), "output bytes length")
+	readOffset += 4
+	require.Equal(t, iotaOutputBytes, snapshotBytes[readOffset:readOffset+len(iotaOutputBytes)], "output bytes not equal")
+	readOffset += len(iotaOutputBytes)
+	require.Equal(t, uint32(len(proofBytes)), binary.LittleEndian.Uint32(snapshotBytes[readOffset:readOffset+4]), "proof bytes length")
+	readOffset += 4
+	require.Equal(t, proofBytes, snapshotBytes[readOffset:readOffset+len(proofBytes)], "proof bytes not equal")
 }
 
 func TestOutputFromSnapshotReader(t *testing.T) {
+	txID := utils.RandTransactionID()
 	outputID := utils.RandOutputID(2)
 	blockID := utils.RandBlockID()
 	slotBooked := utils.RandSlotIndex()
@@ -46,7 +63,12 @@ func TestOutputFromSnapshotReader(t *testing.T) {
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, slotBooked, iotaOutput, iotaOutputBytes)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txID.Identifier(), txID.Slot(), iotago.TxEssenceOutputs{iotaOutput}, 0)
+	require.NoError(t, err)
+	outputProofBytes, err := outputProof.Bytes()
+	require.NoError(t, err)
+
+	output := utxoledger.NewOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, slotBooked, iotaOutput, iotaOutputBytes, outputProof, outputProofBytes)
 	snapshotBytes := output.SnapshotBytes()
 
 	buf := bytes.NewReader(snapshotBytes)
@@ -57,6 +79,7 @@ func TestOutputFromSnapshotReader(t *testing.T) {
 }
 
 func TestSpent_SnapshotBytes(t *testing.T) {
+	txID := utils.RandTransactionID()
 	outputID := utils.RandOutputID(2)
 	blockID := utils.RandBlockID()
 	slotBooked := utils.RandSlotIndex()
@@ -64,7 +87,12 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, slotBooked, iotaOutput, iotaOutputBytes)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txID.Identifier(), txID.Slot(), iotago.TxEssenceOutputs{iotaOutput}, 0)
+	require.NoError(t, err)
+	outputProofBytes, err := outputProof.Bytes()
+	require.NoError(t, err)
+
+	output := utxoledger.NewOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, slotBooked, iotaOutput, iotaOutputBytes, outputProof, outputProofBytes)
 	outputSnapshotBytes := output.SnapshotBytes()
 
 	transactionID := utils.RandTransactionID()
@@ -73,11 +101,14 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 
 	snapshotBytes := spent.SnapshotBytes()
 
-	require.Equal(t, outputSnapshotBytes, snapshotBytes[:len(outputSnapshotBytes)], "output bytes not equal")
-	require.Equal(t, transactionID[:], snapshotBytes[len(outputSnapshotBytes):len(outputSnapshotBytes)+iotago.TransactionIDLength], "transactionID not equal")
+	readOffset := 0
+	require.Equal(t, outputSnapshotBytes, snapshotBytes[readOffset:readOffset+len(outputSnapshotBytes)], "output bytes not equal")
+	readOffset += len(outputSnapshotBytes)
+	require.Equal(t, transactionID[:], snapshotBytes[readOffset:readOffset+iotago.TransactionIDLength], "transactionID not equal")
 }
 
 func TestSpentFromSnapshotReader(t *testing.T) {
+	txID := utils.RandTransactionID()
 	outputID := utils.RandOutputID(2)
 	blockID := utils.RandBlockID()
 	slotBooked := utils.RandSlotIndex()
@@ -85,7 +116,12 @@ func TestSpentFromSnapshotReader(t *testing.T) {
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, slotBooked, iotaOutput, iotaOutputBytes)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txID.Identifier(), txID.Slot(), iotago.TxEssenceOutputs{iotaOutput}, 0)
+	require.NoError(t, err)
+	outputProofBytes, err := outputProof.Bytes()
+	require.NoError(t, err)
+
+	output := utxoledger.NewOutput(api.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, slotBooked, iotaOutput, iotaOutputBytes, outputProof, outputProofBytes)
 
 	transactionID := utils.RandTransactionID()
 	slotSpent := utils.RandSlotIndex()

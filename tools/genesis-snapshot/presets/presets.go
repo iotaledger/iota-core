@@ -22,7 +22,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("default", "rms"),
 			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10, 100, 100, 100),
-			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
+			iotago.WithTimeProviderOptions(1696841745, 10, 13),
 			iotago.WithLivenessOptions(30, 30, 7, 14, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
 			iotago.WithCongestionControlOptions(500, 500, 500, 800000, 500000, 100000, 1000, 100),
@@ -30,7 +30,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 		),
 	),
 	snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
-		iotago.EmptyBlockID(): iotago.NewEmptyCommitment(3).MustID(),
+		iotago.EmptyBlockID: iotago.NewEmptyCommitment(3).MustID(),
 	}),
 }
 

@@ -10,8 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/timed"
-	"github.com/iotaledger/iota-core/components/blockissuer"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
+	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -25,7 +24,7 @@ func init() {
 		Params:   params,
 		Run:      run,
 		IsEnabled: func(_ *dig.Container) bool {
-			return ParamsValidator.Enabled && blockissuer.ParamsBlockIssuer.Enabled
+			return ParamsValidator.Enabled
 		},
 	}
 }
@@ -36,18 +35,18 @@ var (
 
 	isValidator      atomic.Bool
 	executor         *timed.TaskExecutor[iotago.AccountID]
-	validatorAccount blockfactory.Account
+	validatorAccount blockhandler.Account
 )
 
 type dependencies struct {
 	dig.In
 
-	Protocol    *protocol.Protocol
-	BlockIssuer *blockfactory.BlockIssuer
+	Protocol     *protocol.Protocol
+	BlockHandler *blockhandler.BlockHandler
 }
 
 func run() error {
-	validatorAccount = blockfactory.AccountFromParams(ParamsValidator.Account, ParamsValidator.PrivateKey)
+	validatorAccount = blockhandler.AccountFromParams(ParamsValidator.Account, ParamsValidator.PrivateKey)
 
 	executor = timed.NewTaskExecutor[iotago.AccountID](1)
 

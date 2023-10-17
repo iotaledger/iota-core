@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -18,7 +17,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -51,16 +49,11 @@ type Node struct {
 	Testing *testing.T
 
 	Name      string
-	Validator bool
+	Validator *BlockIssuer
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 
-	blockIssuer *blockfactory.BlockIssuer
-
-	privateKey              ed25519.PrivateKey
-	PubKey                  ed25519.PublicKey
-	AccountID               iotago.AccountID
 	PeerID                  peer.ID
 	protocolParametersHash  iotago.Identifier
 	highestSupportedVersion iotago.Version
@@ -91,15 +84,21 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 	peerID := lo.PanicOnErr(peer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
 	RegisterIDAlias(peerID, name)
 
+	var validatorBlockIssuer *BlockIssuer
+	if validator {
+		validatorBlockIssuer = NewBlockIssuer(t, name, validator)
+	} else {
+		validatorBlockIssuer = nil
+	}
+
 	return &Node{
 		Testing: t,
 
-		Name:       name,
-		Validator:  validator,
-		PubKey:     pub,
-		privateKey: priv,
-		AccountID:  accountID,
-		PeerID:     peerID,
+		Name: name,
+
+		Validator: validatorBlockIssuer,
+
+		PeerID: peerID,
 
 		Partition: partition,
 		Endpoint:  net.JoinWithEndpointID(peerID, partition),
@@ -107,6 +106,10 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 		attachedBlocks: make([]*blocks.Block, 0),
 	}
+}
+
+func (n *Node) IsValidator() bool {
+	return n.Validator != nil
 }
 
 func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[protocol.Protocol]) {
@@ -117,8 +120,6 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 
 	n.hookEvents()
 	n.hookLogging(failOnBlockFiltered)
-
-	n.blockIssuer = blockfactory.New(n.Protocol, blockfactory.WithTipSelectionTimeout(3*time.Second), blockfactory.WithTipSelectionRetryInterval(time.Millisecond*100))
 
 	n.ctx, n.ctxCancel = context.WithCancel(context.Background())
 
@@ -180,17 +181,25 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
-	//events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
+	events.Network.WarpSyncResponseReceived.Hook(func(id iotago.CommitmentID, ds iotago.BlockIDs, m *merklehasher.Proof[iotago.Identifier], ds2 iotago.TransactionIDs, m2 *merklehasher.Proof[iotago.Identifier], id2 peer.ID) {
+		fmt.Printf("%s > Network.WarpSyncResponseReceived: from %s %s\n", n.Name, id2, id)
+	})
+
+	events.Network.WarpSyncRequestReceived.Hook(func(id iotago.CommitmentID, id2 peer.ID) {
+		fmt.Printf("%s > Network.WarpSyncRequestReceived: from %s %s\n", n.Name, id2, id)
+	})
+
+	// events.ChainManager.CommitmentBelowRoot.Hook(func(commitmentID iotago.CommitmentID) {
 	//	fmt.Printf("%s > ChainManager.CommitmentBelowRoot: %s\n", n.Name, commitmentID)
-	//})
+	// })
 
 	events.ChainManager.ForkDetected.Hook(func(fork *chainmanager.Fork) {
 		fmt.Printf("%s > ChainManager.ForkDetected: %s\n", n.Name, fork)
 	})
 
-	//events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
+	// events.Engine.TipManager.BlockAdded.Hook(func(tipMetadata tipmanager.TipMetadata) {
 	//	fmt.Printf("%s > TipManager.BlockAdded: %s in pool %d\n", n.Name, tipMetadata.ID(), tipMetadata.TipPool().Get())
-	//})
+	// })
 
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) {
 		fmt.Printf("%s > CandidateEngineActivated: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
@@ -202,6 +211,12 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > MainEngineSwitched: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
 	})
 
+	events.MainEngineRestarted.Hook(func(e *engine.Engine) {
+		fmt.Printf("%s > MainEngineRestarted: %s, ChainID:%s Slot:%s\n", n.Name, e.Name(), e.ChainID(), e.ChainID().Slot())
+
+		n.attachEngineLogsWithName(failOnBlockFiltered, e, fmt.Sprintf("Main2 - %s", e.Name()[:8]))
+	})
+
 	events.Network.Error.Hook(func(err error, id peer.ID) {
 		fmt.Printf("%s > Network.Error: from %s %s\n", n.Name, id, err)
 	})
@@ -211,8 +226,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	})
 }
 
-func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
-	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
+func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engine.Engine, engineName string) {
 	events := instance.Events
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
@@ -332,7 +346,7 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 			require.NoError(n.Testing, err)
 		}
 
-		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s %s %s %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks, roots, attestationBlockIDs)
+		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s Accepted Blocks: %s\n %s\n Attestations: %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks, roots, attestationBlockIDs)
 	})
 
 	events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
@@ -427,6 +441,12 @@ func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engin
 	})
 }
 
+func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
+	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngineInstance() != instance, "Candidate", "Main"), instance.Name()[:8])
+
+	n.attachEngineLogsWithName(failOnBlockFiltered, instance, engineName)
+}
+
 func (n *Node) Wait() {
 	n.Workers.WaitChildren()
 }
@@ -447,13 +467,6 @@ func (n *Node) Shutdown() {
 	}
 
 	<-stopped
-}
-
-func (n *Node) CopyIdentityFromNode(otherNode *Node) {
-	n.AccountID = otherNode.AccountID
-	n.PubKey = otherNode.PubKey
-	n.privateKey = otherNode.privateKey
-	n.Validator = otherNode.Validator
 }
 
 func (n *Node) ProtocolParametersHash() iotago.Identifier {
@@ -478,80 +491,6 @@ func (n *Node) HighestSupportedVersion() iotago.Version {
 
 func (n *Node) SetHighestSupportedVersion(version iotago.Version) {
 	n.highestSupportedVersion = version
-}
-
-func (n *Node) CreateValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
-	modelBlock, err := n.blockIssuer.CreateValidationBlock(ctx, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), opts...)
-	require.NoError(n.Testing, err)
-
-	modelBlock.ID().RegisterAlias(alias)
-
-	return blocks.NewBlock(modelBlock)
-}
-
-func (n *Node) CreateBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BasicBlockParams]) *blocks.Block {
-	modelBlock, err := n.blockIssuer.CreateBlock(ctx, blockfactory.NewEd25519Account(n.AccountID, n.privateKey), opts...)
-	require.NoError(n.Testing, err)
-
-	modelBlock.ID().RegisterAlias(alias)
-
-	return blocks.NewBlock(modelBlock)
-}
-
-func (n *Node) IssueBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.BasicBlockParams]) *blocks.Block {
-	block := n.CreateBlock(ctx, alias, opts...)
-
-	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, alias)
-
-	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
-
-	return block
-}
-
-func (n *Node) IssueExistingBlock(block *blocks.Block) {
-	require.NoErrorf(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()), "%s > failed to issue block with alias %s", n.Name, block.ID().Alias())
-
-	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", n.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
-}
-
-func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[blockfactory.ValidatorBlockParams]) *blocks.Block {
-	block := n.CreateValidationBlock(ctx, alias, opts...)
-
-	require.NoError(n.Testing, n.blockIssuer.IssueBlock(block.ModelBlock()))
-
-	fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
-
-	return block
-}
-
-func (n *Node) IssueActivity(ctx context.Context, wg *sync.WaitGroup, startSlot iotago.SlotIndex) {
-	issuingTime := n.Protocol.APIForSlot(startSlot).TimeProvider().SlotStartTime(startSlot)
-	start := time.Now()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		fmt.Println(n.Name, "> Starting activity")
-		var counter int
-		for {
-			if ctx.Err() != nil {
-				fmt.Println(n.Name, "> Stopped activity due to canceled context:", ctx.Err())
-				return
-			}
-
-			blockAlias := fmt.Sprintf("%s-activity.%d", n.Name, counter)
-			timeOffset := time.Since(start)
-			n.IssueValidationBlock(ctx, blockAlias,
-				blockfactory.WithValidationBlockHeaderOptions(
-					blockfactory.WithIssuingTime(issuingTime.Add(timeOffset)),
-				),
-			)
-
-			counter++
-			time.Sleep(1 * time.Second)
-		}
-	}()
 }
 
 func (n *Node) ForkDetectedCount() int {

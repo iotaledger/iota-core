@@ -5,7 +5,6 @@ import (
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/blockfactory"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -19,13 +18,14 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1")
+	blockIssuer := ts.AddBasicBlockIssuer("default")
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
 
 	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "tx1:0"))
 
-	ts.IssuePayloadWithOptions("block1", node1, tx2)
+	ts.IssuePayloadWithOptions("block1", blockIssuer, node1, tx2)
 
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx2"), true, node1)
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), false, node1)
@@ -33,7 +33,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx2"), false, node1)
 	// make sure that the block is not booked
 
-	ts.IssuePayloadWithOptions("block2", node1, tx1)
+	ts.IssuePayloadWithOptions("block2", blockIssuer, node1, tx1)
 
 	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)
 	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)
@@ -54,12 +54,13 @@ func Test_DoubleSpend(t *testing.T) {
 
 	node1 := ts.AddValidatorNode("node1")
 	node2 := ts.AddValidatorNode("node2")
+	blockIssuer := ts.AddBasicBlockIssuer("default")
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.AccountID,
-		node2.AccountID,
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
 	}, ts.Nodes()...)
 
 	// Create and issue double spends
@@ -67,8 +68,8 @@ func Test_DoubleSpend(t *testing.T) {
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "Genesis:0"))
 
-		ts.IssuePayloadWithOptions("block1", node1, tx1, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssuePayloadWithOptions("block2", node1, tx2, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("block1", blockIssuer, node1, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("block2", blockIssuer, node1, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
@@ -86,8 +87,8 @@ func Test_DoubleSpend(t *testing.T) {
 
 	// Issue some more blocks and assert that conflicts are propagated to blocks.
 	{
-		ts.IssueValidationBlock("block3", node1, blockfactory.WithStrongParents(ts.BlockID("block1")))
-		ts.IssueValidationBlock("block4", node1, blockfactory.WithStrongParents(ts.BlockID("block2")))
+		ts.IssueValidationBlock("block3", node1, mock.WithStrongParents(ts.BlockID("block1")))
+		ts.IssueValidationBlock("block4", node1, mock.WithStrongParents(ts.BlockID("block2")))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block3"): {"tx1"},
@@ -98,15 +99,15 @@ func Test_DoubleSpend(t *testing.T) {
 
 	// Issue an invalid block and assert that its vote is not cast.
 	{
-		ts.IssueValidationBlock("block5", node2, blockfactory.WithStrongParents(ts.BlockIDs("block3", "block4")...))
+		ts.IssueValidationBlock("block5", node2, mock.WithStrongParents(ts.BlockIDs("block3", "block4")...))
 
 		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
 	// Issue valid blocks that resolve the conflict.
 	{
-		ts.IssueValidationBlock("block6", node2, blockfactory.WithStrongParents(ts.BlockIDs("block3", "block4")...), blockfactory.WithShallowLikeParents(ts.BlockID("block2")))
-		ts.IssueValidationBlock("block7", node1, blockfactory.WithStrongParents(ts.BlockIDs("block6")...))
+		ts.IssueValidationBlock("block6", node2, mock.WithStrongParents(ts.BlockIDs("block3", "block4")...), mock.WithShallowLikeParents(ts.BlockID("block2")))
+		ts.IssueValidationBlock("block7", node1, mock.WithStrongParents(ts.BlockIDs("block6")...))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block6"): {"tx2"},
@@ -123,6 +124,8 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	nodeA := ts.AddValidatorNode("nodeA")
 	nodeB := ts.AddValidatorNode("nodeB")
+	blockIssuerA := ts.AddBasicBlockIssuer("blockIssuerA")
+	blockIssuerB := ts.AddBasicBlockIssuer("blockIssuerA")
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
@@ -132,13 +135,13 @@ func Test_MultipleAttachments(t *testing.T) {
 	{
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 2, "Genesis:0"))
 
-		ts.IssuePayloadWithOptions("A.1", nodeA, tx1, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssueValidationBlock("A.1.1", nodeA, blockfactory.WithStrongParents(ts.BlockID("A.1")))
-		ts.IssuePayloadWithOptions("B.1", nodeB, tx1, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssueValidationBlock("B.1.1", nodeB, blockfactory.WithStrongParents(ts.BlockID("B.1")))
+		ts.IssuePayloadWithOptions("A.1", blockIssuerA, nodeA, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueValidationBlock("A.1.1", nodeA, mock.WithStrongParents(ts.BlockID("A.1")))
+		ts.IssuePayloadWithOptions("B.1", blockIssuerB, nodeB, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueValidationBlock("B.1.1", nodeB, mock.WithStrongParents(ts.BlockID("B.1")))
 
-		ts.IssueValidationBlock("A.2", nodeA, blockfactory.WithStrongParents(ts.BlockID("B.1.1")))
-		ts.IssueValidationBlock("B.2", nodeB, blockfactory.WithStrongParents(ts.BlockID("A.1.1")))
+		ts.IssueValidationBlock("A.2", nodeA, mock.WithStrongParents(ts.BlockID("B.1.1")))
+		ts.IssueValidationBlock("B.2", nodeB, mock.WithStrongParents(ts.BlockID("A.1.1")))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.1", "B.1"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1", "B.1"), false, ts.Nodes()...)
@@ -159,14 +162,14 @@ func Test_MultipleAttachments(t *testing.T) {
 	{
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "tx1:1"))
 
-		ts.IssuePayloadWithOptions("A.3", nodeA, tx2, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssueValidationBlock("B.3", nodeB, blockfactory.WithStrongParents(ts.BlockID("A.3")))
-		ts.IssueValidationBlock("A.4", nodeA, blockfactory.WithStrongParents(ts.BlockID("B.3")))
+		ts.IssuePayloadWithOptions("A.3", nodeA.Validator, nodeA, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueValidationBlock("B.3", nodeB, mock.WithStrongParents(ts.BlockID("A.3")))
+		ts.IssueValidationBlock("A.4", nodeA, mock.WithStrongParents(ts.BlockID("B.3")))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.3"), true, ts.Nodes()...)
 
-		ts.IssueValidationBlock("B.4", nodeB, blockfactory.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
-		ts.IssueValidationBlock("A.5", nodeA, blockfactory.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
+		ts.IssueValidationBlock("B.4", nodeB, mock.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
+		ts.IssueValidationBlock("A.5", nodeA, mock.WithStrongParents(ts.BlockIDs("B.3", "A.4")...))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("B.3", "A.4"), true, ts.Nodes()...)
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("B.4", "A.5"), false, ts.Nodes()...)
@@ -191,11 +194,11 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	// Issue a block that includes tx1, and make sure that tx2 is accepted as well as a consequence.
 	{
-		ts.IssueValidationBlock("A.6", nodeA, blockfactory.WithStrongParents(ts.BlockIDs("A.2", "B.2")...))
-		ts.IssueValidationBlock("B.5", nodeB, blockfactory.WithStrongParents(ts.BlockIDs("A.2", "B.2")...))
+		ts.IssueValidationBlock("A.6", nodeA, mock.WithStrongParents(ts.BlockIDs("A.2", "B.2")...))
+		ts.IssueValidationBlock("B.5", nodeB, mock.WithStrongParents(ts.BlockIDs("A.2", "B.2")...))
 
-		ts.IssueValidationBlock("A.7", nodeA, blockfactory.WithStrongParents(ts.BlockIDs("A.6", "B.5")...))
-		ts.IssueValidationBlock("B.6", nodeB, blockfactory.WithStrongParents(ts.BlockIDs("A.6", "B.5")...))
+		ts.IssueValidationBlock("A.7", nodeA, mock.WithStrongParents(ts.BlockIDs("A.6", "B.5")...))
+		ts.IssueValidationBlock("B.6", nodeB, mock.WithStrongParents(ts.BlockIDs("A.6", "B.5")...))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.2", "B.2", "A.6", "B.5"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1", "B.1"), true, ts.Nodes()...)
@@ -222,20 +225,32 @@ func Test_MultipleAttachments(t *testing.T) {
 
 func Test_SpendRejectedCommittedRace(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithGenesisTimestampOffset(20*10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(5),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(20, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				testsuite.DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
+				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
+				2,
+				5,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
 	)
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1")
 	node2 := ts.AddValidatorNode("node2")
+	ts.AddBasicBlockIssuer("default")
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.AccountID,
-		node2.AccountID,
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
 	}, ts.Nodes()...)
 
 	genesisCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(0)).Commitment()
@@ -245,9 +260,9 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "Genesis:0"))
 
-		ts.IssueBlockAtSlotWithOptions("block1.1", 1, genesisCommitment, node1, tx1)
-		ts.IssueBlockAtSlotWithOptions("block1.2", 1, genesisCommitment, node1, tx2)
-		ts.IssueBlockAtSlot("block2.tx1", 2, genesisCommitment, node1, ts.BlockIDs("block1.1")...)
+		ts.IssueBasicBlockAtSlotWithOptions("block1.1", 1, genesisCommitment, ts.DefaultBasicBlockIssuer(), node1, tx1)
+		ts.IssueBasicBlockAtSlotWithOptions("block1.2", 1, genesisCommitment, ts.DefaultBasicBlockIssuer(), node1, tx2)
+		ts.IssueValidationBlockAtSlot("block2.tx1", 2, genesisCommitment, node1, ts.BlockIDs("block1.1")...)
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
@@ -266,8 +281,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Issue some more blocks and assert that conflicts are propagated to blocks.
 	{
-		ts.IssueBlockAtSlot("block2.1", 2, genesisCommitment, node1, ts.BlockID("block1.1"))
-		ts.IssueBlockAtSlot("block2.2", 2, genesisCommitment, node1, ts.BlockID("block1.2"))
+		ts.IssueValidationBlockAtSlot("block2.1", 2, genesisCommitment, node1, ts.BlockID("block1.1"))
+		ts.IssueValidationBlockAtSlot("block2.2", 2, genesisCommitment, node1, ts.BlockID("block1.2"))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block2.1"):   {"tx1"},
@@ -279,8 +294,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Issue valid blocks that resolve the conflict.
 	{
-		ts.IssueBlockAtSlot("block2.3", 2, genesisCommitment, node2, ts.BlockIDs("block2.2")...)
-		ts.IssueBlockAtSlot("block2.4", 2, genesisCommitment, node1, ts.BlockIDs("block2.3")...)
+		ts.IssueValidationBlockAtSlot("block2.3", 2, genesisCommitment, node2, ts.BlockIDs("block2.2")...)
+		ts.IssueValidationBlockAtSlot("block2.4", 2, genesisCommitment, node1, ts.BlockIDs("block2.3")...)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block2.3"):   {"tx2"},
@@ -301,8 +316,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 			testsuite.WithEvictedSlot(0),
 		)
 
-		ts.IssueBlockAtSlot("block5.1", 5, genesisCommitment, node1, ts.BlockIDsWithPrefix("block1.1")...)
-		ts.IssueBlockAtSlot("block5.2", 5, genesisCommitment, node1, ts.BlockIDsWithPrefix("block1.2")...)
+		ts.IssueValidationBlockAtSlot("block5.1", 5, genesisCommitment, node1, ts.BlockIDsWithPrefix("block1.1")...)
+		ts.IssueValidationBlockAtSlot("block5.2", 5, genesisCommitment, node1, ts.BlockIDsWithPrefix("block1.2")...)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block5.1"):   {"tx1"}, // on rejected conflict
@@ -350,7 +365,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Issue TX3 on top of rejected TX1 and 1 commitment on node2 (committed to slot 1)
 	{
-		ts.IssueBlockAtSlotWithOptions("n2-commit1", 5, commitment1, node2, tx4)
+		ts.IssueBasicBlockAtSlotWithOptions("n2-commit1", 5, commitment1, ts.DefaultBasicBlockIssuer(), node2, tx4)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("n2-commit1"): {}, // no conflits inherited as the block is invalid and doesn't get booked.
@@ -368,7 +383,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Issue a block on node1 that inherits a pending conflict that has been orphaned on node2
 	{
-		ts.IssueBlockAtSlot("n1-rejected-genesis", 5, genesisCommitment, node1, ts.BlockIDs("block2.tx1")...)
+		ts.IssueValidationBlockAtSlot("n1-rejected-genesis", 5, genesisCommitment, node1, ts.BlockIDs("block2.tx1")...)
 
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n1-rejected-genesis"), true, node1)
 		ts.AssertBlocksInCacheInvalid(ts.Blocks("n1-rejected-genesis"), false, node1)
@@ -383,7 +398,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Issue TX4 on top of rejected TX1 but Genesis commitment on node2 (committed to slot 1)
 	{
-		ts.IssueBlockAtSlotWithOptions("n2-genesis", 5, genesisCommitment, node2, tx4, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockAtSlotWithOptions("n2-genesis", 5, genesisCommitment, ts.DefaultBasicBlockIssuer(), node2, tx4, mock.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("n2-genesis"): {"tx4"}, // on rejected conflict
@@ -395,7 +410,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Issue TX4 on top of rejected TX1 but Genesis commitment on node1 (committed to slot 0)
 	{
-		ts.IssueBlockAtSlotWithOptions("n1-genesis", 5, genesisCommitment, node1, tx4, blockfactory.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockAtSlotWithOptions("n1-genesis", 5, genesisCommitment, ts.DefaultBasicBlockIssuer(), node1, tx4, mock.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), true, node2)
 		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx4"), true, node2)
@@ -424,14 +439,14 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		)
 
 		// Exchange each-other blocks, ignoring invalidity
-		ts.IssueExistingBlock("n2-genesis", node1)
-		ts.IssueExistingBlock("n2-commit1", node1)
-		ts.IssueExistingBlock("n1-genesis", node2)
-		ts.IssueExistingBlock("n1-rejected-genesis", node2)
+		ts.IssueExistingBlock("n2-genesis", ts.DefaultBasicBlockIssuer(), node1)
+		ts.IssueExistingBlock("n2-commit1", ts.DefaultBasicBlockIssuer(), node1)
+		ts.IssueExistingBlock("n1-genesis", ts.DefaultBasicBlockIssuer(), node2)
+		ts.IssueExistingBlock("n1-rejected-genesis", ts.DefaultBasicBlockIssuer(), node2)
 
-		ts.IssueBlockAtSlot("n1-rejected-commit1", 5, commitment1, node1, ts.BlockIDs("n1-rejected-genesis")...)
+		ts.IssueValidationBlockAtSlot("n1-rejected-commit1", 5, commitment1, node1, ts.BlockIDs("n1-rejected-genesis")...)
 		// Needs reissuing on node2 because it is invalid
-		ts.IssueExistingBlock("n1-rejected-commit1", node2)
+		ts.IssueExistingBlock("n1-rejected-commit1", ts.DefaultBasicBlockIssuer(), node2)
 
 		// The nodes agree on the results of the invalid blocks
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-genesis", "n1-genesis", "n1-rejected-genesis"), true, node1, node2)
@@ -473,20 +488,32 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 func Test_SpendPendingCommittedRace(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithGenesisTimestampOffset(20*10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(5),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(20, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				testsuite.DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
+				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
+				2,
+				5,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
 	)
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1")
 	node2 := ts.AddValidatorNode("node2")
+	ts.AddBasicBlockIssuer("default")
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
-		node1.AccountID,
-		node2.AccountID,
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
 	}, ts.Nodes()...)
 
 	genesisCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(0)).Commitment()
@@ -496,8 +523,8 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
 		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "Genesis:0"))
 
-		ts.IssueBlockAtSlotWithOptions("block1.1", 1, genesisCommitment, node2, tx1)
-		ts.IssueBlockAtSlotWithOptions("block1.2", 1, genesisCommitment, node2, tx2)
+		ts.IssueBasicBlockAtSlotWithOptions("block1.1", 1, genesisCommitment, ts.DefaultBasicBlockIssuer(), node2, tx1)
+		ts.IssueBasicBlockAtSlotWithOptions("block1.2", 1, genesisCommitment, ts.DefaultBasicBlockIssuer(), node2, tx2)
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
@@ -515,8 +542,8 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 	// Issue some more blocks and assert that conflicts are propagated to blocks.
 	{
-		ts.IssueBlockAtSlot("block2.1", 2, genesisCommitment, node2, ts.BlockID("block1.1"))
-		ts.IssueBlockAtSlot("block2.2", 2, genesisCommitment, node2, ts.BlockID("block1.2"))
+		ts.IssueValidationBlockAtSlot("block2.1", 2, genesisCommitment, node2, ts.BlockID("block1.1"))
+		ts.IssueValidationBlockAtSlot("block2.2", 2, genesisCommitment, node2, ts.BlockID("block1.2"))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block2.1"): {"tx1"},
@@ -536,7 +563,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 			testsuite.WithEvictedSlot(0),
 		)
 
-		ts.IssueBlockAtSlot("", 5, genesisCommitment, node1, ts.BlockIDsWithPrefix("4.0")...)
+		ts.IssueValidationBlockAtSlot("", 5, genesisCommitment, node1, ts.BlockIDsWithPrefix("4.0")...)
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, nil)
 
@@ -574,8 +601,8 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 	// Issue a block booked on a pending conflict on node2
 	{
-		ts.IssueBlockAtSlot("n2-pending-genesis", 5, genesisCommitment, node2, ts.BlockIDs("block2.1")...)
-		ts.IssueBlockAtSlot("n2-pending-commit1", 5, commitment1, node2, ts.BlockIDs("block2.1")...)
+		ts.IssueValidationBlockAtSlot("n2-pending-genesis", 5, genesisCommitment, node2, ts.BlockIDs("block2.1")...)
+		ts.IssueValidationBlockAtSlot("n2-pending-commit1", 5, commitment1, node2, ts.BlockIDs("block2.1")...)
 
 		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), true, node2)
 		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1"), true, node2)
@@ -605,8 +632,8 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		)
 
 		// Exchange each-other blocks, ignoring invalidity
-		ts.IssueExistingBlock("n2-pending-genesis", node1)
-		ts.IssueExistingBlock("n2-pending-commit1", node1)
+		ts.IssueExistingBlock("n2-pending-genesis", ts.DefaultBasicBlockIssuer(), node1)
+		ts.IssueExistingBlock("n2-pending-commit1", ts.DefaultBasicBlockIssuer(), node1)
 
 		// The nodes agree on the results of the invalid blocks
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-genesis", "n2-pending-commit1"), true, node1, node2)

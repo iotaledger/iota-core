@@ -136,7 +136,6 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 			}
 
 			committee.SetReused()
-			fmt.Println("reuse committee", currentEpoch, "stake", committee.TotalValidatorStake())
 			o.seatManager.SetCommittee(nextEpoch, committee)
 
 			o.events.CommitteeSelected.Trigger(committee, nextEpoch)
@@ -195,15 +194,15 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		return iotago.Identifier{}, ierrors.Wrapf(err, "committee for a finished epoch %d not found", targetCommitteeEpoch)
 	}
 
-	comitteeTree := ads.NewSet(
+	committeeTree := ads.NewSet(
 		mapdb.NewMapDB(),
 		iotago.AccountID.Bytes,
-		iotago.IdentifierFromBytes,
+		iotago.AccountIDFromBytes,
 	)
 
 	var innerErr error
 	committee.ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
-		if err := comitteeTree.Add(accountID); err != nil {
+		if err := committeeTree.Add(accountID); err != nil {
 			innerErr = ierrors.Wrapf(err, "failed to add account %s to committee tree", accountID)
 			return false
 		}
@@ -214,7 +213,7 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		return iotago.Identifier{}, innerErr
 	}
 
-	return iotago.Identifier(comitteeTree.Root()), nil
+	return iotago.Identifier(committeeTree.Root()), nil
 }
 
 func (o *SybilProtection) SeatManager() seatmanager.SeatManager {

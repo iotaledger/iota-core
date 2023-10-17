@@ -14,7 +14,7 @@ import (
 func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
 	txID, err := httpserver.ParseTransactionIDParam(c, restapipkg.ParameterTransactionID)
 	if err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrapf(err, "failed to parse transaction ID: %s", c.Param(restapipkg.ParameterTransactionID))
+		return iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to parse transaction ID: %s", c.Param(restapipkg.ParameterTransactionID))
 	}
 
 	return blockIDFromTransactionID(txID)
@@ -27,7 +27,7 @@ func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockI
 
 	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
-		return iotago.EmptyBlockID(), ierrors.Wrapf(err, "failed to get output: %s", outputID.String())
+		return iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to get output: %s", outputID.String())
 	}
 
 	return output.BlockID(), nil
