@@ -150,38 +150,15 @@ func newFaucet(clt models.Client, faucetParams *faucetParams) (*faucet, error) {
 	}
 	faucetAddr := mock.NewHDWallet("", genesisSeed, 0).Address(iotago.AddressEd25519)
 
-	indexer, err := clt.Indexer()
-	if err != nil {
-		panic(ierrors.Wrap(err, "failed to get indexer"))
-	}
-
-	results, err := indexer.Outputs(context.Background(), &apimodels.BasicOutputsQuery{
-		AddressBech32: faucetAddr.Bech32(iotago.PrefixTestnet),
-	})
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to prepare faucet unspent outputs indexer request")
-	}
-
-	var (
-		faucetUnspentOutput   iotago.Output
-		faucetUnspentOutputID iotago.OutputID
-		faucetAmount          iotago.BaseToken
-	)
-	for results.Next() {
-		unspents, err := results.Outputs(context.TODO())
-		if err != nil {
-			return nil, ierrors.Wrap(err, "failed to get faucet unspent outputs")
-		}
-
-		faucetUnspentOutput = unspents[0]
-		faucetAmount = faucetUnspentOutput.BaseTokenAmount()
-		faucetUnspentOutputID = lo.Return1(results.Response.Items.OutputIDs())[0]
-	}
-
 	f := &faucet{
 		clt:             clt,
 		account:         blockhandler.AccountFromParams(faucetParams.faucetAccountID, faucetParams.faucetPrivateKey),
 		genesisHdWallet: mock.NewHDWallet("", genesisSeed, 0),
+	}
+
+	faucetUnspentOutput, faucetUnspentOutputID, faucetAmount, err := f.getGenesisOutputFromIndexer(clt, faucetAddr)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to get faucet output from indexer")
 	}
 
 	f.unspentOutput = &models.Output{
@@ -193,6 +170,38 @@ func newFaucet(clt models.Client, faucetParams *faucetParams) (*faucet, error) {
 	}
 
 	return f, nil
+}
+
+func (f *faucet) getGenesisOutputFromIndexer(clt models.Client, faucetAddr iotago.DirectUnlockableAddress) (iotago.Output, iotago.OutputID, iotago.BaseToken, error) {
+	indexer, err := clt.Indexer()
+	if err != nil {
+		panic(ierrors.Wrap(err, "failed to get indexer"))
+	}
+
+	results, err := indexer.Outputs(context.Background(), &apimodels.BasicOutputsQuery{
+		AddressBech32: faucetAddr.Bech32(iotago.PrefixTestnet),
+	})
+	if err != nil {
+		return nil, iotago.EmptyOutputID, 0, ierrors.Wrap(err, "failed to prepare faucet unspent outputs indexer request")
+	}
+
+	var (
+		faucetUnspentOutput   iotago.Output
+		faucetUnspentOutputID iotago.OutputID
+		faucetAmount          iotago.BaseToken
+	)
+	for results.Next() {
+		unspents, err := results.Outputs(context.TODO())
+		if err != nil {
+			return nil, iotago.EmptyOutputID, 0, ierrors.Wrap(err, "failed to get faucet unspent outputs")
+		}
+
+		faucetUnspentOutput = unspents[0]
+		faucetAmount = faucetUnspentOutput.BaseTokenAmount()
+		faucetUnspentOutputID = lo.Return1(results.Response.Items.OutputIDs())[0]
+	}
+
+	return faucetUnspentOutput, faucetUnspentOutputID, faucetAmount, nil
 }
 
 func (f *faucet) prepareFaucetRequest(receiveAddr iotago.Address, amount iotago.BaseToken, rmc iotago.Mana) (*iotago.SignedTransaction, error) {
