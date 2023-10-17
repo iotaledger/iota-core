@@ -61,7 +61,6 @@ type AccountWallet struct {
 	latestUsedIndex uint64
 
 	client *models.WebClient
-	api    iotago.API
 
 	optsClientBindAddress string
 	optsAccountStatesFile string
@@ -78,7 +77,6 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 		optsRequestTicker:  time.Second * 5,
 	}, opts, func(w *AccountWallet) {
 		w.client = models.NewWebClient(w.optsClientBindAddress)
-		w.api = w.client.CurrentAPI()
 
 		faucet, err := newFaucet(w.client, w.optsFaucetParams)
 		if err != nil {
@@ -104,7 +102,7 @@ func (a *AccountWallet) toAccountStateFile() error {
 		accounts = append(accounts, models.AccountStateFromAccountData(acc))
 	}
 
-	stateBytes, err := a.api.Encode(&StateData{
+	stateBytes, err := a.client.LatestAPI().Encode(&StateData{
 		Seed:          base58.Encode(a.seed[:]),
 		LastUsedIndex: a.latestUsedIndex,
 		AccountsData:  accounts,
@@ -131,7 +129,7 @@ func (a *AccountWallet) fromAccountStateFile() error {
 	}
 
 	var data StateData
-	_, err = a.api.Decode(walletStateBytes, &data)
+	_, err = a.client.LatestAPI().Decode(walletStateBytes, &data)
 	if err != nil {
 		return ierrors.Wrap(err, "failed to decode from file")
 	}
@@ -267,12 +265,16 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 	}
 	hdWallet := mock.NewHDWallet("", a.seed[:], accData.Index)
 
+	issuingTime := time.Now()
+	issuingSlot := a.client.LatestAPI().TimeProvider().SlotFromTime(issuingTime)
+	apiForSlot := a.client.APIForSlot(issuingSlot)
+
 	// get output from node
 	// From TIP42: Indexers and node plugins shall map the account address of the output derived with Account ID to the regular address -> output mapping table, so that given an Account Address, its most recent unspent account output can be retrieved.
 	// TODO: use correct outputID
 	accountOutput := a.client.GetOutput(accData.OutputID)
 
-	txBuilder := builder.NewTransactionBuilder(a.api)
+	txBuilder := builder.NewTransactionBuilder(apiForSlot)
 	txBuilder.AddInput(&builder.TxInput{
 		UnlockTarget: a.accountsAliases[alias].Account.ID().ToAddress(),
 		InputID:      accData.OutputID,

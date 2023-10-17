@@ -242,7 +242,7 @@ func (c *WebClient) PostBlock(block *iotago.ProtocolBlock) (blockID iotago.Block
 
 // PostData sends the given data (payload) by creating a block in the backend.
 func (c *WebClient) PostData(data []byte) (blkID string, err error) {
-	blockBuilder := builder.NewBasicBlockBuilder(c.client.CurrentAPI())
+	blockBuilder := builder.NewBasicBlockBuilder(c.client.LatestAPI())
 	blockBuilder.IssuingTime(time.Time{})
 
 	blockBuilder.Payload(&iotago.TaggedData{
