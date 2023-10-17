@@ -219,6 +219,7 @@ func (e *Engine) Shutdown() {
 	if !e.WasStopped() {
 		e.TriggerStopped()
 
+		e.Workers.Shutdown()
 		e.BlockRequester.Shutdown()
 		e.Attestations.Shutdown()
 		e.SyncManager.Shutdown()
@@ -237,7 +238,6 @@ func (e *Engine) Shutdown() {
 		e.Scheduler.Shutdown()
 		e.Retainer.Shutdown()
 		e.Storage.Shutdown()
-		e.Workers.Shutdown()
 	}
 }
 
