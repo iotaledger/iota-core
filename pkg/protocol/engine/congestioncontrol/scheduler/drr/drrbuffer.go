@@ -106,33 +106,10 @@ func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantu
 }
 
 func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) Deficit, maxBuffer int) (droppedBlocks []*blocks.Block) {
-	start := b.Current()
-	ringStart := b.ring
 	// remove as many blocks as necessary to stay within max buffer size
 	for b.Size() > maxBuffer {
-		// TODO: extract to util func
-		// find longest mana-scaled queue
-		maxScale := math.Inf(-1)
-		var maxIssuerID iotago.AccountID
-		for q := start; ; {
-			if issuerQuantum := quantumFunc(q.IssuerID()); issuerQuantum > 0 {
-				if scale := float64(q.Work()) / float64(issuerQuantum); scale > maxScale {
-					maxScale = scale
-					maxIssuerID = q.IssuerID()
-				}
-			} else if q.Size() > 0 {
-				maxIssuerID = q.IssuerID()
-				// return to the start of the issuer ring and break as this is the max value we can have.
-				b.ring = ringStart
-
-				break
-			}
-			q = b.Next()
-			if q == start {
-				break
-			}
-		}
-
+		// find the longest mana-scaled queue
+		maxIssuerID := b.longestQueueIssuerID(quantumFunc)
 		if longestQueue := b.IssuerQueue(maxIssuerID); longestQueue != nil {
 			if tail := longestQueue.RemoveTail(); tail != nil {
 				b.size--
@@ -142,6 +119,33 @@ func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) Deficit, maxBu
 	}
 
 	return droppedBlocks
+}
+
+func (b *BufferQueue) longestQueueIssuerID(quantumFunc func(iotago.AccountID) Deficit) iotago.AccountID {
+	start := b.Current()
+	ringStart := b.ring
+	maxScale := math.Inf(-1)
+	var maxIssuerID iotago.AccountID
+	for q := start; ; {
+		if issuerQuantum := quantumFunc(q.IssuerID()); issuerQuantum > 0 {
+			if scale := float64(q.Work()) / float64(issuerQuantum); scale > maxScale {
+				maxScale = scale
+				maxIssuerID = q.IssuerID()
+			}
+		} else if q.Size() > 0 {
+			// if the issuer has no quantum, then this is the max queue size
+			maxIssuerID = q.IssuerID()
+			b.ring = ringStart
+
+			break
+		}
+		q = b.Next()
+		if q == start {
+			break
+		}
+	}
+
+	return maxIssuerID
 }
 
 // Unsubmit removes a block from the submitted blocks.
