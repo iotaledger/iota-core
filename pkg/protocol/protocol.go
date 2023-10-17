@@ -284,16 +284,20 @@ func (p *Protocol) Network() *core.Protocol {
 	return p.networkProtocol
 }
 
+func (p *Protocol) CommittedAPI() iotago.API {
+	return p.MainEngineInstance().CommittedAPI()
+}
+
 func (p *Protocol) LatestAPI() iotago.API {
 	return p.MainEngineInstance().LatestAPI()
 }
 
-func (p *Protocol) CurrentAPI() iotago.API {
-	return p.MainEngineInstance().CurrentAPI()
-}
-
 func (p *Protocol) APIForVersion(version iotago.Version) (iotago.API, error) {
 	return p.MainEngineInstance().APIForVersion(version)
+}
+
+func (p *Protocol) APIForTime(t time.Time) iotago.API {
+	return p.MainEngineInstance().APIForTime(t)
 }
 
 func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {

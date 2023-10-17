@@ -79,7 +79,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 						// (according to the latest committed slot), and potentially the next selected
 						// committee if we have one.
 
-						currentEpoch := e.CurrentAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
+						currentEpoch := e.LatestAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
 
 						committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 						if !exists {

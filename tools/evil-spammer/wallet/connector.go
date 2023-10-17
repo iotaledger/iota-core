@@ -198,7 +198,7 @@ func (c *WebClient) APIForEpoch(index iotago.EpochIndex) iotago.API {
 }
 
 func (c *WebClient) CurrentAPI() iotago.API {
-	return c.client.CurrentAPI()
+	return c.client.CommittedAPI()
 }
 
 func (c *WebClient) LatestAPI() iotago.API {
@@ -221,7 +221,7 @@ func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
 
 // PostTransaction sends a transaction to the Tangle via a given client.
 func (c *WebClient) PostTransaction(tx *iotago.SignedTransaction) (blockID iotago.BlockID, err error) {
-	blockBuilder := builder.NewBasicBlockBuilder(c.client.CurrentAPI())
+	blockBuilder := builder.NewBasicBlockBuilder(c.client.CommittedAPI())
 
 	blockBuilder.Payload(tx)
 	blockBuilder.IssuingTime(time.Time{})
@@ -241,7 +241,7 @@ func (c *WebClient) PostTransaction(tx *iotago.SignedTransaction) (blockID iotag
 
 // PostData sends the given data (payload) by creating a block in the backend.
 func (c *WebClient) PostData(data []byte) (blkID string, err error) {
-	blockBuilder := builder.NewBasicBlockBuilder(c.client.CurrentAPI())
+	blockBuilder := builder.NewBasicBlockBuilder(c.client.CommittedAPI())
 	blockBuilder.IssuingTime(time.Time{})
 
 	blockBuilder.Payload(&iotago.TaggedData{

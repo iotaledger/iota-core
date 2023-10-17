@@ -264,7 +264,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	}
 	remainderAmount := unspentFaucet.Balance - faucetTokensPerRequest
 
-	txBuilder := builder.NewTransactionBuilder(clt.CurrentAPI())
+	txBuilder := builder.NewTransactionBuilder(clt.CommittedAPI())
 
 	txBuilder.AddInput(&builder.TxInput{
 		UnlockTarget: faucetAddr,
@@ -289,7 +289,7 @@ func (e *EvilWallet) requestFaucetFunds(wallet *Wallet) (outputID *Output, err e
 	})
 
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
-	txBuilder.SetCreationSlot(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
+	txBuilder.SetCreationSlot(clt.CommittedAPI().TimeProvider().SlotFromTime(time.Now()))
 
 	signedTx, err := txBuilder.Build(e.faucet.AddressSigner(faucetAddr))
 	if err != nil {
@@ -710,7 +710,7 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[iotago.Output], w *Wallet) (tx *iotago.SignedTransaction, err error) {
 	clt := e.Connector().GetClient()
 
-	txBuilder := builder.NewTransactionBuilder(clt.CurrentAPI())
+	txBuilder := builder.NewTransactionBuilder(clt.CommittedAPI())
 
 	for _, input := range inputs {
 		txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Address, InputID: input.OutputID, Input: input.OutputStruct})
@@ -736,7 +736,7 @@ func (e *EvilWallet) makeTransaction(inputs []*Output, outputs iotago.Outputs[io
 		inputPrivateKey, _ := wallet.KeyPair(index)
 		walletKeys[i] = iotago.AddressKeys{Address: addr, Keys: inputPrivateKey}
 	}
-	txBuilder.SetCreationSlot(clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
+	txBuilder.SetCreationSlot(clt.CommittedAPI().TimeProvider().SlotFromTime(time.Now()))
 
 	return txBuilder.Build(iotago.NewInMemoryAddressSigner(walletKeys...))
 }

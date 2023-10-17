@@ -99,9 +99,11 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 		blockParams.BlockHeader.IssuingTime = &issuingTime
 	}
 
+	currentAPI := node.Protocol.APIForTime(*blockParams.BlockHeader.IssuingTime)
+
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		var err error
-		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime), node)
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(currentAPI, *blockParams.BlockHeader.IssuingTime, node)
 		if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
 			commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime, node)
 			if err != nil {
@@ -134,7 +136,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 	}
 
 	if blockParams.ProtocolParametersHash == nil {
-		protocolParametersHash, err := node.Protocol.CurrentAPI().ProtocolParameters().Hash()
+		protocolParametersHash, err := currentAPI.ProtocolParameters().Hash()
 		require.NoError(i.Testing, err)
 
 		blockParams.ProtocolParametersHash = &protocolParametersHash
@@ -198,9 +200,8 @@ func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams, node *Node) (i
 		return node.Protocol.APIForVersion(*blockParams.ProtocolVersion)
 	}
 
-	slot := node.Protocol.LatestAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime)
-
-	return node.Protocol.APIForSlot(slot), nil
+	// It is crucial to get the API from the issuing time/slot as that defines the version with which the block should be issued.
+	return node.Protocol.APIForTime(*blockParams.IssuingTime), nil
 }
 
 // CreateBlock creates a new block with the options.
@@ -211,10 +212,11 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *
 		issuingTime := time.Now().UTC()
 		blockParams.BlockHeader.IssuingTime = &issuingTime
 	}
+	currentAPI := node.Protocol.APIForTime(*blockParams.BlockHeader.IssuingTime)
 
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		var err error
-		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime), node)
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(currentAPI, *blockParams.BlockHeader.IssuingTime, node)
 		if err != nil {
 			return nil, ierrors.Wrap(err, "error getting commitment")
 		}
@@ -487,7 +489,8 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 
 	if blockParams.SlotCommitment == nil {
 		var err error
-		blockParams.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime), node)
+		currentAPI := node.Protocol.APIForTime(*blockParams.IssuingTime)
+		blockParams.SlotCommitment, err = i.getAddressableCommitment(currentAPI, *blockParams.IssuingTime, node)
 		if err != nil {
 			return ierrors.Wrap(err, "error getting commitment")
 		}
@@ -511,8 +514,10 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 	return nil
 }
 
-func (i *BlockIssuer) getAddressableCommitment(blockSlot iotago.SlotIndex, node *Node) (*iotago.Commitment, error) {
-	protoParams := node.Protocol.CurrentAPI().ProtocolParameters()
+func (i *BlockIssuer) getAddressableCommitment(currentAPI iotago.API, blockIssuingTime time.Time, node *Node) (*iotago.Commitment, error) {
+	protoParams := currentAPI.ProtocolParameters()
+	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
+
 	commitment := node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 
 	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {

@@ -57,7 +57,7 @@ func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) 
 }
 
 func (t *TestFramework) IssueUnsignedBlockAtTime(alias string, issuingTime time.Time) error {
-	slot := t.apiProvider.CurrentAPI().TimeProvider().SlotFromTime(issuingTime)
+	slot := t.apiProvider.CommittedAPI().TimeProvider().SlotFromTime(issuingTime)
 	block, err := builder.NewBasicBlockBuilder(t.apiProvider.APIForSlot(slot)).
 		StrongParents(iotago.BlockIDs{tpkg.RandBlockID()}).
 		IssuingTime(issuingTime).
@@ -143,7 +143,7 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithVersion(3)), 0)
 	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithVersion(4)), 3)
 
-	timeProvider := apiProvider.CurrentAPI().TimeProvider()
+	timeProvider := apiProvider.CommittedAPI().TimeProvider()
 
 	tf := NewTestFramework(t,
 		apiProvider,
