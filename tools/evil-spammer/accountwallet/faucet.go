@@ -34,7 +34,9 @@ func (a *AccountWallet) RequestBlockBuiltData(clt *nodeclient.Client, issuerID i
 		return nil, nil, 0, ierrors.Wrap(err, "failed to get block issuance data")
 	}
 
-	return congestionResp, issuerResp, clt.CurrentAPI().Version(), nil
+	version := clt.APIForSlot(congestionResp.Slot).Version()
+
+	return congestionResp, issuerResp, version, nil
 }
 
 func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago.Address, amount iotago.BaseToken) (*models.Output, error) {
@@ -94,7 +96,11 @@ func (a *AccountWallet) PostWithBlock(clt models.Client, payload iotago.Payload,
 }
 
 func (a *AccountWallet) CreateBlock(payload iotago.Payload, issuer blockhandler.Account, congestionResp *apimodels.CongestionResponse, issuerResp *apimodels.IssuanceBlockHeaderResponse, version iotago.Version) (*iotago.ProtocolBlock, error) {
-	blockBuilder := builder.NewBasicBlockBuilder(a.api)
+	issuingTime := time.Now()
+	issuingSlot := a.client.LatestAPI().TimeProvider().SlotFromTime(issuingTime)
+	apiForSlot := a.client.APIForSlot(issuingSlot)
+
+	blockBuilder := builder.NewBasicBlockBuilder(apiForSlot)
 
 	commitmentID, err := issuerResp.Commitment.ID()
 	if err != nil {
@@ -215,7 +221,11 @@ func (f *faucet) prepareFaucetRequest(receiveAddr iotago.Address, amount iotago.
 }
 
 func (f *faucet) createFaucetTransactionNoManaHandling(receiveAddr iotago.Address, amount iotago.BaseToken, remainderAmount iotago.BaseToken) (*builder.TransactionBuilder, int, error) {
-	txBuilder := builder.NewTransactionBuilder(f.clt.CurrentAPI())
+	currentTime := time.Now()
+	currentSlot := f.clt.LatestAPI().TimeProvider().SlotFromTime(currentTime)
+
+	apiForSlot := f.clt.APIForSlot(currentSlot)
+	txBuilder := builder.NewTransactionBuilder(apiForSlot)
 
 	txBuilder.AddInput(&builder.TxInput{
 		UnlockTarget: f.genesisHdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address),
@@ -252,7 +262,7 @@ func (f *faucet) createFaucetTransactionNoManaHandling(receiveAddr iotago.Addres
 		},
 	})
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: []byte("Faucet funds"), Data: []byte("to addr" + receiveAddr.String())})
-	txBuilder.SetCreationSlot(f.clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now()))
+	txBuilder.SetCreationSlot(currentSlot)
 
 	return txBuilder, remainderIndex, nil
 }

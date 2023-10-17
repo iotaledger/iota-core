@@ -661,8 +661,11 @@ func (e *EvilWallet) updateOutputBalances(buildOptions *Options) (err error) {
 
 func (e *EvilWallet) makeTransaction(inputs []*models.Output, outputs iotago.Outputs[iotago.Output], w *Wallet, congestionResponse *apimodels.CongestionResponse, allotmentStrategy models.AllotmentStrategy, issuerAccountID iotago.AccountID) (tx *iotago.SignedTransaction, err error) {
 	clt := e.Connector().GetClient()
+	currentTime := time.Now()
+	targetSlot := clt.LatestAPI().TimeProvider().SlotFromTime(currentTime)
+	targetAPI := clt.APIForSlot(targetSlot)
 
-	txBuilder := builder.NewTransactionBuilder(clt.CurrentAPI())
+	txBuilder := builder.NewTransactionBuilder(targetAPI)
 
 	for _, input := range inputs {
 		txBuilder.AddInput(&builder.TxInput{UnlockTarget: input.Address, InputID: input.OutputID, Input: input.OutputStruct})
@@ -688,7 +691,7 @@ func (e *EvilWallet) makeTransaction(inputs []*models.Output, outputs iotago.Out
 		inputPrivateKey, _ := wallet.KeyPair(index)
 		walletKeys[i] = iotago.AddressKeys{Address: addr, Keys: inputPrivateKey}
 	}
-	targetSlot := clt.CurrentAPI().TimeProvider().SlotFromTime(time.Now())
+
 	txBuilder.SetCreationSlot(targetSlot)
 	// no allotment strategy
 	if congestionResponse == nil {
