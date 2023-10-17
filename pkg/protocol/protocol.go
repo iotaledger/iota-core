@@ -229,7 +229,7 @@ func (p *Protocol) initEngineManager() {
 }
 
 func (p *Protocol) initChainManager() {
-	p.ChainManager = chainmanager.NewManager(p.optsChainManagerOptions...)
+	p.ChainManager = chainmanager.NewManager(p, p.HandleError, p.optsChainManagerOptions...)
 	p.Events.ChainManager.LinkTo(p.ChainManager.Events)
 
 	// This needs to be hooked so that the ChainManager always knows the commitments we issued.

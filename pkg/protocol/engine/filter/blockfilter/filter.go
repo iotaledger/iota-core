@@ -66,8 +66,8 @@ func New(apiProvider iotago.APIProvider, opts ...options.Option[Filter]) *Filter
 
 // ProcessReceivedBlock processes block from the given source.
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
+	// Verify the block's version corresponds to the protocol version for the slot.
 	apiForSlot := f.apiProvider.APIForSlot(block.ID().Slot())
-
 	if apiForSlot.Version() != block.ProtocolBlock().ProtocolVersion {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
