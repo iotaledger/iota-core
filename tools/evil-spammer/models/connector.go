@@ -160,6 +160,7 @@ func (c *WebClients) RemoveClient(url string) {
 
 type Client interface {
 	Client() *nodeclient.Client
+	Indexer() (nodeclient.IndexerClient, error)
 	// URL returns a client API url.
 	URL() (cltID string)
 	// PostBlock sends a block to the Tangle via a given client.
@@ -190,6 +191,10 @@ type WebClient struct {
 
 func (c *WebClient) Client() *nodeclient.Client {
 	return c.client
+}
+
+func (c *WebClient) Indexer() (nodeclient.IndexerClient, error) {
+	return c.client.Indexer(context.Background())
 }
 
 func (c *WebClient) APIForVersion(version iotago.Version) (iotago.API, error) {

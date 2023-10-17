@@ -31,11 +31,9 @@ func Run(config *Configuration) (*AccountWallet, error) {
 	}
 
 	opts = append(opts, WithFaucetAccountParams(&faucetParams{
-		latestUsedOutputID: config.LastFauctUnspentOutputID,
-		genesisSeed:        config.GenesisSeed,
-		faucetPrivateKey:   config.BlockIssuerPrivateKey,
-		faucetAccountID:    config.AccountID,
-		genesisOutputID:    config.GenesisOutputID,
+		genesisSeed:      config.GenesisSeed,
+		faucetPrivateKey: config.BlockIssuerPrivateKey,
+		faucetAccountID:  config.AccountID,
 	}))
 
 	wallet := NewAccountWallet(opts...)
@@ -81,7 +79,13 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 	}, opts, func(w *AccountWallet) {
 		w.client = models.NewWebClient(w.optsClientBindAddress)
 		w.api = w.client.CurrentAPI()
-		w.faucet = newFaucet(w.client, w.optsFaucetParams)
+
+		faucet, err := newFaucet(w.client, w.optsFaucetParams)
+		if err != nil {
+			panic(ierrors.Wrap(err, "failed to create faucet"))
+		}
+
+		w.faucet = faucet
 		w.accountsAliases[FaucetAccountAlias] = &models.AccountData{
 			Alias:    FaucetAccountAlias,
 			Status:   models.AccountReady,
@@ -90,10 +94,6 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 			Account:  w.faucet.account,
 		}
 	})
-}
-
-func (a *AccountWallet) LastFaucetUnspentOutputID() iotago.OutputID {
-	return a.faucet.unspentOutput.OutputID
 }
 
 // toAccountStateFile write account states to file.

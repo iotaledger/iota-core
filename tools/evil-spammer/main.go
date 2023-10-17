@@ -45,7 +45,6 @@ func main() {
 			if err != nil {
 				log.Errorf("Error while saving wallet state: %v", err)
 			}
-			config.Update(accWallet.LastFaucetUnspentOutputID())
 			accountwallet.SaveConfiguration(config)
 
 		}()
