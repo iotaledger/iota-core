@@ -217,7 +217,8 @@ func New(
 
 func (e *Engine) Shutdown() {
 	if !e.WasStopped() {
-		e.Workers.Shutdown()
+		e.TriggerStopped()
+
 		e.BlockRequester.Shutdown()
 		e.Attestations.Shutdown()
 		e.SyncManager.Shutdown()
@@ -235,9 +236,8 @@ func (e *Engine) Shutdown() {
 		e.CommitmentFilter.Shutdown()
 		e.Scheduler.Shutdown()
 		e.Retainer.Shutdown()
+		e.Workers.Shutdown()
 		e.Storage.Shutdown()
-
-		e.TriggerStopped()
 	}
 }
 
