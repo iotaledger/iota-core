@@ -84,22 +84,14 @@ func (a *AccountWallet) PostWithBlock(clt models.Client, payload iotago.Payload,
 		return iotago.EmptyBlockID, err
 	}
 
-	_, err = clt.PostBlock(signedBlock)
+	blockID, err := clt.PostBlock(signedBlock)
 	if err != nil {
 		log.Errorf("failed to post block: %s", err)
 
 		return iotago.EmptyBlockID, err
 	}
 
-	blockID, err := signedBlock.ID()
-	if err != nil {
-		log.Errorf("failed to get block id: %s", err)
-
-		return iotago.EmptyBlockID, err
-	}
-
 	return blockID, nil
-
 }
 
 func (a *AccountWallet) CreateBlock(payload iotago.Payload, issuer blockhandler.Account, congestionResp *apimodels.CongestionResponse, issuerResp *apimodels.IssuanceBlockHeaderResponse, version iotago.Version) (*iotago.ProtocolBlock, error) {
