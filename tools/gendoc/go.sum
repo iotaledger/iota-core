@@ -309,8 +309,8 @@ github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231010133617-cdbd538
 github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231010133617-cdbd5387e2af/go.mod h1:IJgaaxbgKCsNat18jlJJEAxCY2oVYR3F30B+M4vJ89I=
 github.com/iotaledger/hive.go/stringify v0.0.0-20231010133617-cdbd5387e2af h1:2/8In9gw03NW1hL4qyXuFYFoWZScHmyZtYUG0kHPmo4=
 github.com/iotaledger/hive.go/stringify v0.0.0-20231010133617-cdbd5387e2af/go.mod h1:FTo/UWzNYgnQ082GI9QVM9HFDERqf9rw9RivNpqrnTs=
-github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231011161248-cf0bd6e08811 h1:nR8uTm1Htn2RQOT53RV2zdCIflpuF8N00Tv2FWYimY0=
-github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231011161248-cf0bd6e08811/go.mod h1:rmclNpXw5sKJDHU0e51Ar/9zL00P7Uu9hkfaM7vAAiE=
+github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231017073322-849072cf02c6 h1:qls7bFuM90FnD3GvF4C20citF9zCOAbjy8WTWZ/KuYE=
+github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231017073322-849072cf02c6/go.mod h1:Vh0LTDmI0GLjGijmCxNX6k5A5AzbMGwvbjlOyZBeFdI=
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231011154428-257141868dad h1:TRM9EkAole9fYY1vHEVQ6zCEOGuvCWq/bczZ98Al5Ec=
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231011154428-257141868dad/go.mod h1:plZ0+8yLdDWHedj3SfHUwQtIETD+lcS6M1iEAxcjzJ4=
 github.com/iotaledger/iota.go/v4 v4.0.0-20231017065204-da0b77a1f460 h1:52SQK5uJ2SCZ0LzGq39r4uYklbPlQgc7rfekuwe41Fg=
