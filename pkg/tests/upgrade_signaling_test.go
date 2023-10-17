@@ -395,10 +395,9 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		ts.RemoveNode(node.Name)
 	}
 
-	// Check that issuing still produces the same commitments
+	// Check that issuing still produces the same commitments on the nodes that upgraded. The nodes that did not upgrade
+	// should not be able to issue and process blocks with the new version.
 	ts.IssueBlocksAtEpoch("", 8, 4, "63.3", ts.Nodes("nodeB", "nodeC"), false, nil)
-
-	// TODO: make nodes that didn't upgrade issue stuff: need to make sure they don't crash
 
 	// Nodes that did not set up the new protocol parameters are not able to process blocks with the new version.
 	ts.AssertNodeState(ts.Nodes("nodeA", "nodeD", "nodeF", "nodeG"),
@@ -410,5 +409,4 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		testsuite.WithLatestCommitmentSlotIndex(69),
 		testsuite.WithEqualStoredCommitmentAtIndex(69),
 	)
-
 }
