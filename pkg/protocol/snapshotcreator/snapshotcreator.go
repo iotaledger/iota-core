@@ -121,13 +121,13 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	}, iotago.BaseToken(0))
 
 	var genesisTransactionOutputs iotago.TxEssenceOutputs
-	genesisOutput, err := createGenesisOutput(api, opt.ProtocolParameters.TokenSupply()-totalAccountAmount, opt.GenesisSeed, engineInstance)
+	genesisOutput, err := createGenesisOutput(api, opt.ProtocolParameters.TokenSupply()-totalAccountAmount, opt.GenesisSeed)
 	if err != nil {
 		return ierrors.Wrap(err, "failed to create genesis outputs")
 	}
 	genesisTransactionOutputs = append(genesisTransactionOutputs, genesisOutput)
 
-	accountOutputs, err := createGenesisAccounts(api, opt.Accounts, engineInstance)
+	accountOutputs, err := createGenesisAccounts(api, opt.Accounts)
 	if err != nil {
 		return ierrors.Wrap(err, "failed to create genesis account outputs")
 	}
@@ -169,7 +169,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	return engineInstance.WriteSnapshot(opt.FilePath)
 }
 
-func createGenesisOutput(api iotago.API, genesisTokenAmount iotago.BaseToken, genesisSeed []byte, engineInstance *engine.Engine) (iotago.Output, error) {
+func createGenesisOutput(api iotago.API, genesisTokenAmount iotago.BaseToken, genesisSeed []byte) (iotago.Output, error) {
 	if genesisTokenAmount > 0 {
 		genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
 		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
@@ -184,7 +184,7 @@ func createGenesisOutput(api iotago.API, genesisTokenAmount iotago.BaseToken, ge
 	return nil, nil
 }
 
-func createGenesisAccounts(api iotago.API, accounts []AccountDetails, engineInstance *engine.Engine) (iotago.TxEssenceOutputs, error) {
+func createGenesisAccounts(api iotago.API, accounts []AccountDetails) (iotago.TxEssenceOutputs, error) {
 	var outputs iotago.TxEssenceOutputs
 	// Account outputs start from Genesis TX index 1
 	for idx, genesisAccount := range accounts {
