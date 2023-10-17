@@ -17,14 +17,12 @@ COPY . .
 # Ensure ca-certificates are up to date
 RUN update-ca-certificates
 
-ENV GOCACHE=/go/cache
-
 # Download go modules
-RUN --mount=type=cache,target=/go go mod download
-RUN --mount=type=cache,target=/go go mod verify
+RUN go mod download
+RUN go mod verify
 
 # Build the binary
-RUN --mount=type=cache,target=/go go build -o /app/iota-core -tags="$BUILD_TAGS" -ldflags='-w -s'
+RUN go build -o /app/iota-core -tags="$BUILD_TAGS" -ldflags='-w -s'
 
 # Copy the assets
 RUN cp ./config_defaults.json /app/config.json
