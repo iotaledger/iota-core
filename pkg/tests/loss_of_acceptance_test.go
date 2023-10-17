@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -27,10 +28,14 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	ts.AddBasicBlockIssuer("default")
 	node0 := ts.AddValidatorNode("node0")
-	ts.AddValidatorNode("node1")
-	ts.AddNode("node2")
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddNode("node2")
 
 	ts.Run(true, nil)
+
+	node0.Protocol.SetLogLevel(log.LevelError)
+	node1.Protocol.SetLogLevel(log.LevelError)
+	node2.Protocol.SetLogLevel(log.LevelTrace)
 
 	// Create snapshot to use later.
 	snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
@@ -41,6 +46,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 		block0 := ts.IssueValidationBlock("block0", node0,
 			mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(50)),
 		)
+		fmt.Println(block0.SlotCommitmentID())
 		require.EqualValues(t, 48, ts.Block("block0").SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
@@ -51,6 +57,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	// Need to issue to slot 52 so that all other nodes can warp sync up to slot 49 and then commit slot 50 themselves.
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{51, 52}, 2, "block0", ts.Nodes("node0"), true, nil)
+
+		time.Sleep(5 * time.Second)
 
 		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(50, ts.Nodes()...)

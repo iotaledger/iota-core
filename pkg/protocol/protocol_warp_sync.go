@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"sync/atomic"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ads"
@@ -98,15 +100,111 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			}
 
 			if !iotago.VerifyProof(proof, iotago.Identifier(acceptedBlocks.Root()), commitment.RootsID()) {
-				w.LogError("failed to verify merkle proof", "commitment", commitment.LogName(), "blockIDs", blockIDs, "proof", proof, "fromPeer", from)
+				w.LogError("failed to verify blocks proof", "commitment", commitment.LogName(), "blockIDs", blockIDs, "proof", proof, "fromPeer", from)
+
+				return false
+			}
+
+			acceptedTransactionIDs := ads.NewSet[iotago.TransactionID](mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
+			for _, transactionID := range transactionIDs {
+				_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
+			}
+
+			if !iotago.VerifyProof(mutationProof, iotago.Identifier(acceptedTransactionIDs.Root()), commitment.RootsID()) {
+				w.LogError("failed to verify mutations proof", "commitment", commitment.LogName(), "transactionIDs", transactionIDs, "proof", mutationProof, "fromPeer", from)
 
 				return false
 			}
 
 			w.ticker.StopTicker(commitmentID)
 
+			// If the engine is "dirty" we need to restore the state of the engine to the state of the chain commitment.
+			// As we already decided to switch and sync to this chain we should make sure that processing the blocks from the commitment
+			// leads to the verified commitment.
+			if targetEngine.Notarization.AcceptedBlocksCount(commitmentID.Slot()) > 0 {
+				targetEngine.Notarization.
+					w.LogError("ENGINE IS DIRTY")
+			}
+
+			// Once all blocks are booked we
+			//   1. Mark all transactions as accepted
+			//   2. Mark all blocks as accepted
+			//   3. Force commitment of the slot
+			totalBlocks := uint32(len(blockIDs))
+			var bookedBlocks atomic.Uint32
+			var notarizedBlocks atomic.Uint32
+
+			w.LogError("TOTAL BLOCKS IN RESPONSE", "totalBlocks", totalBlocks)
+
+			forceCommitmentFunc := func() {
+				// 3. Force commitment of the slot
+				producedCommitment, err := targetEngine.Notarization.ForceCommit(commitmentID.Slot())
+				if err != nil {
+					w.protocol.LogError("failed to force commitment", "commitmentID", commitmentID, "err", err)
+
+					return
+				}
+
+				// 4. Verify that the produced commitment is the same as the initially requested one
+				if producedCommitment.ID() != commitmentID {
+					w.protocol.LogError("commitment does not match", "expectedCommitmentID", commitmentID, "producedCommitmentID", producedCommitment.ID())
+
+					return
+				}
+			}
+
+			if len(blockIDs) == 0 {
+				forceCommitmentFunc()
+
+				return true
+			}
+
+			blockBookedFunc := func(_, _ bool) {
+				if bookedBlocks.Add(1) != totalBlocks {
+					return
+				}
+
+				// 1. Mark all transactions as accepted
+				for _, transactionID := range transactionIDs {
+					targetEngine.Ledger.ConflictDAG().SetAccepted(transactionID)
+				}
+
+				// 2. Mark all blocks as accepted
+				for _, blockID := range blockIDs {
+					block, exists := targetEngine.BlockCache.Block(blockID)
+					if !exists { // this should never happen as we just booked these blocks in this slot.
+						continue
+					}
+
+					targetEngine.BlockGadget.SetAccepted(block)
+
+					block.Notarized().OnUpdate(func(_, _ bool) {
+						// Wait for all blocks to be notarized before forcing the commitment of the slot.
+						if notarizedBlocks.Add(1) != totalBlocks {
+							return
+						}
+
+						forceCommitmentFunc()
+					})
+				}
+			}
+
 			for _, blockID := range blockIDs {
-				targetEngine.BlockDAG.GetOrRequestBlock(blockID)
+				w.LogError("requesting block", "blockID", blockID)
+
+				block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
+				if block == nil {
+					w.protocol.LogError("failed to request block", "blockID", blockID)
+
+					continue
+				}
+
+				// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
+				// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
+				// block cache and thus if not root blocks no block in the next slot can become solid.
+				targetEngine.EvictionState.AddRootBlock(block.ID(), block.SlotCommitmentID())
+
+				block.Booked().OnUpdate(blockBookedFunc)
 			}
 
 			w.LogDebug("received response", "commitment", commitment.LogName())

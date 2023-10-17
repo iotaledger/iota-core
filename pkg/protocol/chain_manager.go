@@ -83,7 +83,7 @@ func (c *ChainManager) PublishCommitment(commitment *model.Commitment) (commitme
 		return nil, false, ierrors.Wrapf(request.Err(), "failed to request commitment %s", commitment.ID())
 	}
 
-	publishedCommitmentMetadata := NewCommitment(commitment, c.protocol.Logger)
+	publishedCommitmentMetadata := NewCommitment(commitment, c.protocol)
 	request.Resolve(publishedCommitmentMetadata).OnSuccess(func(resolvedMetadata *Commitment) {
 		commitmentMetadata = resolvedMetadata
 	})
@@ -123,7 +123,7 @@ func (c *ChainManager) OnChainCreated(callback func(chain *Chain)) (unsubscribe 
 func (c *ChainManager) initMainChain() {
 	c.protocol.LogDebug("initializing main chain")
 
-	mainChain := NewChain(c.protocol.Logger)
+	mainChain := NewChain(c.protocol)
 
 	c.protocol.LogDebug("new chain created", "name", mainChain.LogName(), "forkingPoint", "<snapshot>")
 

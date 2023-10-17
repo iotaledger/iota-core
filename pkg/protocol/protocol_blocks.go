@@ -33,11 +33,15 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-			commitment.InSyncRange.OnUpdate(func(_, inSyncRange bool) {
-				if inSyncRange {
-					for _, droppedBlock := range b.droppedBlocksBuffer.GetValues(commitment.ID()) {
-						b.ProcessResponse(droppedBlock.A, droppedBlock.B)
-					}
+			commitment.isDirectlyAboveLatestVerifiedCommitment.OnUpdate(func(_, isDirectlyAboveLatestVerifiedCommitment bool) {
+				if !isDirectlyAboveLatestVerifiedCommitment {
+					return
+				}
+
+				protocol.LogError("REPLAYING DROPPED BLOCKS", "slot", commitment.ID().Slot())
+
+				for _, droppedBlock := range b.droppedBlocksBuffer.GetValues(commitment.ID()) {
+					b.ProcessResponse(droppedBlock.A, droppedBlock.B)
 				}
 			})
 		})
@@ -93,11 +97,21 @@ func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 		}
 
 		commitment := commitmentRequest.Result()
-		if commitment == nil || !commitment.Chain.Get().DispatchBlock(block, from) {
+		if commitment == nil {
 			if !b.droppedBlocksBuffer.Add(block.ProtocolBlock().SlotCommitmentID, types.NewTuple(block, from)) {
 				b.LogError("failed to add dropped block referencing unsolid commitment to dropped blocks buffer", "commitmentID", block.ProtocolBlock().SlotCommitmentID, "blockID", block.ID())
 			} else {
 				b.LogTrace("dropped block referencing unsolid commitment added to dropped blocks buffer", "commitmentID", block.ProtocolBlock().SlotCommitmentID, "blockID", block.ID())
+			}
+
+			return
+		}
+
+		if !commitment.Chain.Get().DispatchBlock(block, from) {
+			if !b.droppedBlocksBuffer.Add(block.ProtocolBlock().SlotCommitmentID, types.NewTuple(block, from)) {
+				b.LogError("afailed to add dropped block referencing unsolid commitment to dropped blocks buffer", "commitmentID", block.ProtocolBlock().SlotCommitmentID, "blockID", block.ID())
+			} else {
+				b.LogTrace("adropped block referencing unsolid commitment added to dropped blocks buffer", "commitmentID", block.ProtocolBlock().SlotCommitmentID, "blockID", block.ID())
 			}
 
 			return

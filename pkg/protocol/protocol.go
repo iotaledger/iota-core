@@ -22,6 +22,7 @@ type Protocol struct {
 	Events               *Events
 	Workers              *workerpool.Group
 	Network              *core.Protocol
+	NetworkClock         *NetworkClock
 	BlocksProtocol       *BlocksProtocol
 	CommitmentsProtocol  *CommitmentsProtocol
 	AttestationsProtocol *AttestationsProtocol
@@ -44,6 +45,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		ReactiveModule: module.NewReactiveModule(logger),
 	}, opts, func(p *Protocol) {
 		p.Network = core.NewProtocol(networkEndpoint, workers.CreatePool("NetworkProtocol"), p)
+		p.NetworkClock = NewNetworkClock(p)
 		p.BlocksProtocol = NewBlocksProtocol(p)
 		p.CommitmentsProtocol = NewCommitmentsProtocol(p)
 		p.AttestationsProtocol = NewAttestationsProtocol(p)
@@ -83,7 +85,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 
 // IssueBlock issues a block to the node.
 func (p *Protocol) IssueBlock(block *model.Block) error {
-	p.BlocksProtocol.ProcessResponse(block, "self")
+	p.Network.Events.BlockReceived.Trigger(block, "self")
 
 	return nil
 }

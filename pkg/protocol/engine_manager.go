@@ -203,8 +203,10 @@ func (e *EngineManager) syncMainEngineFromMainChain() (unsubscribe func()) {
 
 func (e *EngineManager) syncMainEngineInfoFile() (unsubscribe func()) {
 	return e.MainEngine.OnUpdate(func(_, mainEngine *engine.Engine) {
-		if err := ioutils.WriteJSONToFile(e.infoFilePath(), &engineInfo{Name: filepath.Base(mainEngine.Storage.Directory())}, 0o644); err != nil {
-			e.LogError("unable to write engine info file", "err", err)
+		if mainEngine != nil {
+			if err := ioutils.WriteJSONToFile(e.infoFilePath(), &engineInfo{Name: filepath.Base(mainEngine.Storage.Directory())}, 0o644); err != nil {
+				e.LogError("unable to write engine info file", "err", err)
+			}
 		}
 	})
 }

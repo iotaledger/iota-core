@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"time"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
@@ -22,8 +24,11 @@ type Chain struct {
 	ClaimedWeight            reactive.Variable[uint64]
 	AttestedWeight           reactive.Variable[uint64]
 	VerifiedWeight           reactive.Variable[uint64]
+	NetworkClockSlot         reactive.Variable[iotago.SlotIndex]
 	SyncThreshold            reactive.Variable[iotago.SlotIndex]
+	WarpSync                 reactive.Variable[bool]
 	WarpSyncThreshold        reactive.Variable[iotago.SlotIndex]
+	OutOfSyncThreshold       reactive.Variable[iotago.SlotIndex]
 	VerifyAttestations       reactive.Variable[bool]
 	VerifyState              reactive.Variable[bool]
 	Engine                   reactive.Variable[*engine.Engine]
@@ -37,7 +42,7 @@ type Chain struct {
 	log.Logger
 }
 
-func NewChain(logger log.Logger) *Chain {
+func NewChain(protocol *Protocol) *Chain {
 	c := &Chain{
 		ForkingPoint:             reactive.NewVariable[*Commitment](),
 		ParentChain:              reactive.NewVariable[*Chain](),
@@ -46,6 +51,10 @@ func NewChain(logger log.Logger) *Chain {
 		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
 		LatestVerifiedCommitment: reactive.NewVariable[*Commitment](),
 		AttestedWeight:           reactive.NewVariable[uint64](),
+		WarpSync:                 reactive.NewVariable[bool]().Init(true),
+		NetworkClockSlot:         reactive.NewVariable[iotago.SlotIndex](),
+		WarpSyncThreshold:        reactive.NewVariable[iotago.SlotIndex](),
+		OutOfSyncThreshold:       reactive.NewVariable[iotago.SlotIndex](),
 		VerifyAttestations:       reactive.NewVariable[bool](),
 		IsEvicted:                reactive.NewEvent(),
 
@@ -64,13 +73,41 @@ func NewChain(logger log.Logger) *Chain {
 	c.ClaimedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.LatestCommitment)
 	c.VerifiedWeight = reactive.NewDerivedVariable((*Commitment).cumulativeWeight, c.LatestVerifiedCommitment)
 
-	c.WarpSyncThreshold = reactive.NewDerivedVariable[iotago.SlotIndex](func(latestCommitment *Commitment) iotago.SlotIndex {
-		if latestCommitment == nil || latestCommitment.Slot() < WarpSyncOffset {
-			return 0
+	c.Engine = reactive.NewDerivedVariable2(func(spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
+		if spawnedEngine != nil {
+			return spawnedEngine
 		}
 
-		return latestCommitment.Slot() - WarpSyncOffset
-	}, c.LatestCommitment)
+		return parentEngine
+	}, c.SpawnedEngine, c.parentEngine)
+
+	protocol.NetworkClock.OnUpdate(func(_, now time.Time) {
+		if engineInstance := c.Engine.Get(); engineInstance != nil {
+			c.NetworkClockSlot.Set(engineInstance.LatestAPI().TimeProvider().SlotFromTime(now))
+		}
+	})
+
+	c.NetworkClockSlot.OnUpdate(func(_, slot iotago.SlotIndex) {
+		engineInstance := c.Engine.Get()
+		if engineInstance == nil {
+			return
+		}
+
+		warpSyncThresholdOffset := engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge()
+		outOfSyncThresholdOffset := 2 * warpSyncThresholdOffset
+
+		if warpSyncThresholdOffset > slot {
+			c.WarpSyncThreshold.Set(0)
+		} else {
+			c.WarpSyncThreshold.Set(slot - warpSyncThresholdOffset)
+		}
+
+		if outOfSyncThresholdOffset > slot {
+			c.OutOfSyncThreshold.Set(0)
+		} else {
+			c.OutOfSyncThreshold.Set(slot - outOfSyncThresholdOffset)
+		}
+	})
 
 	c.SyncThreshold = reactive.NewDerivedVariable2[iotago.SlotIndex](func(forkingPoint, latestVerifiedCommitment *Commitment) iotago.SlotIndex {
 		if forkingPoint == nil {
@@ -83,14 +120,6 @@ func NewChain(logger log.Logger) *Chain {
 
 		return latestVerifiedCommitment.Slot() + SyncWindow + 1
 	}, c.ForkingPoint, c.LatestVerifiedCommitment)
-
-	c.Engine = reactive.NewDerivedVariable2(func(spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
-		if spawnedEngine != nil {
-			return spawnedEngine
-		}
-
-		return parentEngine
-	}, c.SpawnedEngine, c.parentEngine)
 
 	c.ParentChain.OnUpdate(func(prevParent, newParent *Chain) {
 		if prevParent != nil {
@@ -115,7 +144,11 @@ func NewChain(logger log.Logger) *Chain {
 		})
 	})
 
-	c.Logger = logger.NewEntityLogger("Chain", c.IsEvicted, func(entityLogger log.Logger) {
+	c.Logger = protocol.NewEntityLogger("Chain", c.IsEvicted, func(entityLogger log.Logger) {
+		c.WarpSync.LogUpdates(entityLogger, log.LevelInfo, "WarpSync")
+		c.NetworkClockSlot.LogUpdates(entityLogger, log.LevelDebug, "NetworkClockSlot")
+		c.WarpSyncThreshold.LogUpdates(entityLogger, log.LevelDebug, "WarpSyncThreshold")
+		c.OutOfSyncThreshold.LogUpdates(entityLogger, log.LevelDebug, "OutOfSyncThreshold")
 		c.ForkingPoint.LogUpdates(entityLogger, log.LevelTrace, "ForkingPoint", (*Commitment).LogName)
 		c.ClaimedWeight.LogUpdates(entityLogger, log.LevelTrace, "ClaimedWeight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
@@ -124,6 +157,30 @@ func NewChain(logger log.Logger) *Chain {
 		c.LatestVerifiedCommitment.LogUpdates(entityLogger, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
 		c.VerifyAttestations.LogUpdates(entityLogger, log.LevelTrace, "VerifyAttestations")
 		c.VerifyState.LogUpdates(entityLogger, log.LevelDebug, "VerifyState")
+	})
+
+	var unsubscribe func()
+	c.WarpSync.OnUpdate(func(_, warpSync bool) {
+		if unsubscribe != nil {
+			unsubscribe()
+		}
+
+		go func() {
+			if warpSync {
+				unsubscribe = c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(latestVerifiedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex) bool {
+					latestVerifiedNil := latestVerifiedCommitment != nil
+					belowWarpSync := latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < warpSyncThreshold
+
+					c.LogError("WarpSync", "latestVerifiedNil", latestVerifiedNil, "belowWarpSync", belowWarpSync)
+
+					return latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < warpSyncThreshold
+				}, c.LatestVerifiedCommitment, c.WarpSyncThreshold))
+			} else {
+				unsubscribe = c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(latestVerifiedCommitment *Commitment, outOfSyncThreshold iotago.SlotIndex) bool {
+					return latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < outOfSyncThreshold
+				}, c.LatestVerifiedCommitment, c.OutOfSyncThreshold))
+			}
+		}()
 	})
 
 	return c
@@ -156,13 +213,12 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
 		return false
 	}
 
-	success = true
 	for _, chain := range append([]*Chain{c}, c.ChildChains.ToSlice()...) {
-		if targetSlot := block.ID().Slot(); chain.VerifyState.Get() && chain.earliestUncommittedSlot() <= targetSlot {
-			if targetEngine := chain.SpawnedEngine.Get(); targetEngine != nil && targetSlot < c.SyncThreshold.Get() {
+		if chain.VerifyState.Get() {
+			if targetEngine := chain.SpawnedEngine.Get(); targetEngine != nil && !chain.WarpSync.Get() || targetEngine.BlockRequester.HasTicker(block.ID()) {
 				targetEngine.ProcessBlockFromPeer(block, src)
-			} else {
-				success = false
+
+				success = true
 			}
 		}
 	}
