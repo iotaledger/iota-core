@@ -1,5 +1,6 @@
 name: Feature network deploy
 on:
+  pull_request:
   push:
     branches:
       - develop
