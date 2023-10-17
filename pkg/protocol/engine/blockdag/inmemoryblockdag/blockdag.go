@@ -78,7 +78,7 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 	block.ForEachParent(func(parent iotago.Parent) {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
-			panic("cannot setup block without existing parent")
+			return
 		}
 
 		parentBlock.Solid().OnUpdateOnce(func(_, _ bool) {
