@@ -497,6 +497,12 @@ func (e *Engine) setupBlockRequester() {
 	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
 		e.BlockRequester.StopTicker(block.ID())
 	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", workerpool.WithWorkerCount(1)))) // Using just 1 worker to avoid contention
+
+	e.MaxSeenSlot.OnUpdate(func(oldMaxSeenSlot, newMaxSeenSlot iotago.SlotIndex) {
+		if newMaxSeenSlot < oldMaxSeenSlot {
+			e.BlockRequester.Clear()
+		}
+	})
 }
 
 func (e *Engine) setupPruning() {
