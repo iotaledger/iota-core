@@ -10,19 +10,19 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/app v0.0.0-20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/constraints v0.0.0-20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/crypto v0.0.0-20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/ds v0.0.0-20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/lo v0.0.0-20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/logger v0.0.0-20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231010133617-cdbd5387e2af
-	github.com/iotaledger/hive.go/stringify v0.0.0-20231010133617-cdbd5387e2af
+	github.com/iotaledger/hive.go/ads v0.0.0-20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/app v0.0.0-20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/constraints v0.0.0-20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/crypto v0.0.0-20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/ds v0.0.0-20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/lo v0.0.0-20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/logger v0.0.0-20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231018045223-41d1072a174c
+	github.com/iotaledger/hive.go/stringify v0.0.0-20231018045223-41d1072a174c
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231011161248-cf0bd6e08811
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231011154428-257141868dad
 	github.com/iotaledger/iota.go/v4 v4.0.0-20231013092100-ad2a52b5ac9a
@@ -60,7 +60,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/ethereum/go-ethereum v1.13.2 // indirect
+	github.com/ethereum/go-ethereum v1.13.4 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/fjl/memsize v0.0.2 // indirect
@@ -88,7 +88,7 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/hive.go/log v0.0.0-20231010133617-cdbd5387e2af // indirect
+	github.com/iotaledger/hive.go/log v0.0.0-20231018045223-41d1072a174c // indirect
 	github.com/ipfs/boxo v0.10.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
@@ -169,7 +169,7 @@ require (
 	go.uber.org/fx v1.20.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
-	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63 // indirect
+	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/image v0.11.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
@@ -177,7 +177,7 @@ require (
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846 // indirect
+	golang.org/x/tools v0.13.0 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231009173412-8bfb1ae86b6c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
