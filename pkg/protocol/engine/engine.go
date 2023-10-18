@@ -216,8 +216,8 @@ func New(
 }
 
 func (e *Engine) Shutdown() {
-	if !e.WasStopped() {
-		e.TriggerStopped()
+	if !e.WasShutdown() {
+		e.TriggerShutdown()
 
 		e.BlockRequester.Shutdown()
 		e.Attestations.Shutdown()
@@ -238,6 +238,8 @@ func (e *Engine) Shutdown() {
 		e.Retainer.Shutdown()
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()
+
+		e.TriggerStopped()
 	}
 }
 
