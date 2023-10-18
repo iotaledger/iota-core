@@ -16,7 +16,7 @@ func (m *MockedOutput) WorkScore(_ *iotago.WorkScoreParameters) (iotago.WorkScor
 	panic("implement me")
 }
 
-func (m *MockedOutput) StorageScore(_ *iotago.RentStructure, _ iotago.StorageScoreFunc) iotago.StorageScore {
+func (m *MockedOutput) StorageScore(_ *iotago.StorageScoreStructure, _ iotago.StorageScoreFunc) iotago.StorageScore {
 	panic("implement me")
 }
 
