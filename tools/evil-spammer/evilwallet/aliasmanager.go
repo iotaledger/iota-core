@@ -1,18 +1,19 @@
-package wallet
+package evilwallet
 
 import (
 	"go.uber.org/atomic"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 )
 
 // region AliasManager /////////////////////////////////////////////////////////////////////////////////////////////////
 
 // AliasManager is the manager for output aliases.
 type AliasManager struct {
-	outputMap map[string]*Output
-	inputMap  map[string]*Output
+	outputMap map[string]*models.Output
+	inputMap  map[string]*models.Output
 
 	outputAliasCount *atomic.Uint64
 	mu               syncutils.RWMutex
@@ -21,14 +22,14 @@ type AliasManager struct {
 // NewAliasManager creates and returns a new AliasManager.
 func NewAliasManager() *AliasManager {
 	return &AliasManager{
-		outputMap:        make(map[string]*Output),
-		inputMap:         make(map[string]*Output),
+		outputMap:        make(map[string]*models.Output),
+		inputMap:         make(map[string]*models.Output),
 		outputAliasCount: atomic.NewUint64(0),
 	}
 }
 
 // AddOutputAlias maps the given outputAliasName to output, if there's duplicate outputAliasName, it will be overwritten.
-func (a *AliasManager) AddOutputAlias(output *Output, aliasName string) {
+func (a *AliasManager) AddOutputAlias(output *models.Output, aliasName string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -36,7 +37,7 @@ func (a *AliasManager) AddOutputAlias(output *Output, aliasName string) {
 }
 
 // AddInputAlias adds an input alias.
-func (a *AliasManager) AddInputAlias(input *Output, aliasName string) {
+func (a *AliasManager) AddInputAlias(input *models.Output, aliasName string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -44,7 +45,7 @@ func (a *AliasManager) AddInputAlias(input *Output, aliasName string) {
 }
 
 // GetInput returns the input for the alias specified.
-func (a *AliasManager) GetInput(aliasName string) (*Output, bool) {
+func (a *AliasManager) GetInput(aliasName string) (*models.Output, bool) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	in, ok := a.inputMap[aliasName]
@@ -53,7 +54,7 @@ func (a *AliasManager) GetInput(aliasName string) (*Output, bool) {
 }
 
 // GetOutput returns the output for the alias specified.
-func (a *AliasManager) GetOutput(aliasName string) *Output {
+func (a *AliasManager) GetOutput(aliasName string) *models.Output {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
@@ -65,8 +66,8 @@ func (a *AliasManager) ClearAllAliases() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	a.inputMap = make(map[string]*Output)
-	a.outputMap = make(map[string]*Output)
+	a.inputMap = make(map[string]*models.Output)
+	a.outputMap = make(map[string]*models.Output)
 }
 
 // ClearAliases clears provided aliases.
@@ -83,7 +84,7 @@ func (a *AliasManager) ClearAliases(aliases ScenarioAlias) {
 }
 
 // AddOutputAliases batch adds the outputs their respective aliases.
-func (a *AliasManager) AddOutputAliases(outputs []*Output, aliases []string) error {
+func (a *AliasManager) AddOutputAliases(outputs []*models.Output, aliases []string) error {
 	if len(outputs) != len(aliases) {
 		return ierrors.New("mismatch outputs and aliases length")
 	}
@@ -95,7 +96,7 @@ func (a *AliasManager) AddOutputAliases(outputs []*Output, aliases []string) err
 }
 
 // AddInputAliases batch adds the inputs their respective aliases.
-func (a *AliasManager) AddInputAliases(inputs []*Output, aliases []string) error {
+func (a *AliasManager) AddInputAliases(inputs []*models.Output, aliases []string) error {
 	if len(inputs) != len(aliases) {
 		return ierrors.New("mismatch outputs and aliases length")
 	}

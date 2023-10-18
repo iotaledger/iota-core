@@ -1,4 +1,4 @@
-package main
+package interactive
 
 import (
 	"encoding/json"
@@ -15,8 +15,9 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/programs"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
-	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
@@ -25,17 +26,12 @@ const (
 	maxConcurrentSpams = 5
 	lastSpamsShowed    = 15
 	timeFormat         = "2006/01/02 15:04:05"
+	configFilename     = "interactive_config.json"
 )
 
 const (
 	AnswerEnable  = "enable"
 	AnswerDisable = "disable"
-
-	SpammerTypeBlock       = "blk"
-	SpammerTypeTx          = "tx"
-	SpammerTypeDs          = "ds"
-	SpammerTypeCustom      = "custom"
-	SpammerTypeCommitments = "commitments"
 )
 
 var (
@@ -73,7 +69,7 @@ var configJSON = fmt.Sprintf(`{
 	"autoRequestingEnabled": false,
 	"autoRequestingAmount": "100",
 	"useRateSetter": true
-}`, SpammerTypeTx)
+}`, spammer.TypeTx)
 
 var defaultConfig = InteractiveConfig{
 	clientURLs: map[string]types.Empty{
@@ -85,7 +81,7 @@ var defaultConfig = InteractiveConfig{
 	timeUnit:             time.Second,
 	Deep:                 false,
 	Reuse:                true,
-	Scenario:             SpammerTypeTx,
+	Scenario:             spammer.TypeTx,
 	AutoRequesting:       false,
 	AutoRequestingAmount: "100",
 	UseRateSetter:        true,
@@ -143,7 +139,7 @@ const (
 )
 
 var (
-	scenarios     = []string{SpammerTypeBlock, SpammerTypeTx, SpammerTypeDs, "conflict-circle", "guava", "orange", "mango", "pear", "lemon", "banana", "kiwi", "peace"}
+	scenarios     = []string{spammer.TypeBlock, spammer.TypeTx, spammer.TypeDs, "conflict-circle", "guava", "orange", "mango", "pear", "lemon", "banana", "kiwi", "peace"}
 	confirms      = []string{AnswerEnable, AnswerDisable}
 	outputNumbers = []string{"100", "1000", "5000", "cancel"}
 	timeUnits     = []string{mpm, mps}
@@ -196,7 +192,7 @@ func configure(mode *Mode) {
 // region Mode /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Mode struct {
-	evilWallet   *wallet.EvilWallet
+	evilWallet   *evilwallet.EvilWallet
 	shutdown     chan types.Empty
 	mainMenu     chan types.Empty
 	spamFinished chan int
@@ -220,7 +216,7 @@ type Mode struct {
 
 func NewInteractiveMode() *Mode {
 	return &Mode{
-		evilWallet:   wallet.NewEvilWallet(),
+		evilWallet:   evilwallet.NewEvilWallet(),
 		action:       make(chan action),
 		shutdown:     make(chan types.Empty),
 		mainMenu:     make(chan types.Empty),
@@ -303,7 +299,7 @@ func (m *Mode) onMenuAction() {
 }
 
 func (m *Mode) prepareFundsIfNeeded() {
-	if m.evilWallet.UnspentOutputsLeft(wallet.Fresh) < minSpamOutputs {
+	if m.evilWallet.UnspentOutputsLeft(evilwallet.Fresh) < minSpamOutputs {
 		if !m.preparingFunds && m.Config.AutoRequesting {
 			m.preparingFunds = true
 			go func() {
@@ -441,7 +437,7 @@ func (m *Mode) areEnoughFundsAvailable() bool {
 		outputsNeeded = int(float64(m.Config.Rate) * m.Config.duration.Minutes())
 	}
 
-	return m.evilWallet.UnspentOutputsLeft(wallet.Fresh) < outputsNeeded && m.Config.Scenario != SpammerTypeBlock
+	return m.evilWallet.UnspentOutputsLeft(evilwallet.Fresh) < outputsNeeded && m.Config.Scenario != spammer.TypeBlock
 }
 
 func (m *Mode) startSpam() {
@@ -449,11 +445,11 @@ func (m *Mode) startSpam() {
 	defer m.spamMutex.Unlock()
 
 	var s *spammer.Spammer
-	if m.Config.Scenario == SpammerTypeBlock {
-		s = SpamBlocks(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, 0, m.Config.UseRateSetter)
+	if m.Config.Scenario == spammer.TypeBlock {
+		s = programs.SpamBlocks(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, 0, m.Config.UseRateSetter, "")
 	} else {
-		scenario, _ := wallet.GetScenario(m.Config.Scenario)
-		s = SpamNestedConflicts(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, scenario, m.Config.Deep, m.Config.Reuse, m.Config.UseRateSetter)
+		scenario, _ := evilwallet.GetScenario(m.Config.Scenario)
+		s = programs.SpamNestedConflicts(m.evilWallet, m.Config.Rate, time.Second, m.Config.duration, scenario, m.Config.Deep, m.Config.Reuse, m.Config.UseRateSetter, "")
 		if s == nil {
 			return
 		}
@@ -698,7 +694,7 @@ func (m *Mode) summarizeSpam(id int) {
 func (m *Mode) updateSentStatistic(s *spammer.Spammer, id int) {
 	blkSent := s.BlocksSent()
 	scenariosCreated := s.BatchesPrepared()
-	if m.spammerLog.SpamDetails(id).Scenario == SpammerTypeBlock {
+	if m.spammerLog.SpamDetails(id).Scenario == spammer.TypeBlock {
 		m.blkSent.Add(blkSent)
 	} else {
 		m.txSent.Add(blkSent)
@@ -709,7 +705,7 @@ func (m *Mode) updateSentStatistic(s *spammer.Spammer, id int) {
 // load the config file.
 func (m *Mode) loadConfig() {
 	// open config file
-	file, err := os.Open("config.json")
+	file, err := os.Open(configFilename)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			panic(err)

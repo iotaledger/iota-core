@@ -36,7 +36,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	if err != nil {
 		rmcSlot = 0
 	}
-	rmc, err := deps.Protocol.CandidateEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
+	rmc, err := deps.Protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get RMC for slot: %d", rmcSlot)
 	}
@@ -141,7 +141,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 
 	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get output %s from ledger", outputID)
+		return nil, ierrors.Wrapf(err, "failed to get output %s from ledger", outputID.ToHex())
 	}
 
 	var reward iotago.Mana
