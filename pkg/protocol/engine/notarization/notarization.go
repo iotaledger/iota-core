@@ -15,5 +15,7 @@ type Notarization interface {
 
 	AcceptedBlocksCount(index iotago.SlotIndex) int
 
+	ClearCache(from, to iotago.SlotIndex)
+
 	module.Interface
 }

@@ -245,6 +245,7 @@ func (e *Engine) Restart() {
 	e.BlockRequester.Clear()
 	e.EvictionState.ClearRootBlocks(latestCommittedSlot + 1)
 	e.Storage.ClearBlocks(latestCommittedSlot+1, latestSeenSlot)
+	e.Notarization.ClearCache(latestCommittedSlot+1, latestSeenSlot)
 	e.Attestations.ClearCache(latestCommittedSlot+1, latestSeenSlot)
 	e.Ledger.ClearCache(latestCommittedSlot+1, latestSeenSlot)
 

@@ -77,13 +77,6 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Slot())
 
 			m.TriggerConstructed()
-
-			e.MaxSeenSlot.OnUpdate(func(oldMaxSeenSlot, newMaxSeenSlot iotago.SlotIndex) {
-				if newMaxSeenSlot < oldMaxSeenSlot {
-					m.slotMutations.ClearCache(newMaxSeenSlot+1, oldMaxSeenSlot)
-				}
-			})
-
 			m.TriggerInitialized()
 		})
 
@@ -137,6 +130,10 @@ func (m *Manager) ForceCommitUntil(commitUntilSlot iotago.SlotIndex) error {
 	}
 
 	return nil
+}
+
+func (m *Manager) ClearCache(from, to iotago.SlotIndex) {
+	m.slotMutations.ClearCache(from, to)
 }
 
 // IsBootstrapped returns if the Manager finished committing all pending slots up to the current acceptance time.
