@@ -9,6 +9,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -65,6 +66,7 @@ type Engine struct {
 	Retainer            retainer.Retainer
 	SyncManager         syncmanager.SyncManager
 	UpgradeOrchestrator upgrade.Orchestrator
+	LatestCachedSlot    reactive.Variable[iotago.SlotIndex]
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -111,11 +113,12 @@ func New(
 
 	return options.Apply(
 		&Engine{
-			Events:        NewEvents(),
-			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
-			Workers:       workers,
-			errorHandler:  errorHandler,
+			Events:           NewEvents(),
+			Storage:          storageInstance,
+			EvictionState:    eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
+			LatestCachedSlot: reactive.NewVariable[iotago.SlotIndex](),
+			Workers:          workers,
+			errorHandler:     errorHandler,
 
 			optsSnapshotPath:  "snapshot.bin",
 			optsSnapshotDepth: 5,
@@ -410,6 +413,18 @@ func (e *Engine) acceptanceHandler() {
 func (e *Engine) setupBlockStorage() {
 	wp := e.Workers.CreatePool("BlockStorage", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
 
+	e.LatestCachedSlot.OnUpdate(func(oldValue, newValue iotago.SlotIndex) {
+		if newValue < oldValue {
+			for slot := newValue + 1; slot <= oldValue; slot++ {
+				if blocksForSlot, err := e.Storage.Blocks(slot); err != nil {
+					e.errorHandler(ierrors.Wrapf(err, "failed to prune storage at slot %d", slot))
+				} else if err = blocksForSlot.Clear(); err != nil {
+					e.errorHandler(ierrors.Wrapf(err, "failed to prune storage at slot %d", slot))
+				}
+			}
+		}
+	})
+
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		store, err := e.Storage.Blocks(block.ID().Slot())
 		if err != nil {
@@ -438,6 +453,10 @@ func (e *Engine) setupEvictionState() {
 				}
 				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().SlotCommitmentID)
 			}
+		})
+
+		e.LatestCachedSlot.Compute(func(latestCachedSlot iotago.SlotIndex) iotago.SlotIndex {
+			return max(latestCachedSlot, block.ID().Slot())
 		})
 	}, event.WithWorkerPool(wp))
 

@@ -69,13 +69,23 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 	return module.Provide(func(e *engine.Engine) attestation.Attestations {
 		latestCommitment := e.Storage.Settings().LatestCommitment()
 
-		return NewManager(
+		n := NewManager(
 			latestCommitment.Slot(),
 			latestCommitment.CumulativeWeight(),
 			e.Storage.Attestations,
 			e.SybilProtection.SeatManager().Committee,
 			e,
 		)
+
+		e.HookConstructed(func() {
+			e.LatestCachedSlot.OnUpdate(func(oldValue, newValue iotago.SlotIndex) {
+				if newValue < oldValue {
+					n.ClearCache(newValue+1, oldValue)
+				}
+			})
+		})
+
+		return n
 	})
 }
 
@@ -306,6 +316,13 @@ func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 	}
 
 	return nil
+}
+
+func (m *Manager) ClearCache(from, to iotago.SlotIndex) {
+	for slot := from; slot <= to; slot++ {
+		m.futureAttestations.Evict(slot)
+		m.pendingAttestations.Evict(slot)
+	}
 }
 
 func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cutoffSlot iotago.SlotIndex, isValid bool) {

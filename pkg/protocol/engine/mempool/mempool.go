@@ -28,4 +28,6 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] interface {
 	StateDiff(slot iotago.SlotIndex) (StateDiff, error)
 
 	Evict(slot iotago.SlotIndex)
+
+	ClearCache(from, to iotago.SlotIndex)
 }

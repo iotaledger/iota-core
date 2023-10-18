@@ -74,9 +74,17 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 
 			e.Events.Notarization.LinkTo(m.events)
 
-			m.TriggerInitialized()
 			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Slot())
+
 			m.TriggerConstructed()
+
+			e.LatestCachedSlot.OnUpdate(func(oldValue, newValue iotago.SlotIndex) {
+				if newValue < oldValue {
+					m.slotMutations.ClearCache(newValue+1, oldValue)
+				}
+			})
+
+			m.TriggerInitialized()
 		})
 
 		return m

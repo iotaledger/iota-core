@@ -197,6 +197,23 @@ func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error)
 	return lo.Return1(m.stateDiffs.GetOrCreate(slot, func() *StateDiff { return NewStateDiff(slot, kv) })), nil
 }
 
+func (m *MemPool[VoteRank]) ClearCache(from, to iotago.SlotIndex) {
+	for slot := from; slot <= to; slot++ {
+		if stateDiff, deleted := m.stateDiffs.DeleteAndReturn(slot); deleted {
+			if err := stateDiff.Reset(); err != nil {
+				m.errorHandler(ierrors.Wrapf(err, "failed to reset state diff for slot %d", slot))
+			}
+		}
+
+		if evictedEntries := m.attachments.Evict(slot); evictedEntries != nil {
+			evictedEntries.ForEach(func(id iotago.BlockID, metadata *SignedTransactionMetadata) bool {
+				metadata.evictAttachment(id)
+				return true
+			})
+		}
+	}
+}
+
 // Evict evicts the slot with the given slot from the MemPool.
 func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 	if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *SignedTransactionMetadata] {

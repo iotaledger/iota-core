@@ -355,6 +355,13 @@ func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iot
 	return nil
 }
 
+func (m *Manager) ClearCache(from, to iotago.SlotIndex) {
+	for slot := from; slot <= to; slot++ {
+		m.blockBurns.Delete(slot)
+		m.latestSupportedVersionSignals.Evict(slot)
+	}
+}
+
 func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetSlot iotago.SlotIndex) (wasDestroyed bool, err error) {
 	// to reach targetSlot, we need to rollback diffs from the current latestCommittedSlot down to targetSlot + 1
 	for diffSlot := m.latestCommittedSlot; diffSlot > targetSlot; diffSlot-- {

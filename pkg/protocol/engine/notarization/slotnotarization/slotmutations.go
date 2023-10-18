@@ -61,15 +61,10 @@ func (m *SlotMutations) Evict(index iotago.SlotIndex) error {
 	return nil
 }
 
-func (m *SlotMutations) Reset(index iotago.SlotIndex) {
-	m.evictionMutex.Lock()
-	defer m.evictionMutex.Unlock()
-
-	for i := m.latestCommittedIndex; i > index; i-- {
-		m.acceptedBlocksBySlot.Delete(i)
+func (m *SlotMutations) ClearCache(from, to iotago.SlotIndex) {
+	for slot := from; slot <= to; slot++ {
+		m.acceptedBlocksBySlot.Delete(slot)
 	}
-
-	m.latestCommittedIndex = index
 }
 
 // AcceptedBlocks returns the set of accepted blocks for the given slot.

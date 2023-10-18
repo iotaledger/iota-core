@@ -78,6 +78,13 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
+			e.LatestCachedSlot.OnUpdate(func(oldValue, newValue iotago.SlotIndex) {
+				if newValue < oldValue {
+					l.memPool.ClearCache(newValue+1, oldValue)
+					l.accountsLedger.ClearCache(newValue+1, oldValue)
+				}
+			})
+
 			// TODO: CHECK IF STILL NECESSARY
 			// e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
 			//	l.memPool.PublishRequestedState(scd.Commitment.Commitment())
