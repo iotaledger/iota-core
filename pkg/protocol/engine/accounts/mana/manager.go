@@ -112,7 +112,7 @@ func (m *Manager) getMana(accountID iotago.AccountID, output *utxoledger.Output,
 	}
 
 	if output.SlotCreated() > slot || bicUpdateTime > slot {
-		return nil, ierrors.Errorf("BIC update time (%d) or output creation slot (%d) earlier than requested slot (%d)", bicUpdateTime, output.SlotCreated(), slot)
+		return nil, ierrors.Errorf("BIC update time (%d) or output creation slot (%d) later than requested slot (%d)", bicUpdateTime, output.SlotCreated(), slot)
 	}
 
 	// Decay and generate stored mana to match either the BIC update time or Output creation slot(bigger of the two),
