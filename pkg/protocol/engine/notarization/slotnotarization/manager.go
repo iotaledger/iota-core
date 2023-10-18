@@ -78,9 +78,9 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 
 			m.TriggerConstructed()
 
-			e.LatestCachedSlot.OnUpdate(func(oldValue, newValue iotago.SlotIndex) {
-				if newValue < oldValue {
-					m.slotMutations.ClearCache(newValue+1, oldValue)
+			e.MaxSeenSlot.OnUpdate(func(oldMaxSeenSlot, newMaxSeenSlot iotago.SlotIndex) {
+				if newMaxSeenSlot < oldMaxSeenSlot {
+					m.slotMutations.ClearCache(newMaxSeenSlot+1, oldMaxSeenSlot)
 				}
 			})
 

@@ -78,7 +78,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 		)
 
 		e.HookConstructed(func() {
-			e.LatestCachedSlot.OnUpdate(func(oldValue, newValue iotago.SlotIndex) {
+			e.MaxSeenSlot.OnUpdate(func(oldValue, newValue iotago.SlotIndex) {
 				if newValue < oldValue {
 					n.ClearCache(newValue+1, oldValue)
 				}

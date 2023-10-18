@@ -78,10 +78,10 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
-			e.LatestCachedSlot.OnUpdate(func(oldValue, newValue iotago.SlotIndex) {
-				if newValue < oldValue {
-					l.memPool.ClearCache(newValue+1, oldValue)
-					l.accountsLedger.ClearCache(newValue+1, oldValue)
+			e.MaxSeenSlot.OnUpdate(func(oldMaxSeenSlot, newMaxSeenSlot iotago.SlotIndex) {
+				if newMaxSeenSlot < oldMaxSeenSlot {
+					l.memPool.ClearCache(newMaxSeenSlot+1, oldMaxSeenSlot)
+					l.accountsLedger.ClearCache(newMaxSeenSlot+1, oldMaxSeenSlot)
 				}
 			})
 
