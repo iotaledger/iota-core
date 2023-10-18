@@ -2,6 +2,7 @@ package accountwallet
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -52,12 +53,13 @@ func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago
 		return nil, err
 	}
 
-	_, err = a.PostWithBlock(clt, signedTx, a.faucet.account, congestionResp, issuerResp, version)
+	blkID, err := a.PostWithBlock(clt, signedTx, a.faucet.account, congestionResp, issuerResp, version)
 	if err != nil {
 		log.Errorf("failed to create block: %s", err)
 
 		return nil, err
 	}
+	fmt.Println("block sent:", blkID.ToHex())
 
 	// set remainder output to be reused by the Faucet wallet
 	a.faucet.unspentOutput = &models.Output{
@@ -114,9 +116,9 @@ func (a *AccountWallet) CreateBlock(payload iotago.Payload, issuer blockhandler.
 	blockBuilder.StrongParents(issuerResp.StrongParents)
 	blockBuilder.WeakParents(issuerResp.WeakParents)
 	blockBuilder.ShallowLikeParents(issuerResp.ShallowLikeParents)
-	blockBuilder.MaxBurnedMana(congestionResp.ReferenceManaCost)
 
 	blockBuilder.Payload(payload)
+	blockBuilder.CalculateAndSetMaxBurnedMana(congestionResp.ReferenceManaCost)
 	blockBuilder.Sign(issuer.ID(), issuer.PrivateKey())
 
 	blk, err := blockBuilder.Build()
