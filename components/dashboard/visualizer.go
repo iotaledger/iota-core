@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -81,22 +82,20 @@ func sendTipInfo(block *blocks.Block, isTip bool) {
 
 func runVisualizer(component *app.Component) {
 	if err := component.Daemon().BackgroundWorker("Dashboard[Visualizer]", func(ctx context.Context) {
+
+		deps.Protocol.MainEngineInstance().Ledger.MemPool().OnSignedTransactionAttached(func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
+			signedTransactionMetadata.OnSignaturesValid(func() {
+				transactionMetadata := signedTransactionMetadata.TransactionMetadata()
+				transactionMetadata.OnAccepted(func() {
+					attachmentID := transactionMetadata.EarliestIncludedAttachment()
+					sendTxAccepted(attachmentID, true)
+				})
+			})
+		})
+
 		unhook := lo.Batch(
 			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 				sendVertex(block, false)
-
-				signedTransaction, hasTx := block.SignedTransaction()
-				if hasTx {
-					txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(signedTransaction.Transaction.ID()))
-					if exists {
-						txMetadata.OnAccepted(func() {
-							sendTxAccepted(block.ID(), true)
-						})
-					}
-				}
-				// if block.ID().Slot() > slot.Index(currentSlot.Load()) {
-				// 	currentSlot.Store(int64(block.ID().Slot()))
-				// }
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
 				sendVertex(block, block.IsConfirmed())
