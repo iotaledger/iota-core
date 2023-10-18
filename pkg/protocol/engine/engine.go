@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
@@ -73,8 +74,9 @@ type Engine struct {
 
 	BlockCache *blocks.Blocks
 
-	chainID iotago.CommitmentID
-	mutex   syncutils.RWMutex
+	chainID      iotago.CommitmentID
+	mutex        syncutils.RWMutex
+	restartMutex sync.RWMutex
 
 	optsSnapshotPath     string
 	optsEntryPointsDepth int
@@ -218,8 +220,19 @@ func New(
 	)
 }
 
+func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
+	e.restartMutex.RLock()
+	defer e.restartMutex.RUnlock()
+
+	e.Filter.ProcessReceivedBlock(block, source)
+	e.Events.BlockProcessed.Trigger(block.ID())
+}
+
 // Restart restarts the engine by resetting it to the state of the latest commitment.
 func (e *Engine) Restart() {
+	e.restartMutex.Lock()
+	defer e.restartMutex.Unlock()
+
 	e.Workers.PendingChildrenCounter.WaitIsZero()
 
 	e.LatestCachedSlot.Set(e.Storage.Settings().LatestCommitment().Slot())
@@ -249,11 +262,6 @@ func (e *Engine) Shutdown() {
 		e.Storage.Shutdown()
 		e.Workers.Shutdown()
 	}
-}
-
-func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
-	e.Filter.ProcessReceivedBlock(block, source)
-	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
 func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {
