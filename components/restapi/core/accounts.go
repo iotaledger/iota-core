@@ -6,7 +6,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
@@ -23,26 +22,23 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		return nil, err
 	}
 
-	slot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
+	commitmentSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
-	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slot)
+	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, commitmentSlot)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get account: %s form the Ledger", accountID.ToHex())
 	}
 	if !exists {
 		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
 	}
-	rmcSlot, err := safemath.SafeSub(slot, deps.Protocol.APIForSlot(slot).ProtocolParameters().MaxCommittableAge())
+
+	rmc, err := deps.Protocol.MainEngineInstance().Ledger.RMCManager().RMC(commitmentSlot)
 	if err != nil {
-		rmcSlot = 0
-	}
-	rmc, err := deps.Protocol.MainEngineInstance().Ledger.RMCManager().RMC(rmcSlot)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get RMC for slot: %d", rmcSlot)
+		return nil, ierrors.Wrapf(err, "failed to get RMC for slot: %d", commitmentSlot)
 	}
 
 	return &apimodels.CongestionResponse{
-		Slot:                 slot,
+		Slot:                 commitmentSlot,
 		Ready:                deps.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(accountID),
 		ReferenceManaCost:    rmc,
 		BlockIssuanceCredits: acc.Credits.Value,
