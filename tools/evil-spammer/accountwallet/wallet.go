@@ -244,9 +244,9 @@ func (a *AccountWallet) isAccountReady(accData *models.AccountData) bool {
 }
 
 func (a *AccountWallet) getFunds(amount uint64, addressType iotago.AddressType) (*models.Output, ed25519.PrivateKey, error) {
-	hdWallet := mock.NewHDWallet("", a.seed[:], a.latestUsedIndex+1)
-	privKey, _ := hdWallet.KeyPair()
-	receiverAddr := hdWallet.Address(addressType)
+	keyManager := mock.NewKeyManager(a.seed[:], a.latestUsedIndex+1)
+	privKey, _ := keyManager.KeyPair()
+	receiverAddr := keyManager.Address(addressType)
 	createdOutput, err := a.RequestFaucetFunds(a.client, receiverAddr, iotago.BaseToken(amount))
 	if err != nil {
 		return nil, nil, ierrors.Wrap(err, "failed to request funds from Faucet")
@@ -263,7 +263,7 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 	if err != nil {
 		return err
 	}
-	hdWallet := mock.NewHDWallet("", a.seed[:], accData.Index)
+	hdWallet := mock.NewKeyManager(a.seed[:], accData.Index)
 
 	issuingTime := time.Now()
 	issuingSlot := a.client.LatestAPI().TimeProvider().SlotFromTime(issuingTime)
@@ -285,7 +285,7 @@ func (a *AccountWallet) destroyAccount(alias string) error {
 	txBuilder.AddOutput(&iotago.BasicOutput{
 		Amount: accountOutput.BaseTokenAmount(),
 		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: a.faucet.genesisHdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)},
+			&iotago.AddressUnlockCondition{Address: a.faucet.genesisKeyManager.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)},
 		},
 	})
 

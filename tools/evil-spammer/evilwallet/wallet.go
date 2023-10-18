@@ -72,9 +72,9 @@ func (w *Wallet) Address() *iotago.Ed25519Address {
 	defer w.Unlock()
 
 	index := uint64(w.lastAddrIdxUsed.Add(1))
-	hdWallet := mock.NewHDWallet("", w.seed[:], index)
+	keyManager := mock.NewKeyManager(w.seed[:], index)
 	//nolint:forcetypeassert
-	addr := hdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	addr := keyManager.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	w.indexAddrMap[index] = addr.String()
 	w.addrIndexMap[addr.String()] = index
 
@@ -86,7 +86,7 @@ func (w *Wallet) AddressOnIndex(index uint64) *iotago.Ed25519Address {
 	w.Lock()
 	defer w.Unlock()
 
-	hdWallet := mock.NewHDWallet("", w.seed[:], index)
+	hdWallet := mock.NewKeyManager(w.seed[:], index)
 	//nolint:forcetypeassert
 	addr := hdWallet.Address(iotago.AddressEd25519).(*iotago.Ed25519Address)
 
@@ -224,7 +224,7 @@ func (w *Wallet) AddressSigner(addr *iotago.Ed25519Address) iotago.AddressSigner
 	w.RLock()
 	defer w.RUnlock()
 	index := w.AddrIndexMap(addr.String())
-	hdWallet := mock.NewHDWallet("", w.seed[:], index)
+	hdWallet := mock.NewKeyManager(w.seed[:], index)
 
 	return hdWallet.AddressSigner()
 }
@@ -232,7 +232,7 @@ func (w *Wallet) AddressSigner(addr *iotago.Ed25519Address) iotago.AddressSigner
 func (w *Wallet) KeyPair(index uint64) (ed25519.PrivateKey, ed25519.PublicKey) {
 	w.RLock()
 	defer w.RUnlock()
-	hdWallet := mock.NewHDWallet("", w.seed[:], index)
+	hdWallet := mock.NewKeyManager(w.seed[:], index)
 
 	return hdWallet.KeyPair()
 }
