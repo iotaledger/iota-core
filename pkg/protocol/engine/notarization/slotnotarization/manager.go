@@ -208,7 +208,7 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 	}
 
 	roots := iotago.NewRoots(
-		iotago.Identifier(acceptedBlocks.Root()),
+		acceptedBlocks.Root(),
 		mutationRoot,
 		attestationsRoot,
 		stateRoot,
