@@ -69,15 +69,13 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 	return module.Provide(func(e *engine.Engine) attestation.Attestations {
 		latestCommitment := e.Storage.Settings().LatestCommitment()
 
-		n := NewManager(
+		return NewManager(
 			latestCommitment.Slot(),
 			latestCommitment.CumulativeWeight(),
 			e.Storage.Attestations,
 			e.SybilProtection.SeatManager().Committee,
 			e,
 		)
-
-		return n
 	})
 }
 
