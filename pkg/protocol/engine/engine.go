@@ -218,6 +218,13 @@ func New(
 	)
 }
 
+// Restart restarts the engine by resetting it to the state of the latest commitment.
+func (e *Engine) Restart() {
+	e.Workers.PendingChildrenCounter.WaitIsZero()
+
+	e.LatestCachedSlot.Set(e.Storage.Settings().LatestCommitment().Slot())
+}
+
 func (e *Engine) Shutdown() {
 	if !e.WasStopped() {
 		e.TriggerStopped()
