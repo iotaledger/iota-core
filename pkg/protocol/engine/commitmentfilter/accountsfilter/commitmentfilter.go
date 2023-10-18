@@ -1,7 +1,6 @@
 package accountsfilter
 
 import (
-	"github.com/iotaledger/hive.go/core/safemath"
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -98,12 +97,9 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 			Reason: ierrors.Wrapf(err, "could not retrieve API for block version %d", block.ProtocolBlock().BlockHeader.ProtocolVersion),
 		})
 	}
-	// check that the block burns sufficient Mana
-	blockSlot := blockAPI.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
-	rmcSlot, err := safemath.SafeSub(blockSlot, blockAPI.ProtocolParameters().MaxCommittableAge())
-	if err != nil {
-		rmcSlot = 0
-	}
+	// check that the block burns sufficient Mana, use slot index of the commitment
+	rmcSlot := block.ProtocolBlock().SlotCommitmentID.Slot()
+
 	rmc, err := c.rmcRetrieveFunc(rmcSlot)
 	if err != nil {
 		c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
