@@ -8,7 +8,9 @@ replace github.com/iotaledger/iota-core/tools/genesis-snapshot => ../genesis-sna
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
+	github.com/ethereum/go-ethereum v1.13.2
 	github.com/iotaledger/hive.go/app v0.0.0-20231018191940-f36386f4e2fa
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231018191940-f36386f4e2fa
 	github.com/iotaledger/hive.go/crypto v0.0.0-20231018191940-f36386f4e2fa
 	github.com/iotaledger/hive.go/ds v0.0.0-20231018191940-f36386f4e2fa
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20231018191940-f36386f4e2fa
@@ -28,9 +30,9 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
-	github.com/ethereum/go-ethereum v1.13.2 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
@@ -38,7 +40,6 @@ require (
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
 	github.com/iotaledger/hive.go/ads v0.0.0-20231018191940-f36386f4e2fa // indirect
 	github.com/iotaledger/hive.go/constraints v0.0.0-20231018191940-f36386f4e2fa // indirect
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231018191940-f36386f4e2fa // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20231018191940-f36386f4e2fa // indirect
 	github.com/iotaledger/hive.go/log v0.0.0-20231018191940-f36386f4e2fa // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231018191940-f36386f4e2fa // indirect
