@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
@@ -236,6 +237,10 @@ func (e *Engine) Shutdown() {
 		e.CommitmentFilter.Shutdown()
 		e.Scheduler.Shutdown()
 		e.Retainer.Shutdown()
+		go func() {
+			time.Sleep(5 * time.Second)
+			fmt.Println(e.Workers.String())
+		}()
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()
 
