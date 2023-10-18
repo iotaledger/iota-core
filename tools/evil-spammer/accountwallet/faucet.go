@@ -30,7 +30,7 @@ func (a *AccountWallet) RequestBlockBuiltData(clt *nodeclient.Client, issuerID i
 		return nil, nil, 0, ierrors.Wrapf(err, "failed to get congestion data for issuer %s", issuerID.ToHex())
 	}
 
-	issuerResp, err := clt.BlockIssuance(context.Background())
+	issuerResp, err := clt.BlockIssuance(context.Background(), congestionResp.Slot)
 	if err != nil {
 		return nil, nil, 0, ierrors.Wrap(err, "failed to get block issuance data")
 	}

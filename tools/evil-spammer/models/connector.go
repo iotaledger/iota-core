@@ -176,7 +176,7 @@ type Client interface {
 	// GetTransaction gets the transaction.
 	GetTransaction(txID iotago.TransactionID) (resp *iotago.SignedTransaction, err error)
 	// GetBlockIssuance returns the latest commitment and data needed to create a new block.
-	GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error)
+	GetBlockIssuance(...iotago.SlotIndex) (resp *apimodels.IssuanceBlockHeaderResponse, err error)
 	// GetCongestion returns congestion data such as rmc or issuing readiness.
 	GetCongestion(id iotago.AccountID) (resp *apimodels.CongestionResponse, err error)
 
@@ -301,13 +301,8 @@ func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.Signed
 	return tx, nil
 }
 
-func (c *WebClient) GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error) {
-	resp, err = c.client.BlockIssuance(context.Background())
-	if err != nil {
-		return
-	}
-
-	return
+func (c *WebClient) GetBlockIssuance(slotIndex ...iotago.SlotIndex) (resp *apimodels.IssuanceBlockHeaderResponse, err error) {
+	return c.client.BlockIssuance(context.Background(), slotIndex...)
 }
 
 func (c *WebClient) GetCongestion(accountID iotago.AccountID) (resp *apimodels.CongestionResponse, err error) {
