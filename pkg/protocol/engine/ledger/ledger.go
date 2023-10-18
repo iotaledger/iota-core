@@ -43,5 +43,7 @@ type Ledger interface {
 	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error
 	TrackBlock(block *blocks.Block)
 
+	ClearCache(from, to iotago.SlotIndex)
+
 	module.Interface
 }

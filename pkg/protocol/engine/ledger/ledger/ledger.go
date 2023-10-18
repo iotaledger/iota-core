@@ -78,13 +78,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 			e.Events.BlockGadget.BlockPreAccepted.Hook(l.blockPreAccepted)
 
-			e.MaxSeenSlot.OnUpdate(func(oldMaxSeenSlot, newMaxSeenSlot iotago.SlotIndex) {
-				if newMaxSeenSlot < oldMaxSeenSlot {
-					l.memPool.ClearCache(newMaxSeenSlot+1, oldMaxSeenSlot)
-					l.accountsLedger.ClearCache(newMaxSeenSlot+1, oldMaxSeenSlot)
-				}
-			})
-
 			// TODO: CHECK IF STILL NECESSARY
 			// e.Events.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
 			//	l.memPool.PublishRequestedState(scd.Commitment.Commitment())
@@ -350,6 +343,11 @@ func (l *Ledger) ManaManager() *mana.Manager {
 
 func (l *Ledger) RMCManager() *rmc.Manager {
 	return l.rmcManager
+}
+
+func (l *Ledger) ClearCache(from, to iotago.SlotIndex) {
+	l.memPool.ClearCache(from, to)
+	l.accountsLedger.ClearCache(from, to)
 }
 
 func (l *Ledger) Shutdown() {

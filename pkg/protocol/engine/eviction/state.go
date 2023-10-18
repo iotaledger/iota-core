@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds/ringbuffer"
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -320,6 +321,22 @@ func (s *State) PopulateFromStorage(latestCommitmentSlot iotago.SlotIndex) {
 
 			return nil
 		})
+	}
+}
+
+func (s *State) ClearRootBlocks(from iotago.SlotIndex) {
+	rootBlocksToClear := make([]iotago.BlockID, 0)
+	s.rootBlocks.ForEach(func(slot iotago.SlotIndex, storage *shrinkingmap.ShrinkingMap[iotago.BlockID, iotago.CommitmentID]) {
+		if slot >= from {
+			storage.ForEach(func(blockID iotago.BlockID, commitmentID iotago.CommitmentID) bool {
+				rootBlocksToClear = append(rootBlocksToClear, blockID)
+				return true
+			})
+		}
+	})
+
+	for _, blockID := range rootBlocksToClear {
+		s.RemoveRootBlock(blockID)
 	}
 }
 

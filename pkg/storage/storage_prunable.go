@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -31,6 +32,16 @@ func (s *Storage) Committee() *epochstore.Store[*account.Accounts] {
 
 func (s *Storage) Blocks(slot iotago.SlotIndex) (*slotstore.Blocks, error) {
 	return s.prunable.Blocks(slot)
+}
+
+func (s *Storage) ClearBlocks(from, to iotago.SlotIndex) {
+	for slot := from; slot <= to; slot++ {
+		if blocksForSlot, err := s.Blocks(slot); err != nil {
+			s.errorHandler(ierrors.Wrapf(err, "failed to clear blocks at slot %d", slot))
+		} else if err = blocksForSlot.Clear(); err != nil {
+			s.errorHandler(ierrors.Wrapf(err, "failed to clear blocks at slot %d", slot))
+		}
+	}
 }
 
 func (s *Storage) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {

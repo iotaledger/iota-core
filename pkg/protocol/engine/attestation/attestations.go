@@ -24,6 +24,8 @@ type Attestations interface {
 	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error)
 	Rollback(index iotago.SlotIndex) (err error)
 
+	ClearCache(from, to iotago.SlotIndex)
+
 	RestoreFromDisk() (err error)
 
 	module.Interface

@@ -239,7 +239,16 @@ func (e *Engine) Restart() {
 
 	e.Workers.WaitChildren()
 
-	e.MaxSeenSlot.Set(e.Storage.Settings().LatestCommitment().Slot())
+	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
+	latestSeenSlot := e.MaxSeenSlot.Get()
+
+	e.BlockRequester.Clear()
+	e.EvictionState.ClearRootBlocks(latestCommittedSlot + 1)
+	e.Storage.ClearBlocks(latestCommittedSlot+1, latestSeenSlot)
+	e.Attestations.ClearCache(latestCommittedSlot+1, latestSeenSlot)
+	e.Ledger.ClearCache(latestCommittedSlot+1, latestSeenSlot)
+
+	e.MaxSeenSlot.Set(latestCommittedSlot)
 }
 
 func (e *Engine) Shutdown() {
@@ -432,18 +441,6 @@ func (e *Engine) acceptanceHandler() {
 func (e *Engine) setupBlockStorage() {
 	wp := e.Workers.CreatePool("BlockStorage", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
 
-	e.MaxSeenSlot.OnUpdate(func(oldMaxSeenSlot, newMaxSeenSlot iotago.SlotIndex) {
-		if newMaxSeenSlot < oldMaxSeenSlot {
-			for slot := newMaxSeenSlot + 1; slot <= oldMaxSeenSlot; slot++ {
-				if blocksForSlot, err := e.Storage.Blocks(slot); err != nil {
-					e.errorHandler(ierrors.Wrapf(err, "failed to prune storage at slot %d", slot))
-				} else if err = blocksForSlot.Clear(); err != nil {
-					e.errorHandler(ierrors.Wrapf(err, "failed to prune storage at slot %d", slot))
-				}
-			}
-		}
-	})
-
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		store, err := e.Storage.Blocks(block.ID().Slot())
 		if err != nil {
@@ -497,12 +494,6 @@ func (e *Engine) setupBlockRequester() {
 	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
 		e.BlockRequester.StopTicker(block.ID())
 	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", workerpool.WithWorkerCount(1)))) // Using just 1 worker to avoid contention
-
-	e.MaxSeenSlot.OnUpdate(func(oldMaxSeenSlot, newMaxSeenSlot iotago.SlotIndex) {
-		if newMaxSeenSlot < oldMaxSeenSlot {
-			e.BlockRequester.Clear()
-		}
-	})
 }
 
 func (e *Engine) setupPruning() {
