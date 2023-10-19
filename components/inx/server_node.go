@@ -15,7 +15,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 	finalizedCommitmentID := iotago.EmptyCommitmentID
 	// HasPruned is false when a node just started from a snapshot and keeps data of the LastPrunedEpoch, thus still need
 	// to send finalized commitment.
-	if !status.HasPruned || status.LatestFinalizedSlot > deps.Protocol.CurrentAPI().TimeProvider().EpochEnd(status.LastPrunedEpoch) {
+	if !status.HasPruned || status.LatestFinalizedSlot > deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(status.LastPrunedEpoch) {
 		finalizedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(status.LatestFinalizedSlot)
 		if err != nil {
 			return nil

@@ -45,13 +45,15 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	apiForSlot := m.apiProvider.APIForSlot(currentSlot)
+
 	mana, exists := m.manaVectorCache.Get(accountID)
 	if !exists || mana.UpdateTime() > currentSlot {
 		output, err := m.accountOutputResolveFunc(accountID, currentSlot)
 		if err != nil {
 			return 0, ierrors.Errorf("failed to resolve AccountOutput for %s in slot %s: %w", accountID, currentSlot, err)
 		}
-		minDeposit, err := m.apiProvider.CurrentAPI().StorageScoreStructure().MinDeposit(output.Output())
+		minDeposit, err := apiForSlot.StorageScoreStructure().MinDeposit(output.Output())
 		if err != nil {
 			return 0, ierrors.Errorf("failed to get min deposit for %s: %w", accountID, err)
 		}
@@ -60,7 +62,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 			excessBaseTokens = 0
 		}
 
-		decayedBIC, err := m.getDecayedBIC(accountID, currentSlot)
+		decayedBIC, err := m.getDecayedBIC(accountID, currentSlot, apiForSlot)
 		if err != nil {
 			return 0, ierrors.Wrapf(err, "failed to get decayed BIC for %s", accountID)
 		}
@@ -80,7 +82,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		return mana.Value(), nil
 	}
 
-	manaDecayProvider := m.apiProvider.CurrentAPI().ManaDecayProvider()
+	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	// apply decay to stored, allotted and potential that was added on last update
 	manaStored, err := manaDecayProvider.ManaWithDecay(mana.Value(), mana.UpdateTime(), currentSlot)
 	if err != nil {
@@ -98,7 +100,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		return 0, ierrors.Wrapf(err, "overflow when adding stored and potential mana for account %s", accountID)
 	}
 
-	decayedBIC, err := m.getDecayedBIC(accountID, currentSlot)
+	decayedBIC, err := m.getDecayedBIC(accountID, currentSlot, apiForSlot)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to get decayed BIC for %s", accountID)
 	}
@@ -116,6 +118,8 @@ func (m *Manager) ApplyDiff(slot iotago.SlotIndex, destroyedAccounts ds.Set[iota
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	apiForSlot := m.apiProvider.APIForSlot(slot)
+
 	destroyedAccounts.Range(func(accountID iotago.AccountID) {
 		m.manaVectorCache.Remove(accountID)
 	})
@@ -127,14 +131,14 @@ func (m *Manager) ApplyDiff(slot iotago.SlotIndex, destroyedAccounts ds.Set[iota
 			var storedMana iotago.Mana
 			var err error
 			if output, has := accountOutputs[accountID]; has {
-				minDeposit := lo.PanicOnErr(m.apiProvider.CurrentAPI().StorageScoreStructure().MinDeposit(output.Output()))
+				minDeposit := lo.PanicOnErr(apiForSlot.StorageScoreStructure().MinDeposit(output.Output()))
 				excessBaseTokens, err = safemath.SafeSub(output.BaseTokenAmount(), minDeposit)
 				if err != nil {
 					excessBaseTokens = 0
 				}
 				storedMana = output.StoredMana()
 			}
-			decayedBIC, err := m.getDecayedBIC(accountID, slot)
+			decayedBIC, err := m.getDecayedBIC(accountID, slot, apiForSlot)
 			if err != nil {
 				return err
 			}
@@ -150,7 +154,7 @@ func (m *Manager) ApplyDiff(slot iotago.SlotIndex, destroyedAccounts ds.Set[iota
 	return nil
 }
 
-func (m *Manager) getDecayedBIC(accountID iotago.AccountID, slot iotago.SlotIndex) (iotago.Mana, error) {
+func (m *Manager) getDecayedBIC(accountID iotago.AccountID, slot iotago.SlotIndex, apiForSlot iotago.API) (iotago.Mana, error) {
 	accountBIC, exists, err := m.accountRetrieveFunc(accountID, slot)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to retrieve account data for %s in slot %s", accountID, slot)
@@ -161,7 +165,7 @@ func (m *Manager) getDecayedBIC(accountID iotago.AccountID, slot iotago.SlotInde
 	if accountBIC.Credits.Value <= 0 {
 		return 0, nil
 	}
-	decayedBIC, err := m.apiProvider.CurrentAPI().ManaDecayProvider().ManaWithDecay(iotago.Mana(accountBIC.Credits.Value), accountBIC.Credits.UpdateTime, slot)
+	decayedBIC, err := apiForSlot.ManaDecayProvider().ManaWithDecay(iotago.Mana(accountBIC.Credits.Value), accountBIC.Credits.UpdateTime, slot)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to apply mana decay for account %s", accountID)
 	}
