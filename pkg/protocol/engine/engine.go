@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
@@ -74,9 +73,8 @@ type Engine struct {
 
 	BlockCache *blocks.Blocks
 
-	chainID      iotago.CommitmentID
-	mutex        syncutils.RWMutex
-	restartMutex sync.RWMutex
+	chainID iotago.CommitmentID
+	mutex   syncutils.RWMutex
 
 	optsSnapshotPath     string
 	optsEntryPointsDepth int
@@ -221,9 +219,6 @@ func New(
 }
 
 func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
-	e.restartMutex.RLock()
-	defer e.restartMutex.RUnlock()
-
 	e.MaxSeenSlot.Compute(func(maxCachedSlot iotago.SlotIndex) iotago.SlotIndex {
 		return max(maxCachedSlot, block.ID().Slot())
 	})
@@ -234,22 +229,23 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 
 // Restart restarts the engine by resetting it to the state of the latest commitment.
 func (e *Engine) Restart() {
-	e.restartMutex.Lock()
-	defer e.restartMutex.Unlock()
+	e.MaxSeenSlot.Compute(func(currentValue iotago.SlotIndex) iotago.SlotIndex {
+		e.Workers.WaitChildren()
 
-	e.Workers.WaitChildren()
+		latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
+		commitmentTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
+		latestSeenSlot := e.MaxSeenSlot.Get()
 
-	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
-	latestSeenSlot := e.MaxSeenSlot.Get()
+		e.BlockRequester.Clear()
+		e.EvictionState.ClearRootBlocks(latestCommittedSlot + 1)
+		e.Storage.ClearBlocks(latestCommittedSlot+1, latestSeenSlot)
+		e.Notarization.ClearCache(latestCommittedSlot+1, latestSeenSlot)
+		e.Attestations.ClearCache(latestCommittedSlot+1, latestSeenSlot)
+		e.Ledger.ClearCache(latestCommittedSlot+1, latestSeenSlot)
+		e.Clock.Reset(commitmentTime)
 
-	e.BlockRequester.Clear()
-	e.EvictionState.ClearRootBlocks(latestCommittedSlot + 1)
-	e.Storage.ClearBlocks(latestCommittedSlot+1, latestSeenSlot)
-	e.Notarization.ClearCache(latestCommittedSlot+1, latestSeenSlot)
-	e.Attestations.ClearCache(latestCommittedSlot+1, latestSeenSlot)
-	e.Ledger.ClearCache(latestCommittedSlot+1, latestSeenSlot)
-
-	e.MaxSeenSlot.Set(latestCommittedSlot)
+		return latestCommittedSlot
+	})
 }
 
 func (e *Engine) Shutdown() {
