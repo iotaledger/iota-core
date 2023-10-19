@@ -76,7 +76,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 					// so the committee should be available in the performance manager.
 					e.HookInitialized(func() {
 						// Mark the committee for the last committed slot as active.
-						currentEpoch := e.CurrentAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
+						currentEpoch := e.CommittedAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
 						err := o.seatManager.InitializeCommittee(currentEpoch, e.Clock.Accepted().RelativeTime())
 						if err != nil {
 							panic(ierrors.Wrap(err, "error while initializing committee"))
@@ -218,7 +218,7 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		return iotago.Identifier{}, ierrors.Wrapf(err, "committee for an epoch %d not found", targetCommitteeEpoch)
 	}
 
-	committeeTree := ads.NewSet(
+	committeeTree := ads.NewSet[iotago.Identifier](
 		mapdb.NewMapDB(),
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
@@ -237,7 +237,7 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		return iotago.Identifier{}, innerErr
 	}
 
-	return iotago.Identifier(committeeTree.Root()), nil
+	return committeeTree.Root(), nil
 }
 
 func (o *SybilProtection) SeatManager() seatmanager.SeatManager {

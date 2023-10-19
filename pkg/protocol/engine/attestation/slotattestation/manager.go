@@ -130,7 +130,7 @@ func (m *Manager) Get(slot iotago.SlotIndex) (attestations []*iotago.Attestation
 
 // GetMap returns the attestations that are included in the commitment of the given slot as ds.AuthenticatedMap.
 // If attestationCommitmentOffset=3 and commitment is 10, then the returned attestations are blocks from 7 to 10 that commit to at least 7.
-func (m *Manager) GetMap(slot iotago.SlotIndex) (ads.Map[iotago.AccountID, *iotago.Attestation], error) {
+func (m *Manager) GetMap(slot iotago.SlotIndex) (ads.Map[iotago.Identifier, iotago.AccountID, *iotago.Attestation], error) {
 	m.commitmentMutex.RLock()
 	defer m.commitmentMutex.RUnlock()
 
@@ -272,7 +272,7 @@ func (m *Manager) Commit(slot iotago.SlotIndex) (newCW uint64, attestationsRoot 
 
 	m.lastCommittedSlot = slot
 
-	return m.lastCumulativeWeight, iotago.Identifier(tree.Root()), nil
+	return m.lastCumulativeWeight, tree.Root(), nil
 }
 
 // Rollback rolls back the component state as if the last committed slot was targetSlot.

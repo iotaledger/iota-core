@@ -30,7 +30,7 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	protocolParametersHash, err := deps.Protocol.CurrentAPI().ProtocolParameters().Hash()
+	protocolParametersHash, err := deps.Protocol.CommittedAPI().ProtocolParameters().Hash()
 	if err != nil {
 		Component.LogWarnf("failed to get protocol parameters hash: %s", err.Error())
 
@@ -39,7 +39,7 @@ func issueValidatorBlock(ctx context.Context) {
 
 	parents := engineInstance.TipSelection.SelectTips(iotago.BlockTypeValidationMaxParents)
 
-	addressableCommitment, err := getAddressableCommitment(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime))
+	addressableCommitment, err := getAddressableCommitment(deps.Protocol.CommittedAPI().TimeProvider().SlotFromTime(blockIssuingTime))
 	if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
 		commitment, parentID, reviveChainErr := reviveChain(blockIssuingTime)
 		if reviveChainErr != nil {
@@ -57,7 +57,7 @@ func issueValidatorBlock(ctx context.Context) {
 	}
 
 	// create the validation block here using the validation block builder from iota.go
-	validationBlock, err := builder.NewValidationBlockBuilder(deps.Protocol.CurrentAPI()).
+	validationBlock, err := builder.NewValidationBlockBuilder(deps.Protocol.CommittedAPI()).
 		IssuingTime(blockIssuingTime).
 		ProtocolParametersHash(protocolParametersHash).
 		SlotCommitmentID(addressableCommitment.MustID()).
@@ -81,7 +81,7 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	blockSlot := deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(blockIssuingTime)
+	blockSlot := deps.Protocol.CommittedAPI().TimeProvider().SlotFromTime(blockIssuingTime)
 	committee, exists := engineInstance.SybilProtection.SeatManager().CommitteeInSlot(blockSlot)
 	if !exists {
 		Component.LogWarnf("committee for slot %d not selected: %s", blockSlot, err.Error())
@@ -143,7 +143,7 @@ func reviveChain(issuingTime time.Time) (*iotago.Commitment, iotago.BlockID, err
 }
 
 func getAddressableCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
-	protoParams := deps.Protocol.CurrentAPI().ProtocolParameters()
+	protoParams := deps.Protocol.CommittedAPI().ProtocolParameters()
 	commitment := deps.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 
 	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {

@@ -21,7 +21,7 @@ type StateDiff struct {
 
 	stateUsageCounters *shrinkingmap.ShrinkingMap[mempool.StateID, int]
 
-	mutations ads.Set[iotago.TransactionID]
+	mutations ads.Set[iotago.Identifier, iotago.TransactionID]
 }
 
 func NewStateDiff(slot iotago.SlotIndex, kv kvstore.KVStore) *StateDiff {
@@ -31,7 +31,7 @@ func NewStateDiff(slot iotago.SlotIndex, kv kvstore.KVStore) *StateDiff {
 		createdOutputs:       shrinkingmap.New[mempool.StateID, mempool.StateMetadata](),
 		executedTransactions: orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata](),
 		stateUsageCounters:   shrinkingmap.New[mempool.StateID, int](),
-		mutations:            ads.NewSet(kv, iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes),
+		mutations:            ads.NewSet[iotago.Identifier](kv, iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes),
 	}
 }
 
@@ -51,7 +51,7 @@ func (s *StateDiff) ExecutedTransactions() *orderedmap.OrderedMap[iotago.Transac
 	return s.executedTransactions
 }
 
-func (s *StateDiff) Mutations() ads.Set[iotago.TransactionID] {
+func (s *StateDiff) Mutations() ads.Set[iotago.Identifier, iotago.TransactionID] {
 	return s.mutations
 }
 

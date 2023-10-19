@@ -273,7 +273,7 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 
 	// The version should be upgraded. We're adding the version to the settings.
 	// Effectively, this is a soft fork as it is contained in the hash of protocol parameters and versions.
-	if err := o.setProtocolParametersEpochMappingFunc(versionAndHashTobeUpgraded.Version, versionAndHashTobeUpgraded.Hash, currentEpoch+iotago.EpochIndex(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().ActivationOffset)); err != nil {
+	if err := o.setProtocolParametersEpochMappingFunc(versionAndHashTobeUpgraded.Version, versionAndHashTobeUpgraded.Hash, currentEpoch+iotago.EpochIndex(o.apiProvider.APIForEpoch(currentEpoch).ProtocolParameters().VersionSignaling().ActivationOffset)); err != nil {
 		o.errorHandler(ierrors.Wrap(err, "failed to set protocol parameters epoch mapping"))
 		return
 	}
@@ -295,7 +295,9 @@ func (o *Orchestrator) maxVersionByCount(versionSupporters map[model.VersionAndH
 func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex) (model.VersionAndHash, bool) {
 	epochVersions := make(map[model.VersionAndHash]int)
 
-	for epoch := o.signalingWindowStart(currentEpoch); epoch <= currentEpoch; epoch++ {
+	apiForEpoch := o.apiProvider.APIForEpoch(currentEpoch)
+
+	for epoch := o.signalingWindowStart(currentEpoch, apiForEpoch); epoch <= currentEpoch; epoch++ {
 		version, err := o.decidedUpgradeSignals.Load(epoch)
 		if err != nil {
 			o.errorHandler(ierrors.Wrapf(err, "failed to get permanent upgrade signals for epoch %d in %d", epoch, currentEpoch))
@@ -314,15 +316,15 @@ func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex)
 	versionMostSignaled, signaledCount := o.maxVersionByCount(epochVersions)
 
 	// Check whether the signaling window threshold is reached.
-	if signaledCount < int(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().WindowTargetRatio) {
+	if signaledCount < int(apiForEpoch.ProtocolParameters().VersionSignaling().WindowTargetRatio) {
 		return model.VersionAndHash{}, false
 	}
 
 	return versionMostSignaled, true
 }
 
-func (o *Orchestrator) signalingWindowStart(epoch iotago.EpochIndex) iotago.EpochIndex {
-	windowSize := iotago.EpochIndex(o.apiProvider.CurrentAPI().ProtocolParameters().VersionSignaling().WindowSize)
+func (o *Orchestrator) signalingWindowStart(epoch iotago.EpochIndex, api iotago.API) iotago.EpochIndex {
+	windowSize := iotago.EpochIndex(api.ProtocolParameters().VersionSignaling().WindowSize)
 
 	if epoch < windowSize {
 		return 0

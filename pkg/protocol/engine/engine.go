@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
@@ -216,8 +217,8 @@ func New(
 }
 
 func (e *Engine) Shutdown() {
-	if !e.WasStopped() {
-		e.TriggerStopped()
+	if !e.WasShutdown() {
+		e.TriggerShutdown()
 
 		e.BlockRequester.Shutdown()
 		e.Attestations.Shutdown()
@@ -236,8 +237,10 @@ func (e *Engine) Shutdown() {
 		e.CommitmentFilter.Shutdown()
 		e.Scheduler.Shutdown()
 		e.Retainer.Shutdown()
-		e.Storage.Shutdown()
 		e.Workers.Shutdown()
+		e.Storage.Shutdown()
+
+		e.TriggerStopped()
 	}
 }
 
@@ -273,6 +276,14 @@ func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	return modelBlock, modelBlock != nil
 }
 
+func (e *Engine) CommittedAPI() iotago.API {
+	return e.Storage.Settings().APIProvider().CommittedAPI()
+}
+
+func (e *Engine) APIForTime(t time.Time) iotago.API {
+	return e.Storage.Settings().APIProvider().APIForTime(t)
+}
+
 func (e *Engine) APIForSlot(slot iotago.SlotIndex) iotago.API {
 	return e.Storage.Settings().APIProvider().APIForSlot(slot)
 }
@@ -289,10 +300,6 @@ func (e *Engine) LatestAPI() iotago.API {
 	return e.Storage.Settings().APIProvider().LatestAPI()
 }
 
-func (e *Engine) CurrentAPI() iotago.API {
-	return e.Storage.Settings().APIProvider().CurrentAPI()
-}
-
 // CommittedSlot returns the committed slot for the given slot index.
 func (e *Engine) CommittedSlot(commitmentID iotago.CommitmentID) (*CommittedSlotAPI, error) {
 	if e.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
@@ -305,7 +312,7 @@ func (e *Engine) CommittedSlot(commitmentID iotago.CommitmentID) (*CommittedSlot
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
 	if len(targetSlot) == 0 {
 		targetSlot = append(targetSlot, e.Storage.Settings().LatestCommitment().Slot())
-	} else if lastPrunedEpoch, hasPruned := e.Storage.LastPrunedEpoch(); hasPruned && e.CurrentAPI().TimeProvider().EpochFromSlot(targetSlot[0]) <= lastPrunedEpoch {
+	} else if lastPrunedEpoch, hasPruned := e.Storage.LastPrunedEpoch(); hasPruned && e.APIForSlot(targetSlot[0]).TimeProvider().EpochFromSlot(targetSlot[0]) <= lastPrunedEpoch {
 		return ierrors.Errorf("impossible to create a snapshot for slot %d because it is pruned (last pruned slot %d)", targetSlot[0], lo.Return1(e.Storage.LastPrunedEpoch()))
 	}
 

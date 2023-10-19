@@ -66,7 +66,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			})
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 				// when the last slot of an epoch is committed, remove the queues of validators that are no longer in the committee.
-				if e.CurrentAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
+				if s.apiProvider.CommittedAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
 					s.bufferMutex.Lock()
 					defer s.bufferMutex.Unlock()
 
@@ -194,7 +194,7 @@ func (s *Scheduler) ValidatorBufferSize() int {
 
 // MaxBufferSize returns the max buffer size of the Scheduler as block count.
 func (s *Scheduler) MaxBufferSize() int {
-	return int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize)
+	return int(s.apiProvider.CommittedAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize)
 }
 
 // ReadyBlocksCount returns the number of ready blocks.
@@ -215,7 +215,7 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 	}
 	work := iotago.WorkScore(0)
 	// if no specific block(s) is provided, assume max block size
-	currentAPI := s.apiProvider.CurrentAPI()
+	currentAPI := s.apiProvider.CommittedAPI()
 	if len(blocks) == 0 {
 		work = currentAPI.MaxBlockWork()
 	}
@@ -270,7 +270,7 @@ func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
 
 			return quantum
 		},
-		int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize),
+		int(s.apiProvider.CommittedAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize),
 	)
 	// error submitting indicates that the block was already submitted so we do nothing else.
 	if !submitted {
@@ -294,7 +294,7 @@ func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
 	if !exists {
 		s.addValidator(block.ProtocolBlock().IssuerID)
 	}
-	droppedBlock, submitted := s.validatorBuffer.Submit(block, int(s.apiProvider.CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize))
+	droppedBlock, submitted := s.validatorBuffer.Submit(block, int(s.apiProvider.CommittedAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize))
 	if !submitted {
 		return
 	}
@@ -319,7 +319,7 @@ loop:
 			break loop
 		// when a block is pushed by the buffer
 		case blockToSchedule = <-s.basicBuffer.blockChan:
-			currentAPI := s.apiProvider.CurrentAPI()
+			currentAPI := s.apiProvider.CommittedAPI()
 			rate := currentAPI.ProtocolParameters().CongestionControlParameters().SchedulerRate
 			if waitTime := s.basicBuffer.waitTime(float64(rate), blockToSchedule); waitTime > 0 {
 				timer := time.NewTimer(waitTime)
@@ -342,7 +342,7 @@ loop:
 			break loop
 		// when a block is pushed by this validator queue.
 		case blockToSchedule = <-validatorQueue.blockChan:
-			currentAPI := s.apiProvider.CurrentAPI()
+			currentAPI := s.apiProvider.CommittedAPI()
 			validationBlocksPerSlot := float64(currentAPI.ProtocolParameters().ValidationBlocksPerSlot())
 			rate := validationBlocksPerSlot / float64(currentAPI.TimeProvider().SlotDurationSeconds())
 			if waitTime := validatorQueue.waitTime(rate); waitTime > 0 {
@@ -488,7 +488,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slot iotago.SlotIndex) (Def
 		var issuerRemoved bool
 
 		for block != nil && time.Now().After(block.IssuingTime()) {
-			currentAPI := s.apiProvider.CurrentAPI()
+			currentAPI := s.apiProvider.CommittedAPI()
 			if block.IsAccepted() && time.Since(block.IssuingTime()) > time.Duration(currentAPI.TimeProvider().SlotDurationSeconds()*int64(currentAPI.ProtocolParameters().MaxCommittableAge())) {
 				if block.SetSkipped() {
 					s.updateChildrenWithoutLocking(block)
@@ -702,7 +702,7 @@ func (s *Scheduler) maxDeficit() Deficit {
 
 func (s *Scheduler) deficitFromWork(work iotago.WorkScore) Deficit {
 	// max workscore block should occupy the full range of the deficit
-	deficitScaleFactor := s.maxDeficit() / Deficit(s.apiProvider.CurrentAPI().MaxBlockWork())
+	deficitScaleFactor := s.maxDeficit() / Deficit(s.apiProvider.CommittedAPI().MaxBlockWork())
 	return Deficit(work) * deficitScaleFactor
 }
 

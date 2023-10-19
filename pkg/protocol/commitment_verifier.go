@@ -32,7 +32,7 @@ func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBefore
 
 func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
 	// 1. Verify that the provided attestations are indeed the ones that were included in the commitment.
-	tree := ads.NewMap(mapdb.NewMapDB(),
+	tree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(),
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
 		func(attestation *iotago.Attestation) ([]byte, error) {
@@ -65,7 +65,7 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 			return nil, 0, ierrors.Wrapf(err, "failed to set attestation for issuerID %s", att.IssuerID)
 		}
 	}
-	if !iotago.VerifyProof(merkleProof, iotago.Identifier(tree.Root()), commitment.RootsID()) {
+	if !iotago.VerifyProof(merkleProof, tree.Root(), commitment.RootsID()) {
 		return nil, 0, ierrors.Errorf("invalid merkle proof for attestations for commitment %s", commitment.ID())
 	}
 
