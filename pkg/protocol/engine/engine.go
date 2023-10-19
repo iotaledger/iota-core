@@ -66,7 +66,7 @@ type Engine struct {
 	Retainer            retainer.Retainer
 	SyncManager         syncmanager.SyncManager
 	UpgradeOrchestrator upgrade.Orchestrator
-	MaxSeenSlot         reactive.Variable[iotago.SlotIndex]
+	MaxProcessedSlot    reactive.Variable[iotago.SlotIndex]
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -113,12 +113,12 @@ func New(
 
 	return options.Apply(
 		&Engine{
-			Events:        NewEvents(),
-			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
-			MaxSeenSlot:   reactive.NewVariable[iotago.SlotIndex](),
-			Workers:       workers,
-			errorHandler:  errorHandler,
+			Events:           NewEvents(),
+			Storage:          storageInstance,
+			EvictionState:    eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
+			MaxProcessedSlot: reactive.NewVariable[iotago.SlotIndex](),
+			Workers:          workers,
+			errorHandler:     errorHandler,
 
 			optsSnapshotPath:  "snapshot.bin",
 			optsSnapshotDepth: 5,
@@ -219,7 +219,7 @@ func New(
 }
 
 func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
-	e.MaxSeenSlot.Compute(func(maxCachedSlot iotago.SlotIndex) iotago.SlotIndex {
+	e.MaxProcessedSlot.Compute(func(maxCachedSlot iotago.SlotIndex) iotago.SlotIndex {
 		return max(maxCachedSlot, block.ID().Slot())
 	})
 
@@ -229,12 +229,10 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 
 // Restart restarts the engine by resetting it to the state of the latest commitment.
 func (e *Engine) Restart() {
-	e.MaxSeenSlot.Compute(func(currentValue iotago.SlotIndex) iotago.SlotIndex {
+	e.MaxProcessedSlot.Compute(func(latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
 		e.Workers.WaitChildren()
 
 		latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
-		commitmentTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
-		latestSeenSlot := e.MaxSeenSlot.Get()
 
 		e.BlockRequester.Clear()
 		e.EvictionState.ClearRootBlocks(latestCommittedSlot + 1)
@@ -242,7 +240,7 @@ func (e *Engine) Restart() {
 		e.Notarization.ClearCache(latestCommittedSlot+1, latestSeenSlot)
 		e.Attestations.ClearCache(latestCommittedSlot+1, latestSeenSlot)
 		e.Ledger.ClearCache(latestCommittedSlot+1, latestSeenSlot)
-		e.Clock.Reset(commitmentTime)
+		e.Clock.Reset(e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot))
 
 		return latestCommittedSlot
 	})
