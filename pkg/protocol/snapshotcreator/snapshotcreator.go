@@ -131,17 +131,17 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	}
 	genesisTransactionOutputs = append(genesisTransactionOutputs, genesisOutput)
 
-	genesisBasicOutputs, err := createGenesisBasicOutputs(api, opt.BasicOutputs)
-	if err != nil {
-		return ierrors.Wrap(err, "failed to create genesis basic outputs")
-	}
-	genesisTransactionOutputs = append(genesisTransactionOutputs, genesisBasicOutputs...)
-
 	accountOutputs, err := createGenesisAccounts(api, opt.Accounts)
 	if err != nil {
 		return ierrors.Wrap(err, "failed to create genesis account outputs")
 	}
 	genesisTransactionOutputs = append(genesisTransactionOutputs, accountOutputs...)
+
+	genesisBasicOutputs, err := createGenesisBasicOutputs(api, opt.BasicOutputs)
+	if err != nil {
+		return ierrors.Wrap(err, "failed to create genesis basic outputs")
+	}
+	genesisTransactionOutputs = append(genesisTransactionOutputs, genesisBasicOutputs...)
 
 	var accountLedgerOutputs utxoledger.Outputs
 	for idx, output := range genesisTransactionOutputs {
