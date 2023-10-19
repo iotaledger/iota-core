@@ -9,6 +9,7 @@ replace github.com/iotaledger/iota-core/tools/genesis-snapshot => ../genesis-sna
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/ethereum/go-ethereum v1.13.4
+	github.com/google/martian v2.1.0+incompatible
 	github.com/iotaledger/hive.go/app v0.0.0-20231019082730-54e1c06ab9c2
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231019082730-54e1c06ab9c2
 	github.com/iotaledger/hive.go/ds v0.0.0-20231019082730-54e1c06ab9c2
@@ -18,7 +19,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20231019082730-54e1c06ab9c2
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231019103309-47202790708b
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231019112751-e9872df31648
 	github.com/mr-tron/base58 v1.2.0
 	go.uber.org/atomic v1.11.0
 )
