@@ -52,7 +52,7 @@ func NewTransactionFramework(t *testing.T, protocol *protocol.Protocol, genesisS
 }
 
 func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.Transaction) {
-	currentAPI := t.apiProvider.CurrentAPI()
+	currentAPI := t.apiProvider.CommittedAPI()
 	(lo.PanicOnErr(transaction.ID())).RegisterAlias(alias)
 
 	t.transactions[alias] = transaction
@@ -77,7 +77,7 @@ func (t *TransactionFramework) RegisterSignedTransaction(alias string, signedTra
 }
 
 func (t *TransactionFramework) CreateSignedTransactionWithOptions(alias string, signingWallet *mock.Wallet, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
-	currentAPI := t.apiProvider.CurrentAPI()
+	currentAPI := t.apiProvider.CommittedAPI()
 
 	txBuilder := builder.NewTransactionBuilder(currentAPI)
 	txBuilder.WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything()))

@@ -17,7 +17,7 @@ func (t *Tracker) RewardsRoot(epoch iotago.EpochIndex) (iotago.Identifier, error
 		return iotago.Identifier{}, err
 	}
 
-	return iotago.Identifier(m.Root()), nil
+	return m.Root(), nil
 }
 
 func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
@@ -188,13 +188,13 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 	return delegatorsReward, epochStart, epochEnd, nil
 }
 
-func (t *Tracker) rewardsMap(epoch iotago.EpochIndex) (ads.Map[iotago.AccountID, *model.PoolRewards], error) {
+func (t *Tracker) rewardsMap(epoch iotago.EpochIndex) (ads.Map[iotago.Identifier, iotago.AccountID, *model.PoolRewards], error) {
 	kv, err := t.rewardsStorePerEpochFunc(epoch)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get rewards store for epoch %d", epoch)
 	}
 
-	return ads.NewMap(kv,
+	return ads.NewMap[iotago.Identifier](kv,
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
 		(*model.PoolRewards).Bytes,
@@ -239,7 +239,7 @@ func (t *Tracker) poolReward(slot iotago.SlotIndex, totalValidatorsStake, totalS
 		return 0, ierrors.Wrapf(err, "failed to calculate pool reward without fixed costs due to overflow for slot %d", slot)
 	}
 
-	result, err = safemath.SafeDiv(scaledPoolReward, uint64(params.RewardsParameters().ValidatorBlocksPerSlot))
+	result, err = safemath.SafeDiv(scaledPoolReward, uint64(params.ValidationBlocksPerSlot()))
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate result reward due division by zero for slot %d", slot)
 	}

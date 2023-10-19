@@ -54,14 +54,13 @@ const (
 // Not mandatory options, if not provided spammer will use default settings:
 // WithSpamDetails, WithEvilWallet, WithErrorCounter, WithLogTickerInterval.
 type Spammer struct {
-	SpamDetails     *SpamDetails
-	State           *State
-	UseRateSetter   bool
-	SpamType        SpamType
-	Clients         models.Connector
-	EvilWallet      *evilwallet.EvilWallet
-	EvilScenario    *evilwallet.EvilScenario
-	IdentityManager *IdentityManager
+	SpamDetails   *SpamDetails
+	State         *State
+	UseRateSetter bool
+	SpamType      SpamType
+	Clients       models.Connector
+	EvilWallet    *evilwallet.EvilWallet
+	EvilScenario  *evilwallet.EvilScenario
 	// CommitmentManager *CommitmentManager
 	ErrCounter  *ErrorCounter
 	IssuerAlias string
@@ -89,12 +88,11 @@ func NewSpammer(options ...Options) *Spammer {
 		logTickTime:   time.Second * 30,
 	}
 	s := &Spammer{
-		SpamDetails:     &SpamDetails{},
-		spamFunc:        CustomConflictSpammingFunc,
-		State:           state,
-		SpamType:        SpamEvilWallet,
-		EvilScenario:    evilwallet.NewEvilScenario(),
-		IdentityManager: NewIdentityManager(),
+		SpamDetails:  &SpamDetails{},
+		spamFunc:     CustomConflictSpammingFunc,
+		State:        state,
+		SpamType:     SpamEvilWallet,
+		EvilScenario: evilwallet.NewEvilScenario(),
 		// CommitmentManager: NewCommitmentManager(),
 		UseRateSetter:  true,
 		done:           make(chan bool),
@@ -123,7 +121,6 @@ func (s *Spammer) BatchesPrepared() uint64 {
 func (s *Spammer) setup() {
 	if s.log == nil {
 		s.initLogger()
-		s.IdentityManager.SetLogger(s.log)
 	}
 
 	switch s.SpamType {

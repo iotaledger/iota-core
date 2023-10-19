@@ -79,7 +79,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 						// (according to the latest committed slot), and potentially the next selected
 						// committee if we have one.
 
-						currentEpoch := e.CurrentAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
+						currentEpoch := e.LatestAPI().TimeProvider().EpochFromSlot(e.Storage.Settings().LatestCommitment().Slot())
 
 						committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
 						if !exists {
@@ -194,7 +194,7 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		return iotago.Identifier{}, ierrors.Wrapf(err, "committee for a finished epoch %d not found", targetCommitteeEpoch)
 	}
 
-	committeeTree := ads.NewSet(
+	committeeTree := ads.NewSet[iotago.Identifier](
 		mapdb.NewMapDB(),
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
@@ -213,7 +213,7 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		return iotago.Identifier{}, innerErr
 	}
 
-	return iotago.Identifier(committeeTree.Root()), nil
+	return committeeTree.Root(), nil
 }
 
 func (o *SybilProtection) SeatManager() seatmanager.SeatManager {
