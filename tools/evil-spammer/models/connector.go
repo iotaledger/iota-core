@@ -214,6 +214,10 @@ func (c *WebClient) APIForVersion(version iotago.Version) (iotago.API, error) {
 	return c.client.APIForVersion(version)
 }
 
+func (c *WebClient) APIForTime(t time.Time) iotago.API {
+	return c.client.APIForTime(t)
+}
+
 func (c *WebClient) APIForSlot(index iotago.SlotIndex) iotago.API {
 	return c.client.APIForSlot(index)
 }
@@ -222,8 +226,8 @@ func (c *WebClient) APIForEpoch(index iotago.EpochIndex) iotago.API {
 	return c.client.APIForEpoch(index)
 }
 
-func (c *WebClient) CurrentAPI() iotago.API {
-	return c.client.CurrentAPI()
+func (c *WebClient) CommittedAPI() iotago.API {
+	return c.client.CommittedAPI()
 }
 
 func (c *WebClient) LatestAPI() iotago.API {
@@ -251,7 +255,7 @@ func (c *WebClient) PostBlock(block *iotago.ProtocolBlock) (blockID iotago.Block
 
 // PostData sends the given data (payload) by creating a block in the backend.
 func (c *WebClient) PostData(data []byte) (blkID string, err error) {
-	blockBuilder := builder.NewBasicBlockBuilder(c.client.LatestAPI())
+	blockBuilder := builder.NewBasicBlockBuilder(c.client.CommittedAPI())
 	blockBuilder.IssuingTime(time.Time{})
 
 	blockBuilder.Payload(&iotago.TaggedData{

@@ -15,8 +15,11 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-var ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
-var ErrValidatorNotInCommittee = ierrors.New("validation block issuer is not in the committee")
+var (
+	ErrBlockTimeTooFarAheadInFuture = ierrors.New("a block cannot be too far ahead in the future")
+	ErrValidatorNotInCommittee      = ierrors.New("validation block issuer is not in the committee")
+	ErrInvalidBlockVersion          = ierrors.New("block has invalid protocol version")
+)
 
 // Filter filters blocks.
 type Filter struct {
@@ -63,6 +66,18 @@ func New(apiProvider iotago.APIProvider, opts ...options.Option[Filter]) *Filter
 
 // ProcessReceivedBlock processes block from the given source.
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
+	// Verify the block's version corresponds to the protocol version for the slot.
+	apiForSlot := f.apiProvider.APIForSlot(block.ID().Slot())
+	if apiForSlot.Version() != block.ProtocolBlock().ProtocolVersion {
+		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+			Block:  block,
+			Reason: ierrors.Wrapf(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().ProtocolVersion, apiForSlot.Version(), apiForSlot.TimeProvider().EpochFromSlot(block.ID().Slot())),
+			Source: source,
+		})
+
+		return
+	}
+
 	// Verify the timestamp is not too far in the future.
 	timeDelta := time.Since(block.ProtocolBlock().IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
@@ -76,17 +91,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 	}
 
 	if _, isValidation := block.ValidationBlock(); isValidation {
-		blockAPI, err := f.apiProvider.APIForVersion(block.ProtocolBlock().ProtocolVersion)
-		if err != nil {
-			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
-				Block:  block,
-				Reason: ierrors.Wrapf(err, "could not get API for version %d", block.ProtocolBlock().ProtocolVersion),
-				Source: source,
-			})
-
-			return
-		}
-		blockSlot := blockAPI.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
+		blockSlot := block.ProtocolBlock().API.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
 		if !f.committeeFunc(blockSlot).HasAccount(block.ProtocolBlock().IssuerID) {
 			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 				Block:  block,

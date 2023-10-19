@@ -97,7 +97,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 
 	switch mimeType {
 	case echo.MIMEApplicationJSON:
-		if err := deps.Protocol.CurrentAPI().JSONDecode(bytes, iotaBlock, serix.WithValidation()); err != nil {
+		if err := deps.Protocol.CommittedAPI().JSONDecode(bytes, iotaBlock, serix.WithValidation()); err != nil {
 			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid block, error: %w", err)
 		}
 
