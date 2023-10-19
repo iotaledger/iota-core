@@ -3,7 +3,8 @@ package spammer
 import (
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 )
 
 type Options func(*Spammer)
@@ -60,6 +61,13 @@ func WithSpammingFunc(spammerFunc func(s *Spammer)) Options {
 	}
 }
 
+// WithAccountAlias sets the alias of the account that will be used to pay with mana for sent blocks.
+func WithAccountAlias(alias string) Options {
+	return func(s *Spammer) {
+		s.IssuerAlias = alias
+	}
+}
+
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // region Spammer EvilWallet options ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,14 +93,14 @@ func WithBatchesSent(maxBatchesSent int) Options {
 }
 
 // WithEvilWallet provides evil wallet instance, that will handle all spam logic according to provided EvilScenario.
-func WithEvilWallet(initWallets *wallet.EvilWallet) Options {
+func WithEvilWallet(initWallets *evilwallet.EvilWallet) Options {
 	return func(s *Spammer) {
 		s.EvilWallet = initWallets
 	}
 }
 
 // WithEvilScenario provides initWallet of spammer, if omitted spammer will prepare funds based on maxBlkSent parameter.
-func WithEvilScenario(scenario *wallet.EvilScenario) Options {
+func WithEvilScenario(scenario *evilwallet.EvilScenario) Options {
 	return func(s *Spammer) {
 		s.EvilScenario = scenario
 	}
@@ -118,7 +126,7 @@ func WithNumberOfSpends(n int) Options {
 
 func WithClientURL(clientURL string) Options {
 	return func(s *Spammer) {
-		s.Clients = wallet.NewWebClients([]string{clientURL})
+		s.Clients = models.NewWebClients([]string{clientURL})
 	}
 }
 
@@ -127,13 +135,6 @@ func WithClientURL(clientURL string) Options {
 // 		s.CommitmentManager.Params.ValidClientURL = validClient
 // 	}
 // }
-
-func WithIdentity(alias, privateKey string) Options {
-	return func(s *Spammer) {
-		s.IdentityManager.AddIdentity(privateKey, alias)
-		s.IdentityManager.primaryAlias = alias
-	}
-}
 
 // WithCommitmentType provides commitment type for the spammer, allowed types: fork, valid, random. Enables commitment spam and disables the wallet functionality.
 // func WithCommitmentType(commitmentType string) Options {

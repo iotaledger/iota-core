@@ -119,8 +119,9 @@ func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 	if err := stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		var exportedCount uint64
 
-		currentEpoch := o.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(targetSlot)
-		for epoch := o.signalingWindowStart(currentEpoch); epoch <= currentEpoch; epoch++ {
+		apiForSlot := o.apiProvider.APIForSlot(targetSlot)
+		currentEpoch := apiForSlot.TimeProvider().EpochFromSlot(targetSlot)
+		for epoch := o.signalingWindowStart(currentEpoch, apiForSlot); epoch <= currentEpoch; epoch++ {
 			versionAndHash, err := o.decidedUpgradeSignals.Load(epoch)
 			if err != nil {
 				if err != nil {

@@ -229,7 +229,7 @@ func (p *Protocol) initEngineManager() {
 }
 
 func (p *Protocol) initChainManager() {
-	p.ChainManager = chainmanager.NewManager(p.optsChainManagerOptions...)
+	p.ChainManager = chainmanager.NewManager(p, p.HandleError, p.optsChainManagerOptions...)
 	p.Events.ChainManager.LinkTo(p.ChainManager.Events)
 
 	// This needs to be hooked so that the ChainManager always knows the commitments we issued.
@@ -284,16 +284,20 @@ func (p *Protocol) Network() *core.Protocol {
 	return p.networkProtocol
 }
 
+func (p *Protocol) CommittedAPI() iotago.API {
+	return p.MainEngineInstance().CommittedAPI()
+}
+
 func (p *Protocol) LatestAPI() iotago.API {
 	return p.MainEngineInstance().LatestAPI()
 }
 
-func (p *Protocol) CurrentAPI() iotago.API {
-	return p.MainEngineInstance().CurrentAPI()
-}
-
 func (p *Protocol) APIForVersion(version iotago.Version) (iotago.API, error) {
 	return p.MainEngineInstance().APIForVersion(version)
+}
+
+func (p *Protocol) APIForTime(t time.Time) iotago.API {
+	return p.MainEngineInstance().APIForTime(t)
 }
 
 func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {

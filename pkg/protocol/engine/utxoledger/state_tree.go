@@ -41,11 +41,11 @@ func (s *stateTreeMetadata) Bytes() ([]byte, error) {
 }
 
 func (m *Manager) StateTreeRoot() iotago.Identifier {
-	return iotago.Identifier(m.stateTree.Root())
+	return m.stateTree.Root()
 }
 
 func (m *Manager) CheckStateTree() bool {
-	comparisonTree := ads.NewMap(mapdb.NewMapDB(),
+	comparisonTree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(),
 		iotago.OutputID.Bytes,
 		iotago.OutputIDFromBytes,
 		(*stateTreeMetadata).Bytes,
