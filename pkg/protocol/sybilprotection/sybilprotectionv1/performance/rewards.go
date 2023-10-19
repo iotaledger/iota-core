@@ -239,7 +239,7 @@ func (t *Tracker) poolReward(slot iotago.SlotIndex, totalValidatorsStake, totalS
 		return 0, ierrors.Wrapf(err, "failed to calculate pool reward without fixed costs due to overflow for slot %d", slot)
 	}
 
-	result, err = safemath.SafeDiv(scaledPoolReward, uint64(params.RewardsParameters().ValidatorBlocksPerSlot))
+	result, err = safemath.SafeDiv(scaledPoolReward, uint64(params.ValidationBlocksPerSlot()))
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate result reward due division by zero for slot %d", slot)
 	}

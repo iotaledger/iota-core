@@ -51,7 +51,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, currentSlot iotag
 		if err != nil {
 			return 0, ierrors.Errorf("failed to resolve AccountOutput for %s in slot %s: %w", accountID, currentSlot, err)
 		}
-		minDeposit, err := m.apiProvider.CurrentAPI().RentStructure().MinDeposit(output.Output())
+		minDeposit, err := m.apiProvider.CurrentAPI().StorageScoreStructure().MinDeposit(output.Output())
 		if err != nil {
 			return 0, ierrors.Errorf("failed to get min deposit for %s: %w", accountID, err)
 		}
@@ -127,7 +127,7 @@ func (m *Manager) ApplyDiff(slot iotago.SlotIndex, destroyedAccounts ds.Set[iota
 			var storedMana iotago.Mana
 			var err error
 			if output, has := accountOutputs[accountID]; has {
-				minDeposit := lo.PanicOnErr(m.apiProvider.CurrentAPI().RentStructure().MinDeposit(output.Output()))
+				minDeposit := lo.PanicOnErr(m.apiProvider.CurrentAPI().StorageScoreStructure().MinDeposit(output.Output()))
 				excessBaseTokens, err = safemath.SafeSub(output.BaseTokenAmount(), minDeposit)
 				if err != nil {
 					excessBaseTokens = 0
