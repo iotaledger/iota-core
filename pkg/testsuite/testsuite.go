@@ -29,6 +29,7 @@ import (
 
 const MinIssuerAccountAmount = iotago.BaseToken(372900)
 const MinValidatorAccountAmount = iotago.BaseToken(722800)
+const AccountConversionManaCost = iotago.Mana(1000000)
 
 type TestSuite struct {
 	Testing     *testing.T
@@ -366,7 +367,8 @@ func (t *TestSuite) RemoveNode(name string) {
 }
 
 func (t *TestSuite) AddBasicBlockIssuer(name string, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.BlockIssuer {
-	newBlockIssuer := mock.NewBlockIssuer(t.Testing, name, false)
+	randomSeed := tpkg.RandEd25519Seed()
+	newBlockIssuer := mock.NewBlockIssuer(t.Testing, name, mock.NewKeyManager(randomSeed[:], 0), iotago.EmptyAccountID, false)
 	t.blockIssuers.Set(name, newBlockIssuer)
 	var bic iotago.BlockIssuanceCredits
 	if len(blockIssuanceCredits) == 0 {
@@ -445,7 +447,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 		node.Initialize(failOnBlockFiltered, baseOpts...)
 
 		if t.TransactionFramework == nil {
-			t.TransactionFramework = NewTransactionFramework(t.Testing, node.Protocol, t.genesisSeed[:], t.optsAccounts...)
+			t.TransactionFramework = NewTransactionFramework(t.Testing, node.Protocol, t.genesisSeed[:])
 		}
 
 		return true

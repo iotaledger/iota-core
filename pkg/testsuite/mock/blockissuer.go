@@ -62,13 +62,12 @@ type BlockIssuer struct {
 	optsRateSetterEnabled       bool
 }
 
-func NewBlockIssuer(t *testing.T, name string, validator bool, opts ...options.Option[BlockIssuer]) *BlockIssuer {
-	pub, priv, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		panic(err)
-	}
+func NewBlockIssuer(t *testing.T, name string, keyManager *KeyManager, accountID iotago.AccountID, validator bool, opts ...options.Option[BlockIssuer]) *BlockIssuer {
+	priv, pub := keyManager.KeyPair()
 
-	accountID := iotago.AccountID(blake2b.Sum256(pub))
+	if accountID == iotago.EmptyAccountID {
+		accountID = iotago.AccountID(blake2b.Sum256(pub))
+	}
 	accountID.RegisterAlias(name)
 
 	return options.Apply(&BlockIssuer{

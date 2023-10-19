@@ -2,7 +2,6 @@ package mock
 
 import (
 	"context"
-	"crypto/ed25519"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -29,6 +28,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 // idAliases contains a list of aliases registered for a set of IDs.
@@ -73,10 +73,9 @@ type Node struct {
 }
 
 func NewNode(t *testing.T, net *Network, partition string, name string, validator bool) *Node {
-	pub, priv, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		panic(err)
-	}
+	seed := tpkg.RandEd25519Seed()
+	keyManager := NewKeyManager(seed[:], 0)
+	priv, pub := keyManager.KeyPair()
 
 	accountID := iotago.AccountID(blake2b.Sum256(pub))
 	accountID.RegisterAlias(name)
@@ -86,7 +85,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 	var validatorBlockIssuer *BlockIssuer
 	if validator {
-		validatorBlockIssuer = NewBlockIssuer(t, name, validator)
+		validatorBlockIssuer = NewBlockIssuer(t, name, keyManager, accountID, validator)
 	} else {
 		validatorBlockIssuer = nil
 	}

@@ -32,14 +32,18 @@ func NewWallet(t *testing.T, name string, seed ...[]byte) *Wallet {
 		randomSeed := tpkg.RandEd25519Seed()
 		seed = append(seed, randomSeed[:])
 	}
+	keyManager := NewKeyManager(seed[0], 0)
 
 	return &Wallet{
-		Testing:     t,
-		Name:        name,
-		keyManager:  NewKeyManager(seed[0], 0),
-		BlockIssuer: NewBlockIssuer(t, name, false),
-		outputs:     make([]*utxoledger.Output, 0),
+		Testing:    t,
+		Name:       name,
+		keyManager: keyManager,
+		outputs:    make([]*utxoledger.Output, 0),
 	}
+}
+
+func (w *Wallet) AddBlockIssuer(accountID iotago.AccountID) {
+	w.BlockIssuer = NewBlockIssuer(w.Testing, w.Name, w.keyManager, accountID, false)
 }
 
 func (w *Wallet) BookSpents(spentOutputs []*utxoledger.Output) {

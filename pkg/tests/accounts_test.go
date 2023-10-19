@@ -453,7 +453,6 @@ func Test_ImplicitAccounts(t *testing.T) {
 	// CREATE IMPLICIT ACCOUNT FROM BASIC UTXO
 	newUserWallet := mock.NewWallet(ts.Testing, "newUser")
 	inputForImplicitAccount, outputsForImplicitAccount := ts.TransactionFramework.CreateImplicitAccountFromInput(
-		ts.TransactionFramework.GenesisWallet,
 		newUserWallet.ImplicitAccountCreationAddress(),
 		"Genesis:0",
 	)
@@ -468,6 +467,9 @@ func Test_ImplicitAccounts(t *testing.T) {
 	implicitAccountOutput := ts.TransactionFramework.Output("TX1:0")
 	implicitAccountOutputID := implicitAccountOutput.OutputID()
 	implicitAccountID := iotago.AccountIDFromOutputID(implicitAccountOutputID)
+
+	// register the new implicit account as a block issuer in the wallet
+	newUserWallet.AddBlockIssuer(implicitAccountID)
 
 	var block1Slot iotago.SlotIndex = 1
 
@@ -486,7 +488,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// TRANSITION IMPLICIT ACCOUNT TO ACCOUNT OUTPUT.
-	// TODO: USE IMPLICIT ACCOUNT AS BLOCK ISSUER.
+	// USE IMPLICIT ACCOUNT AS BLOCK ISSUER.
 	fullAccountBlockIssuerKey := utils.RandBlockIssuerKey()
 
 	inputForImplicitAccountTransition, outputsForImplicitAccountTransition := ts.TransactionFramework.TransitionImplicitAccountToAccountOutput(
@@ -496,34 +498,41 @@ func Test_ImplicitAccounts(t *testing.T) {
 			iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
 			iotago.MaxSlotIndex,
 		),
+		testsuite.WithAccountAmount(testsuite.MinIssuerAccountAmount),
 	)
 
-	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithOptions("TX2",
+	block2Slot := latestParent.ID().Index()
+	latestCommitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSignedTransactionWithAllotmentAndOptions("TX2",
 		newUserWallet,
+		block2Slot,
+		implicitAccountID,
 		testsuite.WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
 				AccountID: implicitAccountID,
 			},
 			&iotago.CommitmentInput{
-				CommitmentID: node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+				CommitmentID: latestCommitment.MustID(),
 			},
 		}),
 		testsuite.WithInputs(inputForImplicitAccountTransition),
 		testsuite.WithOutputs(outputsForImplicitAccountTransition),
-		testsuite.WithSlotCreated(block1Slot),
+		testsuite.WithSlotCreated(block2Slot),
 	))
 
-	block2Slot := latestParent.ID().Index()
-
-	block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), blockIssuer, node1, tx2, mock.WithStrongParents(latestParent.ID()))
+	block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+	block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, block2Commitment, newUserWallet.BlockIssuer, node1, tx2, mock.WithStrongParents(latestParent.ID()))
 
 	latestParent = ts.CommitUntilSlot(block2Slot, block2)
 
 	fullAccountOutputID := ts.TransactionFramework.Output("TX2:0").OutputID()
 
+	allotted := iotago.BlockIssuanceCredits(tx2.Transaction.Allotments.Get(implicitAccountID))
+	burned := iotago.BlockIssuanceCredits(block2.WorkScore()) * iotago.BlockIssuanceCredits(block2Commitment.ReferenceManaCost)
+
 	ts.AssertAccountDiff(implicitAccountID, block2Slot, &model.AccountDiff{
-		BICChange:              0,
-		PreviousUpdatedTime:    0,
+		BICChange:              allotted - burned,
+		PreviousUpdatedTime:    block1Slot,
 		NewOutputID:            fullAccountOutputID,
 		PreviousOutputID:       implicitAccountOutputID,
 		PreviousExpirySlot:     iotago.MaxSlotIndex,
@@ -538,7 +547,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              implicitAccountID,
-		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
+		Credits:         accounts.NewBlockIssuanceCredits(allotted-burned, block2Slot),
 		ExpirySlot:      iotago.MaxSlotIndex,
 		OutputID:        fullAccountOutputID,
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(fullAccountBlockIssuerKey),
