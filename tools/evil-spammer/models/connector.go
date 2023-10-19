@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/martian/log"
+
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -51,8 +53,14 @@ type WebClients struct {
 // NewWebClients creates Connector from provided GoShimmerAPI urls.
 func NewWebClients(urls []string, setters ...options.Option[WebClient]) *WebClients {
 	clients := make([]*WebClient, len(urls))
+	var err error
 	for i, url := range urls {
-		clients[i] = NewWebClient(url, setters...)
+		clients[i], err = NewWebClient(url, setters...)
+		if err != nil {
+			log.Errorf("failed to create client for url %s: %s", url, err)
+
+			return nil
+		}
 	}
 
 	return &WebClients{
@@ -134,7 +142,12 @@ func (c *WebClients) AddClient(url string, setters ...options.Option[WebClient])
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	clt := NewWebClient(url, setters...)
+	clt, err := NewWebClient(url, setters...)
+	if err != nil {
+		log.Errorf("failed to create client for url %s: %s", url, err)
+
+		return
+	}
 	c.clients = append(c.clients, clt)
 	c.urls = append(c.urls, url)
 }
@@ -223,12 +236,13 @@ func (c *WebClient) URL() string {
 }
 
 // NewWebClient creates Connector from provided iota-core API urls.
-func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
+func NewWebClient(url string, opts ...options.Option[WebClient]) (*WebClient, error) {
+	var initErr error
 	return options.Apply(&WebClient{
 		url: url,
 	}, opts, func(w *WebClient) {
-		w.client, _ = nodeclient.New(w.url)
-	})
+		w.client, initErr = nodeclient.New(w.url)
+	}), initErr
 }
 
 func (c *WebClient) PostBlock(block *iotago.ProtocolBlock) (blockID iotago.BlockID, err error) {
