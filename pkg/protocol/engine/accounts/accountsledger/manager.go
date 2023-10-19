@@ -35,7 +35,7 @@ type Manager struct {
 
 	// accountsTree represents the Block Issuer data vector for all registered accounts that have a block issuer feature
 	// at the latest committed slot, it is updated on the slot commitment.
-	accountsTree ads.Map[iotago.AccountID, *accounts.AccountData]
+	accountsTree ads.Map[iotago.Identifier, iotago.AccountID, *accounts.AccountData]
 
 	// TODO: add in memory shrink version of the slot diffs
 	// slot diffs for the Account between [LatestCommittedSlot - MCA, LatestCommittedSlot].
@@ -59,7 +59,7 @@ func New(
 		apiProvider:                   apiProvider,
 		blockBurns:                    shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
 		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *model.SignaledBlock](),
-		accountsTree: ads.NewMap(accountsStore,
+		accountsTree: ads.NewMap[iotago.Identifier](accountsStore,
 			iotago.AccountID.Bytes,
 			iotago.AccountIDFromBytes,
 			(*accounts.AccountData).Bytes,
@@ -131,7 +131,7 @@ func (m *Manager) AccountsTreeRoot() iotago.Identifier {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	return iotago.Identifier(m.accountsTree.Root())
+	return m.accountsTree.Root()
 }
 
 // ApplyDiff applies the given accountDiff to the Account tree.
