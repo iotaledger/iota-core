@@ -28,6 +28,9 @@ type Options struct {
 	// Accounts defines the accounts that are created in the ledger as part of the Genesis.
 	Accounts []AccountDetails
 
+	// BasicOutput defines the basic outputs that are created in the ledger as part of the Genesis.
+	BasicOutputs []BasicOutputDetails
+
 	DataBaseVersion     byte
 	LedgerProvider      module.Provider[*engine.Engine, ledger.Ledger]
 	SeatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]
@@ -107,5 +110,18 @@ type AccountDetails struct {
 func WithAccounts(accounts ...AccountDetails) options.Option[Options] {
 	return func(m *Options) {
 		m.Accounts = accounts
+	}
+}
+
+// BasicOutputDetails is a struct that specifies details of a basic output created in the Genesis snapshot.
+type BasicOutputDetails struct {
+	Address iotago.Address
+	Amount  iotago.BaseToken
+	Mana    iotago.Mana
+}
+
+func WithBasicOutputs(basicOutputs ...BasicOutputDetails) options.Option[Options] {
+	return func(m *Options) {
+		m.BasicOutputs = basicOutputs
 	}
 }

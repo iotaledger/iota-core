@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
@@ -64,6 +65,10 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			if err := r.onBlockAttached(b.ID()); err != nil {
 				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAttached in retainer"))
 			}
+		}, asyncOpt)
+
+		e.Events.CommitmentFilter.BlockFiltered.Hook(func(e *commitmentfilter.BlockFilteredEvent) {
+			r.RetainBlockFailure(e.Block.ID(), determineBlockFailureReason(e.Reason))
 		}, asyncOpt)
 
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
