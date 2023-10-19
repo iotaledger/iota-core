@@ -1,6 +1,7 @@
 package chainmanager
 
 import (
+	"fmt"
 	"sync/atomic"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type TestFramework struct {
@@ -28,14 +30,18 @@ type TestFramework struct {
 	syncutils.RWMutex
 }
 
-func NewTestFramework(test *testing.T, api iotago.API, opts ...options.Option[TestFramework]) (testFramework *TestFramework) {
-	snapshotCommitment := model.NewEmptyCommitment(api)
+func NewTestFramework(test *testing.T, a iotago.API, opts ...options.Option[TestFramework]) (testFramework *TestFramework) {
+	snapshotCommitment := model.NewEmptyCommitment(a)
+
+	handleError := func(err error) {
+		fmt.Println(err)
+	}
 
 	return options.Apply(&TestFramework{
-		Instance: NewManager(),
+		Instance: NewManager(api.SingleVersionProvider(a), handleError),
 
 		test: test,
-		api:  api,
+		api:  a,
 		commitmentsByAlias: map[string]*model.Commitment{
 			"Genesis": snapshotCommitment,
 		},

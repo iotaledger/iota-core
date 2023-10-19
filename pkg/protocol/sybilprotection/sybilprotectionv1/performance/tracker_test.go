@@ -61,7 +61,7 @@ func TestManager_Rewards(t *testing.T) {
 			Delegators:                  []iotago.BaseToken{3, 2},
 			FixedCost:                   100,
 			ActiveSlotsCount:            8,
-			ValidationBlocksSentPerSlot: uint64(ts.api.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot + 2), // no reward for validator issuing more blocks than allowed
+			ValidationBlocksSentPerSlot: uint64(ts.api.ProtocolParameters().ValidationBlocksPerSlot() + 2), // no reward for validator issuing more blocks than allowed
 			SlotPerformance:             10,
 		},
 		"D": {

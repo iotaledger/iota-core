@@ -23,7 +23,6 @@ type SeatManager struct {
 	events *seatmanager.Events
 
 	clock            clock.Clock
-	timeProviderFunc func() *iotago.TimeProvider
 	workers          *workerpool.Group
 	accounts         *account.Accounts
 	committee        *account.SeatedAccounts
@@ -59,9 +58,6 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				e.HookConstructed(func() {
 					s.clock = e.Clock
 
-					s.timeProviderFunc = func() *iotago.TimeProvider {
-						return e.CurrentAPI().TimeProvider()
-					}
 					s.TriggerConstructed()
 
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
