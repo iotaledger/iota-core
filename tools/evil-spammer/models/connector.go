@@ -1,4 +1,4 @@
-package wallet
+package models
 
 import (
 	"context"
@@ -159,10 +159,12 @@ func (c *WebClients) RemoveClient(url string) {
 }
 
 type Client interface {
+	Client() *nodeclient.Client
+	Indexer() (nodeclient.IndexerClient, error)
 	// URL returns a client API url.
 	URL() (cltID string)
-	// PostTransaction sends a transaction to the Tangle via a given client.
-	PostTransaction(tx *iotago.SignedTransaction) (iotago.BlockID, error)
+	// PostBlock sends a block to the Tangle via a given client.
+	PostBlock(block *iotago.ProtocolBlock) (iotago.BlockID, error)
 	// PostData sends the given data (payload) by creating a block in the backend.
 	PostData(data []byte) (blkID string, err error)
 	// GetTransactionConfirmationState returns the AcceptanceState of a given transaction ID.
@@ -175,6 +177,8 @@ type Client interface {
 	GetTransaction(txID iotago.TransactionID) (resp *iotago.SignedTransaction, err error)
 	// GetBlockIssuance returns the latest commitment and data needed to create a new block.
 	GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error)
+	// GetCongestion returns congestion data such as rmc or issuing readiness.
+	GetCongestion(id iotago.AccountID) (resp *apimodels.CongestionResponse, err error)
 
 	iotago.APIProvider
 }
@@ -183,6 +187,14 @@ type Client interface {
 type WebClient struct {
 	client *nodeclient.Client
 	url    string
+}
+
+func (c *WebClient) Client() *nodeclient.Client {
+	return c.client
+}
+
+func (c *WebClient) Indexer() (nodeclient.IndexerClient, error) {
+	return c.client.Indexer(context.Background())
 }
 
 func (c *WebClient) APIForVersion(version iotago.Version) (iotago.API, error) {
@@ -219,29 +231,13 @@ func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
 	})
 }
 
-// PostTransaction sends a transaction to the Tangle via a given client.
-func (c *WebClient) PostTransaction(tx *iotago.SignedTransaction) (blockID iotago.BlockID, err error) {
-	blockBuilder := builder.NewBasicBlockBuilder(c.client.CommittedAPI())
-
-	blockBuilder.Payload(tx)
-	blockBuilder.IssuingTime(time.Time{})
-
-	blk, err := blockBuilder.Build()
-	if err != nil {
-		return iotago.EmptyBlockID, err
-	}
-
-	id, err := c.client.SubmitBlock(context.Background(), blk)
-	if err != nil {
-		return
-	}
-
-	return id, nil
+func (c *WebClient) PostBlock(block *iotago.ProtocolBlock) (blockID iotago.BlockID, err error) {
+	return c.client.SubmitBlock(context.Background(), block)
 }
 
 // PostData sends the given data (payload) by creating a block in the backend.
 func (c *WebClient) PostData(data []byte) (blkID string, err error) {
-	blockBuilder := builder.NewBasicBlockBuilder(c.client.CommittedAPI())
+	blockBuilder := builder.NewBasicBlockBuilder(c.client.CommitedAPI())
 	blockBuilder.IssuingTime(time.Time{})
 
 	blockBuilder.Payload(&iotago.TaggedData{
@@ -312,4 +308,8 @@ func (c *WebClient) GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderRespo
 	}
 
 	return
+}
+
+func (c *WebClient) GetCongestion(accountID iotago.AccountID) (resp *apimodels.CongestionResponse, err error) {
+	return c.client.Congestion(context.Background(), accountID)
 }
