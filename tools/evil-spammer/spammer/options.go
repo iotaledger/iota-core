@@ -136,13 +136,6 @@ func WithClientURL(clientURL string) Options {
 // 	}
 // }
 
-func WithIdentity(alias, privateKey string) Options {
-	return func(s *Spammer) {
-		s.IdentityManager.AddIdentity(privateKey, alias)
-		s.IdentityManager.primaryAlias = alias
-	}
-}
-
 // WithCommitmentType provides commitment type for the spammer, allowed types: fork, valid, random. Enables commitment spam and disables the wallet functionality.
 // func WithCommitmentType(commitmentType string) Options {
 // 	return func(s *Spammer) {
