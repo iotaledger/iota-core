@@ -100,13 +100,13 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, slot iotago.SlotI
 }
 
 func (m *Manager) getMana(accountID iotago.AccountID, output *utxoledger.Output, slot iotago.SlotIndex) (*accounts.Mana, error) {
-	bic, bicUpdateTime, err := m.getBIC(accountID, slot,)
+	bic, bicUpdateTime, err := m.getBIC(accountID, slot)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to retrieve BIC")
 	}
 
-	manaDecayProvider := m.apiProvider.CurrentAPI().ManaDecayProvider()
-	minDeposit := lo.PanicOnErr(m.apiProvider.CurrentAPI().RentStructure().MinDeposit(output.Output()))
+	manaDecayProvider := m.apiProvider.APIForSlot(slot).ManaDecayProvider()
+	minDeposit := lo.PanicOnErr(m.apiProvider.APIForSlot(slot).StorageScoreStructure().MinDeposit(output.Output()))
 	excessBaseTokens, err := safemath.SafeSub(output.BaseTokenAmount(), minDeposit)
 	if err != nil {
 		// if subtraction underflows, then excess base tokens is 0
