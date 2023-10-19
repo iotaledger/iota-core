@@ -248,8 +248,8 @@ func (e *Engine) Restart() {
 }
 
 func (e *Engine) Shutdown() {
-	if !e.WasStopped() {
-		e.TriggerStopped()
+	if !e.WasShutdown() {
+		e.TriggerShutdown()
 
 		e.BlockRequester.Shutdown()
 		e.Attestations.Shutdown()
@@ -268,8 +268,10 @@ func (e *Engine) Shutdown() {
 		e.CommitmentFilter.Shutdown()
 		e.Scheduler.Shutdown()
 		e.Retainer.Shutdown()
-		e.Storage.Shutdown()
 		e.Workers.Shutdown()
+		e.Storage.Shutdown()
+
+		e.TriggerStopped()
 	}
 }
 

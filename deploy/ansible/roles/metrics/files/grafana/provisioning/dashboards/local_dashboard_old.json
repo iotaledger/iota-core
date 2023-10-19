@@ -4847,8 +4847,8 @@
       {
         "current": {
           "selected": false,
-          "text": "faucet:9311",
-          "value": "faucet:9311"
+          "text": "validator-3:9311",
+          "value": "validator-3:9311"
         },
         "datasource": {
           "type": "prometheus",

@@ -24,6 +24,8 @@ type Clock struct {
 	// confirmedTime contains a notion of time that is anchored to the latest confirmed block.
 	confirmedTime *RelativeTime
 
+	workerPool *workerpool.WorkerPool
+
 	syncutils.RWMutex
 
 	// Module embeds the required methods of the module.Interface.
@@ -36,6 +38,7 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 		return options.Apply(&Clock{
 			acceptedTime:  NewRelativeTime(),
 			confirmedTime: NewRelativeTime(),
+			workerPool:    e.Workers.CreatePool("Clock", workerpool.WithWorkerCount(1), workerpool.WithCancelPendingTasksOnShutdown(true), workerpool.WithPanicOnSubmitAfterShutdown(true)),
 		}, opts, func(c *Clock) {
 			e.HookConstructed(func() {
 				latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Slot()
@@ -49,7 +52,7 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 				e.Events.Clock.AcceptedTimeUpdated.LinkTo(c.acceptedTime.OnUpdated)
 				e.Events.Clock.ConfirmedTimeUpdated.LinkTo(c.confirmedTime.OnUpdated)
 
-				asyncOpt := event.WithWorkerPool(e.Workers.CreatePool("Clock", workerpool.WithWorkerCount(1)))
+				asyncOpt := event.WithWorkerPool(c.workerPool)
 				c.HookStopped(lo.Batch(
 					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 						c.acceptedTime.Advance(block.IssuingTime())
@@ -103,5 +106,6 @@ func (c *Clock) Reset(newTime time.Time) {
 }
 
 func (c *Clock) Shutdown() {
+	c.workerPool.Shutdown()
 	c.TriggerStopped()
 }
