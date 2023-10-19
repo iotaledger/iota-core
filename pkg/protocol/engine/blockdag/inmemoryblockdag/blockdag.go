@@ -41,7 +41,6 @@ type BlockDAG struct {
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-
 		b := New(e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
@@ -78,6 +77,8 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 	block.ForEachParent(func(parent iotago.Parent) {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
+			b.errorHandler(ierrors.Errorf("failed to setup block %s, parent %s is missing", block.ID(), parent.ID))
+
 			return
 		}
 
