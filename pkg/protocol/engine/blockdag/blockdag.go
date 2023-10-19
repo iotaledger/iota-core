@@ -16,5 +16,8 @@ type BlockDAG interface {
 	// without requesting it.
 	GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Block, requested bool)
 
+	// Reset resets the BlockDAG to its initial state after the last commitment.
+	Reset()
+
 	module.Interface
 }

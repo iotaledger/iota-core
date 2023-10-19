@@ -136,3 +136,11 @@ func (u *UnsolidCommitmentBuffer[V]) GetValuesAndEvict(commitmentID iotago.Commi
 
 	return values
 }
+
+func (u *UnsolidCommitmentBuffer[V]) Reset() {
+	u.mutex.Lock()
+	defer u.mutex.Unlock()
+
+	u.blockBuffers.Clear()
+	u.commitmentBuffer.Each(func(key iotago.CommitmentID, _ types.Empty) { u.commitmentBuffer.Remove(key) })
+}

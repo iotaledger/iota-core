@@ -113,6 +113,11 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	return nil
 }
 
+// Reset resets the Booker to its empty state after the last commitment.
+func (b *Booker) Reset() {
+	// do nothing / just comply with upcoming interface
+}
+
 func (b *Booker) Shutdown() {
 	b.TriggerStopped()
 }
