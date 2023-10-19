@@ -2,6 +2,7 @@ package accountwallet
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -29,7 +30,7 @@ func (a *AccountWallet) RequestBlockBuiltData(clt *nodeclient.Client, issuerID i
 		return nil, nil, 0, ierrors.Wrapf(err, "failed to get congestion data for issuer %s", issuerID.ToHex())
 	}
 
-	issuerResp, err := clt.BlockIssuance(context.Background())
+	issuerResp, err := clt.BlockIssuance(context.Background(), congestionResp.Slot)
 	if err != nil {
 		return nil, nil, 0, ierrors.Wrap(err, "failed to get block issuance data")
 	}
@@ -52,12 +53,13 @@ func (a *AccountWallet) RequestFaucetFunds(clt models.Client, receiveAddr iotago
 		return nil, err
 	}
 
-	_, err = a.PostWithBlock(clt, signedTx, a.faucet.account, congestionResp, issuerResp, version)
+	blkID, err := a.PostWithBlock(clt, signedTx, a.faucet.account, congestionResp, issuerResp, version)
 	if err != nil {
 		log.Errorf("failed to create block: %s", err)
 
 		return nil, err
 	}
+	fmt.Println("block sent:", blkID.ToHex())
 
 	// set remainder output to be reused by the Faucet wallet
 	a.faucet.unspentOutput = &models.Output{
@@ -114,9 +116,9 @@ func (a *AccountWallet) CreateBlock(payload iotago.Payload, issuer blockhandler.
 	blockBuilder.StrongParents(issuerResp.StrongParents)
 	blockBuilder.WeakParents(issuerResp.WeakParents)
 	blockBuilder.ShallowLikeParents(issuerResp.ShallowLikeParents)
-	blockBuilder.MaxBurnedMana(congestionResp.ReferenceManaCost)
 
 	blockBuilder.Payload(payload)
+	blockBuilder.CalculateAndSetMaxBurnedMana(congestionResp.ReferenceManaCost)
 	blockBuilder.Sign(issuer.ID(), issuer.PrivateKey())
 
 	blk, err := blockBuilder.Build()
@@ -175,7 +177,9 @@ func newFaucet(clt models.Client, faucetParams *faucetParams) (*faucet, error) {
 func (f *faucet) getGenesisOutputFromIndexer(clt models.Client, faucetAddr iotago.DirectUnlockableAddress) (iotago.Output, iotago.OutputID, iotago.BaseToken, error) {
 	indexer, err := clt.Indexer()
 	if err != nil {
-		panic(ierrors.Wrap(err, "failed to get indexer"))
+		log.Errorf("account wallet failed due to failure in connecting to indexer")
+
+		return nil, iotago.EmptyOutputID, 0, ierrors.Wrapf(err, "failed to get indexer from client")
 	}
 
 	results, err := indexer.Outputs(context.Background(), &apimodels.BasicOutputsQuery{
