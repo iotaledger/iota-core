@@ -99,11 +99,12 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 		blockParams.BlockHeader.IssuingTime = &issuingTime
 	}
 
-	currentAPI := node.Protocol.APIForTime(*blockParams.BlockHeader.IssuingTime)
+	apiForBlock, err := i.retrieveAPI(blockParams.BlockHeader, node)
+	require.NoError(i.Testing, err)
 
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		var err error
-		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(currentAPI, *blockParams.BlockHeader.IssuingTime, node)
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(apiForBlock, *blockParams.BlockHeader.IssuingTime, node)
 		if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
 			commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime, node)
 			if err != nil {
@@ -126,7 +127,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 		blockParams.BlockHeader.References = references
 	}
 
-	err := i.setDefaultBlockParams(blockParams.BlockHeader, node)
+	err = i.setDefaultBlockParams(blockParams.BlockHeader, node)
 	require.NoError(i.Testing, err)
 
 	if blockParams.HighestSupportedVersion == nil {
@@ -136,16 +137,13 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 	}
 
 	if blockParams.ProtocolParametersHash == nil {
-		protocolParametersHash, err := currentAPI.ProtocolParameters().Hash()
+		protocolParametersHash, err := apiForBlock.ProtocolParameters().Hash()
 		require.NoError(i.Testing, err)
 
 		blockParams.ProtocolParametersHash = &protocolParametersHash
 	}
 
-	api, err := i.retrieveAPI(blockParams.BlockHeader, node)
-	require.NoError(i.Testing, err)
-
-	blockBuilder := builder.NewValidationBlockBuilder(api)
+	blockBuilder := builder.NewValidationBlockBuilder(apiForBlock)
 
 	blockBuilder.SlotCommitmentID(blockParams.BlockHeader.SlotCommitment.MustID())
 	blockBuilder.LatestFinalizedSlot(*blockParams.BlockHeader.LatestFinalizedSlot)
