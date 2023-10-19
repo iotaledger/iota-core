@@ -78,7 +78,7 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
 
 	matchingEngineFound := false
 	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
-		if engine != nil && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
+		if engine != nil && !engine.WasShutdown() && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
 			if b.inSyncWindow(engine, block) {
 				engine.ProcessBlockFromPeer(block, src)
 			} else {
@@ -220,21 +220,21 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		return nil
 	}
 
-	acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
+	acceptedBlocks := ads.NewSet[iotago.Identifier, iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
 	for _, blockID := range blockIDs {
 		_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
 	}
 
-	if !iotago.VerifyProof(tangleMerkleProof, iotago.Identifier(acceptedBlocks.Root()), chainCommitment.Commitment().RootsID()) {
+	if !iotago.VerifyProof(tangleMerkleProof, acceptedBlocks.Root(), chainCommitment.Commitment().RootsID()) {
 		return ierrors.Errorf("failed to verify tangle merkle proof for %s", commitmentID)
 	}
 
-	acceptedTransactionIDs := ads.NewSet[iotago.TransactionID](mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
+	acceptedTransactionIDs := ads.NewSet[iotago.Identifier, iotago.TransactionID](mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
 	for _, transactionID := range transactionIDs {
 		_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
 	}
 
-	if !iotago.VerifyProof(mutationMerkleProof, iotago.Identifier(acceptedTransactionIDs.Root()), chainCommitment.Commitment().RootsID()) {
+	if !iotago.VerifyProof(mutationMerkleProof, acceptedTransactionIDs.Root(), chainCommitment.Commitment().RootsID()) {
 		return ierrors.Errorf("failed to verify mutation merkle proof for %s", commitmentID)
 	}
 
