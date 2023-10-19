@@ -22,9 +22,9 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		return nil, err
 	}
 
-	commitmentSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
+	commitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
-	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, commitmentSlot)
+	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, commitment.Slot())
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get account: %s form the Ledger", accountID.ToHex())
 	}
@@ -32,15 +32,10 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
 	}
 
-	rmc, err := deps.Protocol.MainEngineInstance().Ledger.RMCManager().RMC(commitmentSlot)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get RMC for slot: %d", commitmentSlot)
-	}
-
 	return &apimodels.CongestionResponse{
-		Slot:                 commitmentSlot,
+		Slot:                 commitment.Slot(),
 		Ready:                deps.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(accountID),
-		ReferenceManaCost:    rmc,
+		ReferenceManaCost:    commitment.ReferenceManaCost(),
 		BlockIssuanceCredits: acc.Credits.Value,
 	}, nil
 }
