@@ -140,7 +140,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		require.NotEqual(t, "withImplicitAccount", event.Block.ID().Alias())
 	})
 
-	keyPair := ed25519.GenerateKeyPair()
+	keyPairAccount := ed25519.GenerateKeyPair()
 	currentSlot := iotago.SlotIndex(100)
 	currentAPI := tf.apiProvider.CurrentAPI()
 
@@ -151,7 +151,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 	require.NoError(t, err)
 	tf.AddCommitment(commitment.Slot, modelCommitment)
 
-	addr := iotago.Ed25519AddressFromPubKey(keyPair.PublicKey[:])
+	addr := iotago.Ed25519AddressFromPubKey(keyPairAccount.PublicKey[:])
 	accountID := iotago.AccountID(addr[:])
 
 	// register the accounts in the proxy account manager
@@ -160,7 +160,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		accounts.NewAccountData(
 			accountID,
 			accounts.WithExpirySlot(iotago.MaxSlotIndex),
-			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPairAccount.PublicKey)),
 		),
 	)
 	keyPairImplicitAccount := ed25519.GenerateKeyPair()
@@ -175,9 +175,10 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		),
 	)
 
-	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
+	// RMC needs to be from tha same slot as commitment index
+	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MinCommittableAge(), iotago.Mana(0))
 
-	tf.IssueSignedBlockAtSlot("withAccount", currentSlot, commitmentID, keyPair)
+	tf.IssueSignedBlockAtSlot("withAccount", currentSlot, commitmentID, keyPairAccount)
 
 	keyPairNoAccount := ed25519.GenerateKeyPair()
 	tf.IssueSignedBlockAtSlot("noAccount", currentSlot, commitmentID, keyPairNoAccount)
@@ -224,7 +225,8 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 		),
 	)
 
-	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(10))
+	// RMC needs to be from tha same slot as commitment index
+	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MinCommittableAge(), iotago.Mana(10))
 
 	tf.IssueSignedBlockAtSlotWithBurnedMana("sufficientBurnedMana", currentSlot, commitmentID, keyPair, iotago.Mana(10))
 	tf.IssueSignedBlockAtSlotWithBurnedMana("sufficientBurnedMana", currentSlot, commitmentID, keyPair, iotago.Mana(11))
@@ -271,7 +273,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	require.NoError(t, err)
 	// add the commitment and 0 RMC to the proxy state
 	tf.AddCommitment(commitment.Slot, modelCommitment)
-	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
+	tf.AddRMCData(commitmentSlot, iotago.Mana(0))
 
 	tf.IssueSignedBlockAtSlot("correct", currentSlot, commitmentID, keyPair)
 
@@ -284,7 +286,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	require.NoError(t, err)
 	// add the commitment and 0 RMC to the proxy state
 	tf.AddCommitment(commitment.Slot, modelCommitment)
-	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
+	tf.AddRMCData(commitmentSlot, iotago.Mana(0))
 
 	tf.IssueSignedBlockAtSlot("almostExpired", currentSlot, commitmentID, keyPair)
 
@@ -297,7 +299,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	require.NoError(t, err)
 	// add the commitment and 0 RMC to the proxy state
 	tf.AddCommitment(commitment.Slot, modelCommitment)
-	tf.AddRMCData(currentSlot-currentAPI.ProtocolParameters().MaxCommittableAge(), iotago.Mana(0))
+	tf.AddRMCData(commitmentSlot, iotago.Mana(0))
 
 	tf.IssueSignedBlockAtSlot("expired", currentSlot, commitmentID, keyPair)
 }
