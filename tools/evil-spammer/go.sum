@@ -201,6 +201,8 @@ github.com/iotaledger/hive.go/stringify v0.0.0-20231019082730-54e1c06ab9c2 h1:vi
 github.com/iotaledger/hive.go/stringify v0.0.0-20231019082730-54e1c06ab9c2/go.mod h1:FTo/UWzNYgnQ082GI9QVM9HFDERqf9rw9RivNpqrnTs=
 github.com/iotaledger/iota.go/v4 v4.0.0-20231019083312-e415fefc417c h1:hk9NK+JD4WMOCImQmUnwK8PoHsdQwaaZyYcEmkRulNc=
 github.com/iotaledger/iota.go/v4 v4.0.0-20231019083312-e415fefc417c/go.mod h1:XmgOVYZ7805zVEYPwhvqBDVa7XieXRgPrCEGZW35W8k=
+github.com/iotaledger/iota.go/v4 v4.0.0-20231019103309-47202790708b h1:FB7OpkACWvlSdTGJXK3HndNSYfhsVkAjHS1I/VFoKrA=
+github.com/iotaledger/iota.go/v4 v4.0.0-20231019103309-47202790708b/go.mod h1:XmgOVYZ7805zVEYPwhvqBDVa7XieXRgPrCEGZW35W8k=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
 github.com/ipfs/go-cid v0.4.1/go.mod h1:uQHwDeX4c6CtyrFwdqyhpNcxVewur1M7l7fNU7LKwZk=
 github.com/jmespath/go-jmespath v0.4.0/go.mod h1:T8mJZnbsbmF+m6zOOFylbeCJqk5+pHWvzYPziyZiYoo=
