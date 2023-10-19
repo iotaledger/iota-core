@@ -110,7 +110,7 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 		return
 	}
 
-	blockEpoch := o.apiProvider.CurrentAPI().TimeProvider().EpochFromSlot(block.ID().Slot())
+	blockEpoch := o.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochFromSlot(block.ID().Slot())
 
 	// if the block is issued before the stake end epoch, then it's not a valid validator or candidate block
 	if accountData.StakeEndEpoch < blockEpoch {
@@ -127,7 +127,7 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 	// or if block is issued after EpochEndSlot - EpochNearingThreshold, because candidates can register only until that point.
 	// then don't consider it because the validator can't be part of the committee in the next epoch
 	if accountData.StakeEndEpoch == blockEpoch ||
-		block.ID().Slot()+o.apiProvider.CurrentAPI().ProtocolParameters().EpochNearingThreshold() > o.apiProvider.CurrentAPI().TimeProvider().EpochEnd(blockEpoch) {
+		block.ID().Slot()+o.apiProvider.APIForSlot(block.ID().Slot()).ProtocolParameters().EpochNearingThreshold() > o.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochEnd(blockEpoch) {
 		return
 	}
 
