@@ -79,12 +79,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
 
-		result, err = safemath.SafeMul(result>>profitMarginExponent, uint64(stakeAmount))
-		if err != nil {
-			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
-		}
-
-		residualValidatorFactor, err := safemath.SafeDiv(result, uint64(rewardsForAccountInEpoch.PoolStake))
+		residualValidatorFactor, err := safemath.Safe64MulDiv(result>>profitMarginExponent, uint64(stakeAmount), uint64(rewardsForAccountInEpoch.PoolStake))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate residual validator factor due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
@@ -210,6 +205,7 @@ func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epoch iotago.Epo
 
 	return m.Get(accountID)
 }
+
 func (t *Tracker) poolReward(slot iotago.SlotIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, performanceFactor uint64) (iotago.Mana, error) {
 	apiForSlot := t.apiProvider.APIForSlot(slot)
 	epoch := apiForSlot.TimeProvider().EpochFromSlot(slot)
