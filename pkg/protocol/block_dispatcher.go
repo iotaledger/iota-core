@@ -78,7 +78,7 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
 
 	matchingEngineFound := false
 	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
-		if engine != nil && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
+		if engine != nil && !engine.WasShutdown() && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
 			if b.inSyncWindow(engine, block) {
 				engine.ProcessBlockFromPeer(block, src)
 			} else {
