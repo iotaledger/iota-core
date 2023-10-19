@@ -34,14 +34,14 @@ type Retainer struct {
 
 	stakersResponses *shrinkingmap.ShrinkingMap[uint32, []*apimodels.ValidatorResponse]
 
-	workers *workerpool.Group
+	workerPool *workerpool.WorkerPool
 
 	module.Module
 }
 
-func New(workers *workerpool.Group, retainerFunc RetainerFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
+func New(workersGroup *workerpool.Group, retainerFunc RetainerFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
 	return &Retainer{
-		workers:                 workers,
+		workerPool:              workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
 		store:                   retainerFunc,
 		stakersResponses:        shrinkingmap.New[uint32, []*apimodels.ValidatorResponse](),
 		latestCommittedSlotFunc: latestCommittedSlotFunc,
@@ -59,7 +59,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			e.Storage.Settings().LatestFinalizedSlot,
 			e.ErrorHandler("retainer"))
 
-		asyncOpt := event.WithWorkerPool(r.workers.CreatePool("Retainer", workerpool.WithWorkerCount(1)))
+		asyncOpt := event.WithWorkerPool(r.workerPool)
 
 		e.Events.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
 			if err := r.onBlockAttached(b.ID()); err != nil {
@@ -143,7 +143,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 }
 
 func (r *Retainer) Shutdown() {
-	r.workers.Shutdown()
+	r.workerPool.Shutdown()
 }
 
 func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
