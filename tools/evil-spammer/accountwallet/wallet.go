@@ -36,10 +36,13 @@ func Run(config *Configuration) (*AccountWallet, error) {
 		faucetAccountID:  config.AccountID,
 	}))
 
-	wallet := NewAccountWallet(opts...)
+	wallet, err := NewAccountWallet(opts...)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to create wallet")
+	}
 
 	// load wallet
-	err := wallet.fromAccountStateFile()
+	err = wallet.fromAccountStateFile()
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to load wallet from file")
 	}
@@ -69,21 +72,26 @@ type AccountWallet struct {
 	optsRequestTicker     time.Duration
 }
 
-func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
+func NewAccountWallet(opts ...options.Option[AccountWallet]) (*AccountWallet, error) {
+	var initErr error
 	return options.Apply(&AccountWallet{
 		accountsAliases:    make(map[string]*models.AccountData),
 		seed:               tpkg.RandEd25519Seed(),
 		optsRequestTimeout: time.Second * 120,
 		optsRequestTicker:  time.Second * 5,
 	}, opts, func(w *AccountWallet) {
-		w.client = models.NewWebClient(w.optsClientBindAddress)
-
-		faucet, err := newFaucet(w.client, w.optsFaucetParams)
-		if err != nil {
-			panic(ierrors.Wrap(err, "failed to create faucet"))
+		w.client, initErr = models.NewWebClient(w.optsClientBindAddress)
+		if initErr != nil {
+			return
 		}
 
-		w.faucet = faucet
+		var f *faucet
+		f, initErr = newFaucet(w.client, w.optsFaucetParams)
+		if initErr != nil {
+			return
+		}
+
+		w.faucet = f
 		w.accountsAliases[FaucetAccountAlias] = &models.AccountData{
 			Alias:    FaucetAccountAlias,
 			Status:   models.AccountReady,
@@ -91,7 +99,7 @@ func NewAccountWallet(opts ...options.Option[AccountWallet]) *AccountWallet {
 			Index:    0,
 			Account:  w.faucet.account,
 		}
-	})
+	}), initErr
 }
 
 // toAccountStateFile write account states to file.
