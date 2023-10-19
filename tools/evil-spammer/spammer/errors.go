@@ -10,14 +10,17 @@ import (
 )
 
 var (
-	ErrFailPostTransaction = ierrors.New("failed to post transaction")
+	ErrFailPostBlock       = ierrors.New("failed to post block")
 	ErrFailSendDataBlock   = ierrors.New("failed to send a data block")
 	ErrFailGetReferences   = ierrors.New("failed to get references")
 	ErrTransactionIsNil    = ierrors.New("provided transaction is nil")
+	ErrTransactionInvalid  = ierrors.New("provided transaction is invalid")
+	ErrPayloadIsNil        = ierrors.New("provided payload is nil")
 	ErrFailToPrepareBatch  = ierrors.New("custom conflict batch could not be prepared")
 	ErrInsufficientClients = ierrors.New("insufficient clients to send conflicts")
 	ErrInputsNotSolid      = ierrors.New("not all inputs are solid")
 	ErrFailPrepareBlock    = ierrors.New("failed to prepare block")
+	ErrFailGetAccount      = ierrors.New("failed to get account from the account wallet")
 )
 
 // ErrorCounter counts errors that appeared during the spam,

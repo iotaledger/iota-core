@@ -21,15 +21,17 @@ var (
 )
 
 type Manager struct {
-	Events              *Events
+	Events      *Events
+	apiProvider iotago.APIProvider
+	handleError func(error)
+
 	commitmentRequester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 
 	commitmentsByID *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ChainCommitment]
 	rootCommitment  *ChainCommitment
 
 	forksByForkingPoint *memstorage.IndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *Fork]
-
-	evictionMutex syncutils.RWMutex
+	evictionMutex       syncutils.RWMutex
 
 	optsCommitmentRequester []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]
 
@@ -37,9 +39,11 @@ type Manager struct {
 	lastEvictedSlot       *model.EvictionIndex[iotago.SlotIndex]
 }
 
-func NewManager(opts ...options.Option[Manager]) (manager *Manager) {
+func NewManager(apiProvider iotago.APIProvider, handleError func(error), opts ...options.Option[Manager]) (manager *Manager) {
 	return options.Apply(&Manager{
-		Events: NewEvents(),
+		Events:      NewEvents(),
+		apiProvider: apiProvider,
+		handleError: handleError,
 
 		commitmentsByID:       memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.CommitmentID, *ChainCommitment](),
 		commitmentEntityMutex: syncutils.NewDAGMutex[iotago.CommitmentID](),
@@ -71,7 +75,11 @@ func (m *Manager) ProcessCommitmentFromSource(commitment *model.Commitment, sour
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	_, isSolid, chainCommitment := m.processCommitment(commitment)
+	_, isSolid, chainCommitment, err := m.processCommitment(commitment)
+	if err != nil {
+		m.handleError(err)
+		return false, nil
+	}
 	if chainCommitment == nil {
 		return false, nil
 	}
@@ -85,7 +93,11 @@ func (m *Manager) ProcessCandidateCommitment(commitment *model.Commitment) (isSo
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	_, isSolid, chainCommitment := m.processCommitment(commitment)
+	_, isSolid, chainCommitment, err := m.processCommitment(commitment)
+	if err != nil {
+		m.handleError(err)
+		return false, nil
+	}
 	if chainCommitment == nil {
 		return false, nil
 	}
@@ -97,7 +109,11 @@ func (m *Manager) ProcessCommitment(commitment *model.Commitment) (isSolid bool,
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
-	wasForked, isSolid, chainCommitment := m.processCommitment(commitment)
+	wasForked, isSolid, chainCommitment, err := m.processCommitment(commitment)
+	if err != nil {
+		m.handleError(err)
+		return false, nil
+	}
 
 	if chainCommitment == nil {
 		return false, nil
@@ -234,7 +250,13 @@ func (m *Manager) SwitchMainChain(head iotago.CommitmentID) error {
 	return m.switchMainChainToCommitment(commitment)
 }
 
-func (m *Manager) processCommitment(commitment *model.Commitment) (wasForked bool, isSolid bool, chainCommitment *ChainCommitment) {
+func (m *Manager) processCommitment(commitment *model.Commitment) (wasForked bool, isSolid bool, chainCommitment *ChainCommitment, err error) {
+	// Verify the commitment's version corresponds to the protocol version for the slot.
+	apiForSlot := m.apiProvider.APIForSlot(commitment.Slot())
+	if apiForSlot.Version() != commitment.Commitment().ProtocolVersion {
+		return false, false, nil, ierrors.Errorf("")
+	}
+
 	// Lock access to the parent commitment. We need to lock this first as we are trying to update children later within this function.
 	// Failure to do so, leads to a deadlock, where a child is locked and tries to lock its parent, which is locked by the parent which tries to lock the child.
 	m.commitmentEntityMutex.Lock(commitment.PreviousCommitmentID())
@@ -251,12 +273,12 @@ func (m *Manager) processCommitment(commitment *model.Commitment) (wasForked boo
 			m.Events.CommitmentBelowRoot.Trigger(commitment.ID())
 		}
 
-		return false, isRootCommitment, chainCommitment
+		return false, isRootCommitment, chainCommitment, nil
 	}
 
 	isNew, isSolid, wasForked, chainCommitment := m.registerCommitment(commitment)
 	if !isNew || chainCommitment.Chain() == nil {
-		return wasForked, isSolid, chainCommitment
+		return wasForked, isSolid, chainCommitment, nil
 	}
 
 	if mainChild := chainCommitment.mainChild(); mainChild != nil {
@@ -273,7 +295,7 @@ func (m *Manager) processCommitment(commitment *model.Commitment) (wasForked boo
 		}
 	}
 
-	return wasForked, isSolid, chainCommitment
+	return wasForked, isSolid, chainCommitment, nil
 }
 
 func (m *Manager) evict(index iotago.SlotIndex) {

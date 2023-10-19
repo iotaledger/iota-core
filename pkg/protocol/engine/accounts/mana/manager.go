@@ -45,6 +45,8 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, slot iotago.SlotI
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	apiForSlot := m.apiProvider.APIForSlot(slot)
+
 	mana, exists := m.manaVectorCache.Get(accountID)
 	// if entry does not exist or required slot is earlier than the one stored in the cache,
 	// then need to calculate it from scratch
@@ -67,7 +69,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, slot iotago.SlotI
 		}
 	}
 
-	manaDecayProvider := m.apiProvider.CurrentAPI().ManaDecayProvider()
+	manaDecayProvider := apiForSlot.ManaDecayProvider()
 
 	// If the requested slot is the same as the update time the cached mana, then return how it is.
 	// Otherwise, need to calculate decay and potential mana generation before returning.
@@ -98,7 +100,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, slot iotago.SlotI
 }
 
 func (m *Manager) getMana(accountID iotago.AccountID, output *utxoledger.Output, slot iotago.SlotIndex) (*accounts.Mana, error) {
-	bic, bicUpdateTime, err := m.getBIC(accountID, slot)
+	bic, bicUpdateTime, err := m.getBIC(accountID, slot,)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to retrieve BIC")
 	}

@@ -131,7 +131,7 @@ func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedPro
 	s.loadFutureProtocolParameters()
 	s.loadProtocolParametersEpochMappings()
 	if s.IsSnapshotImported() {
-		s.apiProvider.SetCurrentSlot(s.latestCommitment().Slot())
+		s.apiProvider.SetCommittedSlot(s.latestCommitment().Slot())
 	}
 
 	return s
@@ -260,7 +260,7 @@ func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.apiProvider.SetCurrentSlot(latestCommitment.Slot())
+	s.apiProvider.SetCommittedSlot(latestCommitment.Slot())
 
 	// Delete the old future protocol parameters if they exist.
 	_ = s.storeFutureProtocolParameters.Delete(s.apiProvider.VersionForSlot(latestCommitment.Slot()))
@@ -273,7 +273,7 @@ func (s *Settings) latestCommitment() *model.Commitment {
 
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return model.NewEmptyCommitment(s.apiProvider.CurrentAPI())
+			return model.NewEmptyCommitment(s.apiProvider.CommittedAPI())
 		}
 		panic(err)
 	}
@@ -439,8 +439,8 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 				return false
 			}
 
-			if s.apiProvider.IsFutureVersion(version) {
-				// We don't export future protocol parameters, just skip to the next ones.
+			// We don't export future protocol parameters, just skip to the next ones.
+			if s.apiProvider.CommittedAPI().Version() < version {
 				return true
 			}
 

@@ -286,7 +286,7 @@ func TestStorage_CopyFromForkedStorageEmpty(t *testing.T) {
 	// Assert that prunableSlotStorage contains exactly the same data.
 	for epoch := 0; epoch <= totalEpochs; epoch++ {
 		// little hack to retrieve underlying prunableSlotStore KVStore without any realm
-		epochStartSlot := tf1.apiProvider.CurrentAPI().TimeProvider().EpochStart(iotago.EpochIndex(epoch))
+		epochStartSlot := tf1.apiProvider.CommittedAPI().TimeProvider().EpochStart(iotago.EpochIndex(epoch))
 
 		attestationKVStoreSource, err := tf1.Instance.Attestations(epochStartSlot)
 		require.NoError(t, err)

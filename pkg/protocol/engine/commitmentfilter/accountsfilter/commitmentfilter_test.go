@@ -142,7 +142,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 
 	keyPair := ed25519.GenerateKeyPair()
 	currentSlot := iotago.SlotIndex(100)
-	currentAPI := tf.apiProvider.CurrentAPI()
+	currentAPI := tf.apiProvider.CommittedAPI()
 
 	commitment := iotago.NewCommitment(currentAPI.Version(), currentSlot-currentAPI.ProtocolParameters().MinCommittableAge(), iotago.CommitmentID{}, iotago.Identifier{}, 0, 0)
 	modelCommitment, err := model.CommitmentFromCommitment(commitment, currentAPI)
@@ -202,7 +202,7 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 
 	keyPair := ed25519.GenerateKeyPair()
 	currentSlot := iotago.SlotIndex(100)
-	currentAPI := tf.apiProvider.CurrentAPI()
+	currentAPI := tf.apiProvider.CommittedAPI()
 
 	commitment := iotago.NewCommitment(currentAPI.Version(), currentSlot-currentAPI.ProtocolParameters().MinCommittableAge(), iotago.CommitmentID{}, iotago.Identifier{}, 0, 0)
 	modelCommitment, err := model.CommitmentFromCommitment(commitment, currentAPI)
@@ -262,7 +262,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	)
 
 	// create a commitment for slot 90
-	currentAPI := tf.apiProvider.CurrentAPI()
+	currentAPI := tf.apiProvider.CommittedAPI()
 	commitmentSlot := iotago.SlotIndex(90)
 	currentSlot := commitmentSlot + currentAPI.ProtocolParameters().MinCommittableAge()
 	commitment := iotago.NewCommitment(currentAPI.Version(), commitmentSlot, iotago.CommitmentID{}, iotago.Identifier{}, 0, 0)
