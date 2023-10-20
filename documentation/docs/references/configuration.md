@@ -375,35 +375,7 @@ Example:
   }
 ```
 
-## <a id="validator"></a> 10. Validator
-
-| Name                       | Description                                                                                                  | Type    | Default value |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------- |
-| enabled                    | Whether the Validator component is enabled                                                                   | boolean | false         |
-| committeeBroadcastInterval | The interval at which the node will broadcast its committee validator block                                  | string  | "500ms"       |
-| candidateBroadcastInterval | The interval at which the node will broadcast its candidate validator block                                  | string  | "30m"         |
-| parentsCount               | The number of parents that node will choose for its validator blocks                                         | int     | 8             |
-| ignoreBootstrapped         | Whether the Validator component should start issuing validator blocks before the main engine is bootstrapped | boolean | false         |
-| account                    | The accountID of the validator account that will issue the blocks                                            | string  | ""            |
-| privateKey                 | The private key of the validator account that will issue the blocks                                          | string  | ""            |
-
-Example:
-
-```json
-  {
-    "validator": {
-      "enabled": false,
-      "committeeBroadcastInterval": "500ms",
-      "candidateBroadcastInterval": "30m",
-      "parentsCount": 8,
-      "ignoreBootstrapped": false,
-      "account": "",
-      "privateKey": ""
-    }
-  }
-```
-
-## <a id="dashboard"></a> 11. Dashboard
+## <a id="dashboard"></a> 10. Dashboard
 
 | Name                              | Description                             | Type    | Default value  |
 | --------------------------------- | --------------------------------------- | ------- | -------------- |
@@ -445,7 +417,7 @@ Example:
   }
 ```
 
-## <a id="metrics"></a> 12. Metrics
+## <a id="metrics"></a> 11. Metrics
 
 | Name            | Description                                          | Type    | Default value  |
 | --------------- | ---------------------------------------------------- | ------- | -------------- |
@@ -469,7 +441,7 @@ Example:
   }
 ```
 
-## <a id="inx"></a> 13. Inx
+## <a id="inx"></a> 12. Inx
 
 | Name        | Description                                            | Type    | Default value    |
 | ----------- | ------------------------------------------------------ | ------- | ---------------- |

@@ -116,15 +116,6 @@
       "useMetricPrefix": false
     }
   },
-  "validator": {
-    "enabled": false,
-    "committeeBroadcastInterval": "500ms",
-    "candidateBroadcastInterval": "30m",
-    "parentsCount": 8,
-    "ignoreBootstrapped": false,
-    "account": "",
-    "privateKey": ""
-  },
   "dashboard": {
     "enabled": true,
     "bindAddress": "0.0.0.0:8081",
