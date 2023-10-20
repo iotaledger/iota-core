@@ -22,9 +22,7 @@ func NewBlockVoteRank(id iotago.BlockID, time time.Time) BlockVoteRank {
 func (v BlockVoteRank) Compare(other BlockVoteRank) int {
 	if v.time.Before(other.time) {
 		return -1
-	}
-
-	if v.time.After(other.time) {
+	} else if v.time.After(other.time) {
 		return 1
 	}
 

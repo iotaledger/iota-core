@@ -44,6 +44,9 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 				b.conflictDAG = b.ledger.ConflictDAG()
 
 				b.ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
+					transaction.OnAccepted(func() {
+						b.events.TransactionAccepted.Trigger(transaction)
+					})
 					transaction.OnInvalid(func(err error) {
 						b.events.TransactionInvalid.Trigger(transaction, err)
 					})

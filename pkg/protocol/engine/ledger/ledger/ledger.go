@@ -254,16 +254,14 @@ func (l *Ledger) outputFromState(state mempool.State) *utxoledger.Output {
 }
 
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
-	output, spent, err := l.OutputOrSpent(outputID)
-	if err != nil {
+	//nolint:revive //false positive
+	if output, spent, err := l.OutputOrSpent(outputID); err != nil {
 		return nil, err
-	}
-
-	if spent != nil {
+	} else if spent != nil {
 		return spent.Output(), nil
+	} else {
+		return output, nil
 	}
-
-	return output, nil
 }
 
 func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *utxoledger.Spent, error) {
@@ -346,12 +344,6 @@ func (l *Ledger) ManaManager() *mana.Manager {
 
 func (l *Ledger) RMCManager() *rmc.Manager {
 	return l.rmcManager
-}
-
-// Reset resets the component to a clean state as if it was created at the last commitment.
-func (l *Ledger) Reset() {
-	l.memPool.Reset()
-	l.accountsLedger.Reset()
 }
 
 func (l *Ledger) Shutdown() {
