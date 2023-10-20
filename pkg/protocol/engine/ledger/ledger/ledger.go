@@ -345,9 +345,10 @@ func (l *Ledger) RMCManager() *rmc.Manager {
 	return l.rmcManager
 }
 
-func (l *Ledger) ClearCache(from, to iotago.SlotIndex) {
-	l.memPool.ClearCache(from, to)
-	l.accountsLedger.ClearCache(from, to)
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (l *Ledger) Reset() {
+	l.memPool.Reset()
+	l.accountsLedger.Reset()
 }
 
 func (l *Ledger) Shutdown() {

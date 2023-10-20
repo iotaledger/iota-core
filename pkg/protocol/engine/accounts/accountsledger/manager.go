@@ -355,9 +355,29 @@ func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iot
 	return nil
 }
 
-func (m *Manager) ClearCache(from, to iotago.SlotIndex) {
-	for slot := from; slot <= to; slot++ {
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (m *Manager) Reset() {
+	blockBurnsToDelete := make([]iotago.SlotIndex, 0)
+	m.blockBurns.ForEachKey(func(slot iotago.SlotIndex) bool {
+		if slot > m.latestCommittedSlot {
+			blockBurnsToDelete = append(blockBurnsToDelete, slot)
+		}
+
+		return true
+	})
+
+	versionSignalsToDelete := make([]iotago.SlotIndex, 0)
+	m.latestSupportedVersionSignals.ForEach(func(slot iotago.SlotIndex, _ *shrinkingmap.ShrinkingMap[iotago.AccountID, *model.SignaledBlock]) {
+		if slot > m.latestCommittedSlot {
+			versionSignalsToDelete = append(versionSignalsToDelete, slot)
+		}
+	})
+
+	for _, slot := range blockBurnsToDelete {
 		m.blockBurns.Delete(slot)
+	}
+
+	for _, slot := range versionSignalsToDelete {
 		m.latestSupportedVersionSignals.Evict(slot)
 	}
 }

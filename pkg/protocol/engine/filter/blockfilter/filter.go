@@ -106,10 +106,8 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 	f.events.BlockPreAllowed.Trigger(block)
 }
 
-// Reset resets the Filter to its clean state after the last commitment.
-func (f *Filter) Reset() {
-	// TODO: check if we need to reset anything
-}
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (f *Filter) Reset() {}
 
 func (f *Filter) Shutdown() {
 	f.TriggerStopped()

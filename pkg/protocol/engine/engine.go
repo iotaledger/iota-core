@@ -238,12 +238,12 @@ func (e *Engine) Restart() {
 
 		e.BlockRequester.Clear()
 		e.Storage.ClearBlocks(latestCommittedSlot+1, latestProcessedSlot)
-		e.Ledger.ClearCache(latestCommittedSlot+1, latestProcessedSlot)
 
 		e.EvictionState.Reset()
 		e.BlockCache.Reset()
 		e.BlockDAG.Reset()
 		e.Booker.Reset()
+		e.Ledger.Reset()
 		e.BlockGadget.Reset()
 		e.SlotGadget.Reset()
 		e.Notarization.Reset()
