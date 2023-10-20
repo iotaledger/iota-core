@@ -242,6 +242,7 @@ func (e *Engine) Shutdown() {
 		e.Scheduler.Shutdown()
 		e.Retainer.Shutdown()
 		e.Workers.Shutdown()
+		e.Storage.Shutdown()
 
 		e.TriggerStopped()
 	}

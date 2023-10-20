@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -92,15 +93,19 @@ func (p *Protocol) IssueBlock(block *model.Block) error {
 
 // Run starts the protocol.
 func (p *Protocol) Run(ctx context.Context) error {
+	fmt.Println("STARTING UP")
+
 	p.waitEngineInitialized()
 
 	p.Initialized.Trigger()
 
 	<-ctx.Done()
 
+	fmt.Println("SHUTTING DOWN")
 	p.Shutdown.Trigger()
 	p.Workers.Shutdown()
 	p.Stopped.Trigger()
+	fmt.Println("SHUTTING DOWN DONE")
 
 	return ctx.Err()
 }
