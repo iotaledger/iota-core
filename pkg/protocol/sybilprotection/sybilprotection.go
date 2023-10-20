@@ -27,6 +27,7 @@ type SybilProtection interface {
 	Import(io.ReadSeeker) error
 	Export(io.WriteSeeker, iotago.SlotIndex) error
 
+	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset()
 
 	module.Interface

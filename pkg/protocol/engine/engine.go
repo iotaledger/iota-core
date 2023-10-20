@@ -230,37 +230,32 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 
 // Restart restarts the engine by resetting it to the state of the latest commitment.
 func (e *Engine) Restart() {
-	e.LatestProcessedSlot.Compute(func(latestProcessedSlot iotago.SlotIndex) iotago.SlotIndex {
-		e.Workers.WaitChildren()
+	e.Workers.WaitChildren()
 
-		latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
-		latestCommittedTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
+	e.BlockRequester.Clear()
+	e.Storage.Reset()
+	e.EvictionState.Reset()
+	e.Filter.Reset()
+	e.CommitmentFilter.Reset()
+	e.BlockCache.Reset()
+	e.BlockDAG.Reset()
+	e.Booker.Reset()
+	e.Ledger.Reset()
+	e.BlockGadget.Reset()
+	e.SlotGadget.Reset()
+	e.Notarization.Reset()
+	e.Attestations.Reset()
+	e.SybilProtection.Reset()
+	e.Scheduler.Reset()
+	e.TipManager.Reset()
+	e.TipSelection.Reset()
+	e.Retainer.Reset()
+	e.SyncManager.Reset()
+	e.UpgradeOrchestrator.Reset()
 
-		e.BlockRequester.Clear()
-		e.Storage.ClearBlocks(latestCommittedSlot+1, latestProcessedSlot)
-
-		e.EvictionState.Reset()
-		e.BlockCache.Reset()
-		e.BlockDAG.Reset()
-		e.Booker.Reset()
-		e.Ledger.Reset()
-		e.BlockGadget.Reset()
-		e.SlotGadget.Reset()
-		e.Notarization.Reset()
-		e.Attestations.Reset()
-		e.SybilProtection.Reset()
-		e.Scheduler.Reset()
-		e.TipManager.Reset()
-		e.TipSelection.Reset()
-		e.Retainer.Reset()
-		e.SyncManager.Reset()
-		e.UpgradeOrchestrator.Reset()
-		e.CommitmentFilter.Reset()
-		e.Filter.Reset()
-		e.Clock.Reset(latestCommittedTime)
-
-		return latestCommittedSlot
-	})
+	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
+	latestCommittedTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
+	e.Clock.Reset(latestCommittedTime)
 }
 
 func (e *Engine) Shutdown() {

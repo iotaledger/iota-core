@@ -142,8 +142,9 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	})
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
 func (r *Retainer) Reset() {
-	// TODO: check if something needs to be cleaned here
+	// TODO: check if something needs to be cleaned here (author of the retainer)
 }
 
 func (r *Retainer) Shutdown() {

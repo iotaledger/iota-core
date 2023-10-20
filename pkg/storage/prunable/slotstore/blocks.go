@@ -90,6 +90,7 @@ func (b *Blocks) ForEachBlockInSlot(consumer func(block *model.Block) error) err
 	return nil
 }
 
+// Clear clears the storage.
 func (b *Blocks) Clear() error {
 	return b.store.Clear()
 }
