@@ -148,6 +148,10 @@ func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
 	}
 }
 
+func (s *SyncManager) Reset() {
+	// TODO: check if something needs to be cleaned here
+}
+
 func (s *SyncManager) Shutdown() {
 	s.TriggerStopped()
 }

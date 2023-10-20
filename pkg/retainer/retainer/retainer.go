@@ -142,6 +142,10 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	})
 }
 
+func (r *Retainer) Reset() {
+	// TODO: check if something needs to be cleaned here
+}
+
 func (r *Retainer) Shutdown() {
 	r.workerPool.Shutdown()
 }

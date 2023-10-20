@@ -252,10 +252,10 @@ func (e *Engine) Restart() {
 		e.Scheduler.Reset()
 		e.TipManager.Reset()
 		e.TipSelection.Reset()
+		e.Retainer.Reset()
+		e.SyncManager.Reset()
 		e.Clock.Reset(latestCommittedTime)
 
-		//Retainer            retainer.Retainer
-		//SyncManager         syncmanager.SyncManager
 		//UpgradeOrchestrator upgrade.Orchestrator
 
 		return latestCommittedSlot

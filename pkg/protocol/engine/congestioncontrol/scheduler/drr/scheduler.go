@@ -238,6 +238,10 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	}
 }
 
+func (s *Scheduler) Reset() {
+	// TODO: check if something needs to be cleaned here
+}
+
 func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
