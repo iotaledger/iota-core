@@ -73,10 +73,9 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 
 			e.Events.Notarization.LinkTo(m.events)
 
-			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Slot())
-
-			m.TriggerConstructed()
 			m.TriggerInitialized()
+			m.slotMutations = NewSlotMutations(e.Storage.Settings().LatestCommitment().Slot())
+			m.TriggerConstructed()
 		})
 
 		return m
@@ -130,6 +129,7 @@ func (m *Manager) ForceCommitUntil(commitUntilSlot iotago.SlotIndex) error {
 	return nil
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
 func (m *Manager) Reset() {
 	m.slotMutations.Reset()
 }
