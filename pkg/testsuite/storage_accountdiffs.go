@@ -1,7 +1,7 @@
 package testsuite
 
 import (
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -24,8 +24,8 @@ func (t *TestSuite) AssertStorageAccountDiffs(slot iotago.SlotIndex, accountDiff
 				if err != nil {
 					return ierrors.Wrapf(err, "AssertStorageAccountDiffs: %s: error loading account diff: %s", node.Name, accountID)
 				}
-				// todo finish this, connect to other tests, is cmp enough
-				if !cmp.Equal(diffChange, storedDiffChange) {
+
+				if !assert.Equal(t.fakeTesting, diffChange, storedDiffChange) {
 					return ierrors.Errorf("AssertStorageAccountDiffs: %s: expected %v, got %v", node.Name, diffChange, storedDiffChange)
 				}
 

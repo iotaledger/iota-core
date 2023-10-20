@@ -35,14 +35,13 @@ type BlockDAG struct {
 
 	workers      *workerpool.Group
 	errorHandler func(error)
-	apiProvider  iotago.APIProvider
 
 	module.Module
 }
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), e, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
+		b := New(e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.HookConstructed(func() {
 			wp := b.workers.CreatePool("BlockDAG.Attach", workerpool.WithWorkerCount(2))
@@ -78,7 +77,9 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 	block.ForEachParent(func(parent iotago.Parent) {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
-			panic("cannot setup block without existing parent")
+			b.errorHandler(ierrors.Errorf("failed to setup block %s, parent %s is missing", block.ID(), parent.ID))
+
+			return
 		}
 
 		parentBlock.Solid().OnUpdateOnce(func(_, _ bool) {
@@ -98,15 +99,14 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, apiProvider iotago.APIProvider, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
-		apiProvider:           apiProvider,
 		events:                blockdag.NewEvents(),
 		evictionState:         evictionState,
 		blockCache:            blockCache,
 		workers:               workers,
 		errorHandler:          errorHandler,
-		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](int(apiProvider.CurrentAPI().ProtocolParameters().MaxCommittableAge()) * 2),
+		uncommittedSlotBlocks: buffer.NewUnsolidCommitmentBuffer[*blocks.Block](unsolidCommitmentBufferSize),
 	}, opts, (*BlockDAG).TriggerConstructed, (*BlockDAG).TriggerInitialized)
 }
 

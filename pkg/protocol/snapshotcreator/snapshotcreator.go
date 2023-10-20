@@ -47,7 +47,7 @@ const (
 	GenesisTransactionCreationSlot = 0
 )
 
-var GenesisTransactionID = iotago.TransactionIDRepresentingData(GenesisTransactionCreationSlot, []byte("genesis"))
+var GenesisTransactionCommitment = iotago.IdentifierFromData([]byte("genesis"))
 
 func CreateSnapshot(opts ...options.Option[Options]) error {
 	opt := NewOptions(opts...)
@@ -65,7 +65,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		return ierrors.Wrap(err, "failed to store the protocol parameters for epoch 0")
 	}
 
-	api := s.Settings().APIProvider().CurrentAPI()
+	api := s.Settings().APIProvider().CommittedAPI()
 	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
 		return ierrors.Wrap(err, "failed to store empty commitment")
 	}
@@ -119,59 +119,117 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	totalAccountAmount := lo.Reduce(opt.Accounts, func(accumulator iotago.BaseToken, details AccountDetails) iotago.BaseToken {
 		return accumulator + details.Amount
 	}, iotago.BaseToken(0))
-	if err := createGenesisOutput(opt.ProtocolParameters.TokenSupply()-totalAccountAmount, opt.GenesisSeed, engineInstance); err != nil {
+
+	totalBasicOutputAmount := lo.Reduce(opt.BasicOutputs, func(accumulator iotago.BaseToken, details BasicOutputDetails) iotago.BaseToken {
+		return accumulator + details.Amount
+	}, iotago.BaseToken(0))
+
+	var genesisTransactionOutputs iotago.TxEssenceOutputs
+	genesisOutput, err := createGenesisOutput(api, opt.ProtocolParameters.TokenSupply()-totalAccountAmount-totalBasicOutputAmount, opt.GenesisSeed)
+	if err != nil {
 		return ierrors.Wrap(err, "failed to create genesis outputs")
 	}
+	genesisTransactionOutputs = append(genesisTransactionOutputs, genesisOutput)
 
-	if err := createGenesisAccounts(opt.Accounts, engineInstance); err != nil {
+	accountOutputs, err := createGenesisAccounts(api, opt.Accounts)
+	if err != nil {
 		return ierrors.Wrap(err, "failed to create genesis account outputs")
+	}
+	genesisTransactionOutputs = append(genesisTransactionOutputs, accountOutputs...)
+
+	genesisBasicOutputs, err := createGenesisBasicOutputs(api, opt.BasicOutputs)
+	if err != nil {
+		return ierrors.Wrap(err, "failed to create genesis basic outputs")
+	}
+	genesisTransactionOutputs = append(genesisTransactionOutputs, genesisBasicOutputs...)
+
+	var accountLedgerOutputs utxoledger.Outputs
+	for idx, output := range genesisTransactionOutputs {
+		proof, err := iotago.NewOutputIDProof(engineInstance.LatestAPI(), GenesisTransactionCommitment, GenesisTransactionCreationSlot, genesisTransactionOutputs, uint16(idx))
+		if err != nil {
+			return err
+		}
+
+		// Generate the OutputID from the proof since we don't have a transaction per se.
+		outputID, err := proof.OutputID(output)
+		if err != nil {
+			return err
+		}
+
+		utxoOutput := utxoledger.CreateOutput(engineInstance, outputID, iotago.EmptyBlockID, GenesisTransactionCreationSlot, output, proof)
+		if err := engineInstance.Ledger.AddGenesisUnspentOutput(utxoOutput); err != nil {
+			return err
+		}
+
+		if output.Type() == iotago.OutputAccount {
+			accountLedgerOutputs = append(accountLedgerOutputs, utxoOutput)
+		}
+	}
+
+	if len(accountLedgerOutputs) != len(opt.Accounts) {
+		return ierrors.Errorf("failed to create genesis account outputs. Expected %d and got %d", len(opt.Accounts), len(accountLedgerOutputs))
+	}
+
+	for idx, accountLedgerOutput := range accountLedgerOutputs {
+		if err := engineInstance.Ledger.AddAccount(accountLedgerOutput, opt.Accounts[idx].BlockIssuanceCredits); err != nil {
+			return err
+		}
 	}
 
 	return engineInstance.WriteSnapshot(opt.FilePath)
 }
 
-func createGenesisOutput(genesisTokenAmount iotago.BaseToken, genesisSeed []byte, engineInstance *engine.Engine) error {
+func createGenesisOutput(api iotago.API, genesisTokenAmount iotago.BaseToken, genesisSeed []byte) (iotago.Output, error) {
 	if genesisTokenAmount > 0 {
 		genesisWallet := mock.NewHDWallet("genesis", genesisSeed, 0)
-		output := createOutput(genesisWallet.Address(), genesisTokenAmount)
+		output := createOutput(genesisWallet.Address(), genesisTokenAmount, 0)
 
-		if _, err := engineInstance.CurrentAPI().RentStructure().CoversMinDeposit(output, genesisTokenAmount); err != nil {
-			return ierrors.Wrap(err, "min rent not covered by Genesis output with index 0")
+		if _, err := api.StorageScoreStructure().CoversMinDeposit(output, genesisTokenAmount); err != nil {
+			return nil, ierrors.Wrap(err, "min rent not covered by Genesis output with index 0")
 		}
 
-		// Genesis output is on Genesis TX index 0
-		if err := engineInstance.Ledger.AddGenesisUnspentOutput(utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(GenesisTransactionID, 0), iotago.EmptyBlockID, 0, output)); err != nil {
-			return err
-		}
+		return output, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
-func createGenesisAccounts(accounts []AccountDetails, engineInstance *engine.Engine) error {
+func createGenesisAccounts(api iotago.API, accounts []AccountDetails) (iotago.TxEssenceOutputs, error) {
+	var outputs iotago.TxEssenceOutputs
 	// Account outputs start from Genesis TX index 1
 	for idx, genesisAccount := range accounts {
 		output := createAccount(genesisAccount.AccountID, genesisAccount.Address, genesisAccount.Amount, genesisAccount.Mana, genesisAccount.IssuerKey, genesisAccount.ExpirySlot, genesisAccount.StakedAmount, genesisAccount.StakingEpochEnd, genesisAccount.FixedCost)
 
-		if _, err := engineInstance.CurrentAPI().RentStructure().CoversMinDeposit(output, genesisAccount.Amount); err != nil {
-			return ierrors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
+		if _, err := api.StorageScoreStructure().CoversMinDeposit(output, genesisAccount.Amount); err != nil {
+			return nil, ierrors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
 		}
 
-		accountOutput := utxoledger.CreateOutput(engineInstance, iotago.OutputIDFromTransactionIDAndIndex(GenesisTransactionID, uint16(idx+1)), iotago.EmptyBlockID, 0, output)
-		if err := engineInstance.Ledger.AddGenesisUnspentOutput(accountOutput); err != nil {
-			return err
-		}
-		if err := engineInstance.Ledger.AddAccount(accountOutput, genesisAccount.BlockIssuanceCredits); err != nil {
-			return err
-		}
+		outputs = append(outputs, output)
 	}
 
-	return nil
+	return outputs, nil
 }
 
-func createOutput(address iotago.Address, tokenAmount iotago.BaseToken) (output iotago.Output) {
+func createGenesisBasicOutputs(api iotago.API, basicOutputs []BasicOutputDetails) (iotago.TxEssenceOutputs, error) {
+	var outputs iotago.TxEssenceOutputs
+
+	for idx, genesisBasicOutput := range basicOutputs {
+		output := createOutput(genesisBasicOutput.Address, genesisBasicOutput.Amount, genesisBasicOutput.Mana)
+
+		if _, err := api.StorageScoreStructure().CoversMinDeposit(output, genesisBasicOutput.Amount); err != nil {
+			return nil, ierrors.Wrapf(err, "min rent not covered by Genesis basic output with index %d", idx)
+		}
+
+		outputs = append(outputs, output)
+	}
+
+	return outputs, nil
+}
+
+func createOutput(address iotago.Address, tokenAmount iotago.BaseToken, mana iotago.Mana) (output iotago.Output) {
 	return &iotago.BasicOutput{
 		Amount: tokenAmount,
+		Mana:   mana,
 		Conditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: address},
 		},

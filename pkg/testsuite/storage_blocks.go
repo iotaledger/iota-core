@@ -1,7 +1,7 @@
 package testsuite
 
 import (
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -24,7 +24,7 @@ func (t *TestSuite) AssertStorageBlock(block *model.Block, node *mock.Node) {
 			return ierrors.Errorf("AssertStorageBlock: %s: expected %s, got %s", node.Name, block.ID(), loadedBlock.ID())
 		}
 
-		if cmp.Equal(block.Data(), loadedBlock.Data()) {
+		if assert.Equal(t.fakeTesting, block.Data(), loadedBlock.Data()) {
 			return ierrors.Errorf("AssertStorageBlock: %s: expected %s, got %s", node.Name, block.Data(), loadedBlock.Data())
 		}
 

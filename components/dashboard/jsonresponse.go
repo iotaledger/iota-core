@@ -39,7 +39,7 @@ type Output struct {
 
 // NewOutput returns an Output from the given ledgerstate.Output.
 func NewOutput(output iotago.Output) (result *Output) {
-	outputJSON, err := deps.Protocol.CurrentAPI().JSONEncode(output)
+	outputJSON, err := deps.Protocol.CommittedAPI().JSONEncode(output)
 	if err != nil {
 		return nil
 	}
@@ -118,14 +118,13 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 
 // Transaction represents the JSON model of a iotago.SignedTransaction.
 type Transaction struct {
-	TransactionID    string                  `json:"txId"`
-	NetworkID        iotago.NetworkID        `json:"networkId"`
-	CreationSlot     iotago.SlotIndex        `json:"creationSlot"`
-	Inputs           []*Input                `json:"inputs"`
-	InputsCommitment iotago.InputsCommitment `json:"inputsCommitment"`
-	Outputs          []*Output               `json:"outputs"`
-	Unlocks          []*UnlockBlock          `json:"unlocks"`
-	Payload          []byte                  `json:"payload"`
+	TransactionID string           `json:"txId"`
+	NetworkID     iotago.NetworkID `json:"networkId"`
+	CreationSlot  iotago.SlotIndex `json:"creationSlot"`
+	Inputs        []*Input         `json:"inputs"`
+	Outputs       []*Output        `json:"outputs"`
+	Unlocks       []*UnlockBlock   `json:"unlocks"`
+	Payload       []byte           `json:"payload"`
 }
 
 // NewTransaction returns a Transaction from the given iotago.SignedTransaction.
@@ -157,7 +156,7 @@ func NewTransaction(signedTx *iotago.SignedTransaction) *Transaction {
 
 	dataPayload := make([]byte, 0)
 	if signedTx.Transaction.Payload != nil {
-		dataPayload, _ = deps.Protocol.CurrentAPI().Encode(signedTx.Transaction.Payload)
+		dataPayload, _ = deps.Protocol.CommittedAPI().Encode(signedTx.Transaction.Payload)
 	}
 
 	return &Transaction{
@@ -216,7 +215,7 @@ func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
 	case *iotago.SignatureUnlock:
 		switch signature := unlock.Signature.(type) {
 		case *iotago.Ed25519Signature:
-			sigJSON, err := deps.Protocol.CurrentAPI().JSONEncode(signature)
+			sigJSON, err := deps.Protocol.CommittedAPI().JSONEncode(signature)
 			if err != nil {
 				return nil
 			}

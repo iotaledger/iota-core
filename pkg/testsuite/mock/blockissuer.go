@@ -99,9 +99,12 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 		blockParams.BlockHeader.IssuingTime = &issuingTime
 	}
 
+	apiForBlock, err := i.retrieveAPI(blockParams.BlockHeader, node)
+	require.NoError(i.Testing, err)
+
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		var err error
-		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime), node)
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(apiForBlock, *blockParams.BlockHeader.IssuingTime, node)
 		if err != nil && ierrors.Is(err, ErrBlockTooRecent) {
 			commitment, parentID, err := i.reviveChain(*blockParams.BlockHeader.IssuingTime, node)
 			if err != nil {
@@ -124,7 +127,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 		blockParams.BlockHeader.References = references
 	}
 
-	err := i.setDefaultBlockParams(blockParams.BlockHeader, node)
+	err = i.setDefaultBlockParams(blockParams.BlockHeader, node)
 	require.NoError(i.Testing, err)
 
 	if blockParams.HighestSupportedVersion == nil {
@@ -134,16 +137,13 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 	}
 
 	if blockParams.ProtocolParametersHash == nil {
-		protocolParametersHash, err := node.Protocol.CurrentAPI().ProtocolParameters().Hash()
+		protocolParametersHash, err := apiForBlock.ProtocolParameters().Hash()
 		require.NoError(i.Testing, err)
 
 		blockParams.ProtocolParametersHash = &protocolParametersHash
 	}
 
-	api, err := i.retrieveAPI(blockParams.BlockHeader, node)
-	require.NoError(i.Testing, err)
-
-	blockBuilder := builder.NewValidationBlockBuilder(api)
+	blockBuilder := builder.NewValidationBlockBuilder(apiForBlock)
 
 	blockBuilder.SlotCommitmentID(blockParams.BlockHeader.SlotCommitment.MustID())
 	blockBuilder.LatestFinalizedSlot(*blockParams.BlockHeader.LatestFinalizedSlot)
@@ -186,7 +186,9 @@ func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, no
 
 	require.NoError(i.Testing, i.IssueBlock(block.ModelBlock(), node))
 
-	// fmt.Printf("Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
+	validationBlock, _ := block.ValidationBlock()
+
+	fmt.Printf("Issued ValidationBlock: %s - slot %d - commitment %s %d - latest finalized slot %d - version: %d - highestSupportedVersion: %d, hash: %s\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot, block.ProtocolBlock().ProtocolVersion, validationBlock.HighestSupportedVersion, validationBlock.ProtocolParametersHash)
 
 	return block
 }
@@ -196,7 +198,8 @@ func (i *BlockIssuer) retrieveAPI(blockParams *BlockHeaderParams, node *Node) (i
 		return node.Protocol.APIForVersion(*blockParams.ProtocolVersion)
 	}
 
-	return node.Protocol.CurrentAPI(), nil
+	// It is crucial to get the API from the issuing time/slot as that defines the version with which the block should be issued.
+	return node.Protocol.APIForTime(*blockParams.IssuingTime), nil
 }
 
 // CreateBlock creates a new block with the options.
@@ -207,10 +210,11 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *
 		issuingTime := time.Now().UTC()
 		blockParams.BlockHeader.IssuingTime = &issuingTime
 	}
+	currentAPI := node.Protocol.APIForTime(*blockParams.BlockHeader.IssuingTime)
 
 	if blockParams.BlockHeader.SlotCommitment == nil {
 		var err error
-		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.BlockHeader.IssuingTime), node)
+		blockParams.BlockHeader.SlotCommitment, err = i.getAddressableCommitment(currentAPI, *blockParams.BlockHeader.IssuingTime, node)
 		if err != nil {
 			return nil, ierrors.Wrap(err, "error getting commitment")
 		}
@@ -279,7 +283,7 @@ func (i *BlockIssuer) IssueBasicBlock(ctx context.Context, alias string, node *N
 
 	require.NoErrorf(i.Testing, i.IssueBlock(block.ModelBlock(), node), "%s > failed to issue block with alias %s", i.Name, alias)
 
-	// fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", i.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
+	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", i.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
 
 	return block
 }
@@ -361,12 +365,12 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	// if anything changes, need to make a new signature
 	var resign bool
 
-	apiForVesion, err := node.Protocol.APIForVersion(iotaBlock.ProtocolVersion)
+	apiForVersion, err := node.Protocol.APIForVersion(iotaBlock.ProtocolVersion)
 	if err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
 	}
 
-	protoParams := apiForVesion.ProtocolParameters()
+	protoParams := apiForVersion.ProtocolParameters()
 
 	if iotaBlock.NetworkID == 0 {
 		iotaBlock.NetworkID = protoParams.NetworkID()
@@ -421,7 +425,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
-		rmcSlot, err := safemath.SafeSub(apiForVesion.TimeProvider().SlotFromTime(iotaBlock.IssuingTime), apiForVesion.ProtocolParameters().MaxCommittableAge())
+		rmcSlot, err := safemath.SafeSub(apiForVersion.TimeProvider().SlotFromTime(iotaBlock.IssuingTime), apiForVersion.ProtocolParameters().MaxCommittableAge())
 		if err != nil {
 			rmcSlot = 0
 		}
@@ -431,7 +435,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		}
 
 		// only set the burned Mana as the last step before signing, so workscore calculation is correct.
-		basicBlock.MaxBurnedMana, err = basicBlock.ManaCost(rmc, apiForVesion.ProtocolParameters().WorkScoreStructure())
+		basicBlock.MaxBurnedMana, err = basicBlock.ManaCost(rmc, apiForVersion.ProtocolParameters().WorkScoreParameters())
 		if err != nil {
 			return iotago.EmptyBlockID, ierrors.Wrapf(err, "could not calculate Mana cost for block")
 		}
@@ -483,7 +487,8 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 
 	if blockParams.SlotCommitment == nil {
 		var err error
-		blockParams.SlotCommitment, err = i.getAddressableCommitment(node.Protocol.CurrentAPI().TimeProvider().SlotFromTime(*blockParams.IssuingTime), node)
+		currentAPI := node.Protocol.APIForTime(*blockParams.IssuingTime)
+		blockParams.SlotCommitment, err = i.getAddressableCommitment(currentAPI, *blockParams.IssuingTime, node)
 		if err != nil {
 			return ierrors.Wrap(err, "error getting commitment")
 		}
@@ -507,8 +512,10 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 	return nil
 }
 
-func (i *BlockIssuer) getAddressableCommitment(blockSlot iotago.SlotIndex, node *Node) (*iotago.Commitment, error) {
-	protoParams := node.Protocol.CurrentAPI().ProtocolParameters()
+func (i *BlockIssuer) getAddressableCommitment(currentAPI iotago.API, blockIssuingTime time.Time, node *Node) (*iotago.Commitment, error) {
+	protoParams := currentAPI.ProtocolParameters()
+	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
+
 	commitment := node.Protocol.MainEngine.Get().Storage.Settings().LatestCommitment().Commitment()
 
 	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {

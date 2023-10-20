@@ -40,7 +40,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 		return mapdb.NewMapDB(), nil
 	}
 
-	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
+	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](func() int { return 0 })
 	memPoolInstance := New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference)
@@ -144,7 +144,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	workers := workerpool.NewGroup(t.Name())
 
-	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
+	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
 	mutationsFunc := func(index iotago.SlotIndex) (kvstore.KVStore, error) {
@@ -159,7 +159,7 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 	workers := workerpool.NewGroup(t.Name())
 
-	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.TransactionID{}, 0))
+	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
 	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
 	mutationsFunc := func(index iotago.SlotIndex) (kvstore.KVStore, error) {

@@ -23,7 +23,7 @@ func (s *Server) RequestTips(_ context.Context, req *inx.TipsRequest) (*inx.Tips
 
 func (s *Server) ValidatePayload(_ context.Context, payload *inx.RawPayload) (*inx.PayloadValidationResponse, error) {
 	if err := func() error {
-		blockPayload, unwrapErr := payload.Unwrap(deps.Protocol.CurrentAPI(), serix.WithValidation())
+		blockPayload, unwrapErr := payload.Unwrap(deps.Protocol.CommittedAPI(), serix.WithValidation())
 		if unwrapErr != nil {
 			return unwrapErr
 		}

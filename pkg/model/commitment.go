@@ -94,6 +94,10 @@ func (c *Commitment) CumulativeWeight() uint64 {
 	return c.Commitment().CumulativeWeight
 }
 
+func (c *Commitment) ReferenceManaCost() iotago.Mana {
+	return c.Commitment().ReferenceManaCost
+}
+
 func (c *Commitment) Data() []byte {
 	return c.data
 }

@@ -67,8 +67,8 @@ func (s *Spent) TransactionIDSpent() iotago.TransactionID {
 	return s.transactionIDSpent
 }
 
-// SlotIndexSpent returns the index of the slot that spent the output.
-func (s *Spent) SlotIndexSpent() iotago.SlotIndex {
+// SlotSpent returns the index of the slot that spent the output.
+func (s *Spent) SlotSpent() iotago.SlotIndex {
 	return s.slotSpent
 }
 

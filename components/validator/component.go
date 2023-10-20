@@ -75,7 +75,7 @@ func checkValidatorStatus(ctx context.Context) {
 		return
 	}
 
-	if !exists || account.StakeEndEpoch <= deps.Protocol.CurrentAPI().TimeProvider().EpochFromSlot(deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time.Now())) {
+	if !exists || account.StakeEndEpoch <= deps.Protocol.CommittedAPI().TimeProvider().EpochFromSlot(deps.Protocol.CommittedAPI().TimeProvider().SlotFromTime(time.Now())) {
 		if prevValue := isValidator.Swap(false); prevValue {
 			// If the account stops being a validator, don't issue any blocks.
 			Component.LogInfof("BlockIssuer account %s stopped being a validator", validatorAccount.ID())

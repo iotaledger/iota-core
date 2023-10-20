@@ -43,26 +43,13 @@ type TestSuite struct {
 	snapshotPath string
 	blocks       *shrinkingmap.ShrinkingMap[string, *blocks.Block]
 
-	API iotago.API
+	API                      iotago.API
+	ProtocolParameterOptions []options.Option[iotago.V3ProtocolParameters]
 
-	optsGenesisTimestampOffset      int64
-	optsLivenessThresholdLowerBound uint16
-	optsLivenessThresholdUpperBound uint16
-	optsMinCommittableAge           iotago.SlotIndex
-	optsMaxCommittableAge           iotago.SlotIndex
-	optsSlotsPerEpochExponent       uint8
-	optsEpochNearingThreshold       iotago.SlotIndex
-	optsRMCMin                      iotago.Mana
-	optsRMCIncrease                 iotago.Mana
-	optsRMCDecrease                 iotago.Mana
-	optsRMCIncreaseThreshold        iotago.WorkScore
-	optsRMCDecreaseThreshold        iotago.WorkScore
-	optsSchedulerRate               iotago.WorkScore
-	optsMaxBufferSize               uint32
-	optsAccounts                    []snapshotcreator.AccountDetails
-	optsSnapshotOptions             []options.Option[snapshotcreator.Options]
-	optsWaitFor                     time.Duration
-	optsTick                        time.Duration
+	optsAccounts        []snapshotcreator.AccountDetails
+	optsSnapshotOptions []options.Option[snapshotcreator.Options]
+	optsWaitFor         time.Duration
+	optsTick            time.Duration
 
 	uniqueBlockTimeCounter              atomic.Int64
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
@@ -72,7 +59,6 @@ type TestSuite struct {
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
-	var schedulerRate iotago.WorkScore = 100000
 	return options.Apply(&TestSuite{
 		Testing:                             testingT,
 		fakeTesting:                         &testing.T{},
@@ -84,65 +70,54 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
 		automaticTransactionIssuingCounters: *shrinkingmap.New[string, int](),
 
-		optsWaitFor:                     DurationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
-		optsTick:                        DurationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
-		optsGenesisTimestampOffset:      0,
-		optsLivenessThresholdLowerBound: 30,
-		optsLivenessThresholdUpperBound: 30,
-		optsMinCommittableAge:           10,
-		optsMaxCommittableAge:           20,
-		optsSlotsPerEpochExponent:       5,
-		optsEpochNearingThreshold:       16,
-		optsRMCMin:                      500,
-		optsRMCIncrease:                 500,
-		optsRMCDecrease:                 500,
-		optsRMCIncreaseThreshold:        8 * schedulerRate,
-		optsRMCDecreaseThreshold:        5 * schedulerRate,
-		optsSchedulerRate:               schedulerRate,
-		optsMaxBufferSize:               100 * iotago.MaxBlockSize,
+		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
-		t.API = iotago.V3API(
-			iotago.NewV3ProtocolParameters(
-				iotago.WithNetworkOptions(
-					testingT.Name(),
-					"rms",
-				),
-				iotago.WithSupplyOptions(
-					1_000_0000,
-					100,
-					1,
-					10,
-					100,
-					100,
-					100,
-				),
-				iotago.WithTimeProviderOptions(
-					time.Now().Truncate(10*time.Second).Unix()-t.optsGenesisTimestampOffset,
-					10,
-					t.optsSlotsPerEpochExponent,
-				),
-				iotago.WithLivenessOptions(
-					t.optsLivenessThresholdLowerBound,
-					t.optsLivenessThresholdUpperBound,
-					t.optsMinCommittableAge,
-					t.optsMaxCommittableAge,
-					t.optsEpochNearingThreshold,
-				),
-				iotago.WithCongestionControlOptions(
-					t.optsRMCMin,
-					t.optsRMCIncrease,
-					t.optsRMCDecrease,
-					t.optsRMCIncreaseThreshold,
-					t.optsRMCDecreaseThreshold,
-					t.optsSchedulerRate,
-					t.optsMaxBufferSize,
-					t.optsMaxBufferSize,
-				),
-				iotago.WithRewardsOptions(10, 8, 8, 31, 1154, 2, 1),
-				iotago.WithStakingOptions(1, 100, 1),
+
+		defaultProtocolParameters := []options.Option[iotago.V3ProtocolParameters]{
+			iotago.WithNetworkOptions(
+				testingT.Name(),
+				"rms",
 			),
-		)
+			iotago.WithSupplyOptions(
+				1_000_0000,
+				100,
+				1,
+				10,
+				100,
+				100,
+				100,
+			),
+			iotago.WithRewardsOptions(8, 8, 31, 1154, 2, 1),
+			iotago.WithStakingOptions(1, 100, 1),
+
+			iotago.WithTimeProviderOptions(
+				GenesisTimeWithOffsetBySlots(0, DefaultSlotDurationInSeconds),
+				DefaultSlotDurationInSeconds,
+				DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				DefaultLivenessThresholdLowerBoundInSeconds,
+				DefaultLivenessThresholdUpperBoundInSeconds,
+				DefaultMinCommittableAge,
+				DefaultMaxCommittableAge,
+				DefaultEpochNearingThreshold,
+			),
+			iotago.WithCongestionControlOptions(
+				DefaultMinReferenceManaCost,
+				DefaultRMCIncrease,
+				DefaultRMCDecrease,
+				DefaultRMCIncreaseThreshold,
+				DefaultRMCDecreaseThreshold,
+				DefaultSchedulerRate,
+				DefaultMaxBufferSize,
+				DefaultMaxValBufferSize,
+			),
+		}
+
+		t.ProtocolParameterOptions = append(defaultProtocolParameters, t.ProtocolParameterOptions...)
+		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(t.ProtocolParameterOptions...))
 
 		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(), time.Unix(t.API.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
@@ -357,11 +332,10 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.Validator.PublicKey)),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
-		}
-		if validator {
-			accountDetails.StakedAmount = accountDetails.Amount
-			accountDetails.StakingEpochEnd = iotago.MaxEpochIndex
-			accountDetails.FixedCost = iotago.Mana(0)
+			StakedAmount:         amount,
+			StakingEpochEnd:      iotago.MaxEpochIndex,
+			FixedCost:            iotago.Mana(0),
+			AccountID:            node.Validator.AccountID,
 		}
 
 		t.optsAccounts = append(t.optsAccounts, accountDetails)
@@ -470,7 +444,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 		node.Initialize(failOnBlockFiltered, baseOpts...)
 
 		if t.TransactionFramework == nil {
-			t.TransactionFramework = NewTransactionFramework(node.Protocol, t.genesisSeed[:], t.optsAccounts...)
+			t.TransactionFramework = NewTransactionFramework(node.Protocol, t.genesisSeed[:])
 		}
 
 		return true

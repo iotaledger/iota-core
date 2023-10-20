@@ -31,9 +31,9 @@ type Protocol struct {
 
 	network                   network.Endpoint
 	workerPool                *workerpool.WorkerPool
-	duplicateBlockBytesFilter *bytesfilter.BytesFilter
+	duplicateBlockBytesFilter *bytesfilter.BytesFilter[iotago.Identifier]
 
-	requestedBlockHashes      *shrinkingmap.ShrinkingMap[types.Identifier, types.Empty]
+	requestedBlockHashes      *shrinkingmap.ShrinkingMap[iotago.Identifier, types.Empty]
 	requestedBlockHashesMutex syncutils.Mutex
 
 	shutdown reactive.Event
@@ -46,8 +46,8 @@ func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, ap
 		network:                   network,
 		workerPool:                workerPool,
 		apiProvider:               apiProvider,
-		duplicateBlockBytesFilter: bytesfilter.New(10000),
-		requestedBlockHashes:      shrinkingmap.New[types.Identifier, types.Empty](shrinkingmap.WithShrinkingThresholdCount(1000)),
+		duplicateBlockBytesFilter: bytesfilter.New(iotago.IdentifierFromData, 10000),
+		requestedBlockHashes:      shrinkingmap.New[iotago.Identifier, types.Empty](shrinkingmap.WithShrinkingThresholdCount(1000)),
 		shutdown:                  reactive.NewEvent(),
 	}, opts, func(p *Protocol) {
 		network.RegisterProtocol(newPacket, p.handlePacket)
@@ -62,7 +62,7 @@ func (p *Protocol) SendBlock(block *model.Block, to ...peer.ID) {
 
 func (p *Protocol) RequestBlock(id iotago.BlockID, to ...peer.ID) {
 	p.requestedBlockHashesMutex.Lock()
-	p.requestedBlockHashes.Set(types.Identifier(id.Identifier()), types.Void)
+	p.requestedBlockHashes.Set(id.Identifier(), types.Void)
 	p.requestedBlockHashesMutex.Unlock()
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_BlockRequest{BlockRequest: &nwmodels.BlockRequest{
@@ -195,10 +195,10 @@ func (p *Protocol) onBlock(blockData []byte, id peer.ID) {
 		return
 	}
 
-	isNew := p.duplicateBlockBytesFilter.AddIdentifier(types.Identifier(blockIdentifier))
+	isNew := p.duplicateBlockBytesFilter.AddIdentifier(blockIdentifier)
 
 	p.requestedBlockHashesMutex.Lock()
-	requested := p.requestedBlockHashes.Delete(types.Identifier(blockIdentifier))
+	requested := p.requestedBlockHashes.Delete(blockIdentifier)
 	p.requestedBlockHashesMutex.Unlock()
 
 	if !isNew && !requested {

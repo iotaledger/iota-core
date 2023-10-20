@@ -168,7 +168,7 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Maximum number of basic blocks that can be stored in the buffer."),
 		collector.WithCollectFunc(func() (float64, []string) {
-			return float64(deps.Protocol.MainEngine.Get().CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize), []string{}
+			return float64(deps.Protocol.MainEngine.Get().CommittedAPI().ProtocolParameters().CongestionControlParameters().MaxBufferSize), []string{}
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(basicBufferReadyBlockCount,
@@ -189,7 +189,7 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Current scheduling rate of basic blocks."),
 		collector.WithCollectFunc(func() (float64, []string) {
-			return float64(deps.Protocol.MainEngine.Get().CurrentAPI().ProtocolParameters().CongestionControlParameters().SchedulerRate), []string{}
+			return float64(deps.Protocol.MainEngine.Get().CommittedAPI().ProtocolParameters().CongestionControlParameters().SchedulerRate), []string{}
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(validatorBufferTotalSize,
@@ -203,7 +203,7 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Maximum number of validation blocks that can be stored in each validator queue."),
 		collector.WithCollectFunc(func() (float64, []string) {
-			return float64(deps.Protocol.MainEngine.Get().CurrentAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize), []string{}
+			return float64(deps.Protocol.MainEngine.Get().CommittedAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize), []string{}
 		}),
 	)),
 )

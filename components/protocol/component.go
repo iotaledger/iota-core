@@ -243,11 +243,11 @@ func configure() error {
 	})
 
 	deps.Protocol.Events.Engine.Clock.AcceptedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogDebugf("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time)
+		Component.LogDebugf("AcceptedTimeUpdated: Slot %d @ %s", deps.Protocol.CommittedAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Clock.ConfirmedTimeUpdated.Hook(func(time time.Time) {
-		Component.LogDebugf("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.CurrentAPI().TimeProvider().SlotFromTime(time), time)
+		Component.LogDebugf("ConfirmedTimeUpdated: Slot %d @ %s", deps.Protocol.CommittedAPI().TimeProvider().SlotFromTime(time), time)
 	})
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {

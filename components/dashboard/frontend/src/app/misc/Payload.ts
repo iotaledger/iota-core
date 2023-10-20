@@ -1,6 +1,6 @@
 export enum PayloadType {
-    TaggedData = 5,
-    Transaction = 6,
+    TaggedData = 0,
+    Transaction = 1,
     Faucet = 3,
 }
 
@@ -26,7 +26,6 @@ export class TransactionPayload {
     networkId: number;
     creationSlot: number;
     inputs: Array<Input>;
-    inputsCommitment: string;
     outputs: Array<Output>;
     payload: any;
     unlocks: Array<UnlockBlock>;

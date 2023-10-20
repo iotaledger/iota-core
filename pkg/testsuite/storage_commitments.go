@@ -1,7 +1,7 @@
 package testsuite
 
 import (
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -20,7 +20,7 @@ func (t *TestSuite) AssertStorageCommitments(commitments []*iotago.Commitment, n
 					return ierrors.Wrapf(err, "AssertStorageCommitments: %s: error loading commitment: %s", node.Name, commitment.MustID())
 				}
 
-				if !cmp.Equal(*commitment, *storedCommitment.Commitment()) {
+				if !assert.Equal(t.fakeTesting, *commitment, *storedCommitment.Commitment()) {
 					return ierrors.Errorf("AssertStorageCommitments: %s: expected %s, got %s", node.Name, commitment, storedCommitment)
 				}
 
@@ -49,7 +49,7 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 				continue
 			}
 
-			if !cmp.Equal(*commitment.Commitment(), *storedCommitment.Commitment()) {
+			if !assert.Equal(t.fakeTesting, *commitment.Commitment(), *storedCommitment.Commitment()) {
 				return ierrors.Errorf("AssertEqualStoredCommitmentAtIndex: %s: expected %s (from %s), got %s", node.Name, commitment, commitmentNode.Name, storedCommitment)
 			}
 		}
@@ -78,7 +78,7 @@ func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expecte
 				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error getting committed blocks for slot: %d", node.Name, slot)
 			}
 
-			if !cmp.Equal(committedBlocks, expectedBlocks) {
+			if !assert.Equal(t.fakeTesting, committedBlocks, expectedBlocks) {
 				return ierrors.Errorf("AssertStorageCommitmentBlocks: %s: expected %s, got %s", node.Name, expectedBlocks, committedBlocks)
 			}
 		}

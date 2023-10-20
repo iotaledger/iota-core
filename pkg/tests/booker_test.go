@@ -226,9 +226,20 @@ func Test_MultipleAttachments(t *testing.T) {
 
 func Test_SpendRejectedCommittedRace(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithGenesisTimestampOffset(20*10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(5),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(20, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				testsuite.DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
+				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
+				2,
+				5,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
 	)
 	defer ts.Shutdown()
 
@@ -481,9 +492,20 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 func Test_SpendPendingCommittedRace(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithGenesisTimestampOffset(20*10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(5),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(20, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				testsuite.DefaultSlotsPerEpochExponent,
+			),
+			iotago.WithLivenessOptions(
+				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
+				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
+				2,
+				5,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
 	)
 	defer ts.Shutdown()
 

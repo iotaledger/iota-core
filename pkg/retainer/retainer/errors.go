@@ -6,6 +6,27 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
+var blocksErrorsFailureReasonMap = map[error]apimodels.BlockFailureReason{
+	iotago.ErrIssuerAccountNotFound:     apimodels.BlockFailureIssuerAccountNotFound,
+	iotago.ErrBurnedInsufficientMana:    apimodels.BlockFailurBurnedInsufficientMana,
+	iotago.ErrBlockVersionInvalid:       apimodels.BlockFailureVersionInvalid,
+	iotago.ErrRMCNotFound:               apimodels.BlockFailureAccountInvalid,
+	iotago.ErrFailedToCalculateManaCost: apimodels.BlockFailureManaCostCalculationFailed,
+	iotago.ErrNegativeBIC:               apimodels.BlockFailureAccountInvalid,
+	iotago.ErrAccountExpired:            apimodels.BlockFailureAccountInvalid,
+	iotago.ErrInvalidSignature:          apimodels.BlockFailureSignatureInvalid,
+}
+
+func determineBlockFailureReason(err error) apimodels.BlockFailureReason {
+	for errKey, failureReason := range blocksErrorsFailureReasonMap {
+		if ierrors.Is(err, errKey) {
+			return failureReason
+		}
+	}
+	// use most general failure reason
+	return apimodels.BlockFailureInvalid
+}
+
 var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	// unknown type / type casting errors
 	iotago.ErrTxTypeInvalid:               apimodels.TxFailureTxTypeInvalid,
@@ -36,7 +57,6 @@ var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	iotago.ErrTimelockNotExpired:           apimodels.TxFailureConfiguredTimelockNotYetExpired,
 	iotago.ErrReturnAmountNotFulFilled:     apimodels.TxFailureReturnAmountNotFulfilled,
 	iotago.ErrInvalidInputUnlock:           apimodels.TxFailureInputUnlockInvalid,
-	iotago.ErrInvalidInputsCommitment:      apimodels.TxFailureInputsCommitmentInvalid,
 	iotago.ErrSenderFeatureNotUnlocked:     apimodels.TxFailureSenderNotUnlocked,
 	iotago.ErrChainTransitionInvalid:       apimodels.TxFailureChainStateTransitionInvalid,
 	iotago.ErrInputOutputManaMismatch:      apimodels.TxFailureManaAmountInvalid,

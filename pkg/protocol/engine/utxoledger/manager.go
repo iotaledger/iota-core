@@ -19,7 +19,7 @@ type Manager struct {
 	store     kvstore.KVStore
 	storeLock syncutils.RWMutex
 
-	stateTree ads.Map[iotago.OutputID, *stateTreeMetadata]
+	stateTree ads.Map[iotago.Identifier, iotago.OutputID, *stateTreeMetadata]
 
 	apiProvider iotago.APIProvider
 }
@@ -27,7 +27,7 @@ type Manager struct {
 func New(store kvstore.KVStore, apiProvider iotago.APIProvider) *Manager {
 	return &Manager{
 		store: store,
-		stateTree: ads.NewMap(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree})),
+		stateTree: ads.NewMap[iotago.Identifier](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree})),
 			iotago.OutputID.Bytes,
 			iotago.OutputIDFromBytes,
 			(*stateTreeMetadata).Bytes,

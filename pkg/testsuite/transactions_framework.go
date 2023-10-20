@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -25,36 +24,32 @@ type TransactionFramework struct {
 	transactions       map[string]*iotago.Transaction
 }
 
-func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte, accounts ...snapshotcreator.AccountDetails) *TransactionFramework {
-	// The genesis output is on index 0 of the genesis TX
-	genesisOutput, err := protocol.MainEngine.Get().Ledger.Output(iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, 0))
-	if err != nil {
-		panic(err)
-	}
-
+func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte) *TransactionFramework {
 	tf := &TransactionFramework{
 		apiProvider:        protocol,
-		states:             map[string]*utxoledger.Output{"Genesis:0": genesisOutput},
+		states:             make(map[string]*utxoledger.Output),
 		signedTransactions: make(map[string]*iotago.SignedTransaction),
 		transactions:       make(map[string]*iotago.Transaction),
 
 		wallet: mock.NewHDWallet("genesis", genesisSeed, 0),
 	}
 
-	for idx := range accounts {
-		// Genesis TX
-		outputID := iotago.OutputIDFromTransactionIDAndIndex(snapshotcreator.GenesisTransactionID, uint16(idx+1))
+	if err := protocol.MainEngine.Get().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
+		tf.states[fmt.Sprintf("Genesis:%d", output.OutputID().Index())] = output
+		return true
+	}); err != nil {
+		panic(err)
+	}
 
-		if tf.states[fmt.Sprintf("Genesis:%d", idx+1)], err = protocol.MainEngine.Get().Ledger.Output(outputID); err != nil {
-			panic(err)
-		}
+	if len(tf.states) == 0 {
+		panic("no genesis outputs found")
 	}
 
 	return tf
 }
 
 func (t *TransactionFramework) RegisterTransaction(alias string, transaction *iotago.Transaction) {
-	currentAPI := t.apiProvider.CurrentAPI()
+	currentAPI := t.apiProvider.CommittedAPI()
 	(lo.PanicOnErr(transaction.ID())).RegisterAlias(alias)
 
 	t.transactions[alias] = transaction
@@ -68,7 +63,7 @@ func (t *TransactionFramework) RegisterTransaction(alias string, transaction *io
 			}
 		}
 
-		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput)
+		t.states[fmt.Sprintf("%s:%d", alias, outputID.Index())] = utxoledger.CreateOutput(t.apiProvider, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput, lo.PanicOnErr(iotago.OutputIDProofFromTransaction(transaction, outputID.Index())))
 	}
 }
 
@@ -79,7 +74,7 @@ func (t *TransactionFramework) RegisterSignedTransaction(alias string, signedTra
 }
 
 func (t *TransactionFramework) CreateSignedTransactionWithOptions(alias string, signingWallets []*mock.HDWallet, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
-	currentAPI := t.apiProvider.CurrentAPI()
+	currentAPI := t.apiProvider.CommittedAPI()
 
 	walletKeys := make([]iotago.AddressKeys, 0, len(signingWallets)*2)
 	for _, wallet := range signingWallets {

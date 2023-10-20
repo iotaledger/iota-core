@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"time"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -35,9 +37,14 @@ func (a *APIProvider) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
 	return a.MainEngine.Get().APIForEpoch(epoch)
 }
 
-// CurrentAPI returns the current API.
-func (a *APIProvider) CurrentAPI() iotago.API {
-	return a.MainEngine.Get().CurrentAPI()
+// APIForTime returns the API for the given time.
+func (a *APIProvider) APIForTime(t time.Time) iotago.API {
+	return a.MainEngine.Get().APIForTime(t)
+}
+
+// CommittedAPI returns the API for the committed state.
+func (a *APIProvider) CommittedAPI() iotago.API {
+	return a.MainEngine.Get().CommittedAPI()
 }
 
 // LatestAPI returns the latest API.

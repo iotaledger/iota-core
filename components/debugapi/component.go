@@ -180,7 +180,7 @@ func configure() error {
 			return err
 		}
 
-		j, err := deps.Protocol.CurrentAPI().JSONEncode(resp)
+		j, err := deps.Protocol.CommittedAPI().JSONEncode(resp)
 		if err != nil {
 			return err
 		}

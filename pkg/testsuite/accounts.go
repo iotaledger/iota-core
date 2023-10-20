@@ -1,7 +1,7 @@
 package testsuite
 
 import (
-	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -41,7 +41,7 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected expiry slot %s, got %s", node.Name, accountData.ID, accountData.ExpirySlot, actualAccountData.ExpirySlot)
 			}
 
-			if !cmp.Equal(accountData.BlockIssuerKeys, actualAccountData.BlockIssuerKeys) {
+			if !assert.Equal(t.fakeTesting, accountData.BlockIssuerKeys, actualAccountData.BlockIssuerKeys) {
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected pub keys %s, got %s", node.Name, accountData.ID, accountData.BlockIssuerKeys, actualAccountData.BlockIssuerKeys)
 			}
 
@@ -118,35 +118,35 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 				return ierrors.Errorf("AssertAccountDiff: %s: expected previous output ID %s but actual %s for account %s at slot %d", node.Name, accountDiff.PreviousOutputID, actualAccountDiff.PreviousOutputID, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.BlockIssuerKeysAdded, actualAccountDiff.BlockIssuerKeysAdded) {
+			if !assert.Equal(t.fakeTesting, accountDiff.BlockIssuerKeysAdded, actualAccountDiff.BlockIssuerKeysAdded) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys added %s but actual %s for account %s at slot %d", node.Name, accountDiff.BlockIssuerKeysAdded, actualAccountDiff.BlockIssuerKeysAdded, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.BlockIssuerKeysRemoved, actualAccountDiff.BlockIssuerKeysRemoved) {
+			if !assert.Equal(t.fakeTesting, accountDiff.BlockIssuerKeysRemoved, actualAccountDiff.BlockIssuerKeysRemoved) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys removed %s but actual %s for account %s at slot %d", node.Name, accountDiff.BlockIssuerKeysRemoved, actualAccountDiff.BlockIssuerKeysRemoved, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.StakeEndEpochChange, actualAccountDiff.StakeEndEpochChange) {
+			if !assert.Equal(t.fakeTesting, accountDiff.StakeEndEpochChange, actualAccountDiff.StakeEndEpochChange) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected new stake end epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.StakeEndEpochChange, actualAccountDiff.StakeEndEpochChange, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.FixedCostChange, actualAccountDiff.FixedCostChange) {
+			if !assert.Equal(t.fakeTesting, accountDiff.FixedCostChange, actualAccountDiff.FixedCostChange) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected fixed cost change %d but actual %d for account %s at slot %d", node.Name, accountDiff.FixedCostChange, actualAccountDiff.FixedCostChange, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.ValidatorStakeChange, actualAccountDiff.ValidatorStakeChange) {
+			if !assert.Equal(t.fakeTesting, accountDiff.ValidatorStakeChange, actualAccountDiff.ValidatorStakeChange) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected validator stake change epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.ValidatorStakeChange, actualAccountDiff.ValidatorStakeChange, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange) {
+			if !assert.Equal(t.fakeTesting, accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected delegation stake change epoch %d but actual %d for account %s at slot %d", node.Name, accountDiff.DelegationStakeChange, actualAccountDiff.DelegationStakeChange, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.PrevLatestSupportedVersionAndHash, actualAccountDiff.PrevLatestSupportedVersionAndHash) {
+			if !assert.Equal(t.fakeTesting, accountDiff.PrevLatestSupportedVersionAndHash, actualAccountDiff.PrevLatestSupportedVersionAndHash) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected previous latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.PreviousExpirySlot, actualAccountDiff.PrevLatestSupportedVersionAndHash, accountID, index)
 			}
 
-			if !cmp.Equal(accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash) {
+			if !assert.Equal(t.fakeTesting, accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected new latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash, accountID, index)
 			}
 		}

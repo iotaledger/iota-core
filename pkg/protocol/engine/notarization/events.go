@@ -26,6 +26,6 @@ var NewEvents = event.CreateGroupConstructor(func() (self *Events) {
 // SlotCommittedDetails contains the details of a committed slot.
 type SlotCommittedDetails struct {
 	Commitment            *model.Commitment
-	AcceptedBlocks        ads.Set[iotago.BlockID]
+	AcceptedBlocks        ads.Set[iotago.Identifier, iotago.BlockID]
 	ActiveValidatorsCount int
 }

@@ -94,7 +94,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				return requestedBlocksReceived
 			}
 
-			acceptedBlocks := ads.NewSet[iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
+			acceptedBlocks := ads.NewSet[iotago.Identifier](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
 			for _, blockID := range blockIDs {
 				_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
 			}
@@ -105,7 +105,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				return false
 			}
 
-			acceptedTransactionIDs := ads.NewSet[iotago.TransactionID](mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
+			acceptedTransactionIDs := ads.NewSet[iotago.Identifier](mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
 			for _, transactionID := range transactionIDs {
 				_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
 			}
@@ -122,8 +122,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			// As we already decided to switch and sync to this chain we should make sure that processing the blocks from the commitment
 			// leads to the verified commitment.
 			if targetEngine.Notarization.AcceptedBlocksCount(commitmentID.Slot()) > 0 {
-				targetEngine.Notarization.
-					w.LogError("ENGINE IS DIRTY")
+				w.LogError("ENGINE IS DIRTY")
 			}
 
 			// Once all blocks are booked we

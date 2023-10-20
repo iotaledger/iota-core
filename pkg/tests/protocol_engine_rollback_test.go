@@ -26,13 +26,20 @@ import (
 
 func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(3),
-		testsuite.WithEpochNearingThreshold(5),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				3,
+				5,
+			),
+		),
 
 		testsuite.WithWaitFor(15*time.Second),
 	)
@@ -200,13 +207,20 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 
 func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(3),
-		testsuite.WithEpochNearingThreshold(5),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				3,
+				5,
+			),
+		),
 
 		testsuite.WithWaitFor(15*time.Second),
 	)
@@ -386,13 +400,20 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 
 func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(3),
-		testsuite.WithEpochNearingThreshold(5),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				3,
+				5,
+			),
+		),
 
 		testsuite.WithWaitFor(15*time.Second),
 	)
@@ -572,13 +593,20 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 
 func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithLivenessThresholdLowerBound(10),
-		testsuite.WithLivenessThresholdUpperBound(10),
-		testsuite.WithMinCommittableAge(2),
-		testsuite.WithMaxCommittableAge(3),
-		testsuite.WithEpochNearingThreshold(5),
-		testsuite.WithSlotsPerEpochExponent(3),
-		testsuite.WithGenesisTimestampOffset(1000*10),
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				3,
+				5,
+			),
+		),
 
 		testsuite.WithWaitFor(15*time.Second),
 	)
