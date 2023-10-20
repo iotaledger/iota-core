@@ -17,5 +17,8 @@ type Orchestrator interface {
 
 	RestoreFromDisk(slot iotago.SlotIndex) error
 
+	// Reset resets the Orchestrator to its clean state after the last commitment.
+	Reset()
+
 	module.Interface
 }

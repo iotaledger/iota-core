@@ -134,6 +134,11 @@ func NewOrchestrator(errorHandler func(error),
 	)
 }
 
+// Reset resets the Orchestrator to its clean state after the last commitment.
+func (o *Orchestrator) Reset() {
+	// TODO: check if something needs to be cleaned here
+}
+
 func (o *Orchestrator) Shutdown() {
 	o.TriggerStopped()
 }

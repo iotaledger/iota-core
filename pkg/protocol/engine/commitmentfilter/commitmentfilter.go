@@ -9,5 +9,8 @@ type CommitmentFilter interface {
 	// ProcessPreFilteredBlock processes block from the given source.
 	ProcessPreFilteredBlock(block *blocks.Block)
 
+	// Reset resets the CommitmentFilter to its clean state after the last commitment.
+	Reset()
+
 	module.Interface
 }
