@@ -14,15 +14,15 @@ var Config = Params{}
 
 var identityConfigJSON = `{
   "docker": {
-    "validator-1": [
+    "node-1": [
       "8q491c3YWjbPwLmF2WD95YmCgh61j2kenCKHfGfByoWi",
       "http://localhost:8080"
     ],
-    "validator-2": [
+    "node-2": [
       "4ata8GcTRMJ5sSv2jQJWmSYYTHct748p3tXmCFYm7wjA",
       "http://localhost:8070"
     ],
-    "validator-3": [
+    "node-3": [
       "3YX6e7AL28hHihZewKdq6CMkEYVsTJBLgRiprUNiNq5E",
       "http://localhost:8090"
     ]
