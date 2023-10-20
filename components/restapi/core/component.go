@@ -208,7 +208,9 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteBlockIssuance, func(c echo.Context) error {
-		resp, err := blockIssuance(c)
+		index, _ := httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
+
+		resp, err := blockIssuanceBySlot(index)
 		if err != nil {
 			return err
 		}
@@ -388,7 +390,7 @@ func responseByHeader(c echo.Context, obj any) error {
 	switch mimeType {
 	case httpserver.MIMEApplicationVendorIOTASerializerV2:
 		// TODO: that should take the API that belongs to the object
-		b, err := deps.Protocol.CurrentAPI().Encode(obj)
+		b, err := deps.Protocol.CommittedAPI().Encode(obj)
 		if err != nil {
 			return err
 		}
@@ -398,7 +400,7 @@ func responseByHeader(c echo.Context, obj any) error {
 	// default to echo.MIMEApplicationJSON
 	default:
 		// TODO: that should take the API that belongs to the object
-		j, err := deps.Protocol.CurrentAPI().JSONEncode(obj)
+		j, err := deps.Protocol.CommittedAPI().JSONEncode(obj)
 		if err != nil {
 			return err
 		}

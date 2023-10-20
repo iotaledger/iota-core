@@ -93,15 +93,15 @@ func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) ds.Set[io
 
 	return eligible
 
-	//epochStart := t.apiProvider.APIForEpoch(epoch).TimeProvider().EpochStart(epoch)
-	//registeredStore := t.registeredValidatorsFunc(epochStart)
-	//eligible := ds.NewSet[iotago.AccountID]()
-	//registeredStore.ForEach(func(accountID iotago.AccountID, a *prunable.RegisteredValidatorActivity) bool {
+	// epochStart := t.apiProvider.APIForEpoch(epoch).TimeProvider().EpochStart(epoch)
+	// registeredStore := t.registeredValidatorsFunc(epochStart)
+	// eligible := ds.NewSet[iotago.AccountID]()
+	// registeredStore.ForEach(func(accountID iotago.AccountID, a *prunable.RegisteredValidatorActivity) bool {
 	//	if a.Active {
 	//		eligible.Add(accountID)
 	//	}
 	//	return true
-	//}
+	// }
 }
 
 // ValidatorCandidates returns the registered validator candidates for the given epoch.
@@ -214,6 +214,8 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.Valida
 		return 0
 	}
 
+	protoParamsForEpoch := t.apiProvider.APIForEpoch(epoch).ProtocolParameters()
+
 	var epochPerformanceFactor uint64
 	for _, pf := range slotActivityVector {
 		// no activity in a slot
@@ -224,7 +226,7 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.Valida
 		// we reward not only total number of blocks issued, but also regularity based on block timestamp
 		slotPerformanceFactor := bits.OnesCount32(pf.SlotActivityVector)
 
-		if pf.BlockIssuedCount > t.apiProvider.APIForEpoch(epoch).ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot {
+		if pf.BlockIssuedCount > protoParamsForEpoch.ValidationBlocksPerSlot() {
 			// we harshly punish validators that issue any blocks more than allowed
 
 			return 0
@@ -233,7 +235,7 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.Valida
 		epochPerformanceFactor += uint64(slotPerformanceFactor)
 	}
 
-	return epochPerformanceFactor >> uint64(t.apiProvider.CurrentAPI().ProtocolParameters().TimeProvider().SlotsPerEpochExponent())
+	return epochPerformanceFactor >> uint64(protoParamsForEpoch.TimeProvider().SlotsPerEpochExponent())
 }
 
 func (t *Tracker) isCommitteeMember(slot iotago.SlotIndex, accountID iotago.AccountID) (bool, error) {
@@ -269,7 +271,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	apiForSlot := t.apiProvider.APIForSlot(block.ID().Slot())
 	// we restrict the number up to ValidatorBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
 	// also it can fint into uint8
-	if validatorPerformance.BlockIssuedCount < apiForSlot.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot+1 {
+	if validatorPerformance.BlockIssuedCount < apiForSlot.ProtocolParameters().ValidationBlocksPerSlot()+1 {
 		validatorPerformance.BlockIssuedCount++
 	}
 	validatorPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{
@@ -284,7 +286,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 // subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validatorBlocksPerSlot equal parts.
 func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int {
 	epochAPI := t.apiProvider.APIForEpoch(t.latestAppliedEpoch)
-	valBlocksNum := epochAPI.ProtocolParameters().RewardsParameters().ValidatorBlocksPerSlot
+	valBlocksNum := epochAPI.ProtocolParameters().ValidationBlocksPerSlot()
 	subslotDur := time.Duration(epochAPI.TimeProvider().SlotDurationSeconds()) * time.Second / time.Duration(valBlocksNum)
 	slotStart := epochAPI.TimeProvider().SlotStartTime(slot)
 

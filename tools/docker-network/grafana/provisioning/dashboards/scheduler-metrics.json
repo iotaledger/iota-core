@@ -772,8 +772,8 @@
       {
         "current": {
           "selected": true,
-          "text": "peer_master2:9311",
-          "value": "peer_master2:9311"
+          "text": "validator-2:9311",
+          "value": "validator-2:9311"
         },
         "datasource": {
           "type": "prometheus",

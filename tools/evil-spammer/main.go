@@ -36,9 +36,12 @@ func main() {
 		// load wallet
 		accWallet, err = accountwallet.Run(config)
 		if err != nil {
-			log.Warn(err)
+			log.Error(err)
+			log.Errorf("Failed to init account wallet, exitting...")
+
 			return
 		}
+
 		// save wallet and latest faucet output
 		defer func() {
 			err = accountwallet.SaveState(accWallet)

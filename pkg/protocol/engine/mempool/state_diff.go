@@ -22,5 +22,5 @@ type StateDiff interface {
 	ExecutedTransactions() *orderedmap.OrderedMap[iotago.TransactionID, TransactionMetadata]
 
 	// Mutations returns an authenticated data structure that allows to commit to the applied mutations.
-	Mutations() ads.Set[iotago.TransactionID]
+	Mutations() ads.Set[iotago.Identifier, iotago.TransactionID]
 }

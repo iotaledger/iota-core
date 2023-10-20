@@ -37,9 +37,8 @@ type Manager struct {
 
 	storage *storage.Storage
 
-	acceptedTimeFunc  func() time.Time
-	minCommittableAge iotago.SlotIndex
-	apiProvider       iotago.APIProvider
+	acceptedTimeFunc func() time.Time
+	apiProvider      iotago.APIProvider
 
 	commitmentMutex syncutils.Mutex
 
@@ -48,7 +47,7 @@ type Manager struct {
 
 func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
-		m := NewManager(e.CurrentAPI().ProtocolParameters().MinCommittableAge(), e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
+		m := NewManager(e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
 
 		m.apiProvider = e
 
@@ -83,12 +82,11 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	})
 }
 
-func NewManager(minCommittableAge iotago.SlotIndex, workers *workerpool.Group, errorHandler func(error)) *Manager {
+func NewManager(workers *workerpool.Group, errorHandler func(error)) *Manager {
 	return &Manager{
-		minCommittableAge: minCommittableAge,
-		events:            notarization.NewEvents(),
-		workers:           workers,
-		errorHandler:      errorHandler,
+		events:       notarization.NewEvents(),
+		workers:      workers,
+		errorHandler: errorHandler,
 	}
 }
 
@@ -137,7 +135,7 @@ func (m *Manager) IsBootstrapped() bool {
 	// because there are 5 full slots and 1 that is still not finished between slot 10 and slot 4.
 	// All slots smaller or equal to 4 are committable.
 	latestIndex := m.storage.Settings().LatestCommitment().Slot()
-	return latestIndex+m.minCommittableAge >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())
+	return latestIndex+m.apiProvider.APIForSlot(latestIndex).ProtocolParameters().MinCommittableAge() >= m.apiProvider.APIForSlot(latestIndex).TimeProvider().SlotFromTime(m.acceptedTimeFunc())
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
@@ -167,8 +165,8 @@ func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
 	}
 }
 
-func (m *Manager) isCommittable(index, acceptedBlockIndex iotago.SlotIndex) bool {
-	return index+m.minCommittableAge <= acceptedBlockIndex
+func (m *Manager) isCommittable(slot, acceptedBlockSlot iotago.SlotIndex) bool {
+	return slot+m.apiProvider.APIForSlot(slot).ProtocolParameters().MinCommittableAge() <= acceptedBlockSlot
 }
 
 func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, error) {
@@ -208,7 +206,7 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 	}
 
 	roots := iotago.NewRoots(
-		iotago.Identifier(acceptedBlocks.Root()),
+		acceptedBlocks.Root(),
 		mutationRoot,
 		attestationsRoot,
 		stateRoot,
