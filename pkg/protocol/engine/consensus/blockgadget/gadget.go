@@ -10,4 +10,6 @@ type Gadget interface {
 
 	TrackWitnessWeight(votingBlock *blocks.Block)
 	SetAccepted(block *blocks.Block) bool
+
+	Reset()
 }

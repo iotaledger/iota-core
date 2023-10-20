@@ -15,6 +15,9 @@ type TipSelection interface {
 	// SetAcceptanceTime updates the acceptance time of the TipSelection.
 	SetAcceptanceTime(acceptanceTime time.Time) (previousTime time.Time)
 
+	// Reset resets the TipSelection to its clean state after the last commitment.
+	Reset()
+
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface
 }

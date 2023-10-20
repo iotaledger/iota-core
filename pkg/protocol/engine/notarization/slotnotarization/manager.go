@@ -130,8 +130,8 @@ func (m *Manager) ForceCommitUntil(commitUntilSlot iotago.SlotIndex) error {
 	return nil
 }
 
-func (m *Manager) ClearCache(from, to iotago.SlotIndex) {
-	m.slotMutations.ClearCache(from, to)
+func (m *Manager) Reset() {
+	m.slotMutations.Reset()
 }
 
 // IsBootstrapped returns if the Manager finished committing all pending slots up to the current acceptance time.

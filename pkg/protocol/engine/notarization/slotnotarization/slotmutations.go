@@ -61,8 +61,17 @@ func (m *SlotMutations) Evict(index iotago.SlotIndex) error {
 	return nil
 }
 
-func (m *SlotMutations) ClearCache(from, to iotago.SlotIndex) {
-	for slot := from; slot <= to; slot++ {
+func (m *SlotMutations) Reset() {
+	slotsToReset := make([]iotago.SlotIndex, 0)
+	m.acceptedBlocksBySlot.ForEachKey(func(slot iotago.SlotIndex) bool {
+		if slot > m.latestCommittedIndex {
+			slotsToReset = append(slotsToReset, slot)
+		}
+
+		return true
+	})
+
+	for _, slot := range slotsToReset {
 		m.acceptedBlocksBySlot.Delete(slot)
 	}
 }

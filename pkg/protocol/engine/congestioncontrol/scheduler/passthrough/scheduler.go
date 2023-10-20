@@ -71,3 +71,7 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 		s.events.BlockScheduled.Trigger(block)
 	}
 }
+
+func (s *Scheduler) Reset() {
+	// TODO: check if something needs to be cleaned here
+}

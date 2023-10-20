@@ -237,22 +237,23 @@ func (e *Engine) Restart() {
 		latestCommittedTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
 
 		e.BlockRequester.Clear()
-		e.EvictionState.ClearRootBlocks(latestCommittedSlot + 1)
 		e.Storage.ClearBlocks(latestCommittedSlot+1, latestProcessedSlot)
-		e.Notarization.ClearCache(latestCommittedSlot+1, latestProcessedSlot)
-		e.Attestations.ClearCache(latestCommittedSlot+1, latestProcessedSlot)
 		e.Ledger.ClearCache(latestCommittedSlot+1, latestProcessedSlot)
 
-		e.Clock.Reset(latestCommittedTime)
+		e.EvictionState.Reset()
+		e.BlockCache.Reset()
 		e.BlockDAG.Reset()
 		e.Booker.Reset()
-		// BlockCache *blocks.Blocks
-		//BlockGadget         blockgadget.Gadget
-		//SlotGadget          slotgadget.Gadget
-		//SybilProtection     sybilprotection.SybilProtection
-		//Scheduler           scheduler.Scheduler
-		//TipManager          tipmanager.TipManager
-		//TipSelection        tipselection.TipSelection
+		e.BlockGadget.Reset()
+		e.SlotGadget.Reset()
+		e.Notarization.Reset()
+		e.Attestations.Reset()
+		e.SybilProtection.Reset()
+		e.Scheduler.Reset()
+		e.TipManager.Reset()
+		e.TipSelection.Reset()
+		e.Clock.Reset(latestCommittedTime)
+
 		//Retainer            retainer.Retainer
 		//SyncManager         syncmanager.SyncManager
 		//UpgradeOrchestrator upgrade.Orchestrator

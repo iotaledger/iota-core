@@ -93,3 +93,7 @@ func (b *Blocks) StoreBlock(block *Block) (stored bool) {
 
 	return storage.Set(block.ID(), block)
 }
+
+func (b *Blocks) Reset() {
+	b.blocks.Clear()
+}

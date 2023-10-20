@@ -103,6 +103,11 @@ func (t *TipManager) Evict(slot iotago.SlotIndex) {
 	}
 }
 
+// Reset resets the TipManager to its clean state after the last commitment.
+func (t *TipManager) Reset() {
+	// TODO: check if something needs to be cleaned here
+}
+
 // Shutdown marks the TipManager as shutdown.
 func (t *TipManager) Shutdown() {
 	t.TriggerShutdown()

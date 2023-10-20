@@ -5,5 +5,7 @@ import (
 )
 
 type Gadget interface {
+	Reset()
+
 	module.Interface
 }

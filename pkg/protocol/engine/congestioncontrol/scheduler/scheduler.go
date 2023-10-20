@@ -23,6 +23,8 @@ type Scheduler interface {
 	IssuerQueueWork(issuerID iotago.AccountID) iotago.WorkScore
 	// ValidatorQueueBlockCount returns the queue size of the given validator as block count.
 	ValidatorQueueBlockCount(validatorID iotago.AccountID) int
+	// Reset resets the scheduler to its clean state after the last commitment.
+	Reset()
 
 	module.Interface
 }

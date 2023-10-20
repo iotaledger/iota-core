@@ -67,6 +67,10 @@ func (g *Gadget) Shutdown() {
 	g.TriggerStopped()
 }
 
+func (g *Gadget) Reset() {
+	// do nothing / just comply with upcoming interface
+}
+
 // propagate performs a breadth-first past cone walk starting at initialBlockIDs. evaluateFunc is called for every block visited
 // and needs to return whether to continue the walk further.
 func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(block *blocks.Block) bool) {

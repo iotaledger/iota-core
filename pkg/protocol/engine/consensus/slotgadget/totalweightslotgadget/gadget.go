@@ -80,6 +80,10 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	})
 }
 
+func (g *Gadget) Reset() {
+
+}
+
 func (g *Gadget) Shutdown() {
 	g.TriggerStopped()
 	g.workers.Shutdown()
