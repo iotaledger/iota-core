@@ -72,6 +72,5 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	}
 }
 
-func (s *Scheduler) Reset() {
-	// TODO: check if something needs to be cleaned here
-}
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (s *Scheduler) Reset() {}

@@ -238,8 +238,9 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 	}
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
 func (s *Scheduler) Reset() {
-	// TODO: check if something needs to be cleaned here
+	// TODO: clear all buffers? currently irrelevant because the scheduler is not relevant for commitments.
 }
 
 func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
