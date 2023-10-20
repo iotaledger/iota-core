@@ -228,11 +228,11 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		return nil
 	}
 
-	sendStateDiffsRange := func(startIndex iotago.SlotIndex, endIndex iotago.SlotIndex) error {
-		for currentIndex := startIndex; currentIndex <= endIndex; currentIndex++ {
+	sendStateDiffsRange := func(startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) error {
+		for currentIndex := startSlot; currentIndex <= endSlot; currentIndex++ {
 			stateDiff, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(currentIndex)
 			if err != nil {
-				return status.Errorf(codes.NotFound, "ledger update for milestoneIndex %d not found", currentIndex)
+				return status.Errorf(codes.NotFound, "ledger update for slot %d not found", currentIndex)
 			}
 
 			if err := createLedgerUpdatePayloadAndSend(stateDiff.Slot, stateDiff.Outputs, stateDiff.Spents); err != nil {
@@ -246,34 +246,34 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 	// if a startIndex is given, we send all available milestone diffs including the start index.
 	// if an endIndex is given, we send all available milestone diffs up to and including min(ledgerIndex, endIndex).
 	// if no startIndex is given, but an endIndex, we don't send previous milestone diffs.
-	sendPreviousStateDiffs := func(startIndex iotago.SlotIndex, endIndex iotago.SlotIndex) (iotago.SlotIndex, error) {
-		if startIndex == 0 {
+	sendPreviousStateDiffs := func(startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) (iotago.SlotIndex, error) {
+		if startSlot == 0 {
 			// no need to send previous milestone diffs
 			return 0, nil
 		}
 
 		latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
-		if startIndex > latestCommitment.Slot() {
+		if startSlot > latestCommitment.Slot() {
 			// no need to send previous milestone diffs
 			return 0, nil
 		}
 
 		// Stream all available milestone diffs first
 		pruningIndex := deps.Protocol.MainEngineInstance().SyncManager.LatestFinalizedSlot()
-		if startIndex <= pruningIndex {
-			return 0, status.Errorf(codes.InvalidArgument, "given startMilestoneIndex %d is older than the current pruningIndex %d", startIndex, pruningIndex)
+		if startSlot <= pruningIndex {
+			return 0, status.Errorf(codes.InvalidArgument, "given startSlot %d is older than the current pruningSlot %d", startSlot, pruningIndex)
 		}
 
-		if endIndex == 0 || endIndex > latestCommitment.Slot() {
-			endIndex = latestCommitment.Slot()
+		if endSlot == 0 || endSlot > latestCommitment.Slot() {
+			endSlot = latestCommitment.Slot()
 		}
 
-		if err := sendStateDiffsRange(startIndex, endIndex); err != nil {
+		if err := sendStateDiffsRange(startSlot, endSlot); err != nil {
 			return 0, err
 		}
 
-		return endIndex, nil
+		return endSlot, nil
 	}
 
 	stream := &streamRange{
