@@ -11,5 +11,6 @@ type Gadget interface {
 	TrackWitnessWeight(votingBlock *blocks.Block)
 	SetAccepted(block *blocks.Block) bool
 
+	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset()
 }
