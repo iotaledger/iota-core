@@ -142,9 +142,9 @@ func (t *TipSelection) SetAcceptanceTime(acceptanceTime time.Time) (previousValu
 	return t.acceptanceTime.Set(acceptanceTime)
 }
 
-// Reset resets the TipSelection to its clean state after the last commitment.
+// Reset resets the component to a clean state as if it was created at the last commitment.
 func (t *TipSelection) Reset() {
-	// TODO: check if something needs to be cleaned here
+	// TODO: reset acceptance time and liveness threshold queue
 }
 
 // Shutdown triggers the shutdown of the TipSelection.
