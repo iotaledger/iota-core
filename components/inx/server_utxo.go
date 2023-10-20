@@ -28,11 +28,11 @@ func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
 		},
 	}
 
-	includedSlotIndex := o.SlotBooked()
-	if includedSlotIndex <= latestCommitment.Slot() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
+	includedSlot := o.SlotBooked()
+	if includedSlot <= latestCommitment.Slot() {
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
+			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", includedSlot)
 		}
 		l.CommitmentIdIncluded = inx.NewCommitmentId(includedCommitment.ID())
 	}
@@ -53,11 +53,11 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 	}
 
 	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
-	spentSlotIndex := s.SlotSpent()
-	if spentSlotIndex <= latestCommitment.Slot() {
-		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
+	spentSlot := s.SlotSpent()
+	if spentSlot <= latestCommitment.Slot() {
+		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
+			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", spentSlot)
 		}
 		l.CommitmentIdSpent = inx.NewCommitmentId(spentCommitment.ID())
 	}
@@ -229,10 +229,10 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 	}
 
 	sendStateDiffsRange := func(startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) error {
-		for currentIndex := startSlot; currentIndex <= endSlot; currentIndex++ {
-			stateDiff, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(currentIndex)
+		for currentSlot := startSlot; currentSlot <= endSlot; currentSlot++ {
+			stateDiff, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(currentSlot)
 			if err != nil {
-				return status.Errorf(codes.NotFound, "ledger update for slot %d not found", currentIndex)
+				return status.Errorf(codes.NotFound, "ledger update for slot %d not found", currentSlot)
 			}
 
 			if err := createLedgerUpdatePayloadAndSend(stateDiff.Slot, stateDiff.Outputs, stateDiff.Spents); err != nil {
@@ -243,26 +243,26 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		return nil
 	}
 
-	// if a startIndex is given, we send all available milestone diffs including the start index.
-	// if an endIndex is given, we send all available milestone diffs up to and including min(ledgerIndex, endIndex).
-	// if no startIndex is given, but an endIndex, we don't send previous milestone diffs.
+	// if a startSlot is given, we send all available state diffs including the start slot.
+	// if an endSlot is given, we send all available state diffs up to and including min(ledgerSlot, endSlot).
+	// if no startSlot is given, but an endSlot we don't send previous state diffs.
 	sendPreviousStateDiffs := func(startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) (iotago.SlotIndex, error) {
 		if startSlot == 0 {
-			// no need to send previous milestone diffs
+			// no need to send previous state diffs
 			return 0, nil
 		}
 
 		latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
 		if startSlot > latestCommitment.Slot() {
-			// no need to send previous milestone diffs
+			// no need to send previous state diffs
 			return 0, nil
 		}
 
 		// Stream all available milestone diffs first
-		pruningIndex := deps.Protocol.MainEngineInstance().SyncManager.LatestFinalizedSlot()
-		if startSlot <= pruningIndex {
-			return 0, status.Errorf(codes.InvalidArgument, "given startSlot %d is older than the current pruningSlot %d", startSlot, pruningIndex)
+		prunedEpoch, hasPruned := deps.Protocol.MainEngineInstance().SyncManager.LastPrunedEpoch()
+		if hasPruned && startSlot <= deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(prunedEpoch) {
+			return 0, status.Errorf(codes.InvalidArgument, "given startSlot %d is older than the current pruningSlot %d", startSlot, deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(prunedEpoch))
 		}
 
 		if endSlot == 0 || endSlot > latestCommitment.Slot() {
@@ -294,7 +294,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	catchUpFunc := func(start iotago.SlotIndex, end iotago.SlotIndex) error {
 		if err := sendStateDiffsRange(start, end); err != nil {
-			Component.LogErrorf("sendMilestoneDiffsRange error: %v", err)
+			Component.LogErrorf("sendStateDiffsRange error: %v", err)
 
 			return err
 		}
@@ -302,8 +302,8 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		return nil
 	}
 
-	sendFunc := func(index iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) error {
-		if err := createLedgerUpdatePayloadAndSend(index, newOutputs, newSpents); err != nil {
+	sendFunc := func(slot iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) error {
+		if err := createLedgerUpdatePayloadAndSend(slot, newOutputs, newSpents); err != nil {
 			Component.LogErrorf("send error: %v", err)
 
 			return err
@@ -317,8 +317,8 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	wp := workerpool.New("ListenToLedgerUpdates", workerpool.WithWorkerCount(workerCount)).Start()
 
-	unhook := deps.Protocol.Events.Engine.Ledger.StateDiffApplied.Hook(func(index iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) {
-		done, err := handleRangedSend2(index, newOutputs, newSpents, stream, catchUpFunc, sendFunc)
+	unhook := deps.Protocol.Events.Engine.Ledger.StateDiffApplied.Hook(func(slot iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) {
+		done, err := handleRangedSend2(slot, newOutputs, newSpents, stream, catchUpFunc, sendFunc)
 		switch {
 		case err != nil:
 			innerErr = err
