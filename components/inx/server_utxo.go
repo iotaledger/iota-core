@@ -8,8 +8,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -337,4 +339,74 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 	wp.ShutdownComplete.Wait()
 
 	return innerErr
+}
+
+func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_ListenToAcceptedTransactionsServer) error {
+	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
+
+	wp := workerpool.New("ListenToAcceptedTransactions", workerpool.WithWorkerCount(workerCount)).Start()
+
+	unhook := deps.Protocol.Events.Engine.Booker.TransactionAccepted.Hook(func(transactionMetadata mempool.TransactionMetadata) {
+		slot := transactionMetadata.EarliestIncludedAttachment().Slot()
+
+		var consumed []*inx.LedgerSpent
+		if err := transactionMetadata.Inputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
+			spentOutput, ok := stateMetadata.State().(*utxoledger.Output)
+			if !ok {
+				return ierrors.Errorf("unexpected state metadata type: %T", stateMetadata.State())
+			}
+
+			inxSpent, err := NewLedgerSpent(utxoledger.NewSpent(spentOutput, transactionMetadata.ID(), slot))
+			if err != nil {
+				return err
+			}
+			consumed = append(consumed, inxSpent)
+
+			return nil
+		}); err != nil {
+			Component.LogErrorf("error creating payload: %v", err)
+			cancel()
+		}
+
+		var created []*inx.LedgerOutput
+		if err := transactionMetadata.Outputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
+			output, ok := stateMetadata.State().(*utxoledger.Output)
+			if !ok {
+				return ierrors.Errorf("unexpected state metadata type: %T", stateMetadata.State())
+			}
+
+			inxOutput, err := NewLedgerOutput(output)
+			if err != nil {
+				return err
+			}
+			created = append(created, inxOutput)
+
+			return nil
+		}); err != nil {
+			Component.LogErrorf("error creating payload: %v", err)
+			cancel()
+		}
+
+		payload := &inx.AcceptedTransaction{
+			TransactionId: inx.NewTransactionId(transactionMetadata.ID()),
+			Slot:          uint32(slot),
+			Consumed:      consumed,
+			Created:       created,
+		}
+		if err := srv.Send(payload); err != nil {
+			Component.LogErrorf("send error: %v", err)
+			cancel()
+		}
+	}, event.WithWorkerPool(wp)).Unhook
+
+	<-ctx.Done()
+	unhook()
+
+	// We need to wait until all tasks are done, otherwise we might call
+	// "SendMsg" and "CloseSend" in parallel on the grpc stream, which is
+	// not safe according to the grpc docs.
+	wp.Shutdown()
+	wp.ShutdownComplete.Wait()
+
+	return ctx.Err()
 }
