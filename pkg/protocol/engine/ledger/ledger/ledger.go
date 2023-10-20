@@ -254,13 +254,16 @@ func (l *Ledger) outputFromState(state mempool.State) *utxoledger.Output {
 }
 
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
-	if output, spent, err := l.OutputOrSpent(outputID); err != nil {
+	output, spent, err := l.OutputOrSpent(outputID)
+	if err != nil {
 		return nil, err
-	} else if spent != nil {
-		return spent.Output(), nil
-	} else {
-		return output, nil
 	}
+
+	if spent != nil {
+		return spent.Output(), nil
+	}
+
+	return output, nil
 }
 
 func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *utxoledger.Spent, error) {
