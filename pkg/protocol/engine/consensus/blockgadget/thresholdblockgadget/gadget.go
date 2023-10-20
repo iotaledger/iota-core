@@ -67,6 +67,9 @@ func (g *Gadget) Shutdown() {
 	g.TriggerStopped()
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (g *Gadget) Reset() {}
+
 // propagate performs a breadth-first past cone walk starting at initialBlockIDs. evaluateFunc is called for every block visited
 // and needs to return whether to continue the walk further.
 func (g *Gadget) propagate(initialBlockIDs iotago.BlockIDs, evaluateFunc func(block *blocks.Block) bool) {

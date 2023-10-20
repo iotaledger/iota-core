@@ -103,6 +103,11 @@ func (t *TipManager) Evict(slot iotago.SlotIndex) {
 	}
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (t *TipManager) Reset() {
+	// TODO: reset tip metadata storage
+}
+
 // Shutdown marks the TipManager as shutdown.
 func (t *TipManager) Shutdown() {
 	t.TriggerShutdown()

@@ -116,6 +116,9 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	return nil
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (b *Booker) Reset() {}
+
 func (b *Booker) Shutdown() {
 	b.TriggerStopped()
 }

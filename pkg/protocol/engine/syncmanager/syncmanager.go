@@ -31,6 +31,9 @@ type SyncManager interface {
 	// LastPrunedEpoch returns the last pruned epoch index.
 	LastPrunedEpoch() (iotago.EpochIndex, bool)
 
+	// Reset resets the component to a clean state as if it was created at the last commitment.
+	Reset()
+
 	// Shutdown shuts down the SyncManager.
 	Shutdown()
 

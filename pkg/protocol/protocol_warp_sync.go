@@ -118,6 +118,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			w.ticker.StopTicker(commitmentID)
 
+			targetEngine.Reset()
 			// If the engine is "dirty" we need to restore the state of the engine to the state of the chain commitment.
 			// As we already decided to switch and sync to this chain we should make sure that processing the blocks from the commitment
 			// leads to the verified commitment.

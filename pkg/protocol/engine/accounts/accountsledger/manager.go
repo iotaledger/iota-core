@@ -355,6 +355,33 @@ func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iot
 	return nil
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (m *Manager) Reset() {
+	blockBurnsToDelete := make([]iotago.SlotIndex, 0)
+	m.blockBurns.ForEachKey(func(slot iotago.SlotIndex) bool {
+		if slot > m.latestCommittedSlot {
+			blockBurnsToDelete = append(blockBurnsToDelete, slot)
+		}
+
+		return true
+	})
+
+	versionSignalsToDelete := make([]iotago.SlotIndex, 0)
+	m.latestSupportedVersionSignals.ForEach(func(slot iotago.SlotIndex, _ *shrinkingmap.ShrinkingMap[iotago.AccountID, *model.SignaledBlock]) {
+		if slot > m.latestCommittedSlot {
+			versionSignalsToDelete = append(versionSignalsToDelete, slot)
+		}
+	})
+
+	for _, slot := range blockBurnsToDelete {
+		m.blockBurns.Delete(slot)
+	}
+
+	for _, slot := range versionSignalsToDelete {
+		m.latestSupportedVersionSignals.Evict(slot)
+	}
+}
+
 func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetSlot iotago.SlotIndex) (wasDestroyed bool, err error) {
 	// to reach targetSlot, we need to rollback diffs from the current latestCommittedSlot down to targetSlot + 1
 	for diffSlot := m.latestCommittedSlot; diffSlot > targetSlot; diffSlot-- {

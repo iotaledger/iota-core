@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -30,7 +31,28 @@ func (s *Storage) Committee() *epochstore.Store[*account.Accounts] {
 }
 
 func (s *Storage) Blocks(slot iotago.SlotIndex) (*slotstore.Blocks, error) {
+	s.lastAccessedBlocks.Compute(func(lastAccessedBlocks iotago.SlotIndex) iotago.SlotIndex {
+		return max(lastAccessedBlocks, slot)
+	})
+
 	return s.prunable.Blocks(slot)
+}
+
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (s *Storage) Reset() {
+	s.lastAccessedBlocks.Compute(func(lastAccessedBlocks iotago.SlotIndex) iotago.SlotIndex {
+		latestCommittedSlot := s.Settings().LatestCommitment().Slot()
+
+		for slot := latestCommittedSlot + 1; slot <= lastAccessedBlocks; slot++ {
+			if blocksForSlot, err := s.prunable.Blocks(slot); err != nil {
+				s.errorHandler(ierrors.Wrapf(err, "failed to clear blocks at slot %d", slot))
+			} else if err = blocksForSlot.Clear(); err != nil {
+				s.errorHandler(ierrors.Wrapf(err, "failed to clear blocks at slot %d", slot))
+			}
+		}
+
+		return latestCommittedSlot
+	})
 }
 
 func (s *Storage) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {

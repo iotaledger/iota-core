@@ -220,6 +220,41 @@ func New(
 	)
 }
 
+func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
+	e.Filter.ProcessReceivedBlock(block, source)
+	e.Events.BlockProcessed.Trigger(block.ID())
+}
+
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (e *Engine) Reset() {
+	e.Workers.WaitChildren()
+
+	e.BlockRequester.Clear()
+	e.Storage.Reset()
+	e.EvictionState.Reset()
+	e.Filter.Reset()
+	e.CommitmentFilter.Reset()
+	e.BlockCache.Reset()
+	e.BlockDAG.Reset()
+	e.Booker.Reset()
+	e.Ledger.Reset()
+	e.BlockGadget.Reset()
+	e.SlotGadget.Reset()
+	e.Notarization.Reset()
+	e.Attestations.Reset()
+	e.SybilProtection.Reset()
+	e.Scheduler.Reset()
+	e.TipManager.Reset()
+	e.TipSelection.Reset()
+	e.Retainer.Reset()
+	e.SyncManager.Reset()
+	e.UpgradeOrchestrator.Reset()
+
+	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
+	latestCommittedTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
+	e.Clock.Reset(latestCommittedTime)
+}
+
 func (e *Engine) Shutdown() {
 	if !e.WasShutdown() {
 		e.TriggerShutdown()
@@ -246,11 +281,6 @@ func (e *Engine) Shutdown() {
 
 		e.TriggerStopped()
 	}
-}
-
-func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
-	e.Filter.ProcessReceivedBlock(block, source)
-	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
 func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {

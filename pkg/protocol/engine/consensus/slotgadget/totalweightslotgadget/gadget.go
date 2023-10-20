@@ -80,6 +80,11 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	})
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (g *Gadget) Reset() {
+	// TODO: reset slotTrackers
+}
+
 func (g *Gadget) Shutdown() {
 	g.TriggerStopped()
 	g.workers.Shutdown()

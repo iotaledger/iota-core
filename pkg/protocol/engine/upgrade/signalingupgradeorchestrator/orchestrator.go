@@ -134,6 +134,11 @@ func NewOrchestrator(errorHandler func(error),
 	)
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (o *Orchestrator) Reset() {
+	// TODO: clean up latestSignals
+}
+
 func (o *Orchestrator) Shutdown() {
 	o.TriggerStopped()
 }

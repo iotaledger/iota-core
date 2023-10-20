@@ -23,4 +23,7 @@ type StateDiff interface {
 
 	// Mutations returns an authenticated data structure that allows to commit to the applied mutations.
 	Mutations() ads.Set[iotago.Identifier, iotago.TransactionID]
+
+	// Reset resets the component to a clean state as if it was created at the last commitment.
+	Reset() error
 }

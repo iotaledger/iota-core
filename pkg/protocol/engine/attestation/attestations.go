@@ -24,6 +24,9 @@ type Attestations interface {
 	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error)
 	Rollback(index iotago.SlotIndex) (err error)
 
+	// Reset resets the component to a clean state as if it was created at the last commitment.
+	Reset()
+
 	RestoreFromDisk() (err error)
 
 	module.Interface

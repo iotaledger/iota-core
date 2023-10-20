@@ -190,6 +190,9 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	c.events.BlockAllowed.Trigger(block)
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (c *CommitmentFilter) Reset() {}
+
 func (c *CommitmentFilter) Shutdown() {
 	c.TriggerStopped()
 }
