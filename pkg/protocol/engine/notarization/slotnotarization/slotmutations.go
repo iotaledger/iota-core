@@ -61,6 +61,7 @@ func (m *SlotMutations) Evict(index iotago.SlotIndex) error {
 	return nil
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
 func (m *SlotMutations) Reset() {
 	slotsToReset := make([]iotago.SlotIndex, 0)
 	m.acceptedBlocksBySlot.ForEachKey(func(slot iotago.SlotIndex) bool {
