@@ -8,8 +8,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -26,11 +28,11 @@ func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
 		},
 	}
 
-	includedSlotIndex := o.SlotBooked()
-	if includedSlotIndex <= latestCommitment.Slot() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
+	includedSlot := o.SlotBooked()
+	if includedSlot <= latestCommitment.Slot() {
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
+			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", includedSlot)
 		}
 		l.CommitmentIdIncluded = inx.NewCommitmentId(includedCommitment.ID())
 	}
@@ -51,11 +53,11 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 	}
 
 	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
-	spentSlotIndex := s.SlotSpent()
-	if spentSlotIndex <= latestCommitment.Slot() {
-		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
+	spentSlot := s.SlotSpent()
+	if spentSlot <= latestCommitment.Slot() {
+		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
+			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", spentSlot)
 		}
 		l.CommitmentIdSpent = inx.NewCommitmentId(spentCommitment.ID())
 	}
@@ -226,11 +228,11 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		return nil
 	}
 
-	sendStateDiffsRange := func(startIndex iotago.SlotIndex, endIndex iotago.SlotIndex) error {
-		for currentIndex := startIndex; currentIndex <= endIndex; currentIndex++ {
-			stateDiff, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(currentIndex)
+	sendStateDiffsRange := func(startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) error {
+		for currentSlot := startSlot; currentSlot <= endSlot; currentSlot++ {
+			stateDiff, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(currentSlot)
 			if err != nil {
-				return status.Errorf(codes.NotFound, "ledger update for milestoneIndex %d not found", currentIndex)
+				return status.Errorf(codes.NotFound, "ledger update for slot %d not found", currentSlot)
 			}
 
 			if err := createLedgerUpdatePayloadAndSend(stateDiff.Slot, stateDiff.Outputs, stateDiff.Spents); err != nil {
@@ -241,37 +243,37 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		return nil
 	}
 
-	// if a startIndex is given, we send all available milestone diffs including the start index.
-	// if an endIndex is given, we send all available milestone diffs up to and including min(ledgerIndex, endIndex).
-	// if no startIndex is given, but an endIndex, we don't send previous milestone diffs.
-	sendPreviousStateDiffs := func(startIndex iotago.SlotIndex, endIndex iotago.SlotIndex) (iotago.SlotIndex, error) {
-		if startIndex == 0 {
-			// no need to send previous milestone diffs
+	// if a startSlot is given, we send all available state diffs including the start slot.
+	// if an endSlot is given, we send all available state diffs up to and including min(ledgerSlot, endSlot).
+	// if no startSlot is given, but an endSlot we don't send previous state diffs.
+	sendPreviousStateDiffs := func(startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) (iotago.SlotIndex, error) {
+		if startSlot == 0 {
+			// no need to send previous state diffs
 			return 0, nil
 		}
 
 		latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
-		if startIndex > latestCommitment.Slot() {
-			// no need to send previous milestone diffs
+		if startSlot > latestCommitment.Slot() {
+			// no need to send previous state diffs
 			return 0, nil
 		}
 
 		// Stream all available milestone diffs first
-		pruningIndex := deps.Protocol.MainEngineInstance().SyncManager.LatestFinalizedSlot()
-		if startIndex <= pruningIndex {
-			return 0, status.Errorf(codes.InvalidArgument, "given startMilestoneIndex %d is older than the current pruningIndex %d", startIndex, pruningIndex)
+		prunedEpoch, hasPruned := deps.Protocol.MainEngineInstance().SyncManager.LastPrunedEpoch()
+		if hasPruned && startSlot <= deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(prunedEpoch) {
+			return 0, status.Errorf(codes.InvalidArgument, "given startSlot %d is older than the current pruningSlot %d", startSlot, deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(prunedEpoch))
 		}
 
-		if endIndex == 0 || endIndex > latestCommitment.Slot() {
-			endIndex = latestCommitment.Slot()
+		if endSlot == 0 || endSlot > latestCommitment.Slot() {
+			endSlot = latestCommitment.Slot()
 		}
 
-		if err := sendStateDiffsRange(startIndex, endIndex); err != nil {
+		if err := sendStateDiffsRange(startSlot, endSlot); err != nil {
 			return 0, err
 		}
 
-		return endIndex, nil
+		return endSlot, nil
 	}
 
 	stream := &streamRange{
@@ -292,7 +294,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	catchUpFunc := func(start iotago.SlotIndex, end iotago.SlotIndex) error {
 		if err := sendStateDiffsRange(start, end); err != nil {
-			Component.LogErrorf("sendMilestoneDiffsRange error: %v", err)
+			Component.LogErrorf("sendStateDiffsRange error: %v", err)
 
 			return err
 		}
@@ -300,8 +302,8 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		return nil
 	}
 
-	sendFunc := func(index iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) error {
-		if err := createLedgerUpdatePayloadAndSend(index, newOutputs, newSpents); err != nil {
+	sendFunc := func(slot iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) error {
+		if err := createLedgerUpdatePayloadAndSend(slot, newOutputs, newSpents); err != nil {
 			Component.LogErrorf("send error: %v", err)
 
 			return err
@@ -315,8 +317,8 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	wp := workerpool.New("ListenToLedgerUpdates", workerpool.WithWorkerCount(workerCount)).Start()
 
-	unhook := deps.Protocol.Events.Engine.Ledger.StateDiffApplied.Hook(func(index iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) {
-		done, err := handleRangedSend2(index, newOutputs, newSpents, stream, catchUpFunc, sendFunc)
+	unhook := deps.Protocol.Events.Engine.Ledger.StateDiffApplied.Hook(func(slot iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) {
+		done, err := handleRangedSend2(slot, newOutputs, newSpents, stream, catchUpFunc, sendFunc)
 		switch {
 		case err != nil:
 			innerErr = err
@@ -337,4 +339,74 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 	wp.ShutdownComplete.Wait()
 
 	return innerErr
+}
+
+func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_ListenToAcceptedTransactionsServer) error {
+	ctx, cancel := context.WithCancel(Component.Daemon().ContextStopped())
+
+	wp := workerpool.New("ListenToAcceptedTransactions", workerpool.WithWorkerCount(workerCount)).Start()
+
+	unhook := deps.Protocol.Events.Engine.Booker.TransactionAccepted.Hook(func(transactionMetadata mempool.TransactionMetadata) {
+		slot := transactionMetadata.EarliestIncludedAttachment().Slot()
+
+		var consumed []*inx.LedgerSpent
+		if err := transactionMetadata.Inputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
+			spentOutput, ok := stateMetadata.State().(*utxoledger.Output)
+			if !ok {
+				return ierrors.Errorf("unexpected state metadata type: %T", stateMetadata.State())
+			}
+
+			inxSpent, err := NewLedgerSpent(utxoledger.NewSpent(spentOutput, transactionMetadata.ID(), slot))
+			if err != nil {
+				return err
+			}
+			consumed = append(consumed, inxSpent)
+
+			return nil
+		}); err != nil {
+			Component.LogErrorf("error creating payload: %v", err)
+			cancel()
+		}
+
+		var created []*inx.LedgerOutput
+		if err := transactionMetadata.Outputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
+			output, ok := stateMetadata.State().(*utxoledger.Output)
+			if !ok {
+				return ierrors.Errorf("unexpected state metadata type: %T", stateMetadata.State())
+			}
+
+			inxOutput, err := NewLedgerOutput(output)
+			if err != nil {
+				return err
+			}
+			created = append(created, inxOutput)
+
+			return nil
+		}); err != nil {
+			Component.LogErrorf("error creating payload: %v", err)
+			cancel()
+		}
+
+		payload := &inx.AcceptedTransaction{
+			TransactionId: inx.NewTransactionId(transactionMetadata.ID()),
+			Slot:          uint32(slot),
+			Consumed:      consumed,
+			Created:       created,
+		}
+		if err := srv.Send(payload); err != nil {
+			Component.LogErrorf("send error: %v", err)
+			cancel()
+		}
+	}, event.WithWorkerPool(wp)).Unhook
+
+	<-ctx.Done()
+	unhook()
+
+	// We need to wait until all tasks are done, otherwise we might call
+	// "SendMsg" and "CloseSend" in parallel on the grpc stream, which is
+	// not safe according to the grpc docs.
+	wp.Shutdown()
+	wp.ShutdownComplete.Wait()
+
+	return ctx.Err()
 }

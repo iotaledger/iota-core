@@ -83,17 +83,11 @@ func sendTipInfo(block *blocks.Block, isTip bool) {
 func runVisualizer(component *app.Component) {
 	if err := component.Daemon().BackgroundWorker("Dashboard[Visualizer]", func(ctx context.Context) {
 
-		deps.Protocol.MainEngineInstance().Ledger.MemPool().OnSignedTransactionAttached(func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
-			signedTransactionMetadata.OnSignaturesValid(func() {
-				transactionMetadata := signedTransactionMetadata.TransactionMetadata()
-				transactionMetadata.OnAccepted(func() {
-					attachmentID := transactionMetadata.EarliestIncludedAttachment()
-					sendTxAccepted(attachmentID, true)
-				})
-			})
-		})
-
 		unhook := lo.Batch(
+			deps.Protocol.Events.Engine.Booker.TransactionAccepted.Hook(func(transactionMetadata mempool.TransactionMetadata) {
+				attachmentID := transactionMetadata.EarliestIncludedAttachment()
+				sendTxAccepted(attachmentID, true)
+			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 				sendVertex(block, false)
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,

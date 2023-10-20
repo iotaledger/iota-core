@@ -254,6 +254,7 @@ func (l *Ledger) outputFromState(state mempool.State) *utxoledger.Output {
 }
 
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
+	//nolint:revive //false positive
 	if output, spent, err := l.OutputOrSpent(outputID); err != nil {
 		return nil, err
 	} else if spent != nil {
