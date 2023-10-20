@@ -309,6 +309,7 @@ func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 	return nil
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
 func (m *Manager) Reset() {
 	futureAttestationsToClear := make([]iotago.SlotIndex, 0)
 	m.futureAttestations.ForEach(func(slot iotago.SlotIndex, _ *shrinkingmap.ShrinkingMap[iotago.AccountID, *iotago.Attestation]) {
