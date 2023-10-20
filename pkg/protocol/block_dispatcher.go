@@ -243,7 +243,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 	b.processedWarpSyncRequests.Add(commitmentID)
 
 	// make sure the engine is clean before we start processing the blocks
-	targetEngine.Restart()
+	targetEngine.Reset()
 
 	// Once all blocks are booked we
 	//   1. Mark all transactions as accepted

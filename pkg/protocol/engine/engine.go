@@ -10,7 +10,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
-	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -67,7 +66,6 @@ type Engine struct {
 	Retainer            retainer.Retainer
 	SyncManager         syncmanager.SyncManager
 	UpgradeOrchestrator upgrade.Orchestrator
-	LatestProcessedSlot reactive.Variable[iotago.SlotIndex]
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -114,12 +112,11 @@ func New(
 
 	return options.Apply(
 		&Engine{
-			Events:              NewEvents(),
-			Storage:             storageInstance,
-			EvictionState:       eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
-			LatestProcessedSlot: reactive.NewVariable[iotago.SlotIndex](),
-			Workers:             workers,
-			errorHandler:        errorHandler,
+			Events:        NewEvents(),
+			Storage:       storageInstance,
+			EvictionState: eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
+			Workers:       workers,
+			errorHandler:  errorHandler,
 
 			optsSnapshotPath:  "snapshot.bin",
 			optsSnapshotDepth: 5,
@@ -220,16 +217,12 @@ func New(
 }
 
 func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
-	e.LatestProcessedSlot.Compute(func(latestProcessedSlot iotago.SlotIndex) iotago.SlotIndex {
-		return max(latestProcessedSlot, block.ID().Slot())
-	})
-
 	e.Filter.ProcessReceivedBlock(block, source)
 	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
-// Restart restarts the engine by resetting it to the state of the latest commitment.
-func (e *Engine) Restart() {
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (e *Engine) Reset() {
 	e.Workers.WaitChildren()
 
 	e.BlockRequester.Clear()
