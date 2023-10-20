@@ -5,7 +5,7 @@ import (
 )
 
 type Booker interface {
-	// Reset resets the Booker to its empty state after the last commitment.
+	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset()
 
 	module.Interface

@@ -94,6 +94,7 @@ func (b *Blocks) StoreBlock(block *Block) (stored bool) {
 	return storage.Set(block.ID(), block)
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
 func (b *Blocks) Reset() {
 	b.blocks.Clear()
 }
