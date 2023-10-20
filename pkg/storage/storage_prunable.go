@@ -44,7 +44,7 @@ func (s *Storage) Reset() {
 		latestCommittedSlot := s.Settings().LatestCommitment().Slot()
 
 		for slot := latestCommittedSlot + 1; slot <= lastAccessedBlocks; slot++ {
-			if blocksForSlot, err := s.Blocks(slot); err != nil {
+			if blocksForSlot, err := s.prunable.Blocks(slot); err != nil {
 				s.errorHandler(ierrors.Wrapf(err, "failed to clear blocks at slot %d", slot))
 			} else if err = blocksForSlot.Clear(); err != nil {
 				s.errorHandler(ierrors.Wrapf(err, "failed to clear blocks at slot %d", slot))
