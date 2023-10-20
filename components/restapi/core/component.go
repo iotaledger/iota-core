@@ -18,6 +18,7 @@ import (
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
+//nolint:goconst // don't care about the number of constants
 const (
 	// RouteInfo is the route for getting the node info.
 	// GET returns the node info.
