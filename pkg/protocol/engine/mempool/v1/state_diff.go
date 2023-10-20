@@ -98,6 +98,7 @@ func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) error 
 	return nil
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
 func (s *StateDiff) Reset() error {
 	s.spentOutputs = shrinkingmap.New[mempool.StateID, mempool.StateMetadata]()
 	s.createdOutputs = shrinkingmap.New[mempool.StateID, mempool.StateMetadata]()
