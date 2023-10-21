@@ -28,10 +28,10 @@ func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {
 	return commitment.Commitment(), nil
 }
 
-func getUTXOChanges(index iotago.SlotIndex) (*apimodels.UTXOChangesResponse, error) {
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(index)
+func getUTXOChanges(slot iotago.SlotIndex) (*apimodels.UTXOChangesResponse, error) {
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(slot)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get slot diffs: %d", index)
+		return nil, ierrors.Wrapf(err, "failed to get slot diffs: %d", slot)
 	}
 
 	createdOutputs := make(iotago.OutputIDs, len(diffs.Outputs))
@@ -46,7 +46,7 @@ func getUTXOChanges(index iotago.SlotIndex) (*apimodels.UTXOChangesResponse, err
 	}
 
 	return &apimodels.UTXOChangesResponse{
-		Index:           index,
+		Slot:            slot,
 		CreatedOutputs:  createdOutputs,
 		ConsumedOutputs: consumedOutputs,
 	}, nil
