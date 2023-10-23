@@ -57,7 +57,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t.Events = instance.Events()
 	t.Instance = instance
 
-	genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID(), time.Unix(tpkg.TestAPI.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
+	genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID(), time.Unix(tpkg.TestAPI.TimeProvider().GenesisUnixTime(), 0))
 	t.blocks.Set("Genesis", genesisBlock)
 	genesisBlock.ID().RegisterAlias("Genesis")
 	evictionState.AddRootBlock(genesisBlock.ID(), genesisBlock.SlotCommitmentID())
