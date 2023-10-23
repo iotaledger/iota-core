@@ -18,6 +18,7 @@ import (
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 )
 
+//nolint:goconst // don't care about the number of constants
 const (
 	// RouteInfo is the route for getting the node info.
 	// GET returns the node info.
@@ -382,29 +383,6 @@ func checkNodeSynced() echo.MiddlewareFunc {
 }
 
 func responseByHeader(c echo.Context, obj any) error {
-	mimeType, err := httpserver.GetAcceptHeaderContentType(c, httpserver.MIMEApplicationVendorIOTASerializerV2, echo.MIMEApplicationJSON)
-	if err != nil && err != httpserver.ErrNotAcceptable {
-		return err
-	}
-
-	switch mimeType {
-	case httpserver.MIMEApplicationVendorIOTASerializerV2:
-		// TODO: that should take the API that belongs to the object
-		b, err := deps.Protocol.CommittedAPI().Encode(obj)
-		if err != nil {
-			return err
-		}
-
-		return c.Blob(http.StatusOK, httpserver.MIMEApplicationVendorIOTASerializerV2, b)
-
-	// default to echo.MIMEApplicationJSON
-	default:
-		// TODO: that should take the API that belongs to the object
-		j, err := deps.Protocol.CommittedAPI().JSONEncode(obj)
-		if err != nil {
-			return err
-		}
-
-		return c.Blob(http.StatusOK, echo.MIMEApplicationJSON, j)
-	}
+	// TODO: that should take the API that belongs to the object
+	return httpserver.SendResponseByHeader(c, deps.Protocol.CommittedAPI(), obj)
 }

@@ -8,7 +8,7 @@ import (
 
 var blocksErrorsFailureReasonMap = map[error]apimodels.BlockFailureReason{
 	iotago.ErrIssuerAccountNotFound:     apimodels.BlockFailureIssuerAccountNotFound,
-	iotago.ErrBurnedInsufficientMana:    apimodels.BlockFailurBurnedInsufficientMana,
+	iotago.ErrBurnedInsufficientMana:    apimodels.BlockFailureBurnedInsufficientMana,
 	iotago.ErrBlockVersionInvalid:       apimodels.BlockFailureVersionInvalid,
 	iotago.ErrRMCNotFound:               apimodels.BlockFailureAccountInvalid,
 	iotago.ErrFailedToCalculateManaCost: apimodels.BlockFailureManaCostCalculationFailed,
