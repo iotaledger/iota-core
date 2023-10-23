@@ -26,7 +26,7 @@ type TransactionFramework struct {
 }
 
 func NewTransactionFramework(t *testing.T, protocol *protocol.Protocol, genesisSeed []byte) *TransactionFramework {
-	genesisWallet := mock.NewWallet(t, "genesis", genesisSeed)
+	genesisWallet := mock.NewWallet(t, "genesis", protocol, genesisSeed)
 	genesisWallet.AddBlockIssuer(iotago.EmptyAccountID)
 
 	tf := &TransactionFramework{
@@ -196,10 +196,10 @@ func (t *TransactionFramework) CreateBasicOutputs(signingWallet *mock.Wallet, am
 	return inputStates, outputStates
 }
 
-func (t *TransactionFramework) CreateAccountFromInput(signingWallet *mock.Wallet, inputAlias string, opts ...options.Option[builder.AccountOutputBuilder]) (utxoledger.Outputs, iotago.Outputs[iotago.Output]) {
+func (t *TransactionFramework) CreateAccountFromInput(transactionName string, signingWallet *mock.Wallet, receivingWallet *mock.Wallet, inputAlias string, opts ...options.Option[builder.AccountOutputBuilder]) (utxoledger.Outputs, iotago.Outputs[iotago.Output]) {
 	input := t.Output(inputAlias)
 
-	accountOutput := options.Apply(builder.NewAccountOutputBuilder(signingWallet.Address(), signingWallet.Address(), input.BaseTokenAmount()).
+	accountOutput := options.Apply(builder.NewAccountOutputBuilder(receivingWallet.Address(), receivingWallet.Address(), input.BaseTokenAmount()).
 		Mana(input.StoredMana()),
 		opts).MustBuild()
 
@@ -211,7 +211,7 @@ func (t *TransactionFramework) CreateAccountFromInput(signingWallet *mock.Wallet
 			Amount: input.BaseTokenAmount() - accountOutput.Amount,
 			Mana:   input.StoredMana() - accountOutput.Mana,
 			Conditions: iotago.BasicOutputUnlockConditions{
-				&iotago.AddressUnlockCondition{Address: signingWallet.Address()},
+				&iotago.AddressUnlockCondition{Address: receivingWallet.Address()},
 			},
 			Features: iotago.BasicOutputFeatures{},
 		})
@@ -536,7 +536,7 @@ func WithInputs(inputs utxoledger.Outputs) options.Option[builder.TransactionBui
 		for _, input := range inputs {
 			switch input.OutputType() {
 			case iotago.OutputFoundry:
-				// For foundries we need to unlock the alias
+				// For foundries we need to unlock the account output
 				txBuilder.AddInput(&builder.TxInput{
 					UnlockTarget: input.Output().UnlockConditionSet().ImmutableAccount().Address,
 					InputID:      input.OutputID(),
