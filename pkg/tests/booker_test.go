@@ -21,30 +21,30 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	blockIssuer := ts.AddBasicBlockIssuer("default")
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
-	tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
+	tx1 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
 
-	tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "tx1:0"))
+	tx2 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "tx1:0")
 
 	ts.IssuePayloadWithOptions("block1", blockIssuer, node1, tx2)
 
-	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx2"), true, node1)
-	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), false, node1)
+	ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx2"), true, node1)
+	ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1"), false, node1)
 
-	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx2"), false, node1)
+	ts.AssertTransactionsInCacheBooked(ts.DefaultWallet.Transactions("tx2"), false, node1)
 	// make sure that the block is not booked
 
 	ts.IssuePayloadWithOptions("block2", blockIssuer, node1, tx1)
 
-	ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)
-	ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1)
+	ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1)
+	ts.AssertTransactionsInCacheBooked(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1)
 	ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 		ts.Block("block1"): {"tx2"},
 		ts.Block("block2"): {"tx1"},
 	}, node1)
 
 	ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-		ts.TransactionFramework.Transaction("tx2"): {"tx2"},
-		ts.TransactionFramework.Transaction("tx1"): {"tx1"},
+		ts.DefaultWallet.Transaction("tx2"): {"tx2"},
+		ts.DefaultWallet.Transaction("tx1"): {"tx1"},
 	}, node1)
 }
 
@@ -65,23 +65,23 @@ func Test_DoubleSpend(t *testing.T) {
 
 	// Create and issue double spends
 	{
-		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
-		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "Genesis:0"))
+		tx1 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
+		tx2 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "Genesis:0")
 
 		ts.IssuePayloadWithOptions("block1", blockIssuer, node1, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssuePayloadWithOptions("block2", blockIssuer, node1, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
 
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block1"): {"tx1"},
 			ts.Block("block2"): {"tx2"},
 		}, node1, node2)
 
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			ts.TransactionFramework.Transaction("tx2"): {"tx2"},
-			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
+			ts.DefaultWallet.Transaction("tx2"): {"tx2"},
+			ts.DefaultWallet.Transaction("tx1"): {"tx1"},
 		}, node1, node2)
 	}
 
@@ -94,14 +94,14 @@ func Test_DoubleSpend(t *testing.T) {
 			ts.Block("block3"): {"tx1"},
 			ts.Block("block4"): {"tx2"},
 		}, node1, node2)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
 	// Issue an invalid block and assert that its vote is not cast.
 	{
 		ts.IssueValidationBlock("block5", node2, mock.WithStrongParents(ts.BlockIDs("block3", "block4")...))
 
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
 	// Issue valid blocks that resolve the conflict.
@@ -112,8 +112,8 @@ func Test_DoubleSpend(t *testing.T) {
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block6"): {"tx2"},
 		}, node1, node2)
-		ts.AssertTransactionsInCacheAccepted(ts.TransactionFramework.Transactions("tx2"), true, node1, node2)
-		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCacheAccepted(ts.DefaultWallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheRejected(ts.DefaultWallet.Transactions("tx1"), true, node1, node2)
 
 	}
 }
@@ -133,7 +133,7 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	// Create a transaction and issue it from both nodes, so that the conflict is accepted, but no attachment is included yet.
 	{
-		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 2, "Genesis:0"))
+		tx1 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx1", 2, "Genesis:0")
 
 		ts.IssuePayloadWithOptions("A.1", blockIssuerA, nodeA, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlock("A.1.1", nodeA, mock.WithStrongParents(ts.BlockID("A.1")))
@@ -153,14 +153,14 @@ func Test_MultipleAttachments(t *testing.T) {
 			ts.Block("B.2"): {"tx1"},
 		}), ts.Nodes()...)
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
+			ts.DefaultWallet.Transaction("tx1"): {"tx1"},
 		}, ts.Nodes()...)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1"}, acceptance.Accepted, ts.Nodes()...)
 	}
 
 	// Create a transaction that is included and whose conflict is accepted, but whose inputs are not accepted.
 	{
-		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "tx1:1"))
+		tx2 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "tx1:1")
 
 		ts.IssuePayloadWithOptions("A.3", nodeA.Validator, nodeA, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlock("B.3", nodeB, mock.WithStrongParents(ts.BlockID("A.3")))
@@ -175,8 +175,8 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("B.4", "A.5"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3"), true, ts.Nodes()...)
 
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(ts.DefaultWallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheConflicts(lo.MergeMaps(blocksConflicts, map[*blocks.Block][]string{
 			ts.Block("A.3"): {"tx2"},
@@ -186,8 +186,8 @@ func Test_MultipleAttachments(t *testing.T) {
 			ts.Block("B.4"): {},
 		}), ts.Nodes()...)
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
-			ts.TransactionFramework.Transaction("tx2"): {"tx2"},
+			ts.DefaultWallet.Transaction("tx1"): {"tx1"},
+			ts.DefaultWallet.Transaction("tx2"): {"tx2"},
 		}, nodeA, nodeB)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, ts.Nodes()...)
 	}
@@ -204,9 +204,9 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1", "B.1"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.7", "B.6"), false, ts.Nodes()...)
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCacheAccepted(ts.TransactionFramework.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(ts.DefaultWallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheAccepted(ts.DefaultWallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheConflicts(lo.MergeMaps(blocksConflicts, map[*blocks.Block][]string{
 			ts.Block("A.6"): {},
@@ -216,8 +216,8 @@ func Test_MultipleAttachments(t *testing.T) {
 		}), ts.Nodes()...)
 
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
-			ts.TransactionFramework.Transaction("tx2"): {"tx2"},
+			ts.DefaultWallet.Transaction("tx1"): {"tx1"},
+			ts.DefaultWallet.Transaction("tx2"): {"tx2"},
 		}, nodeA, nodeB)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, nodeA, nodeB)
 	}
@@ -257,16 +257,16 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Create and issue double spends
 	{
-		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
-		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "Genesis:0"))
+		tx1 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
+		tx2 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "Genesis:0")
 
 		ts.IssueBasicBlockAtSlotWithOptions("block1.1", 1, genesisCommitment, ts.DefaultBasicBlockIssuer(), node1, tx1)
 		ts.IssueBasicBlockAtSlotWithOptions("block1.2", 1, genesisCommitment, ts.DefaultBasicBlockIssuer(), node1, tx2)
 		ts.IssueValidationBlockAtSlot("block2.tx1", 2, genesisCommitment, node1, ts.BlockIDs("block1.1")...)
 
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block1.1"):   {"tx1"},
 			ts.Block("block1.2"):   {"tx2"},
@@ -274,8 +274,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		}, node1, node2)
 
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			ts.TransactionFramework.Transaction("tx2"): {"tx2"},
-			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
+			ts.DefaultWallet.Transaction("tx2"): {"tx2"},
+			ts.DefaultWallet.Transaction("tx1"): {"tx1"},
 		}, node1, node2)
 	}
 
@@ -289,7 +289,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 			ts.Block("block2.2"):   {"tx2"},
 			ts.Block("block2.tx1"): {"tx1"},
 		}, node1, node2)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
 	// Issue valid blocks that resolve the conflict.
@@ -301,8 +301,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 			ts.Block("block2.3"):   {"tx2"},
 			ts.Block("block2.tx1"): {"tx1"},
 		}, node1, node2)
-		ts.AssertTransactionsInCacheAccepted(ts.TransactionFramework.Transactions("tx2"), true, node1, node2)
-		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx1"), true, node1, node2)
+		ts.AssertTransactionsInCacheAccepted(ts.DefaultWallet.Transactions("tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheRejected(ts.DefaultWallet.Transactions("tx1"), true, node1, node2)
 	}
 
 	// Advance both nodes at the edge of slot 1 committability
@@ -361,7 +361,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	commitment1 := lo.PanicOnErr(node2.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 
 	// This should be booked on the rejected tx1 conflict
-	tx4 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx4", 1, "tx1:0"))
+	tx4 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx4", 1, "tx1:0")
 
 	// Issue TX3 on top of rejected TX1 and 1 commitment on node2 (committed to slot 1)
 	{
@@ -372,9 +372,9 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 			ts.Block("block2.tx1"): {"tx1"},
 		}, node2)
 
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), true, node2)
-		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx4"), true, node2)
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx4"), true, node2)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCacheRejected(ts.DefaultWallet.Transactions("tx4"), true, node2)
+		ts.AssertTransactionsInCacheBooked(ts.DefaultWallet.Transactions("tx4"), true, node2)
 
 		// As the block commits to 1 but spending something orphaned in 1 it should be invalid
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-commit1"), false, node2)
@@ -388,7 +388,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n1-rejected-genesis"), true, node1)
 		ts.AssertBlocksInCacheInvalid(ts.Blocks("n1-rejected-genesis"), false, node1)
 
-		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCacheRejected(ts.DefaultWallet.Transactions("tx1"), true, node2)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block2.tx1"):          {"tx1"},
@@ -412,9 +412,9 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	{
 		ts.IssueBasicBlockAtSlotWithOptions("n1-genesis", 5, genesisCommitment, ts.DefaultBasicBlockIssuer(), node1, tx4, mock.WithStrongParents(ts.BlockID("Genesis")))
 
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), true, node2)
-		ts.AssertTransactionsInCacheRejected(ts.TransactionFramework.Transactions("tx4"), true, node2)
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx4"), true, node2)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCacheRejected(ts.DefaultWallet.Transactions("tx4"), true, node2)
+		ts.AssertTransactionsInCacheBooked(ts.DefaultWallet.Transactions("tx4"), true, node2)
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("n1-genesis"): {"tx4"}, // on rejected conflict
@@ -471,7 +471,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Commit further and test eviction of transactions
 	{
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2", "tx4"), true, node1, node2)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1", "tx2", "tx4"), true, node1, node2)
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, nil)
 
@@ -482,7 +482,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 			testsuite.WithEvictedSlot(8),
 		)
 
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2", "tx4"), false, node1, node2)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1", "tx2", "tx4"), false, node1, node2)
 	}
 }
 
@@ -520,23 +520,23 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 	// Create and issue double spends
 	{
-		tx1 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx1", 1, "Genesis:0"))
-		tx2 := lo.PanicOnErr(ts.TransactionFramework.CreateSimpleTransaction("tx2", 1, "Genesis:0"))
+		tx1 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
+		tx2 := ts.DefaultWallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "Genesis:0")
 
 		ts.IssueBasicBlockAtSlotWithOptions("block1.1", 1, genesisCommitment, ts.DefaultBasicBlockIssuer(), node2, tx1)
 		ts.IssueBasicBlockAtSlotWithOptions("block1.2", 1, genesisCommitment, ts.DefaultBasicBlockIssuer(), node2, tx2)
 
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
-		ts.AssertTransactionsInCacheBooked(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block1.1"): {"tx1"},
 			ts.Block("block1.2"): {"tx2"},
 		}, node1, node2)
 
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			ts.TransactionFramework.Transaction("tx2"): {"tx2"},
-			ts.TransactionFramework.Transaction("tx1"): {"tx1"},
+			ts.DefaultWallet.Transaction("tx2"): {"tx2"},
+			ts.DefaultWallet.Transaction("tx1"): {"tx1"},
 		}, node1, node2)
 	}
 
@@ -549,7 +549,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 			ts.Block("block2.1"): {"tx1"},
 			ts.Block("block2.2"): {"tx2"},
 		}, node1, node2)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
 	// Advance both nodes at the edge of slot 1 committability
@@ -604,8 +604,8 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		ts.IssueValidationBlockAtSlot("n2-pending-genesis", 5, genesisCommitment, node2, ts.BlockIDs("block2.1")...)
 		ts.IssueValidationBlockAtSlot("n2-pending-commit1", 5, commitment1, node2, ts.BlockIDs("block2.1")...)
 
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1"), true, node2)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1"), true, node2)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1"), true, node2)
 
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-genesis", "n2-pending-commit1"), true, node2)
 		ts.AssertBlocksInCacheInvalid(ts.Blocks("n2-pending-genesis", "n2-pending-commit1"), false, node2)
@@ -645,13 +645,13 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 			ts.Block("n2-pending-commit1"): {}, // no conflits inherited as the block merges orphaned conflicts.
 		}, node1, node2)
 
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
 	// Commit further and test eviction of transactions
 	{
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
-		ts.AssertTransactionsInCachePending(ts.TransactionFramework.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(ts.DefaultWallet.Transactions("tx1", "tx2"), true, node1, node2)
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, nil)
 
@@ -662,6 +662,6 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 			testsuite.WithEvictedSlot(8),
 		)
 
-		ts.AssertTransactionsExist(ts.TransactionFramework.Transactions("tx1", "tx2"), false, node1, node2)
+		ts.AssertTransactionsExist(ts.DefaultWallet.Transactions("tx1", "tx2"), false, node1, node2)
 	}
 }

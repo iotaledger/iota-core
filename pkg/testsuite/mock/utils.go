@@ -96,3 +96,126 @@ func WithTaggedDataPayload(payload *iotago.TaggedData) options.Option[builder.Tr
 		txBuilder.AddTaggedDataPayload(payload)
 	}
 }
+
+// DelegationOutput options
+
+func WithDelegatedAmount(delegatedAmount iotago.BaseToken) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.DelegatedAmount(delegatedAmount)
+	}
+}
+
+func WithDelegatedValidatorAddress(validatorAddress *iotago.AccountAddress) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.ValidatorAddress(validatorAddress)
+	}
+}
+
+func WithDelegationStartEpoch(startEpoch iotago.EpochIndex) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.StartEpoch(startEpoch)
+	}
+}
+
+func WithDelegationEndEpoch(endEpoch iotago.EpochIndex) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.EndEpoch(endEpoch)
+	}
+}
+
+func WithDelegationConditions(delegationConditions iotago.DelegationOutputUnlockConditions) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.Address(delegationConditions.MustSet().Address().Address)
+	}
+}
+
+func WithDelegationAmount(amount iotago.BaseToken) options.Option[builder.DelegationOutputBuilder] {
+	return func(delegationBuilder *builder.DelegationOutputBuilder) {
+		delegationBuilder.Amount(amount)
+	}
+}
+
+// BlockIssuer options
+
+func WithBlockIssuerFeature(keys iotago.BlockIssuerKeys, expirySlot iotago.SlotIndex) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.BlockIssuer(keys, expirySlot)
+	}
+}
+
+func WithAddBlockIssuerKey(key iotago.BlockIssuerKey) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		transition := accountBuilder.GovernanceTransition()
+		transition.BlockIssuerTransition().AddKeys(key)
+	}
+}
+
+func WithBlockIssuerKeys(keys iotago.BlockIssuerKeys) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		transition := accountBuilder.GovernanceTransition()
+		transition.BlockIssuerTransition().Keys(keys)
+	}
+}
+
+func WithBlockIssuerExpirySlot(expirySlot iotago.SlotIndex) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		transition := accountBuilder.GovernanceTransition()
+		transition.BlockIssuerTransition().ExpirySlot(expirySlot)
+	}
+}
+
+func WithStakingFeature(amount iotago.BaseToken, fixedCost iotago.Mana, startEpoch iotago.EpochIndex, optEndEpoch ...iotago.EpochIndex) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.Staking(amount, fixedCost, startEpoch, optEndEpoch...)
+	}
+}
+
+// Account options
+
+func WithAccountMana(mana iotago.Mana) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.Mana(mana)
+	}
+}
+
+func WithAccountAmount(amount iotago.BaseToken) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.Amount(amount)
+	}
+}
+
+func WithAccountIncreasedFoundryCounter(diff uint32) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.FoundriesToGenerate(diff)
+	}
+}
+
+func WithAccountImmutableFeatures(features iotago.AccountOutputImmFeatures) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		for _, feature := range features.MustSet() {
+			switch feature.Type() {
+			case iotago.FeatureMetadata:
+				//nolint:forcetypeassert
+				accountBuilder.ImmutableMetadata(feature.(*iotago.MetadataFeature).Data)
+			case iotago.FeatureSender:
+				//nolint:forcetypeassert
+				accountBuilder.ImmutableSender(feature.(*iotago.SenderFeature).Address)
+			}
+		}
+	}
+}
+
+func WithAccountConditions(conditions iotago.AccountOutputUnlockConditions) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		for _, condition := range conditions.MustSet() {
+			switch condition.Type() {
+			case iotago.UnlockConditionStateControllerAddress:
+				//nolint:forcetypeassert
+				accountBuilder.StateController(condition.(*iotago.StateControllerAddressUnlockCondition).Address)
+			case iotago.UnlockConditionGovernorAddress:
+				//nolint:forcetypeassert
+				accountBuilder.Governor(condition.(*iotago.GovernorAddressUnlockCondition).Address)
+			}
+		}
+	}
+}

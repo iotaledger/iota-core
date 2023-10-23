@@ -51,8 +51,9 @@ type TestSuite struct {
 	uniqueBlockTimeCounter              atomic.Int64
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
 	mutex                               syncutils.RWMutex
-	TransactionFramework                *TransactionFramework
 	genesisSeed                         [32]byte
+
+	DefaultWallet *mock.Wallet
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
@@ -150,10 +151,7 @@ func (t *TestSuite) AccountOutput(alias string) *utxoledger.Output {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	output, exist := t.TransactionFramework.states[alias]
-	if !exist {
-		panic(fmt.Sprintf("account %s not registered", alias))
-	}
+	output := t.DefaultWallet.Output(alias)
 
 	if _, ok := output.Output().(*iotago.AccountOutput); !ok {
 		panic(fmt.Sprintf("output %s is not an account", alias))
@@ -441,8 +439,15 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 
 		node.Initialize(failOnBlockFiltered, baseOpts...)
 
-		if t.TransactionFramework == nil {
-			t.TransactionFramework = NewTransactionFramework(t.Testing, node, t.genesisSeed[:])
+		if t.DefaultWallet == nil {
+			t.DefaultWallet = mock.NewWallet(t.Testing, "default", node, t.genesisSeed[:])
+			t.DefaultWallet.AddBlockIssuer(iotago.EmptyAccountID)
+			if err := node.Protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
+				t.DefaultWallet.AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), output)
+				return true
+			}); err != nil {
+				panic(err)
+			}
 		}
 
 		return true

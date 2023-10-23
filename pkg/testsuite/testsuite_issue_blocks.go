@@ -200,8 +200,7 @@ func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, ro
 			if txCount == 1 {
 				inputAlias = "Genesis:0"
 			}
-			tx, err := t.TransactionFramework.CreateSimpleTransaction(txAlias, 1, inputAlias)
-			require.NoError(t.Testing, err)
+			tx := t.DefaultWallet.CreateBasicOutputsEquallyFromInputs(txAlias, 1, inputAlias)
 
 			issuingOptionsCopy[node.Name] = t.limitParentsCountInBlockOptions(issuingOptionsCopy[node.Name], iotago.BlockMaxParents)
 

@@ -31,7 +31,8 @@ type Wallet struct {
 
 	BlockIssuer *BlockIssuer
 
-	outputs map[string]*utxoledger.Output
+	outputs      map[string]*utxoledger.Output
+	transactions map[string]*iotago.Transaction
 }
 
 func NewWallet(t *testing.T, name string, node *Node, seed ...[]byte) *Wallet {
@@ -42,11 +43,12 @@ func NewWallet(t *testing.T, name string, node *Node, seed ...[]byte) *Wallet {
 	keyManager := NewKeyManager(seed[0], 0)
 
 	return &Wallet{
-		Testing:    t,
-		Name:       name,
-		node:       node,
-		outputs:    make(map[string]*utxoledger.Output),
-		keyManager: keyManager,
+		Testing:      t,
+		Name:         name,
+		node:         node,
+		outputs:      make(map[string]*utxoledger.Output),
+		transactions: make(map[string]*iotago.Transaction),
+		keyManager:   keyManager,
 	}
 }
 
@@ -109,6 +111,23 @@ func (w *Wallet) AccountOutput(outputName string) *utxoledger.Output {
 	}
 
 	return output
+}
+
+func (w *Wallet) Transaction(alias string) *iotago.Transaction {
+	transaction, exists := w.transactions[alias]
+	if !exists {
+		panic(ierrors.Errorf("transaction with given alias does not exist %s", alias))
+	}
+
+	return transaction
+}
+
+func (w *Wallet) Transactions(transactionNames ...string) []*iotago.Transaction {
+	return lo.Map(transactionNames, w.Transaction)
+}
+
+func (w *Wallet) TransactionID(alias string) iotago.TransactionID {
+	return lo.PanicOnErr(w.Transaction(alias).ID())
 }
 
 func (w *Wallet) AddOutput(outputName string, output *utxoledger.Output) {
@@ -272,6 +291,9 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 		WithSlotCreated(creationSlot),
 	))
 
+	// register the outputs in the wallet
+	w.registerOutputs(transactionName, signedTransaction.Transaction)
+
 	return signedTransaction
 }
 
@@ -420,6 +442,54 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactioName string,
 	return signedTransaction
 }
 
+func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, outputCount int, inputNames ...string) *iotago.SignedTransaction {
+	inputStates := make([]*utxoledger.Output, 0, len(inputNames))
+	totalInputAmounts := iotago.BaseToken(0)
+	totalInputStoredMana := iotago.Mana(0)
+
+	for _, inputName := range inputNames {
+		output := w.Output(inputName)
+		inputStates = append(inputStates, output)
+		totalInputAmounts += output.BaseTokenAmount()
+		totalInputStoredMana += output.StoredMana()
+	}
+
+	manaAmount := totalInputStoredMana / iotago.Mana(outputCount)
+	remainderMana := totalInputStoredMana
+
+	tokenAmount := totalInputAmounts / iotago.BaseToken(outputCount)
+	remainderFunds := totalInputAmounts
+
+	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
+	for i := 0; i < outputCount; i++ {
+		if i+1 == outputCount {
+			tokenAmount = remainderFunds
+			manaAmount = remainderMana
+		}
+		remainderFunds -= tokenAmount
+		remainderMana -= manaAmount
+
+		outputStates = append(outputStates, &iotago.BasicOutput{
+			Amount: tokenAmount,
+			Mana:   manaAmount,
+			Conditions: iotago.BasicOutputUnlockConditions{
+				&iotago.AddressUnlockCondition{Address: w.Address()},
+			},
+			Features: iotago.BasicOutputFeatures{},
+		})
+	}
+
+	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		WithInputs(inputStates),
+		WithOutputs(outputStates),
+	))
+
+	// register the outputs in the wallet
+	w.registerOutputs(transactionName, signedTransaction.Transaction)
+
+	return signedTransaction
+}
+
 func (w *Wallet) createSignedTransactionWithOptions(opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
 	currentAPI := w.node.Protocol.CommittedAPI()
 
@@ -453,6 +523,7 @@ func (w *Wallet) createSignedTransactionWithAllotmentAndOptions(creationSlot iot
 func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Transaction) {
 	currentAPI := w.node.Protocol.CommittedAPI()
 	(lo.PanicOnErr(transaction.ID())).RegisterAlias(transactionName)
+	w.transactions[transactionName] = transaction
 
 	for outputID, output := range lo.PanicOnErr(transaction.OutputsSet()) {
 		// register the output if it belongs to this wallet
