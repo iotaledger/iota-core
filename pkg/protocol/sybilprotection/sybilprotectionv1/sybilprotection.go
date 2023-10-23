@@ -37,7 +37,7 @@ type SybilProtection struct {
 
 	errHandler func(error)
 
-	optsInitialCommittee    *account.Accounts
+	optsInitialCommittee    accounts.AccountsData
 	optsSeatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]
 
 	mutex syncutils.Mutex
@@ -70,6 +70,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
 						}
 					}
+
 					o.TriggerConstructed()
 
 					// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
@@ -315,7 +316,6 @@ func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.
 }
 
 // OrderedRegisteredCandidateValidatorsList returns the currently known list of registered validator candidates for the given epoch.
-// TODO: should a method that returns apimodels be part of SybilProtection?
 func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error) {
 	candidates := o.performanceTracker.ValidatorCandidates(epoch)
 	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
@@ -363,9 +363,9 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 	nextEpoch := currentEpoch + 1
 	candidates := o.performanceTracker.EligibleValidatorCandidates(nextEpoch)
 
-	weightedCandidates := account.NewAccounts()
+	candidateAccounts := make(accounts.AccountsData, 0)
 	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
-		a, exists, err := o.ledger.Account(candidate, slot)
+		accountData, exists, err := o.ledger.Account(candidate, slot)
 		if err != nil {
 			return err
 		}
@@ -373,11 +373,7 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
 		}
 
-		weightedCandidates.Set(candidate, &account.Pool{
-			PoolStake:      a.ValidatorStake + a.DelegationStake,
-			ValidatorStake: a.ValidatorStake,
-			FixedCost:      a.FixedCost,
-		})
+		candidateAccounts = append(candidateAccounts, accountData)
 
 		return nil
 	}); err != nil {
@@ -385,7 +381,7 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 		o.errHandler(err)
 	}
 
-	newCommittee, err := o.seatManager.RotateCommittee(nextEpoch, weightedCandidates)
+	newCommittee, err := o.seatManager.RotateCommittee(nextEpoch, candidateAccounts)
 	if err != nil {
 		o.errHandler(ierrors.Wrap(err, "failed to rotate committee"))
 	}
@@ -397,7 +393,7 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 
 // WithInitialCommittee registers the passed committee on a given slot.
 // This is needed to generate Genesis snapshot with some initial committee.
-func WithInitialCommittee(committee *account.Accounts) options.Option[SybilProtection] {
+func WithInitialCommittee(committee accounts.AccountsData) options.Option[SybilProtection] {
 	return func(o *SybilProtection) {
 		o.optsInitialCommittee = committee
 	}

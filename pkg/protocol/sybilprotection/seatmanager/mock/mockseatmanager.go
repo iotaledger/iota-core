@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
@@ -158,10 +159,18 @@ func (m *ManualPOA) SeatCount() int {
 	return m.committee.SeatCount()
 }
 
-func (m *ManualPOA) RotateCommittee(epoch iotago.EpochIndex, validators *account.Accounts) (*account.SeatedAccounts, error) {
+func (m *ManualPOA) RotateCommittee(epoch iotago.EpochIndex, validators accounts.AccountsData) (*account.SeatedAccounts, error) {
 	if m.committee == nil || m.accounts.Size() == 0 {
-		m.accounts = validators
-		m.committee = m.accounts.SelectCommittee(validators.IDs()...)
+		m.accounts = account.NewAccounts()
+
+		for _, validatorData := range validators {
+			m.accounts.Set(validatorData.ID, &account.Pool{
+				PoolStake:      validatorData.ValidatorStake + validatorData.DelegationStake,
+				ValidatorStake: validatorData.ValidatorStake,
+				FixedCost:      validatorData.FixedCost,
+			})
+		}
+		m.committee = m.accounts.SelectCommittee(m.accounts.IDs()...)
 	}
 
 	if err := m.committeeStore.Store(epoch, m.accounts); err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/activitytracker"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/activitytracker/activitytrackerv1"
@@ -23,7 +24,6 @@ type SeatManager struct {
 	events      *seatmanager.Events
 	apiProvider iotago.APIProvider
 
-	accounts        *account.Accounts
 	committee       *account.SeatedAccounts
 	committeeStore  *epochstore.Store[*account.Accounts]
 	activityTracker activitytracker.ActivityTracker
@@ -44,7 +44,6 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				events:         seatmanager.NewEvents(),
 				apiProvider:    e,
 				committeeStore: e.Storage.Committee(),
-				accounts:       account.NewAccounts(),
 
 				optsActivityWindow: time.Second * 30,
 			}, opts, func(s *SeatManager) {
@@ -81,14 +80,22 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 var _ seatmanager.SeatManager = &SeatManager{}
 
-func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, validators *account.Accounts) (*account.SeatedAccounts, error) {
+func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, validators accounts.AccountsData) (*account.SeatedAccounts, error) {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
 	// if committee is not set, then set it according to passed validators (used for creating a snapshot)
-	if s.accounts.Size() == 0 || s.committee == nil {
-		s.accounts = validators
-		s.committee = s.accounts.SelectCommittee(validators.IDs()...)
+	if s.committee == nil {
+		committeeAccounts := account.NewAccounts()
+
+		for _, validatorData := range validators {
+			committeeAccounts.Set(validatorData.ID, &account.Pool{
+				PoolStake:      validatorData.ValidatorStake + validatorData.DelegationStake,
+				ValidatorStake: validatorData.ValidatorStake,
+				FixedCost:      validatorData.FixedCost,
+			})
+		}
+		s.committee = committeeAccounts.SelectCommittee(committeeAccounts.IDs()...)
 	}
 
 	err := s.committeeStore.Store(epoch, s.committee.Accounts())
@@ -153,10 +160,9 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 		return ierrors.Wrapf(err, "failed to load PoA committee for epoch %d", epoch)
 	}
 
-	s.accounts = committeeAccounts
-	s.committee = s.accounts.SelectCommittee(committeeAccounts.IDs()...)
+	s.committee = committeeAccounts.SelectCommittee(committeeAccounts.IDs()...)
 
-	onlineValidators := s.accounts.IDs()
+	onlineValidators := committeeAccounts.IDs()
 	if len(s.optsOnlineCommitteeStartup) > 0 {
 		onlineValidators = s.optsOnlineCommitteeStartup
 	}
@@ -178,10 +184,9 @@ func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	s.accounts = validators
-	s.committee = s.accounts.SelectCommittee(validators.IDs()...)
+	s.committee = validators.SelectCommittee(validators.IDs()...)
 
-	err := s.committeeStore.Store(epoch, s.accounts)
+	err := s.committeeStore.Store(epoch, s.committee.Accounts())
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to set committee for epoch %d", epoch)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/activitytracker"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/activitytracker/activitytrackerv1"
@@ -80,43 +81,47 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 var _ seatmanager.SeatManager = &SeatManager{}
 
-func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates *account.Accounts) (*account.SeatedAccounts, error) {
+func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accounts.AccountsData) (*account.SeatedAccounts, error) {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
-	type poolWithAccountID struct {
-		accountID iotago.AccountID
-		pool      *account.Pool
-	}
-
-	candidatePools := make([]*poolWithAccountID, 0)
-	candidates.ForEach(func(id iotago.AccountID, pool *account.Pool) bool {
-		candidatePools = append(candidatePools, &poolWithAccountID{pool: pool, accountID: id})
-
-		return true
-	})
-
-	sort.Slice(candidatePools, func(i, j int) bool {
-		if candidatePools[i].pool.PoolStake != candidatePools[j].pool.PoolStake {
-			return candidatePools[i].pool.PoolStake > candidatePools[j].pool.PoolStake
+	sort.Slice(candidates, func(i, j int) bool {
+		// Prioritize the candidate that has a larger pool stake.
+		if candidates[i].ValidatorStake+candidates[i].DelegationStake != candidates[j].ValidatorStake+candidates[j].DelegationStake {
+			return candidates[i].ValidatorStake+candidates[i].DelegationStake > candidates[j].ValidatorStake+candidates[j].DelegationStake
 		}
 
-		if candidatePools[i].pool.ValidatorStake != candidatePools[j].pool.ValidatorStake {
-			return candidatePools[i].pool.ValidatorStake > candidatePools[j].pool.ValidatorStake
+		// Prioritize the candidate that has a larger validator stake.
+		if candidates[i].ValidatorStake != candidates[j].ValidatorStake {
+			return candidates[i].ValidatorStake > candidates[j].ValidatorStake
 		}
 
-		// TODO: add more tie-breaking
+		// Prioritize the candidate that declares a longer staking period.
+		if candidates[i].StakeEndEpoch != candidates[j].StakeEndEpoch {
+			return candidates[i].StakeEndEpoch > candidates[j].StakeEndEpoch
+		}
+
+		// Prioritize the candidate that has smaller FixedCost.
+		if candidates[i].FixedCost != candidates[j].FixedCost {
+			return candidates[i].FixedCost < candidates[j].FixedCost
+		}
 
 		// two candidates never have the same account ID because they come in a map
-		return bytes.Compare(candidatePools[i].accountID[:], candidatePools[j].accountID[:]) > 0
+		return bytes.Compare(candidates[i].ID[:], candidates[j].ID[:]) > 0
 	})
 
 	// Create new Accounts instance that only included validators selected to be part of the committee.
-	accounts := account.NewAccounts()
-	for _, candidatePool := range candidatePools[:s.optsSeatCount] {
-		accounts.Set(candidatePool.accountID, candidatePool.pool)
+	newCommitteeAccounts := account.NewAccounts()
+
+	// TODO: make sure that there are enough accounts
+	for _, candidateData := range candidates[:s.optsSeatCount] {
+		newCommitteeAccounts.Set(candidateData.ID, &account.Pool{
+			PoolStake:      candidateData.ValidatorStake + candidateData.DelegationStake,
+			ValidatorStake: candidateData.ValidatorStake,
+			FixedCost:      candidateData.FixedCost,
+		})
 	}
-	committee := accounts.SelectCommittee(accounts.IDs()...)
+	committee := newCommitteeAccounts.SelectCommittee(newCommitteeAccounts.IDs()...)
 
 	err := s.committeeStore.Store(epoch, committee.Accounts())
 	if err != nil {

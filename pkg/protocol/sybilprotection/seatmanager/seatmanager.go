@@ -6,13 +6,14 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // SeatManager is the minimal interface for the SeatManager component of the IOTA protocol.
 type SeatManager interface {
 	// RotateCommittee rotates the committee evaluating the given set of candidates to produce the new committee.
-	RotateCommittee(epoch iotago.EpochIndex, candidates *account.Accounts) (*account.SeatedAccounts, error)
+	RotateCommittee(epoch iotago.EpochIndex, candidates accounts.AccountsData) (*account.SeatedAccounts, error)
 
 	// SetCommittee sets the committee for a given slot.
 	// This is used when re-using the same committee for consecutive epochs.

@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/activitytracker/activitytrackerv1"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
@@ -135,21 +136,27 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 	assertCommittee(t, initialCommittee, committee)
 
 	// Design candidate list and expected committee members.
-	candidates := account.NewAccounts()
+	accountsContext := make(accounts.AccountsData, 0)
 	expectedCommittee := account.NewAccounts()
 	numCandidates := 10
 
 	// Add some candidates that have the same fields to test sorting by secondary fields.
-	candidates.Set(tpkg.RandAccountID(), &account.Pool{
-		PoolStake:      iotago.BaseToken(800),
-		ValidatorStake: iotago.BaseToken(399),
-		FixedCost:      iotago.Mana(8),
+	candidate1ID := tpkg.RandAccountID()
+	accountsContext = append(accountsContext, &accounts.AccountData{
+		ID:              candidate1ID,
+		ValidatorStake:  399,
+		DelegationStake: 800 - 399,
+		FixedCost:       3,
+		StakeEndEpoch:   iotago.MaxEpochIndex,
 	})
 
-	candidates.Set(tpkg.RandAccountID(), &account.Pool{
-		PoolStake:      iotago.BaseToken(800),
-		ValidatorStake: iotago.BaseToken(399),
-		FixedCost:      iotago.Mana(8),
+	candidate2ID := tpkg.RandAccountID()
+	accountsContext = append(accountsContext, &accounts.AccountData{
+		ID:              candidate2ID,
+		ValidatorStake:  399,
+		DelegationStake: 800 - 399,
+		FixedCost:       3,
+		StakeEndEpoch:   iotago.MaxEpochIndex,
 	})
 
 	for i := 1; i <= numCandidates; i++ {
@@ -159,15 +166,21 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 			ValidatorStake: iotago.BaseToken(i * 50),
 			FixedCost:      iotago.Mana(i),
 		}
-		candidates.Set(candidateAccountID, candidatePool)
+		accountsContext = append(accountsContext, &accounts.AccountData{
+			ID:              candidateAccountID,
+			ValidatorStake:  iotago.BaseToken(i * 50),
+			DelegationStake: iotago.BaseToken(i*100) - iotago.BaseToken(i*50),
+			FixedCost:       tpkg.RandMana(iotago.MaxMana),
+			StakeEndEpoch:   tpkg.RandEpoch(),
+		})
 
 		if i+topStakersSeatManager.SeatCount() > numCandidates {
 			expectedCommittee.Set(candidateAccountID, candidatePool)
 		}
 	}
 
-	// Rotate committee and make sure that the returned committee matches the expected.
-	newCommittee, err := topStakersSeatManager.RotateCommittee(1, candidates)
+	// Rotate the committee and make sure that the returned committee matches the expected.
+	newCommittee, err := topStakersSeatManager.RotateCommittee(1, accountsContext)
 	require.NoError(t, err)
 	assertCommittee(t, expectedCommittee, newCommittee)
 
@@ -180,7 +193,7 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 	topStakersSeatManager.activityTracker.MarkSeatActive(lo.Return1(weightedSeats.GetSeat(newCommitteeMemberIDs[0])), newCommitteeMemberIDs[0], tpkg.TestAPI.TimeProvider().SlotEndTime(14))
 	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(), lo.Return1(weightedSeats.GetSeat(newCommitteeMemberIDs[0])))
 
-	// Make sure that the committee retrieved from committee store matches the expected.
+	// Make sure that the committee retrieved from the committee store matches the expected.
 	committee, exists = topStakersSeatManager.CommitteeInEpoch(1)
 	require.True(t, exists)
 	assertCommittee(t, expectedCommittee, committee)
