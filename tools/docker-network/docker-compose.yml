@@ -161,6 +161,7 @@ services:
     command:
       - "--inx.address=validator-1:9029"
       - "--faucet.bindAddress=inx-faucet:8091"
+      - "--faucet.rateLimit.enabled=false"
     ports:
       - "8088:8091/tcp" # faucet frontend
     networks:
