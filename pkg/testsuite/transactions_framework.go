@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -25,12 +24,12 @@ type TransactionFramework struct {
 	transactions       map[string]*iotago.Transaction
 }
 
-func NewTransactionFramework(t *testing.T, protocol *protocol.Protocol, genesisSeed []byte) *TransactionFramework {
-	genesisWallet := mock.NewWallet(t, "genesis", protocol, genesisSeed)
+func NewTransactionFramework(t *testing.T, node *mock.Node, genesisSeed []byte) *TransactionFramework {
+	genesisWallet := mock.NewWallet(t, "genesis", node, genesisSeed)
 	genesisWallet.AddBlockIssuer(iotago.EmptyAccountID)
 
 	tf := &TransactionFramework{
-		apiProvider:        protocol,
+		apiProvider:        node.Protocol,
 		states:             make(map[string]*utxoledger.Output),
 		signedTransactions: make(map[string]*iotago.SignedTransaction),
 		transactions:       make(map[string]*iotago.Transaction),
@@ -38,8 +37,9 @@ func NewTransactionFramework(t *testing.T, protocol *protocol.Protocol, genesisS
 		GenesisWallet: genesisWallet,
 	}
 
-	if err := protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
+	if err := node.Protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
 		tf.states[fmt.Sprintf("Genesis:%d", output.OutputID().Index())] = output
+		tf.GenesisWallet.AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), output)
 		return true
 	}); err != nil {
 		panic(err)
@@ -87,26 +87,6 @@ func (t *TransactionFramework) CreateSignedTransactionWithOptions(alias string, 
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
 
 	signedTransaction, err := options.Apply(txBuilder, opts).Build(signingWallet.AddressSigner())
-	if err == nil {
-		t.RegisterSignedTransaction(alias, signedTransaction)
-		t.RegisterTransaction(alias, signedTransaction.Transaction)
-	}
-
-	return signedTransaction, err
-}
-
-func (t *TransactionFramework) CreateSignedTransactionWithAllotmentAndOptions(alias string, signingWallet *mock.Wallet, creationSlot iotago.SlotIndex, blockIssuerAccountID iotago.AccountID, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
-	currentAPI := t.apiProvider.CommittedAPI()
-
-	txBuilder := builder.NewTransactionBuilder(currentAPI)
-	txBuilder.WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything()))
-	// Always add a random payload to randomize transaction ID.
-	randomPayload := tpkg.Rand12ByteArray()
-	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
-	options.Apply(txBuilder, opts)
-	txBuilder.AllotAllMana(creationSlot, blockIssuerAccountID)
-
-	signedTransaction, err := txBuilder.Build(signingWallet.AddressSigner())
 	if err == nil {
 		t.RegisterSignedTransaction(alias, signedTransaction)
 		t.RegisterTransaction(alias, signedTransaction.Transaction)
@@ -196,160 +176,6 @@ func (t *TransactionFramework) CreateBasicOutputs(signingWallet *mock.Wallet, am
 	return inputStates, outputStates
 }
 
-func (t *TransactionFramework) CreateAccountFromInput(transactionName string, signingWallet *mock.Wallet, receivingWallet *mock.Wallet, inputAlias string, opts ...options.Option[builder.AccountOutputBuilder]) (utxoledger.Outputs, iotago.Outputs[iotago.Output]) {
-	input := t.Output(inputAlias)
-
-	accountOutput := options.Apply(builder.NewAccountOutputBuilder(receivingWallet.Address(), receivingWallet.Address(), input.BaseTokenAmount()).
-		Mana(input.StoredMana()),
-		opts).MustBuild()
-
-	outputStates := iotago.Outputs[iotago.Output]{accountOutput}
-
-	// if amount was set by options, a remainder output needs to be created
-	if accountOutput.Amount != input.BaseTokenAmount() {
-		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount: input.BaseTokenAmount() - accountOutput.Amount,
-			Mana:   input.StoredMana() - accountOutput.Mana,
-			Conditions: iotago.BasicOutputUnlockConditions{
-				&iotago.AddressUnlockCondition{Address: receivingWallet.Address()},
-			},
-			Features: iotago.BasicOutputFeatures{},
-		})
-	}
-
-	return utxoledger.Outputs{input}, outputStates
-}
-
-// CreateImplicitAccountFromInput creates an implicit account output.
-func (t *TransactionFramework) CreateImplicitAccountFromInput(recipientAddress *iotago.ImplicitAccountCreationAddress, inputAlias string) (utxoledger.Outputs, iotago.Outputs[iotago.Output]) {
-	input := t.Output(inputAlias)
-
-	implicitAccountOutput := &iotago.BasicOutput{
-		Amount: MinIssuerAccountAmount,
-		Mana:   AccountConversionManaCost,
-		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: recipientAddress},
-		},
-		Features: iotago.BasicOutputFeatures{},
-	}
-
-	remainderBasicOutput := &iotago.BasicOutput{
-		Amount: input.BaseTokenAmount() - MinIssuerAccountAmount,
-		Mana:   input.StoredMana() - AccountConversionManaCost,
-		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: input.Output().UnlockConditionSet().Address().Address},
-		},
-		Features: iotago.BasicOutputFeatures{},
-	}
-
-	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{implicitAccountOutput, remainderBasicOutput}
-}
-
-// CreateDelegationFromInput creates a new DelegationOutput with given options from an input. If the remainder Output
-// is not created, then StoredMana from the input is not passed and can potentially be burned.
-// In order not to burn it, it needs to be assigned manually in another output in the transaction.
-func (t *TransactionFramework) CreateDelegationFromInput(signingWallet *mock.Wallet, inputAlias string, opts ...options.Option[builder.DelegationOutputBuilder]) (utxoledger.Outputs, iotago.Outputs[iotago.Output]) {
-	input := t.Output(inputAlias)
-
-	delegationOutput := options.Apply(builder.NewDelegationOutputBuilder(&iotago.AccountAddress{}, signingWallet.Address(), input.BaseTokenAmount()).
-		DelegatedAmount(input.BaseTokenAmount()),
-		opts).MustBuild()
-
-	if delegationOutput.ValidatorAddress.AccountID() == iotago.EmptyAccountID ||
-		delegationOutput.DelegatedAmount == 0 ||
-		delegationOutput.StartEpoch == 0 {
-		panic(fmt.Sprintf("delegation output created incorrectly %+v", delegationOutput))
-	}
-
-	outputStates := iotago.Outputs[iotago.Output]{delegationOutput}
-
-	// if options set an Amount, a remainder output needs to be created
-	if delegationOutput.Amount != input.BaseTokenAmount() {
-		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount: input.BaseTokenAmount() - delegationOutput.Amount,
-			Mana:   input.StoredMana(),
-			Conditions: iotago.BasicOutputUnlockConditions{
-				&iotago.AddressUnlockCondition{Address: signingWallet.Address()},
-			},
-			Features: iotago.BasicOutputFeatures{},
-		})
-	}
-
-	return utxoledger.Outputs{input}, outputStates
-}
-
-// DelayedClaimingTransition transitions DelegationOutput into delayed claiming state by setting DelegationID and EndEpoch.
-func (t *TransactionFramework) DelayedClaimingTransition(inputAlias string, delegationEndEpoch iotago.EpochIndex) (utxoledger.Outputs, iotago.Outputs[iotago.Output]) {
-	input := t.Output(inputAlias)
-	if input.OutputType() != iotago.OutputDelegation {
-		panic(ierrors.Errorf("%s is not a delegation output, cannot transition to delayed claiming state", inputAlias))
-	}
-
-	prevOutput, ok := input.Output().Clone().(*iotago.DelegationOutput)
-	if !ok {
-		panic(ierrors.Errorf("cloned output %s is not a delegation output, cannot transition to delayed claiming state", inputAlias))
-	}
-
-	delegationBuilder := builder.NewDelegationOutputBuilderFromPrevious(prevOutput).EndEpoch(delegationEndEpoch)
-	if prevOutput.DelegationID == iotago.EmptyDelegationID() {
-		delegationBuilder.DelegationID(iotago.DelegationIDFromOutputID(input.OutputID()))
-	}
-
-	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{delegationBuilder.MustBuild()}
-}
-
-func (t *TransactionFramework) DestroyAccount(alias string, signingWallet *mock.Wallet) (consumedInputs *utxoledger.Output, outputs iotago.Outputs[iotago.Output]) {
-	output := t.Output(alias)
-
-	outputStates := iotago.Outputs[iotago.Output]{&iotago.BasicOutput{
-		Amount: output.BaseTokenAmount(),
-		Mana:   output.StoredMana(),
-		Conditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: signingWallet.Address()},
-		},
-		Features: iotago.BasicOutputFeatures{},
-	}}
-
-	return output, outputStates
-}
-
-func (t *TransactionFramework) TransitionAccount(alias string, opts ...options.Option[builder.AccountOutputBuilder]) (consumedInput *utxoledger.Output, outputs iotago.Outputs[iotago.Output]) {
-	output, exists := t.states[alias]
-	if !exists {
-		panic(fmt.Sprintf("account with alias %s does not exist", alias))
-	}
-
-	accountOutput, ok := output.Output().Clone().(*iotago.AccountOutput)
-	if !ok {
-		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", alias))
-	}
-
-	accountBuilder := builder.NewAccountOutputBuilderFromPrevious(accountOutput)
-	accountOutput = options.Apply(accountBuilder, opts).MustBuild()
-
-	return output, iotago.Outputs[iotago.Output]{accountOutput}
-}
-
-func (t *TransactionFramework) TransitionImplicitAccountToAccountOutput(alias string, signingWallet *mock.Wallet, opts ...options.Option[builder.AccountOutputBuilder]) (consumedInput utxoledger.Outputs, outputs iotago.Outputs[iotago.Output]) {
-	input, exists := t.states[alias]
-	if !exists {
-		panic(fmt.Sprintf("output with alias %s does not exist", alias))
-	}
-
-	basicOutput, isBasic := input.Output().(*iotago.BasicOutput)
-	if !isBasic {
-		panic(fmt.Sprintf("output with alias %s is not *iotago.BasicOutput", alias))
-	}
-	if basicOutput.UnlockConditionSet().Address().Address.Type() != iotago.AddressImplicitAccountCreation {
-		panic(fmt.Sprintf("output with alias %s is not an implicit account", alias))
-	}
-
-	accountOutput := options.Apply(builder.NewAccountOutputBuilder(signingWallet.Address(), signingWallet.Address(), MinIssuerAccountAmount).
-		AccountID(iotago.AccountIDFromOutputID(input.OutputID())),
-		opts).MustBuild()
-
-	return utxoledger.Outputs{input}, iotago.Outputs[iotago.Output]{accountOutput}
-}
 
 func (t *TransactionFramework) Output(alias string) *utxoledger.Output {
 	output, exists := t.states[alias]
@@ -402,9 +228,6 @@ func (t *TransactionFramework) Transactions(aliases ...string) []*iotago.Transac
 	return lo.Map(aliases, t.Transaction)
 }
 
-func (t *TransactionFramework) TransactionIDs(aliases ...string) []iotago.TransactionID {
-	return lo.Map(aliases, t.TransactionID)
-}
 
 // DelegationOutput options
 

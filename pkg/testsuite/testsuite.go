@@ -27,10 +27,6 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-const MinIssuerAccountAmount = iotago.BaseToken(372900)
-const MinValidatorAccountAmount = iotago.BaseToken(722800)
-const AccountConversionManaCost = iotago.Mana(1000000)
-
 type TestSuite struct {
 	Testing     *testing.T
 	fakeTesting *testing.T
@@ -321,7 +317,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	node := mock.NewNode(t.Testing, t.network, partition, name, validator)
 	t.nodes.Set(name, node)
 
-	amount := MinValidatorAccountAmount
+	amount := mock.MinValidatorAccountAmount
 	if len(optAmount) > 0 {
 		amount = optAmount[0]
 	}
@@ -378,8 +374,8 @@ func (t *TestSuite) AddBasicBlockIssuer(name string, blockIssuanceCredits ...iot
 
 	accountDetails := snapshotcreator.AccountDetails{
 		Address:              iotago.Ed25519AddressFromPubKey(newBlockIssuer.PublicKey),
-		Amount:               MinIssuerAccountAmount,
-		Mana:                 iotago.Mana(MinIssuerAccountAmount),
+		Amount:               mock.MinIssuerAccountAmount,
+		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount),
 		IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newBlockIssuer.PublicKey)),
 		ExpirySlot:           iotago.MaxSlotIndex,
 		BlockIssuanceCredits: bic,
@@ -446,7 +442,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 		node.Initialize(failOnBlockFiltered, baseOpts...)
 
 		if t.TransactionFramework == nil {
-			t.TransactionFramework = NewTransactionFramework(t.Testing, node.Protocol, t.genesisSeed[:])
+			t.TransactionFramework = NewTransactionFramework(t.Testing, node, t.genesisSeed[:])
 		}
 
 		return true
