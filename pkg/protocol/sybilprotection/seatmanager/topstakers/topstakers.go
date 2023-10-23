@@ -6,15 +6,15 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ds"
-	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/activitytracker"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/activitytracker/activitytrackerv1"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -25,13 +25,9 @@ type SeatManager struct {
 	apiProvider iotago.APIProvider
 	events      *seatmanager.Events
 
-	committeeStore   *epochstore.Store[*account.Accounts]
-	onlineCommittee  ds.Set[account.SeatIndex]
-	inactivityQueue  timed.PriorityQueue[account.SeatIndex]
-	lastActivities   *shrinkingmap.ShrinkingMap[account.SeatIndex, time.Time]
-	lastActivityTime time.Time
-	activityMutex    syncutils.RWMutex
-	committeeMutex   syncutils.RWMutex
+	committeeStore  *epochstore.Store[*account.Accounts]
+	committeeMutex  syncutils.RWMutex
+	activityTracker activitytracker.ActivityTracker
 
 	optsSeatCount              uint32
 	optsActivityWindow         time.Duration
@@ -45,15 +41,17 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
 		return options.Apply(
 			&SeatManager{
-				apiProvider:     e,
-				events:          seatmanager.NewEvents(),
-				committeeStore:  e.Storage.Committee(),
-				onlineCommittee: ds.NewSet[account.SeatIndex](),
-				inactivityQueue: timed.NewPriorityQueue[account.SeatIndex](true),
-				lastActivities:  shrinkingmap.New[account.SeatIndex, time.Time](),
+				apiProvider:    e,
+				events:         seatmanager.NewEvents(),
+				committeeStore: e.Storage.Committee(),
 
 				optsActivityWindow: time.Second * 30,
 			}, opts, func(s *SeatManager) {
+				activityTracker := activitytrackerv1.NewActivityTracker(s.optsActivityWindow)
+				s.activityTracker = activityTracker
+				s.events.OnlineCommitteeSeatAdded.LinkTo(activityTracker.Events.OnlineCommitteeSeatAdded)
+				s.events.OnlineCommitteeSeatRemoved.LinkTo(activityTracker.Events.OnlineCommitteeSeatRemoved)
+
 				e.Events.SeatManager.LinkTo(s.events)
 
 				e.HookConstructed(func() {
@@ -70,7 +68,7 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 						seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
 						if exists {
-							s.markSeatActive(seat, block.ProtocolBlock().IssuerID, block.IssuingTime())
+							s.activityTracker.MarkSeatActive(seat, block.ProtocolBlock().IssuerID, block.IssuingTime())
 						}
 
 						s.events.BlockProcessed.Trigger(block)
@@ -159,10 +157,7 @@ func (s *SeatManager) committeeInEpoch(epoch iotago.EpochIndex) (*account.Seated
 
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
 func (s *SeatManager) OnlineCommittee() ds.Set[account.SeatIndex] {
-	s.activityMutex.RLock()
-	defer s.activityMutex.RUnlock()
-
-	return s.onlineCommittee
+	return s.activityTracker.OnlineCommittee()
 }
 
 func (s *SeatManager) SeatCount() int {
@@ -199,7 +194,7 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 			continue
 		}
 
-		s.markSeatActive(seat, v, activityTime)
+		s.activityTracker.MarkSeatActive(seat, v, activityTime)
 	}
 
 	return nil
@@ -219,42 +214,4 @@ func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.
 	}
 
 	return nil
-}
-
-func (s *SeatManager) markSeatActive(seat account.SeatIndex, id iotago.AccountID, seatActivityTime time.Time) {
-	s.activityMutex.Lock()
-	defer s.activityMutex.Unlock()
-
-	if lastActivity, exists := s.lastActivities.Get(seat); (exists && lastActivity.After(seatActivityTime)) || seatActivityTime.Before(s.lastActivityTime.Add(-s.optsActivityWindow)) {
-		return
-	} else if !exists {
-		s.onlineCommittee.Add(seat)
-		s.events.OnlineCommitteeSeatAdded.Trigger(seat, id)
-	}
-
-	s.lastActivities.Set(seat, seatActivityTime)
-
-	s.inactivityQueue.Push(seat, seatActivityTime)
-
-	if seatActivityTime.Before(s.lastActivityTime) {
-		return
-	}
-
-	s.lastActivityTime = seatActivityTime
-
-	activityThreshold := seatActivityTime.Add(-s.optsActivityWindow)
-	for _, inactiveSeat := range s.inactivityQueue.PopUntil(activityThreshold) {
-		if lastActivityForInactiveSeat, exists := s.lastActivities.Get(inactiveSeat); exists && lastActivityForInactiveSeat.After(activityThreshold) {
-			continue
-		}
-
-		s.markSeatInactive(inactiveSeat)
-	}
-}
-
-func (s *SeatManager) markSeatInactive(seat account.SeatIndex) {
-	s.lastActivities.Delete(seat)
-	s.onlineCommittee.Delete(seat)
-
-	s.events.OnlineCommitteeSeatRemoved.Trigger(seat)
 }
