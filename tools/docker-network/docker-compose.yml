@@ -141,6 +141,7 @@ services:
       - "--inx.address=validator-1:9029"
       - "--restAPI.bindAddress=inx-blockissuer:9086"
       - "--blockIssuer.accountAddress=rms1prkursay9fs2qjmfctamd6yxg9x8r3ry47786x0mvwek4qr9xd9d5c6gkun"
+      - "--blockIssuer.proofOfWork.targetTrailingZeros=5"
     networks:
       - iota-core
 
