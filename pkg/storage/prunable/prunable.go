@@ -171,7 +171,7 @@ func (p *Prunable) Rollback(targetSlot iotago.SlotIndex) error {
 			}
 
 			if shouldRollback {
-				if err = p.committee.DeleteEpoch(epoch); err != nil {
+				if err := p.committee.DeleteEpoch(epoch); err != nil {
 					return ierrors.Wrapf(err, "error while deleting committee for epoch %d", epoch)
 				}
 			}

@@ -99,6 +99,12 @@ func (o *SybilProtection) Shutdown() {
 }
 
 func (o *SybilProtection) TrackBlock(block *blocks.Block) {
+	if _, isValidationBlock := block.ValidationBlock(); isValidationBlock {
+		o.performanceTracker.TrackValidationBlock(block)
+
+		return
+	}
+
 	accountData, exists, err := o.ledger.Account(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Slot())
 	if err != nil {
 		o.errHandler(ierrors.Wrapf(err, "error while retrieving account from account %s in slot %d from accounts ledger", block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Slot()))
@@ -117,17 +123,12 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 		return
 	}
 
-	if _, isValidationBlock := block.ValidationBlock(); isValidationBlock {
-		o.performanceTracker.TrackValidationBlock(block)
-
-		return
-	}
-
 	// if a candidate block is issued in the stake end epoch,
 	// or if block is issued after EpochEndSlot - EpochNearingThreshold, because candidates can register only until that point.
 	// then don't consider it because the validator can't be part of the committee in the next epoch
 	if accountData.StakeEndEpoch == blockEpoch ||
 		block.ID().Slot()+o.apiProvider.APIForSlot(block.ID().Slot()).ProtocolParameters().EpochNearingThreshold() > o.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochEnd(blockEpoch) {
+
 		return
 	}
 
