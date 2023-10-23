@@ -19,7 +19,7 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20231020115340-13da292c580b
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 	github.com/iotaledger/iota-core/tools/genesis-snapshot v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231019174124-aa2290512bcd
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231023073721-97f39c627159
 	github.com/mr-tron/base58 v1.2.0
 	go.uber.org/atomic v1.11.0
 )
@@ -42,7 +42,7 @@ require (
 	github.com/iotaledger/hive.go/constraints v0.0.0-20231020115340-13da292c580b // indirect
 	github.com/iotaledger/hive.go/crypto v0.0.0-20231020115340-13da292c580b // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20231020115340-13da292c580b // indirect
-	github.com/iotaledger/hive.go/log v0.0.0-20231019113503-7986872a7a38 // indirect
+	github.com/iotaledger/hive.go/log v0.0.0-20231020115340-13da292c580b // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231020115340-13da292c580b // indirect
 	github.com/iotaledger/hive.go/stringify v0.0.0-20231020115340-13da292c580b // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
@@ -51,9 +51,9 @@ require (
 	github.com/knadh/koanf v1.5.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
-	github.com/libp2p/go-libp2p v0.30.0 // indirect
+	github.com/libp2p/go-libp2p v0.31.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
@@ -61,7 +61,7 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
-	github.com/multiformats/go-multiaddr v0.11.0 // indirect
+	github.com/multiformats/go-multiaddr v0.12.0 // indirect
 	github.com/multiformats/go-multibase v0.2.0 // indirect
 	github.com/multiformats/go-multicodec v0.9.0 // indirect
 	github.com/multiformats/go-multihash v0.2.3 // indirect
@@ -82,7 +82,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
-	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sync v0.4.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
