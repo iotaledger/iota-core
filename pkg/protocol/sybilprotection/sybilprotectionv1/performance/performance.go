@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -85,7 +84,16 @@ func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) ds.Set[io
 
 	eligible := ds.NewSet[iotago.AccountID]()
 
-	lo.PanicOnErr(t.committeeStore.Load(epoch - 1)).ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
+	// Avoid underflow error. This will be handled properly once TopStakers branch is merged.
+	if epoch == 0 {
+		epoch = 1
+	}
+
+	committee, exists := t.LoadCommitteeForEpoch(epoch - 1)
+	if !exists {
+		panic(ierrors.Errorf("committee for epoch %d does not exist", epoch-1))
+	}
+	committee.ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
 		eligible.Add(accountID)
 
 		return true
