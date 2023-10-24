@@ -148,7 +148,6 @@ func (o *Orchestrator) TrackValidationBlock(block *blocks.Block) {
 
 	committee, exists := o.seatManager.CommitteeInSlot(block.ID().Slot())
 	if !exists {
-		// TODO: committee should exist at this point, what else can we do other than panic?
 		return
 	}
 

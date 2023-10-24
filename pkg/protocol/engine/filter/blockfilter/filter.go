@@ -94,7 +94,12 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 		blockSlot := block.ProtocolBlock().API.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
 		committee, exists := f.committeeFunc(blockSlot)
 		if !exists {
-			// TODO: is it guaranteed that the committee exists at this point? should we drop the block or what?
+			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "no committee for slot %d", blockSlot),
+				Source: source,
+			})
+
 			return
 		}
 

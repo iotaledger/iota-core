@@ -145,20 +145,19 @@ func (m *Manager) GetMap(slot iotago.SlotIndex) (ads.Map[iotago.Identifier, iota
 }
 
 // AddAttestationFromValidationBlock adds an attestation from a block to the future attestations (beyond the attestation window).
-func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
+func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) error {
 	// Only track validator blocks.
 	if _, isValidationBlock := block.ValidationBlock(); !isValidationBlock {
-		return
+		return nil
 	}
 
 	committee, exists := m.committeeFunc(block.ID().Slot())
 	if !exists {
-		// TODO: committee should exist at this point, what else can we do other than panic?
-		return
+		return ierrors.Errorf("committee for slot %d does not exist", block.ID().Slot())
 	}
 	// Only track attestations of active committee members.
 	if _, exists := committee.GetSeat(block.ProtocolBlock().IssuerID); !exists {
-		return
+		return nil
 	}
 
 	m.commitmentMutex.RLock()
@@ -166,7 +165,7 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
 
 	// We only care about attestations that are newer than the last committed slot.
 	if block.ID().Slot() <= m.lastCommittedSlot {
-		return
+		return nil
 	}
 
 	newAttestation := iotago.NewAttestation(m.apiProvider.APIForSlot(block.ID().Slot()), block.ProtocolBlock())
@@ -184,6 +183,8 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
 
 		return currentValue
 	})
+
+	return nil
 }
 
 func (m *Manager) applyToPendingAttestations(attestation *iotago.Attestation, cutoffSlot iotago.SlotIndex) {
@@ -261,8 +262,7 @@ func (m *Manager) Commit(slot iotago.SlotIndex) (newCW uint64, attestationsRoot 
 	// Add all attestations to the tree and calculate the new cumulative weight.
 	committee, exists := m.committeeFunc(slot)
 	if !exists {
-		// TODO: committee should exist at this point, what else can we do other than panic?
-		return
+		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get committee when committing slot %d", slot)
 	}
 
 	for _, a := range attestations {

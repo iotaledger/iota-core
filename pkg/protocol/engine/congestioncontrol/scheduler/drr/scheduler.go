@@ -71,7 +71,6 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 					defer s.bufferMutex.Unlock()
 					committee, exists := s.seatManager.CommitteeInSlot(commitment.Slot() + 1)
 					if !exists {
-						// TODO: panic?
 						s.errorHandler(ierrors.Errorf("committee does not exist in committed slot %d", commitment.Slot()+1))
 
 						return

@@ -5,6 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/walker"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -22,8 +23,9 @@ import (
 type Gadget struct {
 	events *blockgadget.Events
 
-	seatManager seatmanager.SeatManager
-	blockCache  *blocks.Blocks
+	seatManager  seatmanager.SeatManager
+	blockCache   *blocks.Blocks
+	errorHandler func(error)
 
 	optsAcceptanceThreshold               float64
 	optsConfirmationThreshold             float64
@@ -34,7 +36,7 @@ type Gadget struct {
 
 func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine, blockgadget.Gadget] {
 	return module.Provide(func(e *engine.Engine) blockgadget.Gadget {
-		g := New(e.BlockCache, e.SybilProtection.SeatManager(), opts...)
+		g := New(e.BlockCache, e.SybilProtection.SeatManager(), e.ErrorHandler("gadget"), opts...)
 
 		wp := e.Workers.CreatePool("ThresholdBlockGadget", workerpool.WithWorkerCount(1))
 		e.Events.Booker.BlockBooked.Hook(g.TrackWitnessWeight, event.WithWorkerPool(wp))
@@ -45,11 +47,12 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 	})
 }
 
-func New(blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, opts ...options.Option[Gadget]) *Gadget {
+func New(blockCache *blocks.Blocks, seatManager seatmanager.SeatManager, errorHandler func(error), opts ...options.Option[Gadget]) *Gadget {
 	return options.Apply(&Gadget{
-		events:      blockgadget.NewEvents(),
-		seatManager: seatManager,
-		blockCache:  blockCache,
+		events:       blockgadget.NewEvents(),
+		seatManager:  seatManager,
+		blockCache:   blockCache,
+		errorHandler: errorHandler,
 
 		optsAcceptanceThreshold:               0.67,
 		optsConfirmationThreshold:             0.67,
@@ -100,7 +103,8 @@ func (g *Gadget) isCommitteeValidationBlock(block *blocks.Block) (seat account.S
 
 	committee, exists := g.seatManager.CommitteeInSlot(block.ID().Slot())
 	if !exists {
-		// TODO: committee should exist, panic in this case is justified imo
+		g.errorHandler(ierrors.Errorf("committee for slot %d does not exist", block.ID().Slot()))
+
 		return 0, false
 	}
 

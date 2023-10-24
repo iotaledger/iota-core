@@ -750,8 +750,7 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 
 	committee, exists := l.sybilProtection.SeatManager().CommitteeInSlot(block.ID().Slot())
 	if !exists {
-		// TODO: committee should exist at this point, what else can we do other than panic?
-		return
+		panic("committee should exist because we pre-accepted the block")
 	}
 
 	seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
