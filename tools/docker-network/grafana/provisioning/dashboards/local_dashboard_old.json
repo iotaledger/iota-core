@@ -4847,8 +4847,8 @@
       {
         "current": {
           "selected": false,
-          "text": "validator-3:9311",
-          "value": "validator-3:9311"
+          "text": "node-3-validator:9311",
+          "value": "node-3-validator:9311"
         },
         "datasource": {
           "type": "prometheus",

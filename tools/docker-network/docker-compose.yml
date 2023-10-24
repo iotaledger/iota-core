@@ -4,9 +4,31 @@ x-build-iota-core: &iota-core_build
   context: ${DOCKER_BUILD_CONTEXT:-../../}
   dockerfile: ${DOCKERFILE_PATH:-./Dockerfile}
 services:
-  validator-1:
+
+###################
+# IOTA-CORE Nodes #
+###################
+
+  node-1-validator:
     build: *iota-core_build
     stop_grace_period: 1m
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    networks:
+      - iota-core
+    ports:
+      - "8080:8080/tcp" # REST-API
+      - "8081:8081/tcp" # Dashboard
+      - "6081:6061/tcp" # pprof
+      - "9089:9029/tcp" # INX
+    cap_drop:
+      - ALL
+    volumes:
+      - ./docker-network.snapshot:/app/data/snapshot.bin
+      - ./config.json:/app/config.json:ro
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
@@ -17,20 +39,27 @@ services:
       --validator.privateKey=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
+
+  node-2-validator:
+    image: docker-network-node-1-validator:latest
+    stop_grace_period: 1m
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    networks:
+      - iota-core
+    ports:
+      - "8070:8080/tcp" # REST-API
+      - "8071:8081/tcp" # Dashboard
+      - "6071:6061/tcp" # pprof
+      - "9029:9029/tcp" # INX
+    cap_drop:
+      - ALL
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
-    ports:
-      - "8080:8080/tcp" # web API
-      - "8081:8081/tcp" # dashboard
-      - "6081:6061/tcp" # pprof
-      - "9089:9029/tcp" # inx
-    networks:
-      - iota-core
-
-  validator-2:
-    image: docker-network-validator-1:latest
-    stop_grace_period: 1m
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
@@ -40,20 +69,25 @@ services:
       --validator.privateKey=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
+
+  node-3-validator:
+    image: docker-network-node-1-validator:latest
+    stop_grace_period: 1m
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    networks:
+      - iota-core
+    ports:
+      - "8090:8080/tcp" # REST-API
+      - "8091:8081/tcp" # Dashboard
+      - "6091:6061/tcp" # pprof
+      - "9099:9029/tcp" # INX
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
-    ports:
-      - "8070:8080/tcp" # web API
-      - "8071:8081/tcp" # dashboard
-      - "6071:6061/tcp" # pprof
-      - "9029:9029/tcp" # inx
-    networks:
-      - iota-core
-
-  validator-3:
-    image: docker-network-validator-1:latest
-    stop_grace_period: 1m
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
@@ -63,148 +97,167 @@ services:
       --validator.privateKey=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
+
+  node-4:
+    image: docker-network-node-1-validator:latest
+    stop_grace_period: 1m
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    networks:
+      - iota-core
+    ports:
+      - "8040:8080/tcp" # REST-API
+      - "8041:8081/tcp" # Dashboard
+      - "6041:6061/tcp" # pprof
+      - "9049:9029/tcp" # INX
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
-    ports:
-      - "8090:8080/tcp" # web API
-      - "8091:8081/tcp" # dashboard
-      - "6091:6061/tcp" # pprof
-      - "9099:9029/tcp" # inx
-    networks:
-      - iota-core
-
-  node-1:
-    image: docker-network-validator-1:latest
-    stop_grace_period: 1m
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
       --p2p.identityPrivateKey=03feb3bcd25e57f75697bb329e6e0100680431e4c45c85bc013da2aea9e9d0345e08a0c37407dc62369deebc64cb0fb3ea26127d19d141ee7fb8eaa6b92019d7
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
+
+  node-5:
+    image: docker-network-node-1-validator:latest
+    stop_grace_period: 1m
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    networks:
+      - iota-core
+    ports:
+      - "8030:8080/tcp" # REST-API
+      - "8031:8081/tcp" # Dashboard
+      - "6031:6061/tcp" # pprof
+      - "9039:9029/tcp" # INX
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
-    ports:
-      - "8040:8080/tcp" # web API
-      - "8041:8081/tcp" # dashboard
-      - "6041:6061/tcp" # pprof
-      - "9049:9029/tcp" # inx
-    networks:
-      - iota-core
-
-  node-2:
-    image: docker-network-validator-1:latest
-    stop_grace_period: 1m
     command: >
       ${COMMON_CONFIG}
       ${MANUALPEERING_CONFIG}
       --p2p.identityPrivateKey=7d1491df3ef334dee988d6cdfc4b430b996d520bd63375a01d6754f8cee979b855b200fbea8c936ea1937a27e6ad72a7c9a21c1b17c2bd3c11f1f6994d813446
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
-    volumes:
-      - ./docker-network.snapshot:/app/data/snapshot.bin
-      - ./config.json:/app/config.json:ro
-    ports:
-      - "8030:8080/tcp" # web API
-      - "8031:8081/tcp" # dashboard
-      - "6031:6061/tcp" # pprof
-      - "9039:9029/tcp" # inx
+
+##################################################################
+#  Monitoring                                                    #
+##################################################################
+
+  prometheus:
+    image: prom/prometheus:latest
+    stop_grace_period: 1m
+    restart: unless-stopped
+    depends_on:
+      node-1-validator:
+        condition: service_started
     networks:
       - iota-core
+    ports:
+      - "9090:9090" # prometheus
+    secrets:
+      - prometheus.yml
+    command:
+      - "--config.file=/run/secrets/prometheus.yml"
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:9.5.6
+    restart: unless-stopped
+    networks:
+      - iota-core
+    ports:
+      - "3000:3000" # Grafana Dashboard
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/:/etc/grafana/:ro
+    environment:
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/local_dashboard.json
+    profiles:
+      - monitoring
+
+##################
+# INX Extensions #
+##################
 
   inx-indexer:
     image: iotaledger/inx-indexer:2.0-alpha
     stop_grace_period: 1m
+    restart: unless-stopped
     depends_on:
-      validator-1:
+      node-1-validator:
         condition: service_started
-    command:
-      - "--inx.address=validator-1:9029"
-      - "--restAPI.bindAddress=inx-indexer:9091"
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
     networks:
       - iota-core
+    command:
+      - "--inx.address=node-1-validator:9029"
+      - "--restAPI.bindAddress=inx-indexer:9091"
 
   inx-blockissuer:
     image: iotaledger/inx-blockissuer:1.0-alpha
     stop_grace_period: 1m
+    restart: unless-stopped
     depends_on:
-      validator-1:
+      node-1-validator:
         condition: service_started
       inx-indexer:
         condition: service_started
-    restart: on-failure
+    networks:
+      - iota-core
     environment:
       - "BLOCKISSUER_PRV_KEY=432c624ca3260f910df35008d5c740593b222f1e196e6cdb8cd1ad080f0d4e33997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270"
     command:
-      - "--inx.address=validator-1:9029"
+      - "--inx.address=node-1-validator:9029"
       - "--restAPI.bindAddress=inx-blockissuer:9086"
       - "--blockIssuer.accountAddress=rms1prkursay9fs2qjmfctamd6yxg9x8r3ry47786x0mvwek4qr9xd9d5c6gkun"
       - "--blockIssuer.proofOfWork.targetTrailingZeros=5"
-    networks:
-      - iota-core
 
   inx-faucet:
     image: iotaledger/inx-faucet:2.0-alpha
     stop_grace_period: 1m
+    restart: unless-stopped
     depends_on:
-      validator-1:
+      node-1-validator:
         condition: service_started
       inx-indexer:
         condition: service_started
       inx-blockissuer:
         condition: service_started
-    restart: on-failure
+    networks:
+      - iota-core
+    ports:
+      - "8088:8091/tcp" # Faucet Frontend
     environment:
       - "FAUCET_PRV_KEY=de52b9964dda96564e9fab362ab16c2669c715c6a2a853bece8a25fc58c599755b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737"
     command:
-      - "--inx.address=validator-1:9029"
+      - "--inx.address=node-1-validator:9029"
       - "--faucet.bindAddress=inx-faucet:8091"
       - "--faucet.rateLimit.enabled=false"
-    ports:
-      - "8088:8091/tcp" # faucet frontend
-    networks:
-      - iota-core
-
-  prometheus:
-    image: prom/prometheus:latest
-    profiles:
-      - grafana
-    ports:
-      - "9090:9090"
-    command:
-      - --config.file=/run/secrets/prometheus.yml
-    secrets:
-      - prometheus.yml
-    networks:
-      - iota-core
-    depends_on:
-      - validator-1
-
-  grafana:
-    image: grafana/grafana:9.5.6
-    profiles:
-      - grafana
-    environment:
-      - GF_ALERTING_ENABLED=true
-      - GF_UNIFIED_ALERTING_ENABLED=false
-      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/local_dashboard.json
-    networks:
-      - iota-core
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/:/etc/grafana/:ro
 
 # Create our own network
 networks:
   iota-core:
     driver: bridge
+
 # Named Docker volumes for data persistence
 volumes:
   grafana_data:
+
 # read only files to load in the containers that may be shared across containers
 secrets:
   prometheus.yml:

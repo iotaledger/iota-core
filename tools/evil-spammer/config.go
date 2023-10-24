@@ -52,7 +52,7 @@ var (
 	// 	Duration:       time.Second * 20,
 	// 	TimeUnit:       time.Second,
 	// 	NetworkAlias:   "docker",
-	// 	SpammerAlias:   "validator-1",
+	// 	SpammerAlias:   "node-1-validator",
 	// 	ValidAlias:     accountwallet.FaucetAccountAlias,
 	// 	CommitmentType: "latest",
 	// 	ForkAfter:      10,
