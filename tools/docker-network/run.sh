@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Create a function to join an array of strings by a given character
 function join {

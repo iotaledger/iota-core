@@ -20,17 +20,17 @@ func pruneDatabase(c echo.Context) (*apimodels.PruneDatabaseResponse, error) {
 	}
 
 	// only allow one type of pruning at a time
-	if (request.Index == 0 && request.Depth == 0 && request.TargetDatabaseSize == "") ||
-		(request.Index != 0 && request.Depth != 0) ||
-		(request.Index != 0 && request.TargetDatabaseSize != "") ||
+	if (request.Epoch == 0 && request.Depth == 0 && request.TargetDatabaseSize == "") ||
+		(request.Epoch != 0 && request.Depth != 0) ||
+		(request.Epoch != 0 && request.TargetDatabaseSize != "") ||
 		(request.Depth != 0 && request.TargetDatabaseSize != "") {
-		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "either index, depth or size has to be specified")
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "either epoch, depth or size has to be specified")
 	}
 
 	var err error
 
-	if request.Index != 0 {
-		err = deps.Protocol.MainEngineInstance().Storage.PruneByEpochIndex(request.Index)
+	if request.Epoch != 0 {
+		err = deps.Protocol.MainEngineInstance().Storage.PruneByEpochIndex(request.Epoch)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "pruning database failed: %s", err)
 		}
@@ -55,12 +55,12 @@ func pruneDatabase(c echo.Context) (*apimodels.PruneDatabaseResponse, error) {
 		}
 	}
 
-	targetIndex, hasPruned := deps.Protocol.MainEngineInstance().Storage.LastPrunedEpoch()
+	targetEpoch, hasPruned := deps.Protocol.MainEngineInstance().Storage.LastPrunedEpoch()
 	if hasPruned {
-		targetIndex++
+		targetEpoch++
 	}
 
 	return &apimodels.PruneDatabaseResponse{
-		Index: targetIndex,
+		Epoch: targetEpoch,
 	}, nil
 }

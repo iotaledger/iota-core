@@ -212,7 +212,7 @@ func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
 	})
 
 	return &apimodels.CommitteeResponse{
-		EpochIndex:          epoch,
+		Epoch:               epoch,
 		Committee:           committee,
 		TotalStake:          seatedAccounts.Accounts().TotalStake(),
 		TotalValidatorStake: seatedAccounts.Accounts().TotalValidatorStake(),
