@@ -117,7 +117,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		t.ProtocolParameterOptions = append(defaultProtocolParameters, t.ProtocolParameterOptions...)
 		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(t.ProtocolParameterOptions...))
 
-		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(), time.Unix(t.API.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
+		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(), time.Unix(t.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
 
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
