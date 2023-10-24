@@ -201,7 +201,7 @@ func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
 	seatedAccounts, exists := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)
 	if !exists {
 		return &apimodels.CommitteeResponse{
-			EpochIndex: epoch,
+			Epoch: epoch,
 		}
 	}
 
