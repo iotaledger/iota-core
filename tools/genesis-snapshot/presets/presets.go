@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/testsuite"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/hexutil"
@@ -57,38 +57,38 @@ var Docker = []options.Option[snapshotcreator.Options]{
 		snapshotcreator.AccountDetails{ // validator-1
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b"))),
-			Amount:               testsuite.MinValidatorAccountAmount,
+			Amount:               mock.MinValidatorAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
 			StakingEpochEnd:      iotago.MaxEpochIndex,
 			FixedCost:            1,
-			StakedAmount:         testsuite.MinValidatorAccountAmount,
-			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
+			StakedAmount:         mock.MinValidatorAccountAmount,
+			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount),
 		},
 		snapshotcreator.AccountDetails{ // validator-2
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064"))),
-			Amount:               testsuite.MinValidatorAccountAmount,
+			Amount:               mock.MinValidatorAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
 			StakingEpochEnd:      iotago.MaxEpochIndex,
 			FixedCost:            1,
-			StakedAmount:         testsuite.MinValidatorAccountAmount,
-			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
+			StakedAmount:         mock.MinValidatorAccountAmount,
+			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount),
 		},
 		snapshotcreator.AccountDetails{ // validator-3
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648"))),
-			Amount:               testsuite.MinValidatorAccountAmount,
+			Amount:               mock.MinValidatorAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
 			StakingEpochEnd:      iotago.MaxEpochIndex,
 			FixedCost:            1,
-			StakedAmount:         testsuite.MinValidatorAccountAmount,
-			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
+			StakedAmount:         mock.MinValidatorAccountAmount,
+			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount),
 		},
 		snapshotcreator.AccountDetails{
 			/*
@@ -101,11 +101,11 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			*/
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270"))),
-			Amount:               testsuite.MinIssuerAccountAmount,
+			Amount:               mock.MinIssuerAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
-			Mana:                 iotago.Mana(testsuite.MinIssuerAccountAmount),
+			Mana:                 iotago.Mana(mock.MinIssuerAccountAmount),
 		},
 	),
 	snapshotcreator.WithProtocolParameters(
@@ -128,38 +128,38 @@ var Feature = []options.Option[snapshotcreator.Options]{
 		snapshotcreator.AccountDetails{
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe"))),
-			Amount:               testsuite.MinValidatorAccountAmount,
+			Amount:               mock.MinValidatorAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
 			StakingEpochEnd:      iotago.MaxEpochIndex,
 			FixedCost:            1,
-			StakedAmount:         testsuite.MinValidatorAccountAmount,
-			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
+			StakedAmount:         mock.MinValidatorAccountAmount,
+			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount),
 		},
 		snapshotcreator.AccountDetails{
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6"))),
-			Amount:               testsuite.MinValidatorAccountAmount,
+			Amount:               mock.MinValidatorAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
 			StakingEpochEnd:      iotago.MaxEpochIndex,
 			FixedCost:            1,
-			StakedAmount:         testsuite.MinValidatorAccountAmount,
-			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
+			StakedAmount:         mock.MinValidatorAccountAmount,
+			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount),
 		},
 		snapshotcreator.AccountDetails{
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805"))),
-			Amount:               testsuite.MinValidatorAccountAmount,
+			Amount:               mock.MinValidatorAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
 			StakingEpochEnd:      iotago.MaxEpochIndex,
 			FixedCost:            1,
-			StakedAmount:         testsuite.MinValidatorAccountAmount,
-			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
+			StakedAmount:         mock.MinValidatorAccountAmount,
+			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount),
 		},
 	),
 	snapshotcreator.WithProtocolParameters(

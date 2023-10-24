@@ -56,25 +56,6 @@ func (w *Wallet) AddBlockIssuer(accountID iotago.AccountID) {
 	w.BlockIssuer = NewBlockIssuer(w.Testing, w.Name, w.keyManager, accountID, false)
 }
 
-// func (w *Wallet) BookSpents(spentOutputs []*utxoledger.Output) {
-// 	for _, spent := range spentOutputs {
-// 		w.BookSpent(spent)
-// 	}
-// }
-//
-// func (w *Wallet) BookSpent(spentOutput *utxoledger.Output) {
-// 	newOutputs := make([]*utxoledger.Output, 0)
-// 	for _, output := range w.outputs {
-// 		if output.OutputID() == spentOutput.OutputID() {
-// 			fmt.Printf("%s spent %s\n", w.Name, output.OutputID().ToHex())
-
-// 			continue
-// 		}
-// 		newOutputs = append(newOutputs, output)
-// 	}
-// 	w.outputs = newOutputs
-// }
-
 func (w *Wallet) Balance() iotago.BaseToken {
 	var balance iotago.BaseToken
 	for _, output := range w.outputs {
@@ -83,13 +64,6 @@ func (w *Wallet) Balance() iotago.BaseToken {
 
 	return balance
 }
-
-// func (w *Wallet) BookOutput(output *utxoledger.Output) {
-// 	if output != nil {
-// 		fmt.Printf("%s book %s\n", w.Name, output.OutputID().ToHex())
-// 		w.outputs = append(w.outputs, output)
-// 	}
-// }
 
 func (w *Wallet) Output(outputName string) *utxoledger.Output {
 	output, exists := w.outputs[outputName]
