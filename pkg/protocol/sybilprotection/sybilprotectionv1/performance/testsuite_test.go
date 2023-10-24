@@ -141,7 +141,7 @@ func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[strin
 	t.poolRewards[epoch] = make(map[string]*model.PoolRewards)
 
 	for alias, action := range actions {
-		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount >> t.api.ProtocolParameters().TimeProvider().SlotsPerEpochExponent()
+		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount >> t.api.ProtocolParameters().SlotsPerEpochExponent()
 		poolRewards := t.calculatePoolReward(epoch, totalValidatorsStake, totalStake, action.PoolStake, action.ValidatorStake, epochPerformanceFactor)
 		t.poolRewards[epoch][alias] = &model.PoolRewards{
 			PoolStake:   action.PoolStake,
@@ -357,7 +357,7 @@ func (e *EpochActions) validate(t *testing.T, api iotago.API) {
 	}
 	require.Equal(t, e.PoolStake, delegatorsTotal+e.ValidatorStake, "pool stake must be equal to the sum of delegators stakes plus validator")
 
-	sumOfSlots := 1 << api.ProtocolParameters().TimeProvider().SlotsPerEpochExponent()
+	sumOfSlots := 1 << api.ProtocolParameters().SlotsPerEpochExponent()
 	require.LessOrEqual(t, e.ActiveSlotsCount, uint64(sumOfSlots), "active slots count must be less or equal to the number of slots in the epoch")
 
 	require.LessOrEqual(t, e.SlotPerformance, e.ValidationBlocksSentPerSlot, "number of subslots covered cannot be greated than number of blocks sent in a slot")

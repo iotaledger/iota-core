@@ -154,10 +154,10 @@ func getINXBlockMetadata(blockID iotago.BlockID) (*inx.BlockMetadata, error) {
 	}
 
 	return &inx.BlockMetadata{
-		BlockId:            inx.NewBlockId(blockID),
-		BlockState:         inx.WrapBlockState(blockMetadata.BlockState),
-		BlockFailureReason: inx.WrapBlockFailureReason(blockMetadata.BlockFailureReason),
-		TxState:            inx.WrapTransactionState(blockMetadata.TxState),
-		TxFailureReason:    inx.WrapTransactionFailureReason(blockMetadata.TxFailureReason),
+		BlockId:                  inx.NewBlockId(blockID),
+		BlockState:               inx.WrapBlockState(blockMetadata.BlockState),
+		BlockFailureReason:       inx.WrapBlockFailureReason(blockMetadata.BlockFailureReason),
+		TransactionState:         inx.WrapTransactionState(blockMetadata.TransactionState),
+		TransactionFailureReason: inx.WrapTransactionFailureReason(blockMetadata.TransactionFailureReason),
 	}, nil
 }
