@@ -56,7 +56,10 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	})
 
 	t.blockCache = blocks.New(evictionState, api.SingleVersionProvider(tpkg.TestAPI))
-	instance := thresholdblockgadget.New(t.blockCache, t.SeatManager)
+	instance := thresholdblockgadget.New(t.blockCache, t.SeatManager, func(err error) {
+		fmt.Printf(">> Gadget.Error: %s\n", err)
+	})
+
 	t.Events = instance.Events()
 	t.Instance = instance
 
