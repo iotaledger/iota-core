@@ -5,7 +5,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/iota-core/pkg/core/account"
-	"github.com/iotaledger/iota.go/v4"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type ActivityTracker interface {

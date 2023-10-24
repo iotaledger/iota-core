@@ -87,7 +87,7 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accoun
 
 	// If there are fewer candidates than required for epoch 0, then the previous committee cannot be copied.
 	if len(candidates) < s.SeatCount() && epoch == 0 {
-		return nil, ierrors.Errorf("at least %s candidates are required for committee in epoch 0, got %d", s.SeatCount(), len(candidates))
+		return nil, ierrors.Errorf("at least %d candidates are required for committee in epoch 0, got %d", s.SeatCount(), len(candidates))
 	}
 
 	// If there are fewer candidates than required, then re-use the previous committee.
@@ -241,5 +241,6 @@ func (s *SeatManager) selectNewCommittee(candidates accounts.AccountsData) *acco
 		})
 	}
 	committee := newCommitteeAccounts.SelectCommittee(newCommitteeAccounts.IDs()...)
+
 	return committee
 }

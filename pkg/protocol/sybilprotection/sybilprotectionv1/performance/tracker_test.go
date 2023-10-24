@@ -98,17 +98,17 @@ func TestManager_Candidates(t *testing.T) {
 	{
 		block1 := tpkg.RandProtocolBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 
-		block1.IssuingTime = ts.api.ProtocolParameters().TimeProvider().SlotStartTime(1)
+		block1.IssuingTime = ts.api.TimeProvider().SlotStartTime(1)
 		block1.IssuerID = issuer1
 
 		block2 := tpkg.RandProtocolBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 
-		block2.IssuingTime = ts.api.ProtocolParameters().TimeProvider().SlotStartTime(2)
+		block2.IssuingTime = ts.api.TimeProvider().SlotStartTime(2)
 		block2.IssuerID = issuer2
 
 		block3 := tpkg.RandProtocolBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 
-		block3.IssuingTime = ts.api.ProtocolParameters().TimeProvider().SlotStartTime(3)
+		block3.IssuingTime = ts.api.TimeProvider().SlotStartTime(3)
 		block3.IssuerID = issuer3
 
 		ts.Instance.TrackCandidateBlock(blocks.NewBlock(lo.PanicOnErr(model.BlockFromBlock(block1))))
@@ -118,17 +118,17 @@ func TestManager_Candidates(t *testing.T) {
 
 	{
 		block4 := tpkg.RandProtocolBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
-		block4.IssuingTime = ts.api.ProtocolParameters().TimeProvider().SlotStartTime(4)
+		block4.IssuingTime = ts.api.TimeProvider().SlotStartTime(4)
 		block4.IssuerID = issuer1
 
 		block5 := tpkg.RandProtocolBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 
-		block5.IssuingTime = ts.api.ProtocolParameters().TimeProvider().SlotStartTime(5)
+		block5.IssuingTime = ts.api.TimeProvider().SlotStartTime(5)
 		block5.IssuerID = issuer2
 
 		block6 := tpkg.RandProtocolBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 
-		block6.IssuingTime = ts.api.ProtocolParameters().TimeProvider().SlotStartTime(6)
+		block6.IssuingTime = ts.api.TimeProvider().SlotStartTime(6)
 		block6.IssuerID = issuer3
 
 		ts.Instance.TrackCandidateBlock(blocks.NewBlock(lo.PanicOnErr(model.BlockFromBlock(block4))))
