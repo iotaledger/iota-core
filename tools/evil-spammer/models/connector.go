@@ -299,7 +299,7 @@ func (c *WebClient) GetTransactionConfirmationState(txID iotago.TransactionID) s
 		return ""
 	}
 
-	return resp.TxState
+	return resp.TransactionState
 }
 
 // GetTransaction gets the transaction.
