@@ -383,7 +383,10 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 
 	newCommittee, err := o.seatManager.RotateCommittee(nextEpoch, candidateAccounts)
 	if err != nil {
+		// TODO: what to do in this case
 		o.errHandler(ierrors.Wrap(err, "failed to rotate committee"))
+
+		return nil
 	}
 
 	o.performanceTracker.ClearCandidates()

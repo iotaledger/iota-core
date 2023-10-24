@@ -82,46 +82,31 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 var _ seatmanager.SeatManager = &SeatManager{}
 
 func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accounts.AccountsData) (*account.SeatedAccounts, error) {
-	s.committeeMutex.RLock()
-	defer s.committeeMutex.RUnlock()
+	s.committeeMutex.Lock()
+	defer s.committeeMutex.Unlock()
 
-	sort.Slice(candidates, func(i, j int) bool {
-		// Prioritize the candidate that has a larger pool stake.
-		if candidates[i].ValidatorStake+candidates[i].DelegationStake != candidates[j].ValidatorStake+candidates[j].DelegationStake {
-			return candidates[i].ValidatorStake+candidates[i].DelegationStake > candidates[j].ValidatorStake+candidates[j].DelegationStake
-		}
-
-		// Prioritize the candidate that has a larger validator stake.
-		if candidates[i].ValidatorStake != candidates[j].ValidatorStake {
-			return candidates[i].ValidatorStake > candidates[j].ValidatorStake
-		}
-
-		// Prioritize the candidate that declares a longer staking period.
-		if candidates[i].StakeEndEpoch != candidates[j].StakeEndEpoch {
-			return candidates[i].StakeEndEpoch > candidates[j].StakeEndEpoch
-		}
-
-		// Prioritize the candidate that has smaller FixedCost.
-		if candidates[i].FixedCost != candidates[j].FixedCost {
-			return candidates[i].FixedCost < candidates[j].FixedCost
-		}
-
-		// two candidates never have the same account ID because they come in a map
-		return bytes.Compare(candidates[i].ID[:], candidates[j].ID[:]) > 0
-	})
-
-	// Create new Accounts instance that only included validators selected to be part of the committee.
-	newCommitteeAccounts := account.NewAccounts()
-
-	// TODO: make sure that there are enough accounts
-	for _, candidateData := range candidates[:s.optsSeatCount] {
-		newCommitteeAccounts.Set(candidateData.ID, &account.Pool{
-			PoolStake:      candidateData.ValidatorStake + candidateData.DelegationStake,
-			ValidatorStake: candidateData.ValidatorStake,
-			FixedCost:      candidateData.FixedCost,
-		})
+	// If there are fewer candidates than required for epoch 0, then the previous committee cannot be copied.
+	if len(candidates) < s.SeatCount() && epoch == 0 {
+		return nil, ierrors.Errorf("at least %s candidates are required for committee in epoch 0, got %d", s.SeatCount(), len(candidates))
 	}
-	committee := newCommitteeAccounts.SelectCommittee(newCommitteeAccounts.IDs()...)
+
+	// If there are fewer candidates than required, then re-use the previous committee.
+	if len(candidates) < s.SeatCount() {
+		committee, exists := s.committeeInEpoch(epoch - 1)
+		if !exists {
+			return nil, ierrors.Errorf("cannot re-use previous committee from epoch %d as it does not exist", epoch-1)
+		}
+
+		// TODO: should we mark the committee as re-used? It's reused but not because of lack of finalization, so imo it should not be marked as reused.
+		err := s.committeeStore.Store(epoch, committee.Accounts())
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
+		}
+
+		return committee, nil
+	}
+
+	committee := s.selectNewCommittee(candidates)
 
 	err := s.committeeStore.Store(epoch, committee.Accounts())
 	if err != nil {
@@ -150,6 +135,7 @@ func (s *SeatManager) CommitteeInEpoch(epoch iotago.EpochIndex) (*account.Seated
 func (s *SeatManager) committeeInEpoch(epoch iotago.EpochIndex) (*account.SeatedAccounts, bool) {
 	c, err := s.committeeStore.Load(epoch)
 	if err != nil {
+		// TODO: panicking this deep down is probably bad
 		panic(ierrors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
 
@@ -166,9 +152,6 @@ func (s *SeatManager) OnlineCommittee() ds.Set[account.SeatIndex] {
 }
 
 func (s *SeatManager) SeatCount() int {
-	s.committeeMutex.RLock()
-	defer s.committeeMutex.RUnlock()
-
 	return int(s.optsSeatCount)
 }
 
@@ -219,4 +202,44 @@ func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.
 	}
 
 	return nil
+}
+
+func (s *SeatManager) selectNewCommittee(candidates accounts.AccountsData) *account.SeatedAccounts {
+	sort.Slice(candidates, func(i, j int) bool {
+		// Prioritize the candidate that has a larger pool stake.
+		if candidates[i].ValidatorStake+candidates[i].DelegationStake != candidates[j].ValidatorStake+candidates[j].DelegationStake {
+			return candidates[i].ValidatorStake+candidates[i].DelegationStake > candidates[j].ValidatorStake+candidates[j].DelegationStake
+		}
+
+		// Prioritize the candidate that has a larger validator stake.
+		if candidates[i].ValidatorStake != candidates[j].ValidatorStake {
+			return candidates[i].ValidatorStake > candidates[j].ValidatorStake
+		}
+
+		// Prioritize the candidate that declares a longer staking period.
+		if candidates[i].StakeEndEpoch != candidates[j].StakeEndEpoch {
+			return candidates[i].StakeEndEpoch > candidates[j].StakeEndEpoch
+		}
+
+		// Prioritize the candidate that has smaller FixedCost.
+		if candidates[i].FixedCost != candidates[j].FixedCost {
+			return candidates[i].FixedCost < candidates[j].FixedCost
+		}
+
+		// two candidates never have the same account ID because they come in a map
+		return bytes.Compare(candidates[i].ID[:], candidates[j].ID[:]) > 0
+	})
+
+	// Create new Accounts instance that only included validators selected to be part of the committee.
+	newCommitteeAccounts := account.NewAccounts()
+
+	for _, candidateData := range candidates[:s.optsSeatCount] {
+		newCommitteeAccounts.Set(candidateData.ID, &account.Pool{
+			PoolStake:      candidateData.ValidatorStake + candidateData.DelegationStake,
+			ValidatorStake: candidateData.ValidatorStake,
+			FixedCost:      candidateData.FixedCost,
+		})
+	}
+	committee := newCommitteeAccounts.SelectCommittee(newCommitteeAccounts.IDs()...)
+	return committee
 }
