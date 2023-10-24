@@ -357,8 +357,10 @@ func (t *TestSuite) RemoveNode(name string) {
 	t.nodes.Delete(name)
 }
 
+// AddWallet adds a wallet to the test suite with a block issuer in the genesis snapshot and access to the genesis seed.
+// If no block issuance credits are provided, the wallet will be assigned half of the maximum block issuance credits.
 func (t *TestSuite) AddWallet(name string, node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
-	newWallet := mock.NewWallet(t.Testing, name, node)
+	newWallet := mock.NewWallet(t.Testing, name, node, t.genesisSeed[:])
 	newWallet.AddBlockIssuer(iotago.EmptyAccountID)
 	t.wallets.Set(name, newWallet)
 	var bic iotago.BlockIssuanceCredits
@@ -384,7 +386,9 @@ func (t *TestSuite) AddWallet(name string, node *mock.Node, blockIssuanceCredits
 
 func (t *TestSuite) DefaultWallet() *mock.Wallet {
 	defaultWallet, exists := t.wallets.Get("default")
-	require.True(t.Testing, exists, "default wallet not found")
+	if !exists {
+		return nil
+	}
 
 	return defaultWallet
 }
@@ -437,11 +441,13 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 
 		node.Initialize(failOnBlockFiltered, baseOpts...)
 
-		if err := node.Protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
-			t.DefaultWallet().AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), output)
-			return true
-		}); err != nil {
-			panic(err)
+		if defaultWallet := t.DefaultWallet(); defaultWallet != nil {
+			if err := node.Protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
+				defaultWallet.AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), output)
+				return true
+			}); err != nil {
+				panic(err)
+			}
 		}
 
 		return true

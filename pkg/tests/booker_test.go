@@ -25,7 +25,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 
 	tx2 := wallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "tx1:0")
 
-	ts.IssuePayloadWithOptions("block1", wallet.BlockIssuer, node1, tx2)
+	ts.IssuePayloadWithOptions("block1", wallet, tx2)
 
 	ts.AssertTransactionsExist(wallet.Transactions("tx2"), true, node1)
 	ts.AssertTransactionsExist(wallet.Transactions("tx1"), false, node1)
@@ -33,7 +33,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx2"), false, node1)
 	// make sure that the block is not booked
 
-	ts.IssuePayloadWithOptions("block2", wallet.BlockIssuer, node1, tx1)
+	ts.IssuePayloadWithOptions("block2", wallet, tx1)
 
 	ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1)
 	ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, node1)
@@ -68,8 +68,8 @@ func Test_DoubleSpend(t *testing.T) {
 		tx1 := wallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
 		tx2 := wallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "Genesis:0")
 
-		ts.IssuePayloadWithOptions("block1", wallet.BlockIssuer, node1, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssuePayloadWithOptions("block2", wallet.BlockIssuer, node1, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("block1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("block2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, node1, node2)
@@ -124,8 +124,7 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	nodeA := ts.AddValidatorNode("nodeA")
 	nodeB := ts.AddValidatorNode("nodeB")
-	walletA := ts.AddWallet("walletA", nodeA)
-	walletB := ts.AddWallet("walletB", nodeB)
+	wallet := ts.AddWallet("default", nodeA)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
@@ -133,11 +132,12 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	// Create a transaction and issue it from both nodes, so that the conflict is accepted, but no attachment is included yet.
 	{
-		tx1 := walletA.CreateBasicOutputsEquallyFromInputs("tx1", 2, "Genesis:0")
+		tx1 := wallet.CreateBasicOutputsEquallyFromInputs("tx1", 2, "Genesis:0")
 
-		ts.IssuePayloadWithOptions("A.1", walletA.BlockIssuer, nodeA, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("A.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlock("A.1.1", nodeA, mock.WithStrongParents(ts.BlockID("A.1")))
-		ts.IssuePayloadWithOptions("B.1", walletB.BlockIssuer, nodeB, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		wallet.SetDefaultNode(nodeB)
+		ts.IssuePayloadWithOptions("B.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlock("B.1.1", nodeB, mock.WithStrongParents(ts.BlockID("B.1")))
 
 		ts.IssueValidationBlock("A.2", nodeA, mock.WithStrongParents(ts.BlockID("B.1.1")))
@@ -153,17 +153,19 @@ func Test_MultipleAttachments(t *testing.T) {
 			ts.Block("B.2"): {"tx1"},
 		}), ts.Nodes()...)
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			walletA.Transaction("tx1"): {"tx1"},
+			wallet.Transaction("tx1"): {"tx1"},
 		}, ts.Nodes()...)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1"}, acceptance.Accepted, ts.Nodes()...)
 	}
 
 	// Create a transaction that is included and whose conflict is accepted, but whose inputs are not accepted.
 	{
-		tx2 := walletA.CreateBasicOutputsEquallyFromInputs("tx2", 1, "tx1:1")
+		tx2 := wallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "tx1:1")
 
-		ts.IssuePayloadWithOptions("A.3", nodeA.Validator, nodeA, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssueValidationBlock("B.3", nodeB, mock.WithStrongParents(ts.BlockID("A.3")))
+		wallet.SetDefaultNode(nodeA)
+		ts.IssuePayloadWithOptions("A.3", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueValidationBlock("A.3.1", nodeA, mock.WithStrongParents(ts.BlockID("A.3")))
+		ts.IssueValidationBlock("B.3", nodeB, mock.WithStrongParents(ts.BlockID("A.3.1")))
 		ts.IssueValidationBlock("A.4", nodeA, mock.WithStrongParents(ts.BlockID("B.3")))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.3"), true, ts.Nodes()...)
@@ -175,8 +177,8 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("B.4", "A.5"), false, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3"), true, ts.Nodes()...)
 
-		ts.AssertTransactionsInCacheBooked(walletA.Transactions("tx1", "tx2"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCachePending(walletA.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheConflicts(lo.MergeMaps(blocksConflicts, map[*blocks.Block][]string{
 			ts.Block("A.3"): {"tx2"},
@@ -186,8 +188,8 @@ func Test_MultipleAttachments(t *testing.T) {
 			ts.Block("B.4"): {},
 		}), ts.Nodes()...)
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			walletA.Transaction("tx1"): {"tx1"},
-			walletA.Transaction("tx2"): {"tx2"},
+			wallet.Transaction("tx1"): {"tx1"},
+			wallet.Transaction("tx2"): {"tx2"},
 		}, nodeA, nodeB)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, ts.Nodes()...)
 	}
@@ -204,9 +206,9 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1", "B.1"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.7", "B.6"), false, ts.Nodes()...)
-		ts.AssertTransactionsExist(walletA.Transactions("tx1", "tx2"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCacheBooked(walletA.Transactions("tx1", "tx2"), true, ts.Nodes()...)
-		ts.AssertTransactionsInCacheAccepted(walletA.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
+		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("tx1", "tx2"), true, ts.Nodes()...)
 
 		ts.AssertBlocksInCacheConflicts(lo.MergeMaps(blocksConflicts, map[*blocks.Block][]string{
 			ts.Block("A.6"): {},
@@ -216,8 +218,8 @@ func Test_MultipleAttachments(t *testing.T) {
 		}), ts.Nodes()...)
 
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
-			walletA.Transaction("tx1"): {"tx1"},
-			walletA.Transaction("tx2"): {"tx2"},
+			wallet.Transaction("tx1"): {"tx1"},
+			wallet.Transaction("tx2"): {"tx2"},
 		}, nodeA, nodeB)
 		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, nodeA, nodeB)
 	}
@@ -443,14 +445,16 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		)
 
 		// Exchange each-other blocks, ignoring invalidity
-		ts.IssueExistingBlock("n2-genesis", wallet.BlockIssuer, node1)
-		ts.IssueExistingBlock("n2-commit1", wallet.BlockIssuer, node1)
-		ts.IssueExistingBlock("n1-genesis", wallet.BlockIssuer, node2)
-		ts.IssueExistingBlock("n1-rejected-genesis", wallet.BlockIssuer, node2)
+		wallet.SetDefaultNode(node1)
+		ts.IssueExistingBlock("n2-genesis", wallet)
+		ts.IssueExistingBlock("n2-commit1", wallet)
+		wallet.SetDefaultNode(node2)
+		ts.IssueExistingBlock("n1-genesis", wallet)
+		ts.IssueExistingBlock("n1-rejected-genesis", wallet)
 
 		ts.IssueValidationBlockAtSlot("n1-rejected-commit1", 5, commitment1, node1, ts.BlockIDs("n1-rejected-genesis")...)
 		// Needs reissuing on node2 because it is invalid
-		ts.IssueExistingBlock("n1-rejected-commit1", wallet.BlockIssuer, node2)
+		ts.IssueExistingBlock("n1-rejected-commit1", wallet)
 
 		// The nodes agree on the results of the invalid blocks
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-genesis", "n1-genesis", "n1-rejected-genesis"), true, node1, node2)
@@ -637,8 +641,9 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		)
 
 		// Exchange each-other blocks, ignoring invalidity
-		ts.IssueExistingBlock("n2-pending-genesis", wallet.BlockIssuer, node1)
-		ts.IssueExistingBlock("n2-pending-commit1", wallet.BlockIssuer, node1)
+		wallet.SetDefaultNode(node1)
+		ts.IssueExistingBlock("n2-pending-genesis", wallet)
+		ts.IssueExistingBlock("n2-pending-commit1", wallet)
 
 		// The nodes agree on the results of the invalid blocks
 		ts.AssertBlocksInCacheBooked(ts.Blocks("n2-pending-genesis", "n2-pending-commit1"), true, node1, node2)

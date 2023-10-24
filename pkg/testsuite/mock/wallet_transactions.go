@@ -341,7 +341,8 @@ func (w *Wallet) createSignedTransactionWithOptions(opts ...options.Option[build
 	randomPayload := tpkg.Rand12ByteArray()
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
 
-	signedTransaction, err := options.Apply(txBuilder, opts).Build(w.AddressSigner())
+	addrSigner := w.AddressSigner()
+	signedTransaction, err := options.Apply(txBuilder, opts).Build(addrSigner)
 
 	return signedTransaction, err
 }

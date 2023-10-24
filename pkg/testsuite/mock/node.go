@@ -510,3 +510,11 @@ func (n *Node) AttachedBlocks() []*blocks.Block {
 
 	return n.attachedBlocks
 }
+
+func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
+	if n.Validator == nil {
+		panic("node is not a validator")
+	}
+
+	return n.Validator.IssueValidationBlock(ctx, alias, n, opts...)
+}
