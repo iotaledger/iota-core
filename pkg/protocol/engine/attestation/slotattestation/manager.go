@@ -5,7 +5,6 @@ import (
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -152,8 +151,13 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
 		return
 	}
 
+	committee, exists := m.committeeFunc(block.ID().Slot())
+	if !exists {
+		// TODO: committee should exist at this point, what else can we do other than panic?
+		return
+	}
 	// Only track attestations of active committee members.
-	if _, exists := lo.Return1(m.committeeFunc(block.ID().Slot())).GetSeat(block.ProtocolBlock().IssuerID); !exists {
+	if _, exists := committee.GetSeat(block.ProtocolBlock().IssuerID); !exists {
 		return
 	}
 
@@ -255,9 +259,15 @@ func (m *Manager) Commit(slot iotago.SlotIndex) (newCW uint64, attestationsRoot 
 	}
 
 	// Add all attestations to the tree and calculate the new cumulative weight.
+	committee, exists := m.committeeFunc(slot)
+	if !exists {
+		// TODO: committee should exist at this point, what else can we do other than panic?
+		return
+	}
+
 	for _, a := range attestations {
 		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
-		if _, exists := lo.Return1(m.committeeFunc(slot)).GetSeat(a.IssuerID); exists {
+		if _, exists := committee.GetSeat(a.IssuerID); exists {
 			if err := tree.Set(a.IssuerID, a); err != nil {
 				return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to set attestation %s in tree", a.IssuerID)
 			}

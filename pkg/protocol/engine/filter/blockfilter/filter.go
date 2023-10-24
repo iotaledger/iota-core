@@ -6,7 +6,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -93,7 +92,13 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 
 	if _, isValidation := block.ValidationBlock(); isValidation {
 		blockSlot := block.ProtocolBlock().API.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
-		if !lo.Return1(f.committeeFunc(blockSlot)).HasAccount(block.ProtocolBlock().IssuerID) {
+		committee, exists := f.committeeFunc(blockSlot)
+		if !exists {
+			// TODO: is it guaranteed that the committee exists at this point? should we drop the block or what?
+			return
+		}
+
+		if !committee.HasAccount(block.ProtocolBlock().IssuerID) {
 			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 				Block:  block,
 				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().IssuerID, blockSlot),

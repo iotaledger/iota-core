@@ -146,7 +146,12 @@ func (o *Orchestrator) TrackValidationBlock(block *blocks.Block) {
 	}
 	newSignaledBlock := model.NewSignaledBlock(block.ID(), block.ProtocolBlock(), validationBlock)
 
-	committee := lo.Return1(o.seatManager.CommitteeInSlot(block.ID().Slot()))
+	committee, exists := o.seatManager.CommitteeInSlot(block.ID().Slot())
+	if !exists {
+		// TODO: committee should exist at this point, what else can we do other than panic?
+		return
+	}
+
 	seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return

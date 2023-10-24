@@ -66,12 +66,19 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			})
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 				// when the last slot of an epoch is committed, remove the queues of validators that are no longer in the committee.
-				if s.apiProvider.CommittedAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
+				if s.apiProvider.APIForSlot(commitment.Slot()).TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
 					s.bufferMutex.Lock()
 					defer s.bufferMutex.Unlock()
+					committee, exists := s.seatManager.CommitteeInSlot(commitment.Slot() + 1)
+					if !exists {
+						// TODO: panic?
+						s.errorHandler(ierrors.Errorf("committee does not exist in committed slot %d", commitment.Slot()+1))
+
+						return
+					}
 
 					s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
-						if !lo.Return1(s.seatManager.CommitteeInSlot(commitment.Slot() + 1)).HasAccount(accountID) {
+						if !committee.HasAccount(accountID) {
 							s.shutdownValidatorQueue(validatorQueue)
 							s.validatorBuffer.Delete(accountID)
 						}
