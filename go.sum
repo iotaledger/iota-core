@@ -307,10 +307,10 @@ github.com/iotaledger/hive.go/stringify v0.0.0-20231020115340-13da292c580b h1:MD
 github.com/iotaledger/hive.go/stringify v0.0.0-20231020115340-13da292c580b/go.mod h1:FTo/UWzNYgnQ082GI9QVM9HFDERqf9rw9RivNpqrnTs=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231020103531-8702a4719b91 h1:P4g4eoNMW0Esz/SCKzkIby1W1TQ3P3j63RR/Zs9XsYU=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231020103531-8702a4719b91/go.mod h1:Pjdgj/uXuyqoUZUmobj8K9ATbdMIOkuNI7L8j4J6ORs=
-github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231020100621-739388b552f7 h1:EU1O4N5G601nteXW3VVAXF63EkG6TetI4CdQCZiODGU=
-github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231020100621-739388b552f7/go.mod h1:UOcPh1kcNvvKmeOvhz8y19+In51g7ogefkh4MDTBphY=
-github.com/iotaledger/iota.go/v4 v4.0.0-20231019174124-aa2290512bcd h1:FKiEzy3gOyWDGXs6mTMS9qFHGXSxH97N5w+08ljbEtU=
-github.com/iotaledger/iota.go/v4 v4.0.0-20231019174124-aa2290512bcd/go.mod h1:XFwcDfAF0hv6wB/trCsyDmQyPLjEZ60yTrllJ2bprN8=
+github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231024101228-5d9abdd08941 h1:B0Ht9EijMtHJhbkVNEC8P5hbG3Px+/ClWVD3AKXPjSQ=
+github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231024101228-5d9abdd08941/go.mod h1:MK0SHfNicBmcaZb3qS3tA8NEJIWKNbcNtNNKuSDKqXY=
+github.com/iotaledger/iota.go/v4 v4.0.0-20231023205010-58a0b5c7fe6d h1:vGfZmcCCloTzim6TysS3fXxc9xsTfXoVB6bsedZgp7A=
+github.com/iotaledger/iota.go/v4 v4.0.0-20231023205010-58a0b5c7fe6d/go.mod h1:jqbLYq4a/FwuiPBqFfkAwwxU8vs3+kReRq2/tyX5qRA=
 github.com/ipfs/boxo v0.13.1 h1:nQ5oQzcMZR3oL41REJDcTbrvDvuZh3J9ckc9+ILeRQI=
 github.com/ipfs/boxo v0.13.1/go.mod h1:btrtHy0lmO1ODMECbbEY1pxNtrLilvKSYLoGQt1yYCk=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
