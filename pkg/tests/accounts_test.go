@@ -52,7 +52,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	// add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	blockIssuer := ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true)
 
@@ -81,11 +81,11 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	// default block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:3")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              blockIssuer.AccountID,
+		ID:              wallet.BlockIssuer.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
 		OutputID:        blockIssuerAccountOutput.OutputID(),
 		ExpirySlot:      iotago.MaxSlotIndex,
-		BlockIssuerKeys: blockIssuer.BlockIssuerKeys(),
+		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
 	// MODIFY EXISTING GENESIS ACCOUNT
@@ -93,7 +93,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	newGenesisOutputKey := utils.RandBlockIssuerKey()
 	newExpirySlot := iotago.SlotIndex(1)
 
-	tx1 := ts.DefaultWallet.TransitionAccount(
+	tx1 := ts.DefaultWallet().TransitionAccount(
 		"TX1",
 		"Genesis:1",
 		mock.WithAddBlockIssuerKey(newGenesisOutputKey),
@@ -104,7 +104,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	var block1Slot iotago.SlotIndex = 1
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, genesisCommitment, blockIssuer, node1, tx1)
+	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
 	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Slot(), block1)
 
 	// assert diff of a genesis account, it should have a new output ID, same expiry slot and a new block issuer key.
@@ -113,7 +113,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 		PreviousUpdatedTime:    0,
 		PreviousExpirySlot:     1,
 		NewExpirySlot:          1,
-		NewOutputID:            ts.DefaultWallet.Output("TX1:0").OutputID(),
+		NewOutputID:            ts.DefaultWallet().Output("TX1:0").OutputID(),
 		PreviousOutputID:       genesisAccount.OutputID(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newGenesisOutputKey),
@@ -122,7 +122,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              genesisAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.BlockIssuanceCredits(123), 0),
-		OutputID:        ts.DefaultWallet.Output("TX1:0").OutputID(),
+		OutputID:        ts.DefaultWallet().Output("TX1:0").OutputID(),
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ExpirySlot:      1,
 	}, ts.Nodes()...)
@@ -134,8 +134,8 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	// issue the block containing the transaction in the same slot as the latest parent block.
 	block2Slot := latestParent.ID().Slot()
 	// create a transaction which destroys the genesis account.
-	tx2 := ts.DefaultWallet.DestroyAccount("TX2", "TX1:0", block2Slot)
-	block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), blockIssuer, node1, tx2, mock.WithStrongParents(latestParent.ID()))
+	tx2 := ts.DefaultWallet().DestroyAccount("TX2", "TX1:0", block2Slot)
+	block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParent.ID()))
 	latestParent = ts.CommitUntilSlot(block2Slot, block2)
 
 	// assert diff of the destroyed account.
@@ -145,7 +145,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 		NewExpirySlot:          0,
 		PreviousExpirySlot:     1,
 		NewOutputID:            iotago.EmptyOutputID,
-		PreviousOutputID:       ts.DefaultWallet.Output("TX1:0").OutputID(),
+		PreviousOutputID:       ts.DefaultWallet().Output("TX1:0").OutputID(),
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(oldGenesisOutputKey, newGenesisOutputKey),
 		ValidatorStakeChange:   0,
@@ -179,7 +179,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	blockIssuer := ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true)
 
@@ -198,11 +198,11 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// default block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:2")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              blockIssuer.AccountID,
+		ID:              wallet.BlockIssuer.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
 		OutputID:        blockIssuerAccountOutput.OutputID(),
 		ExpirySlot:      iotago.MaxSlotIndex,
-		BlockIssuerKeys: blockIssuer.BlockIssuerKeys(),
+		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
 	//CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
@@ -211,10 +211,10 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
 
 	var block1Slot iotago.SlotIndex = 1
-	tx1 := ts.DefaultWallet.CreateAccountFromInput(
+	tx1 := ts.DefaultWallet().CreateAccountFromInput(
 		"TX1",
 		"Genesis:0",
-		ts.DefaultWallet,
+		ts.DefaultWallet(),
 		block1Slot,
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
 		mock.WithStakingFeature(10000, 421, 0, 10),
@@ -223,10 +223,10 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, genesisCommitment, blockIssuer, node1, tx1)
+	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, ts.DefaultWallet(), tx1)
 	latestParent := ts.CommitUntilSlot(block1Slot, block1)
 
-	newAccount := ts.DefaultWallet.AccountOutput("TX1:0")
+	newAccount := ts.DefaultWallet().AccountOutput("TX1:0")
 	newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block1Slot, &model.AccountDiff{
@@ -259,17 +259,17 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
 	accountAddress := iotago.AccountAddress(newAccountOutput.AccountID)
 	block2Slot := latestParent.ID().Slot()
-	tx2 := ts.DefaultWallet.CreateDelegationFromInput(
+	tx2 := ts.DefaultWallet().CreateDelegationFromInput(
 		"TX2",
 		"TX1:1",
 		block2Slot,
 		mock.WithDelegatedValidatorAddress(&accountAddress),
 		mock.WithDelegationStartEpoch(1),
 	)
-	block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), blockIssuer, node1, tx2, mock.WithStrongParents(latestParent.ID()))
+	block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParent.ID()))
 
 	latestParent = ts.CommitUntilSlot(block2Slot, block2)
-	delegatedAmount := ts.DefaultWallet.Output("TX1:1").BaseTokenAmount()
+	delegatedAmount := ts.DefaultWallet().Output("TX1:1").BaseTokenAmount()
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block2Slot, &model.AccountDiff{
 		BICChange:              0,
@@ -298,8 +298,8 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 
 	// transition a delegation output to a delayed claiming state
 	block3Slot := latestParent.ID().Slot()
-	tx3 := ts.DefaultWallet.DelayedClaimingTransition("TX3", "TX2:0", block3Slot, 0)
-	block3 := ts.IssueBasicBlockAtSlotWithOptions("block3", block3Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), blockIssuer, node1, tx3, mock.WithStrongParents(latestParent.ID()))
+	tx3 := ts.DefaultWallet().DelayedClaimingTransition("TX3", "TX2:0", block3Slot, 0)
+	block3 := ts.IssueBasicBlockAtSlotWithOptions("block3", block3Slot, ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParent.ID()))
 
 	latestParent = ts.CommitUntilSlot(block3Slot, block3)
 
@@ -354,7 +354,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	// add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	blockIssuer := ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true)
 
@@ -373,16 +373,16 @@ func Test_ImplicitAccounts(t *testing.T) {
 	// default block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:2")
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              blockIssuer.AccountID,
+		ID:              wallet.BlockIssuer.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
 		OutputID:        blockIssuerAccountOutput.OutputID(),
 		ExpirySlot:      iotago.MaxSlotIndex,
-		BlockIssuerKeys: blockIssuer.BlockIssuerKeys(),
+		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
 	// CREATE IMPLICIT ACCOUNT FROM BASIC UTXO
 	newUserWallet := mock.NewWallet(ts.Testing, "newUser", node1)
-	tx1 := ts.DefaultWallet.CreateImplicitAccountFromInput(
+	tx1 := ts.DefaultWallet().CreateImplicitAccountFromInput(
 		"TX1",
 		"Genesis:0",
 		newUserWallet,
@@ -394,7 +394,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 
 	var block1Slot iotago.SlotIndex = 1
 
-	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), blockIssuer, node1, tx1)
+	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, ts.DefaultWallet(), tx1)
 
 	latestParent := ts.CommitUntilSlot(block1Slot, block1)
 
@@ -425,7 +425,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	)
 
 	block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
-	block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, block2Commitment, newUserWallet.BlockIssuer, node1, tx2, mock.WithStrongParents(latestParent.ID()))
+	block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, newUserWallet, tx2, mock.WithStrongParents(latestParent.ID()))
 
 	latestParent = ts.CommitUntilSlot(block2Slot, block2)
 

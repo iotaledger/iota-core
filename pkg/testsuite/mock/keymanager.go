@@ -60,16 +60,11 @@ func (k *KeyManager) AddressSigner() iotago.AddressSigner {
 	return iotago.NewInMemoryAddressSigner(ed25519AddressKey, implicitAccountCreationAddressKey)
 }
 
-// Address calculates an ed25519 address by using slip10.
-func (k *KeyManager) Address(addressType ...iotago.AddressType) iotago.DirectUnlockableAddress {
+// Address calculates an address of the specified type.
+func (k *KeyManager) Address(addressType iotago.AddressType) iotago.DirectUnlockableAddress {
 	_, pubKey := k.KeyPair()
 
-	addrType := iotago.AddressEd25519
-	if len(addressType) > 0 {
-		addrType = addressType[0]
-	}
-
-	switch addrType {
+	switch addressType {
 	case iotago.AddressEd25519:
 		return iotago.Ed25519AddressFromPubKey(pubKey)
 	case iotago.AddressImplicitAccountCreation:

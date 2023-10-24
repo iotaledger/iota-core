@@ -182,7 +182,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 func createGenesisOutput(api iotago.API, genesisTokenAmount iotago.BaseToken, genesisSeed []byte) (iotago.Output, error) {
 	if genesisTokenAmount > 0 {
 		genesisKeyManager := mock.NewKeyManager(genesisSeed, 0)
-		output := createOutput(genesisKeyManager.Address(), genesisTokenAmount, iotago.Mana(genesisTokenAmount))
+		output := createOutput(genesisKeyManager.Address(iotago.AddressEd25519), genesisTokenAmount, iotago.Mana(genesisTokenAmount))
 
 		if _, err := api.StorageScoreStructure().CoversMinDeposit(output, genesisTokenAmount); err != nil {
 			return nil, ierrors.Wrap(err, "min rent not covered by Genesis output with index 0")

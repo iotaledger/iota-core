@@ -108,13 +108,13 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		),
 	)
 
-	ts.AddValidatorNode("nodeA")
+	nodeA := ts.AddValidatorNode("nodeA")
 	ts.AddValidatorNode("nodeB")
 	ts.AddValidatorNode("nodeC")
 	ts.AddValidatorNode("nodeD")
 	ts.AddNode("nodeE")
 	ts.AddNode("nodeF")
-	ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddWallet("default", nodeA, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
 		"nodeA": nodeOptionsWithoutV5,
@@ -144,11 +144,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:                                    ts.DefaultBasicBlockIssuer().AccountID,
+		ID:                                    wallet.BlockIssuer.AccountID,
 		Credits:                               &accounts.BlockIssuanceCredits{Value: iotago.MaxBlockIssuanceCredits / 2, UpdateTime: 0},
 		ExpirySlot:                            iotago.MaxSlotIndex,
 		OutputID:                              ts.AccountOutput("Genesis:5").OutputID(),
-		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.DefaultBasicBlockIssuer().PublicKey))),
+		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(wallet.BlockIssuer.PublicKey))),
 		ValidatorStake:                        0,
 		DelegationStake:                       0,
 		FixedCost:                             0,

@@ -13,7 +13,7 @@ func (t *TestSuite) AssertConflictsInCacheAcceptanceState(expectedConflictAliase
 	for _, node := range nodes {
 		for _, conflictAlias := range expectedConflictAliases {
 			t.Eventually(func() error {
-				acceptanceState := node.Protocol.MainEngineInstance().Ledger.ConflictDAG().AcceptanceState(ds.NewSet(t.DefaultWallet.TransactionID(conflictAlias)))
+				acceptanceState := node.Protocol.MainEngineInstance().Ledger.ConflictDAG().AcceptanceState(ds.NewSet(t.DefaultWallet().TransactionID(conflictAlias)))
 
 				if acceptanceState != expectedState {
 					return ierrors.Errorf("assertTransactionsInCacheWithFunc: %s: conflict %s is %s, but expected %s", node.Name, conflictAlias, acceptanceState, expectedState)

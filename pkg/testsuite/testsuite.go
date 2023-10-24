@@ -32,10 +32,10 @@ type TestSuite struct {
 	fakeTesting *testing.T
 	network     *mock.Network
 
-	Directory    *utils.Directory
-	nodes        *orderedmap.OrderedMap[string, *mock.Node]
-	blockIssuers *orderedmap.OrderedMap[string, *mock.BlockIssuer]
-	running      bool
+	Directory *utils.Directory
+	nodes     *orderedmap.OrderedMap[string, *mock.Node]
+	wallets   *orderedmap.OrderedMap[string, *mock.Wallet]
+	running   bool
 
 	snapshotPath string
 	blocks       *shrinkingmap.ShrinkingMap[string, *blocks.Block]
@@ -52,8 +52,6 @@ type TestSuite struct {
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
 	mutex                               syncutils.RWMutex
 	genesisSeed                         [32]byte
-
-	DefaultWallet *mock.Wallet
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
@@ -64,7 +62,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		network:                             mock.NewNetwork(),
 		Directory:                           utils.NewDirectory(testingT.TempDir()),
 		nodes:                               orderedmap.New[string, *mock.Node](),
-		blockIssuers:                        orderedmap.New[string, *mock.BlockIssuer](),
+		wallets:                             orderedmap.New[string, *mock.Wallet](),
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
 		automaticTransactionIssuingCounters: *shrinkingmap.New[string, int](),
 
@@ -151,7 +149,7 @@ func (t *TestSuite) AccountOutput(alias string) *utxoledger.Output {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	output := t.DefaultWallet.Output(alias)
+	output := t.DefaultWallet().Output(alias)
 
 	if _, ok := output.Output().(*iotago.AccountOutput); !ok {
 		panic(fmt.Sprintf("output %s is not an account", alias))
@@ -359,10 +357,10 @@ func (t *TestSuite) RemoveNode(name string) {
 	t.nodes.Delete(name)
 }
 
-func (t *TestSuite) AddBasicBlockIssuer(name string, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.BlockIssuer {
-	randomSeed := tpkg.RandEd25519Seed()
-	newBlockIssuer := mock.NewBlockIssuer(t.Testing, name, mock.NewKeyManager(randomSeed[:], 0), iotago.EmptyAccountID, false)
-	t.blockIssuers.Set(name, newBlockIssuer)
+func (t *TestSuite) AddWallet(name string, node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
+	newWallet := mock.NewWallet(t.Testing, name, node)
+	newWallet.AddBlockIssuer(iotago.EmptyAccountID)
+	t.wallets.Set(name, newWallet)
 	var bic iotago.BlockIssuanceCredits
 	if len(blockIssuanceCredits) == 0 {
 		bic = iotago.MaxBlockIssuanceCredits / 2
@@ -371,24 +369,24 @@ func (t *TestSuite) AddBasicBlockIssuer(name string, blockIssuanceCredits ...iot
 	}
 
 	accountDetails := snapshotcreator.AccountDetails{
-		Address:              iotago.Ed25519AddressFromPubKey(newBlockIssuer.PublicKey),
+		Address:              iotago.Ed25519AddressFromPubKey(newWallet.BlockIssuer.PublicKey),
 		Amount:               mock.MinIssuerAccountAmount,
 		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount),
-		IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newBlockIssuer.PublicKey)),
+		IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newWallet.BlockIssuer.PublicKey)),
 		ExpirySlot:           iotago.MaxSlotIndex,
 		BlockIssuanceCredits: bic,
 	}
 
 	t.optsAccounts = append(t.optsAccounts, accountDetails)
 
-	return newBlockIssuer
+	return newWallet
 }
 
-func (t *TestSuite) DefaultBasicBlockIssuer() *mock.BlockIssuer {
-	defaultBasicBlockIssuer, exists := t.blockIssuers.Get("default")
-	require.True(t.Testing, exists, "default block issuer not found")
+func (t *TestSuite) DefaultWallet() *mock.Wallet {
+	defaultWallet, exists := t.wallets.Get("default")
+	require.True(t.Testing, exists, "default wallet not found")
 
-	return defaultBasicBlockIssuer
+	return defaultWallet
 }
 
 func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
@@ -401,7 +399,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 		t.optsSnapshotOptions = append(t.optsSnapshotOptions, snapshotcreator.WithAccounts(lo.Map(t.optsAccounts, func(accountDetails snapshotcreator.AccountDetails) snapshotcreator.AccountDetails {
 			// if no custom address is assigned to the account, assign an address generated from GenesisSeed
 			if accountDetails.Address == nil {
-				accountDetails.Address = keyManager.Address()
+				accountDetails.Address = keyManager.Address(iotago.AddressEd25519)
 			}
 
 			if accountDetails.AccountID.Empty() {
@@ -439,15 +437,11 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 
 		node.Initialize(failOnBlockFiltered, baseOpts...)
 
-		if t.DefaultWallet == nil {
-			t.DefaultWallet = mock.NewWallet(t.Testing, "default", node, t.genesisSeed[:])
-			t.DefaultWallet.AddBlockIssuer(iotago.EmptyAccountID)
-			if err := node.Protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
-				t.DefaultWallet.AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), output)
-				return true
-			}); err != nil {
-				panic(err)
-			}
+		if err := node.Protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
+			t.DefaultWallet().AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), output)
+			return true
+		}); err != nil {
+			panic(err)
 		}
 
 		return true
@@ -476,7 +470,7 @@ func (t *TestSuite) BlockIssuersForNodes(nodes []*mock.Node) []*mock.BlockIssuer
 		if node.IsValidator() {
 			blockIssuers = append(blockIssuers, node.Validator)
 		} else {
-			blockIssuers = append(blockIssuers, t.DefaultBasicBlockIssuer())
+			blockIssuers = append(blockIssuers, t.DefaultWallet().BlockIssuer)
 		}
 	}
 

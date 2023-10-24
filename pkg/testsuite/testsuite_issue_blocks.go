@@ -123,8 +123,8 @@ func (t *TestSuite) IssueBasicBlockWithOptions(alias string, blockIssuer *mock.B
 	return block
 }
 
-func (t *TestSuite) IssueBasicBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, blockIssuer *mock.BlockIssuer, node *mock.Node, payload iotago.Payload, blockOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
-	t.assertParentsExistFromBlockOptions(blockOpts, node)
+func (t *TestSuite) IssueBasicBlockAtSlotWithOptions(blockName string, slot iotago.SlotIndex, wallet *mock.Wallet, payload iotago.Payload, blockOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockOpts, wallet.Node)
 
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -132,11 +132,11 @@ func (t *TestSuite) IssueBasicBlockAtSlotWithOptions(alias string, slot iotago.S
 	timeProvider := t.API.TimeProvider()
 	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
 
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "wallet: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", wallet.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
-	block := blockIssuer.IssueBasicBlock(context.Background(), alias, node, mock.WithBasicBlockHeader(append(blockOpts, mock.WithIssuingTime(issuingTime), mock.WithSlotCommitment(slotCommitment))...), mock.WithPayload(payload))
+	block := wallet.IssueBasicBlock(context.Background(), blockName, mock.WithBasicBlockHeader(append(blockOpts, mock.WithIssuingTime(issuingTime))...), mock.WithPayload(payload))
 
-	t.registerBlock(alias, block)
+	t.registerBlock(blockName, block)
 
 	return block
 }
@@ -200,7 +200,7 @@ func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, ro
 			if txCount == 1 {
 				inputAlias = "Genesis:0"
 			}
-			tx := t.DefaultWallet.CreateBasicOutputsEquallyFromInputs(txAlias, 1, inputAlias)
+			tx := t.DefaultWallet().CreateBasicOutputsEquallyFromInputs(txAlias, 1, inputAlias)
 
 			issuingOptionsCopy[node.Name] = t.limitParentsCountInBlockOptions(issuingOptionsCopy[node.Name], iotago.BlockMaxParents)
 
