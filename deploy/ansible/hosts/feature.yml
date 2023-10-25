@@ -20,8 +20,8 @@ cores:
           p2pIdentityPrvKey: "{{ NODE_03_P2PIDENTITYPRIVATEKEY }}"
         node-04.feature.shimmer.iota.cafe:
           p2pIdentityPrvKey: "{{ NODE_04_P2PIDENTITYPRIVATEKEY }}"
-          blockissuerPrvKey: "{{ BLOCKISSUER_PRV_KEY }}"
-          faucetPrvKey: "{{ FAUCET_PRV_KEY }}"
+          blockissuerPrvKey: "{{ NODE_04_BLOCKISSUER_PRV_KEY }}"
+          faucetPrvKey: "{{ NODE_04_FAUCET_PRV_KEY }}"
         node-05.feature.shimmer.iota.cafe:
           p2pIdentityPrvKey: "{{ NODE_05_P2PIDENTITYPRIVATEKEY }}"
   vars:

@@ -25,48 +25,47 @@ services:
         hard: 16384
     ports:
       - "14666:14666/tcp" # P2P
-      - "6081:6061/tcp"   # pprof
+      - "6061:6061/tcp"   # pprof
       - "8080:8080/tcp"   # REST-API
       - "8081:8081/tcp"   # Dashboard
       - "9311:9311/tcp"   # Prometheus
-      - "9089:9029/tcp"   # INX
+      - "9029:9029/tcp"   # INX
     volumes:
       - ./config.json:/app/config.json:ro
       - ./data:/app/data/
       - ./snapshot.bin:/app/data/snapshot.bin:ro
       - /etc/localtime:/etc/localtime:ro
-    command:
-      - "-c"
-      - "config.json"
-      - "--logger.level=debug"
-      - "--logger.disableCaller=false"
-      - "--p2p.peers=/dns/node-01.feature/tcp/14666/p2p/12D3KooWCrjmh4dUCWfGVQT6ivzArieJB9Z3eKdy2mdEEN95NDPS"
-      - "--p2p.externalMultiAddresses={{ ips | join(',') }}"
-      - "--p2p.identityPrivateKey={{p2pIdentityPrvKey}}"
-      - "--p2p.db.path=/app/data/peerdb"
-      - "--profiling.enabled=true"
-      - "--profiling.bindAddress=0.0.0.0:6061"
-      - "--restAPI.bindAddress=0.0.0.0:8080"
-      - "--database.path=/app/data/database"
-      - "--protocol.snapshot.path=/app/data/snapshot.bin"
+    command: >
+      -c
+      config.json
+      --logger.level=debug
+      --logger.disableCaller=false
+      --p2p.peers=/dns/node-01.feature/tcp/14666/p2p/12D3KooWCrjmh4dUCWfGVQT6ivzArieJB9Z3eKdy2mdEEN95NDPS
+      --p2p.externalMultiAddresses={{ ips | join(',') }}
+      --p2p.identityPrivateKey={{p2pIdentityPrvKey}}
+      --p2p.db.path=/app/data/peerdb
+      --profiling.enabled=true
+      --profiling.bindAddress=0.0.0.0:6061
+      --restAPI.bindAddress=0.0.0.0:8080
+      --database.path=/app/data/database
+      --protocol.snapshot.path=/app/data/snapshot.bin
       {% if 'node-01' in inventory_hostname or 'node-02' in inventory_hostname or 'node-03' in inventory_hostname %}
-      - "--validator.enabled=true"
+      --validator.enabled=true
         {% if 'node-01' in inventory_hostname %}
-      - "--validator.ignoreBootstrapped=true"
+      --validator.ignoreBootstrapped=true
         {% endif %}
-      - "--validator.account={{validatorAccount}}"
-      - "--validator.privateKey={{validatorPrvKey}}"
+      --validator.account={{validatorAccount}}
+      --validator.privateKey={{validatorPrvKey}}
       {% endif %}
-      - "--dashboard.bindAddress=0.0.0.0:8081"
-      - "--metrics.bindAddress=iota-core:9311"
-      - "--inx.enabled=true"
-      - "--inx.bindAddress=iota-core:9029"
+      --dashboard.bindAddress=0.0.0.0:8081
+      --metrics.bindAddress=iota-core:9311
+      --inx.enabled=true
+      --inx.bindAddress=iota-core:9029
 
 ##################
 # INX Extensions #
 ##################
 
-{% if 'node-04' in inventory_hostname %}
   inx-indexer:
     container_name: inx-indexer
     image: iotaledger/inx-indexer:2.0-alpha
@@ -81,11 +80,12 @@ services:
         hard: 16384
     volumes:
       - ./data:/app/database
-    command:
-      - "--inx.address=iota-core:9029"
-      - "--indexer.db.sqlite.path=database/indexer"
-      - "--restAPI.bindAddress=inx-indexer:9091"
+    command: >
+      --inx.address=iota-core:9029
+      --indexer.db.sqlite.path=database/indexer
+      --restAPI.bindAddress=inx-indexer:9091
 
+{% if 'node-04' in inventory_hostname %}
   inx-blockissuer:
     container_name: inx-blockissuer
     image: iotaledger/inx-blockissuer:1.0-alpha
@@ -98,11 +98,11 @@ services:
         condition: service_started
     environment:
       - "BLOCKISSUER_PRV_KEY={{blockissuerPrvKey}}"
-    command:
-      - "--inx.address=iota-core:9029"
-      - "--restAPI.bindAddress=inx-blockissuer:9086"
-      - "--blockIssuer.accountAddress=rms1pqas0clgfsf8du9e6dw0yx9nwclqe0dd4f728pvgmcshpscm8r5mkddrrfc"
-      - "--blockIssuer.proofOfWork.targetTrailingZeros=5"
+    command: >
+      --inx.address=iota-core:9029
+      --restAPI.bindAddress=inx-blockissuer:9086
+      --blockIssuer.accountAddress=rms1pqas0clgfsf8du9e6dw0yx9nwclqe0dd4f728pvgmcshpscm8r5mkddrrfc
+      --blockIssuer.proofOfWork.targetTrailingZeros=5
 
   inx-faucet:
     container_name: inx-faucet
@@ -122,7 +122,7 @@ services:
       - "8091:8091/tcp" # Faucet Frontend
     environment:
       - "FAUCET_PRV_KEY={{faucetPrvKey}}"
-    command:
-      - "--inx.address=iota-core:9029"
-      - "--faucet.bindAddress=0.0.0.0:8091"
+    command: >
+      --inx.address=iota-core:9029
+      --faucet.bindAddress=0.0.0.0:8091
 {% endif %}

@@ -200,9 +200,9 @@ services:
         hard: 16384
     networks:
       - iota-core
-    command:
-      - "--inx.address=node-1-validator:9029"
-      - "--restAPI.bindAddress=inx-indexer:9091"
+    command: >
+      --inx.address=node-1-validator:9029
+      --restAPI.bindAddress=inx-indexer:9091
 
   inx-blockissuer:
     image: iotaledger/inx-blockissuer:1.0-alpha
@@ -217,11 +217,11 @@ services:
       - iota-core
     environment:
       - "BLOCKISSUER_PRV_KEY=432c624ca3260f910df35008d5c740593b222f1e196e6cdb8cd1ad080f0d4e33997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270"
-    command:
-      - "--inx.address=node-1-validator:9029"
-      - "--restAPI.bindAddress=inx-blockissuer:9086"
-      - "--blockIssuer.accountAddress=rms1prkursay9fs2qjmfctamd6yxg9x8r3ry47786x0mvwek4qr9xd9d5c6gkun"
-      - "--blockIssuer.proofOfWork.targetTrailingZeros=5"
+    command: >
+      --inx.address=node-1-validator:9029
+      --restAPI.bindAddress=inx-blockissuer:9086
+      --blockIssuer.accountAddress=rms1prkursay9fs2qjmfctamd6yxg9x8r3ry47786x0mvwek4qr9xd9d5c6gkun
+      --blockIssuer.proofOfWork.targetTrailingZeros=5
 
   inx-faucet:
     image: iotaledger/inx-faucet:2.0-alpha
@@ -240,10 +240,10 @@ services:
       - "8088:8091/tcp" # Faucet Frontend
     environment:
       - "FAUCET_PRV_KEY=de52b9964dda96564e9fab362ab16c2669c715c6a2a853bece8a25fc58c599755b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737"
-    command:
-      - "--inx.address=node-1-validator:9029"
-      - "--faucet.bindAddress=inx-faucet:8091"
-      - "--faucet.rateLimit.enabled=false"
+    command: >
+      --inx.address=node-1-validator:9029
+      --faucet.bindAddress=inx-faucet:8091
+      --faucet.rateLimit.enabled=false
 
 # Create our own network
 networks:
