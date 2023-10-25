@@ -15,12 +15,12 @@ import (
 func blockByID(c echo.Context) (*model.Block, error) {
 	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse block ID %s: %s", c.Param(restapi.ParameterBlockID), err)
 	}
 
 	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
 	if !exists {
-		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
 	}
 
 	return block, nil
@@ -29,7 +29,7 @@ func blockByID(c echo.Context) (*model.Block, error) {
 func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
 	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get block metadata: %s", blockID.ToHex())
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
 	}
 
 	return blockMetadata.BlockMetadataResponse(), nil
@@ -38,7 +38,7 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataRes
 func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
 	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse block ID %s: %s", c.Param(restapi.ParameterBlockID), err)
 	}
 
 	return blockMetadataByBlockID(blockID)
@@ -55,7 +55,7 @@ func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHe
 	} else {
 		slotCommitment, err = deps.Protocol.MainEngineInstance().Storage.Commitments().Load(slotIndex)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment for requested slot %d", slotIndex)
+			return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to load commitment for requested slot %d: %s", slotIndex, err)
 		}
 	}
 
@@ -77,7 +77,7 @@ func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHe
 func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 	iotaBlock, err := httpserver.ParseRequestByHeader(c, deps.Protocol.CommittedAPI(), iotago.ProtocolBlockFromBytes(deps.Protocol))
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse iotablock: %s", err)
 	}
 
 	blockID, err := deps.BlockHandler.AttachBlock(c.Request().Context(), iotaBlock)

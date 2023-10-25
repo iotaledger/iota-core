@@ -19,17 +19,17 @@ import (
 func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse account ID %s: %s", c.Param(restapipkg.ParameterAccountID), err)
 	}
 
 	commitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
 	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, commitment.Slot())
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get account: %s form the Ledger", accountID.ToHex())
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)
 	}
 	if !exists {
-		return nil, ierrors.Errorf("account not found: %s", accountID.ToHex())
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "account not found: %s", accountID.ToHex())
 	}
 
 	return &apimodels.CongestionResponse{
@@ -46,7 +46,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	if len(c.QueryParam(restapipkg.QueryParameterPageSize)) > 0 {
 		pageSize, err = httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.QueryParameterPageSize)
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse page size %s : %s", c.Param(restapipkg.QueryParameterPageSize), err)
 		}
 		if pageSize > restapi.ParamsRestAPI.MaxPageSize {
 			pageSize = restapi.ParamsRestAPI.MaxPageSize
@@ -59,13 +59,13 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	if len(c.QueryParam(restapipkg.QueryParameterCursor)) != 0 {
 		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.QueryParameterCursor)
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse cursor %s: %s", c.Param(restapipkg.QueryParameterCursor), err)
 		}
 	}
 
 	// do not respond to really old requests
 	if requestedSlot+iotago.SlotIndex(restapi.ParamsRestAPI.MaxRequestedSlotAge) < latestCommittedSlot {
-		return nil, ierrors.Errorf("request is too old, request started at %d, latest committed slot index is %d", requestedSlot, latestCommittedSlot)
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "request is too old, request started at %d, latest committed slot index is %d", requestedSlot, latestCommittedSlot)
 	}
 
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
@@ -75,7 +75,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	if !exists {
 		registeredValidators, err = deps.Protocol.MainEngineInstance().SybilProtection.OrderedRegisteredCandidateValidatorsList(nextEpoch)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to get ordered registered validators list for epoch %d", nextEpoch)
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get ordered registered validators list for epoch %d : %s", nextEpoch, err)
 		}
 		deps.Protocol.MainEngineInstance().Retainer.RetainRegisteredValidatorsCache(slotRange, registeredValidators)
 	}
@@ -98,16 +98,16 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterAccountID)
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse account ID %s: %s", c.Param(restapipkg.ParameterAccountID), err)
 	}
 	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
 	accountData, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get account: %s form the Ledger", accountID.ToHex())
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)
 	}
 	if !exists {
-		return nil, ierrors.Errorf("account not found: %s for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "account %s not found for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 	active := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, nextEpoch)
@@ -127,12 +127,12 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse the %s parameter", restapipkg.ParameterOutputID)
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse output ID %s: %s", c.Param(restapipkg.ParameterOutputID), err)
 	}
 
 	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get output %s from ledger", outputID.ToHex())
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from ledger: %s", outputID.ToHex(), err)
 	}
 
 	var reward iotago.Mana
@@ -143,7 +143,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 		accountOutput := utxoOutput.Output().(*iotago.AccountOutput)
 		feature, exists := accountOutput.FeatureSet()[iotago.FeatureStaking]
 		if !exists {
-			return nil, ierrors.Errorf("account %s is not a validator", outputID)
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "account %s is not a validator", outputID.ToHex())
 		}
 
 		//nolint:forcetypeassert
@@ -174,7 +174,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 		)
 	}
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to calculate reward for output %s", outputID)
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to calculate reward for output %s: %s", outputID.ToHex(), err)
 	}
 
 	return &apimodels.ManaRewardsResponse{

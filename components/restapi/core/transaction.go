@@ -14,7 +14,7 @@ import (
 func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
 	txID, err := httpserver.ParseTransactionIDParam(c, restapipkg.ParameterTransactionID)
 	if err != nil {
-		return iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to parse transaction ID: %s", c.Param(restapipkg.ParameterTransactionID))
+		return iotago.EmptyBlockID, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse transaction ID %s: %s", c.Param(restapipkg.ParameterTransactionID), err)
 	}
 
 	return blockIDFromTransactionID(txID)
@@ -26,7 +26,7 @@ func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockI
 
 	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to get output: %s", outputID.ToHex())
+		return iotago.EmptyBlockID, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s: %s", outputID.ToHex(), err)
 	}
 
 	if output != nil {
@@ -39,12 +39,12 @@ func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockI
 func blockByTransactionID(c echo.Context) (*model.Block, error) {
 	blockID, err := blockIDByTransactionID(c)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get block ID by transaction ID")
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID by transaction ID: %s", err)
 	}
 
 	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
 	if !exists {
-		return nil, ierrors.Errorf("block not found: %s", blockID.String())
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
 	}
 
 	return block, nil
@@ -53,7 +53,7 @@ func blockByTransactionID(c echo.Context) (*model.Block, error) {
 func blockMetadataFromTransactionID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
 	blockID, err := blockIDByTransactionID(c)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get block ID by transaction ID")
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID by transaction ID: %s", err)
 	}
 
 	return blockMetadataByBlockID(blockID)
