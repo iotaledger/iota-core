@@ -30,6 +30,3 @@ dist/
 # snapshot and settings file
 *.bin
 tools/docker-network/docker-network.snapshot
-tools/evil-spammer/evil-spammer
-
-
