@@ -92,12 +92,12 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accoun
 
 	// If there are fewer candidates than required, then re-use the previous committee.
 	if len(candidates) < s.SeatCount() {
+		// TODO: what if staking period of a committee member ends in the next epoch?
 		committee, exists := s.committeeInEpoch(epoch - 1)
 		if !exists {
 			return nil, ierrors.Errorf("cannot re-use previous committee from epoch %d as it does not exist", epoch-1)
 		}
 
-		// TODO: should we mark the committee as re-used? It's reused but not because of lack of finalization, so imo it should not be marked as reused.
 		err := s.committeeStore.Store(epoch, committee.Accounts())
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
@@ -135,7 +135,6 @@ func (s *SeatManager) CommitteeInEpoch(epoch iotago.EpochIndex) (*account.Seated
 func (s *SeatManager) committeeInEpoch(epoch iotago.EpochIndex) (*account.SeatedAccounts, bool) {
 	c, err := s.committeeStore.Load(epoch)
 	if err != nil {
-		// TODO: panicking this deep down is probably bad
 		panic(ierrors.Wrapf(err, "failed to load committee for epoch %d", epoch))
 	}
 

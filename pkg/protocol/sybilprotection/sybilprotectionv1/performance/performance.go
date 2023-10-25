@@ -66,7 +66,9 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	defer t.performanceFactorsMutex.Unlock()
 	isCommitteeMember, err := t.isCommitteeMember(block.ID().Slot(), block.ProtocolBlock().IssuerID)
 	if err != nil {
-		panic(ierrors.Errorf("failed to check if account %s is committee member", block.ProtocolBlock().IssuerID))
+		t.errHandler(ierrors.Wrapf(err, "error while checking if account %s is a committee member in slot %d", block.ProtocolBlock().IssuerID, block.ID().Slot()))
+
+		return
 	}
 
 	if isCommitteeMember {
@@ -89,7 +91,7 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 		if !exists || currentValue > block.ID().Slot() {
 			committeeCandidatesStore, err := t.committeeCandidatesInEpochFunc(blockEpoch)
 			if err != nil {
-				// TODO: panic when we switch to dPoS
+				// if there is an error, and we don't register a candidate, then we might eventually create a different commitment
 				t.errHandler(ierrors.Wrapf(err, "error while retrieving candidate storage for epoch %d", blockEpoch))
 
 				// rollback on error if entry did not exist before
@@ -100,7 +102,7 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 
 			err = committeeCandidatesStore.Set(block.ProtocolBlock().IssuerID[:], block.ID().Slot().MustBytes())
 			if err != nil {
-				// TODO: panic when we switch to dPoS
+				// if there is an error, and we don't register a candidate, then we might eventually create a different commitment
 				t.errHandler(ierrors.Wrapf(err, "error while updating candidate activity for epoch %d", blockEpoch))
 
 				// rollback on error if entry did not exist before
@@ -123,7 +125,7 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 
 }
 
-func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.AccountID] {
+func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago.AccountID], error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
@@ -131,30 +133,28 @@ func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) ds.Set[io
 }
 
 // ValidatorCandidates returns the registered validator candidates for the given epoch.
-func (t *Tracker) ValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.AccountID] {
+func (t *Tracker) ValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago.AccountID], error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
 	return t.getValidatorCandidates(epoch)
 }
 
-func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.AccountID] {
+func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago.AccountID], error) {
 	// we store candidates in the store for the epoch of their activity, but the passed argument points to the target epoch,
-	// so it's necessary to subtract 1 epoch from the passed value
+	// so it's necessary to subtract one epoch from the passed value
 	candidateStore, err := t.committeeCandidatesInEpochFunc(epoch - 1)
 	if err != nil {
-		// TODO: panic or return an error?
-		t.errHandler(ierrors.Wrapf(err, "error while retrieving candidates for epoch %d", epoch))
-
-		return nil
+		return nil, ierrors.Wrapf(err, "error while retrieving candidates for epoch %d", epoch)
 	}
 
 	candidates := ds.NewSet[iotago.AccountID]()
+
+	var innerErr error
 	err = candidateStore.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
 		accountID, _, err := iotago.AccountIDFromBytes(key)
 		if err != nil {
-			t.errHandler(ierrors.Wrapf(err, "error while  for epoch %d", epoch))
-			// TODO: panic or return an error?
+			innerErr = err
 
 			return false
 		}
@@ -163,15 +163,16 @@ func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) ds.Set[iotago.
 
 		return true
 	})
-	if err != nil {
-		// TODO: panic or return an error?
 
-		t.errHandler(ierrors.Wrapf(err, "error while retrieving candidates for epoch %d", epoch))
-
-		return nil
+	if innerErr != nil {
+		return nil, ierrors.Wrapf(innerErr, "error while iterating through candidates for epoch %d", epoch)
 	}
 
-	return candidates
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "error while retrieving candidates for epoch %d", epoch)
+	}
+
+	return candidates, nil
 }
 
 func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
@@ -312,7 +313,6 @@ func (t *Tracker) isCommitteeMember(slot iotago.SlotIndex, accountID iotago.Acco
 	return committee.Has(accountID), nil
 }
 
-// TODO: should errors in this method be only handled by the errHandler and not result in a panic or some more radical result?
 func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.ValidationBlock, block *blocks.Block) {
 	validatorPerformances, err := t.validatorPerformancesFunc(block.ID().Slot())
 	if err != nil {
@@ -324,25 +324,31 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	validatorPerformance, err := validatorPerformances.Load(block.ProtocolBlock().IssuerID)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
+
+		return
 	}
+
 	// key not found
 	if validatorPerformance == nil {
 		validatorPerformance = model.NewValidatorPerformance()
 	}
 
-	// set bit at subslotIndex to 1 to indicate activity in that subslot
+	// set a bit at subslotIndex to 1 to indicate activity in that subslot
 	validatorPerformance.SlotActivityVector = validatorPerformance.SlotActivityVector | (1 << t.subslotIndex(block.ID().Slot(), block.ProtocolBlock().IssuingTime))
 
 	apiForSlot := t.apiProvider.APIForSlot(block.ID().Slot())
+
 	// we restrict the number up to ValidatorBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
 	// also it can fint into uint8
 	if validatorPerformance.BlockIssuedCount < apiForSlot.ProtocolParameters().ValidationBlocksPerSlot()+1 {
 		validatorPerformance.BlockIssuedCount++
 	}
+
 	validatorPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{
 		Version: validationBlock.HighestSupportedVersion,
 		Hash:    validationBlock.ProtocolParametersHash,
 	}
+
 	if err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, validatorPerformance); err != nil {
 		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
 	}

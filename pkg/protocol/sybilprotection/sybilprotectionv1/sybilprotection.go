@@ -282,18 +282,25 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 }
 
 // IsCandidateActive returns true if the given validator is currently active.
-func (o *SybilProtection) IsCandidateActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) bool {
-	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+func (o *SybilProtection) IsCandidateActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) (bool, error) {
+	activeCandidates, err := o.performanceTracker.EligibleValidatorCandidates(epoch)
+	if err != nil {
+		return false, ierrors.Wrapf(err, "failed to retrieve eligible candidates")
+	}
 
-	return activeCandidates.Has(validatorID)
+	return activeCandidates.Has(validatorID), nil
 }
 
 // EligibleValidators returns the currently known list of recently active validator candidates for the given epoch.
 func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error) {
-	candidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+	candidates, err := o.performanceTracker.EligibleValidatorCandidates(epoch)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to retrieve eligible validator candidates for epoch %d", epoch)
+	}
+
 	validators := make(accounts.AccountsData, 0)
 
-	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
+	if err = candidates.ForEach(func(candidate iotago.AccountID) error {
 		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to load account data for candidate %s", candidate)
@@ -317,8 +324,15 @@ func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.
 
 // OrderedRegisteredCandidateValidatorsList returns the currently known list of registered validator candidates for the given epoch.
 func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error) {
-	candidates := o.performanceTracker.ValidatorCandidates(epoch)
-	activeCandidates := o.performanceTracker.EligibleValidatorCandidates(epoch)
+	candidates, err := o.performanceTracker.ValidatorCandidates(epoch)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to retrieve candidates")
+	}
+
+	activeCandidates, err := o.performanceTracker.EligibleValidatorCandidates(epoch)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to retrieve eligible candidates")
+	}
 
 	validatorResp := make([]*apimodels.ValidatorResponse, 0, candidates.Size())
 	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
@@ -361,7 +375,10 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 	timeProvider := o.apiProvider.APIForSlot(slot).TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
-	candidates := o.performanceTracker.EligibleValidatorCandidates(nextEpoch)
+	candidates, err := o.performanceTracker.EligibleValidatorCandidates(nextEpoch)
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to retrieve candidates for epoch %d", nextEpoch))
+	}
 
 	candidateAccounts := make(accounts.AccountsData, 0)
 	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
@@ -370,23 +387,19 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Acc
 			return err
 		}
 		if !exists {
-			return ierrors.Errorf("account of committee candidate does not exist: %s", candidate)
+			return ierrors.Errorf("account of committee candidate %s does not exist in slot %d", candidate, slot)
 		}
 
 		candidateAccounts = append(candidateAccounts, accountData)
 
 		return nil
 	}); err != nil {
-		// TODO: panic?
-		o.errHandler(err)
+		panic(ierrors.Wrap(err, "failed to iterate through candidates"))
 	}
 
 	newCommittee, err := o.seatManager.RotateCommittee(nextEpoch, candidateAccounts)
 	if err != nil {
-		// TODO: what to do in this case
-		o.errHandler(ierrors.Wrap(err, "failed to rotate committee"))
-
-		return nil
+		panic(ierrors.Wrap(err, "failed to rotate committee"))
 	}
 
 	o.performanceTracker.ClearCandidates()
