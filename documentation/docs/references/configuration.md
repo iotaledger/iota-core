@@ -263,7 +263,7 @@ Example:
   }
 ```
 
-## <a id="metricstracker"></a> 7. Metricstracker
+## <a id="metricstracker"></a> 7. MetricsTracker
 
 | Name    | Description                                   | Type    | Default value |
 | ------- | --------------------------------------------- | ------- | ------------- |
@@ -273,7 +273,7 @@ Example:
 
 ```json
   {
-    "metricstracker": {
+    "metricsTracker": {
       "enabled": true
     }
   }

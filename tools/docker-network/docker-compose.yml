@@ -24,8 +24,6 @@ services:
       - "8081:8081/tcp" # Dashboard
       - "6081:6061/tcp" # pprof
       - "9089:9029/tcp" # INX
-    cap_drop:
-      - ALL
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -55,8 +53,6 @@ services:
       - "8071:8081/tcp" # Dashboard
       - "6071:6061/tcp" # pprof
       - "9029:9029/tcp" # INX
-    cap_drop:
-      - ALL
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
