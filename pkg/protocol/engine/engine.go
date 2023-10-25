@@ -407,7 +407,7 @@ func (e *Engine) acceptanceHandler() {
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		e.Ledger.TrackBlock(block)
-		e.SybilProtection.TrackValidationBlock(block)
+		e.SybilProtection.TrackBlock(block)
 		e.UpgradeOrchestrator.TrackValidationBlock(block)
 
 		e.Events.AcceptedBlockProcessed.Trigger(block)

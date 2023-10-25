@@ -6,6 +6,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -29,19 +31,27 @@ type Options struct {
 	// BasicOutput defines the basic outputs that are created in the ledger as part of the Genesis.
 	BasicOutputs []BasicOutputDetails
 
-	DataBaseVersion byte
-	LedgerProvider  func() module.Provider[*engine.Engine, ledger.Ledger]
+	DataBaseVersion     byte
+	LedgerProvider      module.Provider[*engine.Engine, ledger.Ledger]
+	SeatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]
 }
 
 func NewOptions(opts ...options.Option[Options]) *Options {
 	return options.Apply(&Options{
-		FilePath:        "snapshot.bin",
-		DataBaseVersion: 1,
-		LedgerProvider:  ledger1.NewProvider,
+		FilePath:            "snapshot.bin",
+		DataBaseVersion:     1,
+		LedgerProvider:      ledger1.NewProvider(),
+		SeatManagerProvider: poa.NewProvider(),
 	}, opts)
 }
 
-func WithLedgerProvider(ledgerProvider func() module.Provider[*engine.Engine, ledger.Ledger]) options.Option[Options] {
+func WithSeatManagerProvider(seatManagerProvider module.Provider[*engine.Engine, seatmanager.SeatManager]) options.Option[Options] {
+	return func(m *Options) {
+		m.SeatManagerProvider = seatManagerProvider
+	}
+}
+
+func WithLedgerProvider(ledgerProvider module.Provider[*engine.Engine, ledger.Ledger]) options.Option[Options] {
 	return func(m *Options) {
 		m.LedgerProvider = ledgerProvider
 	}

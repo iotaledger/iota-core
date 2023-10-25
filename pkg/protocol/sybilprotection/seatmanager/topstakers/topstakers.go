@@ -1,6 +1,8 @@
-package poa
+package topstakers
 
 import (
+	"bytes"
+	"sort"
 	"time"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -21,28 +23,27 @@ import (
 
 // SeatManager is a sybil protection module for the engine that manages the weights of actors according to their stake.
 type SeatManager struct {
-	events      *seatmanager.Events
 	apiProvider iotago.APIProvider
+	events      *seatmanager.Events
 
-	committee       *account.SeatedAccounts
 	committeeStore  *epochstore.Store[*account.Accounts]
+	committeeMutex  syncutils.RWMutex
 	activityTracker activitytracker.ActivityTracker
 
-	committeeMutex syncutils.RWMutex
-
+	optsSeatCount              uint32
 	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID
 
 	module.Module
 }
 
-// NewProvider returns a new sybil protection provider that uses the ProofOfAuthority module.
+// NewProvider returns a new sybil protection provider that uses the ProofOfStake module.
 func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.Engine, seatmanager.SeatManager] {
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
 		return options.Apply(
 			&SeatManager{
-				events:         seatmanager.NewEvents(),
 				apiProvider:    e,
+				events:         seatmanager.NewEvents(),
 				committeeStore: e.Storage.Committee(),
 
 				optsActivityWindow: time.Second * 30,
@@ -80,30 +81,39 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 var _ seatmanager.SeatManager = &SeatManager{}
 
-func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, validators accounts.AccountsData) (*account.SeatedAccounts, error) {
-	s.committeeMutex.RLock()
-	defer s.committeeMutex.RUnlock()
+func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accounts.AccountsData) (*account.SeatedAccounts, error) {
+	s.committeeMutex.Lock()
+	defer s.committeeMutex.Unlock()
 
-	// if committee is not set, then set it according to passed validators (used for creating a snapshot)
-	if s.committee == nil {
-		committeeAccounts := account.NewAccounts()
-
-		for _, validatorData := range validators {
-			committeeAccounts.Set(validatorData.ID, &account.Pool{
-				PoolStake:      validatorData.ValidatorStake + validatorData.DelegationStake,
-				ValidatorStake: validatorData.ValidatorStake,
-				FixedCost:      validatorData.FixedCost,
-			})
-		}
-		s.committee = committeeAccounts.SelectCommittee(committeeAccounts.IDs()...)
+	// If there are fewer candidates than required for epoch 0, then the previous committee cannot be copied.
+	if len(candidates) < s.SeatCount() && epoch == 0 {
+		return nil, ierrors.Errorf("at least %d candidates are required for committee in epoch 0, got %d", s.SeatCount(), len(candidates))
 	}
 
-	err := s.committeeStore.Store(epoch, s.committee.Accounts())
+	// If there are fewer candidates than required, then re-use the previous committee.
+	if len(candidates) < s.SeatCount() {
+		// TODO: what if staking period of a committee member ends in the next epoch?
+		committee, exists := s.committeeInEpoch(epoch - 1)
+		if !exists {
+			return nil, ierrors.Errorf("cannot re-use previous committee from epoch %d as it does not exist", epoch-1)
+		}
+
+		err := s.committeeStore.Store(epoch, committee.Accounts())
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
+		}
+
+		return committee, nil
+	}
+
+	committee := s.selectNewCommittee(candidates)
+
+	err := s.committeeStore.Store(epoch, committee.Accounts())
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
 	}
 
-	return s.committee, nil
+	return committee, nil
 }
 
 // CommitteeInSlot returns the set of validators selected to be part of the committee in the given slot.
@@ -141,10 +151,7 @@ func (s *SeatManager) OnlineCommittee() ds.Set[account.SeatIndex] {
 }
 
 func (s *SeatManager) SeatCount() int {
-	s.committeeMutex.RLock()
-	defer s.committeeMutex.RUnlock()
-
-	return s.committee.SeatCount()
+	return int(s.optsSeatCount)
 }
 
 func (s *SeatManager) Shutdown() {
@@ -160,7 +167,7 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 		return ierrors.Wrapf(err, "failed to load PoA committee for epoch %d", epoch)
 	}
 
-	s.committee = committeeAccounts.SelectCommittee(committeeAccounts.IDs()...)
+	committee := committeeAccounts.SelectCommittee(committeeAccounts.IDs()...)
 
 	onlineValidators := committeeAccounts.IDs()
 	if len(s.optsOnlineCommitteeStartup) > 0 {
@@ -168,7 +175,7 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 	}
 
 	for _, v := range onlineValidators {
-		seat, exists := s.committee.GetSeat(v)
+		seat, exists := committee.GetSeat(v)
 		if !exists {
 			// Only track identities that are part of the committee.
 			continue
@@ -184,12 +191,55 @@ func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	s.committee = validators.SelectCommittee(validators.IDs()...)
+	if validators.Size() != int(s.optsSeatCount) {
+		return ierrors.Errorf("invalid number of validators: %d, expected: %d", validators.Size(), s.optsSeatCount)
+	}
 
-	err := s.committeeStore.Store(epoch, s.committee.Accounts())
+	err := s.committeeStore.Store(epoch, validators)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to set committee for epoch %d", epoch)
 	}
 
 	return nil
+}
+
+func (s *SeatManager) selectNewCommittee(candidates accounts.AccountsData) *account.SeatedAccounts {
+	sort.Slice(candidates, func(i, j int) bool {
+		// Prioritize the candidate that has a larger pool stake.
+		if candidates[i].ValidatorStake+candidates[i].DelegationStake != candidates[j].ValidatorStake+candidates[j].DelegationStake {
+			return candidates[i].ValidatorStake+candidates[i].DelegationStake > candidates[j].ValidatorStake+candidates[j].DelegationStake
+		}
+
+		// Prioritize the candidate that has a larger validator stake.
+		if candidates[i].ValidatorStake != candidates[j].ValidatorStake {
+			return candidates[i].ValidatorStake > candidates[j].ValidatorStake
+		}
+
+		// Prioritize the candidate that declares a longer staking period.
+		if candidates[i].StakeEndEpoch != candidates[j].StakeEndEpoch {
+			return candidates[i].StakeEndEpoch > candidates[j].StakeEndEpoch
+		}
+
+		// Prioritize the candidate that has smaller FixedCost.
+		if candidates[i].FixedCost != candidates[j].FixedCost {
+			return candidates[i].FixedCost < candidates[j].FixedCost
+		}
+
+		// two candidates never have the same account ID because they come in a map
+		return bytes.Compare(candidates[i].ID[:], candidates[j].ID[:]) > 0
+	})
+
+	// Create new Accounts instance that only included validators selected to be part of the committee.
+	newCommitteeAccounts := account.NewAccounts()
+
+	for _, candidateData := range candidates[:s.optsSeatCount] {
+		newCommitteeAccounts.Set(candidateData.ID, &account.Pool{
+			PoolStake:      candidateData.ValidatorStake + candidateData.DelegationStake,
+			ValidatorStake: candidateData.ValidatorStake,
+			FixedCost:      candidateData.FixedCost,
+		})
+	}
+	committee := newCommitteeAccounts.SelectCommittee(newCommitteeAccounts.IDs()...)
+
+	return committee
 }

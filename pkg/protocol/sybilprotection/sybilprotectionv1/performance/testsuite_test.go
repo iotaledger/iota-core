@@ -73,8 +73,18 @@ func (t *TestSuite) InitPerformanceTracker() {
 	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0)
 	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
+	committeeCandidatesStore := epochstore.NewEpochKVStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0)
 
-	t.Instance = NewTracker(rewardsStore.GetEpoch, poolStatsStore, committeeStore, performanceFactorFunc, t.latestCommittedEpoch, api.SingleVersionProvider(t.api), func(err error) {})
+	t.Instance = NewTracker(
+		rewardsStore.GetEpoch,
+		poolStatsStore,
+		committeeStore,
+		committeeCandidatesStore.GetEpoch,
+		performanceFactorFunc,
+		t.latestCommittedEpoch,
+		api.SingleVersionProvider(t.api),
+		func(err error) {},
+	)
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -103,7 +113,8 @@ func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[strin
 		})
 	}
 
-	err := t.Instance.RegisterCommittee(epoch, committee)
+	// Store directly on the committee store, because in actual code the SeatManager is responsible for adding the storage entry.
+	err := t.Instance.committeeStore.Store(epoch, committee)
 	require.NoError(t.T, err)
 	for accIDAlias, action := range actions {
 		accID := t.Account(accIDAlias, false)

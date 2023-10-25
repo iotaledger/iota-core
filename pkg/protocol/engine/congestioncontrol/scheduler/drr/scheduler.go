@@ -66,12 +66,18 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			})
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 				// when the last slot of an epoch is committed, remove the queues of validators that are no longer in the committee.
-				if s.apiProvider.CommittedAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
+				if s.apiProvider.APIForSlot(commitment.Slot()).TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
 					s.bufferMutex.Lock()
 					defer s.bufferMutex.Unlock()
+					committee, exists := s.seatManager.CommitteeInSlot(commitment.Slot() + 1)
+					if !exists {
+						s.errorHandler(ierrors.Errorf("committee does not exist in committed slot %d", commitment.Slot()+1))
+
+						return
+					}
 
 					s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
-						if !s.seatManager.Committee(commitment.Slot() + 1).HasAccount(accountID) {
+						if !committee.HasAccount(accountID) {
 							s.shutdownValidatorQueue(validatorQueue)
 							s.validatorBuffer.Delete(accountID)
 						}
@@ -615,7 +621,7 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) err
 func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds Deficit, slot iotago.SlotIndex) error {
 	quantum, err := s.quantumFunc(issuerID, slot)
 	if err != nil {
-		return err
+		return ierrors.Wrap(err, "failed to retrieve quantum")
 	}
 
 	delta, err := safemath.SafeMul(quantum, rounds)
