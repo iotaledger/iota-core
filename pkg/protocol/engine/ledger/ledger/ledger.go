@@ -655,7 +655,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 					continue
 				}
 
-				accountDiff.BICChange += iotago.BlockIssuanceCredits(allotment.Value)
+				accountDiff.BICChange += iotago.BlockIssuanceCredits(allotment.Mana)
 				accountDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
 
 				// we are not transitioning the allotted account, so the new and previous expiry slots are the same

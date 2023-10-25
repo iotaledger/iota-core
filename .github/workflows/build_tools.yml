@@ -3,7 +3,6 @@ name: Build internal tools
 on:
   pull_request:
     paths:
-      - 'tools/evil-spammer/**'
       - 'tools/genesis-snapshot/**'
 jobs:
 
@@ -22,10 +21,6 @@ jobs:
 
       - name: Print Go version
         run: go version
-
-      - name: Build evil-spammer tool
-        working-directory: tools/evil-spammer
-        run: go mod tidy && go build .
 
       - name: Build genesis-snapshot tool
         working-directory: tools/genesis-snapshot
