@@ -772,8 +772,8 @@
       {
         "current": {
           "selected": true,
-          "text": "validator-2:9311",
-          "value": "validator-2:9311"
+          "text": "node-2-validator:9311",
+          "value": "node-2-validator:9311"
         },
         "datasource": {
           "type": "prometheus",

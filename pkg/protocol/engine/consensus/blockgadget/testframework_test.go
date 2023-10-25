@@ -9,14 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -40,7 +43,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		T:      test,
 		blocks: shrinkingmap.New[string, *blocks.Block](),
 
-		SeatManager: mock.NewManualPOA(),
+		SeatManager: mock.NewManualPOA(api.SingleVersionProvider(tpkg.TestAPI), epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)),
 	}
 
 	evictionState := eviction.NewState(mapdb.NewMapDB(), func(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
@@ -53,7 +56,10 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	})
 
 	t.blockCache = blocks.New(evictionState, api.SingleVersionProvider(tpkg.TestAPI))
-	instance := thresholdblockgadget.New(t.blockCache, t.SeatManager)
+	instance := thresholdblockgadget.New(t.blockCache, t.SeatManager, func(err error) {
+		fmt.Printf(">> Gadget.Error: %s\n", err)
+	})
+
 	t.Events = instance.Events()
 	t.Instance = instance
 

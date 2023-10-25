@@ -194,7 +194,11 @@ func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.B
 	ch := make(chan *commitmentVerificationResult)
 	defer close(ch)
 
-	commitmentVerifier := NewCommitmentVerifier(p.MainEngineInstance(), fork.MainChain.Commitment(fork.ForkingPoint.Slot()-1).Commitment())
+	commitmentVerifier, err := NewCommitmentVerifier(p.MainEngineInstance(), fork.MainChain.Commitment(fork.ForkingPoint.Slot()-1).Commitment())
+	if err != nil {
+		return nil, false, true, ierrors.Wrapf(err, "failed to create commitment verifier for %s", fork.MainChain.Commitment(fork.ForkingPoint.Slot()-1).ID())
+	}
+
 	verifyCommitmentFunc := func(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) {
 		blockIDs, actualCumulativeWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
 

@@ -83,7 +83,7 @@
     "pruningThreshold": 1,
     "dbGranularity": 100
   },
-  "metricstracker": {
+  "metricsTracker": {
     "enabled": true
   },
   "database": {

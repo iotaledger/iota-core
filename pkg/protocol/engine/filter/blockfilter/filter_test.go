@@ -96,14 +96,14 @@ func (t *TestFramework) IssueBlockAtSlotWithVersion(alias string, slot iotago.Sl
 	return t.processBlock(alias, block)
 }
 
-func mockedCommitteeFunc(validatorAccountID iotago.AccountID) func(iotago.SlotIndex) *account.SeatedAccounts {
+func mockedCommitteeFunc(validatorAccountID iotago.AccountID) func(iotago.SlotIndex) (*account.SeatedAccounts, bool) {
 	mockedAccounts := account.NewAccounts()
 	mockedAccounts.Set(validatorAccountID, new(account.Pool))
 	seatedAccounts := account.NewSeatedAccounts(mockedAccounts)
 	seatedAccounts.Set(account.SeatIndex(0), validatorAccountID)
 
-	return func(slot iotago.SlotIndex) *account.SeatedAccounts {
-		return seatedAccounts
+	return func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool) {
+		return seatedAccounts, true
 	}
 }
 

@@ -14,6 +14,6 @@ var ParamsMetricsTracker = &ParametersMetricsTracker{}
 
 var params = &app.ComponentParams{
 	Params: map[string]any{
-		"metricstracker": ParamsMetricsTracker,
+		"metricsTracker": ParamsMetricsTracker,
 	},
 }
