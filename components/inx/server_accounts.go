@@ -29,8 +29,12 @@ func (s *Server) ReadIsCommitteeMember(_ context.Context, accountInfoRequest *in
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error when parsing account id")
 	}
+	committee, exists := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)
+	if !exists {
+		return nil, ierrors.Errorf("committee does not exist for slot %d", slot)
+	}
 
-	return inx.WrapBoolResponse(deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(slot).HasAccount(accountID)), nil
+	return inx.WrapBoolResponse(committee.HasAccount(accountID)), nil
 }
 
 func (s *Server) ReadIsCandidate(_ context.Context, accountInfoRequest *inx.AccountInfoRequest) (*inx.BoolResponse, error) {
@@ -40,5 +44,10 @@ func (s *Server) ReadIsCandidate(_ context.Context, accountInfoRequest *inx.Acco
 		return nil, ierrors.Wrap(err, "error when parsing account id")
 	}
 
-	return inx.WrapBoolResponse(deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, deps.Protocol.APIForSlot(slot).TimeProvider().EpochFromSlot(slot))), nil
+	isCandidateActive, err := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, deps.Protocol.APIForSlot(slot).TimeProvider().EpochFromSlot(slot))
+	if err != nil {
+		return nil, ierrors.Wrap(err, "error when checking if candidate is active")
+	}
+
+	return inx.WrapBoolResponse(isCandidateActive), nil
 }
