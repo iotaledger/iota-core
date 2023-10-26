@@ -95,7 +95,7 @@ func Test_TransitionAccount(t *testing.T) {
 		testsuite.WithOutputs(append(accountOutputs, equalOutputs...)),
 		testsuite.WithAllotments(iotago.Allotments{&iotago.Allotment{
 			AccountID: genesisAccountOutput.AccountID,
-			Value:     0,
+			Mana:      0,
 		}}),
 	))
 

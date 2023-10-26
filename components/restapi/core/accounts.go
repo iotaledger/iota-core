@@ -110,7 +110,11 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 		return nil, ierrors.Errorf("account not found: %s for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
-	active := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, nextEpoch)
+
+	active, err := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, nextEpoch)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to check if account %s is an active candidate", accountID.ToHex())
+	}
 
 	return &apimodels.ValidatorResponse{
 		AccountID:                      accountID,
@@ -198,7 +202,13 @@ func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
 		slot = timeProvider.EpochEnd(epoch)
 	}
 
-	seatedAccounts := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().Committee(slot)
+	seatedAccounts, exists := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)
+	if !exists {
+		return &apimodels.CommitteeResponse{
+			Epoch: epoch,
+		}
+	}
+
 	committee := make([]*apimodels.CommitteeMemberResponse, 0, seatedAccounts.Accounts().Size())
 	seatedAccounts.Accounts().ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
 		committee = append(committee, &apimodels.CommitteeMemberResponse{

@@ -168,6 +168,22 @@ func (t *TestSuite) IssueValidationBlock(alias string, node *mock.Node, blockHea
 
 	return block
 }
+func (t *TestSuite) IssueCandidacyAnnouncementInSlot(alias string, slot iotago.SlotIndex, parentsPrefixAlias string, node *mock.Node, issuingOptions ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+	timeProvider := t.API.TimeProvider()
+	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
+
+	return t.IssuePayloadWithOptions(
+		alias,
+		node.Validator,
+		node,
+		&iotago.CandidacyAnnouncement{},
+		append(issuingOptions,
+			mock.WithStrongParents(t.BlockIDsWithPrefix(parentsPrefixAlias)...),
+			mock.WithIssuingTime(issuingTime),
+		)...,
+	)
+}
 
 func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, row int, parentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) []*blocks.Block {
 	blockIssuers := t.BlockIssuersForNodes(nodes)
@@ -185,7 +201,8 @@ func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, ro
 		require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
 		var b *blocks.Block
-		if blockIssuers[index].Validator {
+		// Only issue validator blocks if account has staking feature and is part of committee.
+		if blockIssuers[index].Validator && lo.Return1(node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)).HasAccount(node.Validator.AccountID) {
 			blockHeaderOptions := append(issuingOptionsCopy[node.Name], mock.WithIssuingTime(issuingTime))
 			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)
 			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node)
@@ -295,17 +312,31 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 		// preacceptance of nextBlockSlot
 		for _, node := range activeValidators {
 			require.True(t.Testing, node.IsValidator(), "node: %s: is not a validator node", node.Name)
-			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex, node.Name)
-			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			committeeAtBlockSlot, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(nextBlockSlot)
+			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, nextBlockSlot)
+			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
+				blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex, node.Name)
+				tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			}
 		}
 		// acceptance of nextBlockSlot
 		for _, node := range activeValidators {
-			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
-			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			committeeAtBlockSlot, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(nextBlockSlot)
+			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, nextBlockSlot)
+			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
+				blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
+				tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			}
 		}
+
+		for _, node := range activeValidators {
+			t.AssertLatestCommitmentSlotIndex(nextBlockSlot-t.API.ProtocolParameters().MinCommittableAge(), node)
+		}
+
 		if nextBlockSlot == slot+t.API.ProtocolParameters().MinCommittableAge() {
 			break
 		}
+
 		nextBlockSlot = lo.Min(slot+t.API.ProtocolParameters().MinCommittableAge(), nextBlockSlot+t.API.ProtocolParameters().MinCommittableAge())
 		chainIndex += 2
 	}

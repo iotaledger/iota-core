@@ -21,7 +21,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("default", "rms"),
-			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10, 100, 100, 100),
+			iotago.WithSupplyOptions(4_600_000_000_000_000, 100, 1, 10, 100, 100, 100),
 			iotago.WithTimeProviderOptions(1696841745, 10, 13),
 			iotago.WithLivenessOptions(30, 30, 7, 14, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
@@ -36,25 +36,8 @@ var Base = []options.Option[snapshotcreator.Options]{
 
 var Docker = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithFilePath("docker-network.snapshot"),
-	snapshotcreator.WithBasicOutputs(
-		/*
-			inx-faucet
-
-			ed25519 private key:  de52b9964dda96564e9fab362ab16c2669c715c6a2a853bece8a25fc58c599755b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737
-			ed25519 public key:   5b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737
-			ed25519 address:      2f64f9d179991f50542b01e034fa043b195403875b8677efaf196b41c88803d0
-			bech32 address:       rms1qqhkf7w30xv375z59vq7qd86qsa3j4qrsadcval04uvkkswg3qpaqf4hga2
-
-			=> restricted address with mana enabled: rms19qqz7e8e69uej86s2s4srcp5lgzrkx25qwr4hpnha7h3j66pezyq85qpqgqjjc5k
-		*/
-		snapshotcreator.BasicOutputDetails{
-			Address: lo.Return2(iotago.ParseBech32("rms19qqz7e8e69uej86s2s4srcp5lgzrkx25qwr4hpnha7h3j66pezyq85qpqgqjjc5k")),
-			Amount:  5_000_000_000,
-			Mana:    10_000_000,
-		},
-	),
 	snapshotcreator.WithAccounts(
-		snapshotcreator.AccountDetails{ // validator-1
+		snapshotcreator.AccountDetails{ // node-1-validator
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b"))),
 			Amount:               testsuite.MinValidatorAccountAmount,
@@ -66,7 +49,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			StakedAmount:         testsuite.MinValidatorAccountAmount,
 			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
 		},
-		snapshotcreator.AccountDetails{ // validator-2
+		snapshotcreator.AccountDetails{ // node-2-validator
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064"))),
 			Amount:               testsuite.MinValidatorAccountAmount,
@@ -78,7 +61,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			StakedAmount:         testsuite.MinValidatorAccountAmount,
 			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
 		},
-		snapshotcreator.AccountDetails{ // validator-3
+		snapshotcreator.AccountDetails{ // node-3-validator
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648"))),
 			Amount:               testsuite.MinValidatorAccountAmount,
@@ -108,10 +91,27 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			Mana:                 iotago.Mana(testsuite.MinIssuerAccountAmount),
 		},
 	),
+	snapshotcreator.WithBasicOutputs(
+		/*
+			inx-faucet
+
+			ed25519 private key:  de52b9964dda96564e9fab362ab16c2669c715c6a2a853bece8a25fc58c599755b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737
+			ed25519 public key:   5b938327ea463e0c323c0fd44f6fc1843ed94daecc6909c6043d06b7152e4737
+			ed25519 address:      2f64f9d179991f50542b01e034fa043b195403875b8677efaf196b41c88803d0
+			bech32 address:       rms1qqhkf7w30xv375z59vq7qd86qsa3j4qrsadcval04uvkkswg3qpaqf4hga2
+
+			=> restricted address with mana enabled: rms19qqz7e8e69uej86s2s4srcp5lgzrkx25qwr4hpnha7h3j66pezyq85qpqgqjjc5k
+		*/
+		snapshotcreator.BasicOutputDetails{
+			Address: lo.Return2(iotago.ParseBech32("rms19qqz7e8e69uej86s2s4srcp5lgzrkx25qwr4hpnha7h3j66pezyq85qpqgqjjc5k")),
+			Amount:  1_000_000_000_000_000,
+			Mana:    10_000_000,
+		},
+	),
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("docker", "rms"),
-			iotago.WithSupplyOptions(10_000_000_000, 1, 1, 10, 100, 100, 100),
+			iotago.WithSupplyOptions(4_600_000_000_000_000, 1, 1, 10, 100, 100, 100),
 			iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 13),
 			iotago.WithLivenessOptions(30, 30, 7, 14, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
@@ -125,7 +125,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 var Feature = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithFilePath("docker-network.snapshot"),
 	snapshotcreator.WithAccounts(
-		snapshotcreator.AccountDetails{
+		snapshotcreator.AccountDetails{ // node-01
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe"))),
 			Amount:               testsuite.MinValidatorAccountAmount,
@@ -137,7 +137,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			StakedAmount:         testsuite.MinValidatorAccountAmount,
 			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
 		},
-		snapshotcreator.AccountDetails{
+		snapshotcreator.AccountDetails{ // node-02
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6"))),
 			Amount:               testsuite.MinValidatorAccountAmount,
@@ -149,7 +149,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			StakedAmount:         testsuite.MinValidatorAccountAmount,
 			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
 		},
-		snapshotcreator.AccountDetails{
+		snapshotcreator.AccountDetails{ // node-03
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805"))),
 			Amount:               testsuite.MinValidatorAccountAmount,
@@ -161,11 +161,43 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			StakedAmount:         testsuite.MinValidatorAccountAmount,
 			Mana:                 iotago.Mana(testsuite.MinValidatorAccountAmount),
 		},
+		snapshotcreator.AccountDetails{
+			/*
+				inx-blockissuer
+
+				ed25519 public key:   670a1a20ddb02a6cec53ec3196bc7d5bd26df2f5a6ca90b5fffd71364f104b25
+				ed25519 address:      3b07e3e84c1276f0b9d35cf218b3763e0cbdadaa7ca38588de2170c31b38e9bb
+				bech32 address:       rms1pqas0clgfsf8du9e6dw0yx9nwclqe0dd4f728pvgmcshpscm8r5mkddrrfc
+			*/
+			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x670a1a20ddb02a6cec53ec3196bc7d5bd26df2f5a6ca90b5fffd71364f104b25"))),
+			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x670a1a20ddb02a6cec53ec3196bc7d5bd26df2f5a6ca90b5fffd71364f104b25"))),
+			Amount:               testsuite.MinIssuerAccountAmount,
+			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x670a1a20ddb02a6cec53ec3196bc7d5bd26df2f5a6ca90b5fffd71364f104b25")))),
+			ExpirySlot:           iotago.MaxSlotIndex,
+			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+			Mana:                 iotago.Mana(testsuite.MinIssuerAccountAmount),
+		},
+	),
+	snapshotcreator.WithBasicOutputs(
+		/*
+			inx-faucet
+
+			ed25519 public key:   dcd760a51cfafe901f4ca0745d399af7146028af643e8a339c7bb82fbb1be7f9
+			ed25519 address:      48acd764f626523646d5ccf22f807e96d30b7ab0064f370b66fa811985985ec4
+			bech32 address:       rms1qpy2e4my7cn9ydjx6hx0ytuq06tdxzm6kqry7dctvmagzxv9np0vg9c55n4
+
+			=> restricted address with mana enabled: rms19qqy3txhvnmzv53kgm2ueu30splfd5ct02cqvnehpdn04qgeskv9a3qpqgh3p7yy
+		*/
+		snapshotcreator.BasicOutputDetails{
+			Address: lo.Return2(iotago.ParseBech32("rms19qqy3txhvnmzv53kgm2ueu30splfd5ct02cqvnehpdn04qgeskv9a3qpqgh3p7yy")),
+			Amount:  1_000_000_000_000_000,
+			Mana:    10_000_000,
+		},
 	),
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("feature", "rms"),
-			iotago.WithSupplyOptions(10_000_000_000, 100, 1, 10, 100, 100, 100),
+			iotago.WithSupplyOptions(4_600_000_000_000_000, 100, 1, 10, 100, 100, 100),
 			iotago.WithTimeProviderOptions(1697631694, 10, 13),
 			iotago.WithLivenessOptions(30, 30, 10, 20, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate

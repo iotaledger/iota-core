@@ -32,8 +32,8 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 	if state.chainID != nil {
 		t.AssertChainID(*state.chainID, nodes...)
 	}
-	if state.sybilProtectionCommitteeSlot != nil && state.sybilProtectionCommittee != nil {
-		t.AssertSybilProtectionCommittee(*state.sybilProtectionCommitteeSlot, *state.sybilProtectionCommittee, nodes...)
+	if state.sybilProtectionCommitteeEpoch != nil && state.sybilProtectionCommittee != nil {
+		t.AssertSybilProtectionCommittee(*state.sybilProtectionCommitteeEpoch, *state.sybilProtectionCommittee, nodes...)
 	}
 	if state.sybilProtectionOnlineCommittee != nil {
 		t.AssertSybilProtectionOnlineCommittee(*state.sybilProtectionOnlineCommittee, nodes...)
@@ -67,7 +67,7 @@ type NodeState struct {
 	latestFinalizedSlot              *iotago.SlotIndex
 	chainID                          *iotago.CommitmentID
 
-	sybilProtectionCommitteeSlot   *iotago.SlotIndex
+	sybilProtectionCommitteeEpoch  *iotago.EpochIndex
 	sybilProtectionCommittee       *[]iotago.AccountID
 	sybilProtectionOnlineCommittee *[]account.SeatIndex
 
@@ -130,9 +130,9 @@ func WithChainID(chainID iotago.CommitmentID) options.Option[NodeState] {
 	}
 }
 
-func WithSybilProtectionCommittee(slot iotago.SlotIndex, committee []iotago.AccountID) options.Option[NodeState] {
+func WithSybilProtectionCommittee(epoch iotago.EpochIndex, committee []iotago.AccountID) options.Option[NodeState] {
 	return func(state *NodeState) {
-		state.sybilProtectionCommitteeSlot = &slot
+		state.sybilProtectionCommitteeEpoch = &epoch
 		state.sybilProtectionCommittee = &committee
 	}
 }
