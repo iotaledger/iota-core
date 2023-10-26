@@ -16,10 +16,10 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (s *Server) ActiveRootBlocks(_ context.Context, _ *inx.NoParams) *inx.RootBlocksResponse {
+func (s *Server) ReadActiveRootBlocks(_ context.Context, _ *inx.NoParams) (*inx.RootBlocksResponse, error) {
 	activeRootBlocks := deps.Protocol.MainEngineInstance().EvictionState.ActiveRootBlocks()
 
-	return inx.WrapRootBlocks(activeRootBlocks)
+	return inx.WrapRootBlocks(activeRootBlocks), nil
 }
 
 func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlock, error) {

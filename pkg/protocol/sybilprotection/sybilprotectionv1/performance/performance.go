@@ -141,16 +141,19 @@ func (t *Tracker) ValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago.Ac
 }
 
 func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago.AccountID], error) {
+	candidates := ds.NewSet[iotago.AccountID]()
+
+	// Epoch 0 has no candidates as it's the genesis committee.
+	if epoch == 0 {
+		return candidates, nil
+	}
+
 	// we store candidates in the store for the epoch of their activity, but the passed argument points to the target epoch,
 	// so it's necessary to subtract one epoch from the passed value
-	// TODO: handle query for epoch 0
-
 	candidateStore, err := t.committeeCandidatesInEpochFunc(epoch - 1)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "error while retrieving candidates for epoch %d", epoch)
 	}
-
-	candidates := ds.NewSet[iotago.AccountID]()
 
 	var innerErr error
 	err = candidateStore.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
