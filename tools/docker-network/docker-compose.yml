@@ -193,7 +193,7 @@ services:
     restart: unless-stopped
     depends_on:
       node-1-validator:
-        condition: service_started
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -210,7 +210,7 @@ services:
     restart: unless-stopped
     depends_on:
       node-1-validator:
-        condition: service_started
+        condition: service_healthy
       inx-indexer:
         condition: service_started
     networks:
@@ -229,7 +229,7 @@ services:
     restart: unless-stopped
     depends_on:
       node-1-validator:
-        condition: service_started
+        condition: service_healthy
       inx-indexer:
         condition: service_started
       inx-blockissuer:
