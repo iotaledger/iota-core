@@ -88,18 +88,18 @@ func (b *BufferQueue) CreateIssuerQueue(issuerID iotago.AccountID) *IssuerQueue 
 	return issuerQueue
 }
 
-func (b *BufferQueue) GetOrCreateIssuerQueue(issuerID iotago.AccountID) (*IssuerQueue, bool) {
+func (b *BufferQueue) GetOrCreateIssuerQueue(issuerID iotago.AccountID) *IssuerQueue {
 	element, issuerActive := b.activeIssuers.Get(issuerID)
 	if !issuerActive {
 		// create new issuer queue
-		return b.CreateIssuerQueue(issuerID), true
+		return b.CreateIssuerQueue(issuerID)
 	}
 	issuerQueue, isIQ := element.Value.(*IssuerQueue)
 	if !isIQ {
 		panic("buffer contains elements that are not issuer queues")
 	}
 
-	return issuerQueue, false
+	return issuerQueue
 }
 
 // RemoveIssuerQueue removes all blocks (submitted and ready) for the given issuer and deletes the issuer queue.

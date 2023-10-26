@@ -568,10 +568,8 @@ func (s *Scheduler) removeIssuer(issuerID iotago.AccountID, err error) {
 }
 
 func (s *Scheduler) getOrCreateIssuer(accountID iotago.AccountID) *IssuerQueue {
-	issuerQueue, created := s.basicBuffer.GetOrCreateIssuerQueue(accountID)
-	if created {
-		s.deficits.Set(accountID, 0)
-	}
+	issuerQueue := s.basicBuffer.GetOrCreateIssuerQueue(accountID)
+	s.deficits.GetOrCreate(accountID, func() Deficit { return 0 })
 
 	return issuerQueue
 }
