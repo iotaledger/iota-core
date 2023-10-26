@@ -230,7 +230,7 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func(deps p2pDeps) p2pResult {
 		res := p2pResult{}
 
-		privKeyFilePath := filepath.Join(deps.P2PDatabasePath, "identity.key")
+		privKeyFilePath := filepath.Join(deps.P2PDatabasePath, IdentityPrivateKeyFileName)
 
 		// make sure nobody copies around the peer store since it contains the private key of the node
 		Component.LogInfof(`WARNING: never share your "%s" folder as it contains your node's private key!`, deps.P2PDatabasePath)
