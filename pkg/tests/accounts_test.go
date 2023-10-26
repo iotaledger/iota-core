@@ -380,26 +380,24 @@ func Test_ImplicitAccounts(t *testing.T) {
 		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
-	// CREATE IMPLICIT ACCOUNT FROM BASIC UTXO
+	// CREATE IMPLICIT ACCOUNT FROM GENESIS BASIC UTXO, SENT TO A NEW USER WALLET.
+	// this wallet is not registered in the ledger yet.
 	newUserWallet := mock.NewWallet(ts.Testing, "newUser", node1)
+	// a default wallet, already registered in the ledger, will issue the transaction and block.
 	tx1 := ts.DefaultWallet().CreateImplicitAccountFromInput(
 		"TX1",
 		"Genesis:0",
 		newUserWallet,
 	)
+	var block1Slot iotago.SlotIndex = 1
+	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, ts.DefaultWallet(), tx1)
+	latestParent := ts.CommitUntilSlot(block1Slot, block1)
 
 	implicitAccountOutput := newUserWallet.Output("TX1:0")
 	implicitAccountOutputID := implicitAccountOutput.OutputID()
 	implicitAccountID := iotago.AccountIDFromOutputID(implicitAccountOutputID)
-
-	var block1Slot iotago.SlotIndex = 1
-
-	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, ts.DefaultWallet(), tx1)
-
-	latestParent := ts.CommitUntilSlot(block1Slot, block1)
-
 	var implicitBlockIssuerKey iotago.BlockIssuerKey = iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(newUserWallet.ImplicitAccountCreationAddress())
-
+	// the new implicit account should now be registered in the accounts ledger.
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              implicitAccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
@@ -423,17 +421,14 @@ func Test_ImplicitAccounts(t *testing.T) {
 		),
 		mock.WithAccountAmount(mock.MinIssuerAccountAmount),
 	)
-
 	block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 	block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, newUserWallet, tx2, mock.WithStrongParents(latestParent.ID()))
-
 	latestParent = ts.CommitUntilSlot(block2Slot, block2)
 
 	fullAccountOutputID := newUserWallet.Output("TX2:0").OutputID()
-
 	allotted := iotago.BlockIssuanceCredits(tx2.Transaction.Allotments.Get(implicitAccountID))
 	burned := iotago.BlockIssuanceCredits(block2.WorkScore()) * iotago.BlockIssuanceCredits(block2Commitment.ReferenceManaCost)
-
+	// the implicit account should now have been transitioned to a full account in the accounts ledger.
 	ts.AssertAccountDiff(implicitAccountID, block2Slot, &model.AccountDiff{
 		BICChange:              allotted - burned,
 		PreviousUpdatedTime:    block1Slot,
@@ -448,7 +443,6 @@ func Test_ImplicitAccounts(t *testing.T) {
 		FixedCostChange:        0,
 		DelegationStakeChange:  0,
 	}, false, ts.Nodes()...)
-
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              implicitAccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(allotted-burned, block2Slot),
