@@ -203,7 +203,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 
 	l.events.StateDiffApplied.Trigger(slot, outputs, spends)
 
-	return l.utxoLedger.StateTreeRoot(), iotago.Identifier(stateDiff.Mutations().Root()), l.accountsLedger.AccountsTreeRoot(), nil
+	return l.utxoLedger.StateTreeRoot(), stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), nil
 }
 
 func (l *Ledger) AddAccount(output *utxoledger.Output, blockIssuanceCredits iotago.BlockIssuanceCredits) error {
@@ -254,6 +254,7 @@ func (l *Ledger) outputFromState(state mempool.State) *utxoledger.Output {
 }
 
 func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
+	//nolint:revive //false positive
 	if output, spent, err := l.OutputOrSpent(outputID); err != nil {
 		return nil, err
 	} else if spent != nil {

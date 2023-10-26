@@ -89,7 +89,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 				100,
 				100,
 			),
-			iotago.WithRewardsOptions(10, 8, 8, 31, 1154, 2, 1),
+			iotago.WithRewardsOptions(8, 8, 31, 1154, 2, 1),
 			iotago.WithStakingOptions(1, 100, 1),
 
 			iotago.WithTimeProviderOptions(
@@ -119,7 +119,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		t.ProtocolParameterOptions = append(defaultProtocolParameters, t.ProtocolParameterOptions...)
 		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(t.ProtocolParameterOptions...))
 
-		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(), time.Unix(t.API.ProtocolParameters().TimeProvider().GenesisUnixTime(), 0))
+		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(), time.Unix(t.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
 
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
@@ -332,11 +332,10 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.Validator.PublicKey)),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
-		}
-		if validator {
-			accountDetails.StakedAmount = accountDetails.Amount
-			accountDetails.StakingEpochEnd = iotago.MaxEpochIndex
-			accountDetails.FixedCost = iotago.Mana(0)
+			StakedAmount:         amount,
+			StakingEpochEnd:      iotago.MaxEpochIndex,
+			FixedCost:            iotago.Mana(0),
+			AccountID:            node.Validator.AccountID,
 		}
 
 		t.optsAccounts = append(t.optsAccounts, accountDetails)

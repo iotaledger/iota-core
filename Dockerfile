@@ -1,6 +1,5 @@
-ARG WITH_GO_WORK=0
 # https://hub.docker.com/_/golang
-FROM golang:1.21-bullseye AS base
+FROM golang:1.21-bookworm AS build
 
 ARG BUILD_TAGS=rocksdb
 
@@ -13,53 +12,28 @@ RUN mkdir /scratch /app
 
 WORKDIR /scratch
 
-FROM base AS env-with-go-work-0
-
-# Here we assume our build context is the parent directory of iota-core
-COPY . ./iota-core
-
-# We don't want go.work files to interfere in this build environment
-RUN rm -f /scratch/iota-core/go.work /scratch/iota-core/go.work.sum
-
-FROM base AS env-with-go-work-1
-
-COPY ./iota-core ./iota-core
-COPY ./iota.go ./iota.go
-COPY ./hive.go ./hive.go
-COPY ./inx/go ./inx/go
-COPY ./inx-app ./inx-app
-COPY ./go.work ./
-COPY ./go.work.sum ./
-
-FROM env-with-go-work-${WITH_GO_WORK} AS build
-
-WORKDIR /scratch/iota-core
+COPY . .
 
 # Ensure ca-certificates are up to date
 RUN update-ca-certificates
 
-ENV GOCACHE=/go/cache
-
 # Download go modules
-RUN --mount=type=cache,target=/go go mod download
-# Do not verify modules if we have local modules coming from go.work
-RUN --mount=type=cache,target=/go if [ "${WITH_GO_WORK}" = "0" ]; then go mod verify; fi
+RUN go mod download
+RUN go mod verify
 
 # Build the binary
-RUN --mount=type=cache,target=/go go build -o /app/iota-core -tags="$BUILD_TAGS" -ldflags='-w -s'
+RUN go build -o /app/iota-core -tags="$BUILD_TAGS" -ldflags='-w -s'
 
 # Copy the assets
 RUN cp ./config_defaults.json /app/config.json
 RUN cp ./peering.json /app/peering.json
 
-RUN mkdir -p /app/data/peerdb
-
 ############################
 # Runtime Image
 ############################
-# https://console.cloud.google.com/gcr/images/distroless/global/cc-debian11
+# https://console.cloud.google.com/gcr/images/distroless/global/cc-debian12
 # using distroless cc "nonroot" image, which includes everything in the base image (glibc, libssl and openssl)
-FROM gcr.io/distroless/cc-debian11:nonroot
+FROM gcr.io/distroless/cc-debian12:nonroot
 
 # Copy the app dir into distroless image
 COPY --chown=nonroot:nonroot --from=build /app /app

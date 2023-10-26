@@ -1,10 +1,10 @@
-package main
+package programs
 
 import (
 	"time"
 
+	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
 	"github.com/iotaledger/iota-core/tools/evil-spammer/spammer"
-	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
 )
 
 type QuickTestParams struct {
@@ -19,7 +19,7 @@ type QuickTestParams struct {
 
 // QuickTest runs short spamming periods with stable mps.
 func QuickTest(params *QuickTestParams) {
-	evilWallet := wallet.NewEvilWallet(wallet.WithClients(params.ClientURLs...))
+	evilWallet := evilwallet.NewEvilWallet(evilwallet.WithClients(params.ClientURLs...))
 	counter := spammer.NewErrorCount()
 	log.Info("Starting quick test")
 
@@ -41,8 +41,8 @@ func QuickTest(params *QuickTestParams) {
 		spammer.WithSpammingFunc(spammer.DataSpammingFunction),
 	)
 
-	dsScenario := wallet.NewEvilScenario(
-		wallet.WithScenarioCustomConflicts(wallet.NSpendBatch(2)),
+	dsScenario := evilwallet.NewEvilScenario(
+		evilwallet.WithScenarioCustomConflicts(evilwallet.NSpendBatch(2)),
 	)
 
 	//nolint:gocritic // we want a copy here

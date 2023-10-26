@@ -1,4 +1,4 @@
-package wallet
+package evilwallet
 
 import (
 	"sync"
@@ -7,36 +7,19 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/logger"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/models"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-var (
-	awaitOutputToBeConfirmed = 150 * time.Second
+const (
+	awaitOutputToBeConfirmed = 10 * time.Second
 )
-
-// Input contains details of an input.
-type Input struct {
-	OutputID iotago.OutputID
-	Address  iotago.Address
-}
-
-// Output contains details of an output ID.
-type Output struct {
-	OutputID iotago.OutputID
-	Address  iotago.Address
-	Index    uint64
-	Balance  iotago.BaseToken
-
-	OutputStruct iotago.Output
-}
-
-// Outputs is a list of Output.
-type Outputs []*Output
 
 // OutputManager keeps track of the output statuses.
 type OutputManager struct {
-	connector Connector
+	connector models.Connector
 
 	wallets           *Wallets
 	outputIDWalletMap map[string]*Wallet
@@ -44,17 +27,20 @@ type OutputManager struct {
 	// stores solid outputs per node
 	issuerSolidOutIDMap map[string]map[iotago.OutputID]types.Empty
 
+	log *logger.Logger
+
 	syncutils.RWMutex
 }
 
 // NewOutputManager creates an OutputManager instance.
-func NewOutputManager(connector Connector, wallets *Wallets) *OutputManager {
+func NewOutputManager(connector models.Connector, wallets *Wallets, log *logger.Logger) *OutputManager {
 	return &OutputManager{
 		connector:           connector,
 		wallets:             wallets,
 		outputIDWalletMap:   make(map[string]*Wallet),
 		outputIDAddrMap:     make(map[string]string),
 		issuerSolidOutIDMap: make(map[string]map[iotago.OutputID]types.Empty),
+		log:                 log,
 	}
 }
 
@@ -140,11 +126,11 @@ func (o *OutputManager) Track(outputIDs ...iotago.OutputID) (allConfirmed bool) 
 	return !unconfirmedOutputFound.Load()
 }
 
-// CreateOutputFromAddress creates output, retrieves outputID, and adds it to the wallet.
+// createOutputFromAddress creates output, retrieves outputID, and adds it to the wallet.
 // Provided address should be generated from provided wallet. Considers only first output found on address.
-func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519Address, balance iotago.BaseToken, outputID iotago.OutputID, outputStruct iotago.Output) *Output {
+func (o *OutputManager) createOutputFromAddress(w *Wallet, addr *iotago.Ed25519Address, balance iotago.BaseToken, outputID iotago.OutputID, outputStruct iotago.Output) *models.Output {
 	index := w.AddrIndexMap(addr.String())
-	out := &Output{
+	out := &models.Output{
 		Address:      addr,
 		Index:        index,
 		OutputID:     outputID,
@@ -159,9 +145,9 @@ func (o *OutputManager) CreateOutputFromAddress(w *Wallet, addr *iotago.Ed25519A
 }
 
 // AddOutput adds existing output from wallet w to the OutputManager.
-func (o *OutputManager) AddOutput(w *Wallet, output *Output) *Output {
+func (o *OutputManager) AddOutput(w *Wallet, output *models.Output) *models.Output {
 	idx := w.AddrIndexMap(output.Address.String())
-	out := &Output{
+	out := &models.Output{
 		Address:      output.Address,
 		Index:        idx,
 		OutputID:     output.OutputID,
@@ -177,7 +163,7 @@ func (o *OutputManager) AddOutput(w *Wallet, output *Output) *Output {
 
 // GetOutput returns the Output of the given outputID.
 // Firstly checks if output can be retrieved by outputManager from wallet, if not does an API call.
-func (o *OutputManager) GetOutput(outputID iotago.OutputID) (output *Output) {
+func (o *OutputManager) GetOutput(outputID iotago.OutputID) (output *models.Output) {
 	output = o.getOutputFromWallet(outputID)
 
 	// get output info via web api
@@ -193,7 +179,7 @@ func (o *OutputManager) GetOutput(outputID iotago.OutputID) (output *Output) {
 			return nil
 		}
 
-		output = &Output{
+		output = &models.Output{
 			OutputID:     outputID,
 			Address:      basicOutput.UnlockConditionSet().Address().Address,
 			Balance:      basicOutput.BaseTokenAmount(),
@@ -204,7 +190,7 @@ func (o *OutputManager) GetOutput(outputID iotago.OutputID) (output *Output) {
 	return output
 }
 
-func (o *OutputManager) getOutputFromWallet(outputID iotago.OutputID) (output *Output) {
+func (o *OutputManager) getOutputFromWallet(outputID iotago.OutputID) (output *models.Output) {
 	o.RLock()
 	defer o.RUnlock()
 	w, ok := o.outputIDWalletMap[outputID.ToHex()]
@@ -289,6 +275,8 @@ func (o *OutputManager) AwaitTransactionsConfirmation(txIDs ...iotago.Transactio
 	wg := sync.WaitGroup{}
 	semaphore := make(chan bool, 1)
 
+	o.log.Debugf("Awaiting confirmation of %d transactions", len(txIDs))
+
 	for _, txID := range txIDs {
 		wg.Add(1)
 		go func(txID iotago.TransactionID) {
@@ -312,8 +300,9 @@ func (o *OutputManager) AwaitTransactionToBeAccepted(txID iotago.TransactionID, 
 	clt := o.connector.GetClient()
 	var accepted bool
 	for ; time.Since(s) < waitFor; time.Sleep(awaitConfirmationSleep) {
-		// TODO: need to change to pending for now
-		if confirmationState := clt.GetTransactionConfirmationState(txID); confirmationState == "confirmed" || confirmationState == "finalized" {
+		confirmationState := clt.GetTransactionConfirmationState(txID)
+		o.log.Debugf("Tx %s confirmationState: %s", txID.ToHex(), confirmationState)
+		if confirmationState == "confirmed" || confirmationState == "finalized" {
 			accepted = true
 			break
 		}
@@ -322,11 +311,13 @@ func (o *OutputManager) AwaitTransactionToBeAccepted(txID iotago.TransactionID, 
 		return ierrors.Errorf("transaction %s not accepted in time", txID)
 	}
 
+	o.log.Debugf("Transaction %s accepted", txID)
+
 	return nil
 }
 
 // AwaitOutputToBeSolid awaits for solidification of a single output by provided clt.
-func (o *OutputManager) AwaitOutputToBeSolid(outID iotago.OutputID, clt Client, waitFor time.Duration) error {
+func (o *OutputManager) AwaitOutputToBeSolid(outID iotago.OutputID, clt models.Client, waitFor time.Duration) error {
 	s := time.Now()
 	var solid bool
 
@@ -350,7 +341,7 @@ func (o *OutputManager) AwaitOutputToBeSolid(outID iotago.OutputID, clt Client, 
 }
 
 // AwaitOutputsToBeSolid awaits for all provided outputs are solid for a provided client.
-func (o *OutputManager) AwaitOutputsToBeSolid(outputs iotago.OutputIDs, clt Client, maxGoroutines int) (allSolid bool) {
+func (o *OutputManager) AwaitOutputsToBeSolid(outputs iotago.OutputIDs, clt models.Client, maxGoroutines int) (allSolid bool) {
 	wg := sync.WaitGroup{}
 	semaphore := make(chan bool, maxGoroutines)
 	allSolid = true

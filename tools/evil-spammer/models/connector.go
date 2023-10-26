@@ -1,8 +1,10 @@
-package wallet
+package models
 
 import (
 	"context"
 	"time"
+
+	"github.com/google/martian/log"
 
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -51,8 +53,14 @@ type WebClients struct {
 // NewWebClients creates Connector from provided GoShimmerAPI urls.
 func NewWebClients(urls []string, setters ...options.Option[WebClient]) *WebClients {
 	clients := make([]*WebClient, len(urls))
+	var err error
 	for i, url := range urls {
-		clients[i] = NewWebClient(url, setters...)
+		clients[i], err = NewWebClient(url, setters...)
+		if err != nil {
+			log.Errorf("failed to create client for url %s: %s", url, err)
+
+			return nil
+		}
 	}
 
 	return &WebClients{
@@ -134,7 +142,12 @@ func (c *WebClients) AddClient(url string, setters ...options.Option[WebClient])
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	clt := NewWebClient(url, setters...)
+	clt, err := NewWebClient(url, setters...)
+	if err != nil {
+		log.Errorf("failed to create client for url %s: %s", url, err)
+
+		return
+	}
 	c.clients = append(c.clients, clt)
 	c.urls = append(c.urls, url)
 }
@@ -159,10 +172,12 @@ func (c *WebClients) RemoveClient(url string) {
 }
 
 type Client interface {
+	Client() *nodeclient.Client
+	Indexer() (nodeclient.IndexerClient, error)
 	// URL returns a client API url.
 	URL() (cltID string)
-	// PostTransaction sends a transaction to the Tangle via a given client.
-	PostTransaction(tx *iotago.SignedTransaction) (iotago.BlockID, error)
+	// PostBlock sends a block to the Tangle via a given client.
+	PostBlock(block *iotago.ProtocolBlock) (iotago.BlockID, error)
 	// PostData sends the given data (payload) by creating a block in the backend.
 	PostData(data []byte) (blkID string, err error)
 	// GetTransactionConfirmationState returns the AcceptanceState of a given transaction ID.
@@ -174,7 +189,9 @@ type Client interface {
 	// GetTransaction gets the transaction.
 	GetTransaction(txID iotago.TransactionID) (resp *iotago.SignedTransaction, err error)
 	// GetBlockIssuance returns the latest commitment and data needed to create a new block.
-	GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error)
+	GetBlockIssuance(...iotago.SlotIndex) (resp *apimodels.IssuanceBlockHeaderResponse, err error)
+	// GetCongestion returns congestion data such as rmc or issuing readiness.
+	GetCongestion(id iotago.AccountID) (resp *apimodels.CongestionResponse, err error)
 
 	iotago.APIProvider
 }
@@ -185,8 +202,20 @@ type WebClient struct {
 	url    string
 }
 
+func (c *WebClient) Client() *nodeclient.Client {
+	return c.client
+}
+
+func (c *WebClient) Indexer() (nodeclient.IndexerClient, error) {
+	return c.client.Indexer(context.Background())
+}
+
 func (c *WebClient) APIForVersion(version iotago.Version) (iotago.API, error) {
 	return c.client.APIForVersion(version)
+}
+
+func (c *WebClient) APIForTime(t time.Time) iotago.API {
+	return c.client.APIForTime(t)
 }
 
 func (c *WebClient) APIForSlot(index iotago.SlotIndex) iotago.API {
@@ -197,8 +226,8 @@ func (c *WebClient) APIForEpoch(index iotago.EpochIndex) iotago.API {
 	return c.client.APIForEpoch(index)
 }
 
-func (c *WebClient) CurrentAPI() iotago.API {
-	return c.client.CurrentAPI()
+func (c *WebClient) CommittedAPI() iotago.API {
+	return c.client.CommittedAPI()
 }
 
 func (c *WebClient) LatestAPI() iotago.API {
@@ -211,37 +240,22 @@ func (c *WebClient) URL() string {
 }
 
 // NewWebClient creates Connector from provided iota-core API urls.
-func NewWebClient(url string, opts ...options.Option[WebClient]) *WebClient {
+func NewWebClient(url string, opts ...options.Option[WebClient]) (*WebClient, error) {
+	var initErr error
 	return options.Apply(&WebClient{
 		url: url,
 	}, opts, func(w *WebClient) {
-		w.client, _ = nodeclient.New(w.url)
-	})
+		w.client, initErr = nodeclient.New(w.url)
+	}), initErr
 }
 
-// PostTransaction sends a transaction to the Tangle via a given client.
-func (c *WebClient) PostTransaction(tx *iotago.SignedTransaction) (blockID iotago.BlockID, err error) {
-	blockBuilder := builder.NewBasicBlockBuilder(c.client.CurrentAPI())
-
-	blockBuilder.Payload(tx)
-	blockBuilder.IssuingTime(time.Time{})
-
-	blk, err := blockBuilder.Build()
-	if err != nil {
-		return iotago.EmptyBlockID, err
-	}
-
-	id, err := c.client.SubmitBlock(context.Background(), blk)
-	if err != nil {
-		return
-	}
-
-	return id, nil
+func (c *WebClient) PostBlock(block *iotago.ProtocolBlock) (blockID iotago.BlockID, err error) {
+	return c.client.SubmitBlock(context.Background(), block)
 }
 
 // PostData sends the given data (payload) by creating a block in the backend.
 func (c *WebClient) PostData(data []byte) (blkID string, err error) {
-	blockBuilder := builder.NewBasicBlockBuilder(c.client.CurrentAPI())
+	blockBuilder := builder.NewBasicBlockBuilder(c.client.CommittedAPI())
 	blockBuilder.IssuingTime(time.Time{})
 
 	blockBuilder.Payload(&iotago.TaggedData{
@@ -305,11 +319,10 @@ func (c *WebClient) GetTransaction(txID iotago.TransactionID) (tx *iotago.Signed
 	return tx, nil
 }
 
-func (c *WebClient) GetBlockIssuance() (resp *apimodels.IssuanceBlockHeaderResponse, err error) {
-	resp, err = c.client.BlockIssuance(context.Background())
-	if err != nil {
-		return
-	}
+func (c *WebClient) GetBlockIssuance(slotIndex ...iotago.SlotIndex) (resp *apimodels.IssuanceBlockHeaderResponse, err error) {
+	return c.client.BlockIssuance(context.Background(), slotIndex...)
+}
 
-	return
+func (c *WebClient) GetCongestion(accountID iotago.AccountID) (resp *apimodels.CongestionResponse, err error) {
+	return c.client.Congestion(context.Background(), accountID)
 }

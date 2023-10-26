@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Create a function to join an array of strings by a given character
 function join { local IFS="$1"; shift; echo "$*"; }
@@ -26,17 +27,19 @@ echo "Build iota-core"
 
 # Setup necessary environment variables.
 export DOCKER_BUILD_CONTEXT="../../"
-export DOCKERFILE_PATH="./Dockerfile"
+export DOCKERFILE_PATH="./Dockerfile.dev"
 
 if [[ "$WITH_GO_WORK" -eq 1 ]]
 then
   export DOCKER_BUILD_CONTEXT="../../../"
-  export DOCKERFILE_PATH="./iota-core/Dockerfile"
+  export DOCKERFILE_PATH="./iota-core/Dockerfile.dev"
 fi
 
 # Allow docker compose to build and cache an image
 echo $DOCKER_BUILD_CONTEXT $DOCKERFILE_PATH
 docker compose -f $DOCKER_COMPOSE_FILE build --build-arg WITH_GO_WORK=${WITH_GO_WORK:-0} --build-arg DOCKER_BUILD_CONTEXT=${DOCKER_BUILD_CONTEXT} --build-arg DOCKERFILE_PATH=${DOCKERFILE_PATH}
+
+docker compose pull inx-indexer inx-blockissuer inx-faucet
 
 # check exit code of builder
 if [ $? -ne 0 ]

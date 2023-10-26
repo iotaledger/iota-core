@@ -1,11 +1,11 @@
-package main
+package interactive
 
 import (
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/iotaledger/iota-core/tools/evil-spammer/wallet"
+	"github.com/iotaledger/iota-core/tools/evil-spammer/evilwallet"
 )
 
 // region Printer /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,8 +63,8 @@ func (p *Printer) printBanner() {
 func (p *Printer) EvilWalletStatus() {
 	p.PrintTopLine()
 	p.Println(p.colorString("Evil Wallet status:", "cyan"), level2)
-	p.PrintlnPoint(fmt.Sprintf("Available faucet outputs: %d", p.mode.evilWallet.UnspentOutputsLeft(wallet.Fresh)), level2)
-	p.PrintlnPoint(fmt.Sprintf("Available reuse outputs: %d", p.mode.evilWallet.UnspentOutputsLeft(wallet.Reuse)), level2)
+	p.PrintlnPoint(fmt.Sprintf("Available faucet outputs: %d", p.mode.evilWallet.UnspentOutputsLeft(evilwallet.Fresh)), level2)
+	p.PrintlnPoint(fmt.Sprintf("Available reuse outputs: %d", p.mode.evilWallet.UnspentOutputsLeft(evilwallet.Reuse)), level2)
 	p.PrintlnPoint(fmt.Sprintf("Spammed blocks: %d", p.mode.blkSent.Load()), level2)
 	p.PrintlnPoint(fmt.Sprintf("Spammed transactions: %d", p.mode.txSent.Load()), level2)
 	p.PrintlnPoint(fmt.Sprintf("Spammed scenario batches: %d", p.mode.scenariosSent.Load()), level2)

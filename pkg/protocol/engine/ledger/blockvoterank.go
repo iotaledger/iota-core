@@ -24,7 +24,7 @@ func (v BlockVoteRank) Compare(other BlockVoteRank) int {
 		return -1
 	} else if v.time.After(other.time) {
 		return 1
-	} else {
-		return bytes.Compare(v.blockID[:], other.blockID[:])
 	}
+
+	return bytes.Compare(v.blockID[:], other.blockID[:])
 }
