@@ -13,7 +13,7 @@ import (
 func getOutput(c echo.Context) (*apimodels.OutputResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse output ID %s: %s", c.Param(restapipkg.ParameterOutputID), err)
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
 	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
@@ -30,7 +30,7 @@ func getOutput(c echo.Context) (*apimodels.OutputResponse, error) {
 func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadata, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse output ID %s: %s", c.Param(restapipkg.ParameterOutputID), err)
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
 	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
@@ -48,7 +48,7 @@ func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadata, error) {
 func getOutputWithMetadata(c echo.Context) (*apimodels.OutputWithMetadataResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse output ID %s: %s", c.Param(restapipkg.ParameterOutputID), err)
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
 	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)

@@ -13,7 +13,7 @@ import (
 func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
 	commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
 	if err != nil {
-		return iotago.SlotIndex(0), ierrors.Wrapf(echo.ErrBadRequest, "failed to parse commitment ID %s: %s", c.Param(restapipkg.ParameterCommitmentID), err)
+		return iotago.SlotIndex(0), ierrors.Wrapf(err, "failed to parse commitment ID %s", c.Param(restapipkg.ParameterCommitmentID))
 	}
 
 	return commitmentID.Slot(), nil

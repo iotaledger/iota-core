@@ -19,7 +19,7 @@ import (
 func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse account ID %s: %s", c.Param(restapipkg.ParameterAccountID), err)
+		return nil, err
 	}
 
 	commitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
@@ -46,7 +46,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	if len(c.QueryParam(restapipkg.QueryParameterPageSize)) > 0 {
 		pageSize, err = httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse page size %s : %s", c.Param(restapipkg.QueryParameterPageSize), err)
+			return nil, ierrors.Wrapf(err, "failed to parse page size %s", c.Param(restapipkg.QueryParameterPageSize))
 		}
 		if pageSize > restapi.ParamsRestAPI.MaxPageSize {
 			pageSize = restapi.ParamsRestAPI.MaxPageSize
@@ -59,7 +59,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	if len(c.QueryParam(restapipkg.QueryParameterCursor)) != 0 {
 		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse cursor %s: %s", c.Param(restapipkg.QueryParameterCursor), err)
+			return nil, ierrors.Wrapf(err, "failed to parse cursor %s", c.Param(restapipkg.QueryParameterCursor))
 		}
 	}
 
@@ -98,7 +98,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse account ID %s: %s", c.Param(restapipkg.ParameterAccountID), err)
+		return nil, ierrors.Wrapf(err, "failed to parse account ID %s", c.Param(restapipkg.ParameterAccountID))
 	}
 	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
@@ -127,7 +127,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse output ID %s: %s", c.Param(restapipkg.ParameterOutputID), err)
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
 	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)

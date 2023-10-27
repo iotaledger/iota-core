@@ -15,7 +15,7 @@ import (
 func blockByID(c echo.Context) (*model.Block, error) {
 	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse block ID %s: %s", c.Param(restapi.ParameterBlockID), err)
+		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(restapi.ParameterBlockID))
 	}
 
 	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
@@ -38,7 +38,7 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataRes
 func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
 	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse block ID %s: %s", c.Param(restapi.ParameterBlockID), err)
+		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(restapi.ParameterBlockID))
 	}
 
 	return blockMetadataByBlockID(blockID)
@@ -77,7 +77,7 @@ func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHe
 func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 	iotaBlock, err := httpserver.ParseRequestByHeader(c, deps.Protocol.CommittedAPI(), iotago.ProtocolBlockFromBytes(deps.Protocol))
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to parse iotablock: %s", err)
+		return nil, ierrors.Wrapf(err, "failed to parse iotablock")
 	}
 
 	blockID, err := deps.BlockHandler.AttachBlock(c.Request().Context(), iotaBlock)
