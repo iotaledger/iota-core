@@ -28,6 +28,8 @@ func New(store kvstore.KVStore, apiProvider iotago.APIProvider) *Manager {
 	return &Manager{
 		store: store,
 		stateTree: ads.NewMap[iotago.Identifier](lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{StoreKeyPrefixStateTree})),
+			iotago.Identifier.Bytes,
+			iotago.IdentifierFromBytes,
 			iotago.OutputID.Bytes,
 			iotago.OutputIDFromBytes,
 			(*stateTreeMetadata).Bytes,

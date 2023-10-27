@@ -7,7 +7,9 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -21,12 +23,14 @@ type SlotDiff struct {
 	Spents Spents
 }
 
-func slotDiffKeyForIndex(index iotago.SlotIndex) []byte {
-	m := marshalutil.New(iotago.SlotIndexLength + 1)
-	m.WriteByte(StoreKeyPrefixSlotDiffs)
-	m.WriteBytes(index.MustBytes())
+func slotDiffKeyForIndex(slot iotago.SlotIndex) []byte {
+	byteBuffer := stream.NewByteBuffer(serializer.OneByte + iotago.SlotIndexLength)
 
-	return m.Bytes()
+	// There can't be any errors.
+	_ = stream.Write(byteBuffer, StoreKeyPrefixSlotDiffs)
+	_ = stream.Write(byteBuffer, slot)
+
+	return lo.PanicOnErr(byteBuffer.Bytes())
 }
 
 func (sd *SlotDiff) KVStorableKey() []byte {
@@ -34,40 +38,48 @@ func (sd *SlotDiff) KVStorableKey() []byte {
 }
 
 func (sd *SlotDiff) KVStorableValue() []byte {
-	m := marshalutil.New()
+	byteBuffer := stream.NewByteBuffer()
 
-	m.WriteUint32(uint32(len(sd.Outputs)))
-	for _, output := range sd.sortedOutputs() {
-		m.WriteBytes(output.outputID[:])
-	}
+	// There can't be any errors.
+	_ = stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
+		for _, output := range sd.sortedOutputs() {
+			_ = stream.Write(byteBuffer, output.outputID)
+		}
 
-	m.WriteUint32(uint32(len(sd.Spents)))
-	for _, spent := range sd.sortedSpents() {
-		m.WriteBytes(spent.output.outputID[:])
-	}
+		return len(sd.Outputs), nil
+	})
 
-	return m.Bytes()
+	_ = stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
+		for _, spent := range sd.sortedSpents() {
+			_ = stream.Write(byteBuffer, spent.output.outputID)
+		}
+
+		return len(sd.Spents), nil
+	})
+
+	return lo.PanicOnErr(byteBuffer.Bytes())
 }
 
 // note that this method relies on the data being available within other "tables".
 func (sd *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) error {
-	slot, _, err := iotago.SlotIndexFromBytes(key[1:])
-	if err != nil {
+	var err error
+
+	if sd.Slot, _, err = iotago.SlotIndexFromBytes(key[1:]); err != nil {
 		return err
 	}
 
-	marshalUtil := marshalutil.New(value)
+	byteReader := stream.NewByteReader(value)
 
-	outputCount, err := marshalUtil.ReadUint32()
+	outputsCount, err := stream.PeekCollectionSize(byteReader, serializer.SeriLengthPrefixTypeAsUint32)
 	if err != nil {
-		return err
+		return ierrors.Wrap(err, "unable to peek outputs count")
 	}
 
-	outputs := make(Outputs, int(outputCount))
-	for i := 0; i < int(outputCount); i++ {
-		var outputID iotago.OutputID
-		if outputID, err = ParseOutputID(marshalUtil); err != nil {
-			return err
+	outputs := make(Outputs, outputsCount)
+	if err = stream.ReadCollection(byteReader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
+		outputID, err := stream.Read[iotago.OutputID](byteReader)
+		if err != nil {
+			return ierrors.Wrap(err, "unable to read outputID")
 		}
 
 		output, err := manager.ReadOutputByOutputIDWithoutLocking(outputID)
@@ -76,18 +88,22 @@ func (sd *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) e
 		}
 
 		outputs[i] = output
+
+		return nil
+	}); err != nil {
+		return ierrors.Wrapf(err, "unable to read slot diff outputs")
 	}
 
-	spentCount, err := marshalUtil.ReadUint32()
+	spentsCount, err := stream.PeekCollectionSize(byteReader, serializer.SeriLengthPrefixTypeAsUint32)
 	if err != nil {
-		return err
+		return ierrors.Wrap(err, "unable to peek spents count")
 	}
 
-	spents := make(Spents, spentCount)
-	for i := 0; i < int(spentCount); i++ {
-		var outputID iotago.OutputID
-		if outputID, err = ParseOutputID(marshalUtil); err != nil {
-			return err
+	spents := make(Spents, spentsCount)
+	if err = stream.ReadCollection(byteReader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
+		outputID, err := stream.Read[iotago.OutputID](byteReader)
+		if err != nil {
+			return ierrors.Wrap(err, "unable to read outputID")
 		}
 
 		spent, err := manager.ReadSpentForOutputIDWithoutLocking(outputID)
@@ -96,9 +112,12 @@ func (sd *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) e
 		}
 
 		spents[i] = spent
+
+		return nil
+	}); err != nil {
+		return ierrors.Wrapf(err, "unable to read slot diff spents")
 	}
 
-	sd.Slot = slot
 	sd.Outputs = outputs
 	sd.Spents = spents
 

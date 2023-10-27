@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -14,16 +14,7 @@ import (
 // Helpers to serialize/deserialize into/from snapshots
 
 func (o *Output) SnapshotBytes() []byte {
-	m := marshalutil.New()
-	m.WriteBytes(o.outputID[:])
-	m.WriteBytes(o.blockID[:])
-	m.WriteUint32(uint32(o.slotBooked))
-	m.WriteUint32(uint32(len(o.encodedOutput)))
-	m.WriteBytes(o.encodedOutput)
-	m.WriteUint32(uint32(len(o.encodedProof)))
-	m.WriteBytes(o.encodedProof)
-
-	return m.Bytes()
+	return byteutils.ConcatBytes(o.outputID[:], o.KVStorableValue())
 }
 
 func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider) (*Output, error) {
@@ -76,12 +67,9 @@ func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvid
 }
 
 func (s *Spent) SnapshotBytes() []byte {
-	m := marshalutil.New()
-	m.WriteBytes(s.Output().SnapshotBytes())
-	m.WriteBytes(s.transactionIDSpent[:])
-
 	// we don't need to write indexSpent because this info is available in the milestoneDiff that consumes the output
-	return m.Bytes()
+
+	return byteutils.ConcatBytes(s.Output().SnapshotBytes(), s.transactionIDSpent[:])
 }
 
 func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider, indexSpent iotago.SlotIndex) (*Spent, error) {
