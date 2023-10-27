@@ -18,7 +18,7 @@ type SignaledBlock struct {
 func NewSignaledBlock(blockID iotago.BlockID, block *iotago.Block, validationBlock *iotago.ValidationBlockBody) *SignaledBlock {
 	return &SignaledBlock{
 		ID:                      blockID,
-		IssuingTime:             block.IssuingTime,
+		IssuingTime:             block.Header.IssuingTime,
 		HighestSupportedVersion: validationBlock.HighestSupportedVersion,
 		ProtocolParametersHash:  validationBlock.ProtocolParametersHash,
 	}

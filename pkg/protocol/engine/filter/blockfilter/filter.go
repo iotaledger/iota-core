@@ -68,10 +68,10 @@ func New(apiProvider iotago.APIProvider, opts ...options.Option[Filter]) *Filter
 func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 	// Verify the block's version corresponds to the protocol version for the slot.
 	apiForSlot := f.apiProvider.APIForSlot(block.ID().Slot())
-	if apiForSlot.Version() != block.ProtocolBlock().ProtocolVersion {
+	if apiForSlot.Version() != block.ProtocolBlock().Header.ProtocolVersion {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
-			Reason: ierrors.Wrapf(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().ProtocolVersion, apiForSlot.Version(), apiForSlot.TimeProvider().EpochFromSlot(block.ID().Slot())),
+			Reason: ierrors.Wrapf(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().Header.ProtocolVersion, apiForSlot.Version(), apiForSlot.TimeProvider().EpochFromSlot(block.ID().Slot())),
 			Source: source,
 		})
 
@@ -79,7 +79,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 	}
 
 	// Verify the timestamp is not too far in the future.
-	timeDelta := time.Since(block.ProtocolBlock().IssuingTime)
+	timeDelta := time.Since(block.ProtocolBlock().Header.IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
 		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 			Block:  block,
@@ -91,7 +91,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 	}
 
 	if _, isValidation := block.ValidationBlock(); isValidation {
-		blockSlot := block.ProtocolBlock().API.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
+		blockSlot := block.ProtocolBlock().API.TimeProvider().SlotFromTime(block.ProtocolBlock().Header.IssuingTime)
 		committee, exists := f.committeeFunc(blockSlot)
 		if !exists {
 			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
@@ -103,10 +103,10 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 			return
 		}
 
-		if !committee.HasAccount(block.ProtocolBlock().IssuerID) {
+		if !committee.HasAccount(block.ProtocolBlock().Header.IssuerID) {
 			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().IssuerID, blockSlot),
+				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().Header.IssuerID, blockSlot),
 				Source: source,
 			})
 

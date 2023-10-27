@@ -105,7 +105,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 	var payloadJSON []byte
 	basicBlock, isBasic := block.BasicBlock()
 	if isBasic {
-		payloadJSON, err = lo.PanicOnErr(deps.Protocol.APIForVersion(iotaBlk.ProtocolVersion)).JSONEncode(basicBlock.Payload)
+		payloadJSON, err = lo.PanicOnErr(deps.Protocol.APIForVersion(iotaBlk.Header.ProtocolVersion)).JSONEncode(basicBlock.Payload)
 		if err != nil {
 			return nil
 		}
@@ -113,12 +113,12 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 
 	t := &ExplorerBlock{
 		ID:                      block.ID().ToHex(),
-		NetworkID:               iotaBlk.NetworkID,
-		ProtocolVersion:         iotaBlk.ProtocolVersion,
+		NetworkID:               iotaBlk.Header.NetworkID,
+		ProtocolVersion:         iotaBlk.Header.ProtocolVersion,
 		SolidificationTimestamp: 0,
-		IssuanceTimestamp:       iotaBlk.IssuingTime.Unix(),
+		IssuanceTimestamp:       iotaBlk.Header.IssuingTime.Unix(),
 		SequenceNumber:          0,
-		IssuerID:                iotaBlk.IssuerID.ToHex(),
+		IssuerID:                iotaBlk.Header.IssuerID.ToHex(),
 		Signature:               hexutil.EncodeHex(sigBytes),
 		StrongParents:           iotaBlk.Body.StrongParentIDs().ToHex(),
 		WeakParents:             iotaBlk.Body.WeakParentIDs().ToHex(),
@@ -152,8 +152,8 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 
 			return ""
 		}(),
-		CommitmentID:        iotaBlk.SlotCommitmentID.ToHex(),
-		LatestConfirmedSlot: uint64(iotaBlk.LatestFinalizedSlot),
+		CommitmentID:        iotaBlk.Header.SlotCommitmentID.ToHex(),
+		LatestConfirmedSlot: uint64(iotaBlk.Header.LatestFinalizedSlot),
 	}
 
 	if cachedBlock != nil {

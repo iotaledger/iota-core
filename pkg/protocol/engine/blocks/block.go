@@ -232,7 +232,7 @@ func (b *Block) IssuingTime() time.Time {
 		return b.rootBlock.issuingTime
 	}
 
-	return b.modelBlock.ProtocolBlock().IssuingTime
+	return b.modelBlock.ProtocolBlock().Header.IssuingTime
 }
 
 func (b *Block) SlotCommitmentID() iotago.CommitmentID {
@@ -247,7 +247,7 @@ func (b *Block) SlotCommitmentID() iotago.CommitmentID {
 		return b.rootBlock.commitmentID
 	}
 
-	return b.modelBlock.ProtocolBlock().SlotCommitmentID
+	return b.modelBlock.ProtocolBlock().Header.SlotCommitmentID
 }
 
 // IsMissing returns a flag that indicates if the underlying Block data hasn't been stored, yet.

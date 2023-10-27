@@ -156,7 +156,7 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) error {
 		return ierrors.Errorf("committee for slot %d does not exist", block.ID().Slot())
 	}
 	// Only track attestations of active committee members.
-	if _, exists := committee.GetSeat(block.ProtocolBlock().IssuerID); !exists {
+	if _, exists := committee.GetSeat(block.ProtocolBlock().Header.IssuerID); !exists {
 		return nil
 	}
 
@@ -171,7 +171,7 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) error {
 	newAttestation := iotago.NewAttestation(m.apiProvider.APIForSlot(block.ID().Slot()), block.ProtocolBlock())
 
 	// We keep only the latest attestation for each committee member.
-	m.futureAttestations.Get(block.ID().Slot(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
+	m.futureAttestations.Get(block.ID().Slot(), true).Compute(block.ProtocolBlock().Header.IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
 		if !exists {
 			return newAttestation
 		}
