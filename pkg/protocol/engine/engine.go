@@ -216,6 +216,7 @@ func New(
 				}
 			}
 		},
+		(*Engine).Reset,
 		(*Engine).TriggerInitialized,
 	)
 }

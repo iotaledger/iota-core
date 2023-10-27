@@ -40,50 +40,70 @@ func (s *Storage) Blocks(slot iotago.SlotIndex) (*slotstore.Blocks, error) {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (s *Storage) Reset() {
-	s.lastAccessedBlocks.Compute(func(lastAccessedBlocks iotago.SlotIndex) iotago.SlotIndex {
-		latestCommittedSlot := s.Settings().LatestCommitment().Slot()
-
-		for slot := latestCommittedSlot + 1; slot <= lastAccessedBlocks; slot++ {
-			if blocksForSlot, err := s.prunable.Blocks(slot); err != nil {
-				s.errorHandler(ierrors.Wrapf(err, "failed to clear blocks at slot %d", slot))
-			} else if err = blocksForSlot.Clear(); err != nil {
-				s.errorHandler(ierrors.Wrapf(err, "failed to clear blocks at slot %d", slot))
-			}
-		}
-
-		return latestCommittedSlot
-	})
+	s.Rollback(s.Settings().LatestCommitment().Slot())
 }
 
 func (s *Storage) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
+	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
+		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing root blocks")
+	}
+
 	return s.prunable.RootBlocks(slot)
 }
 
 func (s *Storage) Mutations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
+	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
+		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing mutations")
+	}
+
 	return s.prunable.Mutations(slot)
 }
 
 func (s *Storage) Attestations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
+	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
+		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing attestations")
+	}
+
 	return s.prunable.Attestations(slot)
 }
 
 func (s *Storage) AccountDiffs(slot iotago.SlotIndex) (*slotstore.AccountDiffs, error) {
+	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
+		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing account diffs")
+	}
+
 	return s.prunable.AccountDiffs(slot)
 }
 
 func (s *Storage) ValidatorPerformances(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error) {
+	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
+		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing validator performances")
+	}
+
 	return s.prunable.ValidatorPerformances(slot)
 }
 
 func (s *Storage) UpgradeSignals(slot iotago.SlotIndex) (*slotstore.Store[account.SeatIndex, *model.SignaledBlock], error) {
+	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
+		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing upgrade signals")
+	}
+
 	return s.prunable.UpgradeSignals(slot)
 }
 
 func (s *Storage) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.CommitmentID, *iotago.Roots], error) {
+	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
+		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing roots")
+	}
+
 	return s.prunable.Roots(slot)
 }
 
 func (s *Storage) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
+	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
+		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing retainer")
+	}
+
 	return s.prunable.Retainer(slot)
 }
 
@@ -100,6 +120,22 @@ func (s *Storage) RestoreFromDisk() {
 	s.lastPrunedEpoch.MarkEvicted(lastPrunedEpoch)
 }
 
-func (s *Storage) RollbackPrunable(targetIndex iotago.SlotIndex) error {
-	return s.prunable.Rollback(targetIndex)
+func (s *Storage) Rollback(targetSlot iotago.SlotIndex) error {
+	if err := s.prunable.Rollback(s.pruningRange(targetSlot)); err != nil {
+		return ierrors.Wrapf(err, "failed to rollback prunable storage to slot %d", targetSlot)
+	}
+
+	return nil
+}
+
+func (s *Storage) pruningRange(targetSlot iotago.SlotIndex) (targetEpoch iotago.EpochIndex, pruneRange [2]iotago.SlotIndex) {
+	epochOfSlot := func(slot iotago.SlotIndex) iotago.EpochIndex {
+		return s.Settings().APIProvider().APIForSlot(slot).TimeProvider().EpochFromSlot(slot)
+	}
+
+	if targetEpoch, pruneRange = epochOfSlot(targetSlot), [2]iotago.SlotIndex{targetSlot + 1, s.Settings().LatestStoredSlot()}; epochOfSlot(pruneRange[0]) > targetEpoch {
+		pruneRange[1] = s.Settings().APIProvider().APIForEpoch(targetEpoch).TimeProvider().EpochEnd(targetEpoch)
+	}
+
+	return targetEpoch, pruneRange
 }
