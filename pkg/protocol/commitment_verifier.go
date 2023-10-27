@@ -36,31 +36,12 @@ func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBefore
 func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
 	// 1. Verify that the provided attestations are indeed the ones that were included in the commitment.
 	tree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
-		func(attestation *iotago.Attestation) ([]byte, error) {
-			apiForVersion, err := c.engine.APIForVersion(attestation.ProtocolVersion)
-			if err != nil {
-				return nil, ierrors.Wrapf(err, "failed to get API for version %d", attestation.ProtocolVersion)
-			}
-
-			return apiForVersion.Encode(attestation)
-		},
-		func(bytes []byte) (*iotago.Attestation, int, error) {
-			version, _, err := iotago.VersionFromBytes(bytes)
-			if err != nil {
-				return nil, 0, ierrors.Wrap(err, "failed to determine version")
-			}
-
-			a := new(iotago.Attestation)
-			apiForVersion, err := c.engine.APIForVersion(version)
-			if err != nil {
-				return nil, 0, ierrors.Wrapf(err, "failed to get API for version %d", version)
-			}
-			n, err := apiForVersion.Decode(bytes, a)
-
-			return a, n, err
-		},
+		(*iotago.Attestation).Bytes,
+		iotago.AttestationFromBytes(c.engine),
 	)
 
 	for _, att := range attestations {
