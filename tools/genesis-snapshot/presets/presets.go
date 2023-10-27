@@ -100,10 +100,10 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			ed25519 address:      2f64f9d179991f50542b01e034fa043b195403875b8677efaf196b41c88803d0
 			bech32 address:       rms1qqhkf7w30xv375z59vq7qd86qsa3j4qrsadcval04uvkkswg3qpaqf4hga2
 
-			=> restricted address with mana enabled: rms19qqz7e8e69uej86s2s4srcp5lgzrkx25qwr4hpnha7h3j66pezyq85qpqgqjjc5k
+			=> restricted address with mana enabled: rms1xqqz7e8e69uej86s2s4srcp5lgzrkx25qwr4hpnha7h3j66pezyq85qpqg55v3ur
 		*/
 		snapshotcreator.BasicOutputDetails{
-			Address: lo.Return2(iotago.ParseBech32("rms19qqz7e8e69uej86s2s4srcp5lgzrkx25qwr4hpnha7h3j66pezyq85qpqgqjjc5k")),
+			Address: lo.Return2(iotago.ParseBech32("rms1xqqz7e8e69uej86s2s4srcp5lgzrkx25qwr4hpnha7h3j66pezyq85qpqg55v3ur")),
 			Amount:  1_000_000_000_000_000,
 			Mana:    10_000_000,
 		},
@@ -186,10 +186,10 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			ed25519 address:      48acd764f626523646d5ccf22f807e96d30b7ab0064f370b66fa811985985ec4
 			bech32 address:       rms1qpy2e4my7cn9ydjx6hx0ytuq06tdxzm6kqry7dctvmagzxv9np0vg9c55n4
 
-			=> restricted address with mana enabled: rms19qqy3txhvnmzv53kgm2ueu30splfd5ct02cqvnehpdn04qgeskv9a3qpqgh3p7yy
+			=> restricted address with mana enabled: rms1xqqy3txhvnmzv53kgm2ueu30splfd5ct02cqvnehpdn04qgeskv9a3qpqgrhlhv3
 		*/
 		snapshotcreator.BasicOutputDetails{
-			Address: lo.Return2(iotago.ParseBech32("rms19qqy3txhvnmzv53kgm2ueu30splfd5ct02cqvnehpdn04qgeskv9a3qpqgh3p7yy")),
+			Address: lo.Return2(iotago.ParseBech32("rms1xqqy3txhvnmzv53kgm2ueu30splfd5ct02cqvnehpdn04qgeskv9a3qpqgrhlhv3")),
 			Amount:  1_000_000_000_000_000,
 			Mana:    10_000_000,
 		},
