@@ -152,7 +152,7 @@ func (b *Block) Parents() (parents []iotago.BlockID) {
 }
 
 func (b *Block) StrongParents() (parents []iotago.BlockID) {
-	return b.modelBlock.ProtocolBlock().Block.StrongParentIDs()
+	return b.modelBlock.ProtocolBlock().Body.StrongParentIDs()
 }
 
 // ParentsWithType returns the parents of the block with their type.

@@ -110,12 +110,12 @@ func (blk *Block) SignedTransaction() (tx *iotago.SignedTransaction, isTransacti
 }
 
 func (blk *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) {
-	basicBlock, isBasicBlock = blk.ProtocolBlock().Block.(*iotago.BasicBlock)
+	basicBlock, isBasicBlock = blk.ProtocolBlock().Body.(*iotago.BasicBlock)
 	return basicBlock, isBasicBlock
 }
 
 func (blk *Block) ValidationBlock() (validationBlock *iotago.ValidationBlock, isValidationBlock bool) {
-	validationBlock, isValidationBlock = blk.ProtocolBlock().Block.(*iotago.ValidationBlock)
+	validationBlock, isValidationBlock = blk.ProtocolBlock().Body.(*iotago.ValidationBlock)
 	return validationBlock, isValidationBlock
 }
 

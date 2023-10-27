@@ -383,7 +383,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		resign = true
 	}
 
-	switch innerBlock := iotaBlock.Block.(type) {
+	switch innerBlock := iotaBlock.Body.(type) {
 	case *iotago.BasicBlock:
 		switch payload := innerBlock.Payload.(type) {
 		case *iotago.SignedTransaction:
@@ -412,9 +412,9 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	references := make(model.ParentReferences)
-	references[iotago.StrongParentType] = iotaBlock.Block.StrongParentIDs().RemoveDupsAndSort()
-	references[iotago.WeakParentType] = iotaBlock.Block.WeakParentIDs().RemoveDupsAndSort()
-	references[iotago.ShallowLikeParentType] = iotaBlock.Block.ShallowLikeParentIDs().RemoveDupsAndSort()
+	references[iotago.StrongParentType] = iotaBlock.Body.StrongParentIDs().RemoveDupsAndSort()
+	references[iotago.WeakParentType] = iotaBlock.Body.WeakParentIDs().RemoveDupsAndSort()
+	references[iotago.ShallowLikeParentType] = iotaBlock.Body.ShallowLikeParentIDs().RemoveDupsAndSort()
 	if iotaBlock.IssuingTime.Equal(time.Unix(0, 0)) {
 		iotaBlock.IssuingTime = time.Now().UTC()
 		resign = true
@@ -424,7 +424,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
-	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
+	if basicBlock, isBasicBlock := iotaBlock.Body.(*iotago.BasicBlock); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
 		rmcSlot, err := safemath.SafeSub(apiForVersion.TimeProvider().SlotFromTime(iotaBlock.IssuingTime), apiForVersion.ProtocolParameters().MaxCommittableAge())
 		if err != nil {
 			rmcSlot = 0

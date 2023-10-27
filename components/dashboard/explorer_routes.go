@@ -120,9 +120,9 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 		SequenceNumber:          0,
 		IssuerID:                iotaBlk.IssuerID.ToHex(),
 		Signature:               hexutil.EncodeHex(sigBytes),
-		StrongParents:           iotaBlk.Block.StrongParentIDs().ToHex(),
-		WeakParents:             iotaBlk.Block.WeakParentIDs().ToHex(),
-		ShallowLikedParents:     iotaBlk.Block.ShallowLikeParentIDs().ToHex(),
+		StrongParents:           iotaBlk.Body.StrongParentIDs().ToHex(),
+		WeakParents:             iotaBlk.Body.WeakParentIDs().ToHex(),
+		ShallowLikedParents:     iotaBlk.Body.ShallowLikeParentIDs().ToHex(),
 
 		PayloadType: func() iotago.PayloadType {
 			if isBasic && basicBlock.Payload != nil {
