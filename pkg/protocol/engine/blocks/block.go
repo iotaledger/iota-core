@@ -185,7 +185,7 @@ func (b *Block) SignedTransaction() (tx *iotago.SignedTransaction, hasTransactio
 	return b.modelBlock.SignedTransaction()
 }
 
-func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) {
+func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlockBody, isBasicBlock bool) {
 	if b.modelBlock == nil {
 		return nil, false
 	}
@@ -193,7 +193,7 @@ func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) 
 	return b.modelBlock.BasicBlock()
 }
 
-func (b *Block) ValidationBlock() (validationBlock *iotago.ValidationBlock, isValidationBlock bool) {
+func (b *Block) ValidationBlock() (validationBlock *iotago.ValidationBlockBody, isValidationBlock bool) {
 	if b.modelBlock == nil {
 		return nil, false
 	}

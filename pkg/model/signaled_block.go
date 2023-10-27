@@ -15,7 +15,7 @@ type SignaledBlock struct {
 	ProtocolParametersHash  iotago.Identifier `serix:"3"`
 }
 
-func NewSignaledBlock(blockID iotago.BlockID, block *iotago.Block, validationBlock *iotago.ValidationBlock) *SignaledBlock {
+func NewSignaledBlock(blockID iotago.BlockID, block *iotago.Block, validationBlock *iotago.ValidationBlockBody) *SignaledBlock {
 	return &SignaledBlock{
 		ID:                      blockID,
 		IssuingTime:             block.IssuingTime,

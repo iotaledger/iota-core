@@ -313,7 +313,7 @@ func (t *Tracker) isCommitteeMember(slot iotago.SlotIndex, accountID iotago.Acco
 	return committee.Has(accountID), nil
 }
 
-func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.ValidationBlock, block *blocks.Block) {
+func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.ValidationBlockBody, block *blocks.Block) {
 	validatorPerformances, err := t.validatorPerformancesFunc(block.ID().Slot())
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for slot %s", block.ID().Slot()))

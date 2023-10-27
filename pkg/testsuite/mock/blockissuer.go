@@ -384,7 +384,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 	}
 
 	switch innerBlock := iotaBlock.Body.(type) {
-	case *iotago.BasicBlock:
+	case *iotago.BasicBlockBody:
 		switch payload := innerBlock.Payload.(type) {
 		case *iotago.SignedTransaction:
 			if payload.Transaction.NetworkID != protoParams.NetworkID() {
@@ -404,7 +404,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 			resign = true
 		}
 
-	case *iotago.ValidationBlock:
+	case *iotago.ValidationBlockBody:
 		//nolint:revive,staticcheck //temporarily disable
 		if len(iotaBlock.Parents()) == 0 {
 			// TODO: implement tipselection for validator blocks
@@ -424,7 +424,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
-	if basicBlock, isBasicBlock := iotaBlock.Body.(*iotago.BasicBlock); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
+	if basicBlock, isBasicBlock := iotaBlock.Body.(*iotago.BasicBlockBody); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
 		rmcSlot, err := safemath.SafeSub(apiForVersion.TimeProvider().SlotFromTime(iotaBlock.IssuingTime), apiForVersion.ProtocolParameters().MaxCommittableAge())
 		if err != nil {
 			rmcSlot = 0
