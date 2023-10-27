@@ -11,45 +11,45 @@ import (
 type Block struct {
 	blockID iotago.BlockID
 
-	data          []byte
-	protocolBlock *iotago.ProtocolBlock
+	data  []byte
+	block *iotago.Block
 }
 
-func newBlock(blockID iotago.BlockID, iotaBlock *iotago.ProtocolBlock, data []byte) (*Block, error) {
+func newBlock(blockID iotago.BlockID, iotaBlock *iotago.Block, data []byte) (*Block, error) {
 	block := &Block{
-		blockID:       blockID,
-		data:          data,
-		protocolBlock: iotaBlock,
+		blockID: blockID,
+		data:    data,
+		block:   iotaBlock,
 	}
 
 	return block, nil
 }
 
-func BlockFromBlock(protocolBlock *iotago.ProtocolBlock, opts ...serix.Option) (*Block, error) {
-	data, err := protocolBlock.API.Encode(protocolBlock, opts...)
+func BlockFromBlock(block *iotago.Block, opts ...serix.Option) (*Block, error) {
+	data, err := block.API.Encode(block, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	blockID, err := protocolBlock.ID()
+	blockID, err := block.ID()
 	if err != nil {
 		return nil, err
 	}
 
-	return newBlock(blockID, protocolBlock, data)
+	return newBlock(blockID, block, data)
 }
 
 func BlockFromIDAndBytes(blockID iotago.BlockID, data []byte, api iotago.API, opts ...serix.Option) (*Block, error) {
-	protocolBlock := new(iotago.ProtocolBlock)
-	if _, err := api.Decode(data, protocolBlock, opts...); err != nil {
+	block := new(iotago.Block)
+	if _, err := api.Decode(data, block, opts...); err != nil {
 		return nil, err
 	}
 
-	return newBlock(blockID, protocolBlock, data)
+	return newBlock(blockID, block, data)
 }
 
 func BlockFromBytes(data []byte, apiProvider iotago.APIProvider) (*Block, error) {
-	iotaBlock, _, err := iotago.ProtocolBlockFromBytes(apiProvider)(data)
+	iotaBlock, _, err := iotago.BlockFromBytes(apiProvider)(data)
 	if err != nil {
 		return nil, err
 	}
@@ -85,8 +85,8 @@ func (blk *Block) Bytes() ([]byte, error) {
 	return blk.data, nil
 }
 
-func (blk *Block) ProtocolBlock() *iotago.ProtocolBlock {
-	return blk.protocolBlock
+func (blk *Block) ProtocolBlock() *iotago.Block {
+	return blk.block
 }
 
 func (blk *Block) Payload() iotago.Payload {
@@ -120,7 +120,7 @@ func (blk *Block) ValidationBlock() (validationBlock *iotago.ValidationBlock, is
 }
 
 func (blk *Block) String() string {
-	encode, err := blk.protocolBlock.API.JSONEncode(blk.ProtocolBlock())
+	encode, err := blk.block.API.JSONEncode(blk.ProtocolBlock())
 	if err != nil {
 		panic(err)
 	}

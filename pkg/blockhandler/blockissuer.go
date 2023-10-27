@@ -94,7 +94,7 @@ func (i *BlockHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mode
 	}
 }
 
-func (i *BlockHandler) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock) (iotago.BlockID, error) {
+func (i *BlockHandler) AttachBlock(ctx context.Context, iotaBlock *iotago.Block) (iotago.BlockID, error) {
 	modelBlock, err := model.BlockFromBlock(iotaBlock)
 	if err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")

@@ -361,7 +361,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	}
 }
 
-func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock, node *Node, optIssuerAccount ...Account) (iotago.BlockID, error) {
+func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, node *Node, optIssuerAccount ...Account) (iotago.BlockID, error) {
 	// if anything changes, need to make a new signature
 	var resign bool
 

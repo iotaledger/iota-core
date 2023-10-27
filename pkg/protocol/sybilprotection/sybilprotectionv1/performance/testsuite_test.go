@@ -289,7 +289,7 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epoch iot
 
 		for i := uint64(0); i < validationBlocksSentPerSlot; i++ {
 			valBlock := tpkg.RandValidationBlock(t.api)
-			block := tpkg.RandProtocolBlock(valBlock, t.api, 10)
+			block := tpkg.RandBlock(valBlock, t.api, 10)
 			block.IssuerID = accountID
 			subslotIndex := i
 			// issued more than one block in the same slot to reduce performance factor

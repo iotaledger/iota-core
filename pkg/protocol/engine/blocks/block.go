@@ -139,7 +139,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 	}
 }
 
-func (b *Block) ProtocolBlock() *iotago.ProtocolBlock {
+func (b *Block) ProtocolBlock() *iotago.Block {
 	if b.modelBlock == nil {
 		return nil
 	}
