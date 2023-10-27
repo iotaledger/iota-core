@@ -6,7 +6,8 @@ import (
 
 const (
 	// CfgPeers defines the static peers this node should retain a connection to (CLI).
-	CfgPeers = "peers"
+	CfgPeers                   = "peers"
+	IdentityPrivateKeyFileName = "identity.key"
 )
 
 // ParametersP2P contains the definition of configuration parameters used by the p2p plugin.

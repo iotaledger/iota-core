@@ -35,6 +35,8 @@ RUN cp ./peering.json /app/peering.json
 # using distroless cc "nonroot" image, which includes everything in the base image (glibc, libssl and openssl)
 FROM gcr.io/distroless/cc-debian12:nonroot
 
+HEALTHCHECK --interval=10s --timeout=5s --retries=30 CMD ["/app/iota-core", "tools", "node-info"]
+
 # Copy the app dir into distroless image
 COPY --chown=nonroot:nonroot --from=build /app /app
 
