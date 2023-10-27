@@ -148,7 +148,10 @@ func (t *TestFramework) AssertCommit(slot iotago.SlotIndex, expectedCW uint64, e
 
 	require.EqualValues(t.test, expectedCW, cw)
 
-	expectedTree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(),
+	expectedTree := ads.NewMap[iotago.Identifier](
+		mapdb.NewMapDB(),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
 		(*iotago.Attestation).Bytes,

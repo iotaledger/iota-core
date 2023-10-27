@@ -99,7 +99,10 @@ func (m *Manager) attestationsForSlot(index iotago.SlotIndex) (ads.Map[iotago.Id
 		return nil, ierrors.Wrapf(err, "failed to get extended realm for attestations of slot %d", index)
 	}
 
-	return ads.NewMap[iotago.Identifier](attestationsStorage,
+	return ads.NewMap[iotago.Identifier](
+		attestationsStorage,
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
 		(*iotago.Attestation).Bytes,
