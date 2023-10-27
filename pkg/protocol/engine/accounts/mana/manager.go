@@ -222,5 +222,5 @@ func (m *Manager) getBIC(accountID iotago.AccountID, slot iotago.SlotIndex) (bic
 		return 0, 0, nil
 	}
 
-	return iotago.Mana(accountBIC.Credits.Value), accountBIC.Credits.UpdateTime, nil
+	return iotago.Mana(accountBIC.Credits.Value), accountBIC.Credits.UpdateSlot, nil
 }

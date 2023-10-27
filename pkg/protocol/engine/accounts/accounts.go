@@ -9,7 +9,8 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -64,7 +65,7 @@ func (a *AccountData) Clone() *AccountData {
 		ID: a.ID,
 		Credits: &BlockIssuanceCredits{
 			Value:      a.Credits.Value,
-			UpdateTime: a.Credits.UpdateTime,
+			UpdateSlot: a.Credits.UpdateSlot,
 		},
 		ExpirySlot:      a.ExpirySlot,
 		OutputID:        a.OutputID,
@@ -87,6 +88,7 @@ func (a *AccountData) FromReader(readSeeker io.ReadSeeker) error {
 }
 
 func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
+	// TODO: improve this
 	var bytesConsumed int
 
 	bytesRead, err := io.ReadFull(reader, a.ID[:])
@@ -103,7 +105,7 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 	}
 	bytesConsumed += 8
 
-	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.UpdateTime); err != nil {
+	if err := binary.Read(reader, binary.LittleEndian, &a.Credits.UpdateSlot); err != nil {
 		return bytesConsumed, ierrors.Wrapf(err, "unable to read updatedTime for account balance for accountID %s", a.ID)
 	}
 	bytesConsumed += iotago.SlotIndexLength
@@ -189,27 +191,55 @@ func (a *AccountData) readFromReadSeeker(reader io.ReadSeeker) (int, error) {
 }
 
 func (a AccountData) Bytes() ([]byte, error) {
-	idBytes, err := a.ID.Bytes()
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to marshal account id")
+	byteBuffer := stream.NewByteBuffer()
+
+	if err := stream.Write(byteBuffer, a.ID); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write AccountID")
 	}
-	m := marshalutil.New()
-	m.WriteBytes(idBytes)
-	m.WriteBytes(lo.PanicOnErr(a.Credits.Bytes()))
-	m.WriteUint32(uint32(a.ExpirySlot))
-	m.WriteBytes(lo.PanicOnErr(a.OutputID.Bytes()))
-	m.WriteByte(byte(len(a.BlockIssuerKeys)))
-	for _, key := range a.BlockIssuerKeys {
-		m.WriteBytes(key.Bytes())
+	if err := stream.WriteFixedSizeObject(byteBuffer, a.Credits, BlockIssuanceCreditsBytesLength, func(credits *BlockIssuanceCredits) ([]byte, error) {
+		return credits.Bytes()
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write Credits")
+	}
+	if err := stream.Write(byteBuffer, a.ExpirySlot); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write ExpirySlot")
+	}
+	if err := stream.Write(byteBuffer, a.OutputID); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write OutputID")
 	}
 
-	m.WriteUint64(uint64(a.ValidatorStake))
-	m.WriteUint64(uint64(a.DelegationStake))
-	m.WriteUint64(uint64(a.FixedCost))
-	m.WriteUint32(uint32(a.StakeEndEpoch))
-	m.WriteBytes(lo.PanicOnErr(a.LatestSupportedProtocolVersionAndHash.Bytes()))
+	if err := stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsByte, func() (elementsCount int, err error) {
+		// TODO: write this properly as object (depends on how we read it)
+		for _, key := range a.BlockIssuerKeys {
+			if _, err = byteBuffer.Write(key.Bytes()); err != nil {
+				return 0, ierrors.Wrap(err, "failed to write BlockIssuerKey")
+			}
+		}
 
-	return m.Bytes(), nil
+		return len(a.BlockIssuerKeys), nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write BlockIssuerKeys")
+	}
+
+	if err := stream.Write(byteBuffer, a.ValidatorStake); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write ValidatorStake")
+	}
+	if err := stream.Write(byteBuffer, a.DelegationStake); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write DelegationStake")
+	}
+	if err := stream.Write(byteBuffer, a.FixedCost); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write FixedCost")
+	}
+	if err := stream.Write(byteBuffer, a.StakeEndEpoch); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write StakeEndEpoch")
+	}
+	if err := stream.WriteFixedSizeObject(byteBuffer, a.LatestSupportedProtocolVersionAndHash, model.VersionAndHashSize, func(versionAndHash model.VersionAndHash) ([]byte, error) {
+		return versionAndHash.Bytes()
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write LatestSupportedProtocolVersionAndHash")
+	}
+
+	return byteBuffer.Bytes()
 }
 
 func WithCredits(credits *BlockIssuanceCredits) options.Option[AccountData] {

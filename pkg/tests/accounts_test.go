@@ -109,7 +109,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	ts.AssertAccountDiff(genesisAccountOutput.AccountID, block1Slot, &model.AccountDiff{
 		BICChange:              0,
-		PreviousUpdatedTime:    0,
+		PreviousUpdatedSlot:    0,
 		PreviousExpirySlot:     1,
 		NewExpirySlot:          1,
 		NewOutputID:            iotago.OutputIDFromTransactionIDAndIndex(ts.TransactionFramework.TransactionID("TX1"), 0),
@@ -167,7 +167,7 @@ func Test_TransitionAccount(t *testing.T) {
 	// assert diff of a destroyed account, to make sure we can correctly restore it
 	ts.AssertAccountDiff(genesisAccountOutput.AccountID, block2Slot, &model.AccountDiff{
 		BICChange:              -iotago.BlockIssuanceCredits(123),
-		PreviousUpdatedTime:    0,
+		PreviousUpdatedSlot:    0,
 		NewExpirySlot:          0,
 		PreviousExpirySlot:     1,
 		NewOutputID:            iotago.EmptyOutputID,
@@ -185,7 +185,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block2Slot, &model.AccountDiff{
 		BICChange:              0,
-		PreviousUpdatedTime:    0,
+		PreviousUpdatedSlot:    0,
 		NewExpirySlot:          newAccountExpirySlot,
 		PreviousExpirySlot:     0,
 		NewOutputID:            newAccount.OutputID(),
@@ -237,7 +237,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block3Slot, &model.AccountDiff{
 		BICChange:              0,
-		PreviousUpdatedTime:    0,
+		PreviousUpdatedSlot:    0,
 		NewOutputID:            iotago.EmptyOutputID,
 		PreviousOutputID:       iotago.EmptyOutputID,
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
@@ -283,7 +283,7 @@ func Test_TransitionAccount(t *testing.T) {
 	// Transitioning to delayed claiming effectively removes the delegation, so we expect a negative delegation stake change.
 	ts.AssertAccountDiff(newAccountOutput.AccountID, block4Slot, &model.AccountDiff{
 		BICChange:              0,
-		PreviousUpdatedTime:    0,
+		PreviousUpdatedSlot:    0,
 		NewOutputID:            iotago.EmptyOutputID,
 		PreviousOutputID:       iotago.EmptyOutputID,
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
@@ -370,7 +370,7 @@ func Test_TransitionAccount(t *testing.T) {
 
 	ts.AssertAccountDiff(implicitAccountID, slotIndexBlock6, &model.AccountDiff{
 		BICChange:              0,
-		PreviousUpdatedTime:    0,
+		PreviousUpdatedSlot:    0,
 		NewOutputID:            fullAccountOutputID,
 		PreviousOutputID:       implicitAccountOutputID,
 		PreviousExpirySlot:     iotago.MaxSlotIndex,

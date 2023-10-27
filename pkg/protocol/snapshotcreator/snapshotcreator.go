@@ -82,7 +82,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 			accountID := blake2b.Sum256(ed25519PubKey[:])
 			committeeAccountsData = append(committeeAccountsData, &accounts.AccountData{
 				ID:                                    accountID,
-				Credits:                               &accounts.BlockIssuanceCredits{Value: snapshotAccountDetails.BlockIssuanceCredits, UpdateTime: 0},
+				Credits:                               &accounts.BlockIssuanceCredits{Value: snapshotAccountDetails.BlockIssuanceCredits, UpdateSlot: 0},
 				ExpirySlot:                            snapshotAccountDetails.ExpirySlot,
 				OutputID:                              iotago.OutputID{},
 				BlockIssuerKeys:                       iotago.BlockIssuerKeys{snapshotAccountDetails.IssuerKey},

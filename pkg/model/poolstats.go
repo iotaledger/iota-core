@@ -2,7 +2,7 @@ package model
 
 import (
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -15,34 +15,37 @@ type PoolsStats struct {
 
 func PoolsStatsFromBytes(bytes []byte) (*PoolsStats, int, error) {
 	p := new(PoolsStats)
-	m := marshalutil.New(bytes)
-	totalStake, err := m.ReadUint64()
-	if err != nil {
-		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse total stake")
-	}
-	p.TotalStake = iotago.BaseToken(totalStake)
 
-	totalValidatorStake, err := m.ReadUint64()
-	if err != nil {
-		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse total validator stake")
-	}
-	p.TotalValidatorStake = iotago.BaseToken(totalValidatorStake)
+	var err error
+	byteReader := stream.NewByteReader(bytes)
 
-	p.ProfitMargin, err = m.ReadUint64()
-	if err != nil {
-		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse profit margin")
+	if p.TotalStake, err = stream.Read[iotago.BaseToken](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read TotalStake")
+	}
+	if p.TotalValidatorStake, err = stream.Read[iotago.BaseToken](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read TotalValidatorStake")
+	}
+	if p.ProfitMargin, err = stream.Read[uint64](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read ProfitMargin")
 	}
 
-	return p, m.ReadOffset(), nil
+	return p, byteReader.BytesRead(), nil
 }
 
 func (p *PoolsStats) Bytes() ([]byte, error) {
-	m := marshalutil.New()
-	m.WriteUint64(uint64(p.TotalStake))
-	m.WriteUint64(uint64(p.TotalValidatorStake))
-	m.WriteUint64(p.ProfitMargin)
+	byteBuffer := stream.NewByteBuffer()
 
-	return m.Bytes(), nil
+	if err := stream.Write(byteBuffer, p.TotalStake); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write TotalStake")
+	}
+	if err := stream.Write(byteBuffer, p.TotalValidatorStake); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write TotalValidatorStake")
+	}
+	if err := stream.Write(byteBuffer, p.ProfitMargin); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write ProfitMargin")
+	}
+
+	return byteBuffer.Bytes()
 }
 
 type PoolRewards struct {
@@ -56,34 +59,35 @@ type PoolRewards struct {
 
 func PoolRewardsFromBytes(bytes []byte) (*PoolRewards, int, error) {
 	p := new(PoolRewards)
-	m := marshalutil.New(bytes)
 
-	poolStake, err := m.ReadUint64()
-	if err != nil {
-		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse pool stake")
+	var err error
+	byteReader := stream.NewByteReader(bytes)
+
+	if p.PoolStake, err = stream.Read[iotago.BaseToken](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read PoolStake")
 	}
-	p.PoolStake = iotago.BaseToken(poolStake)
-
-	poolRewards, err := m.ReadUint64()
-	if err != nil {
-		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse pool rewards")
+	if p.PoolRewards, err = stream.Read[iotago.Mana](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read PoolRewards")
 	}
-	p.PoolRewards = iotago.Mana(poolRewards)
-
-	fixedCost, err := m.ReadUint64()
-	if err != nil {
-		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse fixed cost")
+	if p.FixedCost, err = stream.Read[iotago.Mana](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read FixedCost")
 	}
-	p.FixedCost = iotago.Mana(fixedCost)
 
-	return p, m.ReadOffset(), nil
+	return p, byteReader.BytesRead(), nil
 }
 
 func (p *PoolRewards) Bytes() ([]byte, error) {
-	m := marshalutil.New()
-	m.WriteUint64(uint64(p.PoolStake))
-	m.WriteUint64(uint64(p.PoolRewards))
-	m.WriteUint64(uint64(p.FixedCost))
+	byteBuffer := stream.NewByteBuffer()
 
-	return m.Bytes(), nil
+	if err := stream.Write(byteBuffer, p.PoolStake); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write PoolStake")
+	}
+	if err := stream.Write(byteBuffer, p.PoolRewards); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write PoolRewards")
+	}
+	if err := stream.Write(byteBuffer, p.FixedCost); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write FixedCost")
+	}
+
+	return byteBuffer.Bytes()
 }

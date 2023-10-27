@@ -29,8 +29,8 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected credits value %d, got %d", node.Name, accountData.ID, accountData.Credits.Value, actualAccountData.Credits.Value)
 			}
 
-			if accountData.Credits.UpdateTime != actualAccountData.Credits.UpdateTime {
-				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected credits update time %d, got %d", node.Name, accountData.ID, accountData.Credits.UpdateTime, actualAccountData.Credits.UpdateTime)
+			if accountData.Credits.UpdateSlot != actualAccountData.Credits.UpdateSlot {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected credits update time %d, got %d", node.Name, accountData.ID, accountData.Credits.UpdateSlot, actualAccountData.Credits.UpdateSlot)
 			}
 
 			if accountData.OutputID != actualAccountData.OutputID {
@@ -98,8 +98,8 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 				return ierrors.Errorf("AssertAccountDiff: %s: expected change %d but actual %d for account %s at slot %d", node.Name, accountDiff.BICChange, actualAccountDiff.BICChange, accountID, index)
 			}
 
-			if accountDiff.PreviousUpdatedTime != actualAccountDiff.PreviousUpdatedTime {
-				return ierrors.Errorf("AssertAccountDiff: %s: expected previous updated time %d but actual %d for account %s at slot %d", node.Name, accountDiff.PreviousUpdatedTime, actualAccountDiff.PreviousUpdatedTime, accountID, index)
+			if accountDiff.PreviousUpdatedSlot != actualAccountDiff.PreviousUpdatedSlot {
+				return ierrors.Errorf("AssertAccountDiff: %s: expected previous updated time %d but actual %d for account %s at slot %d", node.Name, accountDiff.PreviousUpdatedSlot, actualAccountDiff.PreviousUpdatedSlot, accountID, index)
 			}
 
 			if accountDiff.NewExpirySlot != actualAccountDiff.NewExpirySlot {

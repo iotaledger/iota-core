@@ -60,6 +60,8 @@ func New(
 		blockBurns:                    shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.BlockID]](),
 		latestSupportedVersionSignals: memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.AccountID, *model.SignaledBlock](),
 		accountsTree: ads.NewMap[iotago.Identifier](accountsStore,
+			iotago.Identifier.Bytes,
+			iotago.IdentifierFromBytes,
 			iotago.AccountID.Bytes,
 			iotago.AccountIDFromBytes,
 			(*accounts.AccountData).Bytes,
@@ -379,7 +381,7 @@ func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetSlo
 		}
 
 		// update the account data with the diff
-		accountData.Credits.Update(-diffChange.BICChange, diffChange.PreviousUpdatedTime)
+		accountData.Credits.Update(-diffChange.BICChange, diffChange.PreviousUpdatedSlot)
 		// update the expiry slot of the account if it was changed
 		if diffChange.PreviousExpirySlot != diffChange.NewExpirySlot {
 			accountData.ExpirySlot = diffChange.PreviousExpirySlot
@@ -444,7 +446,7 @@ func (m *Manager) preserveDestroyedAccountData(accountID iotago.AccountID) (acco
 	slotDiff.PreviousExpirySlot = accountData.ExpirySlot
 	slotDiff.NewOutputID = iotago.EmptyOutputID
 	slotDiff.PreviousOutputID = accountData.OutputID
-	slotDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
+	slotDiff.PreviousUpdatedSlot = accountData.Credits.UpdateSlot
 	slotDiff.BlockIssuerKeysRemoved = accountData.BlockIssuerKeys.Clone()
 
 	slotDiff.ValidatorStakeChange = -int64(accountData.ValidatorStake)
@@ -519,7 +521,7 @@ func (m *Manager) commitAccountTree(slot iotago.SlotIndex, accountDiffChanges ma
 		if diffChange.BICChange != 0 || !exists {
 			// decay the credits to the current slot if the account exists
 			if exists {
-				decayedPreviousCredits, err := m.apiProvider.APIForSlot(slot).ManaDecayProvider().ManaWithDecay(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateTime, slot)
+				decayedPreviousCredits, err := m.apiProvider.APIForSlot(slot).ManaDecayProvider().ManaWithDecay(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateSlot, slot)
 				if err != nil {
 					return ierrors.Wrapf(err, "can't retrieve account, could not decay credits for account (%s) in slot (%d)", accountData.ID, slot)
 				}

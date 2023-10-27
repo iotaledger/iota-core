@@ -9,7 +9,8 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -134,6 +135,7 @@ func AccountsFromReader(readSeeker io.ReadSeeker) (*Accounts, int, error) {
 }
 
 func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
+	// TODO: improve this
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -181,31 +183,39 @@ func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
 	return n, nil
 }
 
-func (a *Accounts) Bytes() (bytes []byte, err error) {
+func (a *Accounts) Bytes() ([]byte, error) {
 	a.mutex.RLock()
 	defer a.mutex.RUnlock()
 
-	m := marshalutil.New()
+	byteBuffer := stream.NewByteBuffer()
 
-	m.WriteUint32(uint32(a.accountPools.Size()))
-	var innerErr error
-	a.ForEach(func(id iotago.AccountID, pool *Pool) bool {
-		m.WriteBytes(id[:])
-		poolBytes, err := pool.Bytes()
-		if err != nil {
-			innerErr = err
-			return false
+	if err := stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
+		var innerErr error
+		a.ForEach(func(id iotago.AccountID, pool *Pool) bool {
+			if innerErr = stream.Write(byteBuffer, id); innerErr != nil {
+				return false
+			}
+
+			if innerErr = stream.WriteFixedSizeObject(byteBuffer, pool, poolBytesLength, func(pool *Pool) ([]byte, error) {
+				return pool.Bytes()
+			}); innerErr != nil {
+				return false
+			}
+
+			return true
+		})
+		if innerErr != nil {
+			return 0, innerErr
 		}
-		m.WriteBytes(poolBytes)
 
-		return true
-	})
-
-	m.WriteBool(a.reused.Load())
-
-	if innerErr != nil {
-		return nil, innerErr
+		return a.accountPools.Size(), nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write accounts")
 	}
 
-	return m.Bytes(), nil
+	if err := stream.Write(byteBuffer, a.reused.Load()); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write reused flag")
+	}
+
+	return byteBuffer.Bytes()
 }
