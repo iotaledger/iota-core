@@ -26,7 +26,7 @@ services:
     ports:
       - "14666:14666/tcp" # P2P
       - "6061:6061/tcp"   # pprof
-      - "8080:8080/tcp"   # REST-API
+      - "8080:14265/tcp"  # REST-API
       - "8081:8081/tcp"   # Dashboard
       - "9311:9311/tcp"   # Prometheus
       - "9029:9029/tcp"   # INX
@@ -46,7 +46,7 @@ services:
       --p2p.db.path=/app/data/peerdb
       --profiling.enabled=true
       --profiling.bindAddress=0.0.0.0:6061
-      --restAPI.bindAddress=0.0.0.0:8080
+      --restAPI.bindAddress=0.0.0.0:14265
       --database.path=/app/data/database
       --protocol.snapshot.path=/app/data/snapshot.bin
       {% if 'node-01' in inventory_hostname or 'node-02' in inventory_hostname or 'node-03' in inventory_hostname %}
@@ -73,7 +73,7 @@ services:
     restart: unless-stopped
     depends_on:
       iota-core:
-        condition: service_started
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -93,7 +93,7 @@ services:
     restart: unless-stopped
     depends_on:
       iota-core:
-        condition: service_started
+        condition: service_healthy
       inx-indexer:
         condition: service_started
     environment:
@@ -111,7 +111,7 @@ services:
     restart: unless-stopped
     depends_on:
       iota-core:
-        condition: service_started
+        condition: service_healthy
       inx-indexer:
         condition: service_started
       inx-blockissuer:

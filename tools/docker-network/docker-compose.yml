@@ -8,6 +8,7 @@ services:
 ###################
 # IOTA-CORE Nodes #
 ###################
+
   node-1-validator:
     build: *iota-core_build
     stop_grace_period: 1m
@@ -19,7 +20,7 @@ services:
     networks:
       - iota-core
     ports:
-      - "8010:8080/tcp" # REST-API
+      - "8010:14265/tcp" # REST-API
       - "8011:8081/tcp" # Dashboard
       - "6011:6061/tcp" # pprof
       - "9019:9029/tcp" # INX
@@ -44,7 +45,7 @@ services:
     networks:
       - iota-core
     ports:
-      - "8020:8080/tcp" # REST-API
+      - "8020:14265/tcp" # REST-API
       - "8021:8081/tcp" # Dashboard
       - "6021:6061/tcp" # pprof
       - "9029:9029/tcp" # INX
@@ -69,7 +70,7 @@ services:
     networks:
       - iota-core
     ports:
-      - "8030:8080/tcp" # REST-API
+      - "8030:14265/tcp" # REST-API
       - "8031:8081/tcp" # Dashboard
       - "6031:6061/tcp" # pprof
       - "9039:9029/tcp" # INX
@@ -94,7 +95,7 @@ services:
     networks:
       - iota-core
     ports:
-      - "8040:8080/tcp" # REST-API
+      - "8040:14265/tcp" # REST-API
       - "8041:8081/tcp" # Dashboard
       - "6041:6061/tcp" # pprof
       - "9049:9029/tcp" # INX
@@ -119,7 +120,7 @@ services:
     networks:
       - iota-core
     ports:
-      - "8050:8080/tcp" # REST-API
+      - "8050:14265/tcp" # REST-API
       - "8051:8081/tcp" # Dashboard
       - "6051:6061/tcp" # pprof
       - "9059:9029/tcp" # INX
@@ -182,7 +183,7 @@ services:
     restart: unless-stopped
     depends_on:
       node-1-validator:
-        condition: service_started
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -199,7 +200,7 @@ services:
     restart: unless-stopped
     depends_on:
       node-1-validator:
-        condition: service_started
+        condition: service_healthy
       inx-indexer:
         condition: service_started
     networks:
@@ -218,7 +219,7 @@ services:
     restart: unless-stopped
     depends_on:
       node-1-validator:
-        condition: service_started
+        condition: service_healthy
       inx-indexer:
         condition: service_started
       inx-blockissuer:
