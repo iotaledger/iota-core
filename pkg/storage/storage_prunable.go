@@ -40,7 +40,9 @@ func (s *Storage) Blocks(slot iotago.SlotIndex) (*slotstore.Blocks, error) {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (s *Storage) Reset() {
-	s.Rollback(s.Settings().LatestCommitment().Slot())
+	if err := s.Rollback(s.Settings().LatestCommitment().Slot()); err != nil {
+		s.errorHandler(ierrors.Wrap(err, "failed to reset prunable storage"))
+	}
 }
 
 func (s *Storage) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {

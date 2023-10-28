@@ -229,11 +229,13 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
 func (c *Chain) earliestUncommittedSlot() iotago.SlotIndex {
 	if latestVerifiedCommitment := c.LatestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
 		return latestVerifiedCommitment.Slot() + 1
-	} else if forkingPoint := c.ForkingPoint.Get(); forkingPoint != nil {
-		return forkingPoint.Slot()
-	} else {
-		return 0
 	}
+
+	if forkingPoint := c.ForkingPoint.Get(); forkingPoint != nil {
+		return forkingPoint.Slot()
+	}
+
+	return 0
 }
 
 func (c *Chain) InSyncRange(slot iotago.SlotIndex) bool {

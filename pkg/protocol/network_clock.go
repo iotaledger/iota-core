@@ -22,9 +22,9 @@ func NewNetworkClock(protocol *Protocol) *NetworkClock {
 		Variable: reactive.NewVariable[time.Time](func(currentValue time.Time, newValue time.Time) time.Time {
 			if newValue.Before(currentValue) || newValue.After(time.Now()) {
 				return currentValue
-			} else {
-				return newValue
 			}
+
+			return newValue
 		}),
 	}
 

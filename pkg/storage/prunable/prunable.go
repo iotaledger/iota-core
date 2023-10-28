@@ -147,32 +147,32 @@ func (p *Prunable) Rollback(targetEpoch iotago.EpochIndex, pruningRange [2]iotag
 		return ierrors.Wrapf(err, "failed to prune slots in range [%d, %d] from target epoch %d", pruningRange[0], pruningRange[1], targetEpoch)
 	}
 
-	var lastPrunedEpoch iotago.EpochIndex
-	if lastPrunedCommitteeEpoch, err := p.rollbackCommitteeEpochs(targetEpoch, pruningRange[0]-1); err != nil {
+	lastPrunedCommitteeEpoch, err := p.rollbackCommitteeEpochs(targetEpoch, pruningRange[0]-1)
+	if err != nil {
 		return ierrors.Wrapf(err, "failed to rollback committee epochs to target epoch %d", targetEpoch)
-	} else {
-		lastPrunedEpoch = max(lastPrunedEpoch, lastPrunedCommitteeEpoch)
 	}
 
-	if lastPrunedPoolStatsEpoch, err := p.poolStats.RollbackEpochs(targetEpoch); err != nil {
+	lastPrunedPoolStatsEpoch, err := p.poolStats.RollbackEpochs(targetEpoch)
+	if err != nil {
 		return ierrors.Wrapf(err, "failed to rollback pool stats epochs to target epoch %d", targetEpoch)
-	} else {
-		lastPrunedEpoch = max(lastPrunedEpoch, lastPrunedPoolStatsEpoch)
 	}
 
-	if lastPrunedDecidedUpgradeSignalsEpoch, err := p.decidedUpgradeSignals.RollbackEpochs(targetEpoch); err != nil {
+	lastPrunedDecidedUpgradeSignalsEpoch, err := p.decidedUpgradeSignals.RollbackEpochs(targetEpoch)
+	if err != nil {
 		return ierrors.Wrapf(err, "failed to rollback decided upgrade signals epochs to target epoch %d", targetEpoch)
-	} else {
-		lastPrunedEpoch = max(lastPrunedEpoch, lastPrunedDecidedUpgradeSignalsEpoch)
 	}
 
-	if lastPrunedPoolRewardsEpoch, err := p.poolRewards.RollbackEpochs(targetEpoch); err != nil {
+	lastPrunedPoolRewardsEpoch, err := p.poolRewards.RollbackEpochs(targetEpoch)
+	if err != nil {
 		return ierrors.Wrapf(err, "failed to rollback pool rewards epochs to target epoch %d", targetEpoch)
-	} else {
-		lastPrunedEpoch = max(lastPrunedEpoch, lastPrunedPoolRewardsEpoch)
 	}
 
-	for epochToPrune := targetEpoch + 1; epochToPrune <= lastPrunedEpoch; epochToPrune++ {
+	for epochToPrune := targetEpoch + 1; epochToPrune <= max(
+		lastPrunedCommitteeEpoch,
+		lastPrunedPoolStatsEpoch,
+		lastPrunedDecidedUpgradeSignalsEpoch,
+		lastPrunedPoolRewardsEpoch,
+	); epochToPrune++ {
 		p.prunableSlotStore.DeleteBucket(epochToPrune)
 	}
 
