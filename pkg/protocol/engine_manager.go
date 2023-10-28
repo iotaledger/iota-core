@@ -107,7 +107,7 @@ func (e *EngineManager) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error
 
 	// remove commitments that after forking point.
 	latestCommitment := newStorage.Settings().LatestCommitment()
-	if err := newStorage.Commitments().Rollback(slot, latestCommitment.Slot()); err != nil {
+	if err = newStorage.Commitments().Rollback(slot, latestCommitment.Slot()); err != nil {
 		return nil, ierrors.Wrap(err, "failed to rollback commitments")
 	}
 	// create temporary components and rollback their permanent state, which will be reflected on disk.
@@ -118,14 +118,14 @@ func (e *EngineManager) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error
 	accountsManager := accountsledger.New(newStorage.Settings().APIProvider(), blockCache.Block, newStorage.AccountDiffs, newStorage.Accounts())
 
 	accountsManager.SetLatestCommittedSlot(latestCommitment.Slot())
-	if err := accountsManager.Rollback(slot); err != nil {
+	if err = accountsManager.Rollback(slot); err != nil {
 		return nil, ierrors.Wrap(err, "failed to rollback accounts manager")
 	}
 
-	if err := evictionState.Rollback(newStorage.Settings().LatestFinalizedSlot(), slot); err != nil {
+	if err = evictionState.Rollback(newStorage.Settings().LatestFinalizedSlot(), slot); err != nil {
 		return nil, ierrors.Wrap(err, "failed to rollback eviction state")
 	}
-	if err := newStorage.Ledger().Rollback(slot); err != nil {
+	if err = newStorage.Ledger().Rollback(slot); err != nil {
 		return nil, err
 	}
 
@@ -134,18 +134,18 @@ func (e *EngineManager) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error
 		return nil, ierrors.Wrapf(err, "error while retrieving commitment for target index %d", slot)
 	}
 
-	if err := newStorage.Settings().Rollback(targetCommitment); err != nil {
+	if err = newStorage.Settings().Rollback(targetCommitment); err != nil {
 		return nil, err
 	}
 
-	if err := newStorage.RollbackPrunable(slot); err != nil {
+	if err = newStorage.Rollback(slot); err != nil {
 		return nil, err
 	}
 
 	candidateEngine := e.loadEngineInstanceWithStorage(newEngineAlias, newStorage)
 
 	// rollback attestations already on created engine instance, because this action modifies the in-memory storage.
-	if err := candidateEngine.Attestations.Rollback(slot); err != nil {
+	if err = candidateEngine.Attestations.Rollback(slot); err != nil {
 		return nil, ierrors.Wrap(err, "error while rolling back attestations storage on candidate engine")
 	}
 
