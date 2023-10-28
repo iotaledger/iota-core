@@ -90,9 +90,9 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 
 	if err = stream.WriteCollection(writer, func() (uint64, error) {
 		for _, a := range attestations {
-			apiForVersion, err := m.apiProvider.APIForVersion(a.ProtocolVersion)
+			apiForVersion, err := m.apiProvider.APIForVersion(a.Header.ProtocolVersion)
 			if err != nil {
-				return 0, ierrors.Wrapf(err, "failed to get API for version %d", a.ProtocolVersion)
+				return 0, ierrors.Wrapf(err, "failed to get API for version %d", a.Header.ProtocolVersion)
 			}
 			bytes, err := apiForVersion.Encode(a)
 			if err != nil {
