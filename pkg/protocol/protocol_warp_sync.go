@@ -110,7 +110,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
 			}
 
-			if !iotago.VerifyProof(mutationProof, iotago.Identifier(acceptedTransactionIDs.Root()), commitment.RootsID()) {
+			if !iotago.VerifyProof(mutationProof, acceptedTransactionIDs.Root(), commitment.RootsID()) {
 				w.LogError("failed to verify mutations proof", "commitment", commitment.LogName(), "transactionIDs", transactionIDs, "proof", mutationProof, "fromPeer", from)
 
 				return false

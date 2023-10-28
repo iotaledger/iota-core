@@ -262,11 +262,12 @@ func (c *ChainManager) publishEngineCommitments(chain *Chain) {
 
 						return engine.LatestCommitment.OnUpdate(func(_, latestCommitment *model.Commitment) {
 							for latestPublishedSlot < latestCommitment.Slot() {
-								if commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedSlot + 1); err != nil {
+								commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedSlot + 1)
+								if err != nil {
 									panic(err) // this should never happen, but we panic to get a stack trace if it does
-								} else {
-									publishCommitment(commitmentToPublish)
 								}
+
+								publishCommitment(commitmentToPublish)
 							}
 						})
 					})
