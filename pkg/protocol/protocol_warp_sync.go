@@ -99,7 +99,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
 			}
 
-			if !iotago.VerifyProof(proof, iotago.Identifier(acceptedBlocks.Root()), commitment.RootsID()) {
+			if !iotago.VerifyProof(proof, acceptedBlocks.Root(), commitment.RootsID()) {
 				w.LogError("failed to verify blocks proof", "commitment", commitment.LogName(), "blockIDs", blockIDs, "proof", proof, "fromPeer", from)
 
 				return false
