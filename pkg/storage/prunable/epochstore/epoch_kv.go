@@ -22,10 +22,10 @@ func NewEpochKVStore(storeRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay 
 
 	return &EpochKVStore{
 		realm:             storeRealm,
-		kv:                lo.PanicOnErr(kv.WithExtendedRealm(storeRealm)),
+		kv:                lo.PanicOnErr(kv.WithExtendedRealm(append(storeRealm, entriesKey))),
 		pruningDelay:      pruningDelay,
-		lastAccessedEpoch: kvstore.NewTypedValue(kv, kvstore.Realm{lastAccessedEpochKey}, iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes),
-		lastPrunedEpoch:   model.NewPruningIndex(lo.PanicOnErr(kv.WithExtendedRealm(kvstore.Realm{lastPrunedEpochKey})), storeRealm),
+		lastAccessedEpoch: kvstore.NewTypedValue(kv, append(storeRealm, lastAccessedEpochKey), iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes),
+		lastPrunedEpoch:   model.NewPruningIndex(lo.PanicOnErr(kv.WithExtendedRealm(storeRealm)), kvstore.Realm{lastPrunedEpochKey}),
 	}
 }
 
