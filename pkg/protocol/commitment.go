@@ -204,9 +204,6 @@ func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitm
 					}
 
 					spawnedChain = NewChain(c.protocol)
-
-					c.protocol.LogDebug("new chain created", "name", spawnedChain.LogName(), "forkingPoint", c.LogName())
-
 					spawnedChain.ForkingPoint.Set(c)
 				}
 

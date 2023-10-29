@@ -145,6 +145,8 @@ func NewChain(protocol *Protocol) *Chain {
 	})
 
 	c.Logger = protocol.NewEntityLogger("Chain", c.IsEvicted, func(entityLogger log.Logger) {
+		entityLogger.LogDebug("created")
+
 		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
 		c.NetworkClockSlot.LogUpdates(entityLogger, log.LevelTrace, "NetworkClockSlot")
 		c.WarpSyncThreshold.LogUpdates(entityLogger, log.LevelTrace, "WarpSyncThreshold")
