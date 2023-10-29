@@ -59,6 +59,7 @@ func NewChain(protocol *Protocol) *Chain {
 		WarpSyncThreshold:        reactive.NewVariable[iotago.SlotIndex](),
 		OutOfSyncThreshold:       reactive.NewVariable[iotago.SlotIndex](),
 		VerifyAttestations:       reactive.NewVariable[bool](),
+		Engine:                   reactive.NewVariable[*engine.Engine](),
 		IsEvicted:                reactive.NewEvent(),
 
 		commitments:   shrinkingmap.New[iotago.SlotIndex, *Commitment](),
@@ -70,15 +71,8 @@ func NewChain(protocol *Protocol) *Chain {
 	c.initClaimedWeight()
 	c.initAttestedWeight()
 	c.initVerifiedWeight()
+	c.initEngine()
 	c.initWarpSync()
-
-	c.Engine = reactive.NewDerivedVariable2(func(spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
-		if spawnedEngine != nil {
-			return spawnedEngine
-		}
-
-		return parentEngine
-	}, c.SpawnedEngine, c.parentEngine)
 
 	protocol.NetworkClock.OnUpdate(func(_, now time.Time) {
 		if engineInstance := c.Engine.Get(); engineInstance != nil {
@@ -210,11 +204,41 @@ func (c *Chain) initWarpSync() {
 	warpSyncTogglePool := workerpool.New("WarpSync toggle", workerpool.WithWorkerCount(1)).Start()
 	c.IsEvicted.OnTrigger(func() { warpSyncTogglePool.Shutdown() })
 
-	c.WarpSync.OnUpdateWithContext(func(_, warpSync bool, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+	var unsubscribe func()
+
+	c.WarpSync.OnUpdate(func(_, warpSync bool) {
 		if !c.IsEvicted.Get() {
-			warpSyncTogglePool.Submit(func() { unsubscribeOnUpdate(lo.Cond(warpSync, disableWarpSyncIfNecessary, enableWarpSyncIfNecessary)) })
+			warpSyncTogglePool.Submit(func() {
+				if unsubscribe != nil {
+					unsubscribe()
+				}
+
+				if warpSync {
+					unsubscribe = disableWarpSyncIfNecessary()
+				} else {
+					unsubscribe = enableWarpSyncIfNecessary()
+				}
+			})
 		}
 	})
+}
+
+func (c *Chain) initEngine() {
+	c.ParentChain.OnUpdateWithContext(func(_, parentChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+		unsubscribeOnUpdate(func() func() {
+			if parentChain == nil {
+				return c.Engine.InheritFrom(c.SpawnedEngine)
+			}
+
+			return c.Engine.InheritFrom(reactive.NewDerivedVariable2(func(spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
+				if spawnedEngine != nil {
+					return spawnedEngine
+				}
+
+				return parentEngine
+			}, c.SpawnedEngine, parentChain.Engine))
+		})
+	}, true)
 }
 
 func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exists bool) {
