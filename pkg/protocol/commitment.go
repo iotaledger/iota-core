@@ -250,11 +250,3 @@ func (c *Commitment) triggerEventIfBelowThreshold(event func(*Commitment) reacti
 		})
 	})
 }
-
-func (c *Commitment) cumulativeWeight() uint64 {
-	if c == nil {
-		return 0
-	}
-
-	return c.CumulativeWeight()
-}
