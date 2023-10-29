@@ -171,11 +171,11 @@ var Feature = []options.Option[snapshotcreator.Options]{
 			*/
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0x670a1a20ddb02a6cec53ec3196bc7d5bd26df2f5a6ca90b5fffd71364f104b25"))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0x670a1a20ddb02a6cec53ec3196bc7d5bd26df2f5a6ca90b5fffd71364f104b25"))),
-			Amount:               testsuite.MinIssuerAccountAmount,
+			Amount:               mock.MinIssuerAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x670a1a20ddb02a6cec53ec3196bc7d5bd26df2f5a6ca90b5fffd71364f104b25")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
-			Mana:                 iotago.Mana(testsuite.MinIssuerAccountAmount),
+			Mana:                 iotago.Mana(mock.MinIssuerAccountAmount),
 		},
 	),
 	snapshotcreator.WithBasicOutputs(

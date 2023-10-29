@@ -158,15 +158,14 @@ func (t *TestSuite) IssueValidationBlock(blockName string, node *mock.Node, bloc
 
 	return block
 }
-func (t *TestSuite) IssueCandidacyAnnouncementInSlot(alias string, slot iotago.SlotIndex, parentsPrefixAlias string, node *mock.Node, issuingOptions ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+func (t *TestSuite) IssueCandidacyAnnouncementInSlot(alias string, slot iotago.SlotIndex, parentsPrefixAlias string, wallet *mock.Wallet, issuingOptions ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
 	timeProvider := t.API.TimeProvider()
 	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "wallet: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", wallet.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
 	return t.IssuePayloadWithOptions(
 		alias,
-		node.Validator,
-		node,
+		wallet,
 		&iotago.CandidacyAnnouncement{},
 		append(issuingOptions,
 			mock.WithStrongParents(t.BlockIDsWithPrefix(parentsPrefixAlias)...),

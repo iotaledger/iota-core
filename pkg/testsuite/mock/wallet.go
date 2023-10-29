@@ -31,12 +31,14 @@ type Wallet struct {
 	transactions map[string]*iotago.Transaction
 }
 
-func NewWallet(t *testing.T, name string, node *Node, seed ...[]byte) *Wallet {
-	if len(seed) == 0 {
+func NewWallet(t *testing.T, name string, node *Node, keyManager ...*KeyManager) *Wallet {
+	var km *KeyManager
+	if len(keyManager) == 0 {
 		randomSeed := tpkg.RandEd25519Seed()
-		seed = append(seed, randomSeed[:])
+		km = NewKeyManager(randomSeed[:], 0)
+	} else {
+		km = keyManager[0]
 	}
-	keyManager := NewKeyManager(seed[0], 0)
 
 	return &Wallet{
 		Testing:      t,
@@ -44,7 +46,7 @@ func NewWallet(t *testing.T, name string, node *Node, seed ...[]byte) *Wallet {
 		Node:         node,
 		outputs:      make(map[string]*utxoledger.Output),
 		transactions: make(map[string]*iotago.Transaction),
-		keyManager:   keyManager,
+		keyManager:   km,
 	}
 }
 

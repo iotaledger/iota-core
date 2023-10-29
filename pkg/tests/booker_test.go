@@ -18,7 +18,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1")
-	wallet := ts.AddWallet("default", node1)
+	wallet := ts.AddGenesisWallet("default", node1)
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
 	tx1 := wallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
@@ -54,7 +54,7 @@ func Test_DoubleSpend(t *testing.T) {
 
 	node1 := ts.AddValidatorNode("node1")
 	node2 := ts.AddValidatorNode("node2")
-	wallet := ts.AddWallet("default", node1)
+	wallet := ts.AddGenesisWallet("default", node1)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
@@ -124,7 +124,7 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	nodeA := ts.AddValidatorNode("nodeA")
 	nodeB := ts.AddValidatorNode("nodeB")
-	wallet := ts.AddWallet("default", nodeA)
+	wallet := ts.AddGenesisWallet("default", nodeA)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
@@ -246,7 +246,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	node1 := ts.AddValidatorNode("node1")
 	node2 := ts.AddValidatorNode("node2")
-	wallet := ts.AddWallet("default", node1)
+	wallet := ts.AddGenesisWallet("default", node1)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
@@ -515,7 +515,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 	node1 := ts.AddValidatorNode("node1")
 	node2 := ts.AddValidatorNode("node2")
-	wallet := ts.AddWallet("default", node1)
+	wallet := ts.AddGenesisWallet("default", node1)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 

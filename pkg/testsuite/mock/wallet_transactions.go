@@ -333,6 +333,9 @@ func (w *Wallet) createSignedTransactionWithOptions(transactionName string, opts
 	addrSigner := w.AddressSigner()
 	signedTransaction, err := options.Apply(txBuilder, opts).Build(addrSigner)
 
+	// register the outputs in the wallet
+	w.registerOutputs(transactionName, signedTransaction.Transaction)
+
 	return signedTransaction, err
 }
 

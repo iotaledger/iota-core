@@ -48,8 +48,9 @@ func UnregisterIDAliases() {
 type Node struct {
 	Testing *testing.T
 
-	Name      string
-	Validator *BlockIssuer
+	Name       string
+	Validator  *BlockIssuer
+	KeyManager *KeyManager
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -95,7 +96,8 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 		Name: name,
 
-		Validator: validatorBlockIssuer,
+		Validator:  validatorBlockIssuer,
+		KeyManager: keyManager,
 
 		PeerID: peerID,
 

@@ -50,7 +50,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	// add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddGenesisWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true)
 
@@ -177,7 +177,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddGenesisWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true)
 
@@ -352,7 +352,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	// add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddGenesisWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true)
 

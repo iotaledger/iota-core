@@ -51,14 +51,15 @@ type TestSuite struct {
 	uniqueBlockTimeCounter              atomic.Int64
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
 	mutex                               syncutils.RWMutex
-	genesisSeed                         [32]byte
+	genesisKeyManager                   *mock.KeyManager
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
+	genesisSeed := tpkg.RandEd25519Seed()
 	return options.Apply(&TestSuite{
 		Testing:                             testingT,
 		fakeTesting:                         &testing.T{},
-		genesisSeed:                         tpkg.RandEd25519Seed(),
+		genesisKeyManager:                   mock.NewKeyManager(genesisSeed[:], 0),
 		network:                             mock.NewNetwork(),
 		Directory:                           utils.NewDirectory(testingT.TempDir()),
 		nodes:                               orderedmap.New[string, *mock.Node](),
@@ -248,6 +249,18 @@ func (t *TestSuite) Node(name string) *mock.Node {
 	return node
 }
 
+func (t *TestSuite) Wallet(name string) *mock.Wallet {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+
+	wallet, exist := t.wallets.Get(name)
+	if !exist {
+		panic(fmt.Sprintf("wallet %s does not exist", name))
+	}
+
+	return wallet
+}
+
 func (t *TestSuite) Nodes(names ...string) []*mock.Node {
 	if len(names) == 0 {
 		t.mutex.RLock()
@@ -342,7 +355,11 @@ func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, o
 }
 
 func (t *TestSuite) AddValidatorNode(name string, optAmount ...iotago.BaseToken) *mock.Node {
-	return t.addNodeToPartition(name, mock.NetworkMainPartition, true, optAmount...)
+	node := t.addNodeToPartition(name, mock.NetworkMainPartition, true, optAmount...)
+	// create a wallet for each validator node which uses the validator account as a block issuer
+	t.addWallet(name, node, node.Validator.AccountID, node.KeyManager)
+
+	return node
 }
 
 func (t *TestSuite) AddNodeToPartition(name string, partition string, optAmount ...iotago.BaseToken) *mock.Node {
@@ -357,12 +374,10 @@ func (t *TestSuite) RemoveNode(name string) {
 	t.nodes.Delete(name)
 }
 
-// AddWallet adds a wallet to the test suite with a block issuer in the genesis snapshot and access to the genesis seed.
+// AddGenesisWallet adds a wallet to the test suite with a block issuer in the genesis snapshot and access to the genesis seed.
 // If no block issuance credits are provided, the wallet will be assigned half of the maximum block issuance credits.
-func (t *TestSuite) AddWallet(name string, node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
-	newWallet := mock.NewWallet(t.Testing, name, node, t.genesisSeed[:])
-	newWallet.SetBlockIssuer(iotago.EmptyAccountID)
-	t.wallets.Set(name, newWallet)
+func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
+	newWallet := t.addWallet(name, node, iotago.EmptyAccountID, t.genesisKeyManager)
 	var bic iotago.BlockIssuanceCredits
 	if len(blockIssuanceCredits) == 0 {
 		bic = iotago.MaxBlockIssuanceCredits / 2
@@ -384,6 +399,14 @@ func (t *TestSuite) AddWallet(name string, node *mock.Node, blockIssuanceCredits
 	return newWallet
 }
 
+func (t *TestSuite) addWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager *mock.KeyManager) *mock.Wallet {
+	newWallet := mock.NewWallet(t.Testing, name, node, keyManager)
+	newWallet.SetBlockIssuer(accountID)
+	t.wallets.Set(name, newWallet)
+
+	return newWallet
+}
+
 func (t *TestSuite) DefaultWallet() *mock.Wallet {
 	defaultWallet, exists := t.wallets.Get("default")
 	if !exists {
@@ -399,11 +422,10 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 
 	// Create accounts for any block issuer nodes added before starting the network.
 	if t.optsAccounts != nil {
-		keyManager := mock.NewKeyManager(t.genesisSeed[:], 0)
 		t.optsSnapshotOptions = append(t.optsSnapshotOptions, snapshotcreator.WithAccounts(lo.Map(t.optsAccounts, func(accountDetails snapshotcreator.AccountDetails) snapshotcreator.AccountDetails {
-			// if no custom address is assigned to the account, assign an address generated from GenesisSeed
+			// if no custom address is assigned to the account, assign an address generated from GenesisKeyManager
 			if accountDetails.Address == nil {
-				accountDetails.Address = keyManager.Address(iotago.AddressEd25519)
+				accountDetails.Address = t.genesisKeyManager.Address(iotago.AddressEd25519)
 			}
 
 			if accountDetails.AccountID.Empty() {
@@ -420,7 +442,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 		})...))
 	}
 
-	err := snapshotcreator.CreateSnapshot(append([]options.Option[snapshotcreator.Options]{snapshotcreator.WithGenesisSeed(t.genesisSeed[:])}, t.optsSnapshotOptions...)...)
+	err := snapshotcreator.CreateSnapshot(append([]options.Option[snapshotcreator.Options]{snapshotcreator.WithGenesisKeyManager(t.genesisKeyManager)}, t.optsSnapshotOptions...)...)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create snapshot: %s", err))
 	}
