@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -162,29 +163,31 @@ func NewChain(protocol *Protocol) *Chain {
 		c.SpawnedEngine.LogUpdates(entityLogger, log.LevelDebug, "SpawnedEngine", (*engine.Engine).LogName)
 	})
 
+	warpSyncTogglePool := workerpool.New("WarpSync toggle", workerpool.WithWorkerCount(1))
+
 	var unsubscribe func()
 	c.WarpSync.OnUpdate(func(_, warpSync bool) {
-		if warpSync {
-			c.LogDebug("warp-sync enabled")
-		} else {
-			c.LogDebug("warp-sync disabled")
-		}
-
 		if unsubscribe != nil {
 			unsubscribe()
 		}
 
-		go func() {
-			if warpSync {
+		if warpSync {
+			c.LogDebug("warp-sync enabled")
+
+			warpSyncTogglePool.Submit(func() {
 				unsubscribe = c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(latestVerifiedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex) bool {
 					return latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < warpSyncThreshold
 				}, c.LatestVerifiedCommitment, c.WarpSyncThreshold))
-			} else {
+			})
+		} else {
+			c.LogDebug("warp-sync disabled")
+
+			warpSyncTogglePool.Submit(func() {
 				unsubscribe = c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(latestVerifiedCommitment *Commitment, outOfSyncThreshold iotago.SlotIndex) bool {
 					return latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < outOfSyncThreshold
 				}, c.LatestVerifiedCommitment, c.OutOfSyncThreshold))
-			}
-		}()
+			})
+		}
 	})
 
 	return c
