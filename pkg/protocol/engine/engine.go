@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
-	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -237,7 +236,7 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (e *Engine) Reset() {
-	e.LogDebug("resetting engine", "slot", e.Storage.Settings().LatestCommitment().Slot(), "stack-trace", debug.StackTrace(false, 0))
+	e.LogDebug("resetting", "target-slot", e.Storage.Settings().LatestCommitment().Slot())
 
 	e.BlockRequester.Clear()
 	e.Storage.Reset()
@@ -263,30 +262,6 @@ func (e *Engine) Reset() {
 	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
 	latestCommittedTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
 	e.Clock.Reset(latestCommittedTime)
-}
-
-func (e *Engine) shutdown() {
-	e.BlockRequester.Shutdown()
-	e.Attestations.Shutdown()
-	e.SyncManager.Shutdown()
-	e.Notarization.Shutdown()
-	e.Booker.Shutdown()
-	e.Ledger.Shutdown()
-	e.BlockDAG.Shutdown()
-	e.BlockGadget.Shutdown()
-	e.SlotGadget.Shutdown()
-	e.Clock.Shutdown()
-	e.SybilProtection.Shutdown()
-	e.UpgradeOrchestrator.Shutdown()
-	e.TipManager.Shutdown()
-	e.Filter.Shutdown()
-	e.CommitmentFilter.Shutdown()
-	e.Scheduler.Shutdown()
-	e.Retainer.Shutdown()
-	e.Workers.Shutdown()
-	e.Storage.Shutdown()
-
-	e.Stopped.Trigger()
 }
 
 func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {
@@ -592,14 +567,39 @@ func (e *Engine) initLatestCommitment() {
 func (e *Engine) initReactiveModule(logger log.Logger) (reactiveModule *module.ReactiveModule) {
 	stopLogging := reactive.NewEvent()
 
-	reactiveModule = module.NewReactiveModule(logger.NewEntityLogger("Engine", stopLogging, func(engineLogger log.Logger) {
-		// TODO: setup reactive logging
+	reactiveModule = module.NewReactiveModule(logger.NewEntityLogger("Engine", stopLogging, func(l log.Logger) {
+		e.RootCommitment.LogUpdates(l, log.LevelTrace, "RootCommitment")
+		e.LatestCommitment.LogUpdates(l, log.LevelTrace, "LatestCommitment")
 	}))
 
 	reactiveModule.Shutdown.OnTrigger(func() {
+		reactiveModule.LogDebug("shutting down")
+
 		stopLogging.Trigger()
 
-		e.shutdown()
+		e.BlockRequester.Shutdown()
+		e.Attestations.Shutdown()
+		e.SyncManager.Shutdown()
+		e.Notarization.Shutdown()
+		e.Booker.Shutdown()
+		e.Ledger.Shutdown()
+		e.BlockDAG.Shutdown()
+		e.BlockGadget.Shutdown()
+		e.SlotGadget.Shutdown()
+		e.Clock.Shutdown()
+		e.SybilProtection.Shutdown()
+		e.UpgradeOrchestrator.Shutdown()
+		e.TipManager.Shutdown()
+		e.Filter.Shutdown()
+		e.CommitmentFilter.Shutdown()
+		e.Scheduler.Shutdown()
+		e.Retainer.Shutdown()
+		e.Workers.Shutdown()
+		e.Storage.Shutdown()
+
+		reactiveModule.LogDebug("stopped")
+
+		e.Stopped.Trigger()
 	})
 
 	return reactiveModule

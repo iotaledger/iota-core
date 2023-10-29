@@ -145,7 +145,7 @@ func NewChain(protocol *Protocol) *Chain {
 	})
 
 	c.Logger = protocol.NewEntityLogger("Chain", c.IsEvicted, func(entityLogger log.Logger) {
-		c.WarpSync.LogUpdates(entityLogger, log.LevelInfo, "WarpSync")
+		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
 		c.NetworkClockSlot.LogUpdates(entityLogger, log.LevelTrace, "NetworkClockSlot")
 		c.WarpSyncThreshold.LogUpdates(entityLogger, log.LevelTrace, "WarpSyncThreshold")
 		c.OutOfSyncThreshold.LogUpdates(entityLogger, log.LevelTrace, "OutOfSyncThreshold")
@@ -162,6 +162,12 @@ func NewChain(protocol *Protocol) *Chain {
 
 	var unsubscribe func()
 	c.WarpSync.OnUpdate(func(_, warpSync bool) {
+		if warpSync {
+			c.LogDebug("warp-sync enabled")
+		} else {
+			c.LogDebug("warp-sync disabled")
+		}
+
 		if unsubscribe != nil {
 			unsubscribe()
 		}

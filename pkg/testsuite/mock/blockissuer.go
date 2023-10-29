@@ -283,7 +283,7 @@ func (i *BlockIssuer) IssueBasicBlock(ctx context.Context, alias string, node *N
 
 	require.NoErrorf(i.Testing, i.IssueBlock(block.ModelBlock(), node), "%s > failed to issue block with alias %s", i.Name, alias)
 
-	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", i.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
+	node.Protocol.LogTrace("issued block", "block", block, "blockID", block.ID(), "slot", block.ID().Slot(), "commitment", block.SlotCommitmentID(), "latestFinalizedSlot", block.ProtocolBlock().LatestFinalizedSlot, "version", block.ProtocolBlock().ProtocolVersion)
 
 	return block
 }

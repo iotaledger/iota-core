@@ -37,7 +37,7 @@ func (c *CommitmentsProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 	c.workerPool.Submit(func() {
 		c.protocol.Network.RequestSlotCommitment(commitmentID)
 
-		c.LogDebug("sent request", "commitmentID", commitmentID)
+		c.LogDebug("request", "commitment", commitmentID)
 	})
 }
 

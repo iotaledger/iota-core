@@ -54,7 +54,7 @@ func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 		if commitment, err := w.protocol.Commitment(commitmentID, false); err == nil {
 			w.protocol.Network.SendWarpSyncRequest(commitmentID)
 
-			w.LogDebug("sent request", "commitment", commitment.LogName())
+			w.LogDebug("request", "commitment", commitment.LogName())
 		}
 	})
 }
