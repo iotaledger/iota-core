@@ -12,11 +12,9 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// TODO: implement tests for staking and delegation transitions that cover edge cases - part of hardening phase.
 func Test_TransitionAndDestroyAccount(t *testing.T) {
 	oldGenesisOutputKey := utils.RandBlockIssuerKey()
 
-	// add a genesis account to the snapshot which expires in slot 1.
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
 		// Nil address will be replaced with the address generated from genesis seed.
 		Address: nil,
@@ -101,13 +99,13 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 		mock.WithBlockIssuerExpirySlot(newExpirySlot),
 	)
 
-	// defaults block issuer issues a block containing the transaction in slot 1.
+	// default block issuer issues a block containing the transaction in slot 1.
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
 	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Slot(), block1)
 
-	// assert diff of a genesis account, it should have a new output ID, same expiry slot and a new block issuer key.
+	// assert diff of the genesis account, it should have a new output ID, new expiry slot and a new block issuer key.
 	ts.AssertAccountDiff(genesisAccountOutput.AccountID, block1Slot, &model.AccountDiff{
 		BICChange:              0,
 		PreviousUpdatedTime:    0,

@@ -361,7 +361,7 @@ func (t *TestSuite) RemoveNode(name string) {
 // If no block issuance credits are provided, the wallet will be assigned half of the maximum block issuance credits.
 func (t *TestSuite) AddWallet(name string, node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
 	newWallet := mock.NewWallet(t.Testing, name, node, t.genesisSeed[:])
-	newWallet.AddBlockIssuer(iotago.EmptyAccountID)
+	newWallet.SetBlockIssuer(iotago.EmptyAccountID)
 	t.wallets.Set(name, newWallet)
 	var bic iotago.BlockIssuanceCredits
 	if len(blockIssuanceCredits) == 0 {

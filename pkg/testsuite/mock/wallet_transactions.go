@@ -38,6 +38,7 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 	}
 
 	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
 				CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
@@ -48,8 +49,7 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 		WithSlotCreated(creationSlot),
 	))
 
-	// register the outputs in each wallet
-	w.registerOutputs(transactionName, signedTransaction.Transaction)
+	// register the outputs in the recipient wallet (so wallet doesn't have to scan for outputs on its addresses)
 	recipientWallet.registerOutputs(transactionName, signedTransaction.Transaction)
 
 	return signedTransaction
@@ -87,6 +87,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 
 	// create the signed transaction
 	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
 				CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
@@ -96,9 +97,6 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 		WithOutputs(outputStates),
 		WithSlotCreated(creationSlot),
 	))
-
-	// register the outputs in the wallet
-	w.registerOutputs(transactionName, signedTransaction.Transaction)
 
 	return signedTransaction
 }
@@ -123,6 +121,7 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 	delegationOutput := delegationBuilder.MustBuild()
 
 	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
 				CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
@@ -132,9 +131,6 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 		WithOutputs(iotago.Outputs[iotago.Output]{delegationOutput}),
 		WithSlotCreated(creationSlot),
 	))
-
-	// register the outputs in the wallet
-	w.registerOutputs(transactionName, signedTransaction.Transaction)
 
 	return signedTransaction
 }
@@ -154,6 +150,7 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 	accountOutput = options.Apply(accountBuilder, opts).MustBuild()
 
 	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
 		WithAccountInput(input, true),
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
@@ -165,9 +162,6 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 		}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
 	))
-
-	// register the outputs in the wallet
-	w.registerOutputs(transactionName, signedTransaction.Transaction)
 
 	return signedTransaction
 }
@@ -189,6 +183,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string, creati
 	}}
 
 	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
 				AccountID: inputAccount.AccountID,
@@ -201,9 +196,6 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string, creati
 		WithOutputs(destructionOutputs),
 		WithSlotCreated(creationSlot),
 	))
-
-	// register the outputs in the wallet
-	w.registerOutputs(transactionName, signedTransaction.Transaction)
 
 	return signedTransaction
 }
@@ -231,22 +223,22 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 	}
 
 	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(iotago.Outputs[iotago.Output]{implicitAccountOutput, remainderBasicOutput}),
 	))
 
-	// register the outputs in the wallet
-	w.registerOutputs(transactionName, signedTransaction.Transaction)
+	// register the outputs in the recipient wallet (so wallet doesn't have to scan for outputs on its addresses)
 	recipientWallet.registerOutputs(transactionName, signedTransaction.Transaction)
 
 	// register the implicit account as a block issuer in the wallet
 	implicitAccountID := iotago.AccountIDFromOutputID(recipientWallet.Output(fmt.Sprintf("%s:0", transactionName)).OutputID())
-	recipientWallet.AddBlockIssuer(implicitAccountID)
+	recipientWallet.SetBlockIssuer(implicitAccountID)
 
 	return signedTransaction
 }
 
-func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactioName string, inputName string, creationSlot iotago.SlotIndex, opts ...options.Option[builder.AccountOutputBuilder]) *iotago.SignedTransaction {
+func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string, inputName string, creationSlot iotago.SlotIndex, opts ...options.Option[builder.AccountOutputBuilder]) *iotago.SignedTransaction {
 	input := w.Output(inputName)
 	implicitAccountID := iotago.AccountIDFromOutputID(input.OutputID())
 
@@ -262,9 +254,8 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactioName string,
 		AccountID(iotago.AccountIDFromOutputID(input.OutputID())),
 		opts).MustBuild()
 
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithAllotmentAndOptions(
-		creationSlot,
-		implicitAccountID,
+	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
 				AccountID: implicitAccountID,
@@ -276,10 +267,10 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactioName string,
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
 		WithSlotCreated(creationSlot),
+		func(txBuilder *builder.TransactionBuilder) {
+			txBuilder.AllotAllMana(creationSlot, implicitAccountID)
+		},
 	))
-
-	// register the outputs in the wallet
-	w.registerOutputs(transactioName, signedTransaction.Transaction)
 
 	return signedTransaction
 }
@@ -322,17 +313,15 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, out
 	}
 
 	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
 		WithInputs(inputStates),
 		WithOutputs(outputStates),
 	))
 
-	// register the outputs in the wallet
-	w.registerOutputs(transactionName, signedTransaction.Transaction)
-
 	return signedTransaction
 }
 
-func (w *Wallet) createSignedTransactionWithOptions(opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
+func (w *Wallet) createSignedTransactionWithOptions(transactionName string, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
 	currentAPI := w.Node.Protocol.CommittedAPI()
 
 	txBuilder := builder.NewTransactionBuilder(currentAPI)
@@ -343,22 +332,6 @@ func (w *Wallet) createSignedTransactionWithOptions(opts ...options.Option[build
 
 	addrSigner := w.AddressSigner()
 	signedTransaction, err := options.Apply(txBuilder, opts).Build(addrSigner)
-
-	return signedTransaction, err
-}
-
-func (w *Wallet) createSignedTransactionWithAllotmentAndOptions(creationSlot iotago.SlotIndex, blockIssuerAccountID iotago.AccountID, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
-	currentAPI := w.Node.Protocol.CommittedAPI()
-
-	txBuilder := builder.NewTransactionBuilder(currentAPI)
-	txBuilder.WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything()))
-	// Always add a random payload to randomize transaction ID.
-	randomPayload := tpkg.Rand12ByteArray()
-	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
-	options.Apply(txBuilder, opts)
-	txBuilder.AllotAllMana(creationSlot, blockIssuerAccountID)
-
-	signedTransaction, err := txBuilder.Build(w.AddressSigner())
 
 	return signedTransaction, err
 }

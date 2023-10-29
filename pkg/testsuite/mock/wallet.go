@@ -48,7 +48,7 @@ func NewWallet(t *testing.T, name string, node *Node, seed ...[]byte) *Wallet {
 	}
 }
 
-func (w *Wallet) AddBlockIssuer(accountID iotago.AccountID) {
+func (w *Wallet) SetBlockIssuer(accountID iotago.AccountID) {
 	w.BlockIssuer = NewBlockIssuer(w.Testing, w.Name, w.keyManager, accountID, false)
 }
 
