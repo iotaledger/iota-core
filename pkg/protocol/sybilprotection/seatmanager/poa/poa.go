@@ -55,7 +55,7 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 			}, opts, func(s *SeatManager) {
 				e.Events.SeatManager.LinkTo(s.events)
 
-				e.HookConstructed(func() {
+				e.Constructed.OnTrigger(func() {
 					s.clock = e.Clock
 
 					s.TriggerConstructed()

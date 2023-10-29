@@ -51,7 +51,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 			e.Events.SlotGadget.LinkTo(g.events)
 			g.workers = e.Workers.CreateGroup("SlotGadget")
 
-			e.HookConstructed(func() {
+			e.Constructed.OnTrigger(func() {
 				g.seatManager = e.SybilProtection.SeatManager()
 				g.TriggerConstructed()
 
@@ -64,7 +64,7 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 				}
 			}
 
-			e.HookInitialized(func() {
+			e.Initialized.OnTrigger(func() {
 				// Can't use setter here as it has a side effect.
 				func() {
 					g.mutex.Lock()

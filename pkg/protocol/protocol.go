@@ -110,7 +110,7 @@ func (p *Protocol) waitEngineInitialized() {
 
 	waitInitialized.Add(1)
 	p.MainEngine.OnUpdateOnce(func(_, engine *engine.Engine) {
-		engine.HookInitialized(waitInitialized.Done)
+		engine.Initialized.OnTrigger(waitInitialized.Done)
 	})
 	waitInitialized.Wait()
 }

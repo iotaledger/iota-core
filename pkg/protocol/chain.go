@@ -146,9 +146,9 @@ func NewChain(protocol *Protocol) *Chain {
 
 	c.Logger = protocol.NewEntityLogger("Chain", c.IsEvicted, func(entityLogger log.Logger) {
 		c.WarpSync.LogUpdates(entityLogger, log.LevelInfo, "WarpSync")
-		c.NetworkClockSlot.LogUpdates(entityLogger, log.LevelDebug, "NetworkClockSlot")
-		c.WarpSyncThreshold.LogUpdates(entityLogger, log.LevelDebug, "WarpSyncThreshold")
-		c.OutOfSyncThreshold.LogUpdates(entityLogger, log.LevelDebug, "OutOfSyncThreshold")
+		c.NetworkClockSlot.LogUpdates(entityLogger, log.LevelTrace, "NetworkClockSlot")
+		c.WarpSyncThreshold.LogUpdates(entityLogger, log.LevelTrace, "WarpSyncThreshold")
+		c.OutOfSyncThreshold.LogUpdates(entityLogger, log.LevelTrace, "OutOfSyncThreshold")
 		c.ForkingPoint.LogUpdates(entityLogger, log.LevelTrace, "ForkingPoint", (*Commitment).LogName)
 		c.ClaimedWeight.LogUpdates(entityLogger, log.LevelTrace, "ClaimedWeight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
@@ -157,6 +157,7 @@ func NewChain(protocol *Protocol) *Chain {
 		c.LatestVerifiedCommitment.LogUpdates(entityLogger, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
 		c.VerifyAttestations.LogUpdates(entityLogger, log.LevelTrace, "VerifyAttestations")
 		c.VerifyState.LogUpdates(entityLogger, log.LevelDebug, "VerifyState")
+		c.SpawnedEngine.LogUpdates(entityLogger, log.LevelDebug, "SpawnedEngine", (*engine.Engine).LogName)
 	})
 
 	var unsubscribe func()
@@ -168,11 +169,6 @@ func NewChain(protocol *Protocol) *Chain {
 		go func() {
 			if warpSync {
 				unsubscribe = c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(latestVerifiedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex) bool {
-					latestVerifiedNil := latestVerifiedCommitment != nil
-					belowWarpSync := latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < warpSyncThreshold
-
-					c.LogError("WarpSync", "latestVerifiedNil", latestVerifiedNil, "belowWarpSync", belowWarpSync)
-
 					return latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < warpSyncThreshold
 				}, c.LatestVerifiedCommitment, c.WarpSyncThreshold))
 			} else {

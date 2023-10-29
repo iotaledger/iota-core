@@ -13,6 +13,8 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -83,12 +85,12 @@ type Engine struct {
 	optsSnapshotDepth    int
 	optsBlockRequester   []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
 
-	module.Module
+	*module.ReactiveModule
 }
 
 func New(
+	logger log.Logger,
 	workers *workerpool.Group,
-	errorHandler func(error),
 	storageInstance *storage.Storage,
 	filterProvider module.Provider[*Engine, filter.Filter],
 	commitmentFilterProvider module.Provider[*Engine, commitmentfilter.CommitmentFilter],
@@ -121,11 +123,16 @@ func New(
 			RootCommitment:   reactive.NewVariable[*model.Commitment](),
 			LatestCommitment: reactive.NewVariable[*model.Commitment](),
 			Workers:          workers,
-			errorHandler:     errorHandler,
 
 			optsSnapshotPath:  "snapshot.bin",
 			optsSnapshotDepth: 5,
 		}, opts, func(e *Engine) {
+			e.ReactiveModule = e.initReactiveModule(logger)
+
+			e.errorHandler = func(err error) {
+				e.LogTrace("engine error", "err", err)
+			}
+
 			// Import the settings from the snapshot file if needed.
 			if importSnapshot = !e.Storage.Settings().IsSnapshotImported() && e.optsSnapshotPath != ""; importSnapshot {
 				file, fileErr = os.Open(e.optsSnapshotPath)
@@ -169,16 +176,16 @@ func New(
 		(*Engine).setupBlockRequester,
 		(*Engine).setupPruning,
 		(*Engine).acceptanceHandler,
-		(*Engine).TriggerConstructed,
 		func(e *Engine) {
+			e.Constructed.Trigger()
+
 			// Make sure that we have the protocol parameters for the latest supported iota.go protocol version of the software.
 			// If not the user needs to update the protocol parameters file.
 			// This can only happen after a user updated the node version and the new protocol version is not yet active.
 			if _, err := e.APIForVersion(iotago.LatestProtocolVersion()); err != nil {
 				panic(ierrors.Wrap(err, "no protocol parameters for latest protocol version found"))
 			}
-		},
-		func(e *Engine) {
+
 			// Import the rest of the snapshot if needed.
 			if importSnapshot {
 				if err := e.ImportContents(file); err != nil {
@@ -215,9 +222,11 @@ func New(
 					panic(ierrors.Wrap(err, "failed to restore upgrade orchestrator from disk"))
 				}
 			}
+
+			e.Reset()
+
+			e.Initialized.Trigger()
 		},
-		(*Engine).Reset,
-		(*Engine).TriggerInitialized,
 	)
 }
 
@@ -228,7 +237,7 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (e *Engine) Reset() {
-	e.Workers.WaitChildren()
+	e.LogDebug("resetting engine", "slot", e.Storage.Settings().LatestCommitment().Slot(), "stack-trace", debug.StackTrace(false, 0))
 
 	e.BlockRequester.Clear()
 	e.Storage.Reset()
@@ -256,32 +265,28 @@ func (e *Engine) Reset() {
 	e.Clock.Reset(latestCommittedTime)
 }
 
-func (e *Engine) Shutdown() {
-	if !e.WasShutdown() {
-		e.TriggerShutdown()
+func (e *Engine) shutdown() {
+	e.BlockRequester.Shutdown()
+	e.Attestations.Shutdown()
+	e.SyncManager.Shutdown()
+	e.Notarization.Shutdown()
+	e.Booker.Shutdown()
+	e.Ledger.Shutdown()
+	e.BlockDAG.Shutdown()
+	e.BlockGadget.Shutdown()
+	e.SlotGadget.Shutdown()
+	e.Clock.Shutdown()
+	e.SybilProtection.Shutdown()
+	e.UpgradeOrchestrator.Shutdown()
+	e.TipManager.Shutdown()
+	e.Filter.Shutdown()
+	e.CommitmentFilter.Shutdown()
+	e.Scheduler.Shutdown()
+	e.Retainer.Shutdown()
+	e.Workers.Shutdown()
+	e.Storage.Shutdown()
 
-		e.BlockRequester.Shutdown()
-		e.Attestations.Shutdown()
-		e.SyncManager.Shutdown()
-		e.Notarization.Shutdown()
-		e.Booker.Shutdown()
-		e.Ledger.Shutdown()
-		e.BlockDAG.Shutdown()
-		e.BlockGadget.Shutdown()
-		e.SlotGadget.Shutdown()
-		e.Clock.Shutdown()
-		e.SybilProtection.Shutdown()
-		e.UpgradeOrchestrator.Shutdown()
-		e.TipManager.Shutdown()
-		e.Filter.Shutdown()
-		e.CommitmentFilter.Shutdown()
-		e.Scheduler.Shutdown()
-		e.Retainer.Shutdown()
-		e.Workers.Shutdown()
-		e.Storage.Shutdown()
-
-		e.TriggerStopped()
-	}
+	e.Stopped.Trigger()
 }
 
 func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {
@@ -555,14 +560,14 @@ func (e *Engine) initRootCommitment() {
 		})
 	}
 
-	e.HookConstructed(func() {
+	e.Constructed.OnTrigger(func() {
 		unsubscribe := e.Events.SlotGadget.SlotFinalized.Hook(updateRootCommitment).Unhook
 
-		e.HookInitialized(func() {
+		e.Initialized.OnTrigger(func() {
 			updateRootCommitment(e.Storage.Settings().LatestFinalizedSlot())
 		})
 
-		e.HookShutdown(unsubscribe)
+		e.Shutdown.OnTrigger(unsubscribe)
 	})
 }
 
@@ -573,15 +578,31 @@ func (e *Engine) initLatestCommitment() {
 		})
 	}
 
-	e.HookConstructed(func() {
+	e.Constructed.OnTrigger(func() {
 		unsubscribe := e.Events.Notarization.LatestCommitmentUpdated.Hook(updateLatestCommitment).Unhook
 
-		e.HookInitialized(func() {
+		e.Initialized.OnTrigger(func() {
 			updateLatestCommitment(e.Storage.Settings().LatestCommitment())
 		})
 
-		e.HookShutdown(unsubscribe)
+		e.Shutdown.OnTrigger(unsubscribe)
 	})
+}
+
+func (e *Engine) initReactiveModule(logger log.Logger) (reactiveModule *module.ReactiveModule) {
+	stopLogging := reactive.NewEvent()
+
+	reactiveModule = module.NewReactiveModule(logger.NewEntityLogger("Engine", stopLogging, func(engineLogger log.Logger) {
+		// TODO: setup reactive logging
+	}))
+
+	reactiveModule.Shutdown.OnTrigger(func() {
+		stopLogging.Trigger()
+
+		e.shutdown()
+	})
+
+	return reactiveModule
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

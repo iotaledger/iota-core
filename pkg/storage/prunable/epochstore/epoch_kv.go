@@ -19,7 +19,6 @@ type EpochKVStore struct {
 }
 
 func NewEpochKVStore(storeRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex) *EpochKVStore {
-
 	return &EpochKVStore{
 		realm:             storeRealm,
 		kv:                lo.PanicOnErr(kv.WithExtendedRealm(append(storeRealm, entriesKey))),
@@ -110,7 +109,7 @@ func (e *EpochKVStore) RollbackEpochs(epoch iotago.EpochIndex) (lastPrunedEpoch 
 		return lastAccessedEpoch, ierrors.Wrap(err, "failed to get last accessed epoch")
 	}
 
-	for epochToPrune := epoch + 1; epochToPrune <= lastAccessedEpoch; epochToPrune++ {
+	for epochToPrune := epoch; epochToPrune <= lastAccessedEpoch; epochToPrune++ {
 		if err = e.DeleteEpoch(epochToPrune); err != nil {
 			return epochToPrune, ierrors.Wrapf(err, "error while deleting epoch %d", epochToPrune)
 		}

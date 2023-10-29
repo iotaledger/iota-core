@@ -38,8 +38,6 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 					return
 				}
 
-				protocol.LogError("REPLAYING DROPPED BLOCKS", "slot", commitment.ID().Slot())
-
 				for _, droppedBlock := range b.droppedBlocksBuffer.GetValues(commitment.ID()) {
 					b.ProcessResponse(droppedBlock.A, droppedBlock.B)
 				}
@@ -51,7 +49,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 				chain.Engine.OnUpdate(func(_, engine *engine.Engine) {
 					unsubscribe := engine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
 
-					engine.HookShutdown(unsubscribe)
+					engine.Shutdown.OnTrigger(unsubscribe)
 				})
 			})
 		})

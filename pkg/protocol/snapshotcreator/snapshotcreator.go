@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -88,8 +89,9 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		}
 	}
 
-	engineInstance := engine.New(workers.CreateGroup("Engine"),
-		errorHandler,
+	engineInstance := engine.New(
+		log.NewLogger("snapshot-creator"),
+		workers.CreateGroup("Engine"),
 		s,
 		blockfilter.NewProvider(),
 		accountsfilter.NewProvider(),
@@ -110,7 +112,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		trivialsyncmanager.NewProvider(),
 		engine.WithSnapshotPath(""), // magic to disable loading snapshot
 	)
-	defer engineInstance.Shutdown()
+	defer engineInstance.Shutdown.Trigger()
 
 	for blockID, commitmentID := range opt.RootBlocks {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)

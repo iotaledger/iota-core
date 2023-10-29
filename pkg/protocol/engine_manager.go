@@ -186,11 +186,7 @@ func (e *EngineManager) loadEngineInstanceFromSnapshot(engineAlias string, snaps
 }
 
 func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storage *storage.Storage) *engine.Engine {
-	errorHandler := func(err error) {
-		e.protocol.LogError("engine error", "err", err, "name", engineAlias[0:8])
-	}
-
-	return engine.New(e.protocol.Workers.CreateGroup(engineAlias), errorHandler, storage, e.protocol.Options.FilterProvider, e.protocol.Options.CommitmentFilterProvider, e.protocol.Options.BlockDAGProvider, e.protocol.Options.BookerProvider, e.protocol.Options.ClockProvider, e.protocol.Options.BlockGadgetProvider, e.protocol.Options.SlotGadgetProvider, e.protocol.Options.SybilProtectionProvider, e.protocol.Options.NotarizationProvider, e.protocol.Options.AttestationProvider, e.protocol.Options.LedgerProvider, e.protocol.Options.SchedulerProvider, e.protocol.Options.TipManagerProvider, e.protocol.Options.TipSelectionProvider, e.protocol.Options.RetainerProvider, e.protocol.Options.UpgradeOrchestratorProvider, e.protocol.Options.SyncManagerProvider, e.protocol.Options.EngineOptions...)
+	return engine.New(e.protocol.Logger, e.protocol.Workers.CreateGroup(engineAlias), storage, e.protocol.Options.FilterProvider, e.protocol.Options.CommitmentFilterProvider, e.protocol.Options.BlockDAGProvider, e.protocol.Options.BookerProvider, e.protocol.Options.ClockProvider, e.protocol.Options.BlockGadgetProvider, e.protocol.Options.SlotGadgetProvider, e.protocol.Options.SybilProtectionProvider, e.protocol.Options.NotarizationProvider, e.protocol.Options.AttestationProvider, e.protocol.Options.LedgerProvider, e.protocol.Options.SchedulerProvider, e.protocol.Options.TipManagerProvider, e.protocol.Options.TipSelectionProvider, e.protocol.Options.RetainerProvider, e.protocol.Options.UpgradeOrchestratorProvider, e.protocol.Options.SyncManagerProvider, e.protocol.Options.EngineOptions...)
 }
 
 func (e *EngineManager) syncMainEngineFromMainChain() (unsubscribe func()) {
@@ -230,7 +226,7 @@ func (e *EngineManager) injectEngineInstances() (unsubscribe func()) {
 				}(); err != nil {
 					e.LogError("failed to create new engine instance", "err", err)
 				} else {
-					e.protocol.Network.OnShutdown(newEngine.Shutdown)
+					e.protocol.Network.OnShutdown(func() { newEngine.Shutdown.Trigger() })
 
 					chain.SpawnedEngine.Set(newEngine)
 				}

@@ -40,7 +40,7 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 			confirmedTime: NewRelativeTime(),
 			workerPool:    e.Workers.CreatePool("Clock", workerpool.WithWorkerCount(1), workerpool.WithCancelPendingTasksOnShutdown(true), workerpool.WithPanicOnSubmitAfterShutdown(true)),
 		}, opts, func(c *Clock) {
-			e.HookConstructed(func() {
+			e.Constructed.OnTrigger(func() {
 				latestCommitmentIndex := e.Storage.Settings().LatestCommitment().Slot()
 				c.acceptedTime.Set(e.APIForSlot(latestCommitmentIndex).TimeProvider().SlotEndTime(latestCommitmentIndex))
 
@@ -72,7 +72,7 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 				))
 			})
 
-			e.HookStopped(c.TriggerStopped)
+			e.Stopped.OnTrigger(c.TriggerStopped)
 		}, (*Clock).TriggerConstructed)
 	})
 }

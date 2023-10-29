@@ -61,7 +61,7 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			e.ErrorHandler("ledger"),
 		)
 
-		e.HookConstructed(func() {
+		e.Constructed.OnTrigger(func() {
 			e.Events.Ledger.LinkTo(l.events)
 			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
 			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())

@@ -38,7 +38,7 @@ type Booker struct {
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
 		b := New(e, e.BlockCache, e.ErrorHandler("booker"), opts...)
-		e.HookConstructed(func() {
+		e.Constructed.OnTrigger(func() {
 			b.ledger = e.Ledger
 			b.ledger.HookConstructed(func() {
 				b.conflictDAG = b.ledger.ConflictDAG()

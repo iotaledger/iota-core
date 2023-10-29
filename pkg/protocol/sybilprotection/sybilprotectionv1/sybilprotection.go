@@ -56,7 +56,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 			func(o *SybilProtection) {
 				o.seatManager = o.optsSeatManagerProvider(e)
 
-				e.HookConstructed(func() {
+				e.Constructed.OnTrigger(func() {
 					o.ledger = e.Ledger
 					o.errHandler = e.ErrorHandler("SybilProtection")
 
@@ -74,7 +74,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 
 					// When the engine is triggered initialized, snapshot has been read or database has been initialized properly,
 					// so the committee should be available in the performance manager.
-					e.HookInitialized(func() {
+					e.Initialized.OnTrigger(func() {
 						// Make sure that the sybil protection knows about the committee of the current epoch
 						// (according to the latest committed slot), and potentially the next selected
 						// committee if we have one.

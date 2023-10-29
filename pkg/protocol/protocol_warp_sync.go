@@ -28,7 +28,7 @@ func NewWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 	c := &WarpSyncProtocol{
 		Logger:     lo.Return1(protocol.Logger.NewChildLogger("WarpSync")),
 		protocol:   protocol,
-		workerPool: protocol.Workers.CreatePool("WarpSync"),
+		workerPool: protocol.Workers.CreatePool("WarpSync", workerpool.WithWorkerCount(1)),
 		ticker:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
 	}
 
@@ -80,6 +80,19 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			return
 		}
 
+		chain := commitment.Chain.Get()
+		if chain == nil {
+			w.LogTrace("failed to get chain for response", "commitment", commitment.LogName(), "fromPeer", from)
+
+			return
+		}
+
+		if !chain.WarpSync.Get() {
+			w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
+
+			return
+		}
+
 		targetEngine := commitment.Engine.Get()
 		if targetEngine == nil {
 			w.LogDebug("failed to get target engine for response", "commitment", commitment.LogName())
@@ -118,6 +131,14 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			w.ticker.StopTicker(commitmentID)
 
+			targetEngine.Workers.WaitChildren()
+
+			if !chain.WarpSync.Get() {
+				w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
+
+				return false
+			}
+
 			targetEngine.Reset()
 			// If the engine is "dirty" we need to restore the state of the engine to the state of the chain commitment.
 			// As we already decided to switch and sync to this chain we should make sure that processing the blocks from the commitment
@@ -133,8 +154,6 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			totalBlocks := uint32(len(blockIDs))
 			var bookedBlocks atomic.Uint32
 			var notarizedBlocks atomic.Uint32
-
-			w.LogError("TOTAL BLOCKS IN RESPONSE", "totalBlocks", totalBlocks)
 
 			forceCommitmentFunc := func() {
 				// 3. Force commitment of the slot

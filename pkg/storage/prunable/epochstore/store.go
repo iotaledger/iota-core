@@ -162,7 +162,7 @@ func (s *Store[V]) RollbackEpochs(epoch iotago.EpochIndex) (lastPrunedEpoch iota
 		return lastAccessedEpoch, ierrors.Wrap(err, "failed to get last accessed epoch")
 	}
 
-	for epochToPrune := epoch + 1; epochToPrune <= lastAccessedEpoch; epochToPrune++ {
+	for epochToPrune := epoch; epochToPrune <= lastAccessedEpoch; epochToPrune++ {
 		if err = s.DeleteEpoch(epochToPrune); err != nil {
 			return epochToPrune, ierrors.Wrapf(err, "error while deleting epoch %d", epochToPrune)
 		}
