@@ -49,7 +49,7 @@ const (
 //		- obtain and evict from it attestations that *commit to* lastCommittedSlot-attestationCommitmentOffset
 //	- committed attestations: retrieved at slot that we are committing, stored at slot lastCommittedSlot-attestationCommitmentOffset
 type Manager struct {
-	committeeFunc func(slot iotago.SlotIndex) *account.SeatedAccounts
+	committeeFunc func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool)
 
 	futureAttestations  *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
 	pendingAttestations *memstorage.IndexedStorage[iotago.SlotIndex, iotago.AccountID, *iotago.Attestation]
@@ -73,7 +73,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 			latestCommitment.Slot(),
 			latestCommitment.CumulativeWeight(),
 			e.Storage.Attestations,
-			e.SybilProtection.SeatManager().Committee,
+			e.SybilProtection.SeatManager().CommitteeInSlot,
 			e,
 		)
 	})
@@ -83,7 +83,7 @@ func NewManager(
 	lastCommittedSlot iotago.SlotIndex,
 	lastCumulativeWeight uint64,
 	bucketedStorage func(slot iotago.SlotIndex) (kvstore.KVStore, error),
-	committeeFunc func(slot iotago.SlotIndex) *account.SeatedAccounts,
+	committeeFunc func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool),
 	apiProvider iotago.APIProvider,
 ) *Manager {
 	m := &Manager{
@@ -145,15 +145,19 @@ func (m *Manager) GetMap(slot iotago.SlotIndex) (ads.Map[iotago.Identifier, iota
 }
 
 // AddAttestationFromValidationBlock adds an attestation from a block to the future attestations (beyond the attestation window).
-func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
+func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) error {
 	// Only track validator blocks.
 	if _, isValidationBlock := block.ValidationBlock(); !isValidationBlock {
-		return
+		return nil
 	}
 
+	committee, exists := m.committeeFunc(block.ID().Slot())
+	if !exists {
+		return ierrors.Errorf("committee for slot %d does not exist", block.ID().Slot())
+	}
 	// Only track attestations of active committee members.
-	if _, exists := m.committeeFunc(block.ID().Slot()).GetSeat(block.ProtocolBlock().IssuerID); !exists {
-		return
+	if _, exists := committee.GetSeat(block.ProtocolBlock().IssuerID); !exists {
+		return nil
 	}
 
 	m.commitmentMutex.RLock()
@@ -161,7 +165,7 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
 
 	// We only care about attestations that are newer than the last committed slot.
 	if block.ID().Slot() <= m.lastCommittedSlot {
-		return
+		return nil
 	}
 
 	newAttestation := iotago.NewAttestation(m.apiProvider.APIForSlot(block.ID().Slot()), block.ProtocolBlock())
@@ -179,6 +183,8 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) {
 
 		return currentValue
 	})
+
+	return nil
 }
 
 func (m *Manager) applyToPendingAttestations(attestation *iotago.Attestation, cutoffSlot iotago.SlotIndex) {
@@ -254,9 +260,14 @@ func (m *Manager) Commit(slot iotago.SlotIndex) (newCW uint64, attestationsRoot 
 	}
 
 	// Add all attestations to the tree and calculate the new cumulative weight.
+	committee, exists := m.committeeFunc(slot)
+	if !exists {
+		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get committee when committing slot %d", slot)
+	}
+
 	for _, a := range attestations {
 		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
-		if _, exists := m.committeeFunc(slot).GetSeat(a.IssuerID); exists {
+		if _, exists := committee.GetSeat(a.IssuerID); exists {
 			if err := tree.Set(a.IssuerID, a); err != nil {
 				return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to set attestation %s in tree", a.IssuerID)
 			}

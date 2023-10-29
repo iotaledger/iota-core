@@ -9,9 +9,9 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
@@ -70,20 +70,27 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		return ierrors.Wrap(err, "failed to store empty commitment")
 	}
 
-	accounts := account.NewAccounts()
-	for _, accountData := range opt.Accounts {
+	committeeAccountsData := make(accounts.AccountsData, 0)
+	for _, snapshotAccountDetails := range opt.Accounts {
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
-		if accountData.StakedAmount > 0 && accountData.StakingEpochEnd > 0 {
-			blockIssuerKeyEd25519, ok := accountData.IssuerKey.(*iotago.Ed25519PublicKeyBlockIssuerKey)
+		if snapshotAccountDetails.StakedAmount > 0 && snapshotAccountDetails.StakingEpochEnd > 0 {
+			blockIssuerKeyEd25519, ok := snapshotAccountDetails.IssuerKey.(*iotago.Ed25519PublicKeyBlockIssuerKey)
 			if !ok {
 				panic("block issuer key must be of type ed25519")
 			}
 			ed25519PubKey := blockIssuerKeyEd25519.ToEd25519PublicKey()
 			accountID := blake2b.Sum256(ed25519PubKey[:])
-			accounts.Set(accountID, &account.Pool{
-				PoolStake:      accountData.StakedAmount,
-				ValidatorStake: accountData.StakedAmount,
-				FixedCost:      accountData.FixedCost,
+			committeeAccountsData = append(committeeAccountsData, &accounts.AccountData{
+				ID:                                    accountID,
+				Credits:                               &accounts.BlockIssuanceCredits{Value: snapshotAccountDetails.BlockIssuanceCredits, UpdateTime: 0},
+				ExpirySlot:                            snapshotAccountDetails.ExpirySlot,
+				OutputID:                              iotago.OutputID{},
+				BlockIssuerKeys:                       iotago.BlockIssuerKeys{snapshotAccountDetails.IssuerKey},
+				ValidatorStake:                        snapshotAccountDetails.StakedAmount,
+				DelegationStake:                       0,
+				FixedCost:                             snapshotAccountDetails.FixedCost,
+				StakeEndEpoch:                         snapshotAccountDetails.StakingEpochEnd,
+				LatestSupportedProtocolVersionAndHash: model.VersionAndHash{},
 			})
 		}
 	}
@@ -98,10 +105,11 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 		blocktime.NewProvider(),
 		thresholdblockgadget.NewProvider(),
 		totalweightslotgadget.NewProvider(),
-		sybilprotectionv1.NewProvider(sybilprotectionv1.WithInitialCommittee(accounts)),
+		sybilprotectionv1.NewProvider(sybilprotectionv1.WithInitialCommittee(committeeAccountsData),
+			sybilprotectionv1.WithSeatManagerProvider(opt.SeatManagerProvider)),
 		slotnotarization.NewProvider(),
 		slotattestation.NewProvider(),
-		opt.LedgerProvider(),
+		opt.LedgerProvider,
 		passthrough.NewProvider(),
 		tipmanagerv1.NewProvider(),
 		tipselectionv1.NewProvider(),

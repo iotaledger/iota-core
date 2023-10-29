@@ -44,7 +44,7 @@
   },
   "restAPI": {
     "enabled": true,
-    "bindAddress": "0.0.0.0:8080",
+    "bindAddress": "0.0.0.0:14265",
     "publicRoutes": [
       "/health",
       "/api/routes",
@@ -83,7 +83,7 @@
     "pruningThreshold": 1,
     "dbGranularity": 100
   },
-  "metricstracker": {
+  "metricsTracker": {
     "enabled": true
   },
   "database": {

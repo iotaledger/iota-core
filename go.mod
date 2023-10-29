@@ -23,18 +23,20 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20231020115340-13da292c580b
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231020115340-13da292c580b
 	github.com/iotaledger/hive.go/stringify v0.0.0-20231020115340-13da292c580b
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231023191159-38919c4705e0
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231023190837-6e7b2cdfd4fd
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231023190719-1a9daaa83ca8
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231026154618-820b8eaed2cc
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231026154523-9ee0c47a283a
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231026154111-efd63ff4f03d
 	github.com/labstack/echo/v4 v4.11.2
 	github.com/labstack/gommon v0.4.0
 	github.com/libp2p/go-libp2p v0.31.0
 	github.com/libp2p/go-libp2p-kad-dht v0.25.1
+	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.12.0
 	github.com/multiformats/go-varint v0.0.7
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
 	github.com/otiai10/copy v1.14.0
 	github.com/prometheus/client_golang v1.17.0
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
 	github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98
 	github.com/zyedidia/generic v1.2.1
@@ -126,7 +128,6 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
 	github.com/multiformats/go-base36 v0.2.0 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.3.1 // indirect
@@ -157,7 +158,6 @@ require (
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tcnksm/go-latest v0.0.0-20170313132115-e3007ae9052e // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect

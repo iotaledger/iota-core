@@ -81,7 +81,15 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	if !engineInstance.SybilProtection.SeatManager().Committee(deps.Protocol.CommittedAPI().TimeProvider().SlotFromTime(blockIssuingTime)).HasAccount(validatorAccount.ID()) {
+	blockSlot := deps.Protocol.CommittedAPI().TimeProvider().SlotFromTime(blockIssuingTime)
+	committee, exists := engineInstance.SybilProtection.SeatManager().CommitteeInSlot(blockSlot)
+	if !exists {
+		Component.LogWarnf("committee for slot %d not selected: %s", blockSlot, err.Error())
+
+		return
+	}
+
+	if !committee.HasAccount(validatorAccount.ID()) {
 		// update nextBroadcast value here, so that this updated value is used in the `defer`
 		// callback to schedule issuing of the next block at a different interval than for committee members
 		nextBroadcast = blockIssuingTime.Add(ParamsValidator.CandidateBroadcastInterval)

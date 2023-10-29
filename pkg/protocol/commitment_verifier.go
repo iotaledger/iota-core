@@ -19,15 +19,18 @@ type CommitmentVerifier struct {
 	validatorAccountsAtFork map[iotago.AccountID]*accounts.AccountData
 }
 
-func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) *CommitmentVerifier {
-	committeeAtForkingPoint := mainEngine.SybilProtection.SeatManager().Committee(lastCommonCommitmentBeforeFork.Slot()).Accounts().IDs()
+func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) (*CommitmentVerifier, error) {
+	committeeAtForkingPoint, exists := mainEngine.SybilProtection.SeatManager().CommitteeInSlot(lastCommonCommitmentBeforeFork.Slot())
+	if !exists {
+		return nil, ierrors.Errorf("committee in slot %d does not exist", lastCommonCommitmentBeforeFork.Slot())
+	}
 
 	return &CommitmentVerifier{
 		engine:                  mainEngine,
 		cumulativeWeight:        lastCommonCommitmentBeforeFork.CumulativeWeight(),
-		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, lastCommonCommitmentBeforeFork.Slot())),
+		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint.Accounts().IDs(), lastCommonCommitmentBeforeFork.Slot())),
 		// TODO: what happens if the committee rotated after the fork?
-	}
+	}, nil
 }
 
 func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
@@ -153,7 +156,13 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")
 		}
-		if _, seatExists := c.engine.SybilProtection.SeatManager().Committee(attestationBlockID.Slot()).GetSeat(att.IssuerID); seatExists {
+
+		committee, exists := c.engine.SybilProtection.SeatManager().CommitteeInSlot(attestationBlockID.Slot())
+		if !exists {
+			return nil, 0, ierrors.Errorf("committee for slot %d does not exist", attestationBlockID.Slot())
+		}
+
+		if _, seatExists := committee.GetSeat(att.IssuerID); seatExists {
 			seatCount++
 		}
 

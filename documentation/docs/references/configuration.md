@@ -175,7 +175,7 @@ Example:
 | Name                           | Description                                                                                    | Type    | Default value                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ---------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | enabled                        | Whether the REST API plugin is enabled                                                         | boolean | true                                                                                                                                                                                                                                                                                                                                  |
-| bindAddress                    | The bind address on which the REST API listens on                                              | string  | "0.0.0.0:8080"                                                                                                                                                                                                                                                                                                                        |
+| bindAddress                    | The bind address on which the REST API listens on                                              | string  | "0.0.0.0:14265"                                                                                                                                                                                                                                                                                                                       |
 | publicRoutes                   | The HTTP REST routes which can be called without authorization. Wildcards using \* are allowed  | array   | /health<br/>/api/routes<br/>/api/core/v3/info<br/>/api/core/v3/blocks\*<br/>/api/core/v3/transactions\*<br/>/api/core/v3/commitments\*<br/>/api/core/v3/outputs\*<br/>/api/core/v3/accounts\*<br/>/api/core/v3/validators\*<br/>/api/core/v3/rewards\*<br/>/api/core/v3/committee<br/>/api/debug/v2/\*<br/>/api/indexer/v2/\*<br/>/api/mqtt/v2 |
 | protectedRoutes                | The HTTP REST routes which need to be called with authorization. Wildcards using \* are allowed | array   | /api/\*                                                                                                                                                                                                                                                                                                                                |
 | debugRequestLoggerEnabled      | Whether the debug logging for requests should be enabled                                       | boolean | false                                                                                                                                                                                                                                                                                                                                 |
@@ -204,7 +204,7 @@ Example:
   {
     "restAPI": {
       "enabled": true,
-      "bindAddress": "0.0.0.0:8080",
+      "bindAddress": "0.0.0.0:14265",
       "publicRoutes": [
         "/health",
         "/api/routes",
@@ -263,7 +263,7 @@ Example:
   }
 ```
 
-## <a id="metricstracker"></a> 7. Metricstracker
+## <a id="metricstracker"></a> 7. MetricsTracker
 
 | Name    | Description                                   | Type    | Default value |
 | ------- | --------------------------------------------- | ------- | ------------- |
@@ -273,7 +273,7 @@ Example:
 
 ```json
   {
-    "metricstracker": {
+    "metricsTracker": {
       "enabled": true
     }
   }

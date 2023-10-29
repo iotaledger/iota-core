@@ -155,7 +155,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 	blockBuilder.IssuingTime(*blockParams.BlockHeader.IssuingTime)
 
 	strongParents, exists := blockParams.BlockHeader.References[iotago.StrongParentType]
-	require.True(i.Testing, exists && len(strongParents) > 0)
+	require.True(i.Testing, exists && len(strongParents) > 0, "block should have strong parents (exists: %t, parents: %s)", exists, strongParents)
 	blockBuilder.StrongParents(strongParents)
 
 	if weakParents, exists := blockParams.BlockHeader.References[iotago.WeakParentType]; exists {

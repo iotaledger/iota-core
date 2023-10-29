@@ -655,7 +655,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 					continue
 				}
 
-				accountDiff.BICChange += iotago.BlockIssuanceCredits(allotment.Value)
+				accountDiff.BICChange += iotago.BlockIssuanceCredits(allotment.Mana)
 				accountDiff.PreviousUpdatedTime = accountData.Credits.UpdateTime
 
 				// we are not transitioning the allotted account, so the new and previous expiry slots are the same
@@ -748,7 +748,12 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().IssuingTime)
 
-	seat, exists := l.sybilProtection.SeatManager().Committee(block.ID().Slot()).GetSeat(block.ProtocolBlock().IssuerID)
+	committee, exists := l.sybilProtection.SeatManager().CommitteeInSlot(block.ID().Slot())
+	if !exists {
+		panic("committee should exist because we pre-accepted the block")
+	}
+
+	seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
 	if !exists {
 		return
 	}

@@ -2,20 +2,27 @@ package mock
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 type ManualPOA struct {
-	events    *seatmanager.Events
+	events         *seatmanager.Events
+	apiProvider    iotago.APIProvider
+	committeeStore *epochstore.Store[*account.Accounts]
+
 	accounts  *account.Accounts
 	committee *account.SeatedAccounts
 	online    ds.Set[account.SeatIndex]
@@ -24,12 +31,14 @@ type ManualPOA struct {
 	module.Module
 }
 
-func NewManualPOA() *ManualPOA {
+func NewManualPOA(e iotago.APIProvider, committeeStore *epochstore.Store[*account.Accounts]) *ManualPOA {
 	m := &ManualPOA{
-		events:   seatmanager.NewEvents(),
-		accounts: account.NewAccounts(),
-		online:   ds.NewSet[account.SeatIndex](),
-		aliases:  shrinkingmap.New[string, iotago.AccountID](),
+		events:         seatmanager.NewEvents(),
+		apiProvider:    e,
+		committeeStore: committeeStore,
+		accounts:       account.NewAccounts(),
+		online:         ds.NewSet[account.SeatIndex](),
+		aliases:        shrinkingmap.New[string, iotago.AccountID](),
 	}
 	m.committee = m.accounts.SelectCommittee()
 
@@ -38,7 +47,7 @@ func NewManualPOA() *ManualPOA {
 
 func NewManualPOAProvider() module.Provider[*engine.Engine, seatmanager.SeatManager] {
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
-		poa := NewManualPOA()
+		poa := NewManualPOA(e, e.Storage.Committee())
 		e.Events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 			poa.events.BlockProcessed.Trigger(block)
 		})
@@ -52,17 +61,36 @@ func NewManualPOAProvider() module.Provider[*engine.Engine, seatmanager.SeatMana
 func (m *ManualPOA) AddRandomAccount(alias string) iotago.AccountID {
 	id := iotago.AccountID(tpkg.Rand32ByteArray())
 	id.RegisterAlias(alias)
-	m.accounts.Set(id, &account.Pool{}) // We don't care about pools with PoA
+	m.accounts.Set(id, &account.Pool{
+		PoolStake:      1,
+		ValidatorStake: 1,
+		FixedCost:      1,
+	}) // We don't care about pools with PoA, but need to set something to avoid division by zero errors.
+
 	m.aliases.Set(alias, id)
-	m.committee.Set(account.SeatIndex(m.committee.SeatCount()), id)
+
+	m.committee = m.accounts.SelectCommittee(m.accounts.IDs()...)
+
+	if err := m.committeeStore.Store(0, m.accounts); err != nil {
+		panic(err)
+	}
 
 	return id
 }
 
 func (m *ManualPOA) AddAccount(id iotago.AccountID, alias string) iotago.AccountID {
-	m.accounts.Set(id, &account.Pool{}) // We don't care about pools with PoA
+	m.accounts.Set(id, &account.Pool{
+		PoolStake:      1,
+		ValidatorStake: 1,
+		FixedCost:      1,
+	}) // We don't care about pools with PoA, but need to set something to avoid division by zero errors.
 	m.aliases.Set(alias, id)
-	m.committee.Set(account.SeatIndex(m.committee.SeatCount()), id)
+
+	m.committee = m.accounts.SelectCommittee(m.accounts.IDs()...)
+
+	if err := m.committeeStore.Store(0, m.accounts); err != nil {
+		panic(err)
+	}
 
 	return id
 }
@@ -100,8 +128,27 @@ func (m *ManualPOA) Accounts() *account.Accounts {
 	return m.accounts
 }
 
-func (m *ManualPOA) Committee(_ iotago.SlotIndex) *account.SeatedAccounts {
-	return m.committee
+// CommitteeInSlot returns the set of validators selected to be part of the committee in the given slot.
+func (m *ManualPOA) CommitteeInSlot(slot iotago.SlotIndex) (*account.SeatedAccounts, bool) {
+	return m.committeeInEpoch(m.apiProvider.APIForSlot(slot).TimeProvider().EpochFromSlot(slot))
+}
+
+// CommitteeInEpoch returns the set of validators selected to be part of the committee in the given epoch.
+func (m *ManualPOA) CommitteeInEpoch(epoch iotago.EpochIndex) (*account.SeatedAccounts, bool) {
+	return m.committeeInEpoch(epoch)
+}
+
+func (m *ManualPOA) committeeInEpoch(epoch iotago.EpochIndex) (*account.SeatedAccounts, bool) {
+	c, err := m.committeeStore.Load(epoch)
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to load committee for epoch %d", epoch))
+	}
+
+	if c == nil {
+		return nil, false
+	}
+
+	return c.SelectCommittee(c.IDs()...), true
 }
 
 func (m *ManualPOA) OnlineCommittee() ds.Set[account.SeatIndex] {
@@ -112,16 +159,42 @@ func (m *ManualPOA) SeatCount() int {
 	return m.committee.SeatCount()
 }
 
-func (m *ManualPOA) RotateCommittee(_ iotago.EpochIndex, _ *account.Accounts) *account.SeatedAccounts {
-	return m.committee
+func (m *ManualPOA) RotateCommittee(epoch iotago.EpochIndex, validators accounts.AccountsData) (*account.SeatedAccounts, error) {
+	if m.committee == nil || m.accounts.Size() == 0 {
+		m.accounts = account.NewAccounts()
+
+		for _, validatorData := range validators {
+			m.accounts.Set(validatorData.ID, &account.Pool{
+				PoolStake:      validatorData.ValidatorStake + validatorData.DelegationStake,
+				ValidatorStake: validatorData.ValidatorStake,
+				FixedCost:      validatorData.FixedCost,
+			})
+		}
+		m.committee = m.accounts.SelectCommittee(m.accounts.IDs()...)
+	}
+
+	if err := m.committeeStore.Store(epoch, m.accounts); err != nil {
+		panic(err)
+	}
+
+	return m.committee, nil
 }
 
-func (m *ManualPOA) SetCommittee(_ iotago.EpochIndex, _ *account.Accounts) {
+func (m *ManualPOA) SetCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
+	if m.committee == nil || m.accounts.Size() == 0 {
+		m.accounts = validators
+		m.committee = m.accounts.SelectCommittee(validators.IDs()...)
+	}
+
+	if err := m.committeeStore.Store(epoch, validators); err != nil {
+		panic(err)
+	}
+
+	return nil
 }
 
-func (m *ManualPOA) ImportCommittee(_ iotago.EpochIndex, validators *account.Accounts) {
-	m.accounts = validators
-	m.committee = m.accounts.SelectCommittee(validators.IDs()...)
+func (m *ManualPOA) InitializeCommittee(_ iotago.EpochIndex, _ time.Time) error {
+	return nil
 }
 
 func (m *ManualPOA) Shutdown() {}

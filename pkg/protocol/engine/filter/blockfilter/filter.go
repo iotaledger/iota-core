@@ -29,7 +29,7 @@ type Filter struct {
 
 	optsMaxAllowedWallClockDrift time.Duration
 
-	committeeFunc func(iotago.SlotIndex) *account.SeatedAccounts
+	committeeFunc func(iotago.SlotIndex) (*account.SeatedAccounts, bool)
 
 	module.Module
 }
@@ -42,7 +42,7 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 		e.HookConstructed(func() {
 			e.Events.Filter.LinkTo(f.events)
 			e.SybilProtection.HookInitialized(func() {
-				f.committeeFunc = e.SybilProtection.SeatManager().Committee
+				f.committeeFunc = e.SybilProtection.SeatManager().CommitteeInSlot
 			})
 			f.TriggerInitialized()
 		})
@@ -92,7 +92,18 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 
 	if _, isValidation := block.ValidationBlock(); isValidation {
 		blockSlot := block.ProtocolBlock().API.TimeProvider().SlotFromTime(block.ProtocolBlock().IssuingTime)
-		if !f.committeeFunc(blockSlot).HasAccount(block.ProtocolBlock().IssuerID) {
+		committee, exists := f.committeeFunc(blockSlot)
+		if !exists {
+			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "no committee for slot %d", blockSlot),
+				Source: source,
+			})
+
+			return
+		}
+
+		if !committee.HasAccount(block.ProtocolBlock().IssuerID) {
 			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
 				Block:  block,
 				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().IssuerID, blockSlot),
