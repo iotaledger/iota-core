@@ -12,6 +12,7 @@ import (
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/core/safemath"
+	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -45,13 +46,14 @@ type BlockIssuer struct {
 	Name      string
 	Validator bool
 
+	AccountID  iotago.AccountID
+	OutputID   iotago.OutputID
+	PublicKey  ed25519.PublicKey
+	privateKey ed25519.PrivateKey
+
 	events *Events
 
 	workerPool *workerpool.WorkerPool
-
-	privateKey ed25519.PrivateKey
-	PublicKey  ed25519.PublicKey
-	AccountID  iotago.AccountID
 
 	optsTipSelectionTimeout       time.Duration
 	optsTipSelectionRetryInterval time.Duration
@@ -60,13 +62,12 @@ type BlockIssuer struct {
 	optsRateSetterEnabled       bool
 }
 
-func NewBlockIssuer(t *testing.T, name string, validator bool, opts ...options.Option[BlockIssuer]) *BlockIssuer {
-	pub, priv, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		panic(err)
-	}
+func NewBlockIssuer(t *testing.T, name string, keyManager *KeyManager, accountID iotago.AccountID, validator bool, opts ...options.Option[BlockIssuer]) *BlockIssuer {
+	priv, pub := keyManager.KeyPair()
 
-	accountID := iotago.AccountID(blake2b.Sum256(pub))
+	if accountID == iotago.EmptyAccountID {
+		accountID = iotago.AccountID(blake2b.Sum256(pub))
+	}
 	accountID.RegisterAlias(name)
 
 	return options.Apply(&BlockIssuer{
@@ -83,6 +84,10 @@ func NewBlockIssuer(t *testing.T, name string, validator bool, opts ...options.O
 		optsTipSelectionTimeout:       5 * time.Second,
 		optsTipSelectionRetryInterval: 200 * time.Millisecond,
 	}, opts)
+}
+
+func (i *BlockIssuer) BlockIssuerKeys() iotago.BlockIssuerKeys {
+	return iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(i.PublicKey)))
 }
 
 // Shutdown shuts down the block issuer.

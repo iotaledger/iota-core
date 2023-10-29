@@ -8,6 +8,7 @@ import (
 	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -22,8 +23,8 @@ type Options struct {
 	// RootBlocks define the initial blocks to which new blocks can attach to.
 	RootBlocks map[iotago.BlockID]iotago.CommitmentID
 
-	// GenesisSeed defines the seed used to generate keypair that can spend Genesis outputs.
-	GenesisSeed []byte
+	// GenesisKeyManager defines the key manager used to generate keypair that can spend Genesis outputs.
+	GenesisKeyManager *mock.KeyManager
 
 	// Accounts defines the accounts that are created in the ledger as part of the Genesis.
 	Accounts []AccountDetails
@@ -83,10 +84,10 @@ func WithRootBlocks(rootBlocks map[iotago.BlockID]iotago.CommitmentID) options.O
 	}
 }
 
-// WithGenesisSeed defines the seed used to generate keypair that can spend Genesis outputs.
-func WithGenesisSeed(genesisSeed []byte) options.Option[Options] {
+// WithGenesisKeyManager defines the seed used to generate keypair that can spend Genesis outputs.
+func WithGenesisKeyManager(keyManager *mock.KeyManager) options.Option[Options] {
 	return func(m *Options) {
-		m.GenesisSeed = genesisSeed
+		m.GenesisKeyManager = keyManager
 	}
 }
 

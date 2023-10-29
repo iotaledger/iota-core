@@ -2,7 +2,6 @@ package mock
 
 import (
 	"context"
-	"crypto/ed25519"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -29,6 +28,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 // idAliases contains a list of aliases registered for a set of IDs.
@@ -48,8 +48,9 @@ func UnregisterIDAliases() {
 type Node struct {
 	Testing *testing.T
 
-	Name      string
-	Validator *BlockIssuer
+	Name       string
+	Validator  *BlockIssuer
+	KeyManager *KeyManager
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -73,10 +74,9 @@ type Node struct {
 }
 
 func NewNode(t *testing.T, net *Network, partition string, name string, validator bool) *Node {
-	pub, priv, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		panic(err)
-	}
+	seed := tpkg.RandEd25519Seed()
+	keyManager := NewKeyManager(seed[:], 0)
+	priv, pub := keyManager.KeyPair()
 
 	accountID := iotago.AccountID(blake2b.Sum256(pub))
 	accountID.RegisterAlias(name)
@@ -86,7 +86,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 	var validatorBlockIssuer *BlockIssuer
 	if validator {
-		validatorBlockIssuer = NewBlockIssuer(t, name, validator)
+		validatorBlockIssuer = NewBlockIssuer(t, name, keyManager, accountID, validator)
 	} else {
 		validatorBlockIssuer = nil
 	}
@@ -96,7 +96,8 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 		Name: name,
 
-		Validator: validatorBlockIssuer,
+		Validator:  validatorBlockIssuer,
+		KeyManager: keyManager,
 
 		PeerID: peerID,
 
@@ -514,4 +515,12 @@ func (n *Node) AttachedBlocks() []*blocks.Block {
 	defer n.mutex.RUnlock()
 
 	return n.attachedBlocks
+}
+
+func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
+	if n.Validator == nil {
+		panic("node is not a validator")
+	}
+
+	return n.Validator.IssueValidationBlock(ctx, alias, n, opts...)
 }
