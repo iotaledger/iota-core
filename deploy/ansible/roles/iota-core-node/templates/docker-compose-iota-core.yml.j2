@@ -89,11 +89,11 @@ services:
       inx-indexer:
         condition: service_started
     environment:
-      - "BLOCKISSUER_PRV_KEY={{blockissuerPrvKey}}"
+      - "BLOCKISSUER_PRV_KEY={{NODE_04_BLOCKISSUER_PRIVKEY}}"
     command: >
       --inx.address=iota-core:9029
       --restAPI.bindAddress=inx-blockissuer:9086
-      --blockIssuer.accountAddress={{blockissuerAccountAddress}}
+      --blockIssuer.accountAddress={{NODE_04_BLOCKISSUER_ACCOUNTADDRESS}}
       --blockIssuer.proofOfWork.targetTrailingZeros=5
 
   inx-faucet:
@@ -113,7 +113,7 @@ services:
     ports:
       - "8091:8091/tcp" # Faucet Frontend
     environment:
-      - "FAUCET_PRV_KEY={{faucetPrvKey}}"
+      - "FAUCET_PRV_KEY={{NODE_04_FAUCET_PRIVKEY}}"
     command: >
       --inx.address=iota-core:9029
       --faucet.bindAddress=0.0.0.0:8091
