@@ -250,7 +250,7 @@ func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
 
 	slot := s.latestCommittedSlot()
 
-	issuerID := block.ProtocolBlock().IssuerID
+	issuerID := block.ProtocolBlock().Header.IssuerID
 	issuerQueue := s.getOrCreateIssuer(issuerID)
 
 	droppedBlocks, submitted := s.basicBuffer.Submit(
@@ -286,9 +286,9 @@ func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	_, exists := s.validatorBuffer.Get(block.ProtocolBlock().IssuerID)
+	_, exists := s.validatorBuffer.Get(block.ProtocolBlock().Header.IssuerID)
 	if !exists {
-		s.addValidator(block.ProtocolBlock().IssuerID)
+		s.addValidator(block.ProtocolBlock().Header.IssuerID)
 	}
 	droppedBlock, submitted := s.validatorBuffer.Submit(block, int(s.apiProvider.CommittedAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize))
 	if !submitted {
@@ -468,7 +468,7 @@ func (s *Scheduler) selectBasicBlockWithoutLocking() {
 
 	// remove the block from the buffer and adjust issuer's deficit
 	block := s.basicBuffer.PopFront()
-	issuerID := block.ProtocolBlock().IssuerID
+	issuerID := block.ProtocolBlock().Header.IssuerID
 	if _, err := s.updateDeficit(issuerID, -s.deficitFromWork(block.WorkScore())); err != nil {
 		// if something goes wrong with deficit update, drop the block instead of scheduling it.
 		block.SetDropped()
@@ -502,7 +502,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slot iotago.SlotIndex) (Def
 				continue
 			}
 
-			issuerID := block.ProtocolBlock().IssuerID
+			issuerID := block.ProtocolBlock().Header.IssuerID
 
 			// compute how often the deficit needs to be incremented until the block can be scheduled
 			deficit, exists := s.deficits.Get(issuerID)
@@ -672,7 +672,7 @@ func (s *Scheduler) ready(block *blocks.Block) {
 }
 
 func (s *Scheduler) readyValidationBlock(block *blocks.Block) {
-	if validatorQueue, exists := s.validatorBuffer.Get(block.ProtocolBlock().IssuerID); exists {
+	if validatorQueue, exists := s.validatorBuffer.Get(block.ProtocolBlock().Header.IssuerID); exists {
 		validatorQueue.Ready(block)
 	}
 }

@@ -156,7 +156,7 @@ func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantu
 // Unsubmit removes a block from the submitted blocks.
 // If that block is already marked as ready, Unsubmit has no effect.
 func (b *BufferQueue) Unsubmit(block *blocks.Block) bool {
-	issuerID := block.ProtocolBlock().IssuerID
+	issuerID := block.ProtocolBlock().Header.IssuerID
 
 	issuerQueue := b.IssuerQueue(issuerID)
 	if issuerQueue == nil {
@@ -174,7 +174,7 @@ func (b *BufferQueue) Unsubmit(block *blocks.Block) bool {
 
 // Ready marks a previously submitted block as ready to be scheduled.
 func (b *BufferQueue) Ready(block *blocks.Block) bool {
-	issuerQueue := b.IssuerQueue(block.ProtocolBlock().IssuerID)
+	issuerQueue := b.IssuerQueue(block.ProtocolBlock().Header.IssuerID)
 	if issuerQueue == nil {
 		return false
 	}

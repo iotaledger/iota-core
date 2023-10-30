@@ -72,8 +72,8 @@ func BlockMetadataResponseFromBlock(block *blocks.Block) *BlockMetadataResponse 
 	return &BlockMetadataResponse{
 		BlockID:            block.ID().String(),
 		StrongParents:      lo.Map(block.StrongParents(), func(blockID iotago.BlockID) string { return blockID.String() }),
-		WeakParents:        lo.Map(block.ProtocolBlock().Block.WeakParentIDs(), func(blockID iotago.BlockID) string { return blockID.String() }),
-		ShallowLikeParents: lo.Map(block.ProtocolBlock().Block.ShallowLikeParentIDs(), func(blockID iotago.BlockID) string { return blockID.String() }),
+		WeakParents:        lo.Map(block.ProtocolBlock().Body.WeakParentIDs(), func(blockID iotago.BlockID) string { return blockID.String() }),
+		ShallowLikeParents: lo.Map(block.ProtocolBlock().Body.ShallowLikeParentIDs(), func(blockID iotago.BlockID) string { return blockID.String() }),
 		Solid:              block.IsSolid(),
 		Invalid:            block.IsInvalid(),
 		Booked:             block.IsBooked(),

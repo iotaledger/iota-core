@@ -53,7 +53,7 @@ func (m *Manager) writeToDisk() error {
 
 		attestations := m.determineAttestationsFromWindow(i)
 		for _, a := range attestations {
-			if err := storage.Set(a.IssuerID, a); err != nil {
+			if err := storage.Set(a.Header.IssuerID, a); err != nil {
 				return ierrors.Wrapf(err, "failed to set attestation %v", a)
 			}
 		}

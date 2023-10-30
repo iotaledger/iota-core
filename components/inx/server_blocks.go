@@ -126,7 +126,7 @@ func (s *Server) SubmitBlock(ctx context.Context, rawBlock *inx.RawBlock) (*inx.
 	return s.attachBlock(ctx, block)
 }
 
-func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (*inx.BlockId, error) {
+func (s *Server) attachBlock(ctx context.Context, block *iotago.Block) (*inx.BlockId, error) {
 	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
 	defer mergedCtxCancel()
 

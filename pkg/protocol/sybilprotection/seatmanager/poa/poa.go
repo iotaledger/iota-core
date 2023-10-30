@@ -66,9 +66,9 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 							panic(ierrors.Errorf("committee not selected for slot %d, but received block in that slot", block.ID().Slot()))
 						}
 
-						seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
+						seat, exists := committee.GetSeat(block.ProtocolBlock().Header.IssuerID)
 						if exists {
-							s.activityTracker.MarkSeatActive(seat, block.ProtocolBlock().IssuerID, block.IssuingTime())
+							s.activityTracker.MarkSeatActive(seat, block.ProtocolBlock().Header.IssuerID, block.IssuingTime())
 						}
 
 						s.events.BlockProcessed.Trigger(block)

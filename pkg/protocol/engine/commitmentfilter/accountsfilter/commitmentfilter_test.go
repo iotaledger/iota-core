@@ -85,7 +85,7 @@ func (t *TestFramework) AddRMCData(slot iotago.SlotIndex, rmcData iotago.Mana) {
 
 // q: how to get an engine block.Block from protocol block
 
-func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) {
+func (t *TestFramework) processBlock(alias string, block *iotago.Block) {
 	modelBlock, err := model.BlockFromBlock(block)
 	require.NoError(t.Test, err)
 

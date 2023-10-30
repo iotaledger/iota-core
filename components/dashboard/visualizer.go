@@ -48,9 +48,9 @@ func sendVertex(blk *blocks.Block, confirmed bool) {
 
 	broadcastWsBlock(&wsblk{MsgTypeVertex, &vertex{
 		ID:                  blk.ID().ToHex(),
-		StrongParents:       blk.ProtocolBlock().Block.StrongParentIDs().ToHex(),
-		WeakParents:         blk.ProtocolBlock().Block.WeakParentIDs().ToHex(),
-		ShallowLikedParents: blk.ProtocolBlock().Block.ShallowLikeParentIDs().ToHex(),
+		StrongParents:       blk.ProtocolBlock().Body.StrongParentIDs().ToHex(),
+		WeakParents:         blk.ProtocolBlock().Body.WeakParentIDs().ToHex(),
+		ShallowLikedParents: blk.ProtocolBlock().Body.ShallowLikeParentIDs().ToHex(),
 		IsConfirmed:         confirmed,
 		IsTx:                isTx,
 		IsTxAccepted: func() bool {

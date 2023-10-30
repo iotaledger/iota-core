@@ -13,12 +13,12 @@ import (
 func getOutput(c echo.Context) (*apimodels.OutputResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse output ID param: %s", c.Param(restapipkg.ParameterOutputID))
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
 	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get output: %s from the Ledger", outputID.String())
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
 	}
 
 	return &apimodels.OutputResponse{
@@ -30,12 +30,12 @@ func getOutput(c echo.Context) (*apimodels.OutputResponse, error) {
 func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadata, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse output ID param: %s", c.Param(restapipkg.ParameterOutputID))
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
 	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get output: %s from the Ledger", outputID.String())
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
 	}
 
 	if spent != nil {
@@ -48,18 +48,18 @@ func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadata, error) {
 func getOutputWithMetadata(c echo.Context) (*apimodels.OutputWithMetadataResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse output ID param: %s", c.Param(restapipkg.ParameterOutputID))
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
 	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get output: %s from the Ledger", outputID.String())
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
 	}
 
 	if spent != nil {
 		metadata, err := newSpentMetadataResponse(spent)
 		if err != nil {
-			return nil, err
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load spent output metadata: %s", err)
 		}
 
 		return &apimodels.OutputWithMetadataResponse{
@@ -96,7 +96,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 	if includedSlotIndex <= latestCommitment.Slot() {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlotIndex, err)
 		}
 		resp.IncludedCommitmentID = includedCommitment.ID()
 	}
@@ -120,7 +120,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 	if includedSlotIndex <= latestCommitment.Slot() {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlotIndex, err)
 		}
 		resp.IncludedCommitmentID = includedCommitment.ID()
 	}
@@ -129,7 +129,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 	if spentSlotIndex <= latestCommitment.Slot() {
 		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", spentSlotIndex, err)
 		}
 		resp.CommitmentIDSpent = spentCommitment.ID()
 	}

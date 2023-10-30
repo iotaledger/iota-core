@@ -139,7 +139,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 	}
 }
 
-func (b *Block) ProtocolBlock() *iotago.ProtocolBlock {
+func (b *Block) ProtocolBlock() *iotago.Block {
 	if b.modelBlock == nil {
 		return nil
 	}
@@ -152,7 +152,7 @@ func (b *Block) Parents() (parents []iotago.BlockID) {
 }
 
 func (b *Block) StrongParents() (parents []iotago.BlockID) {
-	return b.modelBlock.ProtocolBlock().Block.StrongParentIDs()
+	return b.modelBlock.ProtocolBlock().Body.StrongParentIDs()
 }
 
 // ParentsWithType returns the parents of the block with their type.
@@ -185,7 +185,7 @@ func (b *Block) SignedTransaction() (tx *iotago.SignedTransaction, hasTransactio
 	return b.modelBlock.SignedTransaction()
 }
 
-func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) {
+func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlockBody, isBasicBlock bool) {
 	if b.modelBlock == nil {
 		return nil, false
 	}
@@ -193,7 +193,7 @@ func (b *Block) BasicBlock() (basicBlock *iotago.BasicBlock, isBasicBlock bool) 
 	return b.modelBlock.BasicBlock()
 }
 
-func (b *Block) ValidationBlock() (validationBlock *iotago.ValidationBlock, isValidationBlock bool) {
+func (b *Block) ValidationBlock() (validationBlock *iotago.ValidationBlockBody, isValidationBlock bool) {
 	if b.modelBlock == nil {
 		return nil, false
 	}
@@ -232,7 +232,7 @@ func (b *Block) IssuingTime() time.Time {
 		return b.rootBlock.issuingTime
 	}
 
-	return b.modelBlock.ProtocolBlock().IssuingTime
+	return b.modelBlock.ProtocolBlock().Header.IssuingTime
 }
 
 func (b *Block) SlotCommitmentID() iotago.CommitmentID {
@@ -247,7 +247,7 @@ func (b *Block) SlotCommitmentID() iotago.CommitmentID {
 		return b.rootBlock.commitmentID
 	}
 
-	return b.modelBlock.ProtocolBlock().SlotCommitmentID
+	return b.modelBlock.ProtocolBlock().Header.SlotCommitmentID
 }
 
 // IsMissing returns a flag that indicates if the underlying Block data hasn't been stored, yet.
