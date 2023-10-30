@@ -250,6 +250,7 @@ services:
       --logger.level=debug
       --inx.address=node-1-validator:9029
       --validator.ignoreBootstrapped=true
+      --validator.accountAddress=rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6
 
   inx-validator-2:
     image: iotaledger/inx-validator:latest
@@ -265,6 +266,7 @@ services:
     command: >
       --logger.level=debug
       --inx.address=node-2-validator:9029
+      --validator.accountAddress=rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl
 
   inx-validator-3:
     image: iotaledger/inx-validator:latest
@@ -280,6 +282,7 @@ services:
     command: >
       --logger.level=debug
       --inx.address=node-3-validator:9029
+      --validator.accountAddress=rms1pp4wuuz0y42caz48vv876qfpmffswsvg40zz8v79sy8cp0jfxm4kunflcgt
 
 # Create our own network
 networks:
