@@ -36,7 +36,7 @@ fi
 echo $DOCKER_BUILD_CONTEXT $DOCKERFILE_PATH
 docker compose -f $DOCKER_COMPOSE_FILE build --build-arg WITH_GO_WORK=${WITH_GO_WORK:-0} --build-arg DOCKER_BUILD_CONTEXT=${DOCKER_BUILD_CONTEXT} --build-arg DOCKERFILE_PATH=${DOCKERFILE_PATH}
 
-docker compose pull inx-indexer inx-blockissuer inx-faucet
+docker compose pull inx-indexer inx-blockissuer inx-faucet inx-validator-1
 
 # check exit code of builder
 if [ $? -ne 0 ]; then
