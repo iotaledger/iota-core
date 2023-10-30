@@ -33,7 +33,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-			commitment.ReplayBlocks.OnUpdate(func(_, replayBlocks bool) {
+			commitment.InSyncRange.OnUpdate(func(_, replayBlocks bool) {
 				if replayBlocks {
 					b.LogDebug("replaying blocks", "commitmentID", commitment.ID())
 
