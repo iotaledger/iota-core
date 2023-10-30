@@ -156,7 +156,7 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) error {
 		return ierrors.Errorf("committee for slot %d does not exist", block.ID().Slot())
 	}
 	// Only track attestations of active committee members.
-	if _, exists := committee.GetSeat(block.ProtocolBlock().IssuerID); !exists {
+	if _, exists := committee.GetSeat(block.ProtocolBlock().Header.IssuerID); !exists {
 		return nil
 	}
 
@@ -171,7 +171,7 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) error {
 	newAttestation := iotago.NewAttestation(m.apiProvider.APIForSlot(block.ID().Slot()), block.ProtocolBlock())
 
 	// We keep only the latest attestation for each committee member.
-	m.futureAttestations.Get(block.ID().Slot(), true).Compute(block.ProtocolBlock().IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
+	m.futureAttestations.Get(block.ID().Slot(), true).Compute(block.ProtocolBlock().Header.IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
 		if !exists {
 			return newAttestation
 		}
@@ -188,13 +188,13 @@ func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) error {
 }
 
 func (m *Manager) applyToPendingAttestations(attestation *iotago.Attestation, cutoffSlot iotago.SlotIndex) {
-	if attestation.SlotCommitmentID.Slot() < cutoffSlot {
+	if attestation.Header.SlotCommitmentID.Slot() < cutoffSlot {
 		return
 	}
 
 	updated := true
 
-	updatedAttestation := m.pendingAttestations.Get(cutoffSlot, true).Compute(attestation.IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
+	updatedAttestation := m.pendingAttestations.Get(cutoffSlot, true).Compute(attestation.Header.IssuerID, func(currentValue *iotago.Attestation, exists bool) *iotago.Attestation {
 		if !exists {
 			return attestation
 		}
@@ -214,8 +214,8 @@ func (m *Manager) applyToPendingAttestations(attestation *iotago.Attestation, cu
 		return
 	}
 
-	for i := cutoffSlot; i <= updatedAttestation.SlotCommitmentID.Slot(); i++ {
-		m.pendingAttestations.Get(i, true).Set(attestation.IssuerID, updatedAttestation)
+	for i := cutoffSlot; i <= updatedAttestation.Header.SlotCommitmentID.Slot(); i++ {
+		m.pendingAttestations.Get(i, true).Set(attestation.Header.IssuerID, updatedAttestation)
 	}
 }
 
@@ -267,9 +267,9 @@ func (m *Manager) Commit(slot iotago.SlotIndex) (newCW uint64, attestationsRoot 
 
 	for _, a := range attestations {
 		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
-		if _, exists := committee.GetSeat(a.IssuerID); exists {
-			if err := tree.Set(a.IssuerID, a); err != nil {
-				return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to set attestation %s in tree", a.IssuerID)
+		if _, exists := committee.GetSeat(a.Header.IssuerID); exists {
+			if err := tree.Set(a.Header.IssuerID, a); err != nil {
+				return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to set attestation %s in tree", a.Header.IssuerID)
 			}
 
 			m.lastCumulativeWeight++

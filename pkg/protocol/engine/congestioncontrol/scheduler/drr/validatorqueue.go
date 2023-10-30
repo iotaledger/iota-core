@@ -53,7 +53,7 @@ func (q *ValidatorQueue) AccountID() iotago.AccountID {
 }
 
 func (q *ValidatorQueue) Submit(block *blocks.Block, maxBuffer int) (*blocks.Block, bool) {
-	if blkAccountID := block.ProtocolBlock().IssuerID; q.accountID != blkAccountID {
+	if blkAccountID := block.ProtocolBlock().Header.IssuerID; q.accountID != blkAccountID {
 		panic(fmt.Sprintf("issuerqueue: queue issuer ID(%x) and issuer ID(%x) does not match.", q.accountID, blkAccountID))
 	}
 
@@ -202,7 +202,7 @@ func (b *ValidatorBuffer) Set(accountID iotago.AccountID, validatorQueue *Valida
 }
 
 func (b *ValidatorBuffer) Submit(block *blocks.Block, maxBuffer int) (*blocks.Block, bool) {
-	validatorQueue, exists := b.buffer.Get(block.ProtocolBlock().IssuerID)
+	validatorQueue, exists := b.buffer.Get(block.ProtocolBlock().Header.IssuerID)
 	if !exists {
 		return nil, false
 	}

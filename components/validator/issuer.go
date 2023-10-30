@@ -101,7 +101,7 @@ func issueValidatorBlock(ctx context.Context) {
 		return
 	}
 
-	Component.LogDebugf("Issued validator block: %s - commitment %s %d - latest finalized slot %d", modelBlock.ID(), modelBlock.ProtocolBlock().SlotCommitmentID, modelBlock.ProtocolBlock().SlotCommitmentID.Slot(), modelBlock.ProtocolBlock().LatestFinalizedSlot)
+	Component.LogDebugf("Issued validator block: %s - commitment %s %d - latest finalized slot %d", modelBlock.ID(), modelBlock.ProtocolBlock().Header.SlotCommitmentID, modelBlock.ProtocolBlock().Header.SlotCommitmentID.Slot(), modelBlock.ProtocolBlock().Header.LatestFinalizedSlot)
 }
 
 func reviveChain(issuingTime time.Time) (*iotago.Commitment, iotago.BlockID, error) {

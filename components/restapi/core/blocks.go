@@ -75,7 +75,7 @@ func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHe
 }
 
 func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
-	iotaBlock, err := httpserver.ParseRequestByHeader(c, deps.Protocol.CommittedAPI(), iotago.ProtocolBlockFromBytes(deps.Protocol))
+	iotaBlock, err := httpserver.ParseRequestByHeader(c, deps.Protocol.CommittedAPI(), iotago.BlockFromBytes(deps.Protocol))
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse iotablock")
 	}

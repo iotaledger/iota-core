@@ -193,7 +193,7 @@ func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, no
 
 	validationBlock, _ := block.ValidationBlock()
 
-	fmt.Printf("Issued ValidationBlock: %s - slot %d - commitment %s %d - latest finalized slot %d - version: %d - highestSupportedVersion: %d, hash: %s\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot, block.ProtocolBlock().ProtocolVersion, validationBlock.HighestSupportedVersion, validationBlock.ProtocolParametersHash)
+	fmt.Printf("Issued ValidationBlock: %s - slot %d - commitment %s %d - latest finalized slot %d - version: %d - highestSupportedVersion: %d, hash: %s\n", block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().Header.LatestFinalizedSlot, block.ProtocolBlock().Header.ProtocolVersion, validationBlock.HighestSupportedVersion, validationBlock.ProtocolParametersHash)
 
 	return block
 }
@@ -288,7 +288,7 @@ func (i *BlockIssuer) IssueBasicBlock(ctx context.Context, alias string, node *N
 
 	require.NoErrorf(i.Testing, i.IssueBlock(block.ModelBlock(), node), "%s > failed to issue block with alias %s", i.Name, alias)
 
-	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", i.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().LatestFinalizedSlot)
+	fmt.Printf("%s > Issued block: %s - slot %d - commitment %s %d - latest finalized slot %d\n", i.Name, block.ID(), block.ID().Slot(), block.SlotCommitmentID(), block.SlotCommitmentID().Slot(), block.ProtocolBlock().Header.LatestFinalizedSlot)
 
 	return block
 }
@@ -366,30 +366,30 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	}
 }
 
-func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.ProtocolBlock, node *Node, optIssuerAccount ...Account) (iotago.BlockID, error) {
+func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, node *Node, optIssuerAccount ...Account) (iotago.BlockID, error) {
 	// if anything changes, need to make a new signature
 	var resign bool
 
-	apiForVersion, err := node.Protocol.APIForVersion(iotaBlock.ProtocolVersion)
+	apiForVersion, err := node.Protocol.APIForVersion(iotaBlock.Header.ProtocolVersion)
 	if err != nil {
-		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.ProtocolVersion)
+		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "protocolVersion invalid: %d", iotaBlock.Header.ProtocolVersion)
 	}
 
 	protoParams := apiForVersion.ProtocolParameters()
 
-	if iotaBlock.NetworkID == 0 {
-		iotaBlock.NetworkID = protoParams.NetworkID()
+	if iotaBlock.Header.NetworkID == 0 {
+		iotaBlock.Header.NetworkID = protoParams.NetworkID()
 		resign = true
 	}
 
-	if iotaBlock.SlotCommitmentID == iotago.EmptyCommitmentID {
-		iotaBlock.SlotCommitmentID = node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID()
-		iotaBlock.LatestFinalizedSlot = node.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
+	if iotaBlock.Header.SlotCommitmentID == iotago.EmptyCommitmentID {
+		iotaBlock.Header.SlotCommitmentID = node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID()
+		iotaBlock.Header.LatestFinalizedSlot = node.Protocol.MainEngineInstance().Storage.Settings().LatestFinalizedSlot()
 		resign = true
 	}
 
-	switch innerBlock := iotaBlock.Block.(type) {
-	case *iotago.BasicBlock:
+	switch innerBlock := iotaBlock.Body.(type) {
+	case *iotago.BasicBlockBody:
 		switch payload := innerBlock.Payload.(type) {
 		case *iotago.SignedTransaction:
 			if payload.Transaction.NetworkID != protoParams.NetworkID() {
@@ -409,7 +409,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 			resign = true
 		}
 
-	case *iotago.ValidationBlock:
+	case *iotago.ValidationBlockBody:
 		//nolint:revive,staticcheck //temporarily disable
 		if len(iotaBlock.Parents()) == 0 {
 			// TODO: implement tipselection for validator blocks
@@ -417,20 +417,20 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	references := make(model.ParentReferences)
-	references[iotago.StrongParentType] = iotaBlock.Block.StrongParentIDs().RemoveDupsAndSort()
-	references[iotago.WeakParentType] = iotaBlock.Block.WeakParentIDs().RemoveDupsAndSort()
-	references[iotago.ShallowLikeParentType] = iotaBlock.Block.ShallowLikeParentIDs().RemoveDupsAndSort()
-	if iotaBlock.IssuingTime.Equal(time.Unix(0, 0)) {
-		iotaBlock.IssuingTime = time.Now().UTC()
+	references[iotago.StrongParentType] = iotaBlock.Body.StrongParentIDs().RemoveDupsAndSort()
+	references[iotago.WeakParentType] = iotaBlock.Body.WeakParentIDs().RemoveDupsAndSort()
+	references[iotago.ShallowLikeParentType] = iotaBlock.Body.ShallowLikeParentIDs().RemoveDupsAndSort()
+	if iotaBlock.Header.IssuingTime.Equal(time.Unix(0, 0)) {
+		iotaBlock.Header.IssuingTime = time.Now().UTC()
 		resign = true
 	}
 
-	if err = i.validateReferences(iotaBlock.IssuingTime, iotaBlock.SlotCommitmentID.Slot(), references, node); err != nil {
+	if err = i.validateReferences(iotaBlock.Header.IssuingTime, iotaBlock.Header.SlotCommitmentID.Slot(), references, node); err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "invalid block references, error: %w", err)
 	}
 
-	if basicBlock, isBasicBlock := iotaBlock.Block.(*iotago.BasicBlock); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
-		rmcSlot, err := safemath.SafeSub(apiForVersion.TimeProvider().SlotFromTime(iotaBlock.IssuingTime), apiForVersion.ProtocolParameters().MaxCommittableAge())
+	if basicBlock, isBasicBlock := iotaBlock.Body.(*iotago.BasicBlockBody); isBasicBlock && basicBlock.MaxBurnedMana == 0 {
+		rmcSlot, err := safemath.SafeSub(apiForVersion.TimeProvider().SlotFromTime(iotaBlock.Header.IssuingTime), apiForVersion.ProtocolParameters().MaxCommittableAge())
 		if err != nil {
 			rmcSlot = 0
 		}
@@ -447,10 +447,10 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		resign = true
 	}
 
-	if iotaBlock.IssuerID.Empty() || resign {
+	if iotaBlock.Header.IssuerID.Empty() || resign {
 		if i.optsIncompleteBlockAccepted && len(optIssuerAccount) > 0 {
 			issuerAccount := optIssuerAccount[0]
-			iotaBlock.IssuerID = issuerAccount.ID()
+			iotaBlock.Header.IssuerID = issuerAccount.ID()
 
 			signature, signatureErr := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(issuerAccount.Address().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
 			if signatureErr != nil {
@@ -473,7 +473,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if !i.optsRateSetterEnabled || node.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(modelBlock.ProtocolBlock().IssuerID) {
+	if !i.optsRateSetterEnabled || node.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(modelBlock.ProtocolBlock().Header.IssuerID) {
 		i.events.BlockConstructed.Trigger(modelBlock)
 
 		if err = i.IssueBlockAndAwaitEvent(ctx, modelBlock, node, node.Protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {

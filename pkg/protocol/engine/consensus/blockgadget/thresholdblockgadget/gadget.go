@@ -109,7 +109,7 @@ func (g *Gadget) isCommitteeValidationBlock(block *blocks.Block) (seat account.S
 	}
 
 	// Only accept blocks for issuers that are part of the committee.
-	return committee.GetSeat(block.ProtocolBlock().IssuerID)
+	return committee.GetSeat(block.ProtocolBlock().Header.IssuerID)
 }
 
 func anyChildInSet(block *blocks.Block, set ds.Set[iotago.BlockID]) bool {

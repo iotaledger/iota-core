@@ -355,19 +355,19 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 	})
 
 	events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().Header.SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Slot(), block.ProtocolBlock().SlotCommitmentID)
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Slot(), block.ProtocolBlock().Header.SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().Header.SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().SlotCommitmentID)
+		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().Header.SlotCommitmentID)
 	})
 
 	events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
