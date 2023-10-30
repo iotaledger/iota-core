@@ -170,11 +170,13 @@ func (c *Chain) initClaimedWeight() {
 
 func (c *Chain) initAttestedWeight() {
 	c.LatestAttestedCommitment.OnUpdateWithContext(func(_, latestAttestedCommitment *Commitment, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
-		setupInheritance := func() func() {
-			return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
-		}
+		if latestAttestedCommitment != nil {
+			setupInheritance := func() func() {
+				return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
+			}
 
-		unsubscribeOnUpdate(setupInheritance)
+			unsubscribeOnUpdate(setupInheritance)
+		}
 	})
 }
 
@@ -270,7 +272,7 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
 
 	for _, chain := range append([]*Chain{c}, c.ChildChains.ToSlice()...) {
 		if chain.VerifyState.Get() {
-			if targetEngine := chain.SpawnedEngine.Get(); targetEngine != nil && !chain.WarpSync.Get() || targetEngine.BlockRequester.HasTicker(block.ID()) {
+			if targetEngine := chain.Engine.Get(); targetEngine != nil && !chain.WarpSync.Get() || targetEngine.BlockRequester.HasTicker(block.ID()) {
 				targetEngine.ProcessBlockFromPeer(block, src)
 
 				success = true

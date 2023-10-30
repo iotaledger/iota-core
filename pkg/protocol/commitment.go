@@ -14,23 +14,25 @@ import (
 type Commitment struct {
 	*model.Commitment
 
-	Parent                   reactive.Variable[*Commitment]
-	Children                 reactive.Set[*Commitment]
-	MainChild                reactive.Variable[*Commitment]
-	SpawnedChain             reactive.Variable[*Chain]
-	Chain                    reactive.Variable[*Chain]
-	Engine                   reactive.Variable[*engine.Engine]
-	RequestAttestations      reactive.Variable[bool]
-	RequestBlocks            reactive.Variable[bool]
-	RequestedBlocksReceived  reactive.Variable[bool]
-	Weight                   reactive.Variable[uint64]
-	AttestedWeight           reactive.Variable[uint64]
-	CumulativeAttestedWeight reactive.Variable[uint64]
-	IsSolid                  reactive.Event
-	IsAttested               reactive.Event
-	IsVerified               reactive.Event
-	IsRoot                   reactive.Event
-	IsEvicted                reactive.Event
+	Parent                          reactive.Variable[*Commitment]
+	Children                        reactive.Set[*Commitment]
+	MainChild                       reactive.Variable[*Commitment]
+	SpawnedChain                    reactive.Variable[*Chain]
+	Chain                           reactive.Variable[*Chain]
+	Engine                          reactive.Variable[*engine.Engine]
+	RequestAttestations             reactive.Variable[bool]
+	RequestBlocks                   reactive.Variable[bool]
+	RequestedBlocksReceived         reactive.Variable[bool]
+	Weight                          reactive.Variable[uint64]
+	AttestedWeight                  reactive.Variable[uint64]
+	CumulativeAttestedWeight        reactive.Variable[uint64]
+	IsSolid                         reactive.Event
+	IsAttested                      reactive.Event
+	IsVerified                      reactive.Event
+	IsRoot                          reactive.Event
+	IsEvicted                       reactive.Event
+	IsAboveLatestVerifiedCommitment reactive.Variable[bool]
+	ReplayBlocks                    reactive.Variable[bool]
 
 	protocol                                *Protocol
 	isDirectlyAboveLatestAttestedCommitment reactive.Variable[bool]
@@ -45,23 +47,25 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 	c := &Commitment{
 		Commitment: commitment,
 
-		Parent:                   reactive.NewVariable[*Commitment](),
-		MainChild:                reactive.NewVariable[*Commitment](),
-		Children:                 reactive.NewSet[*Commitment](),
-		SpawnedChain:             reactive.NewVariable[*Chain](),
-		Chain:                    reactive.NewVariable[*Chain](),
-		Engine:                   reactive.NewVariable[*engine.Engine](),
-		RequestAttestations:      reactive.NewVariable[bool](),
-		RequestBlocks:            reactive.NewVariable[bool](),
-		RequestedBlocksReceived:  reactive.NewVariable[bool](),
-		Weight:                   reactive.NewVariable[uint64](),
-		AttestedWeight:           reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
-		CumulativeAttestedWeight: reactive.NewVariable[uint64](),
-		IsSolid:                  reactive.NewEvent(),
-		IsAttested:               reactive.NewEvent(),
-		IsVerified:               reactive.NewEvent(),
-		IsRoot:                   reactive.NewEvent(),
-		IsEvicted:                reactive.NewEvent(),
+		Parent:                          reactive.NewVariable[*Commitment](),
+		MainChild:                       reactive.NewVariable[*Commitment](),
+		Children:                        reactive.NewSet[*Commitment](),
+		SpawnedChain:                    reactive.NewVariable[*Chain](),
+		Chain:                           reactive.NewVariable[*Chain](),
+		Engine:                          reactive.NewVariable[*engine.Engine](),
+		RequestAttestations:             reactive.NewVariable[bool](),
+		RequestBlocks:                   reactive.NewVariable[bool](),
+		RequestedBlocksReceived:         reactive.NewVariable[bool](),
+		Weight:                          reactive.NewVariable[uint64](),
+		AttestedWeight:                  reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
+		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
+		IsSolid:                         reactive.NewEvent(),
+		IsAttested:                      reactive.NewEvent(),
+		IsVerified:                      reactive.NewEvent(),
+		IsRoot:                          reactive.NewEvent(),
+		IsEvicted:                       reactive.NewEvent(),
+		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
+		ReplayBlocks:                    reactive.NewVariable[bool](),
 
 		protocol:                                protocol,
 		isDirectlyAboveLatestAttestedCommitment: reactive.NewVariable[bool](),
@@ -69,6 +73,26 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		isBelowSyncThreshold:                    reactive.NewEvent(),
 		isBelowWarpSyncThreshold:                reactive.NewEvent(),
 	}
+
+	c.Parent.OnUpdateWithContext(func(_, parent *Commitment, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+		if parent != nil {
+			unsubscribeOnUpdate(func() func() {
+				return c.IsAboveLatestVerifiedCommitment.InheritFrom(reactive.NewDerivedVariable2(func(parentAboveLatestVerifiedCommitment, directlyAboveLatestVerifiedCommitment bool) bool {
+					return parentAboveLatestVerifiedCommitment || directlyAboveLatestVerifiedCommitment
+				}, parent.IsAboveLatestVerifiedCommitment, c.isDirectlyAboveLatestVerifiedCommitment))
+			})
+		}
+	})
+
+	c.Chain.OnUpdateWithContext(func(_, chain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+		if chain != nil {
+			unsubscribeOnUpdate(func() func() {
+				return c.ReplayBlocks.InheritFrom(reactive.NewDerivedVariable3(func(spawnedEngine *engine.Engine, warpSyncing, isAboveLatestVerifiedCommitment bool) bool {
+					return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
+				}, chain.SpawnedEngine, chain.WarpSync, c.IsAboveLatestVerifiedCommitment))
+			})
+		}
+	})
 
 	c.Parent.OnUpdateOnce(func(_, parent *Commitment) {
 		parent.registerChild(c)
