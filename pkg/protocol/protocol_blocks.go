@@ -33,15 +33,13 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-			commitment.isDirectlyAboveLatestVerifiedCommitment.OnUpdate(func(_, isDirectlyAboveLatestVerifiedCommitment bool) {
-				if !isDirectlyAboveLatestVerifiedCommitment {
-					return
-				}
+			commitment.ReplayBlocks.OnUpdate(func(_, replayBlocks bool) {
+				if replayBlocks {
+					b.LogDebug("replaying blocks", "commitmentID", commitment.ID())
 
-				protocol.LogError("REPLAYING DROPPED BLOCKS", "slot", commitment.ID().Slot())
-
-				for _, droppedBlock := range b.droppedBlocksBuffer.GetValues(commitment.ID()) {
-					b.ProcessResponse(droppedBlock.A, droppedBlock.B)
+					for _, droppedBlock := range b.droppedBlocksBuffer.GetValues(commitment.ID()) {
+						b.ProcessResponse(droppedBlock.A, droppedBlock.B)
+					}
 				}
 			})
 		})
@@ -51,7 +49,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 				chain.Engine.OnUpdate(func(_, engine *engine.Engine) {
 					unsubscribe := engine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
 
-					engine.HookShutdown(unsubscribe)
+					engine.Shutdown.OnTrigger(unsubscribe)
 				})
 			})
 		})
@@ -75,7 +73,7 @@ func (b *BlocksProtocol) SendRequest(blockID iotago.BlockID) {
 	b.workerPool.Submit(func() {
 		b.protocol.Network.RequestBlock(blockID)
 
-		b.protocol.LogTrace("sent request", "blockID", blockID)
+		b.protocol.LogTrace("request", "blockID", blockID)
 	})
 }
 

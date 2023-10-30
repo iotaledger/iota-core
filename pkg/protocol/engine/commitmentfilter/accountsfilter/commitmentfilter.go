@@ -32,7 +32,7 @@ type CommitmentFilter struct {
 func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter] {
 	return module.Provide(func(e *engine.Engine) commitmentfilter.CommitmentFilter {
 		c := New(e, opts...)
-		e.HookConstructed(func() {
+		e.Constructed.OnTrigger(func() {
 			c.commitmentFunc = e.Storage.Commitments().Load
 
 			c.accountRetrieveFunc = e.Ledger.Account

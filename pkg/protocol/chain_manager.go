@@ -89,7 +89,7 @@ func (c *ChainManager) PublishCommitment(commitment *model.Commitment) (commitme
 	})
 
 	if published = commitmentMetadata == publishedCommitmentMetadata; published {
-		c.protocol.LogDebug("new commitment created", "name", commitmentMetadata.LogName(), "id", commitment.ID())
+		commitmentMetadata.LogDebug("created", "id", commitment.ID())
 	}
 
 	return commitmentMetadata, commitmentMetadata == publishedCommitmentMetadata, nil
@@ -125,7 +125,7 @@ func (c *ChainManager) initMainChain() {
 
 	mainChain := NewChain(c.protocol)
 
-	c.protocol.LogDebug("new chain created", "name", mainChain.LogName(), "forkingPoint", "<snapshot>")
+	//c.protocol.LogDebug("new chain created", "name", mainChain.LogName(), "forkingPoint", "<snapshot>")
 
 	mainChain.VerifyState.Set(true)
 	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
@@ -262,11 +262,12 @@ func (c *ChainManager) publishEngineCommitments(chain *Chain) {
 
 						return engine.LatestCommitment.OnUpdate(func(_, latestCommitment *model.Commitment) {
 							for latestPublishedSlot < latestCommitment.Slot() {
-								if commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedSlot + 1); err != nil {
+								commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedSlot + 1)
+								if err != nil {
 									panic(err) // this should never happen, but we panic to get a stack trace if it does
-								} else {
-									publishCommitment(commitmentToPublish)
 								}
+
+								publishCommitment(commitmentToPublish)
 							}
 						})
 					})

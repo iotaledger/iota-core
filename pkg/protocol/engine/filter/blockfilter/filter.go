@@ -39,7 +39,7 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 		f := New(e, opts...)
 		f.TriggerConstructed()
 
-		e.HookConstructed(func() {
+		e.Constructed.OnTrigger(func() {
 			e.Events.Filter.LinkTo(f.events)
 			e.SybilProtection.HookInitialized(func() {
 				f.committeeFunc = e.SybilProtection.SeatManager().Committee

@@ -37,7 +37,7 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestatio
 		}
 	}
 
-	if !iotago.VerifyProof(merkleProof, iotago.Identifier(tree.Root()), commitment.RootsID()) {
+	if !iotago.VerifyProof(merkleProof, tree.Root(), commitment.RootsID()) {
 		return nil, 0, ierrors.Errorf("invalid merkle proof for attestations for commitment %s", commitment.ID())
 	}
 

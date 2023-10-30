@@ -149,8 +149,6 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 
 func (n *Node) hookEvents() {
 	n.Protocol.HeaviestAttestedChain.OnUpdate(func(prevHeaviestAttestedChain, heaviestAttestedChain *protocol.Chain) {
-		fmt.Println(n.Name, " > HeaviestAttestedChain.OnUpdate", heaviestAttestedChain)
-
 		if prevHeaviestAttestedChain != nil {
 			n.forkDetectedCount.Add(1)
 

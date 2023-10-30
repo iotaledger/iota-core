@@ -87,7 +87,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			r.RetainBlockFailure(b.ID(), apimodels.BlockFailureDroppedDueToCongestion)
 		})
 
-		e.HookInitialized(func() {
+		e.Initialized.OnTrigger(func() {
 			e.Ledger.MemPool().OnSignedTransactionAttached(func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
 				attachment := signedTransactionMetadata.Attachments()[0]
 

@@ -236,18 +236,22 @@ func (b *BucketManager) DeleteBucket(epoch iotago.EpochIndex) (deleted bool) {
 	return true
 }
 
-// RollbackBucket removes data in the bucket in slots [targetSlotIndex+1; epochEndSlot].
-func (b *BucketManager) RollbackBucket(epoch iotago.EpochIndex, targetSlot, epochEndSlot iotago.SlotIndex) error {
-	oldBucketKvStore := b.getDBInstance(epoch).KVStore()
-	for clearSlot := targetSlot + 1; clearSlot <= epochEndSlot; clearSlot++ {
-		// delete slot prefix from forkedPrunable storage that will be eventually copied into the new engine
-		if err := oldBucketKvStore.DeletePrefix(clearSlot.MustBytes()); err != nil {
-			return ierrors.Wrapf(err, "error while clearing slot %d in bucket for epoch %d", clearSlot, epoch)
+// PruneSlots prunes the data of all slots in the range [from, to] in the given epoch.
+func (b *BucketManager) PruneSlots(epoch iotago.EpochIndex, pruningRange [2]iotago.SlotIndex) error {
+	epochStore := b.getDBInstance(epoch).KVStore()
+
+	for slot := pruningRange[0]; slot <= pruningRange[1]; slot++ {
+		if err := epochStore.DeletePrefix(slot.MustBytes()); err != nil {
+			return ierrors.Wrapf(err, "error while clearing slot %d in bucket for epoch %d", slot, epoch)
 		}
 	}
 
+	// shutting down the storage does not prevent this storage from being used again and only forces a flush.
+	b.Shutdown()
+
 	return nil
 }
+
 func (b *BucketManager) Flush() error {
 	b.openDBsMutex.RLock()
 	defer b.openDBsMutex.RUnlock()

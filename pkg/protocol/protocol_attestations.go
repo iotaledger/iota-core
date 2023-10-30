@@ -207,7 +207,7 @@ func (a *AttestationsProtocol) sendRequest(commitmentID iotago.CommitmentID) {
 		if commitment, err := a.protocol.Commitment(commitmentID, false); err == nil {
 			a.protocol.Network.RequestAttestations(commitmentID)
 
-			a.LogDebug("sent request", "commitment", commitment.LogName())
+			a.LogDebug("request", "commitment", commitment.LogName())
 		} else {
 			a.LogError("failed to load commitment", "commitmentID", commitmentID, "err", err)
 		}
