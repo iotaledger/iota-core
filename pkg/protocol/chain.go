@@ -26,7 +26,6 @@ type Chain struct {
 	AttestedWeight           reactive.Variable[uint64]
 	VerifiedWeight           reactive.Variable[uint64]
 	NetworkClockSlot         reactive.Variable[iotago.SlotIndex]
-	SyncThreshold            reactive.Variable[iotago.SlotIndex]
 	WarpSync                 reactive.Variable[bool]
 	WarpSyncThreshold        reactive.Variable[iotago.SlotIndex]
 	OutOfSyncThreshold       reactive.Variable[iotago.SlotIndex]
@@ -37,7 +36,6 @@ type Chain struct {
 	IsEvicted                reactive.Event
 
 	commitments   *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
-	parentEngine  reactive.Variable[*engine.Engine]
 	SpawnedEngine reactive.Variable[*engine.Engine]
 
 	log.Logger
@@ -63,7 +61,6 @@ func NewChain(protocol *Protocol) *Chain {
 		IsEvicted:                reactive.NewEvent(),
 
 		commitments:   shrinkingmap.New[iotago.SlotIndex, *Commitment](),
-		parentEngine:  reactive.NewVariable[*engine.Engine](),
 		VerifyState:   reactive.NewVariable[bool](),
 		SpawnedEngine: reactive.NewVariable[*engine.Engine](),
 	}
@@ -102,18 +99,6 @@ func NewChain(protocol *Protocol) *Chain {
 		}
 	})
 
-	c.SyncThreshold = reactive.NewDerivedVariable2[iotago.SlotIndex](func(forkingPoint, latestVerifiedCommitment *Commitment) iotago.SlotIndex {
-		if forkingPoint == nil {
-			return SyncWindow + 1
-		}
-
-		if latestVerifiedCommitment == nil {
-			return forkingPoint.Slot() + SyncWindow + 1
-		}
-
-		return latestVerifiedCommitment.Slot() + SyncWindow + 1
-	}, c.ForkingPoint, c.LatestVerifiedCommitment)
-
 	c.ParentChain.OnUpdate(func(prevParent, newParent *Chain) {
 		if prevParent != nil {
 			prevParent.ChildChains.Delete(c)
@@ -128,31 +113,28 @@ func NewChain(protocol *Protocol) *Chain {
 		forkingPointContext(func() func() {
 			return forkingPoint.Parent.OnUpdate(func(_, parent *Commitment) {
 				forkingPointContext(func() func() {
-					return lo.Batch(
-						c.ParentChain.InheritFrom(parent.Chain),
-						c.parentEngine.InheritFrom(parent.Engine),
-					)
+					return c.ParentChain.InheritFrom(parent.Chain)
 				})
 			})
 		})
 	})
 
-	c.Logger = protocol.NewEntityLogger("Chain", c.IsEvicted, func(entityLogger log.Logger) {
-		entityLogger.LogDebug("created")
+	c.Logger = protocol.NewEntityLogger("Chain", c.IsEvicted, func(chainLogger log.Logger) {
+		chainLogger.LogDebug("created")
 
-		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
-		c.NetworkClockSlot.LogUpdates(entityLogger, log.LevelTrace, "NetworkClockSlot")
-		c.WarpSyncThreshold.LogUpdates(entityLogger, log.LevelTrace, "WarpSyncThreshold")
-		c.OutOfSyncThreshold.LogUpdates(entityLogger, log.LevelTrace, "OutOfSyncThreshold")
-		c.ForkingPoint.LogUpdates(entityLogger, log.LevelTrace, "ForkingPoint", (*Commitment).LogName)
-		c.ClaimedWeight.LogUpdates(entityLogger, log.LevelTrace, "ClaimedWeight")
-		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
-		c.VerifiedWeight.LogUpdates(entityLogger, log.LevelTrace, "VerifiedWeight")
-		c.LatestCommitment.LogUpdates(entityLogger, log.LevelTrace, "LatestCommitment", (*Commitment).LogName)
-		c.LatestVerifiedCommitment.LogUpdates(entityLogger, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
-		c.VerifyAttestations.LogUpdates(entityLogger, log.LevelTrace, "VerifyAttestations")
-		c.VerifyState.LogUpdates(entityLogger, log.LevelDebug, "VerifyState")
-		c.SpawnedEngine.LogUpdates(entityLogger, log.LevelDebug, "SpawnedEngine", (*engine.Engine).LogName)
+		c.WarpSync.LogUpdates(chainLogger, log.LevelTrace, "WarpSync")
+		c.NetworkClockSlot.LogUpdates(chainLogger, log.LevelTrace, "NetworkClockSlot")
+		c.WarpSyncThreshold.LogUpdates(chainLogger, log.LevelTrace, "WarpSyncThreshold")
+		c.OutOfSyncThreshold.LogUpdates(chainLogger, log.LevelTrace, "OutOfSyncThreshold")
+		c.ForkingPoint.LogUpdates(chainLogger, log.LevelTrace, "ForkingPoint", (*Commitment).LogName)
+		c.ClaimedWeight.LogUpdates(chainLogger, log.LevelTrace, "ClaimedWeight")
+		c.AttestedWeight.LogUpdates(chainLogger, log.LevelTrace, "AttestedWeight")
+		c.VerifiedWeight.LogUpdates(chainLogger, log.LevelTrace, "VerifiedWeight")
+		c.LatestCommitment.LogUpdates(chainLogger, log.LevelTrace, "LatestCommitment", (*Commitment).LogName)
+		c.LatestVerifiedCommitment.LogUpdates(chainLogger, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
+		c.VerifyAttestations.LogUpdates(chainLogger, log.LevelTrace, "VerifyAttestations")
+		c.VerifyState.LogUpdates(chainLogger, log.LevelDebug, "VerifyState")
+		c.SpawnedEngine.LogUpdates(chainLogger, log.LevelDebug, "SpawnedEngine", (*engine.Engine).LogName)
 	})
 
 	return c
@@ -281,16 +263,6 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
 	}
 
 	return success
-}
-
-func (c *Chain) InSyncRange(slot iotago.SlotIndex) bool {
-	if latestVerifiedCommitment := c.LatestVerifiedCommitment.Get(); latestVerifiedCommitment != nil {
-		return slot > latestVerifiedCommitment.Slot() && slot < c.SyncThreshold.Get()
-	}
-
-	forkingPoint := c.ForkingPoint.Get()
-
-	return forkingPoint != nil && (slot > forkingPoint.Slot()-1 && slot < c.SyncThreshold.Get())
 }
 
 func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {

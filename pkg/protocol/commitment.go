@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Commitment struct {
@@ -37,8 +36,6 @@ type Commitment struct {
 	protocol                                *Protocol
 	isDirectlyAboveLatestAttestedCommitment reactive.Variable[bool]
 	isDirectlyAboveLatestVerifiedCommitment reactive.Variable[bool]
-	isBelowSyncThreshold                    reactive.Event
-	isBelowWarpSyncThreshold                reactive.Event
 
 	log.Logger
 }
@@ -70,8 +67,6 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		protocol:                                protocol,
 		isDirectlyAboveLatestAttestedCommitment: reactive.NewVariable[bool](),
 		isDirectlyAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
-		isBelowSyncThreshold:                    reactive.NewEvent(),
-		isBelowWarpSyncThreshold:                reactive.NewEvent(),
 	}
 
 	c.Parent.OnUpdateWithContext(func(_, parent *Commitment, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
@@ -124,16 +119,6 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		c.isDirectlyAboveLatestVerifiedCommitment.InheritFrom(reactive.NewDerivedVariable2(func(parentIsVerified, isVerified bool) bool {
 			return parentIsVerified && !isVerified
 		}, parent.IsVerified, c.IsVerified))
-
-		c.triggerEventIfBelowThreshold(
-			func(c *Commitment) reactive.Event { return c.isBelowSyncThreshold },
-			func(c *Chain) reactive.Variable[iotago.SlotIndex] { return c.SyncThreshold },
-		)
-
-		c.triggerEventIfBelowThreshold(
-			func(c *Commitment) reactive.Event { return c.isBelowWarpSyncThreshold },
-			func(c *Chain) reactive.Variable[iotago.SlotIndex] { return c.WarpSyncThreshold },
-		)
 	})
 
 	c.Chain.OnUpdateWithContext(func(_, chain *Chain, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
@@ -166,8 +151,6 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		c.IsSolid.Set(true)
 		c.IsAttested.Set(true)
 		c.IsVerified.Set(true)
-		c.isBelowWarpSyncThreshold.Set(true)
-		c.isBelowSyncThreshold.Set(true)
 	})
 
 	c.Logger = protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", commitment.Slot()), c.IsEvicted, func(entityLogger log.Logger) {
@@ -249,28 +232,4 @@ func (c *Commitment) promote(targetChain *Chain) {
 			parent.MainChild.Set(c)
 		}
 	}
-}
-
-func (c *Commitment) triggerEventIfBelowThreshold(event func(*Commitment) reactive.Event, chainThreshold func(*Chain) reactive.Variable[iotago.SlotIndex]) {
-	c.Chain.OnUpdateWithContext(func(_, chain *Chain, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
-		if chain == nil {
-			return
-		}
-
-		// only monitor the threshold after the parent event was triggered (minimize listeners to same threshold)
-		withinContext(func() (unsubscribe func()) {
-			return event(c.Parent.Get()).OnTrigger(func() {
-				if chain == nil {
-					c.LogError("chain is nil IN HERE")
-				}
-
-				// since events only trigger once, we unsubscribe from the threshold after the trigger condition is met
-				chainThreshold(chain).OnUpdateOnce(func(_, _ iotago.SlotIndex) {
-					event(c).Trigger()
-				}, func(_, slot iotago.SlotIndex) bool {
-					return c.Slot() < slot
-				})
-			})
-		})
-	})
 }
