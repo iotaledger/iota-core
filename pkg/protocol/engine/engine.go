@@ -443,7 +443,7 @@ func (e *Engine) setupEvictionState() {
 					e.errorHandler(ierrors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
 					return
 				}
-				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().SlotCommitmentID)
+				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().Header.SlotCommitmentID)
 			}
 		})
 	}, event.WithWorkerPool(wp))

@@ -32,8 +32,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
-	ts.AddBasicBlockIssuer("default")
 	node0 := ts.AddValidatorNode("node0")
+	ts.AddGenesisWallet("default", node0)
 	ts.AddValidatorNode("node1")
 	ts.AddNode("node2")
 
@@ -117,8 +117,8 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
-	ts.AddBasicBlockIssuer("default")
 	node0 := ts.AddValidatorNode("node0")
+	ts.AddGenesisWallet("default", node0)
 	ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
 
@@ -211,8 +211,8 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
-	ts.AddBasicBlockIssuer("default")
 	node0 := ts.AddValidatorNode("node0")
+	ts.AddGenesisWallet("default", node0)
 	ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
 

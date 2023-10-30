@@ -76,7 +76,7 @@ func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago
 	encodedAttestations := marshalutil.New()
 	encodedAttestations.WriteUint32(uint32(len(attestations)))
 	for _, att := range attestations {
-		iotagoAPI := lo.PanicOnErr(p.apiProvider.APIForVersion(att.ProtocolVersion))
+		iotagoAPI := lo.PanicOnErr(p.apiProvider.APIForVersion(att.Header.ProtocolVersion))
 		encodedAttestations.WriteBytes(lo.PanicOnErr(iotagoAPI.Encode(att)))
 	}
 
