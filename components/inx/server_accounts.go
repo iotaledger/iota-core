@@ -8,7 +8,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (s *Server) ReadIsAccountValidator(_ context.Context, accountInfoRequest *inx.AccountInfoRequest) (*inx.BoolResponse, error) {
+func (s *Server) ReadIsValidatorAccount(_ context.Context, accountInfoRequest *inx.AccountInfoRequest) (*inx.BoolResponse, error) {
 	slot := iotago.SlotIndex(accountInfoRequest.GetAccountSlot())
 	accountID, _, err := iotago.AccountIDFromBytes(accountInfoRequest.AccountId)
 	if err != nil {

@@ -244,15 +244,16 @@ services:
         condition: service_started
       inx-indexer:
         condition: service_started
-    environment:
-      - "VALIDATOR_PRV_KEY=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b"
-    command:
-      - "--logger.level=debug"
-      - "--inx.address=node-1-validator:9029"
-      - "--validator.ignoreBootstrapped=true"
-      - "--validator.accountAddress=rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6"
     networks:
       - iota-core
+    environment:
+      - "VALIDATOR_PRV_KEY=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b"
+    command: >
+      --logger.level=debug
+      --inx.address=node-1-validator:9029
+      --validator.ignoreBootstrapped=true
+      --validator.accountAddress=rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6
+
 
   inx-validator-2:
     image: iotaledger/inx-validator:latest
@@ -263,14 +264,14 @@ services:
         condition: service_started
       inx-indexer:
         condition: service_started
-    environment:
-      - "VALIDATOR_PRV_KEY=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064"
-    command:
-      - "--logger.level=debug"
-      - "--inx.address=node-2-validator:9029"
-      - "--validator.accountAddress=rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl"
     networks:
       - iota-core
+    environment:
+      - "VALIDATOR_PRV_KEY=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064"
+    command: >
+      --logger.level=debug
+      --inx.address=node-2-validator:9029
+      --validator.accountAddress=rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl
 
   inx-validator-3:
     image: iotaledger/inx-validator:latest
@@ -281,14 +282,15 @@ services:
         condition: service_started
       inx-indexer:
         condition: service_started
-    environment:
-      - "VALIDATOR_PRV_KEY=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648"
-    command:
-      - "--logger.level=debug"
-      - "--inx.address=node-3-validator:9029"
-      - "--validator.accountAddress=rms1pp4wuuz0y42caz48vv876qfpmffswsvg40zz8v79sy8cp0jfxm4kunflcgt"
     networks:
       - iota-core
+    environment:
+      - "VALIDATOR_PRV_KEY=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648"
+    command: >
+      --logger.level=debug
+      --inx.address=node-3-validator:9029
+      --validator.accountAddress=rms1pp4wuuz0y42caz48vv876qfpmffswsvg40zz8v79sy8cp0jfxm4kunflcgt
+
 
 # Create our own network
 networks:
