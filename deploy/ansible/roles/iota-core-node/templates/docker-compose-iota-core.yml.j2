@@ -108,8 +108,6 @@ services:
         condition: service_started
       inx-blockissuer:
         condition: service_started
-    networks:
-      - iota-core
     ports:
       - "8091:8091/tcp" # Faucet Frontend
     environment:
@@ -128,12 +126,9 @@ services:
     depends_on:
       iota-core:
         condition: service_started
-    networks:
-      - iota-core
     environment:
       - "VALIDATOR_PRV_KEY={{validatorPrvKey}}"
     command: >
-      --logger.level=debug
       --inx.address=iota-core:9029
       {% if 'node-01' in inventory_hostname %}
       --validator.ignoreBootstrapped=true
