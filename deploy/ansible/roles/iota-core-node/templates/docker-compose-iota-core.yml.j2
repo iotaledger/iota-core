@@ -127,7 +127,7 @@ services:
     restart: unless-stopped
     depends_on:
       iota-core:
-        condition: service_healthy
+        condition: service_started
     networks:
       - iota-core
     environment:
