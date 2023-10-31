@@ -338,7 +338,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 		commitmentBytes = s.LatestCommitment().Data()
 	}
 
-	if err := stream.WriteByteSlice(writer, commitmentBytes, serializer.SeriLengthPrefixTypeAsUint16); err != nil {
+	if err := stream.WriteBytesWithSize(writer, commitmentBytes, serializer.SeriLengthPrefixTypeAsUint16); err != nil {
 		return ierrors.Wrap(err, "failed to write commitment")
 	}
 
@@ -436,7 +436,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 				return true
 			}
 
-			if err := stream.WriteByteSlice(writer, value, serializer.SeriLengthPrefixTypeAsUint32); err != nil {
+			if err := stream.WriteBytesWithSize(writer, value, serializer.SeriLengthPrefixTypeAsUint32); err != nil {
 				innerErr = err
 				return false
 			}
@@ -459,7 +459,7 @@ func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commit
 }
 
 func (s *Settings) Import(reader io.ReadSeeker) (err error) {
-	commitmentBytes, err := stream.ReadByteSlice(reader, serializer.SeriLengthPrefixTypeAsUint16)
+	commitmentBytes, err := stream.ReadBytesWithSize(reader, serializer.SeriLengthPrefixTypeAsUint16)
 	if err != nil {
 		return ierrors.Wrap(err, "failed to read commitment")
 	}
@@ -523,7 +523,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 
 	// Read protocol parameters
 	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint16, func(i int) error {
-		paramsBytes, err := stream.ReadByteSlice(reader, serializer.SeriLengthPrefixTypeAsUint32)
+		paramsBytes, err := stream.ReadBytesWithSize(reader, serializer.SeriLengthPrefixTypeAsUint32)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to read protocol parameters bytes at index %d", i)
 		}

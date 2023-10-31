@@ -1,7 +1,6 @@
 package permanent
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -46,8 +45,8 @@ func (c *Commitments) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex)
 			if err != nil {
 				return 0, ierrors.Wrapf(err, "failed to load commitment for slot %d", slot)
 			}
-			fmt.Println("commitmentBytes", len(commitmentBytes), commitmentBytes)
-			if err := stream.WriteByteSlice(writer, commitmentBytes, serializer.SeriLengthPrefixTypeAsUint16); err != nil {
+
+			if err := stream.WriteBytesWithSize(writer, commitmentBytes, serializer.SeriLengthPrefixTypeAsUint16); err != nil {
 				return 0, ierrors.Wrapf(err, "failed to write commitment for slot %d", slot)
 			}
 
@@ -64,7 +63,7 @@ func (c *Commitments) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex)
 
 func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
 	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
-		commitment, err := stream.ReadObject[*model.Commitment](reader, serializer.SeriLengthPrefixTypeAsUint16, func(bytes []byte) (*model.Commitment, int, error) {
+		commitment, err := stream.ReadObjectWithSize[*model.Commitment](reader, serializer.SeriLengthPrefixTypeAsUint16, func(bytes []byte) (*model.Commitment, int, error) {
 			return model.CommitmentFromBytes(bytes, c.apiProvider)
 		})
 		if err != nil {

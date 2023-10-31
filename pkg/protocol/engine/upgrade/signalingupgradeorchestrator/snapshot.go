@@ -28,7 +28,7 @@ func (o *Orchestrator) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "failed to read seat")
 		}
 
-		signaledBlock, err := stream.ReadObject(reader, serializer.SeriLengthPrefixTypeAsUint16, model.SignaledBlockFromBytesFunc(o.apiProvider.APIForSlot(slot)))
+		signaledBlock, err := stream.ReadObjectWithSize(reader, serializer.SeriLengthPrefixTypeAsUint16, model.SignaledBlockFromBytesFunc(o.apiProvider.APIForSlot(slot)))
 		if err != nil {
 			return ierrors.Wrap(err, "failed to read signaled block")
 		}
@@ -62,7 +62,7 @@ func (o *Orchestrator) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "failed to read epoch")
 		}
 
-		versionAndHash, err := stream.ReadFixedSizeObject(reader, model.VersionAndHashSize, model.VersionAndHashFromBytes)
+		versionAndHash, err := stream.ReadObject(reader, model.VersionAndHashSize, model.VersionAndHashFromBytes)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to read versionAndHash")
 		}
@@ -100,7 +100,7 @@ func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 				return ierrors.Wrap(err, "failed to write seat")
 			}
 
-			if err := stream.WriteByteSlice(writer, signaledBlockBytes, serializer.SeriLengthPrefixTypeAsUint16); err != nil {
+			if err := stream.WriteBytesWithSize(writer, signaledBlockBytes, serializer.SeriLengthPrefixTypeAsUint16); err != nil {
 				return ierrors.Wrap(err, "failed to write signaled block")
 			}
 
@@ -138,7 +138,7 @@ func (o *Orchestrator) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex
 			if err := stream.Write(writer, epoch); err != nil {
 				return 0, ierrors.Wrapf(err, "failed to write epoch %d", epoch)
 			}
-			if err := stream.WriteFixedSizeObject(writer, versionAndHash, model.VersionAndHashSize, model.VersionAndHash.Bytes); err != nil {
+			if err := stream.WriteObject(writer, versionAndHash, model.VersionAndHash.Bytes); err != nil {
 				return 0, ierrors.Wrapf(err, "failed to write versionAndHash for epoch %d", epoch)
 			}
 

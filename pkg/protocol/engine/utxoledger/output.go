@@ -212,8 +212,8 @@ func (o *Output) KVStorableValue() (value []byte) {
 	// There can't be any errors.
 	_ = stream.Write(byteBuffer, o.blockID)
 	_ = stream.Write(byteBuffer, o.slotBooked)
-	_ = stream.WriteByteSlice(byteBuffer, o.encodedOutput, serializer.SeriLengthPrefixTypeAsUint32)
-	_ = stream.WriteByteSlice(byteBuffer, o.encodedProof, serializer.SeriLengthPrefixTypeAsUint32)
+	_ = stream.WriteBytesWithSize(byteBuffer, o.encodedOutput, serializer.SeriLengthPrefixTypeAsUint32)
+	_ = stream.WriteBytesWithSize(byteBuffer, o.encodedProof, serializer.SeriLengthPrefixTypeAsUint32)
 
 	return lo.PanicOnErr(byteBuffer.Bytes())
 }
@@ -237,10 +237,10 @@ func (o *Output) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
 	if o.slotBooked, err = stream.Read[iotago.SlotIndex](valueReader); err != nil {
 		return ierrors.Wrap(err, "unable to read slotBooked")
 	}
-	if o.encodedOutput, err = stream.ReadByteSlice(valueReader, serializer.SeriLengthPrefixTypeAsUint32); err != nil {
+	if o.encodedOutput, err = stream.ReadBytesWithSize(valueReader, serializer.SeriLengthPrefixTypeAsUint32); err != nil {
 		return ierrors.Wrap(err, "unable to read encodedOutput")
 	}
-	if o.encodedProof, err = stream.ReadByteSlice(valueReader, serializer.SeriLengthPrefixTypeAsUint32); err != nil {
+	if o.encodedProof, err = stream.ReadBytesWithSize(valueReader, serializer.SeriLengthPrefixTypeAsUint32); err != nil {
 		return ierrors.Wrap(err, "unable to read encodedProof")
 	}
 

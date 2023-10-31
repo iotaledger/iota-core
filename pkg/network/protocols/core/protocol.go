@@ -78,7 +78,7 @@ func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago
 
 	if err := stream.WriteCollection(byteBuffer, serializer.UInt32ByteSize, func() (elementsCount int, err error) {
 		for _, att := range attestations {
-			if err = stream.WriteObject(byteBuffer, att, serializer.UInt16ByteSize, (*iotago.Attestation).Bytes); err != nil {
+			if err = stream.WriteObjectWithSize(byteBuffer, att, serializer.UInt16ByteSize, (*iotago.Attestation).Bytes); err != nil {
 				return 0, ierrors.Wrapf(err, "failed to write attestation %v", att)
 			}
 		}
