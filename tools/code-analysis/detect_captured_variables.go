@@ -63,6 +63,10 @@ func main() {
 					return true
 				}
 
+				if ident.Name == "_" { // skip underscore variables
+					return true
+				}
+
 				if ident.Obj == nil || ident.Obj.Kind != ast.Var {
 					return true
 				}
