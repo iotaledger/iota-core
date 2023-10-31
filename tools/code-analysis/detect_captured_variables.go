@@ -73,7 +73,7 @@ func main() {
 
 			if _, isDeclared := declaredVars[ident.Name]; !isDeclared {
 				pos := fset.Position(ident.Pos())
-				fmt.Printf("Variable '%s' captured by closure at %s:%d\n", ident.Name, pos.Filename, pos.Line)
+				fmt.Printf("%s:%d: variable '%s' captured by closure\n", pos.Filename, pos.Line, ident.Name)
 			}
 
 			return true
