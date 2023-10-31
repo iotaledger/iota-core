@@ -1,8 +1,6 @@
 package account
 
 import (
-	"bytes"
-	"encoding/binary"
 	"io"
 	"sync/atomic"
 
@@ -27,14 +25,9 @@ type Accounts struct {
 
 // NewAccounts creates a new Weights instance.
 func NewAccounts() *Accounts {
-	a := new(Accounts)
-	a.initialize()
-
-	return a
-}
-
-func (a *Accounts) initialize() {
-	a.accountPools = shrinkingmap.New[iotago.AccountID, *Pool]()
+	return &Accounts{
+		accountPools: shrinkingmap.New[iotago.AccountID, *Pool](),
+	}
 }
 
 func (a *Accounts) Has(id iotago.AccountID) bool {
@@ -124,63 +117,45 @@ func (a *Accounts) SelectCommittee(members ...iotago.AccountID) *SeatedAccounts 
 }
 
 func AccountsFromBytes(b []byte) (*Accounts, int, error) {
-	return AccountsFromReader(bytes.NewReader(b))
-}
+	reader := stream.NewByteReader(b)
 
-func AccountsFromReader(readSeeker io.ReadSeeker) (*Accounts, int, error) {
-	a := new(Accounts)
-	n, err := a.readFromReadSeeker(readSeeker)
-
-	return a, n, err
-}
-
-func (a *Accounts) readFromReadSeeker(reader io.ReadSeeker) (n int, err error) {
-	// TODO: improve this
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-
-	a.initialize()
-
-	var accountCount uint32
-	if err = binary.Read(reader, binary.LittleEndian, &accountCount); err != nil {
-		return n, ierrors.Wrap(err, "unable to read accounts count")
+	a, err := AccountsFromReader(reader)
+	if err != nil {
+		return nil, 0, ierrors.Wrap(err, "unable to read accounts from bytes")
 	}
-	n += 4
 
-	for i := uint32(0); i < accountCount; i++ {
-		var accountID iotago.AccountID
+	return a, reader.BytesRead(), nil
+}
 
-		if _, err = io.ReadFull(reader, accountID[:]); err != nil {
-			return 0, ierrors.Wrap(err, "unable to read accountID")
-		}
-		n += iotago.AccountIDLength
+func AccountsFromReader(reader io.Reader) (*Accounts, error) {
+	a := NewAccounts()
 
-		poolBytes := make([]byte, poolBytesLength)
-		if _, err = io.ReadFull(reader, poolBytes); err != nil {
-			return 0, ierrors.Wrap(err, "unable to read pool bytes")
-		}
-		n += poolBytesLength
-
-		pool, c, err := PoolFromBytes(poolBytes)
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
+		accountID, err := stream.Read[iotago.AccountID](reader)
 		if err != nil {
-			return 0, ierrors.Wrap(err, "failed to parse pool")
+			return ierrors.Wrapf(err, "unable to read accountID at index %d", i)
 		}
 
-		if c != poolBytesLength {
-			return 0, ierrors.Wrap(err, "invalid pool bytes length")
+		pool, err := stream.ReadObject(reader, poolBytesLength, PoolFromBytes)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to read pool at index %d", i)
 		}
 
 		a.setWithoutLocking(accountID, pool)
+
+		return nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read account data")
 	}
 
-	var reused bool
-	if err = binary.Read(reader, binary.LittleEndian, &reused); err != nil {
-		return n, ierrors.Wrap(err, "unable to read reused flag")
+	reused, err := stream.Read[bool](reader)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to read reused flag")
 	}
+
 	a.reused.Store(reused)
-	n++
 
-	return n, nil
+	return a, nil
 }
 
 func (a *Accounts) Bytes() ([]byte, error) {
@@ -196,9 +171,7 @@ func (a *Accounts) Bytes() ([]byte, error) {
 				return false
 			}
 
-			if innerErr = stream.WriteFixedSizeObject(byteBuffer, pool, poolBytesLength, func(pool *Pool) ([]byte, error) {
-				return pool.Bytes()
-			}); innerErr != nil {
+			if innerErr = stream.WriteObject(byteBuffer, pool, (*Pool).Bytes); innerErr != nil {
 				return false
 			}
 

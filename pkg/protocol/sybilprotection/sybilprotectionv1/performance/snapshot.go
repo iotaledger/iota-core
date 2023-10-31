@@ -196,7 +196,7 @@ func (t *Tracker) importCommittees(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "unable to read epoch index")
 		}
 
-		committee, _, err := account.AccountsFromReader(reader)
+		committee, err := account.AccountsFromReader(reader)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to read committee for the epoch index %d", epoch)
 		}

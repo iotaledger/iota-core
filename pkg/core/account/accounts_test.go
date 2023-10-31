@@ -97,7 +97,7 @@ func TestAccounts(t *testing.T) {
 	require.Equal(t, accounts, accounts2)
 
 	// check "AccountsFromReader"
-	accounts3, _, err := account.AccountsFromReader(bytes.NewReader(accountBytes))
+	accounts3, err := account.AccountsFromReader(bytes.NewReader(accountBytes))
 	require.NoError(t, err)
 
 	// check if the new account is the same

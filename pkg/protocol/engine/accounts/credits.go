@@ -7,7 +7,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-const BlockIssuanceCreditsBytesLength = serializer.Int64ByteSize + serializer.UInt32ByteSize
+const BlockIssuanceCreditsBytesLength = serializer.Int64ByteSize + iotago.SlotIndexLength
 
 // BlockIssuanceCredits is a weight annotated with the slot it was last updated in.
 type BlockIssuanceCredits struct {

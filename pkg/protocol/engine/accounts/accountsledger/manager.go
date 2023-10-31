@@ -65,12 +65,8 @@ func New(
 			iotago.AccountID.Bytes,
 			iotago.AccountIDFromBytes,
 			(*accounts.AccountData).Bytes,
-			func(bytes []byte) (object *accounts.AccountData, consumed int, err error) {
-				a := new(accounts.AccountData)
-				consumed, err = a.FromBytes(bytes)
-
-				return a, consumed, err
-			}),
+			accounts.AccountDataFromBytes,
+		),
 		block:    blockFunc,
 		slotDiff: slotDiffFunc,
 	}
