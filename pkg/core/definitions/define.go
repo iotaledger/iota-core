@@ -35,7 +35,7 @@ func DynamicValue1[T, S comparable](target reactive.Variable[T], definition func
 	}
 }
 
-func With2Dependencies[S1, S2 comparable](source1 reactive.Variable[S1], source2 reactive.Variable[S2]) func(dependencyReceivers ...func(S1, S2) func()) (unsubscribe func()) {
+func InjectDependencies2[S1, S2 comparable](source1 reactive.Variable[S1], source2 reactive.Variable[S2]) func(dependencyReceivers ...func(S1, S2) func()) (unsubscribe func()) {
 	return func(dependencyReceivers ...func(S1, S2) func()) func() {
 		return source1.OnUpdateWithContext(func(_, source1 S1, unsubscribeOnParentUpdate func(subscriptionFactory func() (unsubscribe func()))) {
 			if source1 == *new(S1) {

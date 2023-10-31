@@ -32,8 +32,7 @@ type Commitment struct {
 	IsAboveLatestVerifiedCommitment reactive.Variable[bool]
 	InSyncRange                     reactive.Variable[bool]
 
-	protocol                                *Protocol
-	isDirectlyAboveLatestAttestedCommitment reactive.Variable[bool]
+	protocol *Protocol
 
 	*model.Commitment
 	log.Logger
@@ -62,8 +61,7 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
 		InSyncRange:                     reactive.NewVariable[bool](),
 
-		protocol:                                protocol,
-		isDirectlyAboveLatestAttestedCommitment: reactive.NewVariable[bool](),
+		protocol: protocol,
 	}
 
 	definitions.InjectDependencies1(c.Parent)(
@@ -112,11 +110,17 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		}),
 	)
 
-	definitions.With2Dependencies(c.Parent, c.Chain)(
+	definitions.InjectDependencies2(c.Parent, c.Chain)(
 		definitions.DynamicValue2(c.WarpSync, func(parent *Commitment, chain *Chain) reactive.DerivedVariable[bool] {
 			return reactive.NewDerivedVariable4(func(spawnedEngine *engine.Engine, warpSync, parentIsVerified, isVerified bool) bool {
 				return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
 			}, chain.SpawnedEngine, chain.WarpSync, parent.IsVerified, c.IsVerified)
+		}),
+
+		definitions.DynamicValue2(c.RequestAttestations, func(parent *Commitment, chain *Chain) reactive.DerivedVariable[bool] {
+			return reactive.NewDerivedVariable3(func(verifyAttestations, parentIsAttested, isAttested bool) bool {
+				return verifyAttestations && parentIsAttested && !isAttested
+			}, chain.VerifyAttestations, parent.IsAttested, c.IsAttested)
 		}),
 	)
 
@@ -126,10 +130,6 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		}
 
 		parent.registerChild(c)
-
-		c.isDirectlyAboveLatestAttestedCommitment.InheritFrom(reactive.NewDerivedVariable2(func(parentIsAttested, isAttested bool) bool {
-			return parentIsAttested && !isAttested
-		}, parent.IsAttested, c.IsAttested))
 	})
 
 	c.Chain.OnUpdateWithContext(func(_, chain *Chain, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
@@ -138,18 +138,10 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		}
 
 		withinContext(func() (unsubscribe func()) {
-			requestAttestations := reactive.NewDerivedVariable2(func(verifyAttestations, isDirectlyAboveLatestAttestedCommitment bool) bool {
-				return verifyAttestations && isDirectlyAboveLatestAttestedCommitment
-			}, chain.VerifyAttestations, c.isDirectlyAboveLatestAttestedCommitment)
-
-			c.RequestAttestations.InheritFrom(requestAttestations)
-
 			return lo.Batch(
 				chain.registerCommitment(c),
 
 				c.Engine.InheritFrom(chain.Engine),
-
-				requestAttestations.Unsubscribe,
 			)
 		})
 	})
