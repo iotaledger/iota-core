@@ -14,7 +14,7 @@ services:
 # IOTA-CORE Nodes #
 ###################
 
-  iota_core:
+  iota-core:
     image: {{iota_core_docker_image_repo}}:{{iota_core_docker_image_tag}}
     container_name: iota-core
     stop_grace_period: 1m
@@ -49,14 +49,6 @@ services:
       --restAPI.bindAddress=0.0.0.0:14265
       --database.path=/app/data/database
       --protocol.snapshot.path=/app/data/snapshot.bin
-      {% if 'node-01' in inventory_hostname or 'node-02' in inventory_hostname or 'node-03' in inventory_hostname %}
-      --validator.enabled=true
-        {% if 'node-01' in inventory_hostname %}
-      --validator.ignoreBootstrapped=true
-        {% endif %}
-      --validator.account={{validatorAccount}}
-      --validator.privateKey={{validatorPrvKey}}
-      {% endif %}
       --dashboard.bindAddress=0.0.0.0:8081
       --metrics.bindAddress=iota-core:9311
       --inx.enabled=true
@@ -97,11 +89,11 @@ services:
       inx-indexer:
         condition: service_started
     environment:
-      - "BLOCKISSUER_PRV_KEY={{blockissuerPrvKey}}"
+      - "BLOCKISSUER_PRV_KEY={{NODE_04_BLOCKISSUER_PRIVKEY}}"
     command: >
       --inx.address=iota-core:9029
       --restAPI.bindAddress=inx-blockissuer:9086
-      --blockIssuer.accountAddress=rms1pqas0clgfsf8du9e6dw0yx9nwclqe0dd4f728pvgmcshpscm8r5mkddrrfc
+      --blockIssuer.accountAddress={{NODE_04_BLOCKISSUER_ACCOUNTADDRESS}}
       --blockIssuer.proofOfWork.targetTrailingZeros=5
 
   inx-faucet:
@@ -116,13 +108,30 @@ services:
         condition: service_started
       inx-blockissuer:
         condition: service_started
-    networks:
-      - iota-core
     ports:
       - "8091:8091/tcp" # Faucet Frontend
     environment:
-      - "FAUCET_PRV_KEY={{faucetPrvKey}}"
+      - "FAUCET_PRV_KEY={{NODE_04_FAUCET_PRIVKEY}}"
     command: >
       --inx.address=iota-core:9029
       --faucet.bindAddress=0.0.0.0:8091
+{% endif %}
+
+{% if 'node-01' in inventory_hostname or 'node-02' in inventory_hostname or 'node-03' in inventory_hostname %}
+  inx-validator:
+    container_name: inx-validator
+    image: iotaledger/inx-validator:1.0-alpha
+    stop_grace_period: 1m
+    restart: unless-stopped
+    depends_on:
+      iota-core:
+        condition: service_started
+    environment:
+      - "VALIDATOR_PRV_KEY={{validatorPrvKey}}"
+    command: >
+      --inx.address=iota-core:9029
+      {% if 'node-01' in inventory_hostname %}
+      --validator.ignoreBootstrapped=true
+      {% endif %}
+      --validator.accountAddress={{validatorAccountAddress}}
 {% endif %}
