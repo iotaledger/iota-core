@@ -23,6 +23,7 @@ func main() {
 	}
 
 	var currentMethodReceiver string
+	capturedVars := make(map[string]token.Pos)
 
 	ast.Inspect(node, func(n ast.Node) bool {
 		switch t := n.(type) {
@@ -36,6 +37,16 @@ func main() {
 				}
 			} else {
 				currentMethodReceiver = ""
+			}
+
+		case *ast.AssignStmt:
+			for _, expr := range t.Lhs {
+				if ident, ok := expr.(*ast.Ident); ok {
+					if pos, captured := capturedVars[ident.Name]; captured {
+						pos := fset.Position(pos)
+						fmt.Printf("%s:%d: variable '%s' captured and modified outside closure\n", pos.Filename, pos.Line, ident.Name)
+					}
+				}
 			}
 
 		case *ast.FuncLit:
@@ -77,8 +88,7 @@ func main() {
 
 				if _, isDeclared := declaredVars[ident.Name]; !isDeclared {
 					if ident.Name != currentMethodReceiver {
-						pos := fset.Position(ident.Pos())
-						fmt.Printf("%s:%d: variable '%s' captured by closure\n", pos.Filename, pos.Line, ident.Name)
+						capturedVars[ident.Name] = ident.Pos()
 					}
 				}
 				return true
