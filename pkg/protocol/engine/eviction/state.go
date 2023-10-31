@@ -28,17 +28,20 @@ type State struct {
 	latestNonEmptyStore  kvstore.KVStore
 	evictionMutex        syncutils.RWMutex
 
+	genesisRootBlockFunc func() iotago.BlockID
+
 	optsRootBlocksEvictionDelay iotago.SlotIndex
 }
 
 // NewState creates a new eviction State.
-func NewState(latestNonEmptyStore kvstore.KVStore, rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error), opts ...options.Option[State]) (state *State) {
+func NewState(latestNonEmptyStore kvstore.KVStore, rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error), genesisRootBlockFunc func() iotago.BlockID, opts ...options.Option[State]) (state *State) {
 	return options.Apply(&State{
 		Events:                      NewEvents(),
 		rootBlocks:                  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID](),
 		latestRootBlocks:            ringbuffer.NewRingBuffer[iotago.BlockID](8),
 		rootBlockStorageFunc:        rootBlockStorageFunc,
 		latestNonEmptyStore:         latestNonEmptyStore,
+		genesisRootBlockFunc:        genesisRootBlockFunc,
 		optsRootBlocksEvictionDelay: 3,
 	}, opts)
 }
@@ -167,7 +170,7 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 func (s *State) LatestRootBlocks() iotago.BlockIDs {
 	rootBlocks := s.latestRootBlocks.ToSlice()
 	if len(rootBlocks) == 0 {
-		return iotago.BlockIDs{iotago.EmptyBlockID}
+		return iotago.BlockIDs{s.genesisRootBlockFunc()}
 	}
 
 	return rootBlocks
@@ -183,7 +186,8 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 
 	start, _ := s.delayedBlockEvictionThreshold(lowerTarget)
 
-	latestNonEmptySlot := iotago.SlotIndex(0)
+	genesisSlot := s.genesisRootBlockFunc().Slot()
+	latestNonEmptySlot := genesisSlot
 
 	if err := stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		for currentSlot := start; currentSlot <= targetSlot; currentSlot++ {
@@ -218,7 +222,7 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 	if latestNonEmptySlot > s.optsRootBlocksEvictionDelay {
 		latestNonEmptySlot -= s.optsRootBlocksEvictionDelay
 	} else {
-		latestNonEmptySlot = 0
+		latestNonEmptySlot = genesisSlot
 	}
 
 	if err := stream.WriteSerializable(writer, latestNonEmptySlot, iotago.SlotIndexLength); err != nil {
@@ -283,7 +287,8 @@ func (s *State) Rollback(lowerTarget, targetIndex iotago.SlotIndex) error {
 	defer s.evictionMutex.RUnlock()
 
 	start, _ := s.delayedBlockEvictionThreshold(lowerTarget)
-	latestNonEmptySlot := iotago.SlotIndex(0)
+	genesisSlot := s.genesisRootBlockFunc().Slot()
+	latestNonEmptySlot := genesisSlot
 
 	for currentSlot := start; currentSlot <= targetIndex; currentSlot++ {
 		_, err := s.rootBlockStorageFunc(currentSlot)
@@ -297,7 +302,7 @@ func (s *State) Rollback(lowerTarget, targetIndex iotago.SlotIndex) error {
 	if latestNonEmptySlot > s.optsRootBlocksEvictionDelay {
 		latestNonEmptySlot -= s.optsRootBlocksEvictionDelay
 	} else {
-		latestNonEmptySlot = 0
+		latestNonEmptySlot = genesisSlot
 	}
 
 	if err := s.latestNonEmptyStore.Set([]byte{latestNonEmptySlotKey}, latestNonEmptySlot.MustBytes()); err != nil {
@@ -371,8 +376,9 @@ func (s *State) withinActiveIndexRange(slot iotago.SlotIndex) bool {
 
 // delayedBlockEvictionThreshold returns the slot index that is the threshold for delayed rootblocks eviction.
 func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (thresholdSlot iotago.SlotIndex, shouldEvict bool) {
-	if slot < s.optsRootBlocksEvictionDelay {
-		return 0, false
+	genesisSlot := s.genesisRootBlockFunc().Slot()
+	if slot < genesisSlot+s.optsRootBlocksEvictionDelay {
+		return genesisSlot, false
 	}
 
 	// Check if we have root blocks up to the eviction point.
@@ -383,7 +389,7 @@ func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (thresholdS
 					return slot - s.optsRootBlocksEvictionDelay, true
 				}
 
-				return 0, false
+				return genesisSlot, false
 			}
 		}
 	}
@@ -393,7 +399,7 @@ func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (thresholdS
 		return latestNonEmptySlot - s.optsRootBlocksEvictionDelay, true
 	}
 
-	return 0, false
+	return genesisSlot, false
 }
 
 // WithRootBlocksEvictionDelay sets the time since confirmation threshold.

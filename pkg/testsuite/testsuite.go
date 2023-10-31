@@ -117,7 +117,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		t.ProtocolParameterOptions = append(defaultProtocolParameters, t.ProtocolParameterOptions...)
 		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(t.ProtocolParameterOptions...))
 
-		genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(), time.Unix(t.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
+		genesisBlock := blocks.NewRootBlock(t.API.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(t.API).MustID(), time.Unix(t.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
 		t.RegisterBlock("Genesis", genesisBlock)
 
 		t.snapshotPath = t.Directory.Path("genesis_snapshot.bin")
@@ -126,7 +126,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			snapshotcreator.WithFilePath(t.snapshotPath),
 			snapshotcreator.WithProtocolParameters(t.API.ProtocolParameters()),
 			snapshotcreator.WithRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
-				iotago.EmptyBlockID: iotago.NewEmptyCommitment(t.API.ProtocolParameters().Version()).MustID(),
+				t.API.ProtocolParameters().GenesisBlockID(): iotago.NewEmptyCommitment(t.API).MustID(),
 			}),
 		}
 		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)

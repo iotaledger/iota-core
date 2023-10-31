@@ -99,7 +99,7 @@ func TestConfirmationFlags(t *testing.T) {
 	})
 
 	// Verify that nodes have the expected states.
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithSnapshotImported(true),

@@ -109,7 +109,7 @@ func reviveChain(issuingTime time.Time) (*iotago.Commitment, iotago.BlockID, err
 	apiForSlot := deps.Protocol.APIForSlot(lastCommittedSlot)
 
 	// Get a rootblock as recent as possible for the parent.
-	parentBlockID := iotago.EmptyBlockID
+	parentBlockID := iotago.EmptyBlockID //TODO: use GenesisBlockID
 	for rootBlock := range deps.Protocol.MainEngineInstance().EvictionState.ActiveRootBlocks() {
 		if rootBlock.Slot() > parentBlockID.Slot() {
 			parentBlockID = rootBlock
@@ -151,7 +151,7 @@ func getAddressableCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, e
 	}
 
 	if blockSlot < commitment.Slot+protoParams.MinCommittableAge() {
-		if blockSlot < protoParams.MinCommittableAge() || commitment.Slot < protoParams.MinCommittableAge() {
+		if blockSlot < protoParams.GenesisSlot()+protoParams.MinCommittableAge() || commitment.Slot < protoParams.GenesisSlot()+protoParams.MinCommittableAge() {
 			return commitment, nil
 		}
 

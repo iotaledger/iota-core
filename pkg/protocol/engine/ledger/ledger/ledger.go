@@ -184,7 +184,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	rmcIndex, _ := safemath.SafeSub(slot, maxCommittableAge)
 	rmcForSlot, err := l.rmcManager.RMC(rmcIndex)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to get RMC for slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("ledger failed to get RMC for slot %d: %w", slot, err)
 	}
 	if err = l.accountsLedger.ApplyDiff(slot, rmcForSlot, accountDiffs, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for slot %d: %w", slot, err)

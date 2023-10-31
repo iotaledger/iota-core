@@ -116,7 +116,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 	}
 
 	{
-		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
@@ -309,7 +309,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 	}
 
 	{
-		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
@@ -509,7 +509,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 	}
 
 	{
-		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
@@ -709,7 +709,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 	}
 
 	{
-		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),

@@ -66,7 +66,8 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	}
 
 	api := s.Settings().APIProvider().CommittedAPI()
-	if err := s.Commitments().Store(model.NewEmptyCommitment(api)); err != nil {
+	genesisCommitment := model.NewEmptyCommitment(api)
+	if err := s.Commitments().Store(genesisCommitment); err != nil {
 		return ierrors.Wrap(err, "failed to store empty commitment")
 	}
 
@@ -120,6 +121,10 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	)
 	defer engineInstance.Shutdown()
 
+	if opt.AddGenesisRootBlock {
+		engineInstance.EvictionState.AddRootBlock(api.ProtocolParameters().GenesisBlockID(), genesisCommitment.ID())
+	}
+
 	for blockID, commitmentID := range opt.RootBlocks {
 		engineInstance.EvictionState.AddRootBlock(blockID, commitmentID)
 	}
@@ -164,7 +169,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 			return err
 		}
 
-		utxoOutput := utxoledger.CreateOutput(engineInstance, outputID, iotago.EmptyBlockID, GenesisTransactionCreationSlot, output, proof)
+		utxoOutput := utxoledger.CreateOutput(engineInstance, outputID, api.ProtocolParameters().GenesisBlockID(), GenesisTransactionCreationSlot, output, proof)
 		if err := engineInstance.Ledger.AddGenesisUnspentOutput(utxoOutput); err != nil {
 			return err
 		}

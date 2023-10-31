@@ -44,7 +44,7 @@ func (c *Commitments) Load(slot iotago.SlotIndex) (commitment *model.Commitment,
 func (c *Commitments) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
 	if err := stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
 		var count uint64
-		for slot := iotago.SlotIndex(0); slot <= targetSlot; slot++ {
+		for slot := c.apiProvider.CommittedAPI().ProtocolParameters().GenesisSlot(); slot <= targetSlot; slot++ {
 			commitmentBytes, err := c.store.KVStore().Get(lo.PanicOnErr(slot.Bytes()))
 			if err != nil {
 				return 0, ierrors.Wrapf(err, "failed to load commitment for slot %d", slot)
