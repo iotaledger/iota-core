@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-func main() {
+func complex() {
 	// Captured variables
 	captured1 := 1
 	captured2 := 2
