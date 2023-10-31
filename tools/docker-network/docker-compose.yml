@@ -20,10 +20,10 @@ services:
     networks:
       - iota-core
     ports:
-      - "8010:14265/tcp" # REST-API
-      - "8011:8081/tcp" # Dashboard
-      - "6011:6061/tcp" # pprof
-      - "9019:9029/tcp" # INX
+      - "8050:14265/tcp" # REST-API
+      - "8051:8081/tcp" # Dashboard
+      - "6051:6061/tcp" # pprof
+      - "9059:9029/tcp" # INX
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -45,10 +45,10 @@ services:
     networks:
       - iota-core
     ports:
-      - "8020:14265/tcp" # REST-API
-      - "8021:8081/tcp" # Dashboard
-      - "6021:6061/tcp" # pprof
-      - "9029:9029/tcp" # INX
+      - "8060:14265/tcp" # REST-API
+      - "8061:8081/tcp" # Dashboard
+      - "6061:6061/tcp" # pprof
+      - "9069:9029/tcp" # INX
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -70,10 +70,10 @@ services:
     networks:
       - iota-core
     ports:
-      - "8030:14265/tcp" # REST-API
-      - "8031:8081/tcp" # Dashboard
-      - "6031:6061/tcp" # pprof
-      - "9039:9029/tcp" # INX
+      - "8070:14265/tcp" # REST-API
+      - "8071:8081/tcp" # Dashboard
+      - "6071:6061/tcp" # pprof
+      - "9079:9029/tcp" # INX
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -95,10 +95,10 @@ services:
     networks:
       - iota-core
     ports:
-      - "8040:14265/tcp" # REST-API
-      - "8041:8081/tcp" # Dashboard
-      - "6041:6061/tcp" # pprof
-      - "9049:9029/tcp" # INX
+      - "8080:14265/tcp" # REST-API
+      - "8081:8081/tcp" # Dashboard
+      - "6081:6061/tcp" # pprof
+      - "9089:9029/tcp" # INX
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -120,10 +120,10 @@ services:
     networks:
       - iota-core
     ports:
-      - "8050:14265/tcp" # REST-API
-      - "8051:8081/tcp" # Dashboard
-      - "6051:6061/tcp" # pprof
-      - "9059:9029/tcp" # INX
+      - "8090:14265/tcp" # REST-API
+      - "8091:8081/tcp" # Dashboard
+      - "6091:6061/tcp" # pprof
+      - "9099:9029/tcp" # INX
     volumes:
       - ./docker-network.snapshot:/app/data/snapshot.bin
       - ./config.json:/app/config.json:ro
@@ -236,7 +236,7 @@ services:
       --faucet.rateLimit.enabled=false
 
   inx-validator-1:
-    image: iotaledger/inx-validator:latest
+    image: iotaledger/inx-validator:1.0-alpha
     stop_grace_period: 1m
     restart: unless-stopped
     depends_on:
@@ -253,7 +253,7 @@ services:
       --validator.accountAddress=rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6
 
   inx-validator-2:
-    image: iotaledger/inx-validator:latest
+    image: iotaledger/inx-validator:1.0-alpha
     stop_grace_period: 1m
     restart: unless-stopped
     depends_on:
@@ -269,7 +269,7 @@ services:
       --validator.accountAddress=rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl
 
   inx-validator-3:
-    image: iotaledger/inx-validator:latest
+    image: iotaledger/inx-validator:1.0-alpha
     stop_grace_period: 1m
     restart: unless-stopped
     depends_on:
