@@ -180,11 +180,14 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 
 	// Update the Accounts ledger
 	// first, get the RMC corresponding to this slot
-	maxCommittableAge := l.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge()
-	rmcIndex, _ := safemath.SafeSub(slot, maxCommittableAge)
-	rmcForSlot, err := l.rmcManager.RMC(rmcIndex)
+	protocolParams := l.apiProvider.APIForSlot(slot).ProtocolParameters()
+	rmcSlot, _ := safemath.SafeSub(slot, protocolParams.MaxCommittableAge())
+	if rmcSlot < protocolParams.GenesisSlot() {
+		rmcSlot = protocolParams.GenesisSlot()
+	}
+	rmcForSlot, err := l.rmcManager.RMC(rmcSlot)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("ledger failed to get RMC for slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("ledger failed to get RMC for slot %d: %w", rmcSlot, err)
 	}
 	if err = l.accountsLedger.ApplyDiff(slot, rmcForSlot, accountDiffs, destroyedAccounts); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for slot %d: %w", slot, err)
