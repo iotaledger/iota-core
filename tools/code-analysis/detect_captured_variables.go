@@ -62,6 +62,15 @@ func main() {
 				return true
 			}
 
+			// Check if the variable is a parameter of the function literal
+			for _, param := range funcLit.Type.Params.List {
+				for _, name := range param.Names {
+					if name.Name == ident.Name {
+						return true // Skip parameters, they are not captured variables
+					}
+				}
+			}
+
 			if _, isDeclared := declaredVars[ident.Name]; !isDeclared {
 				pos := fset.Position(ident.Pos())
 				fmt.Printf("Variable '%s' captured by closure at %s:%d\n", ident.Name, pos.Filename, pos.Line)
