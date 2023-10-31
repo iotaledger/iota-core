@@ -43,8 +43,10 @@ func main() {
 			for _, expr := range t.Lhs {
 				if ident, ok := expr.(*ast.Ident); ok {
 					if pos, captured := capturedVars[ident.Name]; captured {
-						pos := fset.Position(pos)
-						fmt.Printf("%s:%d: variable '%s' captured and modified outside closure\n", pos.Filename, pos.Line, ident.Name)
+						capturedPos := fset.Position(pos)
+						modifiedPos := fset.Position(ident.Pos())
+						fmt.Printf("%s:%d: variable '%s' captured by closure and modified at %s:%d\n",
+							capturedPos.Filename, capturedPos.Line, ident.Name, modifiedPos.Filename, modifiedPos.Line)
 					}
 				}
 			}
@@ -71,6 +73,10 @@ func main() {
 			ast.Inspect(t, func(nn ast.Node) bool {
 				ident, ok := nn.(*ast.Ident)
 				if !ok {
+					return true
+				}
+
+				if ident.Name == "_" { // skip underscore variables
 					return true
 				}
 
