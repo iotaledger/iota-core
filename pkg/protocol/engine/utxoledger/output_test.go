@@ -290,8 +290,7 @@ func TestAccountOutputSerialization(t *testing.T) {
 	txCreationSlot := utils.RandSlotIndex()
 	blockID := utils.RandBlockID()
 	aliasID := utils.RandAccountID()
-	stateController := utils.RandAccountID()
-	governor := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	address := utils.RandAccountID().ToAddress()
 	issuer := utils.RandNFTID()
 	sender := utils.RandAccountID()
 	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
@@ -301,6 +300,49 @@ func TestAccountOutputSerialization(t *testing.T) {
 		Amount:    amount,
 		AccountID: aliasID,
 		Conditions: iotago.AccountOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{
+				Address: address,
+			},
+		},
+		Features: iotago.AccountOutputFeatures{
+			&iotago.SenderFeature{
+				Address: sender.ToAddress(),
+			},
+		},
+		ImmutableFeatures: iotago.AccountOutputImmFeatures{
+			&iotago.IssuerFeature{
+				Address: issuer.ToAddress(),
+			},
+		},
+	}
+
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
+	require.NoError(t, err)
+
+	output := CreateOutputAndAssertSerialization(t, blockID, index, iotaOutput, outputProof)
+	spent := CreateSpentAndAssertSerialization(t, output)
+	outputID := output.OutputID()
+
+	require.ElementsMatch(t, byteutils.ConcatBytes([]byte{utxoledger.StoreKeyPrefixOutputUnspent}, outputID[:]), output.UnspentLookupKey())
+	AssertOutputUnspentAndSpentTransitions(t, output, spent)
+}
+
+func TestAnchorOutputSerialization(t *testing.T) {
+	txCommitment := iotago_tpkg.Rand32ByteArray()
+	txCreationSlot := utils.RandSlotIndex()
+	blockID := utils.RandBlockID()
+	aliasID := utils.RandAnchorID()
+	stateController := utils.RandAnchorID()
+	governor := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	issuer := utils.RandNFTID()
+	sender := utils.RandAnchorID()
+	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
+	index := utils.RandSlotIndex()
+
+	iotaOutput := &iotago.AnchorOutput{
+		Amount:   amount,
+		AnchorID: aliasID,
+		Conditions: iotago.AnchorOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{
 				Address: stateController.ToAddress(),
 			},
@@ -309,12 +351,12 @@ func TestAccountOutputSerialization(t *testing.T) {
 			},
 		},
 		StateMetadata: make([]byte, 0),
-		Features: iotago.AccountOutputFeatures{
+		Features: iotago.AnchorOutputFeatures{
 			&iotago.SenderFeature{
 				Address: sender.ToAddress(),
 			},
 		},
-		ImmutableFeatures: iotago.AccountOutputImmFeatures{
+		ImmutableFeatures: iotago.AnchorOutputImmFeatures{
 			&iotago.IssuerFeature{
 				Address: issuer.ToAddress(),
 			},

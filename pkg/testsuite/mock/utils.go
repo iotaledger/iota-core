@@ -24,8 +24,8 @@ func WithInputs(inputs utxoledger.Outputs) options.Option[builder.TransactionBui
 					InputID:      input.OutputID(),
 					Input:        input.Output(),
 				})
-			case iotago.OutputAccount:
-				// For alias we need to unlock the state controller
+			case iotago.OutputAnchor:
+				// For anchor outputs we need to unlock the state controller
 				txBuilder.AddInput(&builder.TxInput{
 					UnlockTarget: input.Output().UnlockConditionSet().StateControllerAddress().Address,
 					InputID:      input.OutputID(),
@@ -42,14 +42,12 @@ func WithInputs(inputs utxoledger.Outputs) options.Option[builder.TransactionBui
 	}
 }
 
-func WithAccountInput(input *utxoledger.Output, governorTransition bool) options.Option[builder.TransactionBuilder] {
+func WithAccountInput(input *utxoledger.Output) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		switch input.OutputType() {
 		case iotago.OutputAccount:
-			address := input.Output().UnlockConditionSet().StateControllerAddress().Address
-			if governorTransition {
-				address = input.Output().UnlockConditionSet().GovernorAddress().Address
-			}
+			address := input.Output().UnlockConditionSet().Address().Address
+
 			txBuilder.AddInput(&builder.TxInput{
 				UnlockTarget: address,
 				InputID:      input.OutputID(),
@@ -145,22 +143,19 @@ func WithBlockIssuerFeature(keys iotago.BlockIssuerKeys, expirySlot iotago.SlotI
 
 func WithAddBlockIssuerKey(key iotago.BlockIssuerKey) options.Option[builder.AccountOutputBuilder] {
 	return func(accountBuilder *builder.AccountOutputBuilder) {
-		transition := accountBuilder.GovernanceTransition()
-		transition.BlockIssuerTransition().AddKeys(key)
+		accountBuilder.BlockIssuerTransition().AddKeys(key)
 	}
 }
 
 func WithBlockIssuerKeys(keys iotago.BlockIssuerKeys) options.Option[builder.AccountOutputBuilder] {
 	return func(accountBuilder *builder.AccountOutputBuilder) {
-		transition := accountBuilder.GovernanceTransition()
-		transition.BlockIssuerTransition().Keys(keys)
+		accountBuilder.BlockIssuerTransition().Keys(keys)
 	}
 }
 
 func WithBlockIssuerExpirySlot(expirySlot iotago.SlotIndex) options.Option[builder.AccountOutputBuilder] {
 	return func(accountBuilder *builder.AccountOutputBuilder) {
-		transition := accountBuilder.GovernanceTransition()
-		transition.BlockIssuerTransition().ExpirySlot(expirySlot)
+		accountBuilder.BlockIssuerTransition().ExpirySlot(expirySlot)
 	}
 }
 
@@ -209,12 +204,9 @@ func WithAccountConditions(conditions iotago.AccountOutputUnlockConditions) opti
 	return func(accountBuilder *builder.AccountOutputBuilder) {
 		for _, condition := range conditions.MustSet() {
 			switch condition.Type() {
-			case iotago.UnlockConditionStateControllerAddress:
+			case iotago.UnlockConditionAddress:
 				//nolint:forcetypeassert
-				accountBuilder.StateController(condition.(*iotago.StateControllerAddressUnlockCondition).Address)
-			case iotago.UnlockConditionGovernorAddress:
-				//nolint:forcetypeassert
-				accountBuilder.Governor(condition.(*iotago.GovernorAddressUnlockCondition).Address)
+				accountBuilder.Address(condition.(*iotago.AddressUnlockCondition).Address)
 			}
 		}
 	}
