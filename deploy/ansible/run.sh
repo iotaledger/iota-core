@@ -4,8 +4,6 @@ export ANSIBLE_STRATEGY=free
 export ANSIBLE_PIPELINING=true
 export ANSIBLE_PERSISTENT_CONTROL_PATH_DIR="/tmp/"
 
-set -x
-
 ARGS=("$@")
 ansible-playbook -u root -i deploy/ansible/hosts/"${1:-feature.yml}" \
   --forks 20 --ssh-common-args "-o ControlMaster=auto -o ControlPersist=5m" \
