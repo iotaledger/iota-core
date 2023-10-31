@@ -249,8 +249,7 @@ func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmou
 		Mana:      mana,
 		AccountID: accountID,
 		Conditions: iotago.AccountOutputUnlockConditions{
-			&iotago.StateControllerAddressUnlockCondition{Address: address},
-			&iotago.GovernorAddressUnlockCondition{Address: address},
+			&iotago.AddressUnlockCondition{Address: address},
 		},
 		Features: iotago.AccountOutputFeatures{
 			&iotago.BlockIssuerFeature{
