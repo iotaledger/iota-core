@@ -7,15 +7,15 @@ cores:
     internal_nodes:
       hosts:
         node-01.feature.shimmer.iota.cafe:
-          validatorAccountAddress:"{{ NODE_01_VALIDATOR_ACCOUNTADDRESS }}"
+          validatorAccountAddress: "{{ NODE_01_VALIDATOR_ACCOUNTADDRESS }}"
           validatorPrvKey: "{{ NODE_01_VALIDATOR_PRIVKEY }}"
           p2pIdentityPrvKey: "{{ NODE_01_P2PIDENTITYPRIVATEKEY }}"
         node-02.feature.shimmer.iota.cafe:
-          validatorAccountAddress:"{{ NODE_02_VALIDATOR_ACCOUNTADDRESS }}"
+          validatorAccountAddress: "{{ NODE_02_VALIDATOR_ACCOUNTADDRESS }}"
           validatorPrvKey: "{{ NODE_02_VALIDATOR_PRIVKEY }}"
           p2pIdentityPrvKey: "{{ NODE_02_P2PIDENTITYPRIVATEKEY }}"
         node-03.feature.shimmer.iota.cafe:
-          validatorAccountAddress:"{{ NODE_03_VALIDATOR_ACCOUNTADDRESS }}"
+          validatorAccountAddress: "{{ NODE_03_VALIDATOR_ACCOUNTADDRESS }}"
           validatorPrvKey: "{{ NODE_03_VALIDATOR_PRIVKEY }}"
           p2pIdentityPrvKey: "{{ NODE_03_P2PIDENTITYPRIVATEKEY }}"
         node-04.feature.shimmer.iota.cafe:
