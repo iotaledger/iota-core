@@ -188,7 +188,7 @@ func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, no
 
 	validationBlock, _ := block.ValidationBlock()
 
-	node.Protocol.MainEngine.Get().LogTrace("issued validation block", "block", validationBlock, "blockID", block.ID(), "slot", block.ID().Slot(), "commitment", block.SlotCommitmentID(), "latestFinalizedSlot", block.ProtocolBlock().LatestFinalizedSlot, "version", block.ProtocolBlock().ProtocolVersion, "highestSupportedVersion", validationBlock.HighestSupportedVersion, "hash", validationBlock.ProtocolParametersHash)
+	node.Protocol.MainEngine.Get().LogTrace("issued validation block", "blockID", block.ID(), "slot", block.ID().Slot(), "commitment", block.SlotCommitmentID(), "latestFinalizedSlot", block.ProtocolBlock().LatestFinalizedSlot, "version", block.ProtocolBlock().ProtocolVersion, "highestSupportedVersion", validationBlock.HighestSupportedVersion, "hash", validationBlock.ProtocolParametersHash)
 
 	return block
 }
@@ -283,7 +283,7 @@ func (i *BlockIssuer) IssueBasicBlock(ctx context.Context, alias string, node *N
 
 	require.NoErrorf(i.Testing, i.IssueBlock(block.ModelBlock(), node), "%s > failed to issue block with alias %s", i.Name, alias)
 
-	node.Protocol.LogTrace("issued block", "block", block, "blockID", block.ID(), "slot", block.ID().Slot(), "commitment", block.SlotCommitmentID(), "latestFinalizedSlot", block.ProtocolBlock().LatestFinalizedSlot, "version", block.ProtocolBlock().ProtocolVersion)
+	node.Protocol.LogTrace("issued block", "blockID", block.ID(), "slot", block.ID().Slot(), "commitment", block.SlotCommitmentID(), "latestFinalizedSlot", block.ProtocolBlock().LatestFinalizedSlot, "version", block.ProtocolBlock().ProtocolVersion)
 
 	return block
 }

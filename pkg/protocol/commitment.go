@@ -118,9 +118,14 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 	c.IsRoot.OnTrigger(func() {
 		c.IsAttested.Set(true)
 		c.IsVerified.Set(true)
+		c.IsSolid.Set(true)
 	})
 
 	c.Logger = protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", commitment.Slot()), c.IsEvicted, func(entityLogger log.Logger) {
+		c.IsSolid.LogUpdates(entityLogger, log.LevelTrace, "IsSolid")
+		c.Chain.LogUpdates(entityLogger, log.LevelTrace, "Chain", (*Chain).LogName)
+		c.IsVerified.LogUpdates(entityLogger, log.LevelTrace, "IsVerified")
+		c.InSyncRange.LogUpdates(entityLogger, log.LevelTrace, "InSyncRange")
 		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
 		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
@@ -132,7 +137,7 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 
 func (c *Commitment) isAboveLatestVerifiedCommitment(parent *Commitment) reactive.DerivedVariable[bool] {
 	return reactive.NewDerivedVariable3(func(parentAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
-		return parentAboveLatestVerifiedCommitment || (parentIsVerified && isVerified)
+		return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
 	}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified)
 }
 
