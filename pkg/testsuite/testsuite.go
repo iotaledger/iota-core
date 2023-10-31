@@ -90,6 +90,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			iotago.WithStakingOptions(1, 100, 1),
 
 			iotago.WithTimeProviderOptions(
+				0,
 				GenesisTimeWithOffsetBySlots(0, DefaultSlotDurationInSeconds),
 				DefaultSlotDurationInSeconds,
 				DefaultSlotsPerEpochExponent,

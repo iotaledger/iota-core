@@ -20,6 +20,7 @@ func TestConfirmationFlags(t *testing.T) {
 		// TODO: remove this opt and use a proper value when refactoring the test with scheduler
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				testsuite.DefaultSlotsPerEpochExponent,
