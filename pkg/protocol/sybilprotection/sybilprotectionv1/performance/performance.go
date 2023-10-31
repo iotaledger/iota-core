@@ -64,9 +64,9 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 
 	t.performanceFactorsMutex.Lock()
 	defer t.performanceFactorsMutex.Unlock()
-	isCommitteeMember, err := t.isCommitteeMember(block.ID().Slot(), block.ProtocolBlock().IssuerID)
+	isCommitteeMember, err := t.isCommitteeMember(block.ID().Slot(), block.ProtocolBlock().Header.IssuerID)
 	if err != nil {
-		t.errHandler(ierrors.Wrapf(err, "error while checking if account %s is a committee member in slot %d", block.ProtocolBlock().IssuerID, block.ID().Slot()))
+		t.errHandler(ierrors.Wrapf(err, "error while checking if account %s is a committee member in slot %d", block.ProtocolBlock().Header.IssuerID, block.ID().Slot()))
 
 		return
 	}
@@ -87,7 +87,7 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 	}
 
 	var rollback bool
-	t.nextEpochCommitteeCandidates.Compute(block.ProtocolBlock().IssuerID, func(currentValue iotago.SlotIndex, exists bool) iotago.SlotIndex {
+	t.nextEpochCommitteeCandidates.Compute(block.ProtocolBlock().Header.IssuerID, func(currentValue iotago.SlotIndex, exists bool) iotago.SlotIndex {
 		if !exists || currentValue > block.ID().Slot() {
 			committeeCandidatesStore, err := t.committeeCandidatesInEpochFunc(blockEpoch)
 			if err != nil {
@@ -100,7 +100,7 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 				return currentValue
 			}
 
-			err = committeeCandidatesStore.Set(block.ProtocolBlock().IssuerID[:], block.ID().Slot().MustBytes())
+			err = committeeCandidatesStore.Set(block.ProtocolBlock().Header.IssuerID[:], block.ID().Slot().MustBytes())
 			if err != nil {
 				// if there is an error, and we don't register a candidate, then we might eventually create a different commitment
 				t.errHandler(ierrors.Wrapf(err, "error while updating candidate activity for epoch %d", blockEpoch))
@@ -120,7 +120,7 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 	// if there was an error when computing the value,
 	// and it was the first entry for the given issuer, then remove the entry
 	if rollback {
-		t.nextEpochCommitteeCandidates.Delete(block.ProtocolBlock().IssuerID)
+		t.nextEpochCommitteeCandidates.Delete(block.ProtocolBlock().Header.IssuerID)
 	}
 
 }
@@ -313,7 +313,7 @@ func (t *Tracker) isCommitteeMember(slot iotago.SlotIndex, accountID iotago.Acco
 	return committee.Has(accountID), nil
 }
 
-func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.ValidationBlock, block *blocks.Block) {
+func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.ValidationBlockBody, block *blocks.Block) {
 	validatorPerformances, err := t.validatorPerformancesFunc(block.ID().Slot())
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for slot %s", block.ID().Slot()))
@@ -321,9 +321,9 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 		return
 	}
 
-	validatorPerformance, err := validatorPerformances.Load(block.ProtocolBlock().IssuerID)
+	validatorPerformance, err := validatorPerformances.Load(block.ProtocolBlock().Header.IssuerID)
 	if err != nil {
-		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().IssuerID))
+		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().Header.IssuerID))
 
 		return
 	}
@@ -334,7 +334,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	}
 
 	// set a bit at subslotIndex to 1 to indicate activity in that subslot
-	validatorPerformance.SlotActivityVector = validatorPerformance.SlotActivityVector | (1 << t.subslotIndex(block.ID().Slot(), block.ProtocolBlock().IssuingTime))
+	validatorPerformance.SlotActivityVector = validatorPerformance.SlotActivityVector | (1 << t.subslotIndex(block.ID().Slot(), block.ProtocolBlock().Header.IssuingTime))
 
 	apiForSlot := t.apiProvider.APIForSlot(block.ID().Slot())
 
@@ -349,8 +349,8 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 		Hash:    validationBlock.ProtocolParametersHash,
 	}
 
-	if err = validatorPerformances.Store(block.ProtocolBlock().IssuerID, validatorPerformance); err != nil {
-		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().IssuerID))
+	if err = validatorPerformances.Store(block.ProtocolBlock().Header.IssuerID, validatorPerformance); err != nil {
+		t.errHandler(ierrors.Errorf("failed to store performance factor for account %s", block.ProtocolBlock().Header.IssuerID))
 	}
 }
 

@@ -67,7 +67,7 @@ func NewBlockDispatcher(protocol *Protocol, opts ...options.Option[BlockDispatch
 
 // Dispatch dispatches the given block to the correct engine instance.
 func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
-	slotCommitment := b.protocol.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().SlotCommitmentID)
+	slotCommitment := b.protocol.ChainManager.LoadCommitmentOrRequestMissing(block.ProtocolBlock().Header.SlotCommitmentID)
 	if !slotCommitment.SolidEvent().WasTriggered() {
 		if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
 			return ierrors.Errorf("failed to add block %s to unsolid commitment buffer", block.ID())
@@ -365,7 +365,7 @@ func (b *BlockDispatcher) inSyncWindow(engine *engine.Engine, block *model.Block
 		return true
 	}
 
-	slotCommitmentID := block.ProtocolBlock().SlotCommitmentID
+	slotCommitmentID := block.ProtocolBlock().Header.SlotCommitmentID
 	latestCommitmentSlot := engine.Storage.Settings().LatestCommitment().Slot()
 	maxCommittableAge := engine.APIForSlot(slotCommitmentID.Slot()).ProtocolParameters().MaxCommittableAge()
 

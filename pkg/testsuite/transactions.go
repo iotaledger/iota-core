@@ -141,7 +141,7 @@ func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*
 					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: block %s does not exist", node.Name, transactionID)
 				}
 
-				expectedConflictIDs := ds.NewSet(lo.Map(conflictAliases, t.TransactionFramework.TransactionID)...)
+				expectedConflictIDs := ds.NewSet(lo.Map(conflictAliases, t.DefaultWallet().TransactionID)...)
 				actualConflictIDs := transactionFromCache.ConflictIDs()
 
 				if expectedConflictIDs.Size() != actualConflictIDs.Size() {

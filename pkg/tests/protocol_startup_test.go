@@ -141,7 +141,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	nodeA := ts.AddValidatorNode("nodeA")
 	nodeB := ts.AddValidatorNode("nodeB")
 	ts.AddNode("nodeC")
-	ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
+	ts.AddGenesisWallet("default", nodeA, iotago.MaxBlockIssuanceCredits/2)
 
 	nodeOptions := []options.Option[protocol.Protocol]{
 		protocol.WithStorageOptions(

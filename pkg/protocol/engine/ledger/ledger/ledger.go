@@ -746,14 +746,14 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
-	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().IssuingTime)
+	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().Header.IssuingTime)
 
 	committee, exists := l.sybilProtection.SeatManager().CommitteeInSlot(block.ID().Slot())
 	if !exists {
 		panic("committee should exist because we pre-accepted the block")
 	}
 
-	seat, exists := committee.GetSeat(block.ProtocolBlock().IssuerID)
+	seat, exists := committee.GetSeat(block.ProtocolBlock().Header.IssuerID)
 	if !exists {
 		return
 	}

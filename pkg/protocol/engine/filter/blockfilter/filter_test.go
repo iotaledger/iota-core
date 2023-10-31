@@ -44,7 +44,7 @@ func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter .
 	return tf
 }
 
-func (t *TestFramework) processBlock(alias string, block *iotago.ProtocolBlock) error {
+func (t *TestFramework) processBlock(alias string, block *iotago.Block) error {
 	modelBlock, err := model.BlockFromBlock(block, serix.WithValidation())
 	if err != nil {
 		return err

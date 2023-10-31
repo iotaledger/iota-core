@@ -8,7 +8,8 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/protocol/snapshotcreator"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
+	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
 )
 
@@ -49,7 +50,8 @@ func parseFlags() (opt []options.Option[snapshotcreator.Options], conf string) {
 		if err != nil {
 			log.Fatal(ierrors.Errorf("failed to decode base58 seed, using the default one: %w", err))
 		}
-		opt = append(opt, snapshotcreator.WithGenesisSeed(genesisSeed))
+		keyManager := mock.NewKeyManager(genesisSeed[:], 0)
+		opt = append(opt, snapshotcreator.WithGenesisKeyManager(keyManager))
 	}
 
 	return opt, *config

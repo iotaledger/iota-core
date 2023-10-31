@@ -106,9 +106,9 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 		return
 	}
 
-	accountData, exists, err := o.ledger.Account(block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Slot())
+	accountData, exists, err := o.ledger.Account(block.ProtocolBlock().Header.IssuerID, block.SlotCommitmentID().Slot())
 	if err != nil {
-		o.errHandler(ierrors.Wrapf(err, "error while retrieving account from account %s in slot %d from accounts ledger", block.ProtocolBlock().IssuerID, block.SlotCommitmentID().Slot()))
+		o.errHandler(ierrors.Wrapf(err, "error while retrieving account from account %s in slot %d from accounts ledger", block.ProtocolBlock().Header.IssuerID, block.SlotCommitmentID().Slot()))
 
 		return
 	}

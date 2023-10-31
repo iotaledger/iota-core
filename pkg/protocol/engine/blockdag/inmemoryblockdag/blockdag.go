@@ -48,7 +48,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 
 			e.Events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
-					b.errorHandler(ierrors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.ProtocolBlock().IssuerID))
+					b.errorHandler(ierrors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.ProtocolBlock().Header.IssuerID))
 				}
 			}, event.WithWorkerPool(wp))
 
@@ -188,7 +188,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
 	if b.evictionState.InRootBlockSlot(data.ID()) && !b.evictionState.IsRootBlock(data.ID()) {
 		b.retainBlockFailure(data.ID(), apimodels.BlockFailureIsTooOld)
-		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().IssuingTime)
+		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().Header.IssuingTime)
 	}
 
 	storedBlock, storedBlockExists := b.blockCache.Block(data.ID())

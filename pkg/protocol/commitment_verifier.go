@@ -45,8 +45,8 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 	)
 
 	for _, att := range attestations {
-		if err := tree.Set(att.IssuerID, att); err != nil {
-			return nil, 0, ierrors.Wrapf(err, "failed to set attestation for issuerID %s", att.IssuerID)
+		if err := tree.Set(att.Header.IssuerID, att); err != nil {
+			return nil, 0, ierrors.Wrapf(err, "failed to set attestation for issuerID %s", att.Header.IssuerID)
 		}
 	}
 	if !iotago.VerifyProof(merkleProof, tree.Root(), commitment.RootsID()) {
@@ -100,11 +100,11 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		//    1. The attestation might be fake.
 		//    2. The issuer might have added a new public key in the meantime, but we don't know about it yet
 		//       since we only have the ledger state at the forking point.
-		accountData, exists := c.validatorAccountsAtFork[att.IssuerID]
+		accountData, exists := c.validatorAccountsAtFork[att.Header.IssuerID]
 
 		// We always need to have the accountData for a validator.
 		if !exists {
-			return nil, 0, ierrors.Errorf("accountData for issuerID %s does not exist", att.IssuerID)
+			return nil, 0, ierrors.Errorf("accountData for issuerID %s does not exist", att.Header.IssuerID)
 		}
 
 		switch signature := att.Signature.(type) {
@@ -128,8 +128,8 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		}
 
 		// 3. A valid set of attestations can't contain multiple attestations from the same issuerID.
-		if visitedIdentities.Has(att.IssuerID) {
-			return nil, 0, ierrors.Errorf("issuerID %s contained in multiple attestations", att.IssuerID)
+		if visitedIdentities.Has(att.Header.IssuerID) {
+			return nil, 0, ierrors.Errorf("issuerID %s contained in multiple attestations", att.Header.IssuerID)
 		}
 
 		// TODO: this might differ if we have a Accounts with changing weights depending on the Slot/epoch
@@ -143,11 +143,11 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 			return nil, 0, ierrors.Errorf("committee for slot %d does not exist", attestationBlockID.Slot())
 		}
 
-		if _, seatExists := committee.GetSeat(att.IssuerID); seatExists {
+		if _, seatExists := committee.GetSeat(att.Header.IssuerID); seatExists {
 			seatCount++
 		}
 
-		visitedIdentities.Add(att.IssuerID)
+		visitedIdentities.Add(att.Header.IssuerID)
 
 		blockID, err := att.BlockID()
 		if err != nil {
