@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/iota-core/pkg/core/definitions"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 )
@@ -65,20 +66,58 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		isDirectlyAboveLatestAttestedCommitment: reactive.NewVariable[bool](),
 	}
 
-	WithDependency(c.Parent,
-		DynamicValueWithDependency(c.chain, c.Chain),
-		DynamicValueWithDependency(c.isSolid, c.IsSolid),
-		DynamicValueWithDependency(c.cumulativeAttestedWeight, c.CumulativeAttestedWeight),
-		DynamicValueWithDependency(c.isAboveLatestVerifiedCommitment, c.IsAboveLatestVerifiedCommitment),
-		DefinitionWithStaticValue(c.weight, c.Weight),
+	definitions.InjectDependencies1(c.Parent)(
+		definitions.DynamicValue1[*Chain](c.Chain, func(parent *Commitment) reactive.DerivedVariable[*Chain] {
+			return reactive.NewDerivedVariable2(func(parentChain, spawnedChain *Chain) *Chain {
+				if spawnedChain != nil {
+					return spawnedChain
+				}
+
+				return parentChain
+			}, parent.Chain, c.SpawnedChain)
+		}),
+
+		definitions.DynamicValue1[bool](c.IsSolid, func(parent *Commitment) reactive.DerivedVariable[bool] {
+			return reactive.NewDerivedVariable2(func(isRoot, parentIsSolid bool) bool {
+				return isRoot || parentIsSolid
+			}, c.IsRoot, parent.IsSolid)
+		}),
+
+		definitions.DynamicValue1[uint64](c.CumulativeAttestedWeight, func(parent *Commitment) reactive.DerivedVariable[uint64] {
+			return reactive.NewDerivedVariable3(func(isAttested bool, parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
+				if !isAttested {
+					return 0
+				}
+
+				return parentCumulativeAttestedWeight + attestedWeight
+			}, c.IsAttested, parent.CumulativeAttestedWeight, c.AttestedWeight)
+		}),
+
+		definitions.DynamicValue1[bool](c.IsAboveLatestVerifiedCommitment, func(parent *Commitment) reactive.DerivedVariable[bool] {
+			return reactive.NewDerivedVariable3(func(parentAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
+				return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
+			}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified)
+		}),
+
+		definitions.StaticValue1[uint64](c.Weight, func(parent *Commitment) uint64 {
+			return c.CumulativeWeight() - parent.CumulativeWeight()
+		}),
 	)
 
-	WithDependency(c.Chain,
-		DynamicValueWithDependency(c.inSyncRange, c.InSyncRange),
+	definitions.InjectDependencies1(c.Chain)(
+		definitions.DynamicValue1(c.InSyncRange, func(chain *Chain) reactive.DerivedVariable[bool] {
+			return reactive.NewDerivedVariable3(func(spawnedEngine *engine.Engine, warpSyncing, isAboveLatestVerifiedCommitment bool) bool {
+				return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
+			}, chain.SpawnedEngine, chain.WarpSync, c.IsAboveLatestVerifiedCommitment)
+		}),
 	)
 
-	WithDependencies2(c.Parent, c.Chain,
-		DynamicValueWith2Dependencies(c.warpSync, c.WarpSync),
+	definitions.With2Dependencies(c.Parent, c.Chain)(
+		definitions.DynamicValue2(c.WarpSync, func(parent *Commitment, chain *Chain) reactive.DerivedVariable[bool] {
+			return reactive.NewDerivedVariable4(func(spawnedEngine *engine.Engine, warpSync, parentIsVerified, isVerified bool) bool {
+				return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
+			}, chain.SpawnedEngine, chain.WarpSync, parent.IsVerified, c.IsVerified)
+		}),
 	)
 
 	c.Parent.OnUpdateOnce(func(_, parent *Commitment) {
@@ -133,54 +172,6 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 	})
 
 	return c
-}
-
-func (c *Commitment) isAboveLatestVerifiedCommitment(parent *Commitment) reactive.DerivedVariable[bool] {
-	return reactive.NewDerivedVariable3(func(parentAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
-		return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
-	}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified)
-}
-
-func (c *Commitment) inSyncRange(chain *Chain) reactive.DerivedVariable[bool] {
-	return reactive.NewDerivedVariable3(func(spawnedEngine *engine.Engine, warpSyncing, isAboveLatestVerifiedCommitment bool) bool {
-		return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
-	}, chain.SpawnedEngine, chain.WarpSync, c.IsAboveLatestVerifiedCommitment)
-}
-
-func (c *Commitment) chain(parent *Commitment) reactive.DerivedVariable[*Chain] {
-	return reactive.NewDerivedVariable2(func(parentChain, spawnedChain *Chain) *Chain {
-		if spawnedChain != nil {
-			return spawnedChain
-		}
-
-		return parentChain
-	}, parent.Chain, c.SpawnedChain)
-}
-
-func (c *Commitment) cumulativeAttestedWeight(parent *Commitment) reactive.DerivedVariable[uint64] {
-	return reactive.NewDerivedVariable3(func(isAttested bool, parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
-		if !isAttested {
-			return 0
-		}
-
-		return parentCumulativeAttestedWeight + attestedWeight
-	}, c.IsAttested, parent.CumulativeAttestedWeight, c.AttestedWeight)
-}
-
-func (c *Commitment) isSolid(parent *Commitment) reactive.DerivedVariable[bool] {
-	return reactive.NewDerivedVariable2(func(isRoot, parentIsSolid bool) bool {
-		return isRoot || parentIsSolid
-	}, c.IsRoot, parent.IsSolid)
-}
-
-func (c *Commitment) warpSync(parent *Commitment, chain *Chain) reactive.DerivedVariable[bool] {
-	return reactive.NewDerivedVariable4(func(spawnedEngine *engine.Engine, warpSync, parentIsVerified, isVerified bool) bool {
-		return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
-	}, chain.SpawnedEngine, chain.WarpSync, parent.IsVerified, c.IsVerified)
-}
-
-func (c *Commitment) weight(parent *Commitment) uint64 {
-	return c.CumulativeWeight() - parent.CumulativeWeight()
 }
 
 func (c *Commitment) registerChild(child *Commitment) {
@@ -250,77 +241,5 @@ func (c *Commitment) promote(targetChain *Chain) {
 		} else if parent := c.Parent.Get(); parent.Chain.Get() == targetChain {
 			parent.MainChild.Set(c)
 		}
-	}
-}
-
-func WithDependency[S comparable](source reactive.Variable[S], dependencyReceiver ...func(S) func()) (unsubscribe func()) {
-	unsubscribeAll := make([]func(), 0)
-
-	return source.OnUpdateWithContext(func(_, parent S, unsubscribeOnParentUpdate func(subscriptionFactory func() (unsubscribe func()))) {
-		if parent == *new(S) {
-			return
-		}
-
-		unsubscribeOnParentUpdate(func() (unsubscribe func()) {
-			for _, dependency := range dependencyReceiver {
-				if unsubscribeDependency := dependency(parent); unsubscribeDependency != nil {
-					unsubscribeAll = append(unsubscribeAll, unsubscribeDependency)
-				}
-			}
-
-			return lo.Batch(unsubscribeAll...)
-		})
-	})
-}
-
-func WithDependencies2[S1, S2 comparable](source1 reactive.Variable[S1], source2 reactive.Variable[S2], dependencyReceiver ...func(S1, S2) func()) (unsubscribe func()) {
-	unsubscribeAll := make([]func(), 0)
-
-	return source1.OnUpdateWithContext(func(_, source1 S1, unsubscribeOnParentUpdate func(subscriptionFactory func() (unsubscribe func()))) {
-		if source1 == *new(S1) {
-			return
-		}
-
-		unsubscribeOnParentUpdate(func() (unsubscribe func()) {
-			return source2.OnUpdateWithContext(func(_, source2 S2, unsubscribeOnParentUpdate func(subscriptionFactory func() (unsubscribe func()))) {
-				if source2 == *new(S2) {
-					return
-				}
-
-				unsubscribeOnParentUpdate(func() (unsubscribe func()) {
-					for _, dependency := range dependencyReceiver {
-						if unsubscribeDependency := dependency(source1, source2); unsubscribeDependency != nil {
-							unsubscribeAll = append(unsubscribeAll, unsubscribeDependency)
-						}
-					}
-
-					return lo.Batch(unsubscribeAll...)
-				})
-			})
-		})
-	})
-}
-
-func DynamicValueWithDependency[T, S comparable](definition func(S) reactive.DerivedVariable[T], target reactive.Variable[T]) func(parent S) func() {
-	return func(parent S) func() {
-		derivedVariable := definition(parent)
-
-		return lo.Batch(target.InheritFrom(derivedVariable), derivedVariable.Unsubscribe)
-	}
-}
-
-func DynamicValueWith2Dependencies[T, S1, S2 comparable](definition func(S1, S2) reactive.DerivedVariable[T], target reactive.Variable[T]) func(S1, S2) func() {
-	return func(source1 S1, source2 S2) func() {
-		derivedVariable := definition(source1, source2)
-
-		return lo.Batch(target.InheritFrom(derivedVariable), derivedVariable.Unsubscribe)
-	}
-}
-
-func DefinitionWithStaticValue[T, S comparable](definition func(S) T, target reactive.Variable[T]) func(parent S) func() {
-	return func(parent S) func() {
-		target.Set(definition(parent))
-
-		return nil
 	}
 }
