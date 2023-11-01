@@ -1,6 +1,7 @@
 name: Run Docker Network and Check Health
 
 on:
+  workflow_dispatch:
   pull_request:
     paths-ignore:
       - 'documentation/**'
