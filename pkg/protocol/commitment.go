@@ -64,6 +64,19 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		protocol: protocol,
 	}
 
+	c.Logger = protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", commitment.Slot()), c.IsEvicted, func(entityLogger log.Logger) {
+		c.Parent.LogUpdates(entityLogger, log.LevelTrace, "Parent", (*Commitment).LogName)
+		c.IsSolid.LogUpdates(entityLogger, log.LevelTrace, "IsSolid")
+		c.Chain.LogUpdates(entityLogger, log.LevelTrace, "Chain", (*Chain).LogName)
+		c.IsVerified.LogUpdates(entityLogger, log.LevelTrace, "IsVerified")
+		c.IsAttested.LogUpdates(entityLogger, log.LevelTrace, "IsAttested")
+		c.InSyncRange.LogUpdates(entityLogger, log.LevelTrace, "InSyncRange")
+		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
+		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")
+		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
+		c.CumulativeAttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "CumulativeAttestedWeight")
+	})
+
 	c.IsSolid.InheritFrom(c.IsRoot)
 	c.IsAttested.InheritFrom(c.IsRoot)
 	c.IsVerified.InheritFrom(c.IsRoot)
@@ -100,6 +113,13 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		define.StaticValue1[uint64](c.Weight, func(parent *Commitment) uint64 {
 			return c.CumulativeWeight() - parent.CumulativeWeight()
 		}),
+
+		func(parent *Commitment) func() {
+			parent.registerChild(c)
+
+			// TODO: MAKE UNRGISTER WORK
+			return nil
+		},
 	)
 
 	define.With1Dependency(c.Chain)(
@@ -131,25 +151,6 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 			}, chain.VerifyAttestations, parent.IsAttested, c.IsAttested)
 		}),
 	)
-
-	c.Parent.OnUpdateOnce(func(_, parent *Commitment) {
-		if parent != nil {
-			parent.registerChild(c)
-		}
-	})
-
-	c.Logger = protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", commitment.Slot()), c.IsEvicted, func(entityLogger log.Logger) {
-		c.Parent.LogUpdates(entityLogger, log.LevelTrace, "Parent", (*Commitment).LogName)
-		c.IsSolid.LogUpdates(entityLogger, log.LevelTrace, "IsSolid")
-		c.Chain.LogUpdates(entityLogger, log.LevelTrace, "Chain", (*Chain).LogName)
-		c.IsVerified.LogUpdates(entityLogger, log.LevelTrace, "IsVerified")
-		c.IsAttested.LogUpdates(entityLogger, log.LevelTrace, "IsAttested")
-		c.InSyncRange.LogUpdates(entityLogger, log.LevelTrace, "InSyncRange")
-		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
-		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")
-		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
-		c.CumulativeAttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "CumulativeAttestedWeight")
-	})
 
 	return c
 }

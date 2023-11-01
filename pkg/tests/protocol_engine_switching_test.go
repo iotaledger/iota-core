@@ -108,15 +108,15 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	ts.Run(false, nodeOptions)
 
-	node0.Protocol.SetLogLevel(log.LevelError)
-	node1.Protocol.SetLogLevel(log.LevelError)
-	node2.Protocol.SetLogLevel(log.LevelError)
-	node3.Protocol.SetLogLevel(log.LevelError)
-	node4.Protocol.SetLogLevel(log.LevelError)
-	node5.Protocol.SetLogLevel(log.LevelError)
+	node0.Protocol.SetLogLevel(log.LevelDebug)
+	node1.Protocol.SetLogLevel(log.LevelDebug)
+	node2.Protocol.SetLogLevel(log.LevelDebug)
+	node3.Protocol.SetLogLevel(log.LevelDebug)
+	node4.Protocol.SetLogLevel(log.LevelDebug)
+	node5.Protocol.SetLogLevel(log.LevelDebug)
 	node6.Protocol.SetLogLevel(log.LevelDebug)
-	node7.Protocol.SetLogLevel(log.LevelError)
-	node8.Protocol.SetLogLevel(log.LevelError)
+	node7.Protocol.SetLogLevel(log.LevelDebug)
+	node8.Protocol.SetLogLevel(log.LevelDebug)
 
 	expectedCommittee := []iotago.AccountID{
 		node0.Validator.AccountID,
