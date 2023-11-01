@@ -1,6 +1,8 @@
 package model
 
 import (
+	"io"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -13,20 +15,29 @@ type PoolsStats struct {
 	ProfitMargin        uint64
 }
 
-func PoolsStatsFromBytes(bytes []byte) (*PoolsStats, int, error) {
+func PoolStatsFromReader(reader io.Reader) (*PoolsStats, error) {
 	p := new(PoolsStats)
 
 	var err error
+	if p.TotalStake, err = stream.Read[iotago.BaseToken](reader); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read TotalStake")
+	}
+	if p.TotalValidatorStake, err = stream.Read[iotago.BaseToken](reader); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read TotalValidatorStake")
+	}
+	if p.ProfitMargin, err = stream.Read[uint64](reader); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read ProfitMargin")
+	}
+
+	return p, nil
+}
+
+func PoolsStatsFromBytes(bytes []byte) (*PoolsStats, int, error) {
 	byteReader := stream.NewByteReader(bytes)
 
-	if p.TotalStake, err = stream.Read[iotago.BaseToken](byteReader); err != nil {
-		return nil, 0, ierrors.Wrap(err, "failed to read TotalStake")
-	}
-	if p.TotalValidatorStake, err = stream.Read[iotago.BaseToken](byteReader); err != nil {
-		return nil, 0, ierrors.Wrap(err, "failed to read TotalValidatorStake")
-	}
-	if p.ProfitMargin, err = stream.Read[uint64](byteReader); err != nil {
-		return nil, 0, ierrors.Wrap(err, "failed to read ProfitMargin")
+	p, err := PoolStatsFromReader(byteReader)
+	if err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to parse PoolStats")
 	}
 
 	return p, byteReader.BytesRead(), nil
@@ -57,20 +68,29 @@ type PoolRewards struct {
 	FixedCost iotago.Mana
 }
 
-func PoolRewardsFromBytes(bytes []byte) (*PoolRewards, int, error) {
+func PoolRewardsFromReader(reader io.Reader) (*PoolRewards, error) {
+	var err error
 	p := new(PoolRewards)
 
-	var err error
+	if p.PoolStake, err = stream.Read[iotago.BaseToken](reader); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read PoolStake")
+	}
+	if p.PoolRewards, err = stream.Read[iotago.Mana](reader); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read PoolRewards")
+	}
+	if p.FixedCost, err = stream.Read[iotago.Mana](reader); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read FixedCost")
+	}
+
+	return p, nil
+}
+
+func PoolRewardsFromBytes(bytes []byte) (*PoolRewards, int, error) {
 	byteReader := stream.NewByteReader(bytes)
 
-	if p.PoolStake, err = stream.Read[iotago.BaseToken](byteReader); err != nil {
-		return nil, 0, ierrors.Wrap(err, "failed to read PoolStake")
-	}
-	if p.PoolRewards, err = stream.Read[iotago.Mana](byteReader); err != nil {
-		return nil, 0, ierrors.Wrap(err, "failed to read PoolRewards")
-	}
-	if p.FixedCost, err = stream.Read[iotago.Mana](byteReader); err != nil {
-		return nil, 0, ierrors.Wrap(err, "failed to read FixedCost")
+	p, err := PoolRewardsFromReader(byteReader)
+	if err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to parse PoolRewards")
 	}
 
 	return p, byteReader.BytesRead(), nil
