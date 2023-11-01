@@ -73,7 +73,7 @@ func (b *BlocksProtocol) SendRequest(blockID iotago.BlockID) {
 	b.workerPool.Submit(func() {
 		b.protocol.Network.RequestBlock(blockID)
 
-		b.protocol.LogTrace("request", "blockID", blockID)
+		b.LogTrace("request", "blockID", blockID)
 	})
 }
 
@@ -81,7 +81,7 @@ func (b *BlocksProtocol) SendResponse(block *model.Block) {
 	b.workerPool.Submit(func() {
 		b.protocol.Network.SendBlock(block)
 
-		b.protocol.LogTrace("sent block", "blockID", block.ID())
+		b.LogTrace("sent", "blockID", block.ID())
 	})
 }
 
