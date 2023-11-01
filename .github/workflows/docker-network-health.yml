@@ -17,7 +17,7 @@ jobs:
 
     - name: Run network, wait and check health
       run: |
-        set +x
+        set -x
 
         # Run network
         cd ./tools/docker-network
