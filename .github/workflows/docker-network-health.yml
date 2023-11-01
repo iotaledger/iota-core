@@ -15,18 +15,24 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Execute run.sh in Background with Timeout
+    - name: Run network, wait and check health
       run: |
+        set +x
+
+        # Run network
         cd ./tools/docker-network
         timeout 300s ./run.sh 0 0 &
         RUN_PID=$!
-        echo "RUN_PID=$RUN_PID" >> $GITHUB_ENV
-
-    - name: Polling health and killing run.sh if healthy
-      run: |
-        # wait for node-4 to be created before querying it
-        timeout 300s bash -c 'until docker ps | grep docker-network-node-4; do sleep 5; done'
+        
+        # Wait for node-4 to be created before querying it
+        timeout 300s bash -c 'until docker ps | grep docker-network-node-4; do sleep 5; done' &
+        WAIT_FOR_CONTAINER_PID=$!
+        
+        wait $WAIT_FOR_CONTAINER_PID || exit 1
+        
         sleep 10  # Additional 10 seconds wait
+
+        # Health check
         SUCCESS=false
         while true; do
           OUTPUT=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8080/health)
@@ -41,6 +47,7 @@ jobs:
           fi
           sleep 5
         done
+
         if [[ ! $SUCCESS ]]; then
           echo "Health check never returned 200. Failing the action."
           exit 1
