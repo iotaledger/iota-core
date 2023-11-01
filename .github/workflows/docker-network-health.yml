@@ -24,6 +24,9 @@ jobs:
 
     - name: Polling health and killing run.sh if healthy
       run: |
+        # wait for node-4 to be created before querying it
+        timeout 300s bash -c 'until docker ps | grep docker-network-node-4; do sleep 5; done'
+        sleep 10  # Additional 10 seconds wait
         SUCCESS=false
         while true; do
           OUTPUT=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8080/health)
