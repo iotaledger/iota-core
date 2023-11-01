@@ -45,8 +45,8 @@ echo "Create snapshot"
 docker run --rm \
   --user $(id -u) \
   -v "$(realpath $(pwd)/../../):/workspace" \
-  -v "$(go env GOCACHE):/go-cache" \
-  -v "$(go env GOMODCACHE):/go-mod-cache" \
+  -v "${HOME}/.cache/go-build:/go-cache" \
+  -v "${HOME}/go/pkg/mod:/go-mod-cache" \
   -e GOCACHE="/go-cache" \
   -e GOMODCACHE="/go-mod-cache" \
   -w "/workspace/tools/genesis-snapshot" \
