@@ -2,6 +2,10 @@ name: Run Docker Network and Check Health
 
 on:
   pull_request:
+    paths-ignore:
+      - 'documentation/**'
+      - 'scripts/**'
+      - 'tools/**'
 
 jobs:
   run-and-check:
