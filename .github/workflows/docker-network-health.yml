@@ -26,11 +26,11 @@ jobs:
 
         # Run network
         cd ./tools/docker-network
-        timeout 300s ./run.sh 0 0 &
+        timeout 10m ./run.sh 0 0 &
         RUN_PID=$!
         
         # Wait for node-4 to be created before querying it
-        timeout 300s bash -c 'until docker ps | grep docker-network-node-4; do sleep 5; done' &
+        timeout 10m bash -c 'until docker ps | grep docker-network-node-4; do sleep 5; done' &
         WAIT_FOR_CONTAINER_PID=$!
         
         wait $WAIT_FOR_CONTAINER_PID || exit 1
