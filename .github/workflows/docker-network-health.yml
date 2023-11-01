@@ -7,6 +7,10 @@ on:
       - 'scripts/**'
       - 'tools/**'
 
+concurrency: 
+  group: run-and-check-group
+  cancel-in-progress: false
+
 jobs:
   run-and-check:
     runs-on: ubuntu-latest
