@@ -1,0 +1,46 @@
+name: Run Docker Network and Check Health
+
+on:
+  pull_request:
+
+jobs:
+  run-and-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Execute run.sh in Background with Timeout
+      run: |
+        cd ./tools/docker-network
+        timeout 300s ./run.sh 0 0 &
+        RUN_PID=$!
+        echo "RUN_PID=$RUN_PID" >> $GITHUB_ENV
+
+    - name: Polling health and killing run.sh if healthy
+      run: |
+        SUCCESS=false
+        while true; do
+          OUTPUT=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8080/health)
+          if [[ $OUTPUT -eq 200 ]]; then
+            SUCCESS=true
+            kill -s SIGINT $RUN_PID
+            break
+          # curl will return a connection refused when the network is tear down from the timeout.
+          elif [[ $OUTPUT -eq 000 ]]; then
+            echo "Connection refused. Failing the action."
+            break
+          fi
+          sleep 5
+        done
+        if [[ ! $SUCCESS ]]; then
+          echo "Health check never returned 200. Failing the action."
+          exit 1
+        fi
+
+    - name: Cleanup
+      run: |
+        cd ./tools/docker-network
+        docker compose kill
+        docker compose down -v
