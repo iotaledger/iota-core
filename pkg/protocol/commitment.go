@@ -4,9 +4,8 @@ import (
 	"fmt"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
-	"github.com/iotaledger/iota-core/pkg/core/definitions"
+	"github.com/iotaledger/iota-core/pkg/core/define"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 )
@@ -24,17 +23,18 @@ type Commitment struct {
 	Weight                          reactive.Variable[uint64]
 	AttestedWeight                  reactive.Variable[uint64]
 	CumulativeAttestedWeight        reactive.Variable[uint64]
+	IsRoot                          reactive.Event
 	IsSolid                         reactive.Event
 	IsAttested                      reactive.Event
 	IsVerified                      reactive.Event
-	IsRoot                          reactive.Event
-	IsEvicted                       reactive.Event
 	IsAboveLatestVerifiedCommitment reactive.Variable[bool]
 	InSyncRange                     reactive.Variable[bool]
+	IsEvicted                       reactive.Event
 
 	protocol *Protocol
 
 	*model.Commitment
+
 	log.Logger
 }
 
@@ -42,8 +42,8 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 	c := &Commitment{
 		Commitment:                      commitment,
 		Parent:                          reactive.NewVariable[*Commitment](),
-		MainChild:                       reactive.NewVariable[*Commitment](),
 		Children:                        reactive.NewSet[*Commitment](),
+		MainChild:                       reactive.NewVariable[*Commitment](),
 		SpawnedChain:                    reactive.NewVariable[*Chain](),
 		Chain:                           reactive.NewVariable[*Chain](),
 		Engine:                          reactive.NewVariable[*engine.Engine](),
@@ -64,8 +64,12 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		protocol: protocol,
 	}
 
-	definitions.InjectDependencies1(c.Parent)(
-		definitions.DynamicValue1[*Chain](c.Chain, func(parent *Commitment) reactive.DerivedVariable[*Chain] {
+	c.IsSolid.InheritFrom(c.IsRoot)
+	c.IsAttested.InheritFrom(c.IsRoot)
+	c.IsVerified.InheritFrom(c.IsRoot)
+
+	define.With1Dependency(c.Parent)(
+		define.DynamicValue1[*Chain](c.Chain, func(parent *Commitment) reactive.DerivedVariable[*Chain] {
 			return reactive.NewDerivedVariable2(func(parentChain, spawnedChain *Chain) *Chain {
 				if spawnedChain != nil {
 					return spawnedChain
@@ -75,49 +79,53 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 			}, parent.Chain, c.SpawnedChain)
 		}),
 
-		definitions.DynamicValue1[bool](c.IsSolid, func(parent *Commitment) reactive.DerivedVariable[bool] {
-			return reactive.NewDerivedVariable2(func(isRoot, parentIsSolid bool) bool {
-				return isRoot || parentIsSolid
-			}, c.IsRoot, parent.IsSolid)
+		define.DynamicValue1[bool](c.IsSolid, func(parent *Commitment) reactive.DerivedVariable[bool] {
+			return reactive.NewDerivedVariable(func(parentIsSolid bool) bool {
+				return parentIsSolid
+			}, parent.IsSolid)
 		}),
 
-		definitions.DynamicValue1[uint64](c.CumulativeAttestedWeight, func(parent *Commitment) reactive.DerivedVariable[uint64] {
-			return reactive.NewDerivedVariable3(func(isAttested bool, parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
-				if !isAttested {
-					return 0
-				}
-
+		define.DynamicValue1[uint64](c.CumulativeAttestedWeight, func(parent *Commitment) reactive.DerivedVariable[uint64] {
+			return reactive.NewDerivedVariable2(func(parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
 				return parentCumulativeAttestedWeight + attestedWeight
-			}, c.IsAttested, parent.CumulativeAttestedWeight, c.AttestedWeight)
+			}, parent.CumulativeAttestedWeight, c.AttestedWeight)
 		}),
 
-		definitions.DynamicValue1[bool](c.IsAboveLatestVerifiedCommitment, func(parent *Commitment) reactive.DerivedVariable[bool] {
+		define.DynamicValue1[bool](c.IsAboveLatestVerifiedCommitment, func(parent *Commitment) reactive.DerivedVariable[bool] {
 			return reactive.NewDerivedVariable3(func(parentAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
 				return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
 			}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified)
 		}),
 
-		definitions.StaticValue1[uint64](c.Weight, func(parent *Commitment) uint64 {
+		define.StaticValue1[uint64](c.Weight, func(parent *Commitment) uint64 {
 			return c.CumulativeWeight() - parent.CumulativeWeight()
 		}),
 	)
 
-	definitions.InjectDependencies1(c.Chain)(
-		definitions.DynamicValue1(c.InSyncRange, func(chain *Chain) reactive.DerivedVariable[bool] {
+	define.With1Dependency(c.Chain)(
+		define.DynamicValue1(c.InSyncRange, func(chain *Chain) reactive.DerivedVariable[bool] {
 			return reactive.NewDerivedVariable3(func(spawnedEngine *engine.Engine, warpSyncing, isAboveLatestVerifiedCommitment bool) bool {
 				return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
 			}, chain.SpawnedEngine, chain.WarpSync, c.IsAboveLatestVerifiedCommitment)
 		}),
+
+		define.InheritedValue(c.Engine, func(chain *Chain) reactive.ReadableVariable[*engine.Engine] {
+			return chain.Engine
+		}),
+
+		func(chain *Chain) func() {
+			return chain.registerCommitment(c)
+		},
 	)
 
-	definitions.InjectDependencies2(c.Parent, c.Chain)(
-		definitions.DynamicValue2(c.WarpSync, func(parent *Commitment, chain *Chain) reactive.DerivedVariable[bool] {
+	define.With2Dependencies(c.Parent, c.Chain)(
+		define.DynamicValue2(c.WarpSync, func(parent *Commitment, chain *Chain) reactive.DerivedVariable[bool] {
 			return reactive.NewDerivedVariable4(func(spawnedEngine *engine.Engine, warpSync, parentIsVerified, isVerified bool) bool {
 				return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
 			}, chain.SpawnedEngine, chain.WarpSync, parent.IsVerified, c.IsVerified)
 		}),
 
-		definitions.DynamicValue2(c.RequestAttestations, func(parent *Commitment, chain *Chain) reactive.DerivedVariable[bool] {
+		define.DynamicValue2(c.RequestAttestations, func(parent *Commitment, chain *Chain) reactive.DerivedVariable[bool] {
 			return reactive.NewDerivedVariable3(func(verifyAttestations, parentIsAttested, isAttested bool) bool {
 				return verifyAttestations && parentIsAttested && !isAttested
 			}, chain.VerifyAttestations, parent.IsAttested, c.IsAttested)
@@ -125,37 +133,17 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 	)
 
 	c.Parent.OnUpdateOnce(func(_, parent *Commitment) {
-		if parent == nil {
-			return
+		if parent != nil {
+			parent.registerChild(c)
 		}
-
-		parent.registerChild(c)
-	})
-
-	c.Chain.OnUpdateWithContext(func(_, chain *Chain, withinContext func(subscriptionFactory func() (unsubscribe func()))) {
-		if chain == nil {
-			return
-		}
-
-		withinContext(func() (unsubscribe func()) {
-			return lo.Batch(
-				chain.registerCommitment(c),
-
-				c.Engine.InheritFrom(chain.Engine),
-			)
-		})
-	})
-
-	c.IsRoot.OnTrigger(func() {
-		c.IsAttested.Set(true)
-		c.IsVerified.Set(true)
-		c.IsSolid.Set(true)
 	})
 
 	c.Logger = protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", commitment.Slot()), c.IsEvicted, func(entityLogger log.Logger) {
+		c.Parent.LogUpdates(entityLogger, log.LevelTrace, "Parent", (*Commitment).LogName)
 		c.IsSolid.LogUpdates(entityLogger, log.LevelTrace, "IsSolid")
 		c.Chain.LogUpdates(entityLogger, log.LevelTrace, "Chain", (*Chain).LogName)
 		c.IsVerified.LogUpdates(entityLogger, log.LevelTrace, "IsVerified")
+		c.IsAttested.LogUpdates(entityLogger, log.LevelTrace, "IsAttested")
 		c.InSyncRange.LogUpdates(entityLogger, log.LevelTrace, "InSyncRange")
 		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
 		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")

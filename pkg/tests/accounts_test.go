@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -17,6 +18,8 @@ import (
 
 // TODO: implement tests for staking and delegation transitions that cover edge cases - part of hardening phase.
 func Test_TransitionAccount(t *testing.T) {
+	//for {
+	//	func() {
 	oldGenesisOutputKey := utils.RandBlockIssuerKey()
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
 		// Nil address will be replaced with the address generated from genesis seed.
@@ -52,10 +55,13 @@ func Test_TransitionAccount(t *testing.T) {
 	defer ts.Shutdown()
 
 	node1 := ts.AddValidatorNode("node1")
-	_ = ts.AddNode("node2")
+	node2 := ts.AddNode("node2")
+
 	blockIssuer := ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
+	node1.Protocol.SetLogLevel(log.LevelTrace)
+	node2.Protocol.SetLogLevel(log.LevelTrace)
 
 	genesisAccount := ts.AccountOutput("Genesis:1")
 	genesisAccountOutput := genesisAccount.Output().(*iotago.AccountOutput)
@@ -392,6 +398,8 @@ func Test_TransitionAccount(t *testing.T) {
 	}, ts.Nodes()...)
 
 	ts.Wait(ts.Nodes()...)
+	//	}()
+	//}
 }
 
 /*
