@@ -32,10 +32,12 @@ jobs:
         # Wait for node-4 to be created before querying it
         timeout 10m bash -c 'until docker ps | grep docker-network-node-4; do sleep 5; done' &
         WAIT_FOR_CONTAINER_PID=$!
+
+        # Wait for any of the two processes to exit
+        wait -n || exit 1
         
-        wait $WAIT_FOR_CONTAINER_PID || exit 1
-        
-        sleep 10  # Additional 10 seconds wait
+        # Additional 10 seconds wait to allow the API to come up
+        sleep 10
 
         # Health check
         SUCCESS=false
