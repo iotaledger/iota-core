@@ -191,7 +191,7 @@ services:
     networks:
       - iota-core
     command: >
-      --inx.address=node-1-validator:9019
+      --inx.address=node-1-validator:9029
       --restAPI.bindAddress=inx-indexer:9011
 
   inx-blockissuer:
