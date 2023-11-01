@@ -45,7 +45,7 @@ echo "Create snapshot"
 docker run --rm \
   --user $(id -u) \
   -v "$(realpath $(pwd)/../../):/workspace" \
-  -v "${HOME}/.cache/go-build:/go-cache" \
+  -v "$(go env BLA):/go-cache" \
   -v "${HOME}/go/pkg/mod:/go-mod-cache" \
   -e GOCACHE="/go-cache" \
   -e GOMODCACHE="/go-mod-cache" \
