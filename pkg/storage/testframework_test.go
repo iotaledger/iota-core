@@ -152,7 +152,9 @@ func (t *TestFramework) GenerateSemiPermanentData(epoch iotago.EpochIndex) {
 	createdBytes += int64(len(lo.PanicOnErr(versionAndHash.Bytes()))) + 8 // for epoch key
 
 	accounts := account.NewAccounts()
-	accounts.Set(tpkg.RandAccountID(), &account.Pool{})
+	if err := accounts.Set(tpkg.RandAccountID(), &account.Pool{}); err != nil {
+		t.t.Fatal(err)
+	}
 	err = committeeStore.Store(epoch, accounts)
 	require.NoError(t.t, err)
 	createdBytes += int64(len(lo.PanicOnErr(accounts.Bytes()))) + 8 // for epoch key

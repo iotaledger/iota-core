@@ -98,18 +98,29 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accoun
 			return nil, ierrors.Errorf("cannot re-use previous committee from epoch %d as it does not exist", epoch-1)
 		}
 
-		err := s.committeeStore.Store(epoch, committee.Accounts())
+		accounts, err := committee.Accounts()
 		if err != nil {
+			return nil, ierrors.Wrapf(err, "error while getting accounts from committee for epoch %d", epoch-1)
+		}
+
+		if err := s.committeeStore.Store(epoch, accounts); err != nil {
 			return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
 		}
 
 		return committee, nil
 	}
 
-	committee := s.selectNewCommittee(candidates)
-
-	err := s.committeeStore.Store(epoch, committee.Accounts())
+	committee, err := s.selectNewCommittee(candidates)
 	if err != nil {
+		return nil, ierrors.Wrap(err, "error while selecting new committee")
+	}
+
+	accounts, err := committee.Accounts()
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "error while getting accounts for newly selected committee for epoch %d", epoch)
+	}
+
+	if err := s.committeeStore.Store(epoch, accounts); err != nil {
 		return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
 	}
 
@@ -203,7 +214,7 @@ func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.
 	return nil
 }
 
-func (s *SeatManager) selectNewCommittee(candidates accounts.AccountsData) *account.SeatedAccounts {
+func (s *SeatManager) selectNewCommittee(candidates accounts.AccountsData) (*account.SeatedAccounts, error) {
 	sort.Slice(candidates, func(i, j int) bool {
 		// Prioritize the candidate that has a larger pool stake.
 		if candidates[i].ValidatorStake+candidates[i].DelegationStake != candidates[j].ValidatorStake+candidates[j].DelegationStake {
@@ -233,13 +244,15 @@ func (s *SeatManager) selectNewCommittee(candidates accounts.AccountsData) *acco
 	newCommitteeAccounts := account.NewAccounts()
 
 	for _, candidateData := range candidates[:s.optsSeatCount] {
-		newCommitteeAccounts.Set(candidateData.ID, &account.Pool{
+		if err := newCommitteeAccounts.Set(candidateData.ID, &account.Pool{
 			PoolStake:      candidateData.ValidatorStake + candidateData.DelegationStake,
 			ValidatorStake: candidateData.ValidatorStake,
 			FixedCost:      candidateData.FixedCost,
-		})
+		}); err != nil {
+			return nil, ierrors.Wrapf(err, "error while setting pool for committee candidate %s", candidateData.ID.String())
+		}
 	}
 	committee := newCommitteeAccounts.SelectCommittee(newCommitteeAccounts.IDs()...)
 
-	return committee
+	return committee, nil
 }
