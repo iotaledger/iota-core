@@ -6,7 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
-	"github.com/iotaledger/iota-core/pkg/core/rx"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 )
@@ -81,51 +80,47 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		c.IsAttested.InheritFrom(c.IsRoot),
 		c.IsVerified.InheritFrom(c.IsRoot),
 
-		rx.WithNonEmptyValue(c.Parent, func(parent *Commitment) func() {
+		reactive.WithNonEmptyValue(func(parent *Commitment) func() {
 			c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
 
-			parent.registerChild(c)
-
 			return lo.Batch(
-				rx.AssignValue[*Chain](c.Chain, reactive.NewDerivedVariable2(func(parentChain, spawnedChain *Chain) *Chain {
-					if spawnedChain != nil {
-						return spawnedChain
-					}
+				c.inheritChainFrom(parent),
 
-					return parentChain
+				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(parentChain, spawnedChain *Chain) *Chain {
+					return lo.Cond(spawnedChain != nil, spawnedChain, parentChain)
 				}, parent.Chain, c.SpawnedChain)),
 
-				rx.AssignValue[bool](c.IsSolid, reactive.NewDerivedVariable(func(parentIsSolid bool) bool {
+				c.IsSolid.DeriveValueFrom(reactive.NewDerivedVariable(func(parentIsSolid bool) bool {
 					return parentIsSolid
 				}, parent.IsSolid)),
 
-				rx.AssignValue[uint64](c.CumulativeAttestedWeight, reactive.NewDerivedVariable2(func(parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
+				c.CumulativeAttestedWeight.DeriveValueFrom(reactive.NewDerivedVariable2(func(parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
 					return parentCumulativeAttestedWeight + attestedWeight
 				}, parent.CumulativeAttestedWeight, c.AttestedWeight)),
 
-				rx.AssignValue[bool](c.IsAboveLatestVerifiedCommitment, reactive.NewDerivedVariable3(func(parentAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
+				c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(parentAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
 					return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
 				}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified)),
 
-				rx.WithNonEmptyValue(c.Chain, func(chain *Chain) func() {
+				reactive.WithNonEmptyValue(func(chain *Chain) func() {
 					return lo.Batch(
-						rx.AssignValue[bool](c.InSyncRange, reactive.NewDerivedVariable3(func(spawnedEngine *engine.Engine, warpSyncing, isAboveLatestVerifiedCommitment bool) bool {
+						c.InSyncRange.DeriveValueFrom(reactive.NewDerivedVariable3(func(spawnedEngine *engine.Engine, warpSyncing, isAboveLatestVerifiedCommitment bool) bool {
 							return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
 						}, chain.SpawnedEngine, chain.WarpSync, c.IsAboveLatestVerifiedCommitment)),
 
-						rx.AssignValue[bool](c.WarpSync, reactive.NewDerivedVariable4(func(spawnedEngine *engine.Engine, warpSync, parentIsVerified, isVerified bool) bool {
+						c.WarpSync.DeriveValueFrom(reactive.NewDerivedVariable4(func(spawnedEngine *engine.Engine, warpSync, parentIsVerified, isVerified bool) bool {
 							return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
 						}, chain.SpawnedEngine, chain.WarpSync, parent.IsVerified, c.IsVerified)),
 
-						rx.AssignValue[bool](c.RequestAttestations, reactive.NewDerivedVariable3(func(verifyAttestations, parentIsAttested, isAttested bool) bool {
+						c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable3(func(verifyAttestations, parentIsAttested, isAttested bool) bool {
 							return verifyAttestations && parentIsAttested && !isAttested
 						}, chain.VerifyAttestations, parent.IsAttested, c.IsAttested)),
 					)
-				}),
+				}, c.Chain),
 			)
-		}),
+		}, c.Parent),
 
-		rx.WithNonEmptyValue(c.Chain, func(chain *Chain) func() { return chain.registerCommitment(c) }),
+		reactive.WithNonEmptyValue(func(chain *Chain) func() { return chain.registerCommitment(c) }, c.Chain),
 	)
 
 	c.IsEvicted.OnTrigger(unsubscribe)
@@ -134,28 +129,23 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 }
 
 func (c *Commitment) Engine() *engine.Engine {
-	chain := c.Chain.Get()
-	if chain == nil {
-		return nil
+	if chain := c.Chain.Get(); chain != nil {
+		return chain.Engine.Get()
 	}
 
-	return chain.Engine.Get()
+	return nil
 }
 
-func (c *Commitment) registerChild(child *Commitment) {
-	if c.Children.Add(child) {
-		c.MainChild.Compute(func(currentMainChild *Commitment) *Commitment {
-			if currentMainChild != nil {
-				return currentMainChild
-			}
-
-			return child
-		})
-
-		unsubscribeChild := c.MainChild.OnUpdate(child.inheritChain(c))
-
-		c.IsEvicted.OnTrigger(unsubscribeChild)
+func (c *Commitment) inheritChainFrom(parent *Commitment) (unregister func()) {
+	if !parent.Children.Add(c) {
+		return func() {}
 	}
+
+	parent.MainChild.Compute(func(mainChild *Commitment) *Commitment {
+		return lo.Cond(mainChild != nil, mainChild, c)
+	})
+
+	return parent.MainChild.OnUpdate(c.inheritChain(parent))
 }
 
 func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitment) {
