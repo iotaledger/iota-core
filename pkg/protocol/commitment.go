@@ -80,19 +80,17 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		c.IsAttested.InheritFrom(c.IsRoot),
 		c.IsVerified.InheritFrom(c.IsRoot),
 
-		reactive.WithNonEmptyValue(func(parent *Commitment) func() {
+		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
 
 			return lo.Batch(
 				c.inheritChainFrom(parent),
 
+				c.IsSolid.InheritFrom(parent.IsSolid),
+
 				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(parentChain, spawnedChain *Chain) *Chain {
 					return lo.Cond(spawnedChain != nil, spawnedChain, parentChain)
 				}, parent.Chain, c.SpawnedChain)),
-
-				c.IsSolid.DeriveValueFrom(reactive.NewDerivedVariable(func(parentIsSolid bool) bool {
-					return parentIsSolid
-				}, parent.IsSolid)),
 
 				c.CumulativeAttestedWeight.DeriveValueFrom(reactive.NewDerivedVariable2(func(parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
 					return parentCumulativeAttestedWeight + attestedWeight
@@ -102,7 +100,7 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 					return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
 				}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified)),
 
-				reactive.WithNonEmptyValue(func(chain *Chain) func() {
+				c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
 					return lo.Batch(
 						c.InSyncRange.DeriveValueFrom(reactive.NewDerivedVariable3(func(spawnedEngine *engine.Engine, warpSyncing, isAboveLatestVerifiedCommitment bool) bool {
 							return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
@@ -116,11 +114,13 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 							return verifyAttestations && parentIsAttested && !isAttested
 						}, chain.VerifyAttestations, parent.IsAttested, c.IsAttested)),
 					)
-				}, c.Chain),
+				}),
 			)
-		}, c.Parent),
+		}),
 
-		reactive.WithNonEmptyValue(func(chain *Chain) func() { return chain.registerCommitment(c) }, c.Chain),
+		c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
+			return chain.registerCommitment(c)
+		}),
 	)
 
 	c.IsEvicted.OnTrigger(unsubscribe)
