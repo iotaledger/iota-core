@@ -40,8 +40,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	ts.Run(true, nil)
 
-	node0.Protocol.SetLogLevel(log.LevelError)
-	node1.Protocol.SetLogLevel(log.LevelError)
+	node0.Protocol.SetLogLevel(log.LevelTrace)
+	node1.Protocol.SetLogLevel(log.LevelTrace)
 	node2.Protocol.SetLogLevel(log.LevelTrace)
 
 	// Create snapshot to use later.
@@ -94,6 +94,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	// Continue issuing on all nodes for a few slots.
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{58, 59}, 3, "57.2", ts.Nodes("node0", "node1", "node2"), true, nil)
+
+		time.Sleep(5 * time.Second)
 
 		ts.AssertEqualStoredCommitmentAtIndex(57, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(57, ts.Nodes()...)

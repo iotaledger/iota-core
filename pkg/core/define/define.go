@@ -30,8 +30,9 @@ func With1Dependency[S comparable](source reactive.Variable[S]) func(dependencyR
 func DynamicValue1[T, S comparable](target reactive.Variable[T], definition func(S) reactive.DerivedVariable[T]) func(dependency S) func() {
 	return func(dependency S) func() {
 		derivedVariable := definition(dependency)
+		target.InheritFrom(derivedVariable)
 
-		return lo.Batch(target.InheritFrom(derivedVariable), derivedVariable.Unsubscribe)
+		return derivedVariable.Unsubscribe
 	}
 }
 

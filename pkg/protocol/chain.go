@@ -266,7 +266,15 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
 }
 
 func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
-	c.commitments.Set(commitment.Slot(), commitment)
+	if c.commitments.Compute(commitment.Slot(), func(currentCommitment *Commitment, exists bool) *Commitment {
+		if !exists {
+			return commitment
+		}
+
+		return currentCommitment
+	}) != commitment {
+		return func() {}
+	}
 
 	// maxCommitment returns the Commitment object with the higher slot.
 	maxCommitment := func(other *Commitment) *Commitment {
@@ -292,7 +300,7 @@ func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
 		c.commitments.Delete(commitment.Slot())
 
 		resetToParent := func(latestCommitment *Commitment) *Commitment {
-			if latestCommitment == nil || commitment.Slot() > latestCommitment.Slot() {
+			if latestCommitment == nil || commitment.Slot() < latestCommitment.Slot() {
 				return latestCommitment
 			}
 
