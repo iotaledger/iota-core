@@ -34,7 +34,7 @@ func ValidatorPerformanceFromBytes(bytes []byte) (*ValidatorPerformance, int, er
 	return v, byteReader.BytesRead(), nil
 }
 
-func ValidatorPerformanceFromReader(reader io.Reader) (*ValidatorPerformance, error) {
+func ValidatorPerformanceFromReader(reader io.ReadSeeker) (*ValidatorPerformance, error) {
 	var err error
 	v := NewValidatorPerformance()
 

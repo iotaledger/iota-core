@@ -15,7 +15,7 @@ type PoolsStats struct {
 	ProfitMargin        uint64
 }
 
-func PoolStatsFromReader(reader io.Reader) (*PoolsStats, error) {
+func PoolStatsFromReader(reader io.ReadSeeker) (*PoolsStats, error) {
 	p := new(PoolsStats)
 
 	var err error
@@ -68,7 +68,7 @@ type PoolRewards struct {
 	FixedCost iotago.Mana
 }
 
-func PoolRewardsFromReader(reader io.Reader) (*PoolRewards, error) {
+func PoolRewardsFromReader(reader io.ReadSeeker) (*PoolRewards, error) {
 	var err error
 	p := new(PoolRewards)
 

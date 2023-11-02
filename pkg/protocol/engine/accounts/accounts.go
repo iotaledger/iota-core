@@ -1,13 +1,10 @@
 package accounts
 
 import (
-	"encoding/binary"
 	"io"
 
-	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -77,8 +74,7 @@ func (a *AccountData) Clone() *AccountData {
 	}
 }
 
-func AccountDataFromReader(reader io.Reader) (*AccountData, error) {
-
+func AccountDataFromReader(reader io.ReadSeeker) (*AccountData, error) {
 	accountID, err := stream.Read[iotago.AccountID](reader)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "unable to read accountID")
@@ -96,34 +92,7 @@ func AccountDataFromReader(reader io.Reader) (*AccountData, error) {
 		return nil, ierrors.Wrap(err, "unable to read outputID")
 	}
 
-	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsByte, func(i int) error {
-		// TODO: improve this
-		var blockIssuerKeyType iotago.BlockIssuerKeyType
-		if err := binary.Read(reader, binary.LittleEndian, &blockIssuerKeyType); err != nil {
-			return ierrors.Wrapf(err, "unable to read block issuer key type for accountID %s", a.ID)
-		}
-
-		switch blockIssuerKeyType {
-		case iotago.BlockIssuerKeyEd25519PublicKey:
-			var ed25519PublicKey ed25519.PublicKey
-			_, err = io.ReadFull(reader, ed25519PublicKey[:])
-			if err != nil {
-				return ierrors.Wrapf(err, "unable to read public key index %d for accountID %s", i, a.ID)
-			}
-			a.BlockIssuerKeys.Add(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519PublicKey))
-		case iotago.BlockIssuerKeyPublicKeyHash:
-			var implicitAccountCreationAddress iotago.ImplicitAccountCreationAddress
-			_, err = io.ReadFull(reader, implicitAccountCreationAddress[:])
-			if err != nil {
-				return ierrors.Wrapf(err, "unable to read address %d for accountID %s", i, a.ID)
-			}
-			a.BlockIssuerKeys.Add(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromImplicitAccountCreationAddress(&implicitAccountCreationAddress))
-		default:
-			return ierrors.Wrapf(err, "unsupported block issuer key type %d for accountID %s at offset %d", blockIssuerKeyType, a.ID, i)
-		}
-
-		return nil
-	}); err != nil {
+	if a.BlockIssuerKeys, err = stream.ReadObjectFromReader(reader, iotago.BlockIssuerKeysFromReader); err != nil {
 		return nil, ierrors.Wrap(err, "unable to read block issuer keys")
 	}
 
@@ -174,16 +143,7 @@ func (a *AccountData) Bytes() ([]byte, error) {
 		return nil, ierrors.Wrap(err, "failed to write OutputID")
 	}
 
-	if err := stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsByte, func() (elementsCount int, err error) {
-		// TODO: write this properly as object (depends on how we read it)
-		for _, key := range a.BlockIssuerKeys {
-			if _, err = byteBuffer.Write(key.Bytes()); err != nil {
-				return 0, ierrors.Wrap(err, "failed to write BlockIssuerKey")
-			}
-		}
-
-		return len(a.BlockIssuerKeys), nil
-	}); err != nil {
+	if err := stream.WriteObject(byteBuffer, a.BlockIssuerKeys, iotago.BlockIssuerKeys.Bytes); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write BlockIssuerKeys")
 	}
 

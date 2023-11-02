@@ -1,12 +1,10 @@
 package model
 
 import (
-	"context"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -98,11 +96,11 @@ func (d *AccountDiff) Bytes() ([]byte, error) {
 		return nil, ierrors.Wrap(err, "unable to write PreviousOutputID in the diff")
 	}
 
-	if err := writeBlockIssuerKeys(byteBuffer, d.BlockIssuerKeysAdded); err != nil {
-		return nil, err
+	if err := stream.WriteObject(byteBuffer, d.BlockIssuerKeysAdded, iotago.BlockIssuerKeys.Bytes); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write added blockIssuerKeys in the diff")
 	}
-	if err := writeBlockIssuerKeys(byteBuffer, d.BlockIssuerKeysRemoved); err != nil {
-		return nil, err
+	if err := stream.WriteObject(byteBuffer, d.BlockIssuerKeysRemoved, iotago.BlockIssuerKeys.Bytes); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write removed blockIssuerKeys in the diff")
 	}
 
 	if err := stream.Write(byteBuffer, d.ValidatorStakeChange); err != nil {
@@ -127,7 +125,7 @@ func (d *AccountDiff) Bytes() ([]byte, error) {
 	return byteBuffer.Bytes()
 }
 
-func AccountDiffFromReader(reader io.Reader) (*AccountDiff, error) {
+func AccountDiffFromReader(reader io.ReadSeeker) (*AccountDiff, error) {
 	var err error
 	d := NewAccountDiff()
 
@@ -150,18 +148,12 @@ func AccountDiffFromReader(reader io.Reader) (*AccountDiff, error) {
 		return nil, ierrors.Wrap(err, "unable to read previous outputID in the diff")
 	}
 
-	// TODO: refactor serialization of blockIssuerKeys
-	keysAdded, _, err := readBlockIssuerKeys(reader)
-	if err != nil {
+	if d.BlockIssuerKeysAdded, err = stream.ReadObjectFromReader(reader, iotago.BlockIssuerKeysFromReader); err != nil {
 		return nil, ierrors.Wrap(err, "unable to read added blockIssuerKeys in the diff")
 	}
-	d.BlockIssuerKeysAdded = keysAdded
-
-	keysRemoved, _, err := readBlockIssuerKeys(reader)
-	if err != nil {
+	if d.BlockIssuerKeysRemoved, err = stream.ReadObjectFromReader(reader, iotago.BlockIssuerKeysFromReader); err != nil {
 		return nil, ierrors.Wrap(err, "unable to read removed blockIssuerKeys in the diff")
 	}
-	d.BlockIssuerKeysRemoved = keysRemoved
 
 	if d.ValidatorStakeChange, err = stream.Read[int64](reader); err != nil {
 		return nil, ierrors.Wrap(err, "unable to read validator stake change in the diff")
@@ -191,39 +183,4 @@ func AccountDiffFromBytes(b []byte) (*AccountDiff, int, error) {
 	a, err := AccountDiffFromReader(reader)
 
 	return a, reader.BytesRead(), err
-}
-
-func writeBlockIssuerKeys(byteBuffer *stream.ByteBuffer, blockIssuerKeys iotago.BlockIssuerKeys) error {
-	// TODO: improve this
-
-	blockIssuerKeysBytes, err := iotago.CommonSerixAPI().Encode(context.TODO(), blockIssuerKeys)
-	if err != nil {
-		return ierrors.Wrap(err, "unable to encode blockIssuerKeys in the diff")
-	}
-
-	if err := stream.WriteBytesWithSize(byteBuffer, blockIssuerKeysBytes, serializer.SeriLengthPrefixTypeAsUint64); err != nil {
-		return ierrors.Wrap(err, "unable to write blockIssuerKeysBytes in the diff")
-	}
-
-	return nil
-}
-
-func readBlockIssuerKeys(reader io.Reader) (iotago.BlockIssuerKeys, int, error) {
-	// TODO: improve this
-	var bytesConsumed int
-
-	blockIssuerKeysBytes, err := stream.ReadBytesWithSize(reader, serializer.SeriLengthPrefixTypeAsUint64)
-	if err != nil {
-		return nil, bytesConsumed, ierrors.Wrap(err, "unable to read blockIssuerKeysBytes in the diff")
-	}
-
-	bytesConsumed += serializer.UInt64ByteSize // add the blob size
-	bytesConsumed += len(blockIssuerKeysBytes)
-
-	var blockIssuerKeys iotago.BlockIssuerKeys
-	if _, err := iotago.CommonSerixAPI().Decode(context.TODO(), blockIssuerKeysBytes, &blockIssuerKeys); err != nil {
-		return nil, bytesConsumed, ierrors.Wrap(err, "unable to decode blockIssuerKeys in the diff")
-	}
-
-	return blockIssuerKeys, bytesConsumed, nil
 }
