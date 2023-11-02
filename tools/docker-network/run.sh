@@ -5,8 +5,8 @@
 function join { local IFS="$1"; shift; echo "$*"; }
 
 # All parameters can be optional now, just make sure we don't have too many
-if [[ $# -gt 4 ]] ; then
-  echo 'Call with ./run [monitoring=0|1]'
+if [[ $# -gt 2 ]] ; then
+  echo 'Call with ./run.sh [monitoring=0|1]'
   exit 0
 fi
 
