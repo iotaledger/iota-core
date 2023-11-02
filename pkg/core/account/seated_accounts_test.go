@@ -19,9 +19,9 @@ func TestSelectedAccounts(t *testing.T) {
 	account3 := iotago.AccountID([32]byte{3})
 	account4 := iotago.AccountID([32]byte{4})
 
-	accounts.Set(account1, &account.Pool{})
-	accounts.Set(account2, &account.Pool{})
-	accounts.Set(account3, &account.Pool{})
+	require.NoError(t, accounts.Set(account1, &account.Pool{}))
+	require.NoError(t, accounts.Set(account2, &account.Pool{}))
+	require.NoError(t, accounts.Set(account3, &account.Pool{}))
 
 	// Create a new set of selected accounts
 	seatedAccounts := account.NewSeatedAccounts(accounts, account1, account3)
@@ -65,7 +65,8 @@ func TestSelectedAccounts(t *testing.T) {
 	require.True(t, has)
 
 	// Test the "Members" method
-	members := seatedAccounts.Accounts()
+	members, err := seatedAccounts.Accounts()
+	require.NoError(t, err)
 	require.Equal(t, 2, members.Size())
 	require.True(t, members.Has(account2))
 	require.True(t, members.Has(account3))

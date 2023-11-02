@@ -161,7 +161,11 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewa
 				panic(fmt.Sprintf("committee for current epoch %d not found", currentEpoch))
 			}
 
-			committeeAccounts := committee.Accounts()
+			committeeAccounts, err := committee.Accounts()
+			if err != nil {
+				return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get accounts from committee for epoch %d", currentEpoch)
+			}
+
 			committeeAccounts.SetReused()
 			if err = o.seatManager.SetCommittee(nextEpoch, committeeAccounts); err != nil {
 				return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to set committee for epoch %d", nextEpoch)
@@ -276,7 +280,13 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 	epochEndSlot := timeProvider.EpochEnd(epoch)
 	if slot+apiForSlot.ProtocolParameters().EpochNearingThreshold() == epochEndSlot &&
 		epochEndSlot > o.lastCommittedSlot+apiForSlot.ProtocolParameters().MaxCommittableAge() {
-		newCommittee := o.selectNewCommittee(slot)
+		newCommittee, err := o.selectNewCommittee(slot)
+		if err != nil {
+			// TODO: should we fail "harder" here?
+			o.errHandler(ierrors.Wrap(err, "error while selecting new committee"))
+
+			return
+		}
 		o.events.CommitteeSelected.Trigger(newCommittee, epoch+1)
 	}
 }
@@ -371,7 +381,7 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 	return validatorResp, nil
 }
 
-func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) *account.Accounts {
+func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Accounts, error) {
 	timeProvider := o.apiProvider.APIForSlot(slot).TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
