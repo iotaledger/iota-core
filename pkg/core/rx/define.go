@@ -1,9 +1,19 @@
-package define
+package rx
 
 import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 )
+
+func WithNonEmptyValue[S comparable](source reactive.Variable[S], dependencyReceiver func(S) func()) (unsubscribe func()) {
+	return source.OnUpdateWithContext(func(_, parent S, unsubscribeOnParentUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+		if parent != *new(S) {
+			unsubscribeOnParentUpdate(func() (unsubscribe func()) {
+				return dependencyReceiver(parent)
+			})
+		}
+	})
+}
 
 func With1Dependency[S comparable](source reactive.Variable[S]) func(dependencyReceiver ...func(S) func()) (unsubscribe func()) {
 	return func(dependencyReceiver ...func(S) func()) (unsubscribe func()) {
@@ -25,6 +35,12 @@ func With1Dependency[S comparable](source reactive.Variable[S]) func(dependencyR
 			})
 		})
 	}
+}
+
+func AssignValue[T comparable](target reactive.Variable[T], derivedVariable reactive.DerivedVariable[T]) func() {
+	target.InheritFrom(derivedVariable)
+
+	return derivedVariable.Unsubscribe
 }
 
 func DynamicValue1[T, S comparable](target reactive.Variable[T], definition func(S) reactive.DerivedVariable[T]) func(dependency S) func() {

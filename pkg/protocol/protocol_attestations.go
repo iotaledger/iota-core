@@ -138,7 +138,7 @@ func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, 
 			return
 		}
 
-		engineInstance := commitment.Engine.Get()
+		engineInstance := commitment.Engine()
 		if engineInstance == nil {
 			a.LogTrace("request for chain without engine", "chain", chain.LogName(), "fromPeer", from)
 
