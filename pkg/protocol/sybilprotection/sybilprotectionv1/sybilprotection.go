@@ -282,10 +282,7 @@ func (o *SybilProtection) slotFinalized(slot iotago.SlotIndex) {
 		epochEndSlot > o.lastCommittedSlot+apiForSlot.ProtocolParameters().MaxCommittableAge() {
 		newCommittee, err := o.selectNewCommittee(slot)
 		if err != nil {
-			// TODO: should we fail "harder" here?
-			o.errHandler(ierrors.Wrap(err, "error while selecting new committee"))
-
-			return
+			panic(ierrors.Wrap(err, "error while selecting new committee"))
 		}
 		o.events.CommitteeSelected.Trigger(newCommittee, epoch+1)
 	}
@@ -387,7 +384,7 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Ac
 	nextEpoch := currentEpoch + 1
 	candidates, err := o.performanceTracker.EligibleValidatorCandidates(nextEpoch)
 	if err != nil {
-		panic(ierrors.Wrapf(err, "failed to retrieve candidates for epoch %d", nextEpoch))
+		return nil, ierrors.Wrapf(err, "failed to retrieve candidates for epoch %d", nextEpoch)
 	}
 
 	candidateAccounts := make(accounts.AccountsData, 0)
@@ -404,12 +401,12 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Ac
 
 		return nil
 	}); err != nil {
-		panic(ierrors.Wrap(err, "failed to iterate through candidates"))
+		return nil, ierrors.Wrap(err, "failed to iterate through candidates")
 	}
 
 	newCommittee, err := o.seatManager.RotateCommittee(nextEpoch, candidateAccounts)
 	if err != nil {
-		panic(ierrors.Wrap(err, "failed to rotate committee"))
+		return nil, ierrors.Wrap(err, "failed to rotate committee")
 	}
 
 	o.performanceTracker.ClearCandidates()
