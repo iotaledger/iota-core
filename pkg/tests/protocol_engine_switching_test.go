@@ -56,7 +56,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	node6 := ts.AddValidatorNode("node6")
 	node7 := ts.AddValidatorNode("node7")
 	node8 := ts.AddNode("node8")
-	ts.AddBasicBlockIssuer("default", iotago.MaxBlockIssuanceCredits/2)
+	ts.AddGenesisWallet("default", node0, iotago.MaxBlockIssuanceCredits/2)
 
 	const expectedCommittedSlotAfterPartitionMerge = 18
 	nodesP1 := []*mock.Node{node0, node1, node2, node3, node4, node5}
@@ -128,15 +128,15 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		node7.Validator.AccountID,
 	}
 	expectedP1OnlineCommittee := []account.SeatIndex{
-		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
-		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
-		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node2.Validator.AccountID)),
-		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node3.Validator.AccountID)),
-		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node4.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node1.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node2.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node3.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node4.Validator.AccountID)),
 	}
 	expectedP2OnlineCommittee := []account.SeatIndex{
-		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node6.Validator.AccountID)),
-		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node7.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node6.Validator.AccountID)),
+		lo.Return1(lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(node7.Validator.AccountID)),
 	}
 	expectedOnlineCommittee := append(expectedP1OnlineCommittee, expectedP2OnlineCommittee...)
 
@@ -174,7 +174,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(11),
 			testsuite.WithEqualStoredCommitmentAtIndex(11),
 			testsuite.WithLatestCommitmentCumulativeWeight(56), // 7 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(11, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(11), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedOnlineCommittee...),
 			testsuite.WithEvictedSlot(11),
 		)
@@ -229,7 +229,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(18),
 			testsuite.WithEqualStoredCommitmentAtIndex(18),
 			testsuite.WithLatestCommitmentCumulativeWeight(99), // 56 + slot 12-15=7 + 5 for each slot starting from 16
-			testsuite.WithSybilProtectionCommittee(18, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(18), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedP1OnlineCommittee...),
 			testsuite.WithEvictedSlot(18),
 		)
@@ -283,7 +283,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithLatestCommitmentSlotIndex(18),
 			testsuite.WithEqualStoredCommitmentAtIndex(18),
 			testsuite.WithLatestCommitmentCumulativeWeight(90), // 56 + slot 12-15=7 + 2 for each slot starting from 16
-			testsuite.WithSybilProtectionCommittee(18, expectedCommittee),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(18), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(expectedP2OnlineCommittee...),
 			testsuite.WithEvictedSlot(18),
 		)

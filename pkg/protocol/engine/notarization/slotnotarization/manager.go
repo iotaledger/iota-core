@@ -160,9 +160,7 @@ func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
 		return ierrors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
 
-	m.attestation.AddAttestationFromValidationBlock(block)
-
-	return
+	return m.attestation.AddAttestationFromValidationBlock(block)
 }
 
 func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {

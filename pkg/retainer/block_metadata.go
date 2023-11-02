@@ -6,23 +6,23 @@ import (
 )
 
 type BlockMetadata struct {
-	BlockID            iotago.BlockID
-	BlockState         apimodels.BlockState
-	BlockFailureReason apimodels.BlockFailureReason
-	TxState            apimodels.TransactionState
-	TxFailureReason    apimodels.TransactionFailureReason
+	BlockID                  iotago.BlockID
+	BlockState               apimodels.BlockState
+	BlockFailureReason       apimodels.BlockFailureReason
+	TransactionState         apimodels.TransactionState
+	TransactionFailureReason apimodels.TransactionFailureReason
 }
 
 func (b *BlockMetadata) BlockMetadataResponse() *apimodels.BlockMetadataResponse {
 	response := &apimodels.BlockMetadataResponse{
-		BlockID:            b.BlockID,
-		BlockState:         b.BlockState.String(),
-		BlockFailureReason: b.BlockFailureReason,
-		TxFailureReason:    b.TxFailureReason,
+		BlockID:                  b.BlockID,
+		BlockState:               b.BlockState.String(),
+		BlockFailureReason:       b.BlockFailureReason,
+		TransactionFailureReason: b.TransactionFailureReason,
 	}
 
-	if b.TxState != apimodels.TransactionStateNoTransaction {
-		response.TxState = b.TxState.String()
+	if b.TransactionState != apimodels.TransactionStateNoTransaction {
+		response.TransactionState = b.TransactionState.String()
 	}
 
 	return response

@@ -23,7 +23,7 @@ var AccountMetrics = collector.NewCollection(accountNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-				accountData, exists, _ := deps.Protocol.Engines.Main.Get().Ledger.Account(block.ProtocolBlock().IssuerID, deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
+				accountData, exists, _ := deps.Protocol.Engines.Main.Get().Ledger.Account(block.ProtocolBlock().Header.IssuerID, deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
 				if exists {
 					deps.Collector.Update(accountNamespace, credits, float64(accountData.Credits.Value), accountData.ID.String())
 				}

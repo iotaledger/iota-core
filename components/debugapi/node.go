@@ -1,6 +1,7 @@
 package debugapi
 
 import (
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -10,8 +11,12 @@ import (
 func validatorsSummary() (*ValidatorsSummaryResponse, error) {
 	seatManager := deps.Protocol.Engines.Main.Get().SybilProtection.SeatManager()
 	latestSlotIndex := deps.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
-	latestCommittee := seatManager.Committee(latestSlotIndex)
-	validatorSeats := []*Validator{}
+	latestCommittee, exists := seatManager.CommitteeInSlot(latestSlotIndex)
+	if !exists {
+		return nil, ierrors.Errorf("committee for slot %d was not selected", latestSlotIndex)
+	}
+
+	var validatorSeats []*Validator
 	latestCommittee.Accounts().ForEach(func(id iotago.AccountID, pool *account.Pool) bool {
 		validatorSeats = append(validatorSeats, &Validator{
 			AccountID:      id,

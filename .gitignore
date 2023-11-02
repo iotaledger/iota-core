@@ -15,8 +15,7 @@ iota-core
 # IDE related files
 .vscode/
 .idea/
-go.work
-go.work.sum
+go.work*
 
 # dist packages
 dist/
@@ -30,6 +29,3 @@ dist/
 # snapshot and settings file
 *.bin
 tools/docker-network/docker-network.snapshot
-tools/evil-spammer/evil-spammer
-
-

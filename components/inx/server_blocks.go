@@ -16,6 +16,12 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+func (s *Server) ReadActiveRootBlocks(_ context.Context, _ *inx.NoParams) (*inx.RootBlocksResponse, error) {
+	activeRootBlocks := deps.Protocol.Engines.Main.Get().EvictionState.ActiveRootBlocks()
+
+	return inx.WrapRootBlocks(activeRootBlocks), nil
+}
+
 func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlock, error) {
 	blkID := blockID.Unwrap()
 	block, exists := deps.Protocol.Engines.Main.Get().Block(blkID) // block +1
@@ -126,7 +132,7 @@ func (s *Server) SubmitBlock(ctx context.Context, rawBlock *inx.RawBlock) (*inx.
 	return s.attachBlock(ctx, block)
 }
 
-func (s *Server) attachBlock(ctx context.Context, block *iotago.ProtocolBlock) (*inx.BlockId, error) {
+func (s *Server) attachBlock(ctx context.Context, block *iotago.Block) (*inx.BlockId, error) {
 	mergedCtx, mergedCtxCancel := contextutils.MergeContexts(ctx, Component.Daemon().ContextStopped())
 	defer mergedCtxCancel()
 
@@ -154,10 +160,10 @@ func getINXBlockMetadata(blockID iotago.BlockID) (*inx.BlockMetadata, error) {
 	}
 
 	return &inx.BlockMetadata{
-		BlockId:            inx.NewBlockId(blockID),
-		BlockState:         inx.WrapBlockState(blockMetadata.BlockState),
-		BlockFailureReason: inx.WrapBlockFailureReason(blockMetadata.BlockFailureReason),
-		TxState:            inx.WrapTransactionState(blockMetadata.TxState),
-		TxFailureReason:    inx.WrapTransactionFailureReason(blockMetadata.TxFailureReason),
+		BlockId:                  inx.NewBlockId(blockID),
+		BlockState:               inx.WrapBlockState(blockMetadata.BlockState),
+		BlockFailureReason:       inx.WrapBlockFailureReason(blockMetadata.BlockFailureReason),
+		TransactionState:         inx.WrapTransactionState(blockMetadata.TransactionState),
+		TransactionFailureReason: inx.WrapTransactionFailureReason(blockMetadata.TransactionFailureReason),
 	}, nil
 }

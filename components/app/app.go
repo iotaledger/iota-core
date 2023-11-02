@@ -1,6 +1,9 @@
 package app
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/app/components/profiling"
 	"github.com/iotaledger/hive.go/app/components/shutdown"
@@ -14,7 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/components/protocol"
 	"github.com/iotaledger/iota-core/components/restapi"
 	coreapi "github.com/iotaledger/iota-core/components/restapi/core"
-	"github.com/iotaledger/iota-core/components/validator"
+	"github.com/iotaledger/iota-core/pkg/toolset"
 )
 
 var (
@@ -28,6 +31,12 @@ var (
 func App() *app.App {
 	return app.New(Name, Version,
 		// app.WithVersionCheck("iotaledger", "iota-core"),
+		app.WithUsageText(fmt.Sprintf(`Usage of %s (%s %s):
+
+Run '%s tools' to list all available tools.
+		
+Command line flags:
+`, os.Args[0], Name, Version, os.Args[0])),
 		app.WithInitComponent(InitComponent),
 		app.WithComponents(
 			shutdown.Component,
@@ -38,7 +47,6 @@ func App() *app.App {
 			debugapi.Component,
 			metricstracker.Component,
 			protocol.Component,
-			validator.Component,
 			dashboardmetrics.Component,
 			dashboard.Component,
 			metrics.Component,
@@ -63,5 +71,15 @@ func init() {
 		AdditionalConfigs: []*app.ConfigurationSet{
 			app.NewConfigurationSet("peering", "peering", "peeringConfigFilePath", "peeringConfig", false, true, false, "peering.json", "n"),
 		},
+		Init: initialize,
 	}
+}
+
+func initialize(_ *app.App) error {
+	if toolset.ShouldHandleTools() {
+		toolset.HandleTools()
+		// HandleTools will call os.Exit
+	}
+
+	return nil
 }

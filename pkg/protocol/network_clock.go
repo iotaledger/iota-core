@@ -31,7 +31,7 @@ func NewNetworkClock(protocol *Protocol) *NetworkClock {
 	protocol.Constructed.OnTrigger(func() {
 		unsubscribe := lo.Batch(
 			protocol.Network.OnBlockReceived(func(block *model.Block, src peer.ID) {
-				n.Set(block.ProtocolBlock().IssuingTime)
+				n.Set(block.ProtocolBlock().Header.IssuingTime)
 			}),
 
 			protocol.OnChainCreated(func(chain *Chain) {

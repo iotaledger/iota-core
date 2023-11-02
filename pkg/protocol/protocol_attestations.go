@@ -43,7 +43,8 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 				if requestAttestations {
 					if commitmentBeforeForkingPoint := forkingPoint.Parent.Get(); commitmentBeforeForkingPoint != nil {
 						a.commitmentVerifiers.GetOrCreate(forkingPoint.ID(), func() *CommitmentVerifier {
-							return NewCommitmentVerifier(chain.Engine.Get(), commitmentBeforeForkingPoint.Commitment)
+							// TODO: HANDLE ERROR GRACEFULLY
+							return lo.PanicOnErr(NewCommitmentVerifier(chain.Engine.Get(), commitmentBeforeForkingPoint.Commitment))
 						})
 					}
 				} else {

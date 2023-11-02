@@ -7,23 +7,19 @@ cores:
     internal_nodes:
       hosts:
         node-01.feature.shimmer.iota.cafe:
-          validatorAccount: "{{ NODE_01_ACCOUNTID }}"
-          validatorPrivKey: "{{ NODE_01_VALIDATOR_PRIVKEY }}"
-          p2pIdentityPrivateKey: "{{ NODE_01_P2PIDENTITYPRIVATEKEY }}"
+          validatorAccountAddress: "{{ NODE_01_VALIDATOR_ACCOUNTADDRESS }}"
+          validatorPrvKey: "{{ NODE_01_VALIDATOR_PRIVKEY }}"
+          p2pIdentityPrvKey: "{{ NODE_01_P2PIDENTITY_PRIVKEY }}"
         node-02.feature.shimmer.iota.cafe:
-          validatorAccount: "{{ NODE_02_ACCOUNTID }}"
-          validatorPrivKey: "{{ NODE_02_VALIDATOR_PRIVKEY }}"
-          p2pIdentityPrivateKey: "{{ NODE_02_P2PIDENTITYPRIVATEKEY }}"
+          validatorAccountAddress: "{{ NODE_02_VALIDATOR_ACCOUNTADDRESS }}"
+          validatorPrvKey: "{{ NODE_02_VALIDATOR_PRIVKEY }}"
+          p2pIdentityPrvKey: "{{ NODE_02_P2PIDENTITY_PRIVKEY }}"
         node-03.feature.shimmer.iota.cafe:
-          validatorAccount: "{{ NODE_03_ACCOUNTID }}"
-          validatorPrivKey: "{{ NODE_03_VALIDATOR_PRIVKEY }}"
-          p2pIdentityPrivateKey: "{{ NODE_03_P2PIDENTITYPRIVATEKEY }}"
+          validatorAccountAddress: "{{ NODE_03_VALIDATOR_ACCOUNTADDRESS }}"
+          validatorPrvKey: "{{ NODE_03_VALIDATOR_PRIVKEY }}"
+          p2pIdentityPrvKey: "{{ NODE_03_P2PIDENTITY_PRIVKEY }}"
         node-04.feature.shimmer.iota.cafe:
-          validatorAccount: "{{ NODE_04_ACCOUNTID }}"
-          validatorPrivKey: "{{ NODE_04_VALIDATOR_PRIVKEY }}"
-          p2pIdentityPrivateKey: "{{ NODE_04_P2PIDENTITYPRIVATEKEY }}"
+          p2pIdentityPrvKey: "{{ NODE_04_P2PIDENTITY_PRIVKEY }}"
         node-05.feature.shimmer.iota.cafe:
-          validatorAccount: "{{ NODE_05_ACCOUNTID }}"
-          validatorPrivKey: "{{ NODE_05_VALIDATOR_PRIVKEY }}"
-          p2pIdentityPrivateKey: "{{ NODE_05_P2PIDENTITYPRIVATEKEY }}"
+          p2pIdentityPrvKey: "{{ NODE_05_P2PIDENTITY_PRIVKEY }}"
   vars:

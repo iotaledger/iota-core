@@ -165,11 +165,11 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 	txStatus, txFailureReason := r.transactionStatus(blockID)
 
 	return &retainer.BlockMetadata{
-		BlockID:            blockID,
-		BlockState:         blockStatus,
-		BlockFailureReason: blockFailureReason,
-		TxState:            txStatus,
-		TxFailureReason:    txFailureReason,
+		BlockID:                  blockID,
+		BlockState:               blockStatus,
+		BlockFailureReason:       blockFailureReason,
+		TransactionState:         txStatus,
+		TransactionFailureReason: txFailureReason,
 	}, nil
 }
 

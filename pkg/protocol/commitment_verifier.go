@@ -18,22 +18,25 @@ type CommitmentVerifier struct {
 	validatorAccountsAtFork map[iotago.AccountID]*accounts.AccountData
 }
 
-func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) *CommitmentVerifier {
-	committeeAtForkingPoint := mainEngine.SybilProtection.SeatManager().Committee(lastCommonCommitmentBeforeFork.Slot()).Accounts().IDs()
+func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) (*CommitmentVerifier, error) {
+	committeeAtForkingPoint, exists := mainEngine.SybilProtection.SeatManager().CommitteeInSlot(lastCommonCommitmentBeforeFork.Slot())
+	if !exists {
+		return nil, ierrors.Errorf("committee in slot %d does not exist", lastCommonCommitmentBeforeFork.Slot())
+	}
 
 	return &CommitmentVerifier{
 		engine:                  mainEngine,
-		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint, lastCommonCommitmentBeforeFork.Slot())),
+		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint.Accounts().IDs(), lastCommonCommitmentBeforeFork.Slot())),
 		// TODO: what happens if the committee rotated after the fork?
-	}
+	}, nil
 }
 
 func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
 	tree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(), iotago.AccountID.Bytes, iotago.AccountIDFromBytes, (*iotago.Attestation).Bytes, iotago.AttestationFromBytes(c.engine))
 
 	for _, att := range attestations {
-		if setErr := tree.Set(att.IssuerID, att); setErr != nil {
-			return nil, 0, ierrors.Wrapf(err, "failed to set attestation for issuerID %s", att.IssuerID)
+		if setErr := tree.Set(att.Header.IssuerID, att); setErr != nil {
+			return nil, 0, ierrors.Wrapf(err, "failed to set attestation for issuerID %s", att.Header.IssuerID)
 		}
 	}
 
@@ -64,11 +67,11 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		//    1. The attestation might be fake.
 		//    2. The issuer might have added a new public key in the meantime, but we don't know about it yet
 		//       since we only have the ledger state at the forking point.
-		accountData, exists := c.validatorAccountsAtFork[att.IssuerID]
+		accountData, exists := c.validatorAccountsAtFork[att.Header.IssuerID]
 
 		// We always need to have the accountData for a validator.
 		if !exists {
-			return nil, 0, ierrors.Errorf("accountData for issuerID %s does not exist", att.IssuerID)
+			return nil, 0, ierrors.Errorf("accountData for issuerID %s does not exist", att.Header.IssuerID)
 		}
 
 		switch signature := att.Signature.(type) {
@@ -92,8 +95,8 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		}
 
 		// 3. A valid set of attestations can't contain multiple attestations from the same issuerID.
-		if visitedIdentities.Has(att.IssuerID) {
-			return nil, 0, ierrors.Errorf("issuerID %s contained in multiple attestations", att.IssuerID)
+		if visitedIdentities.Has(att.Header.IssuerID) {
+			return nil, 0, ierrors.Errorf("issuerID %s contained in multiple attestations", att.Header.IssuerID)
 		}
 
 		// TODO: this might differ if we have a Accounts with changing weights depending on the SlotIndex/epoch
@@ -101,11 +104,17 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")
 		}
-		if _, seatExists := c.engine.SybilProtection.SeatManager().Committee(attestationBlockID.Slot()).GetSeat(att.IssuerID); seatExists {
+
+		committee, exists := c.engine.SybilProtection.SeatManager().CommitteeInSlot(attestationBlockID.Slot())
+		if !exists {
+			return nil, 0, ierrors.Errorf("committee for slot %d does not exist", attestationBlockID.Slot())
+		}
+
+		if _, seatExists := committee.GetSeat(att.Header.IssuerID); seatExists {
 			seatCount++
 		}
 
-		visitedIdentities.Add(att.IssuerID)
+		visitedIdentities.Add(att.Header.IssuerID)
 
 		blockID, err := att.BlockID()
 		if err != nil {

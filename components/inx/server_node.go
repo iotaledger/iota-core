@@ -25,6 +25,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 
 	return &inx.NodeStatus{
 		IsHealthy:                   status.NodeSynced,
+		IsBootstrapped:              status.NodeBootstrapped,
 		LastAcceptedBlockSlot:       uint32(status.LastAcceptedBlockSlot),
 		LastConfirmedBlockSlot:      uint32(status.LastConfirmedBlockSlot),
 		LatestCommitment:            inxCommitment(status.LatestCommitment),
