@@ -125,8 +125,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 	}
 
 	if blockParams.BlockHeader.References == nil {
-		// TODO: change this to get references for validator block
-		references, err := i.getReferences(ctx, nil, node, blockParams.BlockHeader.ParentsCount)
+		references, err := i.getReferencesValidationBlock(ctx, node, blockParams.BlockHeader.ParentsCount)
 		require.NoError(i.Testing, err)
 
 		blockParams.BlockHeader.References = references
@@ -226,7 +225,7 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *
 	}
 
 	if blockParams.BlockHeader.References == nil {
-		references, err := i.getReferences(ctx, blockParams.Payload, node, blockParams.BlockHeader.ParentsCount)
+		references, err := i.getReferencesBasicBlock(ctx, node, blockParams.BlockHeader.ParentsCount)
 		require.NoError(i.Testing, err)
 		blockParams.BlockHeader.References = references
 	}
@@ -388,9 +387,9 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 		resign = true
 	}
 
-	switch innerBlock := iotaBlock.Body.(type) {
+	switch blockBody := iotaBlock.Body.(type) {
 	case *iotago.BasicBlockBody:
-		switch payload := innerBlock.Payload.(type) {
+		switch payload := blockBody.Payload.(type) {
 		case *iotago.SignedTransaction:
 			if payload.Transaction.NetworkID != protoParams.NetworkID() {
 				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "invalid payload, error: wrong networkID: %d", payload.Transaction.NetworkID)
@@ -398,21 +397,28 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 		}
 
 		if len(iotaBlock.Parents()) == 0 {
-			references, referencesErr := i.getReferences(ctx, innerBlock.Payload, node)
+			references, referencesErr := i.getReferencesBasicBlock(ctx, node)
 			if referencesErr != nil {
 				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %w", referencesErr)
 			}
 
-			innerBlock.StrongParents = references[iotago.StrongParentType]
-			innerBlock.WeakParents = references[iotago.WeakParentType]
-			innerBlock.ShallowLikeParents = references[iotago.ShallowLikeParentType]
+			blockBody.StrongParents = references[iotago.StrongParentType]
+			blockBody.WeakParents = references[iotago.WeakParentType]
+			blockBody.ShallowLikeParents = references[iotago.ShallowLikeParentType]
 			resign = true
 		}
 
 	case *iotago.ValidationBlockBody:
-		//nolint:revive,staticcheck //temporarily disable
 		if len(iotaBlock.Parents()) == 0 {
-			// TODO: implement tipselection for validator blocks
+			references, referencesErr := i.getReferencesValidationBlock(ctx, node)
+			if referencesErr != nil {
+				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherAttachingNotPossible, "tipselection failed, error: %w", referencesErr)
+			}
+
+			blockBody.StrongParents = references[iotago.StrongParentType]
+			blockBody.WeakParents = references[iotago.WeakParentType]
+			blockBody.ShallowLikeParents = references[iotago.ShallowLikeParentType]
+			resign = true
 		}
 	}
 
@@ -544,13 +550,22 @@ func (i *BlockIssuer) getAddressableCommitment(currentAPI iotago.API, blockIssui
 	return commitment, nil
 }
 
-func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, node *Node, strongParentsCountOpt ...int) (model.ParentReferences, error) {
-	strongParentsCount := iotago.BlockMaxParents
+func (i *BlockIssuer) getReferencesBasicBlock(ctx context.Context, node *Node, strongParentsCountOpt ...int) (model.ParentReferences, error) {
+	strongParentsCount := iotago.BasicBlockMaxParents
 	if len(strongParentsCountOpt) > 0 && strongParentsCountOpt[0] > 0 {
 		strongParentsCount = strongParentsCountOpt[0]
 	}
 
-	return i.getReferencesWithRetry(ctx, p, strongParentsCount, node)
+	return i.getReferencesWithRetry(ctx, strongParentsCount, node)
+}
+
+func (i *BlockIssuer) getReferencesValidationBlock(ctx context.Context, node *Node, strongParentsCountOpt ...int) (model.ParentReferences, error) {
+	strongParentsCount := iotago.ValidationBlockMaxParents
+	if len(strongParentsCountOpt) > 0 && strongParentsCountOpt[0] > 0 {
+		strongParentsCount = strongParentsCountOpt[0]
+	}
+
+	return i.getReferencesWithRetry(ctx, strongParentsCount, node)
 }
 
 func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIndex iotago.SlotIndex, references model.ParentReferences, node *Node) error {
@@ -594,7 +609,7 @@ func (i *BlockIssuer) CopyIdentityFromBlockIssuer(otherBlockIssuer *BlockIssuer)
 
 // getReferencesWithRetry tries to get references for the given payload. If it fails, it will retry at regular intervals until
 // the timeout is reached.
-func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, _ iotago.Payload, parentsCount int, node *Node) (references model.ParentReferences, err error) {
+func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, parentsCount int, node *Node) (references model.ParentReferences, err error) {
 	timeout := time.NewTimer(i.optsTipSelectionTimeout)
 	interval := time.NewTicker(i.optsTipSelectionRetryInterval)
 	defer timeutil.CleanupTimer(timeout)

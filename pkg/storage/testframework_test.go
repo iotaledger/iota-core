@@ -91,7 +91,7 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 	var createdBytes int64
 	for createdBytes < size {
 		block := tpkg.RandBlock(&iotago.BasicBlockBody{
-			StrongParents: tpkg.SortedRandBlockIDs(1 + rand.Intn(iotago.BlockMaxParents)),
+			StrongParents: tpkg.SortedRandBlockIDs(1 + rand.Intn(iotago.BasicBlockMaxParents)),
 			Payload:       &iotago.TaggedData{Data: make([]byte, 8192)},
 			MaxBurnedMana: 1000,
 		}, apiForEpoch, 0)
