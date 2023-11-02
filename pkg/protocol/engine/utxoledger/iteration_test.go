@@ -21,6 +21,7 @@ func TestUTXOComputeBalance(t *testing.T) {
 	initialOutput := tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, utils.RandAddress(iotago.AddressEd25519), 2_134_656_365)
 	require.NoError(t, manager.AddGenesisUnspentOutput(initialOutput))
 	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputAccount, utils.RandAddress(iotago.AddressAccount), 56_549_524)))
+	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputAnchor, utils.RandAddress(iotago.AddressAccount), 56_549_524)))
 	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputFoundry, utils.RandAddress(iotago.AddressAccount), 25_548_858)))
 	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputNFT, utils.RandAddress(iotago.AddressEd25519), 545_699_656)))
 	require.NoError(t, manager.AddGenesisUnspentOutput(tpkg.RandLedgerStateOutputOnAddressWithAmount(iotago.OutputBasic, utils.RandAddress(iotago.AddressAccount), 626_659_696)))
@@ -43,12 +44,12 @@ func TestUTXOComputeBalance(t *testing.T) {
 
 	unspent, err := manager.UnspentOutputs()
 	require.NoError(t, err)
-	require.Equal(t, 5, len(unspent))
+	require.Equal(t, 6, len(unspent))
 
 	balance, count, err := manager.ComputeLedgerBalance()
 	require.NoError(t, err)
-	require.Equal(t, 5, count)
-	require.Equal(t, iotago.BaseToken(2_134_656_365+56_549_524+25_548_858+545_699_656+626_659_696), balance)
+	require.Equal(t, 6, count)
+	require.Equal(t, iotago.BaseToken(2_134_656_365+56_549_524+56_549_524+25_548_858+545_699_656+626_659_696), balance)
 }
 
 func TestUTXOIteration(t *testing.T) {
@@ -67,6 +68,7 @@ func TestUTXOIteration(t *testing.T) {
 		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputNFT, utils.RandAddress(iotago.AddressNFT)),
 		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputNFT, utils.RandAddress(iotago.AddressAccount)),
 		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputAccount, utils.RandAddress(iotago.AddressEd25519)),
+		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputAnchor, utils.RandAddress(iotago.AddressEd25519)),
 		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputFoundry, utils.RandAddress(iotago.AddressAccount)),
 		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputFoundry, utils.RandAddress(iotago.AddressAccount)),
 		tpkg.RandLedgerStateOutputOnAddress(iotago.OutputFoundry, utils.RandAddress(iotago.AddressAccount)),

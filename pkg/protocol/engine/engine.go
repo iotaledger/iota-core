@@ -437,7 +437,7 @@ func (e *Engine) acceptanceHandler() {
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
 		e.Ledger.TrackBlock(block)
-		e.SybilProtection.TrackValidationBlock(block)
+		e.SybilProtection.TrackBlock(block)
 		e.UpgradeOrchestrator.TrackValidationBlock(block)
 
 		e.Events.AcceptedBlockProcessed.Trigger(block)
@@ -473,7 +473,7 @@ func (e *Engine) setupEvictionState() {
 					e.errorHandler(ierrors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
 					return
 				}
-				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().SlotCommitmentID)
+				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().Header.SlotCommitmentID)
 			}
 		})
 	}, event.WithWorkerPool(wp))

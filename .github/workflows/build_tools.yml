@@ -3,13 +3,12 @@ name: Build internal tools
 on:
   pull_request:
     paths:
-      - 'tools/evil-spammer/**'
       - 'tools/genesis-snapshot/**'
 jobs:
 
   build:
     name: Import Check
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
 
       - name: Checkout repository
@@ -22,10 +21,6 @@ jobs:
 
       - name: Print Go version
         run: go version
-
-      - name: Build evil-spammer tool
-        working-directory: tools/evil-spammer
-        run: go mod tidy && go build .
 
       - name: Build genesis-snapshot tool
         working-directory: tools/genesis-snapshot

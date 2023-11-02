@@ -49,29 +49,19 @@ func (t *TestSuite) limitParentsCountInBlockOptions(blockOpts []options.Option[m
 	return blockOpts
 }
 
-func (t *TestSuite) RegisterBlock(alias string, block *blocks.Block) {
+func (t *TestSuite) RegisterBlock(blockName string, block *blocks.Block) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	t.registerBlock(alias, block)
+	t.registerBlock(blockName, block)
 }
 
-func (t *TestSuite) registerBlock(alias string, block *blocks.Block) {
-	t.blocks.Set(alias, block)
-	block.ID().RegisterAlias(alias)
+func (t *TestSuite) registerBlock(blockName string, block *blocks.Block) {
+	t.blocks.Set(blockName, block)
+	block.ID().RegisterAlias(blockName)
 }
 
-func (t *TestSuite) CreateBasicBlock(alias string, blockIssuer *mock.BlockIssuer, node *mock.Node, blockOpts ...options.Option[mock.BasicBlockParams]) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	block, err := blockIssuer.CreateBasicBlock(context.Background(), alias, node, blockOpts...)
-	require.NoError(t.Testing, err)
-
-	t.registerBlock(alias, block)
-}
-
-func (t *TestSuite) IssueValidationBlockAtSlot(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, node *mock.Node, parents ...iotago.BlockID) *blocks.Block {
+func (t *TestSuite) IssueValidationBlockAtSlot(blockName string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, node *mock.Node, parents ...iotago.BlockID) *blocks.Block {
 	t.AssertBlocksExist(t.Blocks(lo.Map(parents, func(id iotago.BlockID) string { return id.Alias() })...), true, node)
 
 	t.mutex.Lock()
@@ -83,48 +73,48 @@ func (t *TestSuite) IssueValidationBlockAtSlot(alias string, slot iotago.SlotInd
 	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 	require.True(t.Testing, node.IsValidator(), "node: %s: is not a validator node", node.Name)
 
-	block := node.Validator.IssueValidationBlock(context.Background(), alias, node, mock.WithValidationBlockHeaderOptions(mock.WithIssuingTime(issuingTime), mock.WithSlotCommitment(slotCommitment), mock.WithStrongParents(parents...)))
+	block := node.Validator.IssueValidationBlock(context.Background(), blockName, node, mock.WithValidationBlockHeaderOptions(mock.WithIssuingTime(issuingTime), mock.WithSlotCommitment(slotCommitment), mock.WithStrongParents(parents...)))
 
-	t.registerBlock(alias, block)
+	t.registerBlock(blockName, block)
 
 	return block
 }
 
-func (t *TestSuite) IssueExistingBlock(alias string, blockIssuer *mock.BlockIssuer, node *mock.Node) {
+func (t *TestSuite) IssueExistingBlock(blockName string, wallet *mock.Wallet) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block, exists := t.blocks.Get(alias)
+	block, exists := t.blocks.Get(blockName)
 	require.True(t.Testing, exists)
 	require.NotNil(t.Testing, block)
 
-	require.NoError(t.Testing, blockIssuer.IssueBlock(block.ModelBlock(), node))
+	require.NoError(t.Testing, wallet.BlockIssuer.IssueBlock(block.ModelBlock(), wallet.Node))
 }
 
-func (t *TestSuite) IssueValidationBlockWithOptions(alias string, blockIssuer *mock.BlockIssuer, node *mock.Node, blockOpts ...options.Option[mock.ValidatorBlockParams]) *blocks.Block {
+func (t *TestSuite) IssueValidationBlockWithOptions(blockName string, node *mock.Node, blockOpts ...options.Option[mock.ValidatorBlockParams]) *blocks.Block {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := blockIssuer.IssueValidationBlock(context.Background(), alias, node, blockOpts...)
+	block := node.IssueValidationBlock(context.Background(), blockName, blockOpts...)
 
-	t.registerBlock(alias, block)
+	t.registerBlock(blockName, block)
 
 	return block
 }
 
-func (t *TestSuite) IssueBasicBlockWithOptions(alias string, blockIssuer *mock.BlockIssuer, node *mock.Node, blockOpts ...options.Option[mock.BasicBlockParams]) *blocks.Block {
+func (t *TestSuite) IssueBasicBlockWithOptions(blockName string, wallet *mock.Wallet, blockOpts ...options.Option[mock.BasicBlockParams]) *blocks.Block {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := blockIssuer.IssueBasicBlock(context.Background(), alias, node, blockOpts...)
+	block := wallet.IssueBasicBlock(context.Background(), blockName, blockOpts...)
 
-	t.registerBlock(alias, block)
+	t.registerBlock(blockName, block)
 
 	return block
 }
 
-func (t *TestSuite) IssueBasicBlockAtSlotWithOptions(alias string, slot iotago.SlotIndex, slotCommitment *iotago.Commitment, blockIssuer *mock.BlockIssuer, node *mock.Node, payload iotago.Payload, blockOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
-	t.assertParentsExistFromBlockOptions(blockOpts, node)
+func (t *TestSuite) IssueBasicBlockAtSlotWithOptions(blockName string, slot iotago.SlotIndex, wallet *mock.Wallet, payload iotago.Payload, blockOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockOpts, wallet.Node)
 
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -132,29 +122,29 @@ func (t *TestSuite) IssueBasicBlockAtSlotWithOptions(alias string, slot iotago.S
 	timeProvider := t.API.TimeProvider()
 	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
 
-	require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "wallet: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", wallet.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
-	block := blockIssuer.IssueBasicBlock(context.Background(), alias, node, mock.WithBasicBlockHeader(append(blockOpts, mock.WithIssuingTime(issuingTime), mock.WithSlotCommitment(slotCommitment))...), mock.WithPayload(payload))
+	block := wallet.IssueBasicBlock(context.Background(), blockName, mock.WithBasicBlockHeader(append(blockOpts, mock.WithIssuingTime(issuingTime))...), mock.WithPayload(payload))
 
-	t.registerBlock(alias, block)
+	t.registerBlock(blockName, block)
 
 	return block
 }
 
-func (t *TestSuite) IssuePayloadWithOptions(alias string, blockIssuer *mock.BlockIssuer, node *mock.Node, payload iotago.Payload, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
-	t.assertParentsExistFromBlockOptions(blockHeaderOpts, node)
+func (t *TestSuite) IssuePayloadWithOptions(blockName string, wallet *mock.Wallet, payload iotago.Payload, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+	t.assertParentsExistFromBlockOptions(blockHeaderOpts, wallet.Node)
 
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := blockIssuer.IssueBasicBlock(context.Background(), alias, node, mock.WithPayload(payload), mock.WithBasicBlockHeader(blockHeaderOpts...))
+	block := wallet.IssueBasicBlock(context.Background(), blockName, mock.WithPayload(payload), mock.WithBasicBlockHeader(blockHeaderOpts...))
 
-	t.registerBlock(alias, block)
+	t.registerBlock(blockName, block)
 
 	return block
 }
 
-func (t *TestSuite) IssueValidationBlock(alias string, node *mock.Node, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+func (t *TestSuite) IssueValidationBlock(blockName string, node *mock.Node, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
 	t.assertParentsExistFromBlockOptions(blockHeaderOpts, node)
 
 	require.Truef(t.Testing, node.IsValidator(), "node: %s: is not a validator node", node.Name)
@@ -162,22 +152,36 @@ func (t *TestSuite) IssueValidationBlock(alias string, node *mock.Node, blockHea
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	block := node.Validator.IssueValidationBlock(context.Background(), alias, node, mock.WithValidationBlockHeaderOptions(blockHeaderOpts...))
+	block := node.Validator.IssueValidationBlock(context.Background(), blockName, node, mock.WithValidationBlockHeaderOptions(blockHeaderOpts...))
 
-	t.registerBlock(alias, block)
+	t.registerBlock(blockName, block)
 
 	return block
 }
+func (t *TestSuite) IssueCandidacyAnnouncementInSlot(alias string, slot iotago.SlotIndex, parentsPrefixAlias string, wallet *mock.Wallet, issuingOptions ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+	timeProvider := t.API.TimeProvider()
+	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
+	require.Truef(t.Testing, issuingTime.Before(time.Now()), "wallet: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", wallet.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
-func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, row int, parentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) []*blocks.Block {
-	blockIssuers := t.BlockIssuersForNodes(nodes)
+	return t.IssuePayloadWithOptions(
+		alias,
+		wallet,
+		&iotago.CandidacyAnnouncement{},
+		append(issuingOptions,
+			mock.WithStrongParents(t.BlockIDsWithPrefix(parentsPrefixAlias)...),
+			mock.WithIssuingTime(issuingTime),
+		)...,
+	)
+}
+
+func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, row int, parentsPrefix string, nodes []*mock.Node, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) []*blocks.Block {
 	blocksIssued := make([]*blocks.Block, 0, len(nodes))
 
-	strongParents := t.BlockIDsWithPrefix(parentsPrefixAlias)
+	strongParents := t.BlockIDsWithPrefix(parentsPrefix)
 	issuingOptionsCopy := lo.MergeMaps(make(map[string][]options.Option[mock.BlockHeaderParams]), issuingOptions)
 
-	for index, node := range nodes {
-		blockAlias := fmt.Sprintf("%s%d.%d-%s", prefix, slot, row, node.Name)
+	for _, node := range nodes {
+		blockName := fmt.Sprintf("%s%d.%d-%s", prefix, slot, row, node.Name)
 		issuingOptionsCopy[node.Name] = append(issuingOptionsCopy[node.Name], mock.WithStrongParents(strongParents...))
 
 		timeProvider := t.API.TimeProvider()
@@ -185,31 +189,32 @@ func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, ro
 		require.Truef(t.Testing, issuingTime.Before(time.Now()), "node: %s: issued block (%s, slot: %d) is in the current (%s, slot: %d) or future slot", node.Name, issuingTime, slot, time.Now(), timeProvider.SlotFromTime(time.Now()))
 
 		var b *blocks.Block
-		if blockIssuers[index].Validator {
+		// Only issue validator blocks if account has staking feature and is part of committee.
+		if node.Validator != nil && lo.Return1(node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)).HasAccount(node.Validator.AccountID) {
 			blockHeaderOptions := append(issuingOptionsCopy[node.Name], mock.WithIssuingTime(issuingTime))
 			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)
 			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node)
 
-			b = t.IssueValidationBlockWithOptions(blockAlias, blockIssuers[index], node, mock.WithValidationBlockHeaderOptions(blockHeaderOptions...), mock.WithHighestSupportedVersion(node.HighestSupportedVersion()), mock.WithProtocolParametersHash(node.ProtocolParametersHash()))
+			b = t.IssueValidationBlockWithOptions(blockName, node, mock.WithValidationBlockHeaderOptions(blockHeaderOptions...), mock.WithHighestSupportedVersion(node.HighestSupportedVersion()), mock.WithProtocolParametersHash(node.ProtocolParametersHash()))
 		} else {
 			txCount := t.automaticTransactionIssuingCounters.Compute(node.Partition, func(currentValue int, exists bool) int {
 				return currentValue + 1
 			})
-			inputAlias := fmt.Sprintf("automaticSpent-%d:0", txCount-1)
-			txAlias := fmt.Sprintf("automaticSpent-%d", txCount)
+			inputName := fmt.Sprintf("automaticSpent-%d:0", txCount-1)
+			txName := fmt.Sprintf("automaticSpent-%d", txCount)
 			if txCount == 1 {
-				inputAlias = "Genesis:0"
+				inputName = "Genesis:0"
 			}
-			tx, err := t.TransactionFramework.CreateSimpleTransaction(txAlias, 1, inputAlias)
-			require.NoError(t.Testing, err)
+			tx := t.DefaultWallet().CreateBasicOutputsEquallyFromInputs(txName, 1, inputName)
 
-			issuingOptionsCopy[node.Name] = t.limitParentsCountInBlockOptions(issuingOptionsCopy[node.Name], iotago.BlockMaxParents)
+			issuingOptionsCopy[node.Name] = t.limitParentsCountInBlockOptions(issuingOptionsCopy[node.Name], iotago.BasicBlockMaxParents)
 
 			blockHeaderOptions := append(issuingOptionsCopy[node.Name], mock.WithIssuingTime(issuingTime))
 			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)
 			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node)
 
-			b = t.IssueBasicBlockWithOptions(blockAlias, blockIssuers[index], node, mock.WithPayload(tx), mock.WithBasicBlockHeader(blockHeaderOptions...))
+			t.DefaultWallet().SetDefaultNode(node)
+			b = t.IssueBasicBlockWithOptions(blockName, t.DefaultWallet(), mock.WithPayload(tx), mock.WithBasicBlockHeader(blockHeaderOptions...))
 		}
 		blocksIssued = append(blocksIssued, b)
 	}
@@ -217,32 +222,32 @@ func (t *TestSuite) IssueBlockRowInSlot(prefix string, slot iotago.SlotIndex, ro
 	return blocksIssued
 }
 
-func (t *TestSuite) IssueBlockRowsInSlot(prefix string, slot iotago.SlotIndex, rows int, initialParentsPrefixAlias string, nodes []*mock.Node, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+func (t *TestSuite) IssueBlockRowsInSlot(prefix string, slot iotago.SlotIndex, rows int, initialParentsPrefix string, nodes []*mock.Node, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
 	var blocksIssued, lastBlockRowIssued []*blocks.Block
-	parentsPrefixAlias := initialParentsPrefixAlias
+	parentsPrefix := initialParentsPrefix
 
 	for row := 0; row < rows; row++ {
 		if row > 0 {
-			parentsPrefixAlias = fmt.Sprintf("%s%d.%d", prefix, slot, row-1)
+			parentsPrefix = fmt.Sprintf("%s%d.%d", prefix, slot, row-1)
 		}
 
-		lastBlockRowIssued = t.IssueBlockRowInSlot(prefix, slot, row, parentsPrefixAlias, nodes, issuingOptions)
+		lastBlockRowIssued = t.IssueBlockRowInSlot(prefix, slot, row, parentsPrefix, nodes, issuingOptions)
 		blocksIssued = append(blocksIssued, lastBlockRowIssued...)
 	}
 
 	return blocksIssued, lastBlockRowIssued
 }
 
-func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, rowsPerSlot int, initialParentsPrefix string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
 	var blocksIssued, lastBlockRowIssued []*blocks.Block
-	parentsPrefixAlias := initialParentsPrefixAlias
+	parentsPrefix := initialParentsPrefix
 
 	for i, slot := range slots {
 		if i > 0 {
-			parentsPrefixAlias = fmt.Sprintf("%s%d.%d", prefix, slots[i-1], rowsPerSlot-1)
+			parentsPrefix = fmt.Sprintf("%s%d.%d", prefix, slots[i-1], rowsPerSlot-1)
 		}
 
-		blocksInSlot, lastRowInSlot := t.IssueBlockRowsInSlot(prefix, slot, rowsPerSlot, parentsPrefixAlias, nodes, issuingOptions)
+		blocksInSlot, lastRowInSlot := t.IssueBlockRowsInSlot(prefix, slot, rowsPerSlot, parentsPrefix, nodes, issuingOptions)
 		blocksIssued = append(blocksIssued, blocksInSlot...)
 		lastBlockRowIssued = lastRowInSlot
 
@@ -258,8 +263,8 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 	return blocksIssued, lastBlockRowIssued
 }
 
-func (t *TestSuite) IssueBlocksAtEpoch(prefix string, epoch iotago.EpochIndex, rowsPerSlot int, initialParentsPrefixAlias string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
-	return t.IssueBlocksAtSlots(prefix, t.SlotsForEpoch(epoch), rowsPerSlot, initialParentsPrefixAlias, nodes, waitForSlotsCommitted, issuingOptions)
+func (t *TestSuite) IssueBlocksAtEpoch(prefix string, epoch iotago.EpochIndex, rowsPerSlot int, initialParentsPrefix string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+	return t.IssueBlocksAtSlots(prefix, t.SlotsForEpoch(epoch), rowsPerSlot, initialParentsPrefix, nodes, waitForSlotsCommitted, issuingOptions)
 }
 
 func (t *TestSuite) SlotsForEpoch(epoch iotago.EpochIndex) []iotago.SlotIndex {
@@ -295,17 +300,31 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 		// preacceptance of nextBlockSlot
 		for _, node := range activeValidators {
 			require.True(t.Testing, node.IsValidator(), "node: %s: is not a validator node", node.Name)
-			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex, node.Name)
-			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			committeeAtBlockSlot, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(nextBlockSlot)
+			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, nextBlockSlot)
+			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
+				blockName := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex, node.Name)
+				tip = t.IssueValidationBlockAtSlot(blockName, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			}
 		}
 		// acceptance of nextBlockSlot
 		for _, node := range activeValidators {
-			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
-			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			committeeAtBlockSlot, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(nextBlockSlot)
+			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, nextBlockSlot)
+			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
+				blockName := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
+				tip = t.IssueValidationBlockAtSlot(blockName, nextBlockSlot, node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			}
 		}
+
+		for _, node := range activeValidators {
+			t.AssertLatestCommitmentSlotIndex(nextBlockSlot-t.API.ProtocolParameters().MinCommittableAge(), node)
+		}
+
 		if nextBlockSlot == slot+t.API.ProtocolParameters().MinCommittableAge() {
 			break
 		}
+
 		nextBlockSlot = lo.Min(slot+t.API.ProtocolParameters().MinCommittableAge(), nextBlockSlot+t.API.ProtocolParameters().MinCommittableAge())
 		chainIndex += 2
 	}

@@ -1,0 +1,66 @@
+name: Run Docker Network and Check Health
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths-ignore:
+      - 'documentation/**'
+      - 'scripts/**'
+      - 'tools/**'
+
+concurrency: 
+  group: run-and-check-group
+  cancel-in-progress: false
+
+jobs:
+  run-and-check:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Run network, wait and check health
+      run: |
+        set -x
+
+        # Run network
+        cd ./tools/docker-network
+        timeout 10m ./run.sh 0 0 &
+        RUN_PID=$!
+        
+        # Wait for node-4 to be created before querying it
+        timeout 10m bash -c 'until docker ps | grep docker-network-node-4; do sleep 5; done' &
+
+        # Wait for any of the two processes to exit
+        wait -n || exit 1
+        
+        # Additional 10 seconds wait to allow the API to come up
+        sleep 10
+
+        # Health check
+        SUCCESS=false
+        while true; do
+          OUTPUT=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8080/health)
+          if [[ $OUTPUT -eq 200 ]]; then
+            SUCCESS=true
+            kill -s SIGINT $RUN_PID
+            break
+          # curl will return a connection refused when the network is tear down from the timeout.
+          elif [[ $OUTPUT -eq 000 ]]; then
+            echo "Connection refused. Failing the action."
+            break
+          fi
+          sleep 5
+        done
+
+        if [[ ! $SUCCESS ]]; then
+          echo "Health check never returned 200. Failing the action."
+          exit 1
+        fi
+
+    - name: Cleanup
+      run: |
+        cd ./tools/docker-network
+        docker compose kill
+        docker compose down -v

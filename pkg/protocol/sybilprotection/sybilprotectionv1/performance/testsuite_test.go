@@ -73,8 +73,18 @@ func (t *TestSuite) InitPerformanceTracker() {
 	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0)
 	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
+	committeeCandidatesStore := epochstore.NewEpochKVStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0)
 
-	t.Instance = NewTracker(rewardsStore.GetEpoch, poolStatsStore, committeeStore, performanceFactorFunc, t.latestCommittedEpoch, api.SingleVersionProvider(t.api), func(err error) {})
+	t.Instance = NewTracker(
+		rewardsStore.GetEpoch,
+		poolStatsStore,
+		committeeStore,
+		committeeCandidatesStore.GetEpoch,
+		performanceFactorFunc,
+		t.latestCommittedEpoch,
+		api.SingleVersionProvider(t.api),
+		func(err error) {},
+	)
 }
 
 func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.AccountID {
@@ -103,7 +113,8 @@ func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[strin
 		})
 	}
 
-	err := t.Instance.RegisterCommittee(epoch, committee)
+	// Store directly on the committee store, because in actual code the SeatManager is responsible for adding the storage entry.
+	err := t.Instance.committeeStore.Store(epoch, committee)
 	require.NoError(t.T, err)
 	for accIDAlias, action := range actions {
 		accID := t.Account(accIDAlias, false)
@@ -130,7 +141,7 @@ func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[strin
 	t.poolRewards[epoch] = make(map[string]*model.PoolRewards)
 
 	for alias, action := range actions {
-		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount >> t.api.ProtocolParameters().TimeProvider().SlotsPerEpochExponent()
+		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount >> t.api.ProtocolParameters().SlotsPerEpochExponent()
 		poolRewards := t.calculatePoolReward(epoch, totalValidatorsStake, totalStake, action.PoolStake, action.ValidatorStake, epochPerformanceFactor)
 		t.poolRewards[epoch][alias] = &model.PoolRewards{
 			PoolStake:   action.PoolStake,
@@ -278,14 +289,14 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epoch iot
 
 		for i := uint64(0); i < validationBlocksSentPerSlot; i++ {
 			valBlock := tpkg.RandValidationBlock(t.api)
-			block := tpkg.RandProtocolBlock(valBlock, t.api, 10)
-			block.IssuerID = accountID
+			block := tpkg.RandBlock(valBlock, t.api, 10)
+			block.Header.IssuerID = accountID
 			subslotIndex := i
 			// issued more than one block in the same slot to reduce performance factor
 			if i >= slotPerformanceFactor {
 				subslotIndex = 0
 			}
-			block.IssuingTime = t.api.TimeProvider().SlotStartTime(slot).Add(time.Duration(subslotIndex)*subslotDur + 1*time.Nanosecond)
+			block.Header.IssuingTime = t.api.TimeProvider().SlotStartTime(slot).Add(time.Duration(subslotIndex)*subslotDur + 1*time.Nanosecond)
 			modelBlock, err := model.BlockFromBlock(block)
 			t.Instance.TrackValidationBlock(blocks.NewBlock(modelBlock))
 			require.NoError(t.T, err)
@@ -346,7 +357,7 @@ func (e *EpochActions) validate(t *testing.T, api iotago.API) {
 	}
 	require.Equal(t, e.PoolStake, delegatorsTotal+e.ValidatorStake, "pool stake must be equal to the sum of delegators stakes plus validator")
 
-	sumOfSlots := 1 << api.ProtocolParameters().TimeProvider().SlotsPerEpochExponent()
+	sumOfSlots := 1 << api.ProtocolParameters().SlotsPerEpochExponent()
 	require.LessOrEqual(t, e.ActiveSlotsCount, uint64(sumOfSlots), "active slots count must be less or equal to the number of slots in the epoch")
 
 	require.LessOrEqual(t, e.SlotPerformance, e.ValidationBlocksSentPerSlot, "number of subslots covered cannot be greated than number of blocks sent in a slot")

@@ -57,7 +57,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		})), nil
 	}
 
-	committeeFunc := func(index iotago.SlotIndex) *account.SeatedAccounts {
+	committeeFunc := func(index iotago.SlotIndex) (*account.SeatedAccounts, bool) {
 		accounts := account.NewAccounts()
 		var members []iotago.AccountID
 		t.issuerByAlias.ForEach(func(alias string, issuer *issuer) bool {
@@ -65,7 +65,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 			members = append(members, issuer.accountID)
 			return true
 		})
-		return accounts.SelectCommittee(members...)
+		return accounts.SelectCommittee(members...), true
 	}
 
 	t.testAPI = iotago.V3API(

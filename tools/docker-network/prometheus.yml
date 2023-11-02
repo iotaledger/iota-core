@@ -3,11 +3,11 @@ scrape_configs:
     scrape_interval: 5s
     static_configs:
       - targets:
-          - validator-1:9311
-          - validator-2:9311
-          - validator-3:9311
-          - node-1:9311
-          - node-2:9311
+          - node-1-validator:9311
+          - node-2-validator:9311
+          - node-3-validator:9311
+          - node-4:9311
+          - node-5:9311
     dns_sd_configs:
       - names:
           - 'peer_replica'

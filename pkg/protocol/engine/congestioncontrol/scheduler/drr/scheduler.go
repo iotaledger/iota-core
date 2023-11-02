@@ -66,12 +66,18 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			})
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 				// when the last slot of an epoch is committed, remove the queues of validators that are no longer in the committee.
-				if s.apiProvider.CommittedAPI().TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
+				if s.apiProvider.APIForSlot(commitment.Slot()).TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
 					s.bufferMutex.Lock()
 					defer s.bufferMutex.Unlock()
+					committee, exists := s.seatManager.CommitteeInSlot(commitment.Slot() + 1)
+					if !exists {
+						s.errorHandler(ierrors.Errorf("committee does not exist in committed slot %d", commitment.Slot()+1))
+
+						return
+					}
 
 					s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
-						if !s.seatManager.Committee(commitment.Slot() + 1).HasAccount(accountID) {
+						if !committee.HasAccount(accountID) {
 							s.shutdownValidatorQueue(validatorQueue)
 							s.validatorBuffer.Delete(accountID)
 						}
@@ -148,12 +154,12 @@ func (s *Scheduler) Start() {
 	s.TriggerInitialized()
 }
 
-// IssuerQueueSizeCount returns the number of blocks in the queue of the given issuer.
+// IssuerQueueBlockCount returns the number of blocks in the queue of the given issuer.
 func (s *Scheduler) IssuerQueueBlockCount(issuerID iotago.AccountID) int {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
-	return s.basicBuffer.IssuerQueue(issuerID).Size()
+	return s.basicBuffer.IssuerQueueBlockCount(issuerID)
 }
 
 // IssuerQueueWork returns the queue size of the given issuer in work units.
@@ -161,7 +167,7 @@ func (s *Scheduler) IssuerQueueWork(issuerID iotago.AccountID) iotago.WorkScore 
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
-	return s.basicBuffer.IssuerQueue(issuerID).Work()
+	return s.basicBuffer.IssuerQueueWork(issuerID)
 }
 
 // ValidatorQueueBlockCount returns the number of validation blocks in the validator queue of the given issuer.
@@ -227,7 +233,7 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 		return false
 	}
 
-	return deficit >= s.deficitFromWork(work+s.basicBuffer.IssuerQueue(accountID).Work())
+	return deficit >= s.deficitFromWork(work+s.basicBuffer.IssuerQueueWork(accountID))
 }
 
 func (s *Scheduler) AddBlock(block *blocks.Block) {
@@ -249,18 +255,8 @@ func (s *Scheduler) enqueueBasicBlock(block *blocks.Block) {
 
 	slot := s.latestCommittedSlot()
 
-	issuerID := block.ProtocolBlock().IssuerID
-	issuerQueue, err := s.basicBuffer.GetIssuerQueue(issuerID)
-	if err != nil {
-		// this should only ever happen if the issuer has been removed due to insufficient Mana.
-		// if Mana is now sufficient again, we can add the issuer again.
-		_, quantumErr := s.quantumFunc(issuerID, slot)
-		if quantumErr != nil {
-			s.errorHandler(ierrors.Wrapf(quantumErr, "failed to retrieve quantum for issuerID %s in slot %d when adding a block", issuerID, slot))
-		}
-
-		issuerQueue = s.createIssuer(issuerID)
-	}
+	issuerID := block.ProtocolBlock().Header.IssuerID
+	issuerQueue := s.getOrCreateIssuer(issuerID)
 
 	droppedBlocks, submitted := s.basicBuffer.Submit(
 		block,
@@ -295,9 +291,9 @@ func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	_, exists := s.validatorBuffer.Get(block.ProtocolBlock().IssuerID)
+	_, exists := s.validatorBuffer.Get(block.ProtocolBlock().Header.IssuerID)
 	if !exists {
-		s.addValidator(block.ProtocolBlock().IssuerID)
+		s.addValidator(block.ProtocolBlock().Header.IssuerID)
 	}
 	droppedBlock, submitted := s.validatorBuffer.Submit(block, int(s.apiProvider.CommittedAPI().ProtocolParameters().CongestionControlParameters().MaxValidationBufferSize))
 	if !submitted {
@@ -442,7 +438,7 @@ func (s *Scheduler) selectBasicBlockWithoutLocking() {
 		// increment every issuer's deficit for the required number of rounds
 		for q := start; ; {
 			issuerID := q.IssuerID()
-			if err := s.incrementDeficit(issuerID, rounds, slot); err != nil {
+			if _, err := s.incrementDeficit(issuerID, rounds, slot); err != nil {
 				s.errorHandler(ierrors.Wrapf(err, "failed to increment deficit for issuerID %s in slot %d", issuerID, slot))
 				s.removeIssuer(issuerID, err)
 
@@ -461,20 +457,24 @@ func (s *Scheduler) selectBasicBlockWithoutLocking() {
 	// increment the deficit for all issuers before schedulingIssuer one more time
 	for q := start; q != schedulingIssuer; q = s.basicBuffer.Next() {
 		issuerID := q.IssuerID()
-		if err := s.incrementDeficit(issuerID, 1, slot); err != nil {
+		newDeficit, err := s.incrementDeficit(issuerID, 1, slot)
+		if err != nil {
 			s.errorHandler(ierrors.Wrapf(err, "failed to increment deficit for issuerID %s in slot %d", issuerID, slot))
 			s.removeIssuer(issuerID, err)
 
 			return
 		}
+
+		// remove empty issuer queues of issuers with max deficit.
+		if newDeficit == s.maxDeficit() {
+			s.basicBuffer.RemoveIssuerQueueIfEmpty(issuerID)
+		}
 	}
 
 	// remove the block from the buffer and adjust issuer's deficit
 	block := s.basicBuffer.PopFront()
-	issuerID := block.ProtocolBlock().IssuerID
-	err := s.updateDeficit(issuerID, -s.deficitFromWork(block.WorkScore()))
-
-	if err != nil {
+	issuerID := block.ProtocolBlock().Header.IssuerID
+	if _, err := s.updateDeficit(issuerID, -s.deficitFromWork(block.WorkScore())); err != nil {
 		// if something goes wrong with deficit update, drop the block instead of scheduling it.
 		block.SetDropped()
 		s.events.BlockDropped.Trigger(block, err)
@@ -507,7 +507,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slot iotago.SlotIndex) (Def
 				continue
 			}
 
-			issuerID := block.ProtocolBlock().IssuerID
+			issuerID := block.ProtocolBlock().Header.IssuerID
 
 			// compute how often the deficit needs to be incremented until the block can be scheduled
 			deficit, exists := s.deficits.Get(issuerID)
@@ -575,8 +575,14 @@ func (s *Scheduler) removeIssuer(issuerID iotago.AccountID, err error) {
 	}
 
 	s.deficits.Delete(issuerID)
+	s.basicBuffer.RemoveIssuerQueue(issuerID)
+}
 
-	s.basicBuffer.RemoveIssuer(issuerID)
+func (s *Scheduler) getOrCreateIssuer(accountID iotago.AccountID) *IssuerQueue {
+	issuerQueue := s.basicBuffer.GetOrCreateIssuerQueue(accountID)
+	s.deficits.GetOrCreate(accountID, func() Deficit { return 0 })
+
+	return issuerQueue
 }
 
 func (s *Scheduler) createIssuer(accountID iotago.AccountID) *IssuerQueue {
@@ -586,16 +592,16 @@ func (s *Scheduler) createIssuer(accountID iotago.AccountID) *IssuerQueue {
 	return issuerQueue
 }
 
-func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) error {
+func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) (Deficit, error) {
 	var updateErr error
-	s.deficits.Compute(accountID, func(currentValue Deficit, exists bool) Deficit {
+	updatedDeficit := s.deficits.Compute(accountID, func(currentValue Deficit, exists bool) Deficit {
 		if !exists {
 			updateErr = ierrors.Errorf("could not get deficit for issuer %s", accountID)
 			return 0
 		}
 		newDeficit, err := safemath.SafeAdd(currentValue, delta)
-		if err != nil {
-			// It can only overflow. We never allow the value to go below 0, so underflow is impossible.
+		// It can only overflow. We never allow the value to go below 0, so underflow is impossible.
+		if err != nil || newDeficit >= s.maxDeficit() {
 			return s.maxDeficit()
 		}
 
@@ -605,22 +611,22 @@ func (s *Scheduler) updateDeficit(accountID iotago.AccountID, delta Deficit) err
 			return 0
 		}
 
-		return lo.Min(newDeficit, s.maxDeficit())
+		return newDeficit
 	})
 
 	if updateErr != nil {
 		s.removeIssuer(accountID, updateErr)
 
-		return updateErr
+		return 0, updateErr
 	}
 
-	return nil
+	return updatedDeficit, nil
 }
 
-func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds Deficit, slot iotago.SlotIndex) error {
+func (s *Scheduler) incrementDeficit(issuerID iotago.AccountID, rounds Deficit, slot iotago.SlotIndex) (Deficit, error) {
 	quantum, err := s.quantumFunc(issuerID, slot)
 	if err != nil {
-		return err
+		return 0, ierrors.Wrap(err, "failed to retrieve quantum")
 	}
 
 	delta, err := safemath.SafeMul(quantum, rounds)
@@ -671,7 +677,7 @@ func (s *Scheduler) ready(block *blocks.Block) {
 }
 
 func (s *Scheduler) readyValidationBlock(block *blocks.Block) {
-	if validatorQueue, exists := s.validatorBuffer.Get(block.ProtocolBlock().IssuerID); exists {
+	if validatorQueue, exists := s.validatorBuffer.Get(block.ProtocolBlock().Header.IssuerID); exists {
 		validatorQueue.Ready(block)
 	}
 }

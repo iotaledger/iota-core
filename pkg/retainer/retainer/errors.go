@@ -8,7 +8,7 @@ import (
 
 var blocksErrorsFailureReasonMap = map[error]apimodels.BlockFailureReason{
 	iotago.ErrIssuerAccountNotFound:     apimodels.BlockFailureIssuerAccountNotFound,
-	iotago.ErrBurnedInsufficientMana:    apimodels.BlockFailurBurnedInsufficientMana,
+	iotago.ErrBurnedInsufficientMana:    apimodels.BlockFailureBurnedInsufficientMana,
 	iotago.ErrBlockVersionInvalid:       apimodels.BlockFailureVersionInvalid,
 	iotago.ErrRMCNotFound:               apimodels.BlockFailureAccountInvalid,
 	iotago.ErrFailedToCalculateManaCost: apimodels.BlockFailureManaCostCalculationFailed,
@@ -62,6 +62,14 @@ var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
 	iotago.ErrInputOutputManaMismatch:      apimodels.TxFailureManaAmountInvalid,
 	iotago.ErrManaAmountInvalid:            apimodels.TxFailureManaAmountInvalid,
 	iotago.ErrInputCreationAfterTxCreation: apimodels.TxFailureInputCreationAfterTxCreation,
+
+	// tx capabilities errors
+	iotago.ErrTxCapabilitiesNativeTokenBurningNotAllowed: apimodels.TxFailureCapabilitiesNativeTokenBurningNotAllowed,
+	iotago.ErrTxCapabilitiesManaBurningNotAllowed:        apimodels.TxFailureCapabilitiesManaBurningNotAllowed,
+	iotago.ErrTxCapabilitiesAccountDestructionNotAllowed: apimodels.TxFailureCapabilitiesAccountDestructionNotAllowed,
+	iotago.ErrTxCapabilitiesAnchorDestructionNotAllowed:  apimodels.TxFailureCapabilitiesAnchorDestructionNotAllowed,
+	iotago.ErrTxCapabilitiesFoundryDestructionNotAllowed: apimodels.TxFailureCapabilitiesFoundryDestructionNotAllowed,
+	iotago.ErrTxCapabilitiesNFTDestructionNotAllowed:     apimodels.TxFailureCapabilitiesNFTDestructionNotAllowed,
 }
 
 func determineTxFailureReason(err error) apimodels.TransactionFailureReason {

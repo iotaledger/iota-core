@@ -9,58 +9,129 @@
 version: '3.3'
 
 services:
-  iota_core:
+
+###################
+# IOTA-CORE Nodes #
+###################
+
+  iota-core:
     image: {{iota_core_docker_image_repo}}:{{iota_core_docker_image_tag}}
     container_name: iota-core
+    stop_grace_period: 1m
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    ports:
+      - "14666:14666/tcp" # P2P
+      - "6061:6061/tcp"   # pprof
+      - "8080:14265/tcp"  # REST-API
+      - "8081:8081/tcp"   # Dashboard
+      - "9311:9311/tcp"   # Prometheus
+      - "9029:9029/tcp"   # INX
     volumes:
-      - ./snapshot.bin:/app/data/snapshot.bin:ro
       - ./config.json:/app/config.json:ro
       - ./data:/app/data/
+      - ./snapshot.bin:/app/data/snapshot.bin:ro
       - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "0.0.0.0:14666:14666/tcp"
-      - "0.0.0.0:8080:8080/tcp"
-      - "0.0.0.0:8081:8081/tcp"
-      - "0.0.0.0:6061:6061/tcp"
-      # prometheus
-      - "0.0.0.0:9311:9311/tcp"
-    environment:
-      - WEBAPI_BINDADDRESS=0.0.0.0:8080
-      - DASHBOARD_BINDADDRESS=0.0.0.0:8081
-      - PROFILING_BINDADDRESS=0.0.0.0:6061
     command: >
-      -c config.json
+      -c
+      config.json
       --logger.level=debug
       --logger.disableCaller=false
-      --logger.disableStacktrace=false
-      --logger.encoding=console
-      --logger.outputPaths=stdout
-      --database.path=/app/data/database
-      --p2p.db.path=/app/data/peerdb
-      --profiling.bindAddress=0.0.0.0:6061
-      --profiling.enabled=true
-      --protocol.snapshot.path=/app/data/snapshot.bin
-      {% if 'node-01' in inventory_hostname or 'node-02' in inventory_hostname or 'node-03' in inventory_hostname %}
-      --validator.enabled=true
-      --validator.account={{validatorAccount}}
-      --validator.privateKey={{validatorPrivKey}}
-      {% endif %}
-      {% if 'node-01' in inventory_hostname %}
-      --validator.ignoreBootstrapped=true
-      {% endif %}
       --p2p.peers=/dns/node-01.feature/tcp/14666/p2p/12D3KooWCrjmh4dUCWfGVQT6ivzArieJB9Z3eKdy2mdEEN95NDPS
       --p2p.externalMultiAddresses={{ ips | join(',') }}
-      --p2p.identityPrivateKey={{p2pIdentityPrivateKey}}
+      --p2p.identityPrivateKey={{p2pIdentityPrvKey}}
+      --p2p.db.path=/app/data/peerdb
+      --profiling.enabled=true
+      --profiling.bindAddress=0.0.0.0:6061
+      --restAPI.bindAddress=0.0.0.0:14265
+      --database.path=/app/data/database
+      --protocol.snapshot.path=/app/data/snapshot.bin
+      --dashboard.bindAddress=0.0.0.0:8081
+      --metrics.bindAddress=iota-core:9311
       --inx.enabled=true
       --inx.bindAddress=iota-core:9029
+
+##################
+# INX Extensions #
+##################
 
   inx-indexer:
     container_name: inx-indexer
     image: iotaledger/inx-indexer:2.0-alpha
-    stop_grace_period: 5m
+    stop_grace_period: 1m
+    restart: unless-stopped
+    depends_on:
+      iota-core:
+        condition: service_healthy
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
     volumes:
       - ./data:/app/database
-    command:
-      - "--inx.address=iota-core:9029"
-      - "--indexer.db.sqlite.path=database/indexer"
-      - "--restAPI.bindAddress=inx-indexer:9091"
+    command: >
+      --inx.address=iota-core:9029
+      --indexer.db.sqlite.path=database/indexer
+      --restAPI.bindAddress=inx-indexer:9091
+
+{% if 'node-04' in inventory_hostname %}
+  inx-blockissuer:
+    container_name: inx-blockissuer
+    image: iotaledger/inx-blockissuer:1.0-alpha
+    stop_grace_period: 1m
+    restart: unless-stopped
+    depends_on:
+      iota-core:
+        condition: service_healthy
+      inx-indexer:
+        condition: service_started
+    environment:
+      - "BLOCKISSUER_PRV_KEY={{NODE_04_BLOCKISSUER_PRIVKEY}}"
+    command: >
+      --inx.address=iota-core:9029
+      --restAPI.bindAddress=inx-blockissuer:9086
+      --blockIssuer.accountAddress={{NODE_04_BLOCKISSUER_ACCOUNTADDRESS}}
+      --blockIssuer.proofOfWork.targetTrailingZeros=5
+
+  inx-faucet:
+    container_name: inx-faucet
+    image: iotaledger/inx-faucet:2.0-alpha
+    stop_grace_period: 1m
+    restart: unless-stopped
+    depends_on:
+      iota-core:
+        condition: service_healthy
+      inx-indexer:
+        condition: service_started
+      inx-blockissuer:
+        condition: service_started
+    ports:
+      - "8091:8091/tcp" # Faucet Frontend
+    environment:
+      - "FAUCET_PRV_KEY={{NODE_04_FAUCET_PRIVKEY}}"
+    command: >
+      --inx.address=iota-core:9029
+      --faucet.bindAddress=0.0.0.0:8091
+{% endif %}
+
+{% if 'node-01' in inventory_hostname or 'node-02' in inventory_hostname or 'node-03' in inventory_hostname %}
+  inx-validator:
+    container_name: inx-validator
+    image: iotaledger/inx-validator:1.0-alpha
+    stop_grace_period: 1m
+    restart: unless-stopped
+    depends_on:
+      iota-core:
+        condition: service_started
+    environment:
+      - "VALIDATOR_PRV_KEY={{validatorPrvKey}}"
+    command: >
+      --inx.address=iota-core:9029
+      {% if 'node-01' in inventory_hostname %}
+      --validator.ignoreBootstrapped=true
+      {% endif %}
+      --validator.accountAddress={{validatorAccountAddress}}
+{% endif %}

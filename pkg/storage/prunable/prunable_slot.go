@@ -21,6 +21,7 @@ const (
 	slotPrefixUpgradeSignals
 	slotPrefixRoots
 	slotPrefixRetainer
+	epochPrefixCommitteeCandidates
 )
 
 func (p *Prunable) getKVStoreFromSlot(slot iotago.SlotIndex, prefix kvstore.Realm) (kvstore.KVStore, error) {
@@ -50,6 +51,12 @@ func (p *Prunable) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.Bl
 		iotago.CommitmentID.Bytes,
 		iotago.CommitmentIDFromBytes,
 	), nil
+}
+
+func (p *Prunable) CommitteeCandidates(epoch iotago.EpochIndex) (kvstore.KVStore, error) {
+	// Use the first slot of an epoch to avoid random clashes with other keys.
+	// Candidates belong to an epoch, but we store them here so that they're pruned more quickly and easily without unnecessary key iteration.
+	return p.prunableSlotStore.Get(epoch, byteutils.ConcatBytes(p.apiProvider.APIForEpoch(epoch).TimeProvider().EpochStart(epoch).MustBytes(), kvstore.Realm{epochPrefixCommitteeCandidates}))
 }
 
 func (p *Prunable) Mutations(slot iotago.SlotIndex) (kvstore.KVStore, error) {

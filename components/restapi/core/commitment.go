@@ -13,7 +13,7 @@ import (
 func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
 	commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
 	if err != nil {
-		return iotago.SlotIndex(0), ierrors.Wrapf(err, "failed to parse commitment ID: %s", c.Param(restapipkg.ParameterCommitmentID))
+		return iotago.SlotIndex(0), ierrors.Wrapf(err, "failed to parse commitment ID %s", c.Param(restapipkg.ParameterCommitmentID))
 	}
 
 	return commitmentID.Slot(), nil
@@ -22,16 +22,16 @@ func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
 func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {
 	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to load commitment: %d", index)
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment %d: %s", index, err)
 	}
 
 	return commitment.Commitment(), nil
 }
 
-func getUTXOChanges(index iotago.SlotIndex) (*apimodels.UTXOChangesResponse, error) {
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(index)
+func getUTXOChanges(slot iotago.SlotIndex) (*apimodels.UTXOChangesResponse, error) {
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(slot)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get slot diffs: %d", index)
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs %d: %s", slot, err)
 	}
 
 	createdOutputs := make(iotago.OutputIDs, len(diffs.Outputs))
@@ -46,7 +46,7 @@ func getUTXOChanges(index iotago.SlotIndex) (*apimodels.UTXOChangesResponse, err
 	}
 
 	return &apimodels.UTXOChangesResponse{
-		Index:           index,
+		Slot:            slot,
 		CreatedOutputs:  createdOutputs,
 		ConsumedOutputs: consumedOutputs,
 	}, nil
