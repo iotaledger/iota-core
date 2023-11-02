@@ -147,6 +147,10 @@ func (p *Prunable) Rollback(targetEpoch iotago.EpochIndex, pruningRange [2]iotag
 		return ierrors.Wrapf(err, "failed to prune slots in range [%d, %d] from target epoch %d", pruningRange[0], pruningRange[1], targetEpoch)
 	}
 
+	if err := p.rollbackCommitteesCandidates(targetEpoch, pruningRange[0]-1); err != nil {
+		return ierrors.Wrapf(err, "failed to rollback committee candidates to target epoch %d", targetEpoch)
+	}
+
 	lastPrunedCommitteeEpoch, err := p.rollbackCommitteeEpochs(targetEpoch+1, pruningRange[0]-1)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to rollback committee epochs to target epoch %d", targetEpoch)

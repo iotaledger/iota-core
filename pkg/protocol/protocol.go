@@ -80,6 +80,8 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		})
 
 		p.Constructed.Trigger()
+
+		p.waitEngineInitialized()
 	})
 }
 
@@ -92,8 +94,6 @@ func (p *Protocol) IssueBlock(block *model.Block) error {
 
 // Run starts the protocol.
 func (p *Protocol) Run(ctx context.Context) error {
-	p.waitEngineInitialized()
-
 	p.Initialized.Trigger()
 
 	<-ctx.Done()
