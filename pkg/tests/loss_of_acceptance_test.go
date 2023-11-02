@@ -46,7 +46,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	// Create snapshot to use later.
 	snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-	require.NoError(t, ts.Node("node0").Protocol.MainEngine.Get().WriteSnapshot(snapshotPath))
+	require.NoError(t, ts.Node("node0").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
 
 	// Revive chain on node0.
 	{
@@ -147,7 +147,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	var node0restarted *mock.Node
 	{
 		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-		require.NoError(t, ts.Node("node0").Protocol.MainEngine.Get().WriteSnapshot(snapshotPath))
+		require.NoError(t, ts.Node("node0").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
 
 		node0restarted = ts.AddNode("node0-restarted")
 		node0restarted.Validator = node0.Validator

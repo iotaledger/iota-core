@@ -12,7 +12,7 @@ import (
 )
 
 func (s *Server) RequestTips(_ context.Context, req *inx.TipsRequest) (*inx.TipsResponse, error) {
-	references := deps.Protocol.MainEngine.Get().TipSelection.SelectTips(int(req.GetCount()))
+	references := deps.Protocol.Engines.Main.Get().TipSelection.SelectTips(int(req.GetCount()))
 
 	return &inx.TipsResponse{
 		StrongTips:      inx.NewBlockIds(references[iotago.StrongParentType]),
@@ -30,7 +30,7 @@ func (s *Server) ValidatePayload(_ context.Context, payload *inx.RawPayload) (*i
 
 		switch typedPayload := blockPayload.(type) {
 		case *iotago.SignedTransaction:
-			memPool := deps.Protocol.MainEngine.Get().Ledger.MemPool()
+			memPool := deps.Protocol.Engines.Main.Get().Ledger.MemPool()
 
 			inputReferences, inputsErr := memPool.VM().Inputs(typedPayload.Transaction)
 			if inputsErr != nil {

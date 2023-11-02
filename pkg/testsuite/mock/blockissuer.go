@@ -188,7 +188,7 @@ func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, no
 
 	validationBlock, _ := block.ValidationBlock()
 
-	node.Protocol.MainEngine.Get().LogTrace("issued validation block", "blockID", block.ID(), "slot", block.ID().Slot(), "commitment", block.SlotCommitmentID(), "latestFinalizedSlot", block.ProtocolBlock().LatestFinalizedSlot, "version", block.ProtocolBlock().ProtocolVersion, "highestSupportedVersion", validationBlock.HighestSupportedVersion, "hash", validationBlock.ProtocolParametersHash)
+	node.Protocol.Engines.Main.Get().LogTrace("issued validation block", "blockID", block.ID(), "slot", block.ID().Slot(), "commitment", block.SlotCommitmentID(), "latestFinalizedSlot", block.ProtocolBlock().LatestFinalizedSlot, "version", block.ProtocolBlock().ProtocolVersion, "highestSupportedVersion", validationBlock.HighestSupportedVersion, "hash", validationBlock.ProtocolParametersHash)
 
 	return block
 }
@@ -255,7 +255,7 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *
 	if err != nil {
 		rmcSlot = 0
 	}
-	rmc, err := node.Protocol.MainEngine.Get().Ledger.RMCManager().RMC(rmcSlot)
+	rmc, err := node.Protocol.Engines.Main.Get().Ledger.RMCManager().RMC(rmcSlot)
 	require.NoError(i.Testing, err)
 
 	// only set the burned Mana as the last step before signing, so workscore calculation is correct.
@@ -378,8 +378,8 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 	}
 
 	if iotaBlock.SlotCommitmentID == iotago.EmptyCommitmentID {
-		iotaBlock.SlotCommitmentID = node.Protocol.MainEngine.Get().Storage.Settings().LatestCommitment().Commitment().MustID()
-		iotaBlock.LatestFinalizedSlot = node.Protocol.MainEngine.Get().Storage.Settings().LatestFinalizedSlot()
+		iotaBlock.SlotCommitmentID = node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID()
+		iotaBlock.LatestFinalizedSlot = node.Protocol.Engines.Main.Get().Storage.Settings().LatestFinalizedSlot()
 		resign = true
 	}
 
@@ -429,7 +429,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		if err != nil {
 			rmcSlot = 0
 		}
-		rmc, err := node.Protocol.MainEngine.Get().Ledger.RMCManager().RMC(rmcSlot)
+		rmc, err := node.Protocol.Engines.Main.Get().Ledger.RMCManager().RMC(rmcSlot)
 		if err != nil {
 			return iotago.EmptyBlockID, ierrors.Wrapf(err, "error loading commitment of slot %d from storage to get RMC", rmcSlot)
 		}
@@ -468,7 +468,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Protoco
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if !i.optsRateSetterEnabled || node.Protocol.MainEngine.Get().Scheduler.IsBlockIssuerReady(modelBlock.ProtocolBlock().IssuerID) {
+	if !i.optsRateSetterEnabled || node.Protocol.Engines.Main.Get().Scheduler.IsBlockIssuerReady(modelBlock.ProtocolBlock().IssuerID) {
 		i.events.BlockConstructed.Trigger(modelBlock)
 
 		if err = i.IssueBlockAndAwaitEvent(ctx, modelBlock, node, node.Protocol.Events.Engine.BlockDAG.BlockAttached); err != nil {
@@ -495,7 +495,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 	}
 
 	if blockParams.LatestFinalizedSlot == nil {
-		latestFinalizedSlot := node.Protocol.MainEngine.Get().Storage.Settings().LatestFinalizedSlot()
+		latestFinalizedSlot := node.Protocol.Engines.Main.Get().Storage.Settings().LatestFinalizedSlot()
 		blockParams.LatestFinalizedSlot = &latestFinalizedSlot
 	}
 
@@ -516,7 +516,7 @@ func (i *BlockIssuer) getAddressableCommitment(currentAPI iotago.API, blockIssui
 	protoParams := currentAPI.ProtocolParameters()
 	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
 
-	commitment := node.Protocol.MainEngine.Get().Storage.Settings().LatestCommitment().Commitment()
+	commitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
 	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {
 		return nil, ierrors.Wrapf(ErrBlockTooRecent, "can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)
@@ -528,7 +528,7 @@ func (i *BlockIssuer) getAddressableCommitment(currentAPI iotago.API, blockIssui
 		}
 
 		commitmentSlot := commitment.Slot - protoParams.MinCommittableAge()
-		loadedCommitment, err := node.Protocol.MainEngine.Get().Storage.Commitments().Load(commitmentSlot)
+		loadedCommitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "error loading valid commitment of slot %d according to minCommittableAge from storage", commitmentSlot)
 		}
@@ -550,7 +550,7 @@ func (i *BlockIssuer) getReferences(ctx context.Context, p iotago.Payload, node 
 
 func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIndex iotago.SlotIndex, references model.ParentReferences, node *Node) error {
 	for _, parent := range lo.Flatten(lo.Map(lo.Values(references), func(ds iotago.BlockIDs) []iotago.BlockID { return ds })) {
-		b, exists := node.Protocol.MainEngine.Get().BlockFromCache(parent)
+		b, exists := node.Protocol.Engines.Main.Get().BlockFromCache(parent)
 		if !exists {
 			return ierrors.Errorf("cannot issue block if the parents are not known: %s", parent)
 		}
@@ -572,7 +572,7 @@ func (i *BlockIssuer) IssueBlock(block *model.Block, node *Node) error {
 	}
 
 	if _, isValidationBlock := block.ValidationBlock(); isValidationBlock {
-		_ = node.Protocol.MainEngine.Get().Storage.Settings().SetLatestIssuedValidationBlock(block)
+		_ = node.Protocol.Engines.Main.Get().Storage.Settings().SetLatestIssuedValidationBlock(block)
 	}
 
 	i.events.BlockIssued.Trigger(block)
@@ -596,7 +596,7 @@ func (i *BlockIssuer) getReferencesWithRetry(ctx context.Context, _ iotago.Paylo
 	defer timeutil.CleanupTicker(interval)
 
 	for {
-		references = node.Protocol.MainEngine.Get().TipSelection.SelectTips(parentsCount)
+		references = node.Protocol.Engines.Main.Get().TipSelection.SelectTips(parentsCount)
 		if len(references[iotago.StrongParentType]) > 0 {
 			return references, nil
 		}

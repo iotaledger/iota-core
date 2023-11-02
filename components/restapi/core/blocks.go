@@ -21,7 +21,7 @@ func blockByID(c echo.Context) (*model.Block, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse block ID: %s", c.Param(restapi.ParameterBlockID))
 	}
 
-	block, exists := deps.Protocol.MainEngine.Get().Block(blockID)
+	block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
 		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
 	}
@@ -30,7 +30,7 @@ func blockByID(c echo.Context) (*model.Block, error) {
 }
 
 func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
-	blockMetadata, err := deps.Protocol.MainEngine.Get().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get block metadata: %s", blockID.ToHex())
 	}
@@ -48,15 +48,15 @@ func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error)
 }
 
 func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHeaderResponse, error) {
-	references := deps.Protocol.MainEngine.Get().TipSelection.SelectTips(iotago.BlockMaxParents)
+	references := deps.Protocol.Engines.Main.Get().TipSelection.SelectTips(iotago.BlockMaxParents)
 
 	var slotCommitment *model.Commitment
 	var err error
 	// by default we use latest commitment
 	if slotIndex == 0 {
-		slotCommitment = deps.Protocol.MainEngine.Get().SyncManager.LatestCommitment()
+		slotCommitment = deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 	} else {
-		slotCommitment, err = deps.Protocol.MainEngine.Get().Storage.Commitments().Load(slotIndex)
+		slotCommitment, err = deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(slotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment for requested slot %d", slotIndex)
 		}
@@ -70,7 +70,7 @@ func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHe
 		StrongParents:       references[iotago.StrongParentType],
 		WeakParents:         references[iotago.WeakParentType],
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType],
-		LatestFinalizedSlot: deps.Protocol.MainEngine.Get().SyncManager.LatestFinalizedSlot(),
+		LatestFinalizedSlot: deps.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot(),
 		Commitment:          slotCommitment.Commitment(),
 	}
 

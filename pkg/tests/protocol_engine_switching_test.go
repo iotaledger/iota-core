@@ -128,20 +128,20 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		node7.Validator.AccountID,
 	}
 	expectedP1OnlineCommittee := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngine.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
-		lo.Return1(node0.Protocol.MainEngine.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
-		lo.Return1(node0.Protocol.MainEngine.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node2.Validator.AccountID)),
-		lo.Return1(node0.Protocol.MainEngine.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node3.Validator.AccountID)),
-		lo.Return1(node0.Protocol.MainEngine.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node4.Validator.AccountID)),
+		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node0.Validator.AccountID)),
+		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node1.Validator.AccountID)),
+		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node2.Validator.AccountID)),
+		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node3.Validator.AccountID)),
+		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node4.Validator.AccountID)),
 	}
 	expectedP2OnlineCommittee := []account.SeatIndex{
-		lo.Return1(node0.Protocol.MainEngine.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node6.Validator.AccountID)),
-		lo.Return1(node0.Protocol.MainEngine.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node7.Validator.AccountID)),
+		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node6.Validator.AccountID)),
+		lo.Return1(node0.Protocol.Engines.Main.Get().SybilProtection.SeatManager().Committee(1).GetSeat(node7.Validator.AccountID)),
 	}
 	expectedOnlineCommittee := append(expectedP1OnlineCommittee, expectedP2OnlineCommittee...)
 
 	for _, node := range ts.Nodes() {
-		node.Protocol.MainEngine.Get().SybilProtection.SeatManager().(*mock2.ManualPOA).SetOnline("node0", "node1", "node2", "node3", "node4", "node6", "node7")
+		node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().(*mock2.ManualPOA).SetOnline("node0", "node1", "node2", "node3", "node4", "node6", "node7")
 	}
 
 	// Verify that nodes have the expected states.
@@ -207,7 +207,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	// Set online committee for each partition.
 	for _, node := range ts.Nodes() {
-		manualPOA := node.Protocol.MainEngine.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
+		manualPOA := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
 		if node.Partition == "P1" {
 			manualPOA.SetOnline("node0", "node1", "node2", "node3", "node4")
 			manualPOA.SetOffline("node6", "node7")
@@ -329,7 +329,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}
 
 	for _, node := range ts.Nodes() {
-		manualPOA := node.Protocol.MainEngine.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
+		manualPOA := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
 		manualPOA.SetOnline("node0", "node1", "node2", "node3", "node4", "node6", "node7")
 	}
 	// Merge the partitions

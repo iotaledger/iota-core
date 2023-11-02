@@ -24,7 +24,7 @@ func blockIDFromTransactionID(transactionID iotago.TransactionID) (iotago.BlockI
 	// Get the first output of that transaction (using index 0)
 	outputID := iotago.OutputIDFromTransactionIDAndIndex(transactionID, 0)
 
-	output, spent, err := deps.Protocol.MainEngine.Get().Ledger.OutputOrSpent(outputID)
+	output, spent, err := deps.Protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to get output: %s", outputID.ToHex())
 	}
@@ -42,7 +42,7 @@ func blockByTransactionID(c echo.Context) (*model.Block, error) {
 		return nil, ierrors.Wrapf(err, "failed to get block ID by transaction ID")
 	}
 
-	block, exists := deps.Protocol.MainEngine.Get().Block(blockID)
+	block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
 		return nil, ierrors.Errorf("block not found: %s", blockID.String())
 	}

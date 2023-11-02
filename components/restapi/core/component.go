@@ -373,7 +373,7 @@ func AddFeature(feature string) {
 func checkNodeSynced() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if !deps.Protocol.MainEngine.Get().SyncManager.IsNodeSynced() {
+			if !deps.Protocol.Engines.Main.Get().SyncManager.IsNodeSynced() {
 				return ierrors.Wrap(echo.ErrServiceUnavailable, "node is not synced")
 			}
 

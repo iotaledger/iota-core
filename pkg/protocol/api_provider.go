@@ -20,8 +20,8 @@ func NewAPIProvider(protocol *Protocol) *APIProvider {
 
 // APIForVersion returns the API for the given version.
 func (a *APIProvider) APIForVersion(version iotago.Version) (api iotago.API, err error) {
-	if mainEngineInstance := a.MainEngine.Get(); mainEngineInstance != nil {
-		return a.MainEngine.Get().APIForVersion(version)
+	if mainEngineInstance := a.Engines.Main.Get(); mainEngineInstance != nil {
+		return a.Engines.Main.Get().APIForVersion(version)
 	}
 
 	return nil, ierrors.New("no engine instance available")
@@ -29,25 +29,25 @@ func (a *APIProvider) APIForVersion(version iotago.Version) (api iotago.API, err
 
 // APIForSlot returns the API for the given slot.
 func (a *APIProvider) APIForSlot(slot iotago.SlotIndex) iotago.API {
-	return a.MainEngine.Get().APIForSlot(slot)
+	return a.Engines.Main.Get().APIForSlot(slot)
 }
 
 // APIForEpoch returns the API for the given epoch.
 func (a *APIProvider) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
-	return a.MainEngine.Get().APIForEpoch(epoch)
+	return a.Engines.Main.Get().APIForEpoch(epoch)
 }
 
 // APIForTime returns the API for the given time.
 func (a *APIProvider) APIForTime(t time.Time) iotago.API {
-	return a.MainEngine.Get().APIForTime(t)
+	return a.Engines.Main.Get().APIForTime(t)
 }
 
 // CommittedAPI returns the API for the committed state.
 func (a *APIProvider) CommittedAPI() iotago.API {
-	return a.MainEngine.Get().CommittedAPI()
+	return a.Engines.Main.Get().CommittedAPI()
 }
 
 // LatestAPI returns the latest API.
 func (a *APIProvider) LatestAPI() iotago.API {
-	return a.MainEngine.Get().LatestAPI()
+	return a.Engines.Main.Get().LatestAPI()
 }

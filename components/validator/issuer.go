@@ -14,7 +14,7 @@ var ErrBlockTooRecent = ierrors.New("block is too recent compared to latest comm
 
 func issueValidatorBlock(ctx context.Context) {
 	// Get the main engine instance in case it changes mid-execution.
-	engineInstance := deps.Protocol.MainEngine.Get()
+	engineInstance := deps.Protocol.Engines.Main.Get()
 
 	blockIssuingTime := time.Now()
 	nextBroadcast := blockIssuingTime.Add(ParamsValidator.CommitteeBroadcastInterval)
@@ -97,12 +97,12 @@ func issueValidatorBlock(ctx context.Context) {
 }
 
 func reviveChain(issuingTime time.Time) (*iotago.Commitment, iotago.BlockID, error) {
-	lastCommittedSlot := deps.Protocol.MainEngine.Get().Storage.Settings().LatestCommitment().Slot()
+	lastCommittedSlot := deps.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
 	apiForSlot := deps.Protocol.APIForSlot(lastCommittedSlot)
 
 	// Get a rootblock as recent as possible for the parent.
 	parentBlockID := iotago.EmptyBlockID
-	for rootBlock := range deps.Protocol.MainEngine.Get().EvictionState.ActiveRootBlocks() {
+	for rootBlock := range deps.Protocol.Engines.Main.Get().EvictionState.ActiveRootBlocks() {
 		if rootBlock.Slot() > parentBlockID.Slot() {
 			parentBlockID = rootBlock
 		}
@@ -122,11 +122,11 @@ func reviveChain(issuingTime time.Time) (*iotago.Commitment, iotago.BlockID, err
 	}
 	commitUntilSlot := issuingSlot - apiForSlot.ProtocolParameters().MinCommittableAge()
 
-	if err := deps.Protocol.MainEngine.Get().Notarization.ForceCommitUntil(commitUntilSlot); err != nil {
+	if err := deps.Protocol.Engines.Main.Get().Notarization.ForceCommitUntil(commitUntilSlot); err != nil {
 		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to force commit until slot %d", commitUntilSlot)
 	}
 
-	commitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(commitUntilSlot)
+	commitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitUntilSlot)
 	if err != nil {
 		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to commit until slot %d to revive chain", commitUntilSlot)
 	}
@@ -136,7 +136,7 @@ func reviveChain(issuingTime time.Time) (*iotago.Commitment, iotago.BlockID, err
 
 func getAddressableCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, error) {
 	protoParams := deps.Protocol.CommittedAPI().ProtocolParameters()
-	commitment := deps.Protocol.MainEngine.Get().Storage.Settings().LatestCommitment().Commitment()
+	commitment := deps.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
 	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {
 		return nil, ierrors.Wrapf(ErrBlockTooRecent, "can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)
@@ -148,7 +148,7 @@ func getAddressableCommitment(blockSlot iotago.SlotIndex) (*iotago.Commitment, e
 		}
 
 		commitmentSlot := commitment.Slot - protoParams.MinCommittableAge()
-		loadedCommitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(commitmentSlot)
+		loadedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "error loading valid commitment of slot %d according to minCommittableAge from storage", commitmentSlot)
 		}

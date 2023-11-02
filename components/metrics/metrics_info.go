@@ -36,7 +36,7 @@ var InfoMetrics = collector.NewCollection(infoNamespace,
 		collector.WithType(collector.Gauge),
 		collector.WithHelp("Node sync status based on ATT."),
 		collector.WithCollectFunc(func() (metricValue float64, labelValues []string) {
-			if deps.Protocol.MainEngine.Get().SyncManager.IsNodeSynced() {
+			if deps.Protocol.Engines.Main.Get().SyncManager.IsNodeSynced() {
 				return 1, nil
 			}
 

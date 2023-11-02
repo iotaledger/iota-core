@@ -22,9 +22,9 @@ var ConflictMetrics = collector.NewCollection(conflictNamespace,
 		collector.WithHelp("Time since transaction issuance to the conflict acceptance"),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
-				if txMetadata, exists := deps.Protocol.MainEngine.Get().Ledger.MemPool().TransactionMetadata(conflictID); exists {
+				if txMetadata, exists := deps.Protocol.Engines.Main.Get().Ledger.MemPool().TransactionMetadata(conflictID); exists {
 					firstAttachmentID := txMetadata.EarliestIncludedAttachment()
-					if block, blockExists := deps.Protocol.MainEngine.Get().BlockFromCache(firstAttachmentID); blockExists {
+					if block, blockExists := deps.Protocol.Engines.Main.Get().BlockFromCache(firstAttachmentID); blockExists {
 						timeSinceIssuance := time.Since(block.IssuingTime()).Milliseconds()
 						timeIssuanceSeconds := float64(timeSinceIssuance) / 1000
 						deps.Collector.Update(conflictNamespace, resolutionTime, timeIssuanceSeconds)

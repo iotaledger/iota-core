@@ -27,10 +27,10 @@ type Protocol struct {
 	CommitmentsProtocol  *CommitmentsProtocol
 	AttestationsProtocol *AttestationsProtocol
 	WarpSyncProtocol     *WarpSyncProtocol
+	Engines              *Engines
 	Options              *Options
 
 	*ChainManager
-	*EngineManager
 	*APIProvider
 
 	*module.ReactiveModule
@@ -51,7 +51,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		p.AttestationsProtocol = NewAttestationsProtocol(p)
 		p.WarpSyncProtocol = NewWarpSyncProtocol(p)
 		p.ChainManager = newChainManager(p)
-		p.EngineManager = NewEngineManager(p)
+		p.Engines = NewEngines(p)
 		p.APIProvider = NewAPIProvider(p)
 
 		p.Initialized.OnTrigger(func() {
@@ -75,7 +75,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 				p.AttestationsProtocol.Shutdown()
 				p.WarpSyncProtocol.Shutdown()
 				p.Network.Shutdown()
-				p.EngineManager.Shutdown.Trigger()
+				p.Engines.Shutdown.Trigger()
 			})
 		})
 
@@ -109,7 +109,7 @@ func (p *Protocol) waitEngineInitialized() {
 	var waitInitialized sync.WaitGroup
 
 	waitInitialized.Add(1)
-	p.MainEngine.OnUpdateOnce(func(_, engine *engine.Engine) {
+	p.Engines.Main.OnUpdateOnce(func(_, engine *engine.Engine) {
 		engine.Initialized.OnTrigger(waitInitialized.Done)
 	})
 	waitInitialized.Wait()

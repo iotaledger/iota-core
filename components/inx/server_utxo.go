@@ -17,7 +17,7 @@ import (
 )
 
 func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
-	latestCommitment := deps.Protocol.MainEngine.Get().SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 
 	l := &inx.LedgerOutput{
 		OutputId:   inx.NewOutputId(o.OutputID()),
@@ -30,7 +30,7 @@ func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
 
 	includedSlot := o.SlotBooked()
 	if includedSlot <= latestCommitment.Slot() {
-		includedCommitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(includedSlot)
+		includedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(includedSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", includedSlot)
 		}
@@ -52,10 +52,10 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 		SlotSpent:          uint32(s.SlotSpent()),
 	}
 
-	latestCommitment := deps.Protocol.MainEngine.Get().SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 	spentSlot := s.SlotSpent()
 	if spentSlot <= latestCommitment.Slot() {
-		spentCommitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(spentSlot)
+		spentCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(spentSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", spentSlot)
 		}
@@ -118,7 +118,7 @@ func NewLedgerUpdateBatchOperationConsumed(spent *utxoledger.Spent) (*inx.Ledger
 }
 
 func (s *Server) ReadOutput(_ context.Context, id *inx.OutputId) (*inx.OutputResponse, error) {
-	engine := deps.Protocol.MainEngine.Get()
+	engine := deps.Protocol.Engines.Main.Get()
 
 	latestCommitment := engine.Storage.Settings().LatestCommitment()
 
@@ -157,7 +157,7 @@ func (s *Server) ReadOutput(_ context.Context, id *inx.OutputId) (*inx.OutputRes
 }
 
 func (s *Server) ReadUnspentOutputs(_ *inx.NoParams, srv inx.INX_ReadUnspentOutputsServer) error {
-	engine := deps.Protocol.MainEngine.Get()
+	engine := deps.Protocol.Engines.Main.Get()
 	latestCommitment := engine.Storage.Settings().LatestCommitment()
 
 	var innerErr error
@@ -230,7 +230,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	sendStateDiffsRange := func(startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) error {
 		for currentSlot := startSlot; currentSlot <= endSlot; currentSlot++ {
-			stateDiff, err := deps.Protocol.MainEngine.Get().Ledger.SlotDiffs(currentSlot)
+			stateDiff, err := deps.Protocol.Engines.Main.Get().Ledger.SlotDiffs(currentSlot)
 			if err != nil {
 				return status.Errorf(codes.NotFound, "ledger update for slot %d not found", currentSlot)
 			}
@@ -252,7 +252,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 			return 0, nil
 		}
 
-		latestCommitment := deps.Protocol.MainEngine.Get().SyncManager.LatestCommitment()
+		latestCommitment := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 
 		if startSlot > latestCommitment.Slot() {
 			// no need to send previous state diffs
@@ -260,7 +260,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		}
 
 		// Stream all available milestone diffs first
-		prunedEpoch, hasPruned := deps.Protocol.MainEngine.Get().SyncManager.LastPrunedEpoch()
+		prunedEpoch, hasPruned := deps.Protocol.Engines.Main.Get().SyncManager.LastPrunedEpoch()
 		if hasPruned && startSlot <= deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(prunedEpoch) {
 			return 0, status.Errorf(codes.InvalidArgument, "given startSlot %d is older than the current pruningSlot %d", startSlot, deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(prunedEpoch))
 		}

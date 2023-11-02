@@ -8,12 +8,12 @@ import (
 )
 
 func (i *BlockIssuer) reviveChain(issuingTime time.Time, node *Node) (*iotago.Commitment, iotago.BlockID, error) {
-	lastCommittedSlot := node.Protocol.MainEngine.Get().Storage.Settings().LatestCommitment().Slot()
+	lastCommittedSlot := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
 	apiForSlot := node.Protocol.APIForSlot(lastCommittedSlot)
 
 	// Get a rootblock as recent as possible for the parent.
 	parentBlockID := iotago.EmptyBlockID
-	for rootBlock := range node.Protocol.MainEngine.Get().EvictionState.ActiveRootBlocks() {
+	for rootBlock := range node.Protocol.Engines.Main.Get().EvictionState.ActiveRootBlocks() {
 		if rootBlock.Slot() > parentBlockID.Slot() {
 			parentBlockID = rootBlock
 		}
@@ -33,11 +33,11 @@ func (i *BlockIssuer) reviveChain(issuingTime time.Time, node *Node) (*iotago.Co
 	}
 	commitUntilSlot := issuingSlot - apiForSlot.ProtocolParameters().MinCommittableAge()
 
-	if err := node.Protocol.MainEngine.Get().Notarization.ForceCommitUntil(commitUntilSlot); err != nil {
+	if err := node.Protocol.Engines.Main.Get().Notarization.ForceCommitUntil(commitUntilSlot); err != nil {
 		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to force commit until slot %d", commitUntilSlot)
 	}
 
-	commitment, err := node.Protocol.MainEngine.Get().Storage.Commitments().Load(commitUntilSlot)
+	commitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitUntilSlot)
 	if err != nil {
 		return nil, iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to commit until slot %d to revive chain", commitUntilSlot)
 	}

@@ -27,9 +27,9 @@ func nodeInfoExtended() *NodeInfoExtended {
 
 func databaseSizesMetrics() (*DatabaseSizesMetric, error) {
 	return &DatabaseSizesMetric{
-		Prunable:  deps.Protocol.MainEngine.Get().Storage.PrunableDatabaseSize(),
-		Permanent: deps.Protocol.MainEngine.Get().Storage.PermanentDatabaseSize(),
-		Total:     deps.Protocol.MainEngine.Get().Storage.Size(),
+		Prunable:  deps.Protocol.Engines.Main.Get().Storage.PrunableDatabaseSize(),
+		Permanent: deps.Protocol.Engines.Main.Get().Storage.PermanentDatabaseSize(),
+		Total:     deps.Protocol.Engines.Main.Get().Storage.Size(),
 		Time:      time.Now().Unix(),
 	}, nil
 }

@@ -16,7 +16,7 @@ func getOutput(c echo.Context) (*apimodels.OutputResponse, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID param: %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
-	output, err := deps.Protocol.MainEngine.Get().Ledger.Output(outputID)
+	output, err := deps.Protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get output: %s from the Ledger", outputID.String())
 	}
@@ -33,7 +33,7 @@ func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadata, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID param: %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
-	output, spent, err := deps.Protocol.MainEngine.Get().Ledger.OutputOrSpent(outputID)
+	output, spent, err := deps.Protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get output: %s from the Ledger", outputID.String())
 	}
@@ -51,7 +51,7 @@ func getOutputWithMetadata(c echo.Context) (*apimodels.OutputWithMetadataRespons
 		return nil, ierrors.Wrapf(err, "failed to parse output ID param: %s", c.Param(restapipkg.ParameterOutputID))
 	}
 
-	output, spent, err := deps.Protocol.MainEngine.Get().Ledger.OutputOrSpent(outputID)
+	output, spent, err := deps.Protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to get output: %s from the Ledger", outputID.String())
 	}
@@ -82,7 +82,7 @@ func getOutputWithMetadata(c echo.Context) (*apimodels.OutputWithMetadataRespons
 }
 
 func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMetadata, error) {
-	latestCommitment := deps.Protocol.MainEngine.Get().SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 
 	resp := &apimodels.OutputMetadata{
 		BlockID:            output.BlockID(),
@@ -94,7 +94,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 
 	includedSlotIndex := output.SlotBooked()
 	if includedSlotIndex <= latestCommitment.Slot() {
-		includedCommitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(includedSlotIndex)
+		includedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
 		}
@@ -105,7 +105,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 }
 
 func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadata, error) {
-	latestCommitment := deps.Protocol.MainEngine.Get().SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 
 	resp := &apimodels.OutputMetadata{
 		BlockID:            spent.BlockID(),
@@ -118,7 +118,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 
 	includedSlotIndex := spent.Output().SlotBooked()
 	if includedSlotIndex <= latestCommitment.Slot() {
-		includedCommitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(includedSlotIndex)
+		includedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", includedSlotIndex)
 		}
@@ -127,7 +127,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 
 	spentSlotIndex := spent.SlotSpent()
 	if spentSlotIndex <= latestCommitment.Slot() {
-		spentCommitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(spentSlotIndex)
+		spentCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(spentSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with index: %d", spentSlotIndex)
 		}

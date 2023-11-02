@@ -284,7 +284,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 	// then issue one more block to accept the last in the chain which will trigger commitment of the second last in the chain
 	activeValidators := t.Validators()
 
-	latestCommittedSlot := activeValidators[0].Protocol.MainEngine.Get().Storage.Settings().LatestCommitment().Slot()
+	latestCommittedSlot := activeValidators[0].Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
 	if latestCommittedSlot >= slot {
 		return parent
 	}
@@ -296,12 +296,12 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 		for _, node := range activeValidators {
 			require.True(t.Testing, node.IsValidator(), "node: %s: is not a validator node", node.Name)
 			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex, node.Name)
-			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngine.Get().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
 		}
 		// acceptance of nextBlockSlot
 		for _, node := range activeValidators {
 			blockAlias := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
-			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.MainEngine.Get().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
+			tip = t.IssueValidationBlockAtSlot(blockAlias, nextBlockSlot, node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment(), node, tip.ID())
 		}
 		if nextBlockSlot == slot+t.API.ProtocolParameters().MinCommittableAge() {
 			break

@@ -8,8 +8,8 @@ import (
 
 //nolint:unparam // we have no error case right now
 func validatorsSummary() (*ValidatorsSummaryResponse, error) {
-	seatManager := deps.Protocol.MainEngine.Get().SybilProtection.SeatManager()
-	latestSlotIndex := deps.Protocol.MainEngine.Get().Storage.Settings().LatestCommitment().Slot()
+	seatManager := deps.Protocol.Engines.Main.Get().SybilProtection.SeatManager()
+	latestSlotIndex := deps.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
 	latestCommittee := seatManager.Committee(latestSlotIndex)
 	validatorSeats := []*Validator{}
 	latestCommittee.Accounts().ForEach(func(id iotago.AccountID, pool *account.Pool) bool {

@@ -12,7 +12,7 @@ func (t *TestSuite) AssertStorageRootBlocks(blocks []*blocks.Block, nodes ...*mo
 	for _, node := range nodes {
 		for _, block := range blocks {
 			t.Eventually(func() error {
-				storage, err := node.Protocol.MainEngine.Get().Storage.RootBlocks(block.ID().Slot())
+				storage, err := node.Protocol.Engines.Main.Get().Storage.RootBlocks(block.ID().Slot())
 				if err != nil {
 					return ierrors.Errorf("AssertStorageRootBlocks: %s: error loading root blocks for %s: %v", node.Name, block.ID().Slot(), err)
 				}

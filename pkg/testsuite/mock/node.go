@@ -395,7 +395,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 }
 
 func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
-	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.MainEngine.Get() != instance, "Candidate", "Main"), instance.Name()[:8])
+	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.Engines.Main.Get() != instance, "Candidate", "Main"), instance.Name()[:8])
 
 	n.attachEngineLogsWithName(failOnBlockFiltered, instance, engineName)
 }

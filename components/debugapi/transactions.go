@@ -17,7 +17,7 @@ func init() {
 
 func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) error {
 	slot := scd.Commitment.Slot()
-	stateDiff, err := deps.Protocol.MainEngine.Get().Ledger.MemPool().StateDiff(slot)
+	stateDiff, err := deps.Protocol.Engines.Main.Get().Ledger.MemPool().StateDiff(slot)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to retrieve state diff for slot %d", slot)
 	}

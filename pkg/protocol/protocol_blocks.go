@@ -121,7 +121,7 @@ func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 
 func (b *BlocksProtocol) ProcessRequest(blockID iotago.BlockID, from peer.ID) {
 	b.workerPool.Submit(func() {
-		block, exists := b.protocol.MainEngine.Get().Block(blockID)
+		block, exists := b.protocol.Engines.Main.Get().Block(blockID)
 		if !exists {
 			b.LogTrace("requested block not found", "blockID", blockID)
 

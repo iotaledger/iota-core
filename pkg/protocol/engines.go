@@ -21,8 +21,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type EngineManager struct {
-	MainEngine reactive.Variable[*engine.Engine]
+type Engines struct {
+	Main reactive.Variable[*engine.Engine]
 
 	protocol  *Protocol
 	worker    *workerpool.WorkerPool
@@ -31,9 +31,9 @@ type EngineManager struct {
 	*module.ReactiveModule
 }
 
-func NewEngineManager(protocol *Protocol) *EngineManager {
-	e := &EngineManager{
-		MainEngine:     reactive.NewVariable[*engine.Engine](),
+func NewEngines(protocol *Protocol) *Engines {
+	e := &Engines{
+		Main:           reactive.NewVariable[*engine.Engine](),
 		ReactiveModule: protocol.NewReactiveSubModule("Engines"),
 		protocol:       protocol,
 		worker:         protocol.Workers.CreatePool("Engines", workerpool.WithWorkerCount(1)),
@@ -63,7 +63,7 @@ func NewEngineManager(protocol *Protocol) *EngineManager {
 	return e
 }
 
-func (e *EngineManager) LoadMainEngine(snapshotPath string) (*engine.Engine, error) {
+func (e *Engines) LoadMainEngine(snapshotPath string) (*engine.Engine, error) {
 	info := &engineInfo{}
 	if err := ioutils.ReadJSONFromFile(e.infoFilePath(), info); err != nil && !ierrors.Is(err, os.ErrNotExist) {
 		return nil, ierrors.Errorf("unable to read engine info file: %w", err)
@@ -72,12 +72,12 @@ func (e *EngineManager) LoadMainEngine(snapshotPath string) (*engine.Engine, err
 	// load previous engine as main engine if it exists.
 	if len(info.Name) > 0 {
 		if exists, isDirectory, err := ioutils.PathExists(e.directory.Path(info.Name)); err == nil && exists && isDirectory {
-			e.MainEngine.Set(e.loadEngineInstanceFromSnapshot(info.Name, snapshotPath))
+			e.Main.Set(e.loadEngineInstanceFromSnapshot(info.Name, snapshotPath))
 		}
 	}
 
 	// load new engine if no previous engine exists.
-	e.MainEngine.Compute(func(mainEngine *engine.Engine) *engine.Engine {
+	e.Main.Compute(func(mainEngine *engine.Engine) *engine.Engine {
 		if mainEngine != nil {
 			return mainEngine
 		}
@@ -90,19 +90,19 @@ func (e *EngineManager) LoadMainEngine(snapshotPath string) (*engine.Engine, err
 		return nil, err
 	}
 
-	return e.MainEngine.Get(), nil
+	return e.Main.Get(), nil
 }
 
-func (e *EngineManager) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
+func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 	newEngineAlias := lo.PanicOnErr(uuid.NewUUID()).String()
 	errorHandler := func(err error) {
 		e.protocol.LogError("engine error", "err", err, "name", newEngineAlias[0:8])
 	}
 
 	// copy raw data on disk.
-	newStorage, err := storage.Clone(e.MainEngine.Get().Storage, e.directory.Path(newEngineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...)
+	newStorage, err := storage.Clone(e.Main.Get().Storage, e.directory.Path(newEngineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to copy storage from active engine instance (%s) to new engine instance (%s)", e.MainEngine.Get().Storage.Directory(), e.directory.Path(newEngineAlias))
+		return nil, ierrors.Wrapf(err, "failed to copy storage from active engine instance (%s) to new engine instance (%s)", e.Main.Get().Storage.Directory(), e.directory.Path(newEngineAlias))
 	}
 
 	// remove commitments that after forking point.
@@ -152,8 +152,8 @@ func (e *EngineManager) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error
 	return candidateEngine, nil
 }
 
-func (e *EngineManager) CleanupCandidates() error {
-	activeDir := filepath.Base(e.MainEngine.Get().Storage.Directory())
+func (e *Engines) CleanupCandidates() error {
+	activeDir := filepath.Base(e.Main.Get().Storage.Directory())
 
 	dirs, err := e.directory.SubDirs()
 	if err != nil {
@@ -171,11 +171,11 @@ func (e *EngineManager) CleanupCandidates() error {
 	return nil
 }
 
-func (e *EngineManager) infoFilePath() string {
+func (e *Engines) infoFilePath() string {
 	return e.directory.Path(engineInfoFile)
 }
 
-func (e *EngineManager) loadEngineInstanceFromSnapshot(engineAlias string, snapshotPath string) *engine.Engine {
+func (e *Engines) loadEngineInstanceFromSnapshot(engineAlias string, snapshotPath string) *engine.Engine {
 	errorHandler := func(err error) {
 		e.protocol.LogError("engine error", "err", err, "name", engineAlias[0:8])
 	}
@@ -185,20 +185,20 @@ func (e *EngineManager) loadEngineInstanceFromSnapshot(engineAlias string, snaps
 	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...))
 }
 
-func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storage *storage.Storage) *engine.Engine {
+func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *storage.Storage) *engine.Engine {
 	return engine.New(e.protocol.Logger, e.protocol.Workers.CreateGroup(engineAlias), storage, e.protocol.Options.FilterProvider, e.protocol.Options.CommitmentFilterProvider, e.protocol.Options.BlockDAGProvider, e.protocol.Options.BookerProvider, e.protocol.Options.ClockProvider, e.protocol.Options.BlockGadgetProvider, e.protocol.Options.SlotGadgetProvider, e.protocol.Options.SybilProtectionProvider, e.protocol.Options.NotarizationProvider, e.protocol.Options.AttestationProvider, e.protocol.Options.LedgerProvider, e.protocol.Options.SchedulerProvider, e.protocol.Options.TipManagerProvider, e.protocol.Options.TipSelectionProvider, e.protocol.Options.RetainerProvider, e.protocol.Options.UpgradeOrchestratorProvider, e.protocol.Options.SyncManagerProvider, e.protocol.Options.EngineOptions...)
 }
 
-func (e *EngineManager) syncMainEngineFromMainChain() (unsubscribe func()) {
+func (e *Engines) syncMainEngineFromMainChain() (unsubscribe func()) {
 	return e.protocol.MainChain.OnUpdateWithContext(func(_, mainChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
 		unsubscribeOnUpdate(func() func() {
-			return e.MainEngine.InheritFrom(mainChain.SpawnedEngine)
+			return e.Main.InheritFrom(mainChain.SpawnedEngine)
 		})
 	})
 }
 
-func (e *EngineManager) syncMainEngineInfoFile() (unsubscribe func()) {
-	return e.MainEngine.OnUpdate(func(_, mainEngine *engine.Engine) {
+func (e *Engines) syncMainEngineInfoFile() (unsubscribe func()) {
+	return e.Main.OnUpdate(func(_, mainEngine *engine.Engine) {
 		if mainEngine != nil {
 			if err := ioutils.WriteJSONToFile(e.infoFilePath(), &engineInfo{Name: filepath.Base(mainEngine.Storage.Directory())}, 0o644); err != nil {
 				e.LogError("unable to write engine info file", "err", err)
@@ -207,7 +207,7 @@ func (e *EngineManager) syncMainEngineInfoFile() (unsubscribe func()) {
 	})
 }
 
-func (e *EngineManager) injectEngineInstances() (unsubscribe func()) {
+func (e *Engines) injectEngineInstances() (unsubscribe func()) {
 	return e.protocol.OnChainCreated(func(chain *Chain) {
 		chain.VerifyState.OnUpdate(func(_, instantiate bool) {
 			e.worker.Submit(func() {
@@ -218,7 +218,7 @@ func (e *EngineManager) injectEngineInstances() (unsubscribe func()) {
 				}
 
 				if newEngine, err := func() (*engine.Engine, error) {
-					if e.MainEngine.Get() == nil {
+					if e.Main.Get() == nil {
 						return e.LoadMainEngine(e.protocol.Options.SnapshotPath)
 					}
 

@@ -16,7 +16,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 	// HasPruned is false when a node just started from a snapshot and keeps data of the LastPrunedEpoch, thus still need
 	// to send finalized commitment.
 	if !status.HasPruned || status.LatestFinalizedSlot > deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(status.LastPrunedEpoch) {
-		finalizedCommitment, err := deps.Protocol.MainEngine.Get().Storage.Commitments().Load(status.LatestFinalizedSlot)
+		finalizedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(status.LatestFinalizedSlot)
 		if err != nil {
 			return nil
 		}
@@ -34,7 +34,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 }
 
 func (s *Server) ReadNodeStatus(context.Context, *inx.NoParams) (*inx.NodeStatus, error) {
-	return inxNodeStatus(deps.Protocol.MainEngine.Get().SyncManager.SyncStatus()), nil
+	return inxNodeStatus(deps.Protocol.Engines.Main.Get().SyncManager.SyncStatus()), nil
 }
 
 func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_ListenToNodeStatusServer) error {
@@ -95,7 +95,7 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 
 func (s *Server) ReadNodeConfiguration(context.Context, *inx.NoParams) (*inx.NodeConfiguration, error) {
 	protoParams := make([]*inx.RawProtocolParameters, 0)
-	provider := deps.Protocol.MainEngine.Get().Storage.Settings().APIProvider()
+	provider := deps.Protocol.Engines.Main.Get().Storage.Settings().APIProvider()
 	for _, version := range provider.ProtocolEpochVersions() {
 		protocolParams := provider.ProtocolParameters(version.Version)
 		if protocolParams == nil {

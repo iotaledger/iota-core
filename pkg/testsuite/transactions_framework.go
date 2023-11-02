@@ -34,7 +34,7 @@ func NewTransactionFramework(protocol *protocol.Protocol, genesisSeed []byte) *T
 		wallet: mock.NewHDWallet("genesis", genesisSeed, 0),
 	}
 
-	if err := protocol.MainEngine.Get().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
+	if err := protocol.Engines.Main.Get().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
 		tf.states[fmt.Sprintf("Genesis:%d", output.OutputID().Index())] = output
 		return true
 	}); err != nil {
