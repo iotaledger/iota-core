@@ -51,29 +51,36 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		Weight:                          reactive.NewVariable[uint64](),
 		AttestedWeight:                  reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
+		IsRoot:                          reactive.NewEvent(),
 		IsSolid:                         reactive.NewEvent(),
 		IsAttested:                      reactive.NewEvent(),
 		IsVerified:                      reactive.NewEvent(),
-		IsRoot:                          reactive.NewEvent(),
-		IsEvicted:                       reactive.NewEvent(),
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
 		InSyncRange:                     reactive.NewVariable[bool](),
+		IsEvicted:                       reactive.NewEvent(),
 
 		protocol: protocol,
 	}
 
 	c.Logger = protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", commitment.Slot()), c.IsEvicted, func(entityLogger log.Logger) {
 		c.Parent.LogUpdates(entityLogger, log.LevelTrace, "Parent", (*Commitment).LogName)
+		// Children
+		c.MainChild.LogUpdates(entityLogger, log.LevelTrace, "MainChild", (*Commitment).LogName)
+		c.SpawnedChain.LogUpdates(entityLogger, log.LevelTrace, "SpawnedChain", (*Chain).LogName)
+		c.Chain.LogUpdates(entityLogger, log.LevelTrace, "Chain", (*Chain).LogName)
+		c.RequestAttestations.LogUpdates(entityLogger, log.LevelTrace, "RequestAttestations")
+		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
 		c.IsSolid.LogUpdates(entityLogger, log.LevelTrace, "IsSolid")
 		c.Chain.LogUpdates(entityLogger, log.LevelTrace, "Chain", (*Chain).LogName)
 		c.IsVerified.LogUpdates(entityLogger, log.LevelTrace, "IsVerified")
 		c.IsAttested.LogUpdates(entityLogger, log.LevelTrace, "IsAttested")
 		c.InSyncRange.LogUpdates(entityLogger, log.LevelTrace, "InSyncRange")
-		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
 		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
 		c.CumulativeAttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "CumulativeAttestedWeight")
 	})
+
+	var spawnedChain *Chain
 
 	unsubscribe := lo.Batch(
 		c.IsSolid.InheritFrom(c.IsRoot),
@@ -83,10 +90,25 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
 
-			return lo.Batch(
-				c.inheritChainFrom(parent),
+			// TODO: REMOVE ON UNSUBSCRIBE
+			parent.MainChild.Compute(func(mainChild *Commitment) *Commitment {
+				return lo.Cond(mainChild != nil, mainChild, c)
+			})
 
+			return lo.Batch(
 				c.IsSolid.InheritFrom(parent.IsSolid),
+
+				c.SpawnedChain.DeriveValueFrom(reactive.NewDerivedVariable(func(mainChild *Commitment) *Chain {
+					if mainChild == c && spawnedChain != nil {
+						spawnedChain.IsEvicted.Trigger()
+						spawnedChain = nil
+					} else if mainChild != c && spawnedChain == nil {
+						spawnedChain = NewChain(protocol)
+						spawnedChain.ForkingPoint.Set(c)
+					}
+
+					return spawnedChain
+				}, parent.MainChild)),
 
 				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(parentChain, spawnedChain *Chain) *Chain {
 					return lo.Cond(spawnedChain != nil, spawnedChain, parentChain)
@@ -134,58 +156,6 @@ func (c *Commitment) Engine() *engine.Engine {
 	}
 
 	return nil
-}
-
-func (c *Commitment) inheritChainFrom(parent *Commitment) (unregister func()) {
-	if !parent.Children.Add(c) {
-		return func() {}
-	}
-
-	parent.MainChild.Compute(func(mainChild *Commitment) *Commitment {
-		return lo.Cond(mainChild != nil, mainChild, c)
-	})
-
-	return parent.MainChild.OnUpdate(c.inheritChain(parent))
-}
-
-func (c *Commitment) inheritChain(parent *Commitment) func(*Commitment, *Commitment) {
-	var unsubscribeFromParent func()
-
-	return func(_, mainChild *Commitment) {
-		c.SpawnedChain.Compute(func(spawnedChain *Chain) (newSpawnedChain *Chain) {
-			if c.IsRoot.WasTriggered() {
-				return spawnedChain
-			}
-
-			switch mainChild {
-			case nil:
-				panic("main child may not be changed to nil")
-
-			case c:
-				if spawnedChain != nil {
-					spawnedChain.IsEvicted.Trigger()
-				}
-
-				unsubscribeFromParent = parent.Chain.OnUpdate(func(_, chain *Chain) {
-					c.Chain.Set(chain)
-				})
-
-				return nil
-
-			default:
-				if spawnedChain == nil {
-					if unsubscribeFromParent != nil {
-						unsubscribeFromParent()
-					}
-
-					spawnedChain = NewChain(c.protocol)
-					spawnedChain.ForkingPoint.Set(c)
-				}
-
-				return spawnedChain
-			}
-		})
-	}
 }
 
 func (c *Commitment) promote(targetChain *Chain) {
