@@ -25,10 +25,15 @@ func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBefore
 		return nil, ierrors.Errorf("committee in slot %d does not exist", lastCommonCommitmentBeforeFork.Slot())
 	}
 
+	accountsAtForkingPoint, err := committeeAtForkingPoint.Accounts()
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get accounts from committee for slot %d", lastCommonCommitmentBeforeFork.Slot())
+	}
+
 	return &CommitmentVerifier{
 		engine:                  mainEngine,
 		cumulativeWeight:        lastCommonCommitmentBeforeFork.CumulativeWeight(),
-		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(committeeAtForkingPoint.Accounts().IDs(), lastCommonCommitmentBeforeFork.Slot())),
+		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(accountsAtForkingPoint.IDs(), lastCommonCommitmentBeforeFork.Slot())),
 		// TODO: what happens if the committee rotated after the fork?
 	}, nil
 }

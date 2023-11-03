@@ -20,11 +20,13 @@ func TestAccounts(t *testing.T) {
 
 	// check "Set"
 	for id, stake := range issuers {
-		accounts.Set(id, &account.Pool{
+		if err := accounts.Set(id, &account.Pool{
 			PoolStake:      iotago.BaseToken(stake),
 			ValidatorStake: iotago.BaseToken(stake) * 2,
 			FixedCost:      iotago.Mana(stake) * 3,
-		})
+		}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// check "Size"

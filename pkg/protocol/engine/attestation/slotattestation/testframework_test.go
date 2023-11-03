@@ -61,7 +61,9 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		accounts := account.NewAccounts()
 		var members []iotago.AccountID
 		t.issuerByAlias.ForEach(func(alias string, issuer *issuer) bool {
-			accounts.Set(issuer.accountID, &account.Pool{}) // we don't care about pools with PoA
+			if err := accounts.Set(issuer.accountID, &account.Pool{}); err != nil { // we don't care about pools with PoA
+				test.Fatal(err)
+			}
 			members = append(members, issuer.accountID)
 			return true
 		})

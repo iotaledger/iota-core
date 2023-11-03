@@ -198,7 +198,7 @@ func (m *Metric) schedulePruning(labelValues []string) {
 
 func (m *Metric) shutdown() {
 	if m.pruningExecutor != nil {
-		m.pruningExecutor.Shutdown()
+		m.pruningExecutor.Shutdown(timed.CancelPendingElements)
 	}
 }
 
