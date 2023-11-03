@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -305,6 +306,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 						),
 					),
 				)
+				nodeC1.Protocol.SetLogLevel(log.LevelTrace)
 				ts.Wait()
 
 				// Everything that was accepted before shutting down should be available on disk.
@@ -339,6 +341,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 						storage.WithPruningDelay(1),
 					))...,
 				)
+				nodeD.Protocol.SetLogLevel(log.LevelTrace)
 				ts.Wait()
 
 				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
