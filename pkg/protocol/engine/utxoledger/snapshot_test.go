@@ -152,10 +152,8 @@ func TestReadSlotDiffToSnapshotReader(t *testing.T) {
 	}
 
 	writer := &writerseeker.WriterSeeker{}
-	written, err := utxoledger.WriteSlotDiffToSnapshotWriter(writer, slotDiff)
+	err := utxoledger.WriteSlotDiffToSnapshotWriter(writer, slotDiff)
 	require.NoError(t, err)
-
-	require.Equal(t, int64(writer.BytesReader().Len()), written)
 
 	reader := writer.BytesReader()
 	readSlotDiff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
@@ -182,10 +180,8 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 	}
 
 	writer := &writerseeker.WriterSeeker{}
-	written, err := utxoledger.WriteSlotDiffToSnapshotWriter(writer, slotDiff)
+	err := utxoledger.WriteSlotDiffToSnapshotWriter(writer, slotDiff)
 	require.NoError(t, err)
-
-	require.Equal(t, int64(writer.BytesReader().Len()), written)
 
 	reader := writer.BytesReader()
 
@@ -358,6 +354,7 @@ func TestManager_Export(t *testing.T) {
 
 	// Test exporting at the current slot 2
 	{
+		// TODO: replace with our own BytesBuffer, adjust test to use stream API
 		writer := &writerseeker.WriterSeeker{}
 		require.NoError(t, manager.Export(writer, 2))
 

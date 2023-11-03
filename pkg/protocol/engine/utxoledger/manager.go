@@ -2,13 +2,13 @@ package utxoledger
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -370,7 +370,8 @@ func (m *Manager) LedgerStateSHA256Sum() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := binary.Write(ledgerStateHash, binary.LittleEndian, ledgerSlot); err != nil {
+
+	if err := stream.Write(ledgerStateHash, ledgerSlot); err != nil {
 		return nil, err
 	}
 
@@ -386,22 +387,16 @@ func (m *Manager) LedgerStateSHA256Sum() ([]byte, error) {
 			return nil, err
 		}
 
-		if _, err := ledgerStateHash.Write(output.outputID[:]); err != nil {
+		if err := stream.Write(ledgerStateHash, outputID); err != nil {
 			return nil, err
 		}
 
-		if _, err := ledgerStateHash.Write(output.KVStorableValue()); err != nil {
+		if err := stream.WriteBytes(ledgerStateHash, output.KVStorableValue()); err != nil {
 			return nil, err
 		}
 	}
 
-	// Add root of the state tree
-	stateTreeBytes, err := m.StateTreeRoot().Bytes()
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := ledgerStateHash.Write(stateTreeBytes); err != nil {
+	if err := stream.Write(ledgerStateHash, m.StateTreeRoot()); err != nil {
 		return nil, err
 	}
 

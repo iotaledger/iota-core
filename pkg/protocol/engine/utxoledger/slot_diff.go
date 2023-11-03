@@ -2,7 +2,6 @@ package utxoledger
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 	"sort"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -146,11 +145,11 @@ func (sd *SlotDiff) sortedSpents() LexicalOrderedSpents {
 func (sd *SlotDiff) SHA256Sum() ([]byte, error) {
 	sdDiffHash := sha256.New()
 
-	if err := binary.Write(sdDiffHash, binary.LittleEndian, sd.KVStorableKey()); err != nil {
+	if err := stream.WriteBytes(sdDiffHash, sd.KVStorableKey()); err != nil {
 		return nil, ierrors.Errorf("unable to serialize slot diff: %w", err)
 	}
 
-	if err := binary.Write(sdDiffHash, binary.LittleEndian, sd.KVStorableValue()); err != nil {
+	if err := stream.WriteBytes(sdDiffHash, sd.KVStorableValue()); err != nil {
 		return nil, ierrors.Errorf("unable to serialize slot diff: %w", err)
 	}
 

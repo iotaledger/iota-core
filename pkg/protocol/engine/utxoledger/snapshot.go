@@ -5,9 +5,10 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
-	"github.com/iotaledger/iota-core/pkg/utils"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -128,34 +129,36 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIPr
 	return slotDiff, nil
 }
 
-func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *SlotDiff) (written int64, err error) {
-	var totalBytesWritten int64
-
-	if err := utils.WriteValueFunc(writer, diff.Slot.MustBytes(), &totalBytesWritten); err != nil {
-		return 0, ierrors.Wrap(err, "unable to write slot diff index")
+func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *SlotDiff) error {
+	if err := stream.Write(writer, diff.Slot); err != nil {
+		return ierrors.Wrap(err, "unable to write slot diff index")
 	}
 
-	if err := utils.WriteValueFunc(writer, uint64(len(diff.Outputs)), &totalBytesWritten); err != nil {
-		return 0, ierrors.Wrap(err, "unable to write slot diff created count")
-	}
-
-	for _, output := range diff.sortedOutputs() {
-		if err := utils.WriteBytesFunc(writer, output.SnapshotBytes(), &totalBytesWritten); err != nil {
-			return 0, ierrors.Wrap(err, "unable to write slot diff created output")
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (elementsCount int, err error) {
+		for _, output := range diff.sortedOutputs() {
+			if err := stream.WriteBytes(writer, output.SnapshotBytes()); err != nil {
+				return 0, ierrors.Wrap(err, "unable to write slot diff created output")
+			}
 		}
+
+		return len(diff.Outputs), nil
+	}); err != nil {
+		return ierrors.Wrap(err, "unable to write slot diff created collection")
 	}
 
-	if err := utils.WriteValueFunc(writer, uint64(len(diff.Spents)), &totalBytesWritten); err != nil {
-		return 0, ierrors.Wrap(err, "unable to write slot diff consumed count")
-	}
-
-	for _, spent := range diff.sortedSpents() {
-		if err := utils.WriteBytesFunc(writer, spent.SnapshotBytes(), &totalBytesWritten); err != nil {
-			return 0, ierrors.Wrap(err, "unable to write slot diff created output")
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (elementsCount int, err error) {
+		for _, spent := range diff.sortedSpents() {
+			if err := stream.WriteBytes(writer, spent.SnapshotBytes()); err != nil {
+				return 0, ierrors.Wrap(err, "unable to write slot diff spent output")
+			}
 		}
+
+		return len(diff.Spents), nil
+	}); err != nil {
+		return ierrors.Wrap(err, "unable to write slot diff spent collection")
 	}
 
-	return totalBytesWritten, nil
+	return nil
 }
 
 // Import imports the ledger state from the given reader.
@@ -163,6 +166,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
+	// TODO: change this to stream API and collections
 	var snapshotLedgerIndex iotago.SlotIndex
 	if err := binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex); err != nil {
 		return ierrors.Errorf("unable to read LS ledger index: %w", err)
@@ -177,11 +181,6 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		return ierrors.Errorf("unable to read LS output count: %w", err)
 	}
 
-	var slotDiffCount uint64
-	if err := binary.Read(reader, binary.LittleEndian, &slotDiffCount); err != nil {
-		return ierrors.Errorf("unable to read LS slot diff count: %w", err)
-	}
-
 	for i := uint64(0); i < outputCount; i++ {
 		output, err := OutputFromSnapshotReader(reader, m.apiProvider)
 		if err != nil {
@@ -191,6 +190,11 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		if err := m.importUnspentOutputWithoutLocking(output); err != nil {
 			return err
 		}
+	}
+
+	var slotDiffCount uint64
+	if err := binary.Read(reader, binary.LittleEndian, &slotDiffCount); err != nil {
+		return ierrors.Errorf("unable to read LS slot diff count: %w", err)
 	}
 
 	for i := uint64(0); i < slotDiffCount; i++ {
@@ -224,83 +228,55 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	if err != nil {
 		return err
 	}
-	if err := utils.WriteValueFunc(writer, ledgerIndex); err != nil {
+
+	if err := stream.Write(writer, ledgerIndex); err != nil {
 		return ierrors.Wrap(err, "unable to write ledger index")
 	}
 
-	var relativeCountersPosition int64
-
-	var outputCount uint64
-	var slotDiffCount uint64
-
-	// Outputs Count
-	// The amount of UTXOs contained within this snapshot.
-	if err := utils.WriteValueFunc(writer, outputCount, &relativeCountersPosition); err != nil {
-		return ierrors.Wrap(err, "unable to write outputs count")
-	}
-
-	// Slot Diffs Count
-	// The amount of slot diffs contained within this snapshot.
-	if err := utils.WriteValueFunc(writer, slotDiffCount, &relativeCountersPosition); err != nil {
-		return ierrors.Wrap(err, "unable to write slot diffs count")
-	}
-
-	// Get all UTXOs and sort them by outputID
-	outputIDs, err := m.UnspentOutputsIDs(ReadLockLedger(false))
-	if err != nil {
-		return ierrors.Wrap(err, "error while retrieving unspent outputIDs")
-	}
-
-	for _, outputID := range outputIDs.RemoveDupsAndSort() {
-		output, err := m.ReadOutputByOutputIDWithoutLocking(outputID)
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (int, error) {
+		// Get all UTXOs and sort them by outputID
+		outputIDs, err := m.UnspentOutputsIDs(ReadLockLedger(false))
 		if err != nil {
-			return ierrors.Wrapf(err, "error while retrieving output %s", outputID)
+			return 0, ierrors.Wrap(err, "error while retrieving unspent outputIDs")
 		}
 
-		if err := utils.WriteBytesFunc(writer, output.SnapshotBytes(), &relativeCountersPosition); err != nil {
-			return ierrors.Wrap(err, "unable to write output ID")
+		var outputCount int
+		for _, outputID := range outputIDs.RemoveDupsAndSort() {
+			output, err := m.ReadOutputByOutputIDWithoutLocking(outputID)
+			if err != nil {
+				return 0, ierrors.Wrapf(err, "error while retrieving output %s", outputID)
+			}
+
+			if err := stream.WriteBytes(writer, output.SnapshotBytes()); err != nil {
+				return 0, ierrors.Wrapf(err, "unable to write output with ID %s", outputID)
+			}
+
+			outputCount++
 		}
 
-		outputCount++
+		return outputCount, nil
+	}); err != nil {
+		return ierrors.Wrap(err, "unable to write unspent output collection")
 	}
 
-	for diffIndex := ledgerIndex; diffIndex > targetIndex; diffIndex-- {
-		slotDiff, err := m.SlotDiffWithoutLocking(diffIndex)
-		if err != nil {
-			return ierrors.Wrapf(err, "error while retrieving slot diffs for slot %s", diffIndex)
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (int, error) {
+		var slotDiffCount int
+		for diffIndex := ledgerIndex; diffIndex > targetIndex; diffIndex-- {
+			slotDiff, err := m.SlotDiffWithoutLocking(diffIndex)
+			if err != nil {
+				return 0, ierrors.Wrapf(err, "error while retrieving slot diffs for slot %s", diffIndex)
+			}
+
+			if WriteSlotDiffToSnapshotWriter(writer, slotDiff) != nil {
+				return 0, ierrors.Wrapf(err, "error while writing slot diffs for slot %s", diffIndex)
+			}
+
+			slotDiffCount++
 		}
 
-		written, err := WriteSlotDiffToSnapshotWriter(writer, slotDiff)
-		if err != nil {
-			return ierrors.Wrapf(err, "error while writing slot diffs for slot %s", diffIndex)
-		}
-
-		relativeCountersPosition += written
-		slotDiffCount++
-	}
-
-	// seek back to the file position of the counters
-	if _, err := writer.Seek(-relativeCountersPosition, io.SeekCurrent); err != nil {
-		return ierrors.Errorf("unable to seek to LS counter placeholders: %w", err)
-	}
-
-	var countersSize int64
-
-	// Outputs Count
-	// The amount of UTXOs contained within this snapshot.
-	if err := utils.WriteValueFunc(writer, outputCount, &countersSize); err != nil {
-		return ierrors.Wrap(err, "unable to write outputs count")
-	}
-
-	// Slot Diffs Count
-	// The amount of slot diffs contained within this snapshot.
-	if err := utils.WriteValueFunc(writer, slotDiffCount, &countersSize); err != nil {
-		return ierrors.Wrap(err, "unable to write slot diffs count")
-	}
-
-	// seek back to the last write position
-	if _, err := writer.Seek(relativeCountersPosition-countersSize, io.SeekCurrent); err != nil {
-		return ierrors.Errorf("unable to seek to LS last written position: %w", err)
+		return slotDiffCount, nil
+	}); err != nil {
+		return ierrors.Wrap(err, "unable to write slot diff collection")
 	}
 
 	return nil
