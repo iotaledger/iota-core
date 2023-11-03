@@ -1,6 +1,8 @@
 package tipmanagerv1
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ds/randommap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -147,6 +149,10 @@ func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(pare
 
 			if !exists || parentBlock.IsRootBlock() {
 				continue
+			}
+
+			if parentBlock.ModelBlock() == nil {
+				panic(fmt.Sprintf(">> parentBlock exists, but parentBlock.ProtocolBlock() == nil, %s", parentBlock.String()))
 			}
 
 			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(parentBlock) })
