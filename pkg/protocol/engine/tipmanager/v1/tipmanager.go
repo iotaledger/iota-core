@@ -152,7 +152,7 @@ func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(pare
 			}
 
 			if parentBlock.ModelBlock() == nil {
-				panic(fmt.Sprintf(">> parentBlock exists, but parentBlock.ProtocolBlock() == nil, %s", parentBlock.String()))
+				fmt.Printf(">> parentBlock exists, but parentBlock.ProtocolBlock() == nil\n %s\n", parentBlock.String())
 			}
 
 			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(parentBlock) })
