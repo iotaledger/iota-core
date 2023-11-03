@@ -98,7 +98,9 @@ func (t *TestFramework) IssueBlockAtSlotWithVersion(alias string, slot iotago.Sl
 
 func mockedCommitteeFunc(validatorAccountID iotago.AccountID) func(iotago.SlotIndex) (*account.SeatedAccounts, bool) {
 	mockedAccounts := account.NewAccounts()
-	mockedAccounts.Set(validatorAccountID, new(account.Pool))
+	if err := mockedAccounts.Set(validatorAccountID, new(account.Pool)); err != nil {
+		panic(err)
+	}
 	seatedAccounts := account.NewSeatedAccounts(mockedAccounts)
 	seatedAccounts.Set(account.SeatIndex(0), validatorAccountID)
 

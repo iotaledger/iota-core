@@ -357,7 +357,10 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteCommittee, func(c echo.Context) error {
-		resp := selectedCommittee(c)
+		resp, err := selectedCommittee(c)
+		if err != nil {
+			return err
+		}
 
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())

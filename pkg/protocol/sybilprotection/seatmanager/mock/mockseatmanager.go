@@ -61,11 +61,13 @@ func NewManualPOAProvider() module.Provider[*engine.Engine, seatmanager.SeatMana
 func (m *ManualPOA) AddRandomAccount(alias string) iotago.AccountID {
 	id := iotago.AccountID(tpkg.Rand32ByteArray())
 	id.RegisterAlias(alias)
-	m.accounts.Set(id, &account.Pool{
+	if err := m.accounts.Set(id, &account.Pool{ // We don't care about pools with PoA, but need to set something to avoid division by zero errors.
 		PoolStake:      1,
 		ValidatorStake: 1,
 		FixedCost:      1,
-	}) // We don't care about pools with PoA, but need to set something to avoid division by zero errors.
+	}); err != nil {
+		panic(err)
+	}
 
 	m.aliases.Set(alias, id)
 
@@ -79,11 +81,13 @@ func (m *ManualPOA) AddRandomAccount(alias string) iotago.AccountID {
 }
 
 func (m *ManualPOA) AddAccount(id iotago.AccountID, alias string) iotago.AccountID {
-	m.accounts.Set(id, &account.Pool{
+	if err := m.accounts.Set(id, &account.Pool{ // We don't care about pools with PoA, but need to set something to avoid division by zero errors.
 		PoolStake:      1,
 		ValidatorStake: 1,
 		FixedCost:      1,
-	}) // We don't care about pools with PoA, but need to set something to avoid division by zero errors.
+	}); err != nil {
+		panic(err)
+	}
 	m.aliases.Set(alias, id)
 
 	m.committee = m.accounts.SelectCommittee(m.accounts.IDs()...)
@@ -164,11 +168,13 @@ func (m *ManualPOA) RotateCommittee(epoch iotago.EpochIndex, validators accounts
 		m.accounts = account.NewAccounts()
 
 		for _, validatorData := range validators {
-			m.accounts.Set(validatorData.ID, &account.Pool{
+			if err := m.accounts.Set(validatorData.ID, &account.Pool{
 				PoolStake:      validatorData.ValidatorStake + validatorData.DelegationStake,
 				ValidatorStake: validatorData.ValidatorStake,
 				FixedCost:      validatorData.FixedCost,
-			})
+			}); err != nil {
+				return nil, ierrors.Wrapf(err, "error while setting pool for epoch %d for validator %s", epoch, validatorData.ID.String())
+			}
 		}
 		m.committee = m.accounts.SelectCommittee(m.accounts.IDs()...)
 	}

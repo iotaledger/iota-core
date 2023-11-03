@@ -35,11 +35,13 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 	// Create committee for epoch 0
 	initialCommittee := account.NewAccounts()
 	for i := 0; i < 3; i++ {
-		initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
+		if err := initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
 			PoolStake:      1900,
 			ValidatorStake: 900,
 			FixedCost:      11,
-		})
+		}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	// Try setting committee that is too small - should return an error.
 	err := topStakersSeatManager.SetCommittee(0, initialCommittee)
@@ -53,7 +55,6 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 
 	require.NoError(t, topStakersSeatManager.InitializeCommittee(0, time.Time{}))
 	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[0])), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])))
-
 }
 
 func TestTopStakers_RotateCommittee(t *testing.T) {
@@ -77,27 +78,27 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 
 	// Create committee for epoch 0
 	initialCommittee := account.NewAccounts()
-	initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
+	require.NoError(t, initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
 		PoolStake:      1900,
 		ValidatorStake: 900,
 		FixedCost:      11,
-	})
+	}))
 
-	initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
+	require.NoError(t, initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
 		PoolStake:      1900,
 		ValidatorStake: 900,
 		FixedCost:      11,
-	})
+	}))
 
 	// Try setting committee that is too small - should return an error.
 	err := topStakersSeatManager.SetCommittee(0, initialCommittee)
 	require.Error(t, err)
 
-	initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
+	require.NoError(t, initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
 		PoolStake:      1900,
 		ValidatorStake: 900,
 		FixedCost:      11,
-	})
+	}))
 
 	// Set committee with the correct size
 	err = topStakersSeatManager.SetCommittee(0, initialCommittee)
@@ -187,7 +188,9 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 	// Make sure that after committee rotation, the online committee is not changed.
 	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])))
 
-	newCommitteeMemberIDs := newCommittee.Accounts().IDs()
+	accounts, err := newCommittee.Accounts()
+	require.NoError(t, err)
+	newCommitteeMemberIDs := accounts.IDs()
 
 	// A new committee member appears online and makes the previously active committee seat inactive.
 	topStakersSeatManager.activityTracker.MarkSeatActive(lo.Return1(weightedSeats.GetSeat(newCommitteeMemberIDs[0])), newCommitteeMemberIDs[0], tpkg.TestAPI.TimeProvider().SlotEndTime(14))
@@ -213,9 +216,11 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 }
 
 func assertCommittee(t *testing.T, expectedCommittee *account.Accounts, actualCommittee *account.SeatedAccounts) {
-	require.Equal(t, actualCommittee.Accounts().Size(), expectedCommittee.Size())
+	actualAccounts, err := actualCommittee.Accounts()
+	require.NoError(t, err)
+	require.Equal(t, actualAccounts.Size(), expectedCommittee.Size())
 	for _, memberID := range expectedCommittee.IDs() {
-		require.Truef(t, actualCommittee.Accounts().Has(memberID), "expected account %s to be part of committee, but it is not, actual committee members: %s", memberID, actualCommittee.Accounts().IDs())
+		require.Truef(t, actualAccounts.Has(memberID), "expected account %s to be part of committee, but it is not, actual committee members: %s", memberID, actualAccounts.IDs())
 	}
 }
 

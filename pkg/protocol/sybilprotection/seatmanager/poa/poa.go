@@ -89,17 +89,23 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, validators accoun
 		committeeAccounts := account.NewAccounts()
 
 		for _, validatorData := range validators {
-			committeeAccounts.Set(validatorData.ID, &account.Pool{
+			if err := committeeAccounts.Set(validatorData.ID, &account.Pool{
 				PoolStake:      validatorData.ValidatorStake + validatorData.DelegationStake,
 				ValidatorStake: validatorData.ValidatorStake,
 				FixedCost:      validatorData.FixedCost,
-			})
+			}); err != nil {
+				return nil, ierrors.Wrapf(err, "error while setting committee for epoch %d for validator %s", epoch, validatorData.ID.String())
+			}
 		}
 		s.committee = committeeAccounts.SelectCommittee(committeeAccounts.IDs()...)
 	}
 
-	err := s.committeeStore.Store(epoch, s.committee.Accounts())
+	accounts, err := s.committee.Accounts()
 	if err != nil {
+		return nil, ierrors.Wrapf(err, "error while getting accounts from committee for epoch %d", epoch)
+	}
+
+	if err := s.committeeStore.Store(epoch, accounts); err != nil {
 		return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
 	}
 
@@ -186,8 +192,12 @@ func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.
 
 	s.committee = validators.SelectCommittee(validators.IDs()...)
 
-	err := s.committeeStore.Store(epoch, s.committee.Accounts())
+	accounts, err := s.committee.Accounts()
 	if err != nil {
+		return ierrors.Wrapf(err, "failed to get accounts from committee for epoch %d", epoch)
+	}
+
+	if err := s.committeeStore.Store(epoch, accounts); err != nil {
 		return ierrors.Wrapf(err, "failed to set committee for epoch %d", epoch)
 	}
 
