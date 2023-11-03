@@ -71,7 +71,6 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		c.RequestAttestations.LogUpdates(entityLogger, log.LevelTrace, "RequestAttestations")
 		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
 		c.IsSolid.LogUpdates(entityLogger, log.LevelTrace, "IsSolid")
-		c.Chain.LogUpdates(entityLogger, log.LevelTrace, "Chain", (*Chain).LogName)
 		c.IsVerified.LogUpdates(entityLogger, log.LevelTrace, "IsVerified")
 		c.IsAttested.LogUpdates(entityLogger, log.LevelTrace, "IsAttested")
 		c.InSyncRange.LogUpdates(entityLogger, log.LevelTrace, "InSyncRange")
@@ -80,14 +79,14 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		c.CumulativeAttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "CumulativeAttestedWeight")
 	})
 
-	var spawnedChain *Chain
-
 	unsubscribe := lo.Batch(
 		c.IsSolid.InheritFrom(c.IsRoot),
 		c.IsAttested.InheritFrom(c.IsRoot),
 		c.IsVerified.InheritFrom(c.IsRoot),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
+			var spawnedChain *Chain
+
 			c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
 
 			// TODO: REMOVE ON UNSUBSCRIBE
@@ -96,19 +95,23 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 			})
 
 			return lo.Batch(
-				c.IsSolid.InheritFrom(parent.IsSolid),
-
-				c.SpawnedChain.DeriveValueFrom(reactive.NewDerivedVariable(func(mainChild *Commitment) *Chain {
-					if mainChild == c && spawnedChain != nil {
-						spawnedChain.IsEvicted.Trigger()
-						spawnedChain = nil
-					} else if mainChild != c && spawnedChain == nil {
-						spawnedChain = NewChain(protocol)
-						spawnedChain.ForkingPoint.Set(c)
+				c.SpawnedChain.DeriveValueFrom(reactive.NewDerivedVariable2(func(isRoot bool, mainChild *Commitment) *Chain {
+					if !isRoot { // do not automatically adjust the chain of the root commitment
+						if mainChild != c {
+							if spawnedChain == nil {
+								spawnedChain = NewChain(protocol)
+								spawnedChain.ForkingPoint.Set(c)
+							}
+						} else {
+							if spawnedChain != nil {
+								spawnedChain.IsEvicted.Trigger()
+								spawnedChain = nil
+							}
+						}
 					}
 
 					return spawnedChain
-				}, parent.MainChild)),
+				}, c.IsRoot, parent.MainChild)),
 
 				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(parentChain, spawnedChain *Chain) *Chain {
 					return lo.Cond(spawnedChain != nil, spawnedChain, parentChain)
@@ -121,6 +124,8 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 				c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(parentAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
 					return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
 				}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified)),
+
+				c.IsSolid.InheritFrom(parent.IsSolid),
 
 				c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
 					return lo.Batch(
