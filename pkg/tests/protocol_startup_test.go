@@ -119,24 +119,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 	}
 }
 
-func TestLook(t *testing.T) {
-	for {
-		Test_StartNodeFromSnapshotAndDisk(t)
-	}
-}
-
 func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
-	//logFile, err := os.OpenFile("/tmp/123.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0700)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//defer func(logFile *os.File) {
-	//	if err = logFile.Close(); err != nil {
-	//		panic(err)
-	//	}
-	//}(logFile)
-
 	ts := testsuite.NewTestSuite(t,
 		//testsuite.WithLogHandler(log.NewTextHandler(logFile)),
 		testsuite.WithProtocolParametersOptions(
@@ -323,7 +306,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 						),
 					),
 				)
-				//nodeC1.Protocol.SetLogLevel(log.LevelTrace)
 				ts.Wait()
 
 				// Everything that was accepted before shutting down should be available on disk.
@@ -358,7 +340,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 						storage.WithPruningDelay(1),
 					))...,
 				)
-				//nodeD.Protocol.SetLogLevel(log.LevelTrace)
 				ts.Wait()
 
 				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
