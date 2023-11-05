@@ -77,16 +77,22 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
 		c.CumulativeAttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "CumulativeAttestedWeight")
+		c.IsRoot.LogUpdates(entityLogger, log.LevelTrace, "IsRoot")
 	})
 
+	var spawnedChain *Chain
+
 	unsubscribe := lo.Batch(
+		// populate the local copy of the spawned chain variable with the first value we ever set
+		c.SpawnedChain.OnUpdateOnce(func(_, newSpawnedChain *Chain) { spawnedChain = newSpawnedChain }),
+
 		c.IsSolid.InheritFrom(c.IsRoot),
+
 		c.IsAttested.InheritFrom(c.IsRoot),
+
 		c.IsVerified.InheritFrom(c.IsRoot),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
-			var spawnedChain *Chain
-
 			c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
 
 			// TODO: REMOVE ON UNSUBSCRIBE

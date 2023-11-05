@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -69,13 +70,14 @@ type Node struct {
 	candidateEngineActivatedCount atomic.Uint32
 	mainEngineSwitchedCount       atomic.Uint32
 
+	logHandler          slog.Handler
 	enableEngineLogging bool
 
 	mutex          syncutils.RWMutex
 	attachedBlocks []*blocks.Block
 }
 
-func NewNode(t *testing.T, net *Network, partition string, name string, validator bool) *Node {
+func NewNode(t *testing.T, net *Network, partition string, name string, validator bool, logHandler slog.Handler) *Node {
 	seed := tpkg.RandEd25519Seed()
 	keyManager := NewKeyManager(seed[:], 0)
 	priv, pub := keyManager.KeyPair()
@@ -107,6 +109,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		Endpoint:  net.JoinWithEndpointID(peerID, partition),
 		Workers:   workerpool.NewGroup(name),
 
+		logHandler:          logHandler,
 		enableEngineLogging: false,
 
 		attachedBlocks: make([]*blocks.Block, 0),
@@ -119,7 +122,7 @@ func (n *Node) IsValidator() bool {
 
 func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[protocol.Protocol]) {
 	n.Protocol = protocol.New(
-		log.NewLogger(n.Name),
+		log.NewLogger(n.Name, n.logHandler),
 		n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
