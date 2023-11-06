@@ -38,6 +38,7 @@ type SyncManager interface {
 }
 
 type SyncStatus struct {
+	NodeBootstrapped       bool
 	NodeSynced             bool
 	LastAcceptedBlockSlot  iotago.SlotIndex
 	LastConfirmedBlockSlot iotago.SlotIndex

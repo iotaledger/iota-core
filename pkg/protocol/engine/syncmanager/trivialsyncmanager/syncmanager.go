@@ -139,6 +139,7 @@ func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
 
 	return &syncmanager.SyncStatus{
 		NodeSynced:             s.IsNodeSynced(),
+		NodeBootstrapped:       s.IsBootstrapped(),
 		LastAcceptedBlockSlot:  s.lastAcceptedBlockSlot,
 		LastConfirmedBlockSlot: s.lastConfirmedBlockSlot,
 		LatestCommitment:       s.latestCommitment,

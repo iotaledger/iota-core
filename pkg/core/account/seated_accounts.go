@@ -78,19 +78,22 @@ func (s *SeatedAccounts) SeatCount() int {
 	return s.seatsByAccount.Size()
 }
 
-func (s *SeatedAccounts) Accounts() *Accounts {
+func (s *SeatedAccounts) Accounts() (*Accounts, error) {
 	accounts := NewAccounts()
+	var err error
 	s.seatsByAccount.ForEachKey(func(id iotago.AccountID) bool {
 		pool, exists := s.accounts.Get(id)
 		if !exists {
 			panic("account not found")
 		}
-		accounts.Set(id, pool)
+		if err = accounts.Set(id, pool); err != nil {
+			return false
+		}
 
 		return true
 	})
 
-	return accounts
+	return accounts, err
 }
 
 func (s *SeatedAccounts) String() string {

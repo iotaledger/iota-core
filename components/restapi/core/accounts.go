@@ -188,7 +188,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	}, nil
 }
 
-func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
+func selectedCommittee(c echo.Context) (*apimodels.CommitteeResponse, error) {
 	timeProvider := deps.Protocol.CommittedAPI().TimeProvider()
 
 	var slot iotago.SlotIndex
@@ -206,11 +206,16 @@ func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
 	if !exists {
 		return &apimodels.CommitteeResponse{
 			Epoch: epoch,
-		}
+		}, nil
 	}
 
-	committee := make([]*apimodels.CommitteeMemberResponse, 0, seatedAccounts.Accounts().Size())
-	seatedAccounts.Accounts().ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
+	accounts, err := seatedAccounts.Accounts()
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get accounts from committee for slot %d", slot)
+	}
+
+	committee := make([]*apimodels.CommitteeMemberResponse, 0, accounts.Size())
+	accounts.ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
 		committee = append(committee, &apimodels.CommitteeMemberResponse{
 			AccountID:      accountID,
 			PoolStake:      seat.PoolStake,
@@ -224,7 +229,7 @@ func selectedCommittee(c echo.Context) *apimodels.CommitteeResponse {
 	return &apimodels.CommitteeResponse{
 		Epoch:               epoch,
 		Committee:           committee,
-		TotalStake:          seatedAccounts.Accounts().TotalStake(),
-		TotalValidatorStake: seatedAccounts.Accounts().TotalValidatorStake(),
-	}
+		TotalStake:          accounts.TotalStake(),
+		TotalValidatorStake: accounts.TotalValidatorStake(),
+	}, nil
 }

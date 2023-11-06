@@ -70,7 +70,7 @@ jobs:
       - name: Ansible deploy
         env:
           CUSTOM_SNAPSHOT_URL: '${{ github.event.inputs.snapshotUrl }}'
-          DEFAULT_SNAPSHOT_URL: 'https://0x0.st/HJXh.bin'
+          DEFAULT_SNAPSHOT_URL: 'https://0x0.st/HywH.bin'
           NETWORK_ENVIRONMENT: '${{ secrets.NETWORK_ENVIRONMENT }}'
           IOTA_CORE_DOCKER_IMAGE_REPO: 'iotaledger/iota-core'
           IOTA_CORE_DOCKER_IMAGE_TAG: 'feature'

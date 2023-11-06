@@ -15,8 +15,7 @@ iota-core
 # IDE related files
 .vscode/
 .idea/
-go.work
-go.work.sum
+go.work*
 
 # dist packages
 dist/

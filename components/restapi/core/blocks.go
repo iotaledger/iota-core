@@ -45,7 +45,7 @@ func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error)
 }
 
 func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHeaderResponse, error) {
-	references := deps.Protocol.MainEngineInstance().TipSelection.SelectTips(iotago.BlockMaxParents)
+	references := deps.Protocol.MainEngineInstance().TipSelection.SelectTips(iotago.BasicBlockMaxParents)
 
 	var slotCommitment *model.Commitment
 	var err error

@@ -17,7 +17,12 @@ func validatorsSummary() (*ValidatorsSummaryResponse, error) {
 	}
 
 	var validatorSeats []*Validator
-	latestCommittee.Accounts().ForEach(func(id iotago.AccountID, pool *account.Pool) bool {
+	accounts, err := latestCommittee.Accounts()
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get accounts from committee for slot %d", latestSlotIndex)
+	}
+
+	accounts.ForEach(func(id iotago.AccountID, pool *account.Pool) bool {
 		validatorSeats = append(validatorSeats, &Validator{
 			AccountID:      id,
 			SeatIndex:      uint8(lo.Return1(latestCommittee.GetSeat(id))),
