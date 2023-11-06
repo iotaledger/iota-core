@@ -5,12 +5,12 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/utils"
@@ -151,11 +151,11 @@ func TestReadSlotDiffToSnapshotReader(t *testing.T) {
 		},
 	}
 
-	writer := &writerseeker.WriterSeeker{}
+	writer := stream.NewByteBuffer()
 	err := utxoledger.WriteSlotDiffToSnapshotWriter(writer, slotDiff)
 	require.NoError(t, err)
 
-	reader := writer.BytesReader()
+	reader := writer.Reader()
 	readSlotDiff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 	require.NoError(t, err)
 
@@ -179,11 +179,11 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 		},
 	}
 
-	writer := &writerseeker.WriterSeeker{}
+	writer := stream.NewByteBuffer()
 	err := utxoledger.WriteSlotDiffToSnapshotWriter(writer, slotDiff)
 	require.NoError(t, err)
 
-	reader := writer.BytesReader()
+	reader := writer.Reader()
 
 	var readSlot iotago.SlotIndex
 	require.NoError(t, binary.Read(reader, binary.LittleEndian, &readSlot))
@@ -267,10 +267,10 @@ func TestManager_Import(t *testing.T) {
 
 	// Test exporting and importing at the current slot 2
 	{
-		writer := &writerseeker.WriterSeeker{}
+		writer := stream.NewByteBuffer()
 		require.NoError(t, manager.Export(writer, 2))
 
-		reader := writer.BytesReader()
+		reader := writer.Reader()
 
 		importedSlot2 := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 		require.NoError(t, importedSlot2.Import(reader))
@@ -281,10 +281,10 @@ func TestManager_Import(t *testing.T) {
 
 	// Test exporting and importing at slot 1
 	{
-		writer := &writerseeker.WriterSeeker{}
+		writer := stream.NewByteBuffer()
 		require.NoError(t, manager.Export(writer, 1))
 
-		reader := writer.BytesReader()
+		reader := writer.Reader()
 
 		importedSlot1 := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 		require.NoError(t, importedSlot1.Import(reader))
@@ -298,10 +298,10 @@ func TestManager_Import(t *testing.T) {
 
 	// Test exporting and importing at slot 0
 	{
-		writer := &writerseeker.WriterSeeker{}
+		writer := stream.NewByteBuffer()
 		require.NoError(t, manager.Export(writer, 0))
 
-		reader := writer.BytesReader()
+		reader := writer.Reader()
 
 		importedSlot0 := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
 		require.NoError(t, importedSlot0.Import(reader))
@@ -354,11 +354,10 @@ func TestManager_Export(t *testing.T) {
 
 	// Test exporting at the current slot 2
 	{
-		// TODO: replace with our own BytesBuffer, adjust test to use stream API
-		writer := &writerseeker.WriterSeeker{}
+		writer := stream.NewByteBuffer()
 		require.NoError(t, manager.Export(writer, 2))
 
-		reader := writer.BytesReader()
+		reader := writer.Reader()
 
 		var snapshotLedgerSlot iotago.SlotIndex
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &snapshotLedgerSlot))
@@ -367,10 +366,6 @@ func TestManager_Export(t *testing.T) {
 		var outputCount uint64
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &outputCount))
 		require.Equal(t, uint64(8), outputCount)
-
-		var slotDiffCount uint64
-		require.NoError(t, binary.Read(reader, binary.LittleEndian, &slotDiffCount))
-		require.Equal(t, uint64(0), slotDiffCount)
 
 		var snapshotOutputs utxoledger.Outputs
 		for i := uint64(0); i < outputCount; i++ {
@@ -384,14 +379,18 @@ func TestManager_Export(t *testing.T) {
 		require.NoError(t, err)
 
 		tpkg.EqualOutputs(t, unspentOutputs, snapshotOutputs)
+
+		var slotDiffCount uint64
+		require.NoError(t, binary.Read(reader, binary.LittleEndian, &slotDiffCount))
+		require.Equal(t, uint64(0), slotDiffCount)
 	}
 
 	// Test exporting at slot 1
 	{
-		writer := &writerseeker.WriterSeeker{}
+		writer := stream.NewByteBuffer()
 		require.NoError(t, manager.Export(writer, 1))
 
-		reader := writer.BytesReader()
+		reader := writer.Reader()
 
 		var snapshotLedgerSlot iotago.SlotIndex
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &snapshotLedgerSlot))
@@ -400,10 +399,6 @@ func TestManager_Export(t *testing.T) {
 		var outputCount uint64
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &outputCount))
 		require.Equal(t, uint64(8), outputCount)
-
-		var slotDiffCount uint64
-		require.NoError(t, binary.Read(reader, binary.LittleEndian, &slotDiffCount))
-		require.Equal(t, uint64(1), slotDiffCount)
 
 		var snapshotOutputs utxoledger.Outputs
 		for i := uint64(0); i < outputCount; i++ {
@@ -416,6 +411,10 @@ func TestManager_Export(t *testing.T) {
 		require.NoError(t, err)
 
 		tpkg.EqualOutputs(t, unspentOutputs, snapshotOutputs)
+
+		var slotDiffCount uint64
+		require.NoError(t, binary.Read(reader, binary.LittleEndian, &slotDiffCount))
+		require.Equal(t, uint64(1), slotDiffCount)
 
 		for i := uint64(0); i < slotDiffCount; i++ {
 			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
@@ -426,10 +425,10 @@ func TestManager_Export(t *testing.T) {
 
 	// Test exporting at slot 0
 	{
-		writer := &writerseeker.WriterSeeker{}
+		writer := stream.NewByteBuffer()
 		require.NoError(t, manager.Export(writer, 0))
 
-		reader := writer.BytesReader()
+		reader := writer.Reader()
 
 		var snapshotLedgerSlot iotago.SlotIndex
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &snapshotLedgerSlot))
@@ -438,10 +437,6 @@ func TestManager_Export(t *testing.T) {
 		var outputCount uint64
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &outputCount))
 		require.Equal(t, uint64(8), outputCount)
-
-		var slotDiffCount uint64
-		require.NoError(t, binary.Read(reader, binary.LittleEndian, &slotDiffCount))
-		require.Equal(t, uint64(2), slotDiffCount)
 
 		var snapshotOutputs utxoledger.Outputs
 		for i := uint64(0); i < outputCount; i++ {
@@ -454,6 +449,10 @@ func TestManager_Export(t *testing.T) {
 		require.NoError(t, err)
 
 		tpkg.EqualOutputs(t, unspentOutputs, snapshotOutputs)
+
+		var slotDiffCount uint64
+		require.NoError(t, binary.Read(reader, binary.LittleEndian, &slotDiffCount))
+		require.Equal(t, uint64(2), slotDiffCount)
 
 		for i := uint64(0); i < slotDiffCount; i++ {
 			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))

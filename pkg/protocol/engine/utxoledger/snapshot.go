@@ -1,7 +1,6 @@
 package utxoledger
 
 import (
-	"encoding/binary"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -19,49 +18,50 @@ func (o *Output) SnapshotBytes() []byte {
 }
 
 func OutputFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider) (*Output, error) {
-	outputID := iotago.OutputID{}
-	if _, err := io.ReadFull(reader, outputID[:]); err != nil {
-		return nil, ierrors.Errorf("unable to read LS output ID: %w", err)
-	}
-
-	blockID := iotago.BlockID{}
-	if _, err := io.ReadFull(reader, blockID[:]); err != nil {
-		return nil, ierrors.Errorf("unable to read LS block ID: %w", err)
-	}
-
-	var slotBooked iotago.SlotIndex
-	if err := binary.Read(reader, binary.LittleEndian, &slotBooked); err != nil {
-		return nil, ierrors.Errorf("unable to read LS output milestone index booked: %w", err)
-	}
-
-	var outputLength uint32
-	if err := binary.Read(reader, binary.LittleEndian, &outputLength); err != nil {
-		return nil, ierrors.Errorf("unable to read LS output length: %w", err)
-	}
-
-	outputBytes := make([]byte, outputLength)
-	if _, err := io.ReadFull(reader, outputBytes); err != nil {
-		return nil, ierrors.Errorf("unable to read LS output bytes: %w", err)
-	}
-
-	var output iotago.TxEssenceOutput
-	if _, err := apiProvider.APIForSlot(blockID.Slot()).Decode(outputBytes, &output, serix.WithValidation()); err != nil {
-		return nil, ierrors.Errorf("invalid LS output address: %w", err)
-	}
-
-	var proofLength uint32
-	if err := binary.Read(reader, binary.LittleEndian, &proofLength); err != nil {
-		return nil, ierrors.Errorf("unable to read LS output proof length: %w", err)
-	}
-
-	proofBytes := make([]byte, proofLength)
-	if _, err := io.ReadFull(reader, proofBytes); err != nil {
-		return nil, ierrors.Errorf("unable to read LS output proof bytes: %w", err)
-	}
-
-	proof, _, err := iotago.OutputIDProofFromBytes(apiProvider.APIForSlot(blockID.Slot()))(proofBytes)
+	outputID, err := stream.Read[iotago.OutputID](reader)
 	if err != nil {
-		return nil, ierrors.Errorf("invalid LS output proof: %w", err)
+		return nil, ierrors.Wrap(err, "unable to read LS output ID")
+	}
+
+	blockID, err := stream.Read[iotago.BlockID](reader)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "unable to read LS block ID")
+	}
+
+	slotBooked, err := stream.Read[iotago.SlotIndex](reader)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "unable to read LS output slot booked")
+	}
+
+	var outputBytes []byte
+	output, err := stream.ReadObjectWithSize(reader, serializer.SeriLengthPrefixTypeAsUint32, func(bytes []byte) (iotago.TxEssenceOutput, int, error) {
+		outputBytes = bytes
+
+		var o iotago.TxEssenceOutput
+		readBytes, err := apiProvider.APIForSlot(blockID.Slot()).Decode(bytes, &o, serix.WithValidation())
+		if err != nil {
+			return nil, 0, ierrors.Wrap(err, "invalid LS output address")
+		}
+
+		return o, readBytes, nil
+	})
+	if err != nil {
+		return nil, ierrors.Wrap(err, "unable to read LS output")
+	}
+
+	var proofBytes []byte
+	proof, err := stream.ReadObjectWithSize(reader, serializer.SeriLengthPrefixTypeAsUint32, func(bytes []byte) (*iotago.OutputIDProof, int, error) {
+		proofBytes = bytes
+
+		proof, readBytes, err := iotago.OutputIDProofFromBytes(apiProvider.APIForSlot(blockID.Slot()))(proofBytes)
+		if err != nil {
+			return nil, 0, ierrors.Wrap(err, "invalid LS output proof")
+		}
+
+		return proof, readBytes, nil
+	})
+	if err != nil {
+		return nil, ierrors.Wrap(err, "unable to read LS output proof")
 	}
 
 	return NewOutput(apiProvider, outputID, blockID, slotBooked, output, outputBytes, proof, proofBytes), nil
@@ -79,51 +79,54 @@ func SpentFromSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvide
 		return nil, err
 	}
 
-	transactionIDSpent := iotago.TransactionID{}
-	if _, err := io.ReadFull(reader, transactionIDSpent[:]); err != nil {
-		return nil, ierrors.Errorf("unable to read LS transaction ID spent: %w", err)
+	transactionIDSpent, err := stream.Read[iotago.TransactionID](reader)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "unable to read LS transaction ID spent")
 	}
 
 	return NewSpent(output, transactionIDSpent, indexSpent), nil
 }
 
 func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIProvider) (*SlotDiff, error) {
+	var err error
 	slotDiff := &SlotDiff{}
 
-	var diffIndex iotago.SlotIndex
-	if err := binary.Read(reader, binary.LittleEndian, &diffIndex); err != nil {
-		return nil, ierrors.Errorf("unable to read slot diff index: %w", err)
-	}
-	slotDiff.Slot = diffIndex
-
-	var createdCount uint64
-	if err := binary.Read(reader, binary.LittleEndian, &createdCount); err != nil {
-		return nil, ierrors.Errorf("unable to read slot diff created count: %w", err)
+	if slotDiff.Slot, err = stream.Read[iotago.SlotIndex](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read slot diff index")
 	}
 
+	createdCount, err := stream.Peek(reader, serializer.SeriLengthPrefixTypeAsUint64)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "unable to peek slot diff created count")
+	}
 	slotDiff.Outputs = make(Outputs, createdCount)
 
-	for i := uint64(0); i < createdCount; i++ {
-		var err error
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
 		slotDiff.Outputs[i], err = OutputFromSnapshotReader(reader, apiProvider)
 		if err != nil {
-			return nil, ierrors.Errorf("unable to read slot diff output: %w", err)
+			return ierrors.Wrap(err, "unable to read slot diff output")
 		}
+
+		return nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read slot diff created collection")
 	}
 
-	var consumedCount uint64
-	if err := binary.Read(reader, binary.LittleEndian, &consumedCount); err != nil {
-		return nil, ierrors.Errorf("unable to read slot diff consumed count: %w", err)
+	consumedCount, err := stream.Peek(reader, serializer.SeriLengthPrefixTypeAsUint64)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "unable to peek slot diff consumed count")
 	}
-
 	slotDiff.Spents = make(Spents, consumedCount)
 
-	for i := uint64(0); i < consumedCount; i++ {
-		var err error
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
 		slotDiff.Spents[i], err = SpentFromSnapshotReader(reader, apiProvider, slotDiff.Slot)
 		if err != nil {
-			return nil, ierrors.Errorf("unable to read slot diff spent: %w", err)
+			return ierrors.Wrap(err, "unable to read slot diff spent")
 		}
+
+		return nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read slot diff consumed collection")
 	}
 
 	return slotDiff, nil
@@ -166,41 +169,33 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	m.WriteLockLedger()
 	defer m.WriteUnlockLedger()
 
-	// TODO: change this to stream API and collections
-	var snapshotLedgerIndex iotago.SlotIndex
-	if err := binary.Read(reader, binary.LittleEndian, &snapshotLedgerIndex); err != nil {
-		return ierrors.Errorf("unable to read LS ledger index: %w", err)
+	snapshotLedgerIndex, err := stream.Read[iotago.SlotIndex](reader)
+	if err != nil {
+		return ierrors.Wrap(err, "unable to read LS ledger index")
 	}
-
 	if err := m.StoreLedgerIndexWithoutLocking(snapshotLedgerIndex); err != nil {
 		return err
 	}
 
-	var outputCount uint64
-	if err := binary.Read(reader, binary.LittleEndian, &outputCount); err != nil {
-		return ierrors.Errorf("unable to read LS output count: %w", err)
-	}
-
-	for i := uint64(0); i < outputCount; i++ {
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
 		output, err := OutputFromSnapshotReader(reader, m.apiProvider)
 		if err != nil {
-			return ierrors.Errorf("at pos %d: %w", i, err)
+			return ierrors.Wrapf(err, "at pos %d", i)
 		}
 
 		if err := m.importUnspentOutputWithoutLocking(output); err != nil {
-			return err
+			return ierrors.Wrap(err, "unable to import LS output")
 		}
+
+		return nil
+	}); err != nil {
+		return ierrors.Wrap(err, "unable to read LS output collection")
 	}
 
-	var slotDiffCount uint64
-	if err := binary.Read(reader, binary.LittleEndian, &slotDiffCount); err != nil {
-		return ierrors.Errorf("unable to read LS slot diff count: %w", err)
-	}
-
-	for i := uint64(0); i < slotDiffCount; i++ {
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
 		slotDiff, err := ReadSlotDiffToSnapshotReader(reader, m.apiProvider)
 		if err != nil {
-			return err
+			return ierrors.Wrapf(err, "unable to read LS slot diff at index %d", i)
 		}
 
 		if slotDiff.Slot != snapshotLedgerIndex-iotago.SlotIndex(i) {
@@ -208,8 +203,12 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		}
 
 		if err := m.RollbackDiffWithoutLocking(slotDiff.Slot, slotDiff.Outputs, slotDiff.Spents); err != nil {
-			return err
+			return ierrors.Wrapf(err, "unable to rollback LS slot diff at index %d", i)
 		}
+
+		return nil
+	}); err != nil {
+		return ierrors.Wrap(err, "unable to read LS slot diff collection")
 	}
 
 	if err := m.stateTree.Commit(); err != nil {
