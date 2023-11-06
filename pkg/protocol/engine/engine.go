@@ -212,6 +212,7 @@ func New(
 		func(e *Engine) {
 			fmt.Println("Engine Settings", e.Storage.Settings().String())
 		},
+		(*Engine).Reset,
 		(*Engine).TriggerInitialized,
 	)
 }
@@ -223,8 +224,6 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (e *Engine) Reset() {
-	e.Workers.WaitChildren()
-
 	e.BlockRequester.Clear()
 	e.Storage.Reset()
 	e.EvictionState.Reset()
