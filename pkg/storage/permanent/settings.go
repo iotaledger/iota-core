@@ -22,6 +22,7 @@ const (
 	snapshotImportedKey = iota
 	latestCommitmentKey
 	latestFinalizedSlotKey
+	latestStoredSlotKey
 	protocolVersionEpochMappingKey
 	futureProtocolParametersKey
 	protocolParametersKey
@@ -34,6 +35,7 @@ type Settings struct {
 	storeSnapshotImported            *kvstore.TypedValue[bool]
 	storeLatestCommitment            *kvstore.TypedValue[*model.Commitment]
 	storeLatestFinalizedSlot         *kvstore.TypedValue[iotago.SlotIndex]
+	storeLatestProcessedSlot         *kvstore.TypedValue[iotago.SlotIndex]
 	storeLatestIssuedValidationBlock *kvstore.TypedValue[*model.Block]
 	storeProtocolVersionEpochMapping *kvstore.TypedStore[iotago.Version, iotago.EpochIndex]
 	storeFutureProtocolParameters    *kvstore.TypedStore[iotago.Version, *types.Tuple[iotago.EpochIndex, iotago.Identifier]]
@@ -80,6 +82,12 @@ func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedPro
 		storeLatestFinalizedSlot: kvstore.NewTypedValue(
 			store,
 			[]byte{latestFinalizedSlotKey},
+			iotago.SlotIndex.Bytes,
+			iotago.SlotIndexFromBytes,
+		),
+		storeLatestProcessedSlot: kvstore.NewTypedValue(
+			store,
+			[]byte{latestStoredSlotKey},
 			iotago.SlotIndex.Bytes,
 			iotago.SlotIndexFromBytes,
 		),
@@ -285,7 +293,7 @@ func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return s.latestFinalizedSlot()
+	return read(s.storeLatestFinalizedSlot)
 }
 
 func (s *Settings) SetLatestFinalizedSlot(slot iotago.SlotIndex) (err error) {
@@ -295,23 +303,42 @@ func (s *Settings) SetLatestFinalizedSlot(slot iotago.SlotIndex) (err error) {
 	return s.storeLatestFinalizedSlot.Set(slot)
 }
 
-func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
-	latestFinalizedSlot, err := s.storeLatestFinalizedSlot.Get()
-	if err != nil {
-		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return 0
+func (s *Settings) LatestStoredSlot() iotago.SlotIndex {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	return read(s.storeLatestProcessedSlot)
+}
+
+func (s *Settings) SetLatestStoredSlot(slot iotago.SlotIndex) (err error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	return s.storeLatestProcessedSlot.Set(slot)
+}
+
+func (s *Settings) AdvanceLatestStoredSlot(slot iotago.SlotIndex) (err error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if _, err = s.storeLatestProcessedSlot.Compute(func(latestStoredSlot iotago.SlotIndex, _ bool) (newValue iotago.SlotIndex, err error) {
+		if latestStoredSlot >= slot {
+			return latestStoredSlot, kvstore.ErrTypedValueNotChanged
 		}
-		panic(err)
+
+		return slot, nil
+	}); err != nil {
+		return ierrors.Wrap(err, "failed to advance latest stored slot")
 	}
 
-	return latestFinalizedSlot
+	return nil
 }
 
 func (s *Settings) LatestIssuedValidationBlock() *model.Block {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	return s.latestIssuedValidationBlock()
+	return read(s.storeLatestIssuedValidationBlock)
 }
 
 func (s *Settings) SetLatestIssuedValidationBlock(block *model.Block) (err error) {
@@ -319,18 +346,6 @@ func (s *Settings) SetLatestIssuedValidationBlock(block *model.Block) (err error
 	defer s.mutex.Unlock()
 
 	return s.storeLatestIssuedValidationBlock.Set(block)
-}
-
-func (s *Settings) latestIssuedValidationBlock() *model.Block {
-	block, err := s.storeLatestIssuedValidationBlock.Get()
-	if err != nil {
-		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return nil
-		}
-		panic(err)
-	}
-
-	return block
 }
 
 func (s *Settings) Export(writer io.WriteSeeker, targetCommitment *iotago.Commitment) error {
@@ -579,7 +594,7 @@ func (s *Settings) String() string {
 	builder := stringify.NewStructBuilder("Settings")
 	builder.AddField(stringify.NewStructField("IsSnapshotImported", lo.PanicOnErr(s.storeSnapshotImported.Has())))
 	builder.AddField(stringify.NewStructField("LatestCommitment", s.latestCommitment()))
-	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", s.latestFinalizedSlot()))
+	builder.AddField(stringify.NewStructField("LatestFinalizedSlot", read(s.storeLatestFinalizedSlot)))
 	if err := s.storeProtocolParameters.Iterate(kvstore.EmptyPrefix, func(version iotago.Version, protocolParams iotago.ProtocolParameters) bool {
 		builder.AddField(stringify.NewStructField(fmt.Sprintf("ProtocolParameters(%d)", version), protocolParams))
 
@@ -589,4 +604,13 @@ func (s *Settings) String() string {
 	}
 
 	return builder.String()
+}
+
+func read[T any](typedValue *kvstore.TypedValue[T]) (value T) {
+	value, err := typedValue.Get()
+	if err != nil && !ierrors.Is(err, kvstore.ErrKeyNotFound) {
+		panic(err)
+	}
+
+	return value
 }

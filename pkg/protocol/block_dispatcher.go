@@ -242,7 +242,10 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 	b.processedWarpSyncRequests.Add(commitmentID)
 
-	// make sure the engine is clean before we start processing the blocks
+	// make sure the engine is clean and requires a warp-sync before we start processing the blocks
+	if targetEngine.Workers.WaitChildren(); targetEngine.Storage.Settings().LatestCommitment().ID().Slot() > commitmentID.Slot() {
+		return nil
+	}
 	targetEngine.Reset()
 
 	// Once all blocks are booked we
