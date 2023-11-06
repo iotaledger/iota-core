@@ -3,7 +3,6 @@ package eviction
 import (
 	"io"
 
-	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -359,11 +358,12 @@ func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (thresholdS
 		storage := lo.PanicOnErr(s.rootBlockStorageFunc(slot))
 
 		storage.StreamKeys(func(_ iotago.BlockID) error {
-			if thresholdSlot, _ = safemath.SafeSub(slot, s.optsRootBlocksEvictionDelay); thresholdSlot <= genesisSlot {
+			if slot >= s.optsRootBlocksEvictionDelay {
+				thresholdSlot = slot - s.optsRootBlocksEvictionDelay
+				shouldEvict = true
+			} else {
 				thresholdSlot = genesisSlot
 				shouldEvict = false
-			} else {
-				shouldEvict = true
 			}
 
 			rootBlockInWindow = true
