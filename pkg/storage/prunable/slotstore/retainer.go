@@ -62,6 +62,7 @@ func (t *TransactionRetainerData) Bytes() ([]byte, error) {
 	if err := stream.Write(byteBuffer, t.FailureReason); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write transaction failure reason")
 	}
+
 	return byteBuffer.Bytes()
 }
 
