@@ -1,8 +1,6 @@
 package core
 
 import (
-	"encoding/binary"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/protobuf/proto"
 
@@ -208,28 +206,31 @@ func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []by
 		return
 	}
 
-	if len(attestationsBytes) < 4 {
-		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize attestations, invalid attestation count"), id)
+	reader := stream.NewByteReader(attestationsBytes)
+
+	attestationsCount, err := stream.Peek(reader, serializer.SeriLengthPrefixTypeAsUint32)
+	if err != nil {
+		p.Events.Error.Trigger(ierrors.Errorf("failed peek attestations count"), id)
 
 		return
 	}
 
-	attestationCount := binary.LittleEndian.Uint32(attestationsBytes[0:4])
-	readOffset := 4
-	attestations := make([]*iotago.Attestation, attestationCount)
-	for i := uint32(0); i < attestationCount; i++ {
-		attestation, consumed, err := iotago.AttestationFromBytes(p.apiProvider)(attestationsBytes[readOffset:])
+	attestations := make([]*iotago.Attestation, attestationsCount)
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
+		attestations[i], err = stream.ReadObjectWithSize(reader, serializer.SeriLengthPrefixTypeAsUint16, iotago.AttestationFromBytes(p.apiProvider))
 		if err != nil {
-			p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
-
-			return
+			return ierrors.Wrapf(err, "failed to deserialize attestation %d", i)
 		}
 
-		readOffset += consumed
-		attestations[i] = attestation
+		return nil
+	}); err != nil {
+		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
+
+		return
 	}
-	if readOffset != len(attestationsBytes) {
-		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize attestations: %d bytes remaining", len(attestationsBytes)-readOffset), id)
+
+	if reader.BytesRead() != len(attestationsBytes) {
+		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize attestations: %d bytes remaining", len(attestationsBytes)-reader.BytesRead()), id)
 
 		return
 	}
