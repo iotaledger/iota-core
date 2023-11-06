@@ -181,7 +181,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	// Update the Accounts ledger
 	// first, get the RMC corresponding to this slot
 	protocolParams := l.apiProvider.APIForSlot(slot).ProtocolParameters()
-	rmcSlot, _ := safemath.SafeSub(slot, protocolParams.MaxCommittableAge())
+	rmcSlot, _ := safemath.SafeSub(slot, protocolParams.MaxCommittableAge()) // We can safely ignore the underflow error and use the default 0 return value
 	if rmcSlot < protocolParams.GenesisSlot() {
 		rmcSlot = protocolParams.GenesisSlot()
 	}
