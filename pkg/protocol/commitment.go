@@ -80,10 +80,12 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		c.IsRoot.LogUpdates(entityLogger, log.LevelTrace, "IsRoot")
 	})
 
+	// spawnedChain contains a local copy of the spawned chain variable, so we can return the same instance when we fork
 	var spawnedChain *Chain
 
 	unsubscribe := lo.Batch(
-		// populate the local copy of the spawned chain variable with the first value we ever set
+		// populate first value of the spawned chain variable to our local variable, so we can access the latest value
+		// even if it was set from the outside (e.g. for the root commitment where we manually set the main chain).
 		c.SpawnedChain.OnUpdateOnce(func(_, newSpawnedChain *Chain) { spawnedChain = newSpawnedChain }),
 
 		c.IsSolid.InheritFrom(c.IsRoot),
@@ -102,7 +104,7 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 
 			return lo.Batch(
 				c.SpawnedChain.DeriveValueFrom(reactive.NewDerivedVariable2(func(isRoot bool, mainChild *Commitment) *Chain {
-					if !isRoot { // do not automatically adjust the chain of the root commitment
+					if !isRoot { // do not adjust the chain of the root commitment
 						if mainChild != c {
 							if spawnedChain == nil {
 								spawnedChain = NewChain(protocol)
@@ -169,14 +171,14 @@ func (c *Commitment) Engine() *engine.Engine {
 	return nil
 }
 
-func (c *Commitment) promote(targetChain *Chain) {
+func (c *Commitment) setChain(targetChain *Chain) {
 	if currentChain := c.Chain.Get(); currentChain != targetChain {
 		if currentChain == nil {
-			// since we only promote commitments that come from an engine, this can only happen if the commitment is the
-			// root commitment of the main chain that is the first commitment ever published (which means that we can just
-			// set the chain that we want it to have)
-			c.Chain.Set(targetChain)
+			// since we only call setChain for commitments coming from an engine (which by definition are solid), this
+			// can only happen if the commitment is the root commitment of the main chain that is the first commitment
+			// ever published (which means that we can just set the chain that we want it to have).
 			c.SpawnedChain.Set(targetChain)
+			c.Chain.Set(targetChain)
 		} else if parent := c.Parent.Get(); parent.Chain.Get() == targetChain {
 			parent.MainChild.Set(c)
 		}

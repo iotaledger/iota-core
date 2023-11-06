@@ -241,7 +241,7 @@ func (c *ChainManager) publishEngineCommitments(chain *Chain) {
 				latestPublishedSlot = commitment.Slot()
 
 				if publishedCommitment.IsSolid.Get() {
-					publishedCommitment.promote(chain)
+					publishedCommitment.setChain(chain)
 				}
 
 				return publishedCommitment, published
@@ -253,7 +253,7 @@ func (c *ChainManager) publishEngineCommitments(chain *Chain) {
 						if forkingPoint := chain.ForkingPoint.Get(); forkingPoint == nil {
 							rootCommitment, _ := publishCommitment(engine.RootCommitment.Get())
 							rootCommitment.IsRoot.Trigger()
-							rootCommitment.promote(chain)
+							rootCommitment.setChain(chain)
 
 							chain.ForkingPoint.Set(rootCommitment)
 						} else {
