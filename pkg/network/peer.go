@@ -81,15 +81,15 @@ func (p *Peer) SetConnStatus(cs ConnectionStatus) {
 func (p *Peer) Bytes() ([]byte, error) {
 	byteBuffer := stream.NewByteBuffer()
 
-	if err := stream.WriteObjectWithSize(byteBuffer, p.ID, serializer.UInt16ByteSize, func(id peer.ID) ([]byte, error) {
+	if err := stream.WriteObjectWithSize(byteBuffer, p.ID, serializer.SeriLengthPrefixTypeAsUint16, func(id peer.ID) ([]byte, error) {
 		return []byte(id), nil
 	}); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write peer ID")
 	}
 
-	if err := stream.WriteCollection(byteBuffer, serializer.OneByte, func() (elementsCount int, err error) {
+	if err := stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsByte, func() (elementsCount int, err error) {
 		for _, addr := range p.PeerAddresses {
-			if err = stream.WriteObjectWithSize(byteBuffer, addr, serializer.UInt16ByteSize, func(m multiaddr.Multiaddr) ([]byte, error) {
+			if err = stream.WriteObjectWithSize(byteBuffer, addr, serializer.SeriLengthPrefixTypeAsUint16, func(m multiaddr.Multiaddr) ([]byte, error) {
 				return m.Bytes(), nil
 			}); err != nil {
 				return 0, ierrors.Wrap(err, "failed to write peer address")
@@ -120,7 +120,7 @@ func peerFromBytes(bytes []byte) (*Peer, error) {
 	var err error
 	byteReader := stream.NewByteReader(bytes)
 
-	if p.ID, err = stream.ReadObjectWithSize(byteReader, serializer.UInt16ByteSize, func(bytes []byte) (peer.ID, int, error) {
+	if p.ID, err = stream.ReadObjectWithSize(byteReader, serializer.SeriLengthPrefixTypeAsUint16, func(bytes []byte) (peer.ID, int, error) {
 		id, err := peer.IDFromBytes(bytes)
 		if err != nil {
 			return "", 0, ierrors.Wrap(err, "failed to parse peerID")
@@ -133,8 +133,8 @@ func peerFromBytes(bytes []byte) (*Peer, error) {
 
 	p.SetConnStatus(ConnStatusDisconnected)
 
-	if err = stream.ReadCollection(byteReader, serializer.OneByte, func(i int) error {
-		addr, err := stream.ReadObjectWithSize(byteReader, serializer.UInt16ByteSize, func(bytes []byte) (multiaddr.Multiaddr, int, error) {
+	if err = stream.ReadCollection(byteReader, serializer.SeriLengthPrefixTypeAsByte, func(i int) error {
+		addr, err := stream.ReadObjectWithSize(byteReader, serializer.SeriLengthPrefixTypeAsUint16, func(bytes []byte) (multiaddr.Multiaddr, int, error) {
 			m, err := multiaddr.NewMultiaddrBytes(bytes)
 			if err != nil {
 				return nil, 0, ierrors.Wrap(err, "failed to parse peer address")

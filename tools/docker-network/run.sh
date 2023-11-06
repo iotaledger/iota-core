@@ -49,7 +49,7 @@ docker run --rm \
   -e GOCACHE="/go-cache" \
   -e GOMODCACHE="/go-mod-cache" \
   -w "/workspace/tools/genesis-snapshot" \
-  golang:1.21 go run -tags=rocksdb . --config docker --seed 7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih
+  golang:1.21-bookworm go run -tags=rocksdb . --config docker --seed 7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih
 
 # Move and set permissions for the .snapshot file
 mv -f ../genesis-snapshot/*.snapshot .

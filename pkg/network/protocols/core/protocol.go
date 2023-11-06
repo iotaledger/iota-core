@@ -76,9 +76,9 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...peer.ID) {
 func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...peer.ID) {
 	byteBuffer := stream.NewByteBuffer()
 
-	if err := stream.WriteCollection(byteBuffer, serializer.UInt32ByteSize, func() (elementsCount int, err error) {
+	if err := stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
 		for _, att := range attestations {
-			if err = stream.WriteObjectWithSize(byteBuffer, att, serializer.UInt16ByteSize, (*iotago.Attestation).Bytes); err != nil {
+			if err = stream.WriteObjectWithSize(byteBuffer, att, serializer.SeriLengthPrefixTypeAsUint16, (*iotago.Attestation).Bytes); err != nil {
 				return 0, ierrors.Wrapf(err, "failed to write attestation %v", att)
 			}
 		}
