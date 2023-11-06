@@ -3,8 +3,7 @@ package eviction
 import (
 	"io"
 
-	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ds/ringbuffer"
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -21,8 +20,6 @@ const latestNonEmptySlotKey = 1
 type State struct {
 	Events *Events
 
-	rootBlocks           *memstorage.IndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID]
-	latestRootBlocks     *ringbuffer.RingBuffer[iotago.BlockID]
 	rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error)
 	lastEvictedSlot      iotago.SlotIndex
 	latestNonEmptyStore  kvstore.KVStore
@@ -37,8 +34,6 @@ type State struct {
 func NewState(latestNonEmptyStore kvstore.KVStore, rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error), genesisRootBlockFunc func() iotago.BlockID, opts ...options.Option[State]) (state *State) {
 	return options.Apply(&State{
 		Events:                      NewEvents(),
-		rootBlocks:                  memstorage.NewIndexedStorage[iotago.SlotIndex, iotago.BlockID, iotago.CommitmentID](),
-		latestRootBlocks:            ringbuffer.NewRingBuffer[iotago.BlockID](8),
 		rootBlockStorageFunc:        rootBlockStorageFunc,
 		latestNonEmptyStore:         latestNonEmptyStore,
 		genesisRootBlockFunc:        genesisRootBlockFunc,
@@ -57,8 +52,12 @@ func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 
 	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(slot); shouldEvictRootBlocks {
 		// Remember the last slot outside our cache window that has root blocks.
-		if evictedSlot := s.rootBlocks.Evict(delayedIndex); evictedSlot != nil && evictedSlot.Size() > 0 {
-			s.setLatestNonEmptySlot(delayedIndex)
+		if storage, err := s.rootBlockStorageFunc(delayedIndex); err != nil {
+			storage.StreamKeys(func(_ iotago.BlockID) error {
+				s.setLatestNonEmptySlot(delayedIndex)
+
+				return ierrors.New("stop iteration")
+			})
 		}
 	}
 
@@ -89,15 +88,17 @@ func (s *State) ActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
 	activeRootBlocks := make(map[iotago.BlockID]iotago.CommitmentID)
 	startSlot, endSlot := s.activeIndexRange()
 	for slot := startSlot; slot <= endSlot; slot++ {
-		storage := s.rootBlocks.Get(slot)
-		if storage == nil {
+		// We assume the cache is always populated for the latest slots.
+		storage, err := s.rootBlockStorageFunc(slot)
+		// Slot too old, it was pruned.
+		if err != nil {
 			continue
 		}
 
-		storage.ForEach(func(id iotago.BlockID, commitmentID iotago.CommitmentID) bool {
+		storage.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
 			activeRootBlocks[id] = commitmentID
 
-			return true
+			return nil
 		})
 	}
 
@@ -114,13 +115,9 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 		return
 	}
 
-	if s.rootBlocks.Get(id.Slot(), true).Set(id, commitmentID) {
-		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Store(id, commitmentID); err != nil {
-			panic(ierrors.Wrapf(err, "failed to store root block %s", id))
-		}
+	if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Store(id, commitmentID); err != nil {
+		panic(ierrors.Wrapf(err, "failed to store root block %s", id))
 	}
-
-	s.latestRootBlocks.Add(id)
 }
 
 // RemoveRootBlock removes a solid entry points from the map.
@@ -128,10 +125,8 @@ func (s *State) RemoveRootBlock(id iotago.BlockID) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	if rootBlocks := s.rootBlocks.Get(id.Slot()); rootBlocks != nil && rootBlocks.Delete(id) {
-		if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Delete(id); err != nil {
-			panic(err)
-		}
+	if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Delete(id); err != nil {
+		panic(err)
 	}
 }
 
@@ -144,9 +139,12 @@ func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
 		return false
 	}
 
-	slotBlocks := s.rootBlocks.Get(id.Slot(), false)
+	storage, err := s.rootBlockStorageFunc(id.Slot())
+	if err != nil {
+		return false
+	}
 
-	return slotBlocks != nil && slotBlocks.Has(id)
+	return lo.PanicOnErr(storage.Has(id))
 }
 
 // RootBlockCommitmentID returns the commitmentID if it is a known root block.
@@ -158,22 +156,15 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 		return iotago.CommitmentID{}, false
 	}
 
-	slotBlocks := s.rootBlocks.Get(id.Slot(), false)
-	if slotBlocks == nil {
-		return iotago.CommitmentID{}, false
+	storage, err := s.rootBlockStorageFunc(id.Slot())
+	if err != nil {
+		return iotago.EmptyCommitmentID, false
 	}
 
-	return slotBlocks.Get(id)
-}
+	// This return empty value for commitmentID in the case the key is not found.
+	commitmentID = lo.PanicOnErr(storage.Load(id))
 
-// LatestRootBlocks returns the latest root blocks.
-func (s *State) LatestRootBlocks() iotago.BlockIDs {
-	rootBlocks := s.latestRootBlocks.ToSlice()
-	if len(rootBlocks) == 0 {
-		return iotago.BlockIDs{s.genesisRootBlockFunc()}
-	}
-
-	return rootBlocks
+	return commitmentID, commitmentID != iotago.EmptyCommitmentID
 }
 
 // Export exports the root blocks to the given writer.
@@ -235,7 +226,6 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 // Import imports the root blocks from the given reader.
 func (s *State) Import(reader io.ReadSeeker) error {
 	if err := stream.ReadCollection(reader, func(i int) error {
-
 		blockIDBytes, err := stream.ReadBlob(reader)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to read root block id %d", i)
@@ -256,10 +246,8 @@ func (s *State) Import(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "failed to parse root block's %s commitment id", rootBlockID)
 		}
 
-		if s.rootBlocks.Get(rootBlockID.Slot(), true).Set(rootBlockID, commitmentID) {
-			if err := lo.PanicOnErr(s.rootBlockStorageFunc(rootBlockID.Slot())).Store(rootBlockID, commitmentID); err != nil {
-				panic(ierrors.Wrapf(err, "failed to store root block %s", rootBlockID))
-			}
+		if err := lo.PanicOnErr(s.rootBlockStorageFunc(rootBlockID.Slot())).Store(rootBlockID, commitmentID); err != nil {
+			panic(ierrors.Wrapf(err, "failed to store root block %s", rootBlockID))
 		}
 
 		return nil
@@ -310,22 +298,6 @@ func (s *State) Rollback(lowerTarget, targetIndex iotago.SlotIndex) error {
 	}
 
 	return nil
-}
-
-// PopulateFromStorage populates the root blocks from the storage.
-func (s *State) PopulateFromStorage(latestCommitmentSlot iotago.SlotIndex) {
-	for slot := lo.Return1(s.delayedBlockEvictionThreshold(latestCommitmentSlot)); slot <= latestCommitmentSlot; slot++ {
-		storedRootBlocks, err := s.rootBlockStorageFunc(slot)
-		if err != nil {
-			continue
-		}
-
-		_ = storedRootBlocks.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
-			s.AddRootBlock(id, commitmentID)
-
-			return nil
-		})
-	}
 }
 
 // latestNonEmptySlot returns the latest slot that contains a rootblock.
@@ -381,17 +353,27 @@ func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (thresholdS
 		return genesisSlot, false
 	}
 
+	var rootBlockInWindow bool
 	// Check if we have root blocks up to the eviction point.
 	for ; slot >= s.lastEvictedSlot; slot-- {
-		if rb := s.rootBlocks.Get(slot); rb != nil {
-			if rb.Size() > 0 {
-				if slot >= s.optsRootBlocksEvictionDelay {
-					return slot - s.optsRootBlocksEvictionDelay, true
-				}
+		storage := lo.PanicOnErr(s.rootBlockStorageFunc(slot))
 
-				return genesisSlot, false
+		storage.StreamKeys(func(_ iotago.BlockID) error {
+			if thresholdSlot, _ = safemath.SafeSub(slot, s.optsRootBlocksEvictionDelay); thresholdSlot <= genesisSlot {
+				thresholdSlot = genesisSlot
+				shouldEvict = false
+			} else {
+				shouldEvict = true
 			}
-		}
+
+			rootBlockInWindow = true
+
+			return ierrors.New("stop iteration")
+		})
+	}
+
+	if rootBlockInWindow {
+		return thresholdSlot, shouldEvict
 	}
 
 	// If we didn't find any root blocks, we have to fallback to the latestNonEmptySlot before the eviction point.
