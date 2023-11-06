@@ -325,11 +325,7 @@ func (m *Manager) Reset() {
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 
-	m.futureAttestations.ForEach(func(slot iotago.SlotIndex, _ *shrinkingmap.ShrinkingMap[iotago.AccountID, *iotago.Attestation]) {
-		if slot > m.lastCommittedSlot {
-			m.futureAttestations.Evict(slot)
-		}
-	})
+	m.futureAttestations.Clear()
 
 	m.pendingAttestations.ForEach(func(slot iotago.SlotIndex, _ *shrinkingmap.ShrinkingMap[iotago.AccountID, *iotago.Attestation]) {
 		if slot > m.lastCommittedSlot {
