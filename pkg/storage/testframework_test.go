@@ -91,7 +91,7 @@ func (t *TestFramework) GeneratePrunableData(epoch iotago.EpochIndex, size int64
 	var createdBytes int64
 	for createdBytes < size {
 		block := tpkg.RandBlock(&iotago.BasicBlockBody{
-			StrongParents: tpkg.SortedRandBlockIDs(1 + rand.Intn(iotago.BlockMaxParents)),
+			StrongParents: tpkg.SortedRandBlockIDs(1 + rand.Intn(iotago.BasicBlockMaxParents)),
 			Payload:       &iotago.TaggedData{Data: make([]byte, 8192)},
 			MaxBurnedMana: 1000,
 		}, apiForEpoch, 0)
@@ -152,7 +152,9 @@ func (t *TestFramework) GenerateSemiPermanentData(epoch iotago.EpochIndex) {
 	createdBytes += int64(len(lo.PanicOnErr(versionAndHash.Bytes()))) + 8 // for epoch key
 
 	accounts := account.NewAccounts()
-	accounts.Set(tpkg.RandAccountID(), &account.Pool{})
+	if err := accounts.Set(tpkg.RandAccountID(), &account.Pool{}); err != nil {
+		t.t.Fatal(err)
+	}
 	err = committeeStore.Store(epoch, accounts)
 	require.NoError(t.t, err)
 	createdBytes += int64(len(lo.PanicOnErr(accounts.Bytes()))) + 8 // for epoch key

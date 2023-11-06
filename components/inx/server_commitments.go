@@ -22,6 +22,14 @@ func inxCommitment(commitment *model.Commitment) *inx.Commitment {
 	}
 }
 
+func (s *Server) ForceCommitUntil(_ context.Context, slot *inx.SlotIndex) (*inx.NoParams, error) {
+	err := deps.Protocol.MainEngineInstance().Notarization.ForceCommitUntil(slot.Unwrap())
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "error while performing force commit until %d", slot.Index)
+	}
+
+	return &inx.NoParams{}, nil
+}
 func (s *Server) ReadCommitment(_ context.Context, req *inx.CommitmentRequest) (*inx.Commitment, error) {
 	commitmentSlot := iotago.SlotIndex(req.GetCommitmentSlot())
 

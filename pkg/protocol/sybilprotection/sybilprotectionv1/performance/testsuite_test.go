@@ -104,11 +104,13 @@ func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[strin
 		action.validate(t.T, t.api)
 
 		accountID := t.Account(alias, true)
-		committee.Set(accountID, &account.Pool{
+		if err := committee.Set(accountID, &account.Pool{
 			PoolStake:      action.PoolStake,
 			ValidatorStake: action.ValidatorStake,
 			FixedCost:      action.FixedCost,
-		})
+		}); err != nil {
+			t.T.Fatal(err)
+		}
 	}
 
 	// Store directly on the committee store, because in actual code the SeatManager is responsible for adding the storage entry.

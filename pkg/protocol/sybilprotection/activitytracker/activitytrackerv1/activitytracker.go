@@ -77,7 +77,9 @@ func (a *ActivityTracker) MarkSeatActive(seat account.SeatIndex, id iotago.Accou
 
 func (a *ActivityTracker) markSeatInactive(seat account.SeatIndex) {
 	a.lastActivities.Delete(seat)
-	a.onlineCommittee.Delete(seat)
 
-	a.Events.OnlineCommitteeSeatRemoved.Trigger(seat)
+	// Only trigger the event if online committee member is removed.
+	if a.onlineCommittee.Delete(seat) {
+		a.Events.OnlineCommitteeSeatRemoved.Trigger(seat)
+	}
 }

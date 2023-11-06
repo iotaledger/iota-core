@@ -4,6 +4,7 @@ import (
 	"io"
 	"sync/atomic"
 
+	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -65,31 +66,44 @@ func (a *Accounts) Get(id iotago.AccountID) (pool *Pool, exists bool) {
 }
 
 // setWithoutLocking sets the weight of the given identity.
-func (a *Accounts) setWithoutLocking(id iotago.AccountID, pool *Pool) {
+func (a *Accounts) setWithoutLocking(id iotago.AccountID, pool *Pool) error {
 	value, created := a.accountPools.GetOrCreate(id, func() *Pool {
 		return pool
 	})
 
+	var safeMathErr error
+
 	if !created {
 		// if there was already an entry, we need to subtract the former
 		// stake first and set the new value
-		// TODO: use safemath
-		a.totalStake -= value.PoolStake
-		a.totalValidatorStake -= value.ValidatorStake
+		if a.totalStake, safeMathErr = safemath.SafeSub(a.totalStake, value.PoolStake); safeMathErr != nil {
+			return ierrors.Wrapf(safeMathErr, "failed to subtract pool stake from total stake for account %s", id.String())
+		}
+
+		if a.totalValidatorStake, safeMathErr = safemath.SafeSub(a.totalValidatorStake, value.ValidatorStake); safeMathErr != nil {
+			return ierrors.Wrapf(safeMathErr, "failed to subtract validator stake from total validator stake for account %s", id.String())
+		}
 
 		a.accountPools.Set(id, pool)
 	}
 
-	a.totalStake += pool.PoolStake
-	a.totalValidatorStake += pool.ValidatorStake
+	if a.totalStake, safeMathErr = safemath.SafeAdd(a.totalStake, pool.PoolStake); safeMathErr != nil {
+		return ierrors.Wrapf(safeMathErr, "failed to add pool stake to total stake for account %s", id.String())
+	}
+
+	if a.totalValidatorStake, safeMathErr = safemath.SafeAdd(a.totalValidatorStake, pool.ValidatorStake); safeMathErr != nil {
+		return ierrors.Wrapf(safeMathErr, "failed to add validator stake to total validator stake for account %s", id.String())
+	}
+
+	return nil
 }
 
 // Set sets the weight of the given identity.
-func (a *Accounts) Set(id iotago.AccountID, pool *Pool) {
+func (a *Accounts) Set(id iotago.AccountID, pool *Pool) error {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	a.setWithoutLocking(id, pool)
+	return a.setWithoutLocking(id, pool)
 }
 
 func (a *Accounts) TotalStake() iotago.BaseToken {
@@ -141,7 +155,9 @@ func AccountsFromReader(reader io.Reader) (*Accounts, error) {
 			return ierrors.Wrapf(err, "unable to read pool at index %d", i)
 		}
 
-		a.setWithoutLocking(accountID, pool)
+		if err := a.setWithoutLocking(accountID, pool); err != nil {
+			return ierrors.Wrapf(err, "failed to set pool for account %s", accountID.String())
+		}
 
 		return nil
 	}); err != nil {

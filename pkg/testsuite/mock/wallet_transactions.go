@@ -18,7 +18,7 @@ import (
 func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string, recipientWallet *Wallet, creationSlot iotago.SlotIndex, opts ...options.Option[builder.AccountOutputBuilder]) *iotago.SignedTransaction {
 	input := w.Output(inputName)
 
-	accountOutput := options.Apply(builder.NewAccountOutputBuilder(recipientWallet.Address(), recipientWallet.Address(), input.BaseTokenAmount()).
+	accountOutput := options.Apply(builder.NewAccountOutputBuilder(recipientWallet.Address(), input.BaseTokenAmount()).
 		Mana(input.StoredMana()),
 		opts).MustBuild()
 
@@ -151,7 +151,7 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 
 	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
 		transactionName,
-		WithAccountInput(input, true),
+		WithAccountInput(input),
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
 				AccountID: accountOutput.AccountID,
@@ -192,7 +192,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string, creati
 				CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
 			},
 		}),
-		WithAccountInput(input, true),
+		WithAccountInput(input),
 		WithOutputs(destructionOutputs),
 		WithSlotCreated(creationSlot),
 	))
@@ -250,7 +250,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 		panic(fmt.Sprintf("output with alias %s is not an implicit account", inputName))
 	}
 
-	accountOutput := options.Apply(builder.NewAccountOutputBuilder(w.Address(), w.Address(), MinIssuerAccountAmount).
+	accountOutput := options.Apply(builder.NewAccountOutputBuilder(w.Address(), MinIssuerAccountAmount).
 		AccountID(iotago.AccountIDFromOutputID(input.OutputID())),
 		opts).MustBuild()
 
