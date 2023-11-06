@@ -307,7 +307,7 @@ func (e *EngineManager) rollbackStorage(newStorage *storage.Storage, slot iotago
 		return ierrors.Wrap(err, "failed to rollback settings")
 	}
 
-	if err := newStorage.RollbackPrunable(slot); err != nil {
+	if err := newStorage.Rollback(slot); err != nil {
 		return ierrors.Wrap(err, "failed to rollback prunable data")
 	}
 

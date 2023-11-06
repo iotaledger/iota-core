@@ -41,10 +41,10 @@ func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler 
 
 		semiPermanentDBConfig: semiPermanentDBConfig,
 		semiPermanentDB:       semiPermanentDB,
-		decidedUpgradeSignals: epochstore.NewStore(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, kvstore.Realm{lastPrunedEpochKey}, semiPermanentDB.KVStore(), pruningDelayDecidedUpgradeSignals, model.VersionAndHash.Bytes, model.VersionAndHashFromBytes),
-		poolRewards:           epochstore.NewEpochKVStore(kvstore.Realm{epochPrefixPoolRewards}, kvstore.Realm{lastPrunedEpochKey}, semiPermanentDB.KVStore(), pruningDelayPoolRewards),
-		poolStats:             epochstore.NewStore(kvstore.Realm{epochPrefixPoolStats}, kvstore.Realm{lastPrunedEpochKey}, semiPermanentDB.KVStore(), pruningDelayPoolStats, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes),
-		committee:             epochstore.NewStore(kvstore.Realm{epochPrefixCommittee}, kvstore.Realm{lastPrunedEpochKey}, semiPermanentDB.KVStore(), pruningDelayCommittee, (*account.Accounts).Bytes, account.AccountsFromBytes),
+		decidedUpgradeSignals: epochstore.NewStore(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, semiPermanentDB.KVStore(), pruningDelayDecidedUpgradeSignals, model.VersionAndHash.Bytes, model.VersionAndHashFromBytes),
+		poolRewards:           epochstore.NewEpochKVStore(kvstore.Realm{epochPrefixPoolRewards}, semiPermanentDB.KVStore(), pruningDelayPoolRewards),
+		poolStats:             epochstore.NewStore(kvstore.Realm{epochPrefixPoolStats}, semiPermanentDB.KVStore(), pruningDelayPoolStats, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes),
+		committee:             epochstore.NewStore(kvstore.Realm{epochPrefixCommittee}, semiPermanentDB.KVStore(), pruningDelayCommittee, (*account.Accounts).Bytes, account.AccountsFromBytes),
 	}
 }
 
@@ -142,58 +142,64 @@ func (p *Prunable) Flush() {
 	}
 }
 
-func (p *Prunable) Rollback(targetSlot iotago.SlotIndex) error {
-	timeProvider := p.apiProvider.APIForSlot(targetSlot).TimeProvider()
-	targetSlotEpoch := timeProvider.EpochFromSlot(targetSlot)
-	lastCommittedEpoch := targetSlotEpoch
-	// if the target index is the last slot of the epoch, the epoch was committed
-	if timeProvider.EpochEnd(targetSlotEpoch) != targetSlot {
-		lastCommittedEpoch--
+func (p *Prunable) Rollback(targetEpoch iotago.EpochIndex, pruningRange [2]iotago.SlotIndex) error {
+	if err := p.prunableSlotStore.PruneSlots(targetEpoch, pruningRange); err != nil {
+		return ierrors.Wrapf(err, "failed to prune slots in range [%d, %d] from target epoch %d", pruningRange[0], pruningRange[1], targetEpoch)
 	}
 
-	if err := p.prunableSlotStore.RollbackBucket(targetSlotEpoch, targetSlot, timeProvider.EpochEnd(targetSlotEpoch)); err != nil {
-		return ierrors.Wrapf(err, "error while rolling back slots in a bucket for epoch %d", targetSlotEpoch)
+	if err := p.rollbackCommitteesCandidates(targetEpoch, pruningRange[0]-1); err != nil {
+		return ierrors.Wrapf(err, "failed to rollback committee candidates to target epoch %d", targetEpoch)
 	}
 
-	if err := p.rollbackCommitteesCandidates(targetSlotEpoch, targetSlot); err != nil {
-		return ierrors.Wrapf(err, "error while rolling back committee for epoch %d", targetSlotEpoch)
+	lastPrunedCommitteeEpoch, err := p.rollbackCommitteeEpochs(targetEpoch+1, pruningRange[0]-1)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to rollback committee epochs to target epoch %d", targetEpoch)
 	}
 
-	// Shut down the prunableSlotStore in order to flush and get consistent state on disk after reopening.
-	p.prunableSlotStore.Shutdown()
+	lastPrunedPoolStatsEpoch, err := p.poolStats.RollbackEpochs(targetEpoch)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to rollback pool stats epochs to target epoch %d", targetEpoch)
+	}
 
-	// Removed entries that belong to the old fork and cannot be re-used.
-	for epoch := lastCommittedEpoch + 1; ; epoch++ {
-		if epoch > targetSlotEpoch {
-			shouldRollback, err := p.shouldRollbackCommittee(epoch, targetSlot)
-			if err != nil {
-				return ierrors.Wrapf(err, "error while checking if committee for epoch %d should be rolled back", epoch)
-			}
+	lastPrunedDecidedUpgradeSignalsEpoch, err := p.decidedUpgradeSignals.RollbackEpochs(targetEpoch)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to rollback decided upgrade signals epochs to target epoch %d", targetEpoch)
+	}
 
-			if shouldRollback {
-				if err := p.committee.DeleteEpoch(epoch); err != nil {
-					return ierrors.Wrapf(err, "error while deleting committee for epoch %d", epoch)
-				}
-			}
+	lastPrunedPoolRewardsEpoch, err := p.poolRewards.RollbackEpochs(targetEpoch)
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to rollback pool rewards epochs to target epoch %d", targetEpoch)
+	}
 
-			if deleted := p.prunableSlotStore.DeleteBucket(epoch); !deleted {
-				break
-			}
-		}
-
-		if err := p.poolRewards.DeleteEpoch(epoch); err != nil {
-			return ierrors.Wrapf(err, "error while deleting pool rewards for epoch %d", epoch)
-		}
-		if err := p.poolStats.DeleteEpoch(epoch); err != nil {
-			return ierrors.Wrapf(err, "error while deleting pool stats for epoch %d", epoch)
-		}
-
-		if err := p.decidedUpgradeSignals.DeleteEpoch(epoch); err != nil {
-			return ierrors.Wrapf(err, "error while deleting decided upgrade signals for epoch %d", epoch)
-		}
+	for epochToPrune := targetEpoch + 1; epochToPrune <= max(
+		lastPrunedCommitteeEpoch,
+		lastPrunedPoolStatsEpoch,
+		lastPrunedDecidedUpgradeSignalsEpoch,
+		lastPrunedPoolRewardsEpoch,
+	); epochToPrune++ {
+		p.prunableSlotStore.DeleteBucket(epochToPrune)
 	}
 
 	return nil
+}
+
+func (p *Prunable) rollbackCommitteeEpochs(epoch iotago.EpochIndex, targetSlot iotago.SlotIndex) (lastPrunedEpoch iotago.EpochIndex, err error) {
+	lastAccessedEpoch, err := p.committee.LastAccessedEpoch()
+	if err != nil {
+		return lastAccessedEpoch, ierrors.Wrap(err, "failed to get last accessed committee epoch")
+	}
+
+	for epochToPrune := epoch; epochToPrune <= lastAccessedEpoch; epochToPrune++ {
+		if shouldRollback, rollbackErr := p.shouldRollbackCommittee(epochToPrune, targetSlot); rollbackErr != nil {
+			return epochToPrune, ierrors.Wrapf(rollbackErr, "error while checking if committee for epoch %d should be rolled back", epochToPrune)
+		} else if shouldRollback {
+			if err = p.committee.DeleteEpoch(epochToPrune); err != nil {
+				return epochToPrune, ierrors.Wrapf(err, "error while deleting committee for epoch %d", epochToPrune)
+			}
+		}
+	}
+
+	return lastAccessedEpoch, nil
 }
 
 // Remove committee for the next epoch only if forking point is before point of no return and committee is reused.
