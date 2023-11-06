@@ -139,6 +139,9 @@ func (u *UnsolidCommitmentBuffer[V]) GetValuesAndEvict(commitmentID iotago.Commi
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (u *UnsolidCommitmentBuffer[V]) Reset() {
+	u.mutex.Lock()
+	defer u.mutex.Unlock()
+
 	u.blockBuffers.Clear()
 	u.commitmentBuffer.Each(func(key iotago.CommitmentID, _ types.Empty) { u.commitmentBuffer.Remove(key) })
 }
