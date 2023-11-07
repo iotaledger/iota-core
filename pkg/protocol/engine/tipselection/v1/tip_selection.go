@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/timed"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -54,6 +55,12 @@ type TipSelection struct {
 
 	// optMaxWeakReferences contains the maximum number of weak references that are allowed.
 	optMaxWeakReferences int
+
+	// livenessThresholdQueueMutex is used to synchronize access to the liveness threshold queue.
+	livenessThresholdQueueMutex syncutils.RWMutex
+
+	// acceptanceTimeMutex is used to synchronize access to the acceptance time.
+	acceptanceTimeMutex syncutils.RWMutex
 
 	// Module embeds the required methods of the module.Interface.
 	module.Module
@@ -139,12 +146,16 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 
 // SetAcceptanceTime updates the acceptance time of the TipSelection.
 func (t *TipSelection) SetAcceptanceTime(acceptanceTime time.Time) (previousValue time.Time) {
+	t.acceptanceTimeMutex.RLock()
+	defer t.acceptanceTimeMutex.RUnlock()
+
 	return t.acceptanceTime.Set(acceptanceTime)
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (t *TipSelection) Reset() {
-	// TODO: reset acceptance time and liveness threshold queue
+	t.resetAcceptanceTime()
+	t.resetLivenessThresholdQueue()
 }
 
 // Shutdown triggers the shutdown of the TipSelection.
@@ -235,6 +246,9 @@ func (t *TipSelection) isValidWeakTip(block *blocks.Block) bool {
 
 // triggerLivenessThreshold triggers the liveness threshold for all tips that have reached the given threshold.
 func (t *TipSelection) triggerLivenessThreshold(threshold time.Time) {
+	t.livenessThresholdQueueMutex.RLock()
+	defer t.livenessThresholdQueueMutex.RUnlock()
+
 	for _, tip := range t.livenessThresholdQueue.PopUntil(threshold) {
 		if dynamicLivenessThreshold := tip.Block().IssuingTime().Add(t.livenessThreshold(tip)); dynamicLivenessThreshold.After(threshold) {
 			t.livenessThresholdQueue.Push(tip, dynamicLivenessThreshold)
@@ -242,6 +256,24 @@ func (t *TipSelection) triggerLivenessThreshold(threshold time.Time) {
 			tip.LivenessThresholdReached().Trigger()
 		}
 	}
+}
+
+func (t *TipSelection) resetLivenessThresholdQueue() {
+	t.livenessThresholdQueueMutex.Lock()
+	defer t.livenessThresholdQueueMutex.Unlock()
+
+	t.livenessThresholdQueue = timed.NewPriorityQueue[tipmanager.TipMetadata](true)
+}
+
+func (t *TipSelection) resetAcceptanceTime() {
+	t.acceptanceTimeMutex.Lock()
+	defer t.acceptanceTimeMutex.Unlock()
+
+	t.acceptanceTime = reactive.NewVariable[time.Time](monotonicallyIncreasing)
+
+	t.acceptanceTime.OnUpdate(func(_, acceptanceTime time.Time) {
+		t.triggerLivenessThreshold(acceptanceTime)
+	})
 }
 
 // WithMaxStrongParents is an option for the TipSelection that allows to configure the maximum number of strong parents.
