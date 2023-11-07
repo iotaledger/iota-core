@@ -372,11 +372,14 @@ func (w *Wallet) createSignedTransactionWithOptions(transactionName string, opts
 
 	addrSigner := w.AddressSigner()
 	signedTransaction, err := options.Apply(txBuilder, opts).Build(addrSigner)
+	if err != nil {
+		return nil, err
+	}
 
 	// register the outputs in the wallet
 	w.registerOutputs(transactionName, signedTransaction.Transaction)
 
-	return signedTransaction, err
+	return signedTransaction, nil
 }
 
 func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Transaction) {

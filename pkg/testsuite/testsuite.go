@@ -410,6 +410,10 @@ func (t *TestSuite) addWallet(name string, node *mock.Node, accountID iotago.Acc
 }
 
 func (t *TestSuite) DefaultWallet() *mock.Wallet {
+	if t.wallets.Has("default") {
+		return lo.Return1(t.wallets.Get("default"))
+	}
+
 	_, defaultWallet, exists := t.wallets.Head()
 	if !exists {
 		return nil
