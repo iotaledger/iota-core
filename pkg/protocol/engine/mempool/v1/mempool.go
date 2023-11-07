@@ -69,8 +69,6 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	// evictionMutex is used to synchronize the eviction of slots.
 	evictionMutex syncutils.RWMutex
 
-	optForkAllTransactions bool
-
 	signedTransactionAttached *event.Event1[mempool.SignedTransactionMetadata]
 
 	transactionAttached *event.Event1[mempool.TransactionMetadata]
@@ -319,23 +317,13 @@ func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context,
 }
 
 func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
-	if m.optForkAllTransactions {
-		inputsToFork := lo.Filter(transaction.inputs, func(metadata *StateMetadata) bool {
-			return !metadata.state.IsReadOnly()
-		})
+	inputsToFork := lo.Filter(transaction.inputs, func(metadata *StateMetadata) bool {
+		return !metadata.state.IsReadOnly()
+	})
 
-		m.forkTransaction(transaction, ds.NewSet(lo.Map(inputsToFork, func(stateMetadata *StateMetadata) mempool.StateID {
-			return stateMetadata.state.StateID()
-		})...))
-	} else {
-		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
-			if !input.state.IsReadOnly() {
-				input.OnDoubleSpent(func() {
-					m.forkTransaction(transaction, ds.NewSet(input.state.StateID()))
-				})
-			}
-		})
-	}
+	m.forkTransaction(transaction, ds.NewSet(lo.Map(inputsToFork, func(stateMetadata *StateMetadata) mempool.StateID {
+		return stateMetadata.state.StateID()
+	})...))
 
 	// if !lo.Return2(transaction.IsOrphaned()) && transaction.setBooked() {
 	if transaction.setBooked() {
@@ -546,12 +534,6 @@ func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransactionMetadata *Si
 	signedTransactionMetadata.evicted.OnTrigger(func() {
 		m.cachedSignedTransactions.Delete(signedTransactionMetadata.ID())
 	})
-}
-
-func WithForkAllTransactions[VoteRank conflictdag.VoteRankType[VoteRank]](forkAllTransactions bool) options.Option[MemPool[VoteRank]] {
-	return func(m *MemPool[VoteRank]) {
-		m.optForkAllTransactions = forkAllTransactions
-	}
 }
 
 var _ mempool.MemPool[vote.MockedRank] = new(MemPool[vote.MockedRank])
