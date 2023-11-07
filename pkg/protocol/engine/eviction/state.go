@@ -325,20 +325,18 @@ func (s *State) PopulateFromStorage(latestCommitmentSlot iotago.SlotIndex) {
 }
 
 func (s *State) Reset() {
-	rootBlocksToClear := make([]iotago.BlockID, 0)
+	s.evictionMutex.Lock()
+	defer s.evictionMutex.Unlock()
+
 	s.rootBlocks.ForEach(func(slot iotago.SlotIndex, storage *shrinkingmap.ShrinkingMap[iotago.BlockID, iotago.CommitmentID]) {
 		if slot > s.lastEvictedSlot {
 			storage.ForEach(func(blockID iotago.BlockID, commitmentID iotago.CommitmentID) bool {
-				rootBlocksToClear = append(rootBlocksToClear, blockID)
+				s.RemoveRootBlock(blockID)
 
 				return true
 			})
 		}
 	})
-
-	for _, blockID := range rootBlocksToClear {
-		s.RemoveRootBlock(blockID)
-	}
 }
 
 // latestNonEmptySlot returns the latest slot that contains a rootblock.
