@@ -160,7 +160,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 // 1. Use default wallet to create a new account with staking feature from genesis basic output.
 // 2. Use default wallet to create a delegation to the new account from a basic output.
 // 3. Use default wallet to transition the delegation to delayed claiming.
-func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
+func Test_StakeAndDelegate(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
@@ -462,25 +462,22 @@ func Test_ImplicitAccounts(t *testing.T) {
 	ts.Wait(ts.Nodes()...)
 }
 
-// Starts with an account already existing in snapshot (default wallet).
-// 
-
 /*
 Testcases:
 
 - Test that Reward Inputs can point to an account id that does not exist or has no rewards in the rewards data.
-When fetching rewards for accounts that don't exist (or have no rewards) the node should return 0 rather than an error. 
+When fetching rewards for accounts that don't exist (or have no rewards) the node should return 0 rather than an error.
 This is because reward inputs are required for removing a Staking Feature from an Account or for destroying a Delegation Output.
 Otherwise, if I delegated to some address that doesn't exist, I could not destroy my delegation output because the reward would error.
 (I haven't verified whether this is already implemented as-is or not, but it should be tested regardless).
 
-- Test that Reward Inputs can only point to Accounts & Delegation Outputs. 
+- Test that Reward Inputs can only point to Accounts & Delegation Outputs.
 I tried to quickly find that this is checked somewhere but couldn't, so perhaps it's missing.
 
 - Test that a transaction fails whenever the condition for claiming is not given.
 That is, coming up with scenarios where claiming is not allowed and try to claim (remove staking feature, destroy delegation output).
 
-- Test delegation stuff 
+- Test delegation stuff
 // Step 1
 
 Create Delegation Output A delegating to X

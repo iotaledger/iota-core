@@ -73,11 +73,21 @@ func WithSlotCreated(creationSlot iotago.SlotIndex) options.Option[builder.Trans
 	}
 }
 
-func WithContextInputs(contextInputs iotago.TxEssenceContextInputs) options.Option[builder.TransactionBuilder] {
+func WithCommitmentInput(input *iotago.CommitmentInput) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
-		for _, input := range contextInputs {
-			txBuilder.AddContextInput(input)
-		}
+		txBuilder.AddCommitmentInput(input)
+	}
+}
+
+func WithBlockIssuanceCreditInput(input *iotago.BlockIssuanceCreditInput) options.Option[builder.TransactionBuilder] {
+	return func(txBuilder *builder.TransactionBuilder) {
+		txBuilder.AddBlockIssuanceCreditInput(input)
+	}
+}
+
+func WithRewardInput(input *iotago.RewardInput, mana iotago.Mana) options.Option[builder.TransactionBuilder] {
+	return func(txBuilder *builder.TransactionBuilder) {
+		txBuilder.AddRewardInput(input, mana)
 	}
 }
 
@@ -159,9 +169,21 @@ func WithBlockIssuerExpirySlot(expirySlot iotago.SlotIndex) options.Option[build
 	}
 }
 
+func WithoutBlockIssuerFeature() options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.RemoveFeature(iotago.FeatureBlockIssuer)
+	}
+}
+
 func WithStakingFeature(amount iotago.BaseToken, fixedCost iotago.Mana, startEpoch iotago.EpochIndex, optEndEpoch ...iotago.EpochIndex) options.Option[builder.AccountOutputBuilder] {
 	return func(accountBuilder *builder.AccountOutputBuilder) {
 		accountBuilder.Staking(amount, fixedCost, startEpoch, optEndEpoch...)
+	}
+}
+
+func WithoutStakingFeature() options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.RemoveFeature(iotago.FeatureStaking)
 	}
 }
 
