@@ -80,18 +80,9 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		c.IsRoot.LogUpdates(entityLogger, log.LevelTrace, "IsRoot")
 	})
 
-	// spawnedChain contains a local copy of the spawned chain variable, so we can return the same instance when we fork
-	var spawnedChain *Chain
-
 	unsubscribe := lo.Batch(
-		// populate first value of the spawned chain variable to our local variable, so we can access the latest value
-		// even if it was set from the outside (e.g. for the root commitment where we manually set the main chain).
-		c.SpawnedChain.OnUpdateOnce(func(_, newSpawnedChain *Chain) { spawnedChain = newSpawnedChain }),
-
 		c.IsSolid.InheritFrom(c.IsRoot),
-
 		c.IsAttested.InheritFrom(c.IsRoot),
-
 		c.IsVerified.InheritFrom(c.IsRoot),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
@@ -103,7 +94,7 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 			})
 
 			return lo.Batch(
-				c.SpawnedChain.DeriveValueFrom(reactive.NewDerivedVariable2(func(isRoot bool, mainChild *Commitment) *Chain {
+				c.SpawnedChain.DeriveValueFrom(reactive.NewDerivedVariable2(func(spawnedChain *Chain, isRoot bool, mainChild *Commitment) *Chain {
 					if !isRoot { // do not adjust the chain of the root commitment
 						if mainChild != c {
 							if spawnedChain == nil {
@@ -119,17 +110,17 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 					}
 
 					return spawnedChain
-				}, c.IsRoot, parent.MainChild)),
+				}, c.IsRoot, parent.MainChild, c.SpawnedChain.Get())),
 
-				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(parentChain, spawnedChain *Chain) *Chain {
+				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(_, parentChain, spawnedChain *Chain) *Chain {
 					return lo.Cond(spawnedChain != nil, spawnedChain, parentChain)
 				}, parent.Chain, c.SpawnedChain)),
 
-				c.CumulativeAttestedWeight.DeriveValueFrom(reactive.NewDerivedVariable2(func(parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
+				c.CumulativeAttestedWeight.DeriveValueFrom(reactive.NewDerivedVariable2(func(_, parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
 					return parentCumulativeAttestedWeight + attestedWeight
 				}, parent.CumulativeAttestedWeight, c.AttestedWeight)),
 
-				c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(parentAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
+				c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_, parentAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
 					return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
 				}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified)),
 
@@ -137,15 +128,15 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 
 				c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
 					return lo.Batch(
-						c.InSyncRange.DeriveValueFrom(reactive.NewDerivedVariable3(func(spawnedEngine *engine.Engine, warpSyncing, isAboveLatestVerifiedCommitment bool) bool {
+						c.InSyncRange.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, spawnedEngine *engine.Engine, warpSyncing, isAboveLatestVerifiedCommitment bool) bool {
 							return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
 						}, chain.SpawnedEngine, chain.WarpSync, c.IsAboveLatestVerifiedCommitment)),
 
-						c.WarpSync.DeriveValueFrom(reactive.NewDerivedVariable4(func(spawnedEngine *engine.Engine, warpSync, parentIsVerified, isVerified bool) bool {
+						c.WarpSync.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync, parentIsVerified, isVerified bool) bool {
 							return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
 						}, chain.SpawnedEngine, chain.WarpSync, parent.IsVerified, c.IsVerified)),
 
-						c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable3(func(verifyAttestations, parentIsAttested, isAttested bool) bool {
+						c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, verifyAttestations, parentIsAttested, isAttested bool) bool {
 							return verifyAttestations && parentIsAttested && !isAttested
 						}, chain.VerifyAttestations, parent.IsAttested, c.IsAttested)),
 					)

@@ -141,7 +141,7 @@ func NewChain(protocol *Protocol) *Chain {
 }
 
 func (c *Chain) initClaimedWeight() {
-	c.ClaimedWeight.InheritFrom(reactive.NewDerivedVariable(func(c *Commitment) uint64 {
+	c.ClaimedWeight.InheritFrom(reactive.NewDerivedVariable(func(_ uint64, c *Commitment) uint64 {
 		if c == nil {
 			return 0
 		}
@@ -163,7 +163,7 @@ func (c *Chain) initAttestedWeight() {
 }
 
 func (c *Chain) initVerifiedWeight() {
-	c.VerifiedWeight.InheritFrom(reactive.NewDerivedVariable(func(c *Commitment) uint64 {
+	c.VerifiedWeight.InheritFrom(reactive.NewDerivedVariable(func(_ uint64, c *Commitment) uint64 {
 		if c == nil {
 			return 0
 		}
@@ -174,13 +174,13 @@ func (c *Chain) initVerifiedWeight() {
 
 func (c *Chain) initWarpSync() {
 	enableWarpSyncIfNecessary := func() (unsubscribe func()) {
-		return c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(latestVerifiedCommitment *Commitment, outOfSyncThreshold iotago.SlotIndex) bool {
+		return c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(_ bool, latestVerifiedCommitment *Commitment, outOfSyncThreshold iotago.SlotIndex) bool {
 			return latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < outOfSyncThreshold
 		}, c.LatestVerifiedCommitment, c.OutOfSyncThreshold))
 	}
 
 	disableWarpSyncIfNecessary := func() (unsubscribe func()) {
-		return c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(latestVerifiedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex) bool {
+		return c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(_ bool, latestVerifiedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex) bool {
 			return latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < warpSyncThreshold
 		}, c.LatestVerifiedCommitment, c.WarpSyncThreshold))
 	}
@@ -214,7 +214,7 @@ func (c *Chain) initEngine() {
 				return c.Engine.InheritFrom(c.SpawnedEngine)
 			}
 
-			return c.Engine.InheritFrom(reactive.NewDerivedVariable2(func(spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
+			return c.Engine.InheritFrom(reactive.NewDerivedVariable2(func(_, spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
 				if spawnedEngine != nil {
 					return spawnedEngine
 				}
