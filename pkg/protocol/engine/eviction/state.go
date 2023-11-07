@@ -325,9 +325,6 @@ func (s *State) PopulateFromStorage(latestCommitmentSlot iotago.SlotIndex) {
 }
 
 func (s *State) Reset() {
-	s.evictionMutex.Lock()
-	defer s.evictionMutex.Unlock()
-
 	s.rootBlocks.ForEach(func(slot iotago.SlotIndex, storage *shrinkingmap.ShrinkingMap[iotago.BlockID, iotago.CommitmentID]) {
 		if slot > s.lastEvictedSlot {
 			storage.ForEach(func(blockID iotago.BlockID, commitmentID iotago.CommitmentID) bool {
