@@ -59,8 +59,6 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{51, 52}, 2, "block0", ts.Nodes("node0"), true, nil)
 
-		time.Sleep(5 * time.Second)
-
 		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(50, ts.Nodes()...)
 		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes()...)
