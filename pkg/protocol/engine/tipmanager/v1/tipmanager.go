@@ -1,6 +1,8 @@
 package tipmanagerv1
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ds/randommap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
@@ -148,25 +150,26 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 
 // forEachParentByType iterates through the parents of the given block and calls the consumer for each parent.
 func (t *TipManager) forEachParentByType(block *blocks.Block, consumer func(parentType iotago.ParentsType, parentMetadata *TipMetadata)) {
-	if block == nil || block.ProtocolBlock() == nil {
-		return
-	}
-
 	for _, parent := range block.ParentsWithType() {
 		if metadataStorage := t.metadataStorage(parent.ID.Slot()); metadataStorage != nil {
-			// Make sure we don't add rootblocks back to the tips.
+			// Make sure we don't add root blocks back to the tips.
 			parentBlock, exists := t.retrieveBlock(parent.ID)
+
 			if !exists || parentBlock.IsRootBlock() {
 				continue
 			}
 
-			if parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(parentBlock) }); parentMetadata.Block() != nil {
-				consumer(parent.Type, parentMetadata)
-
-				if created {
-					t.setupBlockMetadata(parentMetadata)
-				}
+			if parentBlock.ModelBlock() == nil {
+				fmt.Printf(">> parentBlock exists, but parentBlock.ProtocolBlock() == nil\n ParentBlock: %s\n Block: %s\n", parentBlock.String(), block.String())
 			}
+
+			parentMetadata, created := metadataStorage.GetOrCreate(parent.ID, func() *TipMetadata { return NewBlockMetadata(parentBlock) })
+			consumer(parent.Type, parentMetadata)
+
+			if created {
+				t.setupBlockMetadata(parentMetadata)
+			}
+
 		}
 	}
 }

@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 # Create a function to join an array of strings by a given character
 function join { local IFS="$1"; shift; echo "$*"; }
 
@@ -52,7 +51,11 @@ docker run --rm \
   golang:1.21 go run -tags=rocksdb . --config docker --seed 7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih
 
 # Move and set permissions for the .snapshot file
-mv -f ../genesis-snapshot/*.snapshot .
+if ! mv -f ../genesis-snapshot/*.snapshot .; then
+  echo "Failed to create or move snapshot file"
+  exit 1
+fi
+
 chmod o+r *.snapshot
 
 echo "Run iota-core network"
