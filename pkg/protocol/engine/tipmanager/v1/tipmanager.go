@@ -44,11 +44,13 @@ type TipManager struct {
 // New creates a new TipManager.
 func New(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool)) *TipManager {
 	t := &TipManager{
-		retrieveBlock: blockRetriever,
-		blockAdded:    event.New1[tipmanager.TipMetadata](),
+		retrieveBlock:      blockRetriever,
+		tipMetadataStorage: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
+		strongTipSet:       randommap.New[iotago.BlockID, *TipMetadata](),
+		weakTipSet:         randommap.New[iotago.BlockID, *TipMetadata](),
+		blockAdded:         event.New1[tipmanager.TipMetadata](),
 	}
 
-	t.Reset()
 	t.TriggerConstructed()
 	t.TriggerInitialized()
 
