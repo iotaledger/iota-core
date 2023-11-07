@@ -69,8 +69,9 @@ type Node struct {
 	candidateEngineActivatedCount atomic.Uint32
 	mainEngineSwitchedCount       atomic.Uint32
 
-	mutex          syncutils.RWMutex
-	attachedBlocks []*blocks.Block
+	mutex               syncutils.RWMutex
+	attachedBlocks      []*blocks.Block
+	filteredBlockEvents []*commitmentfilter.BlockFilteredEvent
 }
 
 func NewNode(t *testing.T, net *Network, partition string, name string, validator bool) *Node {
@@ -149,6 +150,10 @@ func (n *Node) hookEvents() {
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) { n.candidateEngineActivatedCount.Add(1) })
 
 	events.MainEngineSwitched.Hook(func(e *engine.Engine) { n.mainEngineSwitchedCount.Add(1) })
+
+	events.Engine.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+		n.filteredBlockEvents = append(n.filteredBlockEvents, event)
+	})
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
@@ -504,6 +509,10 @@ func (n *Node) ForkDetectedCount() int {
 
 func (n *Node) CandidateEngineActivatedCount() int {
 	return int(n.candidateEngineActivatedCount.Load())
+}
+
+func (n *Node) FilteredBlocks() []*commitmentfilter.BlockFilteredEvent {
+	return n.filteredBlockEvents
 }
 
 func (n *Node) MainEngineSwitchedCount() int {

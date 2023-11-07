@@ -37,7 +37,7 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 		outputStates = append(outputStates, remainderOutput)
 	}
 
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := lo.PanicOnErr(w.CreateSignedTransactionWithOptions(
 		transactionName,
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
@@ -86,7 +86,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 	}
 
 	// create the signed transaction
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := lo.PanicOnErr(w.CreateSignedTransactionWithOptions(
 		transactionName,
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
@@ -120,7 +120,7 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 
 	delegationOutput := delegationBuilder.MustBuild()
 
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := lo.PanicOnErr(w.CreateSignedTransactionWithOptions(
 		transactionName,
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.CommitmentInput{
@@ -149,7 +149,7 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 	accountBuilder := builder.NewAccountOutputBuilderFromPrevious(accountOutput)
 	accountOutput = options.Apply(accountBuilder, opts).MustBuild()
 
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := lo.PanicOnErr(w.CreateSignedTransactionWithOptions(
 		transactionName,
 		WithAccountInput(input),
 		WithContextInputs(iotago.TxEssenceContextInputs{
@@ -182,7 +182,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string, creati
 		Features: iotago.BasicOutputFeatures{},
 	}}
 
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := lo.PanicOnErr(w.CreateSignedTransactionWithOptions(
 		transactionName,
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
@@ -222,7 +222,7 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 		Features: iotago.BasicOutputFeatures{},
 	}
 
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := lo.PanicOnErr(w.CreateSignedTransactionWithOptions(
 		transactionName,
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(iotago.Outputs[iotago.Output]{implicitAccountOutput, remainderBasicOutput}),
@@ -254,7 +254,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 		AccountID(iotago.AccountIDFromOutputID(input.OutputID())),
 		opts).MustBuild()
 
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := lo.PanicOnErr(w.CreateSignedTransactionWithOptions(
 		transactionName,
 		WithContextInputs(iotago.TxEssenceContextInputs{
 			&iotago.BlockIssuanceCreditInput{
@@ -312,7 +312,7 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, out
 		})
 	}
 
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := lo.PanicOnErr(w.CreateSignedTransactionWithOptions(
 		transactionName,
 		WithInputs(inputStates),
 		WithOutputs(outputStates),
@@ -321,7 +321,7 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, out
 	return signedTransaction
 }
 
-func (w *Wallet) createSignedTransactionWithOptions(transactionName string, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
+func (w *Wallet) CreateSignedTransactionWithOptions(transactionName string, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
 	currentAPI := w.Node.Protocol.CommittedAPI()
 
 	txBuilder := builder.NewTransactionBuilder(currentAPI)
