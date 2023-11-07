@@ -108,9 +108,9 @@ func (t *TipManager) Reset() {
 	t.evictionMutex.Lock()
 	defer t.evictionMutex.Unlock()
 
-	t.tipMetadataStorage = shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]()
-	t.strongTipSet = randommap.New[iotago.BlockID, *TipMetadata]()
-	t.weakTipSet = randommap.New[iotago.BlockID, *TipMetadata]()
+	t.tipMetadataStorage.Clear()
+	lo.ForEach(t.strongTipSet.Keys(), func(id iotago.BlockID) { t.strongTipSet.Delete(id) })
+	lo.ForEach(t.weakTipSet.Keys(), func(id iotago.BlockID) { t.strongTipSet.Delete(id) })
 }
 
 // Shutdown marks the TipManager as shutdown.
