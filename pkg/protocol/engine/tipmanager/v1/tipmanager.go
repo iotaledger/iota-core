@@ -44,11 +44,13 @@ type TipManager struct {
 // New creates a new TipManager.
 func New(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool)) *TipManager {
 	t := &TipManager{
-		retrieveBlock: blockRetriever,
-		blockAdded:    event.New1[tipmanager.TipMetadata](),
+		retrieveBlock:      blockRetriever,
+		tipMetadataStorage: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
+		strongTipSet:       randommap.New[iotago.BlockID, *TipMetadata](),
+		weakTipSet:         randommap.New[iotago.BlockID, *TipMetadata](),
+		blockAdded:         event.New1[tipmanager.TipMetadata](),
 	}
 
-	t.Reset()
 	t.TriggerConstructed()
 	t.TriggerInitialized()
 
@@ -108,9 +110,9 @@ func (t *TipManager) Reset() {
 	t.evictionMutex.Lock()
 	defer t.evictionMutex.Unlock()
 
-	t.tipMetadataStorage = shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]()
-	t.strongTipSet = randommap.New[iotago.BlockID, *TipMetadata]()
-	t.weakTipSet = randommap.New[iotago.BlockID, *TipMetadata]()
+	t.tipMetadataStorage.Clear()
+	lo.ForEach(t.strongTipSet.Keys(), func(id iotago.BlockID) { t.strongTipSet.Delete(id) })
+	lo.ForEach(t.weakTipSet.Keys(), func(id iotago.BlockID) { t.strongTipSet.Delete(id) })
 }
 
 // Shutdown marks the TipManager as shutdown.
