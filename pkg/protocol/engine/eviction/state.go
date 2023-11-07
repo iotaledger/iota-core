@@ -52,7 +52,7 @@ func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(slot); shouldEvictRootBlocks {
 		// Remember the last slot outside our cache window that has root blocks.
 		if storage, err := s.rootBlockStorageFunc(delayedIndex); err != nil {
-			storage.StreamKeys(func(_ iotago.BlockID) error {
+			_ = storage.StreamKeys(func(_ iotago.BlockID) error {
 				s.setLatestNonEmptySlot(delayedIndex)
 
 				return ierrors.New("stop iteration")
@@ -94,7 +94,7 @@ func (s *State) ActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
 			continue
 		}
 
-		storage.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
+		_ = storage.Stream(func(id iotago.BlockID, commitmentID iotago.CommitmentID) error {
 			activeRootBlocks[id] = commitmentID
 
 			return nil
@@ -360,7 +360,7 @@ func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (thresholdS
 	for ; slot >= s.lastEvictedSlot; slot-- {
 		storage := lo.PanicOnErr(s.rootBlockStorageFunc(slot))
 
-		storage.StreamKeys(func(_ iotago.BlockID) error {
+		_ = storage.StreamKeys(func(_ iotago.BlockID) error {
 			if slot >= s.optsRootBlocksEvictionDelay {
 				thresholdSlot = slot - s.optsRootBlocksEvictionDelay
 				shouldEvict = true

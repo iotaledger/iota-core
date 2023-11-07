@@ -129,6 +129,7 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 				} else if i.Slot() < j.Slot() {
 					return 1
 				}
+
 				return -1
 			})
 
