@@ -12,6 +12,9 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// Starts with an account already existing in snapshot (default wallet).
+// 1. Change expiry slot to expire soon + add new block issuer key.
+// 2. Destroy account.
 func Test_TransitionAndDestroyAccount(t *testing.T) {
 	oldGenesisOutputKey := utils.RandBlockIssuerKey()
 
@@ -86,7 +89,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
-	// MODIFY EXISTING GENESIS ACCOUNT
+	// 1. MODIFY EXISTING GENESIS ACCOUNT TO HAVE NEW EXPIRY SLOT AND NEW BLOCK ISSUER KEY.
 	newGenesisOutputKey := utils.RandBlockIssuerKey()
 	var block1Slot iotago.SlotIndex = 1
 	// set the expiry of the genesis account to be the block slot + max committable age.
@@ -125,7 +128,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 		ExpirySlot:      newExpirySlot,
 	}, ts.Nodes()...)
 
-	// DESTROY GENESIS ACCOUNT
+	// 2. DESTROY GENESIS ACCOUNT
 	// commit until the expiry slot of the transitioned genesis account plus one.
 	latestParent = ts.CommitUntilSlot(newExpirySlot+1, latestParent)
 
@@ -153,6 +156,10 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	}, true, ts.Nodes()...)
 }
 
+// Starts with an account already existing in snapshot (default wallet).
+// 1. Use default wallet to create a new account with staking feature from genesis basic output.
+// 2. Use default wallet to create a delegation to the new account from a basic output.
+// 3. Use default wallet to transition the delegation to delayed claiming.
 func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
@@ -203,10 +210,10 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
-	//CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
+	// 1. CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
 	newAccountBlockIssuerKey := utils.RandBlockIssuerKey()
-	// set the expiry slot of the transitioned genesis account to the latest committed + MaxCommittableAge
-	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
+	// set the expiry slot of the new account to note expire
+	newAccountExpirySlot := iotago.MaxSlotIndex
 
 	var block1Slot iotago.SlotIndex = 1
 	tx1 := ts.DefaultWallet().CreateAccountFromInput(
@@ -254,7 +261,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
-	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
+	// 2. CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
 	accountAddress := iotago.AccountAddress(newAccountOutput.AccountID)
 	block2Slot := latestParent.ID().Slot()
 	tx2 := ts.DefaultWallet().CreateDelegationFromInput(
@@ -294,7 +301,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
-	// transition a delegation output to a delayed claiming state
+	// 3. TRANSITION DELEGATION TO DELAYED CLAIMING
 	block3Slot := latestParent.ID().Slot()
 	tx3 := ts.DefaultWallet().DelayedClaimingTransition("TX3", "TX2:0", block3Slot, 0)
 	block3 := ts.IssueBasicBlockAtSlotWithOptions("block3", block3Slot, ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParent.ID()))
@@ -328,6 +335,9 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	}, ts.Nodes()...)
 }
 
+// Starts with an account already existing in snapshot (default wallet).
+// 1. Use default wallet to send an implicit account output to a new user wallet.
+// 2. Use implicit account itself to transition the implicit account output to a full account.
 func Test_ImplicitAccounts(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
@@ -378,7 +388,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
-	// CREATE IMPLICIT ACCOUNT FROM GENESIS BASIC UTXO, SENT TO A NEW USER WALLET.
+	// 1. CREATE IMPLICIT ACCOUNT FROM GENESIS BASIC UTXO, SENT TO A NEW USER WALLET.
 	// this wallet is not registered in the ledger yet.
 	newUserWallet := mock.NewWallet(ts.Testing, "newUser", node1)
 	// a default wallet, already registered in the ledger, will issue the transaction and block.
@@ -404,7 +414,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(implicitBlockIssuerKey),
 	}, ts.Nodes()...)
 
-	// TRANSITION IMPLICIT ACCOUNT TO ACCOUNT OUTPUT.
+	// 2. TRANSITION IMPLICIT ACCOUNT TO ACCOUNT OUTPUT.
 	// USE IMPLICIT ACCOUNT AS BLOCK ISSUER.
 	fullAccountBlockIssuerKey := utils.RandBlockIssuerKey()
 
@@ -452,34 +462,67 @@ func Test_ImplicitAccounts(t *testing.T) {
 	ts.Wait(ts.Nodes()...)
 }
 
-/*
-For Mana allotment and stored:
-1. Collect potential and stored on the input side.
-2. Add options to allot amounts to accounts upon TX creation.
-3. Add option to store mana on the output side.
-4. Optionally add option to split amount on outputs unevenly.
-
-WithAllotments
-{
-	A1: amount
-	A3: amount
-}
-WithStoredOnOutput
-{
-	0: amount
-	3: amount
-}
-*/
+// Starts with an account already existing in snapshot (default wallet).
+// 
 
 /*
-TX involving Accounts:
-1. Add option to add accounts as inputs.
-2. Add option to add accounts as outputs.
-3. Create account.
-4. Destroy accounts.
-5. Accounts w/out and w/ BIC.
-
 Testcases:
+
+- Test that Reward Inputs can point to an account id that does not exist or has no rewards in the rewards data.
+When fetching rewards for accounts that don't exist (or have no rewards) the node should return 0 rather than an error. 
+This is because reward inputs are required for removing a Staking Feature from an Account or for destroying a Delegation Output.
+Otherwise, if I delegated to some address that doesn't exist, I could not destroy my delegation output because the reward would error.
+(I haven't verified whether this is already implemented as-is or not, but it should be tested regardless).
+
+- Test that Reward Inputs can only point to Accounts & Delegation Outputs. 
+I tried to quickly find that this is checked somewhere but couldn't, so perhaps it's missing.
+
+- Test that a transaction fails whenever the condition for claiming is not given.
+That is, coming up with scenarios where claiming is not allowed and try to claim (remove staking feature, destroy delegation output).
+
+- Test delegation stuff 
+// Step 1
+
+Create Delegation Output A delegating to X
+
+// Step 2 (separate epoch)
+
+Create Account X with Staking Feature
+Create Delegation Output B delegating to X
+Create Delegation Output C delegating to X
+Create Delegation Output D delegating to X
+
+In this test X is never selected as a validator. Any Delegation Output that is destroyed should claim 0 rewards.
+
+Assert expectations: X's total stake should be X + A + B + C + D. (I.e. make sure that A is counted even though it was created before X created its staking feature).
+
+// Step 3
+
+Destroy A
+Create Delegation Output E delegating to X
+
+Assert expectations: X's total stake should be X + B + C + D + E.
+
+// Step 4
+
+Transition B to Delayed Claiming.
+Destroy C.
+
+Assert expectations: X's total stake should be X + D + E.
+
+// Step 5
+
+Destroy Account.
+
+Assert expectations: X should be removed from the "staking tracking data" (not sure what it's called exactly).
+
+// Step 6
+
+Destroy B, D & E.
+
+Assert expectations.
+
+
 1. Create account w/out BIC from normal UTXO.
 2. Create account w/ BIC from normal UTXO.
 3. Transition non-BIC account to BIC account.
