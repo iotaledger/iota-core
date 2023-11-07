@@ -322,12 +322,10 @@ func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (m *Manager) Reset() {
-	futureAttestationsToClear := make([]iotago.SlotIndex, 0)
-	m.futureAttestations.ForEach(func(slot iotago.SlotIndex, _ *shrinkingmap.ShrinkingMap[iotago.AccountID, *iotago.Attestation]) {
-		if slot > m.lastCommittedSlot {
-			futureAttestationsToClear = append(futureAttestationsToClear, slot)
-		}
-	})
+	m.commitmentMutex.Lock()
+	defer m.commitmentMutex.Unlock()
+
+	m.futureAttestations.Clear()
 
 	pendingAttestationsToClear := make([]iotago.SlotIndex, 0)
 	m.pendingAttestations.ForEach(func(slot iotago.SlotIndex, _ *shrinkingmap.ShrinkingMap[iotago.AccountID, *iotago.Attestation]) {
@@ -335,10 +333,6 @@ func (m *Manager) Reset() {
 			pendingAttestationsToClear = append(pendingAttestationsToClear, slot)
 		}
 	})
-
-	for _, slot := range futureAttestationsToClear {
-		m.futureAttestations.Evict(slot)
-	}
 
 	for _, slot := range pendingAttestationsToClear {
 		m.pendingAttestations.Evict(slot)

@@ -199,10 +199,13 @@ func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error)
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (m *MemPool[VoteRank]) Reset() {
-	stateDiffsToDelete := make([]iotago.SlotIndex, 0)
 	m.stateDiffs.ForEachKey(func(slot iotago.SlotIndex) bool {
 		if slot > m.lastEvictedSlot {
-			stateDiffsToDelete = append(stateDiffsToDelete, slot)
+			if stateDiff, deleted := m.stateDiffs.DeleteAndReturn(slot); deleted {
+				if err := stateDiff.Reset(); err != nil {
+					m.errorHandler(ierrors.Wrapf(err, "failed to reset state diff for slot %d", slot))
+				}
+			}
 		}
 
 		return true
@@ -214,14 +217,6 @@ func (m *MemPool[VoteRank]) Reset() {
 			attachmentsToDelete = append(attachmentsToDelete, slot)
 		}
 	})
-
-	for _, slot := range stateDiffsToDelete {
-		if stateDiff, deleted := m.stateDiffs.DeleteAndReturn(slot); deleted {
-			if err := stateDiff.Reset(); err != nil {
-				m.errorHandler(ierrors.Wrapf(err, "failed to reset state diff for slot %d", slot))
-			}
-		}
-	}
 
 	for _, slot := range attachmentsToDelete {
 		if evictedAttachments := m.attachments.Evict(slot); evictedAttachments != nil {

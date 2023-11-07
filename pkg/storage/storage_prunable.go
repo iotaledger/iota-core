@@ -127,11 +127,7 @@ func (s *Storage) RestoreFromDisk() {
 }
 
 func (s *Storage) Rollback(targetSlot iotago.SlotIndex) error {
-	if err := s.prunable.Rollback(s.pruningRange(targetSlot)); err != nil {
-		return ierrors.Wrapf(err, "failed to rollback prunable storage to slot %d", targetSlot)
-	}
-
-	return nil
+	return s.prunable.Rollback(s.pruningRange(targetSlot))
 }
 
 func (s *Storage) pruningRange(targetSlot iotago.SlotIndex) (targetEpoch iotago.EpochIndex, pruneRange [2]iotago.SlotIndex) {

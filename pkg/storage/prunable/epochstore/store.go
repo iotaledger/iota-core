@@ -9,12 +9,6 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-const (
-	entriesKey byte = iota
-	lastAccessedEpochKey
-	lastPrunedEpochKey
-)
-
 type Store[V any] struct {
 	realm        kvstore.Realm
 	kv           *kvstore.TypedStore[iotago.EpochIndex, V]

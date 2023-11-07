@@ -63,18 +63,7 @@ func (m *SlotMutations) Evict(index iotago.SlotIndex) error {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (m *SlotMutations) Reset() {
-	slotsToReset := make([]iotago.SlotIndex, 0)
-	m.acceptedBlocksBySlot.ForEachKey(func(slot iotago.SlotIndex) bool {
-		if slot > m.latestCommittedIndex {
-			slotsToReset = append(slotsToReset, slot)
-		}
-
-		return true
-	})
-
-	for _, slot := range slotsToReset {
-		m.acceptedBlocksBySlot.Delete(slot)
-	}
+	m.acceptedBlocksBySlot.Clear()
 }
 
 // AcceptedBlocks returns the set of accepted blocks for the given slot.

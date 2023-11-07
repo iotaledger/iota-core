@@ -118,7 +118,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
-func (f *Filter) Reset() {}
+func (f *Filter) Reset() { /* nothing to reset but comply with interface */ }
 
 func (f *Filter) Shutdown() {
 	f.TriggerStopped()

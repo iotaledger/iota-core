@@ -191,7 +191,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
-func (c *CommitmentFilter) Reset() {}
+func (c *CommitmentFilter) Reset() { /* nothing to reset but comply with interface */ }
 
 func (c *CommitmentFilter) Shutdown() {
 	c.TriggerStopped()

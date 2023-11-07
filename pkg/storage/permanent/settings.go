@@ -323,11 +323,11 @@ func (s *Settings) AdvanceLatestStoredSlot(slot iotago.SlotIndex) (err error) {
 
 	if _, err = s.storeLatestProcessedSlot.Compute(func(latestStoredSlot iotago.SlotIndex, _ bool) (newValue iotago.SlotIndex, err error) {
 		if latestStoredSlot >= slot {
-			return latestStoredSlot, errLatestStoredSlotUnchanged
+			return latestStoredSlot, kvstore.ErrTypedValueNotChanged
 		}
 
 		return slot, nil
-	}); err != nil && !ierrors.Is(err, errLatestStoredSlotUnchanged) {
+	}); err != nil {
 		return ierrors.Wrap(err, "failed to advance latest stored slot")
 	}
 
@@ -614,5 +614,3 @@ func read[T any](typedValue *kvstore.TypedValue[T]) (value T) {
 
 	return value
 }
-
-var errLatestStoredSlotUnchanged = ierrors.New("latest stored slot did not change")

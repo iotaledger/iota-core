@@ -117,7 +117,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
-func (b *Booker) Reset() {}
+func (b *Booker) Reset() { /* nothing to reset but comply with interface */ }
 
 func (b *Booker) Shutdown() {
 	b.TriggerStopped()

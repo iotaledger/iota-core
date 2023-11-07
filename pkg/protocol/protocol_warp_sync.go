@@ -139,13 +139,11 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				return false
 			}
 
-			targetEngine.Reset()
-			// If the engine is "dirty" we need to restore the state of the engine to the state of the chain commitment.
-			// As we already decided to switch and sync to this chain we should make sure that processing the blocks from the commitment
-			// leads to the verified commitment.
-			if targetEngine.Notarization.AcceptedBlocksCount(commitmentID.Slot()) > 0 {
-				w.LogError("ENGINE IS DIRTY")
+			// make sure the engine is clean and requires a warp-sync before we start processing the blocks
+			if targetEngine.Workers.WaitChildren(); targetEngine.Storage.Settings().LatestCommitment().ID().Slot() > commitmentID.Slot() {
+				return true
 			}
+			targetEngine.Reset()
 
 			// Once all blocks are booked we
 			//   1. Mark all transactions as accepted
