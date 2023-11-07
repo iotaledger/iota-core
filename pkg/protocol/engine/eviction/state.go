@@ -161,9 +161,12 @@ func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.Co
 	}
 
 	// This return empty value for commitmentID in the case the key is not found.
-	commitmentID = lo.PanicOnErr(storage.Load(id))
+	commitmentID, exists, err = storage.Load(id)
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to load root block %s", id))
+	}
 
-	return commitmentID, commitmentID != iotago.EmptyCommitmentID
+	return commitmentID, exists
 }
 
 // Export exports the root blocks to the given writer.

@@ -44,7 +44,7 @@ func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
 		return nil, ierrors.Errorf("no roots storage for slot %d", c.CommitmentID)
 	}
 
-	roots, err := rootsStorage.Load(c.CommitmentID)
+	roots, _, err := rootsStorage.Load(c.CommitmentID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to load roots for slot %d", c.CommitmentID)
 	}

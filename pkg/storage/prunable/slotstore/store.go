@@ -25,18 +25,18 @@ func NewStore[K, V any](
 	}
 }
 
-func (s *Store[K, V]) Load(key K) (V, error) {
-	value, err := s.kv.Get(key)
+func (s *Store[K, V]) Load(key K) (value V, exists bool, err error) {
+	value, err = s.kv.Get(key)
 	if err != nil {
 		var zeroValue V
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return zeroValue, nil
+			return zeroValue, false, nil
 		}
 
-		return zeroValue, ierrors.Wrapf(err, "failed to get value for key %v", key)
+		return zeroValue, false, ierrors.Wrapf(err, "failed to get value for key %v", key)
 	}
 
-	return value, nil
+	return value, true, nil
 }
 
 func (s *Store[K, V]) Store(key K, value V) error {
