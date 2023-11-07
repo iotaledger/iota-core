@@ -49,8 +49,5 @@ message WarpSyncRequest {
 
 message WarpSyncResponse {
   bytes commitment_id = 1;
-  bytes block_ids = 2;
-  bytes tangle_merkle_proof = 3;
-  bytes transaction_ids = 4;
-  bytes mutations_merkle_proof = 5;
+  bytes payload = 2;
 }

@@ -52,10 +52,10 @@ func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
 	return roots, nil
 }
 
-// BlockIDs returns the accepted block IDs of the slot.
-func (c *CommittedSlotAPI) BlockIDs() (blockIDs iotago.BlockIDs, err error) {
+// BlocksIDsBySlotCommitmentID returns the accepted block IDs of the slot grouped by their SlotCommitmentID.
+func (c *CommittedSlotAPI) BlocksIDsBySlotCommitmentID() (map[iotago.CommitmentID]iotago.BlockIDs, error) {
 	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
-		return blockIDs, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
+		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
 
 	store, err := c.engine.Storage.Blocks(c.CommitmentID.Slot())
@@ -63,14 +63,15 @@ func (c *CommittedSlotAPI) BlockIDs() (blockIDs iotago.BlockIDs, err error) {
 		return nil, ierrors.Errorf("failed to get block store of slot index %d", c.CommitmentID.Slot())
 	}
 
+	blockIDsBySlotCommitmentID := make(map[iotago.CommitmentID]iotago.BlockIDs)
 	if err := store.ForEachBlockInSlot(func(block *model.Block) error {
-		blockIDs = append(blockIDs, block.ID())
+		blockIDsBySlotCommitmentID[block.SlotCommitmentID()] = append(blockIDsBySlotCommitmentID[block.SlotCommitmentID()], block.ID())
 		return nil
 	}); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to iterate over blocks of slot %d", c.CommitmentID.Slot())
 	}
 
-	return blockIDs, nil
+	return blockIDsBySlotCommitmentID, nil
 }
 
 func (c *CommittedSlotAPI) TransactionIDs() (iotago.TransactionIDs, error) {
