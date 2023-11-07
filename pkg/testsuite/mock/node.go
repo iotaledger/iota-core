@@ -150,10 +150,6 @@ func (n *Node) hookEvents() {
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) { n.candidateEngineActivatedCount.Add(1) })
 
 	events.MainEngineSwitched.Hook(func(e *engine.Engine) { n.mainEngineSwitchedCount.Add(1) })
-
-	events.Engine.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
-		n.filteredBlockEvents = append(n.filteredBlockEvents, event)
-	})
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
@@ -319,6 +315,10 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		if failOnBlockFiltered {
 			n.Testing.Fatal("no blocks should be filtered")
 		}
+
+		n.mutex.Lock()
+		defer n.mutex.Unlock()
+		n.filteredBlockEvents = append(n.filteredBlockEvents, event)
 	})
 
 	events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
@@ -512,6 +512,9 @@ func (n *Node) CandidateEngineActivatedCount() int {
 }
 
 func (n *Node) FilteredBlocks() []*commitmentfilter.BlockFilteredEvent {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+
 	return n.filteredBlockEvents
 }
 
