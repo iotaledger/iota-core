@@ -87,6 +87,14 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			r.RetainBlockFailure(b.ID(), apimodels.BlockFailureDroppedDueToCongestion)
 		})
 
+		e.Events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
+			txMetadata, exist := e.Ledger.MemPool().TransactionMetadata(conflictID)
+			if !exist {
+				return
+			}
+			r.RetainTransactionFailure(txMetadata.EarliestIncludedAttachment(), iotago.ErrTxConflicting)
+		}, asyncOpt)
+
 		e.HookInitialized(func() {
 			e.Ledger.MemPool().OnSignedTransactionAttached(func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
 				attachment := signedTransactionMetadata.Attachments()[0]
@@ -102,11 +110,6 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 					if err := r.onTransactionAttached(attachment); err != nil {
 						r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAttached in retainer"))
 					}
-
-					transactionMetadata.OnConflicting(func() {
-						// transaction is not included yet, thus EarliestIncludedAttachment is not set.
-						r.RetainTransactionFailure(attachment, iotago.ErrTxConflicting)
-					})
 
 					transactionMetadata.OnInvalid(func(err error) {
 						// transaction is not included yet, thus EarliestIncludedAttachment is not set.
