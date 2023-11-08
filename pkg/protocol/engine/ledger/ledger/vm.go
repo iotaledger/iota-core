@@ -114,7 +114,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 				// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
 				// "last epoch", which is the epoch index corresponding to the future bounded slot index minus 1.
 				apiForSlot := v.ledger.apiProvider.APIForSlot(commitmentInput.Slot)
-				futureBoundedSlotIndex := commitmentInput.Slot + iotago.SlotIndex(apiForSlot.ProtocolParameters().MinCommittableAge())
+				futureBoundedSlotIndex := commitmentInput.Slot + apiForSlot.ProtocolParameters().MinCommittableAge()
 				delegationEnd = apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex) - iotago.EpochIndex(1)
 			}
 
