@@ -31,10 +31,8 @@ jobs:
           go build -buildmode=plugin -o typegroupingcheck.so
 
       - name: golangci-lint
-        uses: reviewdog/action-golangci-lint@v2
+        uses: golangci/golangci-lint-action@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          golangci_lint_flags: "--timeout=10m"
-          reporter: github-pr-check
-          filter_mode: nofilter
-          fail_on_error: true
+          version: latest
+          install-mode: goinstall
+          args: --timeout=10m
