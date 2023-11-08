@@ -22,11 +22,11 @@ func (l LexicalOrderedSpents) Len() int {
 	return len(l)
 }
 
-func (l LexicalOrderedSpents) Less(i, j int) bool {
+func (l LexicalOrderedSpents) Less(i int, j int) bool {
 	return bytes.Compare(l[i].outputID[:], l[j].outputID[:]) < 0
 }
 
-func (l LexicalOrderedSpents) Swap(i, j int) {
+func (l LexicalOrderedSpents) Swap(i int, j int) {
 	l[i], l[j] = l[j], l[i]
 }
 
