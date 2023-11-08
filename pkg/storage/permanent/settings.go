@@ -67,7 +67,7 @@ func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedPro
 			store,
 			[]byte{latestCommitmentKey},
 			(*model.Commitment).Bytes,
-			model.CommitmentFromBytesFactory(apiProvider),
+			model.CommitmentFromBytes(apiProvider),
 		),
 		storeLatestFinalizedSlot: kvstore.NewTypedValue(
 			store,
@@ -542,7 +542,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 	}
 
 	// Now that we parsed the protocol parameters, we can parse the commitment since there will be an API available
-	commitment, _, err := model.CommitmentFromBytes(commitmentBytes, s.apiProvider)
+	commitment, err := lo.DropCount(model.CommitmentFromBytes(s.apiProvider)(commitmentBytes))
 	if err != nil {
 		return ierrors.Wrap(err, "failed to parse commitment")
 	}

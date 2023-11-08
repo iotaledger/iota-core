@@ -24,7 +24,7 @@ func NewCommitments(store kvstore.KVStore, apiProvider iotago.APIProvider) *Comm
 			iotago.SlotIndex.Bytes,
 			iotago.SlotIndexFromBytes,
 			(*model.Commitment).Bytes,
-			model.CommitmentFromBytesFactory(apiProvider),
+			model.CommitmentFromBytes(apiProvider),
 		),
 	}
 }
@@ -63,9 +63,7 @@ func (c *Commitments) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex)
 
 func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
 	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
-		commitment, err := stream.ReadObjectWithSize[*model.Commitment](reader, serializer.SeriLengthPrefixTypeAsUint16, func(bytes []byte) (*model.Commitment, int, error) {
-			return model.CommitmentFromBytes(bytes, c.apiProvider)
-		})
+		commitment, err := stream.ReadObjectWithSize[*model.Commitment](reader, serializer.SeriLengthPrefixTypeAsUint16, model.CommitmentFromBytes(c.apiProvider))
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to read commitment at index %d", i)
 		}

@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/hive.go/serializer/v2"
-	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
@@ -178,7 +177,7 @@ func (p *Protocol) onBlockRequest(idBytes []byte, id peer.ID) {
 }
 
 func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id peer.ID) {
-	receivedCommitment, _, err := model.CommitmentFromBytes(commitmentBytes, p.apiProvider, serix.WithValidation())
+	receivedCommitment, err := lo.DropCount(model.CommitmentFromBytes(p.apiProvider)(commitmentBytes))
 	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize slot commitment"), id)
 
@@ -199,7 +198,7 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id peer.ID) {
 }
 
 func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []byte, merkleProof []byte, id peer.ID) {
-	cm, _, err := model.CommitmentFromBytes(commitmentBytes, p.apiProvider, serix.WithValidation())
+	cm, err := lo.DropCount(model.CommitmentFromBytes(p.apiProvider)(commitmentBytes))
 	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize commitment"), id)
 

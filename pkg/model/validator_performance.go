@@ -11,14 +11,14 @@ type ValidatorPerformance struct {
 	// works if ValidatorBlocksPerSlot is less than 32 because we use it as bit vector
 	SlotActivityVector uint32
 	// can be uint8 because max count per slot is maximally ValidatorBlocksPerSlot + 1
-	BlockIssuedCount               uint8
+	BlocksIssuedCount              uint8
 	HighestSupportedVersionAndHash VersionAndHash
 }
 
 func NewValidatorPerformance() *ValidatorPerformance {
 	return &ValidatorPerformance{
 		SlotActivityVector:             0,
-		BlockIssuedCount:               0,
+		BlocksIssuedCount:              0,
 		HighestSupportedVersionAndHash: VersionAndHash{},
 	}
 }
@@ -41,8 +41,8 @@ func ValidatorPerformanceFromReader(reader io.ReadSeeker) (*ValidatorPerformance
 	if v.SlotActivityVector, err = stream.Read[uint32](reader); err != nil {
 		return nil, ierrors.Wrap(err, "failed to read SlotActivityVector")
 	}
-	if v.BlockIssuedCount, err = stream.Read[uint8](reader); err != nil {
-		return nil, ierrors.Wrap(err, "failed to read BlockIssuedCount")
+	if v.BlocksIssuedCount, err = stream.Read[uint8](reader); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read BlocksIssuedCount")
 	}
 	if v.HighestSupportedVersionAndHash, err = stream.ReadObject(reader, VersionAndHashSize, VersionAndHashFromBytes); err != nil {
 		return nil, ierrors.Wrap(err, "failed to read HighestSupportedVersionAndHash")
@@ -57,8 +57,8 @@ func (p *ValidatorPerformance) Bytes() ([]byte, error) {
 	if err := stream.Write(byteBuffer, p.SlotActivityVector); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write SlotActivityVector")
 	}
-	if err := stream.Write(byteBuffer, p.BlockIssuedCount); err != nil {
-		return nil, ierrors.Wrap(err, "failed to write BlockIssuedCount")
+	if err := stream.Write(byteBuffer, p.BlocksIssuedCount); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write BlocksIssuedCount")
 	}
 	if err := stream.WriteObject(byteBuffer, p.HighestSupportedVersionAndHash, VersionAndHash.Bytes); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write HighestSupportedVersionAndHash")
