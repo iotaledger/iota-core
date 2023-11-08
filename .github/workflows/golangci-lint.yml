@@ -22,9 +22,11 @@ jobs:
 
       - name: Setup go
         uses: actions/setup-go@v4
+        with:
+          go-version-file: './typegroupingcheck/go.mod'
 
       - name: Build custom linter
-        working_directory: ./typegroupingcheck
+        working-directory: ./typegroupingcheck
         run: |
           go build -buildmode=plugin -o typegroupingcheck.so
 
