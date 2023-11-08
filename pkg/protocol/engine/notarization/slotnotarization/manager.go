@@ -168,7 +168,7 @@ func (m *Manager) tryCommitSlotUntil(acceptedBlockIndex iotago.SlotIndex) {
 	}
 }
 
-func (m *Manager) isCommittable(slot, acceptedBlockSlot iotago.SlotIndex) bool {
+func (m *Manager) isCommittable(slot iotago.SlotIndex, acceptedBlockSlot iotago.SlotIndex) bool {
 	return slot+m.apiProvider.APIForSlot(slot).ProtocolParameters().MinCommittableAge() <= acceptedBlockSlot
 }
 

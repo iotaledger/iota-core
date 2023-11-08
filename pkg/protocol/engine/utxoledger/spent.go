@@ -3,8 +3,11 @@ package utxoledger
 import (
 	"bytes"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -19,11 +22,11 @@ func (l LexicalOrderedSpents) Len() int {
 	return len(l)
 }
 
-func (l LexicalOrderedSpents) Less(i, j int) bool {
+func (l LexicalOrderedSpents) Less(i int, j int) bool {
 	return bytes.Compare(l[i].outputID[:], l[j].outputID[:]) < 0
 }
 
-func (l LexicalOrderedSpents) Swap(i, j int) {
+func (l LexicalOrderedSpents) Swap(i int, j int) {
 	l[i], l[j] = l[j], l[i]
 }
 
@@ -84,11 +87,13 @@ func NewSpent(output *Output, transactionIDSpent iotago.TransactionID, slotSpent
 }
 
 func spentStorageKeyForOutputID(outputID iotago.OutputID) []byte {
-	ms := marshalutil.New(iotago.OutputIDLength + 1)
-	ms.WriteByte(StoreKeyPrefixOutputSpent) // 1 byte
-	ms.WriteBytes(outputID[:])              // iotago.OutputIDLength bytes
+	byteBuffer := stream.NewByteBuffer(iotago.OutputIDLength + serializer.OneByte)
 
-	return ms.Bytes()
+	// There can't be any errors.
+	_ = stream.Write(byteBuffer, StoreKeyPrefixOutputSpent) // 1 byte
+	_ = stream.Write(byteBuffer, outputID)
+
+	return lo.PanicOnErr(byteBuffer.Bytes())
 }
 
 func (s *Spent) KVStorableKey() (key []byte) {
@@ -96,40 +101,33 @@ func (s *Spent) KVStorableKey() (key []byte) {
 }
 
 func (s *Spent) KVStorableValue() (value []byte) {
-	ms := marshalutil.New(iotago.TransactionIDLength + iotago.SlotIndexLength)
-	ms.WriteBytes(s.transactionIDSpent[:]) // iotago.TransactionIDLength bytes
-	ms.WriteBytes(s.slotSpent.MustBytes()) // iotago.SlotIndexLength bytes
+	byteBuffer := stream.NewByteBuffer(iotago.TransactionIDLength + iotago.SlotIndexLength)
 
-	return ms.Bytes()
+	// There can't be any errors.
+	_ = stream.Write(byteBuffer, s.transactionIDSpent)
+	_ = stream.Write(byteBuffer, s.slotSpent)
+
+	return lo.PanicOnErr(byteBuffer.Bytes())
 }
 
 func (s *Spent) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
-	// Parse key
-	keyUtil := marshalutil.New(key)
+	var err error
+	keyReader := stream.NewByteReader(key)
 
-	// Read prefix output
-	_, err := keyUtil.ReadByte()
-	if err != nil {
-		return err
+	if _, err = stream.Read[byte](keyReader); err != nil {
+		return ierrors.Wrap(err, "unable to read prefix")
+	}
+	if s.outputID, err = stream.Read[iotago.OutputID](keyReader); err != nil {
+		return ierrors.Wrap(err, "unable to read outputID")
 	}
 
-	// Read OutputID
-	if s.outputID, err = ParseOutputID(keyUtil); err != nil {
-		return err
+	valueReader := stream.NewByteReader(value)
+
+	if s.transactionIDSpent, err = stream.Read[iotago.TransactionID](valueReader); err != nil {
+		return ierrors.Wrap(err, "unable to read transactionIDSpent")
 	}
-
-	// Parse value
-	valueUtil := marshalutil.New(value)
-
-	// Read transaction ID
-	if s.transactionIDSpent, err = parseTransactionID(valueUtil); err != nil {
-		return err
-	}
-
-	// Read slot index spent index
-	s.slotSpent, err = parseSlotIndex(valueUtil)
-	if err != nil {
-		return err
+	if s.slotSpent, err = stream.Read[iotago.SlotIndex](valueReader); err != nil {
+		return ierrors.Wrap(err, "unable to read slotSpent")
 	}
 
 	return nil

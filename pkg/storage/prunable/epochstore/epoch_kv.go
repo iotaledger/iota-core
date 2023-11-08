@@ -19,7 +19,6 @@ type EpochKVStore struct {
 }
 
 func NewEpochKVStore(storeRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex) *EpochKVStore {
-
 	return &EpochKVStore{
 		realm:             storeRealm,
 		kv:                lo.PanicOnErr(kv.WithExtendedRealm(append(storeRealm, entriesKey))),

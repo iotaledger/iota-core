@@ -309,7 +309,7 @@ func (m *Manager) getOrCreateCommitment(id iotago.CommitmentID) (commitment *Cha
 	})
 }
 
-func (m *Manager) evaluateAgainstRootCommitment(commitment *iotago.Commitment) (isBelow, isRootCommitment bool) {
+func (m *Manager) evaluateAgainstRootCommitment(commitment *iotago.Commitment) (isBelow bool, isRootCommitment bool) {
 	isBelow = commitment.Slot <= m.rootCommitment.Commitment().Slot()
 	isRootCommitment = commitment.Equals(m.rootCommitment.Commitment().Commitment())
 

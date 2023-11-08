@@ -280,7 +280,7 @@ func (e *EngineManager) rollbackStorage(newStorage *storage.Storage, slot iotago
 		return ierrors.Wrap(err, "failed to rollback commitments")
 	}
 	// Create temporary components and rollback their permanent state, which will be reflected on disk.
-	evictionState := eviction.NewState(newStorage.LatestNonEmptySlot(), newStorage.RootBlocks)
+	evictionState := eviction.NewState(newStorage.LatestNonEmptySlot(), newStorage.RootBlocks, newStorage.GenesisRootBlockID)
 	evictionState.Initialize(latestCommitment.Slot())
 
 	blockCache := blocks.New(evictionState, newStorage.Settings().APIProvider())

@@ -21,7 +21,13 @@ func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) error {
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to retrieve state diff for slot %d", slot)
 	}
-	mutationsTree := ads.NewSet[iotago.Identifier](mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
+	mutationsTree := ads.NewSet[iotago.Identifier](
+		mapdb.NewMapDB(),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		iotago.TransactionID.Bytes,
+		iotago.TransactionIDFromBytes,
+	)
 	tcs := &TransactionsChangesResponse{
 		Index:                slot,
 		IncludedTransactions: make([]string, 0),

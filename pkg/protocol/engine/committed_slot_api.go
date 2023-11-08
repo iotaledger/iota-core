@@ -44,7 +44,7 @@ func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
 		return nil, ierrors.Errorf("no roots storage for slot %d", c.CommitmentID)
 	}
 
-	roots, err := rootsStorage.Load(c.CommitmentID)
+	roots, _, err := rootsStorage.Load(c.CommitmentID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to load roots for slot %d", c.CommitmentID)
 	}
@@ -52,10 +52,10 @@ func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
 	return roots, nil
 }
 
-// BlockIDs returns the accepted block IDs of the slot.
-func (c *CommittedSlotAPI) BlockIDs() (blockIDs iotago.BlockIDs, err error) {
+// BlocksIDsBySlotCommitmentID returns the accepted block IDs of the slot grouped by their SlotCommitmentID.
+func (c *CommittedSlotAPI) BlocksIDsBySlotCommitmentID() (map[iotago.CommitmentID]iotago.BlockIDs, error) {
 	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
-		return blockIDs, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
+		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
 
 	store, err := c.engine.Storage.Blocks(c.CommitmentID.Slot())
@@ -63,14 +63,15 @@ func (c *CommittedSlotAPI) BlockIDs() (blockIDs iotago.BlockIDs, err error) {
 		return nil, ierrors.Errorf("failed to get block store of slot index %d", c.CommitmentID.Slot())
 	}
 
+	blockIDsBySlotCommitmentID := make(map[iotago.CommitmentID]iotago.BlockIDs)
 	if err := store.ForEachBlockInSlot(func(block *model.Block) error {
-		blockIDs = append(blockIDs, block.ID())
+		blockIDsBySlotCommitmentID[block.SlotCommitmentID()] = append(blockIDsBySlotCommitmentID[block.SlotCommitmentID()], block.ID())
 		return nil
 	}); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to iterate over blocks of slot %d", c.CommitmentID.Slot())
 	}
 
-	return blockIDs, nil
+	return blockIDsBySlotCommitmentID, nil
 }
 
 func (c *CommittedSlotAPI) TransactionIDs() (iotago.TransactionIDs, error) {
@@ -83,7 +84,13 @@ func (c *CommittedSlotAPI) TransactionIDs() (iotago.TransactionIDs, error) {
 		return nil, ierrors.Errorf("failed to get mutations of slot index %d", c.CommitmentID.Slot())
 	}
 
-	set := ads.NewSet[iotago.Identifier](store, iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
+	set := ads.NewSet[iotago.Identifier](
+		store,
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		iotago.TransactionID.Bytes,
+		iotago.TransactionIDFromBytes,
+	)
 	transactionIDs := make(iotago.TransactionIDs, 0, set.Size())
 
 	if err = set.Stream(func(txID iotago.TransactionID) error {

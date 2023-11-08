@@ -181,7 +181,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 		//nolint:forcetypeassert // we already checked the type
 		iotaOutput = &iotago.BasicOutput{
 			Amount: amount,
-			Conditions: iotago.BasicOutputUnlockConditions{
+			UnlockConditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{
 					Address: address,
 				},
@@ -194,7 +194,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 		iotaOutput = &iotago.AccountOutput{
 			Amount:    amount,
 			AccountID: RandAccountID(),
-			Conditions: iotago.AccountOutputUnlockConditions{
+			UnlockConditions: iotago.AccountOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{
 					Address: address,
 				},
@@ -208,7 +208,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 		iotaOutput = &iotago.AnchorOutput{
 			Amount:   amount,
 			AnchorID: RandAnchorID(),
-			Conditions: iotago.AnchorOutputUnlockConditions{
+			UnlockConditions: iotago.AnchorOutputUnlockConditions{
 				&iotago.StateControllerAddressUnlockCondition{
 					Address: address,
 				},
@@ -236,7 +236,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 				MeltedTokens:  new(big.Int).SetBytes([]byte{0}),
 				MaximumSupply: supply,
 			},
-			Conditions: iotago.FoundryOutputUnlockConditions{
+			UnlockConditions: iotago.FoundryOutputUnlockConditions{
 				&iotago.ImmutableAccountUnlockCondition{
 					Address: address.(*iotago.AccountAddress),
 				},
@@ -250,7 +250,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 		iotaOutput = &iotago.NFTOutput{
 			Amount: amount,
 			NFTID:  RandNFTID(),
-			Conditions: iotago.NFTOutputUnlockConditions{
+			UnlockConditions: iotago.NFTOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{
 					Address: address,
 				},
@@ -268,7 +268,7 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 			ValidatorAddress: tpkg.RandAccountAddress(),
 			StartEpoch:       tpkg.RandEpoch(),
 			EndEpoch:         iotago.MaxEpochIndex,
-			Conditions: iotago.DelegationOutputUnlockConditions{
+			UnlockConditions: iotago.DelegationOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{
 					Address: address,
 				},

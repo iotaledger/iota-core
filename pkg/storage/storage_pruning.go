@@ -80,7 +80,7 @@ func (s *Storage) PruneByEpochIndex(epoch iotago.EpochIndex) error {
 	return nil
 }
 
-func (s *Storage) PruneByDepth(epochDepth iotago.EpochIndex) (firstPruned, lastPruned iotago.EpochIndex, err error) {
+func (s *Storage) PruneByDepth(epochDepth iotago.EpochIndex) (firstPruned iotago.EpochIndex, lastPruned iotago.EpochIndex, err error) {
 	// Depth of 0 and 1 means we prune to the latestPrunableEpoch.
 	if epochDepth == 0 {
 		epochDepth = 1

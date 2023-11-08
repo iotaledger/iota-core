@@ -51,7 +51,7 @@ func (b *Blocks) Block(id iotago.BlockID) (block *Block, exists bool) {
 	return storage.Get(id)
 }
 
-func (b *Blocks) StoreOrUpdate(data *model.Block) (storedBlock *Block, evicted, updated bool) {
+func (b *Blocks) StoreOrUpdate(data *model.Block) (storedBlock *Block, evicted bool, updated bool) {
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
