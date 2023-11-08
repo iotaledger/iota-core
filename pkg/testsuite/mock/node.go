@@ -182,7 +182,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
-	events.Network.WarpSyncResponseReceived.Hook(func(id iotago.CommitmentID, ds iotago.BlockIDs, m *merklehasher.Proof[iotago.Identifier], ds2 iotago.TransactionIDs, m2 *merklehasher.Proof[iotago.Identifier], id2 peer.ID) {
+	events.Network.WarpSyncResponseReceived.Hook(func(id iotago.CommitmentID, ds map[iotago.CommitmentID]iotago.BlockIDs, m *merklehasher.Proof[iotago.Identifier], ds2 iotago.TransactionIDs, m2 *merklehasher.Proof[iotago.Identifier], id2 peer.ID) {
 		fmt.Printf("%s > Network.WarpSyncResponseReceived: from %s %s\n", n.Name, id2, id)
 	})
 

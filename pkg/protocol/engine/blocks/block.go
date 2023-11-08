@@ -247,7 +247,7 @@ func (b *Block) SlotCommitmentID() iotago.CommitmentID {
 		return b.rootBlock.commitmentID
 	}
 
-	return b.modelBlock.ProtocolBlock().Header.SlotCommitmentID
+	return b.modelBlock.SlotCommitmentID()
 }
 
 // IsMissing returns a flag that indicates if the underlying Block data hasn't been stored, yet.
