@@ -131,7 +131,7 @@ func (t *TestSuite) ApplySlotActions(slot iotago.SlotIndex, rmc iotago.Mana, act
 			BICChange:              iotago.BlockIssuanceCredits(action.TotalAllotments), // manager takes AccountDiff only with allotments filled in when applyDiff is triggered
 			BlockIssuerKeysAdded:   t.BlockIssuerKeys(action.AddedKeys, true),
 			BlockIssuerKeysRemoved: t.BlockIssuerKeys(action.RemovedKeys, true),
-			PreviousUpdatedTime:    prevAccountFields.BICUpdatedAt,
+			PreviousUpdatedSlot:    prevAccountFields.BICUpdatedAt,
 			NewExpirySlot:          prevAccountFields.ExpirySlot,
 
 			DelegationStakeChange: action.DelegationStakeChange,
@@ -265,7 +265,7 @@ func (t *TestSuite) assertDiff(slot iotago.SlotIndex, accountID iotago.AccountID
 	expectedAccountDiff := accountsSlotBuildData.SlotDiff[accountID]
 
 	require.Equal(t.T, expectedAccountDiff.PreviousOutputID, actualDiff.PreviousOutputID)
-	require.Equal(t.T, expectedAccountDiff.PreviousUpdatedTime, actualDiff.PreviousUpdatedTime)
+	require.Equal(t.T, expectedAccountDiff.PreviousUpdatedSlot, actualDiff.PreviousUpdatedSlot)
 	require.Equal(t.T, expectedAccountDiff.NewExpirySlot, actualDiff.NewExpirySlot)
 	require.Equal(t.T, expectedAccountDiff.PreviousExpirySlot, actualDiff.PreviousExpirySlot)
 
