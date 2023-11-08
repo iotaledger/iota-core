@@ -232,9 +232,14 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 				continue
 			}
 
-			validatorPerformance, err := validatorSlotPerformances.Load(accountID)
+			validatorPerformance, exists, err := validatorSlotPerformances.Load(accountID)
 			if err != nil {
 				panic(ierrors.Wrapf(err, "failed to load performance factor for account %s", accountID))
+			}
+
+			// key not found
+			if !exists {
+				validatorPerformance = model.NewValidatorPerformance()
 			}
 
 			validatorPerformances = append(validatorPerformances, validatorPerformance)
@@ -296,7 +301,7 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.Valida
 		// we reward not only total number of blocks issued, but also regularity based on block timestamp
 		slotPerformanceFactor := bits.OnesCount32(pf.SlotActivityVector)
 
-		if pf.BlockIssuedCount > protoParamsForEpoch.ValidationBlocksPerSlot() {
+		if pf.BlocksIssuedCount > protoParamsForEpoch.ValidationBlocksPerSlot() {
 			// we harshly punish validators that issue any blocks more than allowed
 
 			return 0
@@ -326,7 +331,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 		return
 	}
 
-	validatorPerformance, err := validatorPerformances.Load(block.ProtocolBlock().Header.IssuerID)
+	validatorPerformance, exists, err := validatorPerformances.Load(block.ProtocolBlock().Header.IssuerID)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().Header.IssuerID))
 
@@ -334,7 +339,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	}
 
 	// key not found
-	if validatorPerformance == nil {
+	if !exists {
 		validatorPerformance = model.NewValidatorPerformance()
 	}
 
@@ -345,8 +350,8 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 
 	// we restrict the number up to ValidatorBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
 	// also it can fint into uint8
-	if validatorPerformance.BlockIssuedCount < apiForSlot.ProtocolParameters().ValidationBlocksPerSlot()+1 {
-		validatorPerformance.BlockIssuedCount++
+	if validatorPerformance.BlocksIssuedCount < apiForSlot.ProtocolParameters().ValidationBlocksPerSlot()+1 {
+		validatorPerformance.BlocksIssuedCount++
 	}
 
 	validatorPerformance.HighestSupportedVersionAndHash = model.VersionAndHash{

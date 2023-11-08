@@ -190,6 +190,8 @@ func (t *Tracker) rewardsMap(epoch iotago.EpochIndex) (ads.Map[iotago.Identifier
 	}
 
 	return ads.NewMap[iotago.Identifier](kv,
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
 		(*model.PoolRewards).Bytes,

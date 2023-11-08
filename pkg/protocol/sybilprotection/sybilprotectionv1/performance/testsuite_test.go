@@ -41,7 +41,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 		epochStats:  make(map[iotago.EpochIndex]*model.PoolsStats),
 		api: iotago.V3API(
 			iotago.NewV3ProtocolParameters(
-				iotago.WithTimeProviderOptions(time.Now().Unix(), 10, 3),
+				iotago.WithTimeProviderOptions(0, time.Now().Unix(), 10, 3),
 				iotago.WithRewardsOptions(8, 8, 11, 1154, 2, 1),
 			),
 		),
@@ -61,10 +61,8 @@ func (t *TestSuite) InitPerformanceTracker() {
 		p := slotstore.NewStore(slot, prunableStores[slot],
 			iotago.AccountID.Bytes,
 			iotago.AccountIDFromBytes,
-			func(s *model.ValidatorPerformance) ([]byte, error) {
-				return s.Bytes(t.api)
-			},
-			model.ValidatorPerformanceFromBytes(t.api),
+			(*model.ValidatorPerformance).Bytes,
+			model.ValidatorPerformanceFromBytes,
 		)
 
 		return p, nil

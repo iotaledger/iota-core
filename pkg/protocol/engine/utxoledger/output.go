@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -193,11 +193,13 @@ func (o *Output) CopyWithBlockIDAndSlotBooked(blockID iotago.BlockID, slotBooked
 // - kvStorable
 
 func outputStorageKeyForOutputID(outputID iotago.OutputID) []byte {
-	ms := marshalutil.New(iotago.OutputIDLength + 1)
-	ms.WriteByte(StoreKeyPrefixOutput) // 1 byte
-	ms.WriteBytes(outputID[:])         // iotago.OutputIDLength bytes
+	byteBuffer := stream.NewByteBuffer(iotago.OutputIDLength + serializer.OneByte)
 
-	return ms.Bytes()
+	// There can't be any errors.
+	_ = stream.Write(byteBuffer, StoreKeyPrefixOutput)
+	_ = stream.Write(byteBuffer, outputID)
+
+	return lo.PanicOnErr(byteBuffer.Bytes())
 }
 
 func (o *Output) KVStorableKey() (key []byte) {
@@ -205,68 +207,41 @@ func (o *Output) KVStorableKey() (key []byte) {
 }
 
 func (o *Output) KVStorableValue() (value []byte) {
-	ms := marshalutil.New()
-	ms.WriteBytes(o.blockID[:])             // BlockIDLength bytes
-	ms.WriteBytes(o.slotBooked.MustBytes()) // 4 bytes
+	byteBuffer := stream.NewByteBuffer()
 
-	ms.WriteUint32(uint32(len(o.encodedOutput))) // 4 bytes
-	ms.WriteBytes(o.encodedOutput)
+	// There can't be any errors.
+	_ = stream.Write(byteBuffer, o.blockID)
+	_ = stream.Write(byteBuffer, o.slotBooked)
+	_ = stream.WriteBytesWithSize(byteBuffer, o.encodedOutput, serializer.SeriLengthPrefixTypeAsUint32)
+	_ = stream.WriteBytesWithSize(byteBuffer, o.encodedProof, serializer.SeriLengthPrefixTypeAsUint32)
 
-	ms.WriteUint32(uint32(len(o.encodedProof))) // 4 bytes
-	ms.WriteBytes(o.encodedProof)
-
-	return ms.Bytes()
+	return lo.PanicOnErr(byteBuffer.Bytes())
 }
 
 func (o *Output) kvStorableLoad(_ *Manager, key []byte, value []byte) error {
-	// Parse key
-	keyUtil := marshalutil.New(key)
+	var err error
 
-	// Read prefix output
-	_, err := keyUtil.ReadByte()
-	if err != nil {
-		return err
+	keyReader := stream.NewByteReader(key)
+
+	if _, err = stream.Read[byte](keyReader); err != nil {
+		return ierrors.Wrap(err, "unable to read prefix")
+	}
+	if o.outputID, err = stream.Read[iotago.OutputID](keyReader); err != nil {
+		return ierrors.Wrap(err, "unable to read outputID")
 	}
 
-	// Read OutputID
-	if o.outputID, err = ParseOutputID(keyUtil); err != nil {
-		return err
+	valueReader := stream.NewByteReader(value)
+	if o.blockID, err = stream.Read[iotago.BlockID](valueReader); err != nil {
+		return ierrors.Wrap(err, "unable to read blockID")
 	}
-
-	// Parse value
-	valueUtil := marshalutil.New(value)
-
-	// Read BlockID
-	if o.blockID, err = ParseBlockID(valueUtil); err != nil {
-		return err
+	if o.slotBooked, err = stream.Read[iotago.SlotIndex](valueReader); err != nil {
+		return ierrors.Wrap(err, "unable to read slotBooked")
 	}
-
-	// Read Slot
-	o.slotBooked, err = parseSlotIndex(valueUtil)
-	if err != nil {
-		return err
+	if o.encodedOutput, err = stream.ReadBytesWithSize(valueReader, serializer.SeriLengthPrefixTypeAsUint32); err != nil {
+		return ierrors.Wrap(err, "unable to read encodedOutput")
 	}
-
-	// Read Output
-	outputLen, err := valueUtil.ReadUint32()
-	if err != nil {
-		return err
-	}
-
-	o.encodedOutput, err = valueUtil.ReadBytes(int(outputLen))
-	if err != nil {
-		return err
-	}
-
-	// Read Output proof
-	proofLen, err := valueUtil.ReadUint32()
-	if err != nil {
-		return err
-	}
-
-	o.encodedProof, err = valueUtil.ReadBytes(int(proofLen))
-	if err != nil {
-		return err
+	if o.encodedProof, err = stream.ReadBytesWithSize(valueReader, serializer.SeriLengthPrefixTypeAsUint32); err != nil {
+		return ierrors.Wrap(err, "unable to read encodedProof")
 	}
 
 	return nil
