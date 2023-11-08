@@ -3,7 +3,6 @@ package slotattestation
 import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/memstorage"
-	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -325,18 +324,8 @@ func (m *Manager) Reset() {
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()
 
+	// only reset future attestations as pending ones are only updated on commitment and accordingly in a "clean state".
 	m.futureAttestations.Clear()
-
-	pendingAttestationsToClear := make([]iotago.SlotIndex, 0)
-	m.pendingAttestations.ForEach(func(slot iotago.SlotIndex, _ *shrinkingmap.ShrinkingMap[iotago.AccountID, *iotago.Attestation]) {
-		if slot > m.lastCommittedSlot {
-			pendingAttestationsToClear = append(pendingAttestationsToClear, slot)
-		}
-	})
-
-	for _, slot := range pendingAttestationsToClear {
-		m.pendingAttestations.Evict(slot)
-	}
 }
 
 func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cutoffSlot iotago.SlotIndex, isValid bool) {
