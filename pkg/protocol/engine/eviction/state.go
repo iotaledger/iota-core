@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -185,18 +186,18 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 
 	latestNonEmptySlot := iotago.SlotIndex(0)
 
-	if err := stream.WriteCollection(writer, func() (elementsCount uint64, err error) {
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
 		for currentSlot := start; currentSlot <= targetSlot; currentSlot++ {
 			storage, err := s.rootBlockStorageFunc(currentSlot)
 			if err != nil {
 				continue
 			}
 			if err = storage.StreamBytes(func(rootBlockIDBytes []byte, commitmentIDBytes []byte) (err error) {
-				if err = stream.WriteBlob(writer, rootBlockIDBytes); err != nil {
+				if err = stream.WriteBytes(writer, rootBlockIDBytes); err != nil {
 					return ierrors.Wrapf(err, "failed to write root block ID %s", rootBlockIDBytes)
 				}
 
-				if err = stream.WriteBlob(writer, commitmentIDBytes); err != nil {
+				if err = stream.WriteBytes(writer, commitmentIDBytes); err != nil {
 					return ierrors.Wrapf(err, "failed to write root block's %s commitment %s", rootBlockIDBytes, commitmentIDBytes)
 				}
 
@@ -221,7 +222,7 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 		latestNonEmptySlot = 0
 	}
 
-	if err := stream.WriteSerializable(writer, latestNonEmptySlot, iotago.SlotIndexLength); err != nil {
+	if err := stream.Write(writer, latestNonEmptySlot); err != nil {
 		return ierrors.Wrap(err, "failed to write latest non empty slot")
 	}
 
@@ -230,26 +231,15 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 
 // Import imports the root blocks from the given reader.
 func (s *State) Import(reader io.ReadSeeker) error {
-	if err := stream.ReadCollection(reader, func(i int) error {
-
-		blockIDBytes, err := stream.ReadBlob(reader)
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
+		rootBlockID, err := stream.Read[iotago.BlockID](reader)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to read root block id %d", i)
 		}
 
-		rootBlockID, _, err := iotago.BlockIDFromBytes(blockIDBytes)
+		commitmentID, err := stream.Read[iotago.CommitmentID](reader)
 		if err != nil {
-			return ierrors.Wrapf(err, "failed to parse root block id %d", i)
-		}
-
-		commitmentIDBytes, err := stream.ReadBlob(reader)
-		if err != nil {
-			return ierrors.Wrapf(err, "failed to read root block's %s commitment id", rootBlockID)
-		}
-
-		commitmentID, _, err := iotago.CommitmentIDFromBytes(commitmentIDBytes)
-		if err != nil {
-			return ierrors.Wrapf(err, "failed to parse root block's %s commitment id", rootBlockID)
+			return ierrors.Wrapf(err, "failed to read root block's %s commitment id %d", rootBlockID, i)
 		}
 
 		if s.rootBlocks.Get(rootBlockID.Slot(), true).Set(rootBlockID, commitmentID) {
@@ -263,14 +253,9 @@ func (s *State) Import(reader io.ReadSeeker) error {
 		return ierrors.Wrap(err, "failed to read root blocks")
 	}
 
-	latestNonEmptySlotBytes, err := stream.ReadBytes(reader, iotago.SlotIndexLength)
+	latestNonEmptySlot, err := stream.Read[iotago.SlotIndex](reader)
 	if err != nil {
 		return ierrors.Wrap(err, "failed to read latest non empty slot")
-	}
-
-	latestNonEmptySlot, _, err := iotago.SlotIndexFromBytes(latestNonEmptySlotBytes)
-	if err != nil {
-		return ierrors.Wrap(err, "failed to parse latest non empty slot")
 	}
 
 	s.setLatestNonEmptySlot(latestNonEmptySlot)
