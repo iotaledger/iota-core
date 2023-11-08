@@ -1,15 +1,10 @@
 package model
 
 import (
-	"bytes"
-	"context"
-	"encoding/binary"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/serializer/v2"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -18,7 +13,7 @@ import (
 type AccountDiff struct {
 	BICChange iotago.BlockIssuanceCredits
 
-	PreviousUpdatedTime iotago.SlotIndex
+	PreviousUpdatedSlot iotago.SlotIndex
 
 	NewExpirySlot      iotago.SlotIndex
 	PreviousExpirySlot iotago.SlotIndex
@@ -44,7 +39,7 @@ type AccountDiff struct {
 func NewAccountDiff() *AccountDiff {
 	return &AccountDiff{
 		BICChange:                         0,
-		PreviousUpdatedTime:               0,
+		PreviousUpdatedSlot:               0,
 		NewExpirySlot:                     0,
 		PreviousExpirySlot:                0,
 		NewOutputID:                       iotago.EmptyOutputID,
@@ -60,37 +55,10 @@ func NewAccountDiff() *AccountDiff {
 	}
 }
 
-func (d AccountDiff) Bytes() ([]byte, error) {
-	m := marshalutil.New()
-
-	m.WriteInt64(int64(d.BICChange))
-	m.WriteUint32(uint32(d.PreviousUpdatedTime))
-	m.WriteUint32(uint32(d.NewExpirySlot))
-	m.WriteUint32(uint32(d.PreviousExpirySlot))
-	m.WriteBytes(lo.PanicOnErr(d.NewOutputID.Bytes()))
-	m.WriteBytes(lo.PanicOnErr(d.PreviousOutputID.Bytes()))
-
-	if err := writeBlockIssuerKeys(m, d.BlockIssuerKeysAdded); err != nil {
-		return nil, err
-	}
-	if err := writeBlockIssuerKeys(m, d.BlockIssuerKeysRemoved); err != nil {
-		return nil, err
-	}
-
-	m.WriteInt64(d.ValidatorStakeChange)
-	m.WriteInt64(d.DelegationStakeChange)
-	m.WriteInt64(d.FixedCostChange)
-	m.WriteUint64(uint64(d.StakeEndEpochChange))
-	m.WriteBytes(lo.PanicOnErr(d.NewLatestSupportedVersionAndHash.Bytes()))
-	m.WriteBytes(lo.PanicOnErr(d.PrevLatestSupportedVersionAndHash.Bytes()))
-
-	return m.Bytes(), nil
-}
-
 func (d *AccountDiff) Clone() *AccountDiff {
 	return &AccountDiff{
 		BICChange:                         d.BICChange,
-		PreviousUpdatedTime:               d.PreviousUpdatedTime,
+		PreviousUpdatedSlot:               d.PreviousUpdatedSlot,
 		NewExpirySlot:                     d.NewExpirySlot,
 		PreviousExpirySlot:                d.PreviousExpirySlot,
 		NewOutputID:                       d.NewOutputID,
@@ -106,131 +74,113 @@ func (d *AccountDiff) Clone() *AccountDiff {
 	}
 }
 
-func (d *AccountDiff) FromBytes(b []byte) (int, error) {
-	return d.readFromReadSeeker(bytes.NewReader(b))
+func (d *AccountDiff) Bytes() ([]byte, error) {
+	byteBuffer := stream.NewByteBuffer()
+
+	if err := stream.Write(byteBuffer, d.BICChange); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write BICChange value in the diff")
+	}
+	if err := stream.Write(byteBuffer, d.PreviousUpdatedSlot); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write PreviousUpdatedSlot in the diff")
+	}
+	if err := stream.Write(byteBuffer, d.NewExpirySlot); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write NewExpirySlot in the diff")
+	}
+	if err := stream.Write(byteBuffer, d.PreviousExpirySlot); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write PreviousExpirySlot in the diff")
+	}
+	if err := stream.Write(byteBuffer, d.NewOutputID); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write NewOutputID in the diff")
+	}
+	if err := stream.Write(byteBuffer, d.PreviousOutputID); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write PreviousOutputID in the diff")
+	}
+
+	if err := stream.WriteObject(byteBuffer, d.BlockIssuerKeysAdded, iotago.BlockIssuerKeys.Bytes); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write added blockIssuerKeys in the diff")
+	}
+	if err := stream.WriteObject(byteBuffer, d.BlockIssuerKeysRemoved, iotago.BlockIssuerKeys.Bytes); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write removed blockIssuerKeys in the diff")
+	}
+
+	if err := stream.Write(byteBuffer, d.ValidatorStakeChange); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write ValidatorStakeChange in the diff")
+	}
+	if err := stream.Write(byteBuffer, d.DelegationStakeChange); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write DelegationStakeChange in the diff")
+	}
+	if err := stream.Write(byteBuffer, d.FixedCostChange); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write FixedCostChange in the diff")
+	}
+	if err := stream.Write(byteBuffer, d.StakeEndEpochChange); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write StakeEndEpochChange in the diff")
+	}
+	if err := stream.WriteObject(byteBuffer, d.NewLatestSupportedVersionAndHash, VersionAndHash.Bytes); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write NewLatestSupportedVersionAndHash in the diff")
+	}
+	if err := stream.WriteObject(byteBuffer, d.PrevLatestSupportedVersionAndHash, VersionAndHash.Bytes); err != nil {
+		return nil, ierrors.Wrap(err, "unable to write PrevLatestSupportedVersionAndHash in the diff")
+	}
+
+	return byteBuffer.Bytes()
 }
 
-func (d *AccountDiff) FromReader(readSeeker io.ReadSeeker) error {
-	return lo.Return2(d.readFromReadSeeker(readSeeker))
+func AccountDiffFromReader(reader io.ReadSeeker) (*AccountDiff, error) {
+	var err error
+	d := NewAccountDiff()
+
+	if d.BICChange, err = stream.Read[iotago.BlockIssuanceCredits](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read account BIC balance value in the diff")
+	}
+	if d.PreviousUpdatedSlot, err = stream.Read[iotago.SlotIndex](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read previous updated time in the diff")
+	}
+	if d.NewExpirySlot, err = stream.Read[iotago.SlotIndex](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read new expiry slot in the diff")
+	}
+	if d.PreviousExpirySlot, err = stream.Read[iotago.SlotIndex](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read previous expiry slot in the diff")
+	}
+	if d.NewOutputID, err = stream.Read[iotago.OutputID](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read new outputID in the diff")
+	}
+	if d.PreviousOutputID, err = stream.Read[iotago.OutputID](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read previous outputID in the diff")
+	}
+
+	if d.BlockIssuerKeysAdded, err = stream.ReadObjectFromReader(reader, iotago.BlockIssuerKeysFromReader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read added blockIssuerKeys in the diff")
+	}
+	if d.BlockIssuerKeysRemoved, err = stream.ReadObjectFromReader(reader, iotago.BlockIssuerKeysFromReader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read removed blockIssuerKeys in the diff")
+	}
+
+	if d.ValidatorStakeChange, err = stream.Read[int64](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read validator stake change in the diff")
+	}
+	if d.DelegationStakeChange, err = stream.Read[int64](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read delegation stake change in the diff")
+	}
+	if d.FixedCostChange, err = stream.Read[int64](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read fixed cost change in the diff")
+	}
+	if d.StakeEndEpochChange, err = stream.Read[int64](reader); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read new stake end epoch in the diff")
+	}
+	if d.NewLatestSupportedVersionAndHash, err = stream.ReadObject(reader, VersionAndHashSize, VersionAndHashFromBytes); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read new latest supported version and hash in the diff")
+	}
+	if d.PrevLatestSupportedVersionAndHash, err = stream.ReadObject(reader, VersionAndHashSize, VersionAndHashFromBytes); err != nil {
+		return nil, ierrors.Wrap(err, "unable to read prev latest supported version and hash in the diff")
+	}
+
+	return d, nil
 }
 
-func (d *AccountDiff) readFromReadSeeker(reader io.ReadSeeker) (offset int, err error) {
-	if err = binary.Read(reader, binary.LittleEndian, &d.BICChange); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read account BIC balance value in the diff")
-	}
-	offset += 8
+func AccountDiffFromBytes(b []byte) (*AccountDiff, int, error) {
+	reader := stream.NewByteReader(b)
 
-	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousUpdatedTime); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read previous updated time in the diff")
-	}
-	offset += iotago.SlotIndexLength
+	a, err := AccountDiffFromReader(reader)
 
-	if err = binary.Read(reader, binary.LittleEndian, &d.NewExpirySlot); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read new expiry slot in the diff")
-	}
-	offset += iotago.SlotIndexLength
-
-	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousExpirySlot); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read previous expiry slot in the diff")
-	}
-	offset += iotago.SlotIndexLength
-
-	if err = binary.Read(reader, binary.LittleEndian, &d.NewOutputID); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read new outputID in the diff")
-	}
-	offset += iotago.OutputIDLength
-
-	if err = binary.Read(reader, binary.LittleEndian, &d.PreviousOutputID); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read previous outputID in the diff")
-	}
-	offset += iotago.OutputIDLength
-
-	keysAdded, bytesRead, err := readBlockIssuerKeys(reader)
-	if err != nil {
-		return offset, ierrors.Wrap(err, "unable to read added blockIssuerKeys in the diff")
-	}
-	offset += bytesRead
-
-	d.BlockIssuerKeysAdded = keysAdded
-
-	keysRemoved, bytesRead, err := readBlockIssuerKeys(reader)
-	if err != nil {
-		return offset, ierrors.Wrap(err, "unable to read removed blockIssuerKeys in the diff")
-	}
-	offset += bytesRead
-
-	d.BlockIssuerKeysRemoved = keysRemoved
-
-	if err = binary.Read(reader, binary.LittleEndian, &d.ValidatorStakeChange); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read validator stake change in the diff")
-	}
-	offset += 8
-
-	if err = binary.Read(reader, binary.LittleEndian, &d.DelegationStakeChange); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read delegation stake change in the diff")
-	}
-	offset += 8
-
-	if err = binary.Read(reader, binary.LittleEndian, &d.FixedCostChange); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read fixed cost change in the diff")
-	}
-	offset += 8
-
-	if err = binary.Read(reader, binary.LittleEndian, &d.StakeEndEpochChange); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read new stake end epoch in the diff")
-	}
-	offset += 8
-
-	newVersionAndHashBytes := make([]byte, VersionAndHashSize)
-	if err = binary.Read(reader, binary.LittleEndian, newVersionAndHashBytes); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read new version and hash bytes in the diff")
-	}
-	d.NewLatestSupportedVersionAndHash, _, err = VersionAndHashFromBytes(newVersionAndHashBytes)
-	if err != nil {
-		return offset, ierrors.Wrap(err, "unable to parse new version and hash bytes in the diff")
-	}
-	offset += len(newVersionAndHashBytes)
-
-	prevVersionAndHashBytes := make([]byte, VersionAndHashSize)
-	if err = binary.Read(reader, binary.LittleEndian, prevVersionAndHashBytes); err != nil {
-		return offset, ierrors.Wrap(err, "unable to read prev version and hash bytes in the diff")
-	}
-	d.PrevLatestSupportedVersionAndHash, _, err = VersionAndHashFromBytes(prevVersionAndHashBytes)
-	if err != nil {
-		return offset, ierrors.Wrap(err, "unable to parse prev version and hash bytes in the diff")
-	}
-	offset += len(prevVersionAndHashBytes)
-
-	return offset, nil
-}
-
-func writeBlockIssuerKeys(m *marshalutil.MarshalUtil, blockIssuerKeys iotago.BlockIssuerKeys) error {
-	blockIssuerKeysBytes, err := iotago.CommonSerixAPI().Encode(context.TODO(), blockIssuerKeys)
-	if err != nil {
-		return ierrors.Wrap(err, "unable to encode blockIssuerKeys in the diff")
-	}
-
-	m.WriteUint64(uint64(len(blockIssuerKeysBytes)))
-	m.WriteBytes(blockIssuerKeysBytes)
-
-	return nil
-}
-
-func readBlockIssuerKeys(reader io.ReadSeeker) (iotago.BlockIssuerKeys, int, error) {
-	var bytesConsumed int
-
-	blockIssuerKeysBytes, err := stream.ReadBlob(reader)
-	if err != nil {
-		return nil, bytesConsumed, ierrors.Wrap(err, "unable to read blockIssuerKeysBytes in the diff")
-	}
-
-	bytesConsumed += serializer.UInt64ByteSize // add the blob size
-	bytesConsumed += len(blockIssuerKeysBytes)
-
-	var blockIssuerKeys iotago.BlockIssuerKeys
-	if _, err := iotago.CommonSerixAPI().Decode(context.TODO(), blockIssuerKeysBytes, &blockIssuerKeys); err != nil {
-		return nil, bytesConsumed, ierrors.Wrap(err, "unable to decode blockIssuerKeys in the diff")
-	}
-
-	return blockIssuerKeys, bytesConsumed, nil
+	return a, reader.BytesRead(), err
 }

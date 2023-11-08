@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -13,28 +14,14 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	defer m.commitmentMutex.Unlock()
 
 	var attestations []*iotago.Attestation
-	if err := stream.ReadCollection(reader, func(i int) error {
-		attestationBytes, err := stream.ReadBlob(reader)
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
+
+		attestation, err := stream.ReadObjectWithSize[*iotago.Attestation](reader, serializer.SeriLengthPrefixTypeAsUint16, iotago.AttestationFromBytes(m.apiProvider))
 		if err != nil {
-			return ierrors.Wrap(err, "failed to read attestation")
+			return ierrors.Wrapf(err, "failed to read attestation %d", i)
 		}
 
-		version, _, err := iotago.VersionFromBytes(attestationBytes)
-		if err != nil {
-			return ierrors.Wrap(err, "failed to determine version")
-		}
-
-		apiForVersion, err := m.apiProvider.APIForVersion(version)
-		if err != nil {
-			return ierrors.Wrapf(err, "failed to get API for version %d", version)
-		}
-
-		importedAttestation := new(iotago.Attestation)
-		if _, err = apiForVersion.Decode(attestationBytes, importedAttestation); err != nil {
-			return ierrors.Wrapf(err, "failed to decode attestation %d", i)
-		}
-
-		attestations = append(attestations, importedAttestation)
+		attestations = append(attestations, attestation)
 
 		return nil
 	}); err != nil {
@@ -88,23 +75,14 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 		return ierrors.Wrapf(err, "failed to stream attestations of slot %d", targetSlot)
 	}
 
-	if err = stream.WriteCollection(writer, func() (uint64, error) {
+	if err = stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (int, error) {
 		for _, a := range attestations {
-			apiForVersion, err := m.apiProvider.APIForVersion(a.Header.ProtocolVersion)
-			if err != nil {
-				return 0, ierrors.Wrapf(err, "failed to get API for version %d", a.Header.ProtocolVersion)
-			}
-			bytes, err := apiForVersion.Encode(a)
-			if err != nil {
-				return 0, ierrors.Wrapf(err, "failed to encode attestation %v", a)
-			}
-
-			if writeErr := stream.WriteBlob(writer, bytes); writeErr != nil {
-				return 0, ierrors.Wrapf(writeErr, "failed to write attestation %v", a)
+			if err := stream.WriteObjectWithSize(writer, a, serializer.SeriLengthPrefixTypeAsUint16, (*iotago.Attestation).Bytes); err != nil {
+				return 0, ierrors.Wrapf(err, "failed to write attestation %v", a)
 			}
 		}
 
-		return uint64(len(attestations)), nil
+		return len(attestations), nil
 	}); err != nil {
 		return ierrors.Wrapf(err, "failed to write attestations of slot %d", targetSlot)
 	}
