@@ -10,7 +10,8 @@ import (
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 )
 
 const DefaultReconnectInterval = 5 * time.Second
@@ -78,17 +79,29 @@ func (p *Peer) SetConnStatus(cs ConnectionStatus) {
 }
 
 func (p *Peer) Bytes() ([]byte, error) {
-	m := marshalutil.New()
-	m.WriteUint64(uint64(len(p.ID)))
-	m.WriteBytes([]byte(p.ID))
-	m.WriteUint8(uint8(len(p.PeerAddresses)))
-	for _, addr := range p.PeerAddresses {
-		addrBytes := addr.Bytes()
-		m.WriteUint64(uint64(len(addrBytes)))
-		m.WriteBytes(addrBytes)
+	byteBuffer := stream.NewByteBuffer()
+
+	if err := stream.WriteObjectWithSize(byteBuffer, p.ID, serializer.SeriLengthPrefixTypeAsUint16, func(id peer.ID) ([]byte, error) {
+		return []byte(id), nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write peer ID")
 	}
 
-	return m.Bytes(), nil
+	if err := stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsByte, func() (elementsCount int, err error) {
+		for _, addr := range p.PeerAddresses {
+			if err = stream.WriteObjectWithSize(byteBuffer, addr, serializer.SeriLengthPrefixTypeAsUint16, func(m multiaddr.Multiaddr) ([]byte, error) {
+				return m.Bytes(), nil
+			}); err != nil {
+				return 0, ierrors.Wrap(err, "failed to write peer address")
+			}
+		}
+
+		return len(p.PeerAddresses), nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write peer addresses")
+	}
+
+	return byteBuffer.Bytes()
 }
 
 func (p *Peer) String() string {
@@ -97,46 +110,48 @@ func (p *Peer) String() string {
 
 // peerFromBytes parses a peer from a byte slice.
 func peerFromBytes(bytes []byte) (*Peer, error) {
-	m := marshalutil.New(bytes)
-	idLen, err := m.ReadUint64()
-	if err != nil {
-		return nil, err
-	}
-	idBytes, err := m.ReadBytes(int(idLen))
-	if err != nil {
-		return nil, err
-	}
-	id := peer.ID(idBytes)
-
-	peer := &Peer{
-		ID:            id,
+	p := &Peer{
 		PeerAddresses: make([]multiaddr.Multiaddr, 0),
 		ConnStatus:    &atomic.Value{},
 		RemoveCh:      make(chan struct{}),
 		DoneCh:        make(chan struct{}),
 	}
 
-	peer.SetConnStatus(ConnStatusDisconnected)
+	var err error
+	byteReader := stream.NewByteReader(bytes)
 
-	peerAddrLen, err := m.ReadUint8()
-	if err != nil {
-		return nil, err
-	}
-	for i := 0; i < int(peerAddrLen); i++ {
-		addrLen, err := m.ReadUint64()
+	if p.ID, err = stream.ReadObjectWithSize(byteReader, serializer.SeriLengthPrefixTypeAsUint16, func(bytes []byte) (peer.ID, int, error) {
+		id, err := peer.IDFromBytes(bytes)
 		if err != nil {
-			return nil, err
+			return "", 0, ierrors.Wrap(err, "failed to parse peerID")
 		}
-		addrBytes, err := m.ReadBytes(int(addrLen))
-		if err != nil {
-			return nil, err
-		}
-		addr, err := multiaddr.NewMultiaddrBytes(addrBytes)
-		if err != nil {
-			return nil, err
-		}
-		peer.PeerAddresses = append(peer.PeerAddresses, addr)
+
+		return id, len(bytes), nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read peer ID")
 	}
 
-	return peer, nil
+	p.SetConnStatus(ConnStatusDisconnected)
+
+	if err = stream.ReadCollection(byteReader, serializer.SeriLengthPrefixTypeAsByte, func(i int) error {
+		addr, err := stream.ReadObjectWithSize(byteReader, serializer.SeriLengthPrefixTypeAsUint16, func(bytes []byte) (multiaddr.Multiaddr, int, error) {
+			m, err := multiaddr.NewMultiaddrBytes(bytes)
+			if err != nil {
+				return nil, 0, ierrors.Wrap(err, "failed to parse peer address")
+			}
+
+			return m, len(bytes), nil
+		})
+		if err != nil {
+			return ierrors.Wrap(err, "failed to read peer address")
+		}
+
+		p.PeerAddresses = append(p.PeerAddresses, addr)
+
+		return nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read peer addresses")
+	}
+
+	return p, nil
 }
