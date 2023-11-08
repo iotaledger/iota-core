@@ -410,11 +410,7 @@ func (t *TestSuite) addWallet(name string, node *mock.Node, accountID iotago.Acc
 }
 
 func (t *TestSuite) DefaultWallet() *mock.Wallet {
-	if t.wallets.Has("default") {
-		return lo.Return1(t.wallets.Get("default"))
-	}
-
-	_, defaultWallet, exists := t.wallets.Head()
+	defaultWallet, exists := t.wallets.Get("default")
 	if !exists {
 		return nil
 	}
@@ -425,6 +421,16 @@ func (t *TestSuite) DefaultWallet() *mock.Wallet {
 func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
+
+	// Add default wallet by default when creating the first node.
+	if !t.wallets.Has("default") {
+		_, node, exists := t.nodes.Head()
+		if !exists {
+			panic("at least one node is needed to create a default wallet")
+		}
+
+		t.AddGenesisWallet("default", node)
+	}
 
 	// Create accounts for any block issuer nodes added before starting the network.
 	if t.optsAccounts != nil {
