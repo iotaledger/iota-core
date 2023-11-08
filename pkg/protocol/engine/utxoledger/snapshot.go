@@ -95,13 +95,13 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIPr
 		return nil, ierrors.Wrap(err, "unable to read slot diff index")
 	}
 
-	createdCount, err := stream.PeekSize(reader, serializer.SeriLengthPrefixTypeAsUint64)
+	createdCount, err := stream.PeekSize(reader, serializer.SeriLengthPrefixTypeAsUint32)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "unable to peek slot diff created count")
 	}
 	slotDiff.Outputs = make(Outputs, createdCount)
 
-	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
 		slotDiff.Outputs[i], err = OutputFromSnapshotReader(reader, apiProvider)
 		if err != nil {
 			return ierrors.Wrap(err, "unable to read slot diff output")
@@ -112,13 +112,13 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIPr
 		return nil, ierrors.Wrap(err, "unable to read slot diff created collection")
 	}
 
-	consumedCount, err := stream.PeekSize(reader, serializer.SeriLengthPrefixTypeAsUint64)
+	consumedCount, err := stream.PeekSize(reader, serializer.SeriLengthPrefixTypeAsUint32)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "unable to peek slot diff consumed count")
 	}
 	slotDiff.Spents = make(Spents, consumedCount)
 
-	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
 		slotDiff.Spents[i], err = SpentFromSnapshotReader(reader, apiProvider, slotDiff.Slot)
 		if err != nil {
 			return ierrors.Wrap(err, "unable to read slot diff spent")
@@ -137,7 +137,7 @@ func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *SlotDiff) error 
 		return ierrors.Wrap(err, "unable to write slot diff index")
 	}
 
-	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (elementsCount int, err error) {
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
 		for _, output := range diff.sortedOutputs() {
 			if err := stream.WriteBytes(writer, output.SnapshotBytes()); err != nil {
 				return 0, ierrors.Wrap(err, "unable to write slot diff created output")
@@ -149,7 +149,7 @@ func WriteSlotDiffToSnapshotWriter(writer io.WriteSeeker, diff *SlotDiff) error 
 		return ierrors.Wrap(err, "unable to write slot diff created collection")
 	}
 
-	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (elementsCount int, err error) {
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
 		for _, spent := range diff.sortedSpents() {
 			if err := stream.WriteBytes(writer, spent.SnapshotBytes()); err != nil {
 				return 0, ierrors.Wrap(err, "unable to write slot diff spent output")
@@ -192,7 +192,7 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 		return ierrors.Wrap(err, "unable to read LS output collection")
 	}
 
-	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
 		slotDiff, err := ReadSlotDiffToSnapshotReader(reader, m.apiProvider)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to read LS slot diff at index %d", i)
@@ -258,7 +258,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 		return ierrors.Wrap(err, "unable to write unspent output collection")
 	}
 
-	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (int, error) {
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (int, error) {
 		var slotDiffCount int
 		for diffIndex := ledgerIndex; diffIndex > targetIndex; diffIndex-- {
 			slotDiff, err := m.SlotDiffWithoutLocking(diffIndex)

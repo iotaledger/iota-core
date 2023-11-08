@@ -189,9 +189,9 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 	require.NoError(t, binary.Read(reader, binary.LittleEndian, &readSlot))
 	require.Equal(t, slot, readSlot)
 
-	var createdCount uint64
+	var createdCount uint32
 	require.NoError(t, binary.Read(reader, binary.LittleEndian, &createdCount))
-	require.Equal(t, uint64(len(slotDiff.Outputs)), createdCount)
+	require.Equal(t, uint32(len(slotDiff.Outputs)), createdCount)
 
 	var snapshotOutputs utxoledger.Outputs
 	for i := 0; i < len(slotDiff.Outputs); i++ {
@@ -202,9 +202,9 @@ func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
 
 	tpkg.EqualOutputs(t, slotDiff.Outputs, snapshotOutputs)
 
-	var consumedCount uint64
+	var consumedCount uint32
 	require.NoError(t, binary.Read(reader, binary.LittleEndian, &consumedCount))
-	require.Equal(t, uint64(len(slotDiff.Spents)), consumedCount)
+	require.Equal(t, uint32(len(slotDiff.Spents)), consumedCount)
 
 	var snapshotSpents utxoledger.Spents
 	for i := 0; i < len(slotDiff.Spents); i++ {
@@ -380,9 +380,9 @@ func TestManager_Export(t *testing.T) {
 
 		tpkg.EqualOutputs(t, unspentOutputs, snapshotOutputs)
 
-		var slotDiffCount uint64
+		var slotDiffCount uint32
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &slotDiffCount))
-		require.Equal(t, uint64(0), slotDiffCount)
+		require.Equal(t, uint32(0), slotDiffCount)
 	}
 
 	// Test exporting at slot 1
@@ -412,11 +412,11 @@ func TestManager_Export(t *testing.T) {
 
 		tpkg.EqualOutputs(t, unspentOutputs, snapshotOutputs)
 
-		var slotDiffCount uint64
+		var slotDiffCount uint32
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &slotDiffCount))
-		require.Equal(t, uint64(1), slotDiffCount)
+		require.Equal(t, uint32(1), slotDiffCount)
 
-		for i := uint64(0); i < slotDiffCount; i++ {
+		for i := uint32(0); i < slotDiffCount; i++ {
 			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
 			require.Equal(t, snapshotLedgerSlot-iotago.SlotIndex(i), diff.Slot)
@@ -450,11 +450,11 @@ func TestManager_Export(t *testing.T) {
 
 		tpkg.EqualOutputs(t, unspentOutputs, snapshotOutputs)
 
-		var slotDiffCount uint64
+		var slotDiffCount uint32
 		require.NoError(t, binary.Read(reader, binary.LittleEndian, &slotDiffCount))
-		require.Equal(t, uint64(2), slotDiffCount)
+		require.Equal(t, uint32(2), slotDiffCount)
 
-		for i := uint64(0); i < slotDiffCount; i++ {
+		for i := uint32(0); i < slotDiffCount; i++ {
 			diff, err := utxoledger.ReadSlotDiffToSnapshotReader(reader, api.SingleVersionProvider(iotago_tpkg.TestAPI))
 			require.NoError(t, err)
 			require.Equal(t, snapshotLedgerSlot-iotago.SlotIndex(i), diff.Slot)
