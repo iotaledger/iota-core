@@ -106,13 +106,16 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 
 		case *iotago.DelegationOutput:
 			delegationID := castOutput.DelegationID
+			delegationEnd := castOutput.EndEpoch
+
 			if delegationID.Empty() {
 				delegationID = iotago.DelegationIDFromOutputID(outputID)
-			}
 
-			delegationEnd := castOutput.EndEpoch
-			if delegationEnd == 0 {
-				delegationEnd = v.ledger.apiProvider.APIForSlot(commitmentInput.Slot).TimeProvider().EpochFromSlot(commitmentInput.Slot) - iotago.EpochIndex(1)
+				// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
+				// "last epoch", which is the epoch index corresponding to the future bounded slot index minus 1.
+				apiForSlot := v.ledger.apiProvider.APIForSlot(commitmentInput.Slot)
+				futureBoundedSlotIndex := commitmentInput.Slot + iotago.SlotIndex(apiForSlot.ProtocolParameters().MinCommittableAge())
+				delegationEnd = apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex) - iotago.EpochIndex(1)
 			}
 
 			reward, _, _, rewardErr := v.ledger.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
