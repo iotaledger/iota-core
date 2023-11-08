@@ -146,14 +146,14 @@ func (s *SeatManager) OnlineCommittee() ds.Set[account.SeatIndex] {
 	return s.activityTracker.OnlineCommittee()
 }
 
-func (s *SeatManager) SeatCountInSlot(slot iotago.SlotIndex) int {
+func (s *SeatManager) SeatCountInSlot(_ iotago.SlotIndex) int {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
 	return s.committee.SeatCount()
 }
 
-func (s *SeatManager) SeatCountInEpoch(epoch iotago.EpochIndex) int {
+func (s *SeatManager) SeatCountInEpoch(_ iotago.EpochIndex) int {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
