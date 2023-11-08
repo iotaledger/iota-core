@@ -72,7 +72,7 @@ func (t *Tracker) Export(writer io.WriteSeeker, targetSlotIndex iotago.SlotIndex
 }
 
 func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
-	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
 		slot, err := stream.Read[iotago.SlotIndex](reader)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to read slot index at index %d", i)
@@ -110,7 +110,7 @@ func (t *Tracker) importPerformanceFactor(reader io.ReadSeeker) error {
 }
 
 func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
-	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(int) error {
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(int) error {
 		epoch, err := stream.Read[iotago.EpochIndex](reader)
 		if err != nil {
 			return ierrors.Wrap(err, "unable to read epoch")
@@ -154,7 +154,7 @@ func (t *Tracker) importPoolRewards(reader io.ReadSeeker) error {
 }
 
 func (t *Tracker) importPoolsStats(reader io.ReadSeeker) error {
-	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(int) error {
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(int) error {
 		epoch, err := stream.Read[iotago.EpochIndex](reader)
 		if err != nil {
 			return ierrors.Wrap(err, "unable to read epoch")
@@ -178,7 +178,7 @@ func (t *Tracker) importPoolsStats(reader io.ReadSeeker) error {
 }
 
 func (t *Tracker) importCommittees(reader io.ReadSeeker) error {
-	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(int) error {
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(int) error {
 		epoch, err := stream.Read[iotago.EpochIndex](reader)
 		if err != nil {
 			return ierrors.Wrap(err, "unable to read epoch index")
@@ -205,7 +205,7 @@ func (t *Tracker) exportPerformanceFactor(writer io.WriteSeeker, startSlot, targ
 	t.performanceFactorsMutex.RLock()
 	defer t.performanceFactorsMutex.RUnlock()
 
-	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (int, error) {
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (int, error) {
 		var slotCount int
 
 		for currentSlot := startSlot; currentSlot <= targetSlot; currentSlot++ {
@@ -257,7 +257,7 @@ func (t *Tracker) exportPoolRewards(writer io.WriteSeeker, targetEpoch iotago.Ep
 	// export all stored pools
 	// in theory we could save the epoch count only once, because stats and rewards should be the same length
 
-	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (int, error) {
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (int, error) {
 		var epochCount int
 
 		for epoch := targetEpoch; epoch > iotago.EpochIndex(lo.Max(0, int(targetEpoch)-daysInYear)); epoch-- {
@@ -310,7 +310,7 @@ func (t *Tracker) exportPoolRewards(writer io.WriteSeeker, targetEpoch iotago.Ep
 }
 
 func (t *Tracker) exportPoolsStats(writer io.WriteSeeker, targetEpoch iotago.EpochIndex) error {
-	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (int, error) {
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (int, error) {
 		var epochCount int
 
 		// export all stored pools
@@ -354,7 +354,7 @@ func (t *Tracker) exportCommittees(writer io.WriteSeeker, targetSlot iotago.Slot
 
 	pointOfNoReturn := apiForSlot.TimeProvider().EpochEnd(epochFromTargetSlot) - apiForSlot.ProtocolParameters().MaxCommittableAge()
 
-	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (int, error) {
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (int, error) {
 		var epochCount int
 
 		if err := t.committeeStore.StreamBytes(func(epochBytes []byte, committeeBytes []byte) error {
