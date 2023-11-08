@@ -226,7 +226,14 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		blockIDs = append(blockIDs, ids...)
 	}
 
-	acceptedBlocks := ads.NewSet[iotago.Identifier, iotago.BlockID](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
+	acceptedBlocks := ads.NewSet[iotago.Identifier, iotago.BlockID](
+		mapdb.NewMapDB(),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		iotago.BlockID.Bytes,
+		iotago.BlockIDFromBytes,
+	)
+
 	for _, blockID := range blockIDs {
 		_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
 	}
@@ -235,7 +242,14 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		return ierrors.Errorf("failed to verify tangle merkle proof for %s", commitmentID)
 	}
 
-	acceptedTransactionIDs := ads.NewSet[iotago.Identifier, iotago.TransactionID](mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
+	acceptedTransactionIDs := ads.NewSet[iotago.Identifier, iotago.TransactionID](
+		mapdb.NewMapDB(),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		iotago.TransactionID.Bytes,
+		iotago.TransactionIDFromBytes,
+	)
+	
 	for _, transactionID := range transactionIDs {
 		_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
 	}

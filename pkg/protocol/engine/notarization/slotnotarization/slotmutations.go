@@ -76,7 +76,13 @@ func (m *SlotMutations) Reset(index iotago.SlotIndex) {
 func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) ads.Set[iotago.Identifier, iotago.BlockID] {
 	if len(createIfMissing) > 0 && createIfMissing[0] {
 		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, func() ads.Set[iotago.Identifier, iotago.BlockID] {
-			return ads.NewSet[iotago.Identifier](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
+			return ads.NewSet[iotago.Identifier](
+				mapdb.NewMapDB(),
+				iotago.Identifier.Bytes,
+				iotago.IdentifierFromBytes,
+				iotago.BlockID.Bytes,
+				iotago.BlockIDFromBytes,
+			)
 		}))
 	}
 

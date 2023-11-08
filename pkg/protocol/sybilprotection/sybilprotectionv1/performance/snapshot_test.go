@@ -3,9 +3,9 @@ package performance
 import (
 	"testing"
 
-	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -37,7 +37,7 @@ func TestManager_Import_Export(t *testing.T) {
 	}
 
 	{
-		writer := &writerseeker.WriterSeeker{}
+		writer := stream.NewByteBuffer()
 
 		delegatorRewardBeforeImport, validatorRewardBeforeImport := ts.calculateExpectedRewards(epochsCount, epochActions)
 		// export two full epochs
@@ -47,14 +47,14 @@ func TestManager_Import_Export(t *testing.T) {
 
 		ts.InitPerformanceTracker()
 
-		err = ts.Instance.Import(writer.BytesReader())
+		err = ts.Instance.Import(writer.Reader())
 		require.NoError(t, err)
 		delegatorRewardAfterImport, validatorRewardAfterImport := ts.calculateExpectedRewards(epochsCount, epochActions)
 		require.Equal(t, delegatorRewardBeforeImport, delegatorRewardAfterImport)
 		require.Equal(t, validatorRewardBeforeImport, validatorRewardAfterImport)
 	}
 	{
-		writer := &writerseeker.WriterSeeker{}
+		writer := stream.NewByteBuffer()
 
 		delegatorRewardBeforeImport, validatorRewardBeforeImport := ts.calculateExpectedRewards(epochsCount, epochActions)
 		// export at the beginning of epoch 2, skip epoch 3 at all
@@ -64,7 +64,7 @@ func TestManager_Import_Export(t *testing.T) {
 
 		ts.InitPerformanceTracker()
 
-		err = ts.Instance.Import(writer.BytesReader())
+		err = ts.Instance.Import(writer.Reader())
 		require.NoError(t, err)
 		delegatorRewardAfterImport, validatorRewardAfterImport := ts.calculateExpectedRewards(epochsCount, epochActions)
 
