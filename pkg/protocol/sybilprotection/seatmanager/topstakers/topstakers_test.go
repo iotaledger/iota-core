@@ -1,6 +1,7 @@
 package topstakers
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -21,15 +22,22 @@ import (
 )
 
 func TestTopStakers_InitializeCommittee(t *testing.T) {
+	var testAPI = iotago.V3API(
+		iotago.NewV3ProtocolParameters(
+			iotago.WithNetworkOptions("TestJungle", "tgl"),
+			iotago.WithSupplyOptions(2_779_530_283_277_761, 0, 0, 0, 0, 0, 0),
+			iotago.WithWorkScoreOptions(0, 1, 0, 0, 0, 0, 0, 0, 0, 0), // all zero except block offset gives all blocks workscore = 1
+			iotago.WithTargetCommitteeSize(3),
+		),
+	)
+
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
 
 	topStakersSeatManager := &SeatManager{
-		apiProvider:     api.SingleVersionProvider(tpkg.TestAPI),
+		apiProvider:     api.SingleVersionProvider(testAPI),
 		committeeStore:  committeeStore,
 		events:          seatmanager.NewEvents(),
 		activityTracker: activitytrackerv1.NewActivityTracker(time.Second * 30),
-
-		optsSeatCount: 3,
 	}
 
 	// Create committee for epoch 0
@@ -58,161 +66,218 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 }
 
 func TestTopStakers_RotateCommittee(t *testing.T) {
+	var testAPI = iotago.V3API(
+		iotago.NewV3ProtocolParameters(
+			iotago.WithNetworkOptions("TestJungle", "tgl"),
+			iotago.WithSupplyOptions(2_779_530_283_277_761, 0, 0, 0, 0, 0, 0),
+			iotago.WithWorkScoreOptions(0, 1, 0, 0, 0, 0, 0, 0, 0, 0), // all zero except block offset gives all blocks workscore = 1
+			iotago.WithTargetCommitteeSize(10),
+		),
+	)
+
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
 
-	topStakersSeatManager := &SeatManager{
-		apiProvider:     api.SingleVersionProvider(tpkg.TestAPI),
+	s := &SeatManager{
+		apiProvider:     api.SingleVersionProvider(testAPI),
 		committeeStore:  committeeStore,
 		events:          seatmanager.NewEvents(),
 		activityTracker: activitytrackerv1.NewActivityTracker(time.Second * 30),
-
-		optsSeatCount: 3,
 	}
 
 	// Committee should not exist because it was never set.
-	_, exists := topStakersSeatManager.CommitteeInSlot(10)
+	_, exists := s.CommitteeInSlot(10)
 	require.False(t, exists)
 
-	_, exists = topStakersSeatManager.CommitteeInEpoch(0)
+	_, exists = s.CommitteeInEpoch(0)
 	require.False(t, exists)
+
+	var committeeInEpoch0 *account.SeatedAccounts
+	var committeeInEpoch0IDs []iotago.AccountID
+	expectedCommitteeInEpoch0 := account.NewAccounts()
 
 	// Create committee for epoch 0
-	initialCommittee := account.NewAccounts()
-	require.NoError(t, initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
-		PoolStake:      1900,
-		ValidatorStake: 900,
-		FixedCost:      11,
-	}))
+	{
+		addCommitteeMember(t, expectedCommitteeInEpoch0, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11})
+		addCommitteeMember(t, expectedCommitteeInEpoch0, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11})
+		addCommitteeMember(t, expectedCommitteeInEpoch0, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11})
 
-	require.NoError(t, initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
-		PoolStake:      1900,
-		ValidatorStake: 900,
-		FixedCost:      11,
-	}))
+		// We should be able to set a committee with only 3 members for epoch 0 (this could be set e.g. via the snapshot).
+		err := s.SetCommittee(0, expectedCommitteeInEpoch0)
+		require.NoError(t, err)
 
-	// Try setting committee that is too small - should return an error.
-	err := topStakersSeatManager.SetCommittee(0, initialCommittee)
-	require.Error(t, err)
+		// Make sure that the online committee is handled correctly.
+		{
+			committeeInEpoch0, exists = s.CommitteeInEpoch(0)
+			require.True(t, exists)
+			committeeInEpoch0IDs = expectedCommitteeInEpoch0.IDs()
 
-	require.NoError(t, initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
-		PoolStake:      1900,
-		ValidatorStake: 900,
-		FixedCost:      11,
-	}))
+			require.True(t, s.OnlineCommittee().IsEmpty())
 
-	// Set committee with the correct size
-	err = topStakersSeatManager.SetCommittee(0, initialCommittee)
-	require.NoError(t, err)
-	weightedSeats, exists := topStakersSeatManager.CommitteeInEpoch(0)
-	require.True(t, exists)
-	initialCommitteeAccountIDs := initialCommittee.IDs()
+			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[0])), committeeInEpoch0IDs[0], testAPI.TimeProvider().SlotStartTime(1))
+			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[0])))
 
-	// Make sure that the online committee is handled correctly.
-	require.True(t, topStakersSeatManager.OnlineCommittee().IsEmpty())
+			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[1])), committeeInEpoch0IDs[1], testAPI.TimeProvider().SlotStartTime(2))
+			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[0])), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[1])))
 
-	topStakersSeatManager.activityTracker.MarkSeatActive(lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[0])), initialCommitteeAccountIDs[0], tpkg.TestAPI.TimeProvider().SlotStartTime(1))
-	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[0])))
+			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])), committeeInEpoch0IDs[2], testAPI.TimeProvider().SlotStartTime(3))
+			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[0])), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[1])), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])))
 
-	topStakersSeatManager.activityTracker.MarkSeatActive(lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[1])), initialCommitteeAccountIDs[1], tpkg.TestAPI.TimeProvider().SlotStartTime(2))
-	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[0])), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[1])))
-
-	topStakersSeatManager.activityTracker.MarkSeatActive(lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])), initialCommitteeAccountIDs[2], tpkg.TestAPI.TimeProvider().SlotStartTime(3))
-	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[0])), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[1])), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])))
-
-	// Make sure that after a period of inactivity, the inactive seats are marked as offline.
-	topStakersSeatManager.activityTracker.MarkSeatActive(lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])), initialCommitteeAccountIDs[2], tpkg.TestAPI.TimeProvider().SlotEndTime(7))
-	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])))
-
-	// Make sure that the committee was assigned to the correct epoch.
-	_, exists = topStakersSeatManager.CommitteeInEpoch(1)
-	require.False(t, exists)
-
-	// Make sure that the committee members match the expected ones.
-	committee, exists := topStakersSeatManager.CommitteeInEpoch(0)
-	require.True(t, exists)
-	assertCommittee(t, initialCommittee, committee)
-
-	committee, exists = topStakersSeatManager.CommitteeInSlot(3)
-	require.True(t, exists)
-	assertCommittee(t, initialCommittee, committee)
-
-	// Design candidate list and expected committee members.
-	accountsContext := make(accounts.AccountsData, 0)
-	expectedCommittee := account.NewAccounts()
-	numCandidates := 10
-
-	// Add some candidates that have the same fields to test sorting by secondary fields.
-	candidate1ID := tpkg.RandAccountID()
-	accountsContext = append(accountsContext, &accounts.AccountData{
-		ID:              candidate1ID,
-		ValidatorStake:  399,
-		DelegationStake: 800 - 399,
-		FixedCost:       3,
-		StakeEndEpoch:   iotago.MaxEpochIndex,
-	})
-
-	candidate2ID := tpkg.RandAccountID()
-	accountsContext = append(accountsContext, &accounts.AccountData{
-		ID:              candidate2ID,
-		ValidatorStake:  399,
-		DelegationStake: 800 - 399,
-		FixedCost:       3,
-		StakeEndEpoch:   iotago.MaxEpochIndex,
-	})
-
-	for i := 1; i <= numCandidates; i++ {
-		candidateAccountID := tpkg.RandAccountID()
-		candidatePool := &account.Pool{
-			PoolStake:      iotago.BaseToken(i * 100),
-			ValidatorStake: iotago.BaseToken(i * 50),
-			FixedCost:      iotago.Mana(i),
+			// Make sure that after a period of inactivity, the inactive seats are marked as offline.
+			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])), committeeInEpoch0IDs[2], testAPI.TimeProvider().SlotEndTime(7))
+			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])))
 		}
-		accountsContext = append(accountsContext, &accounts.AccountData{
-			ID:              candidateAccountID,
-			ValidatorStake:  iotago.BaseToken(i * 50),
-			DelegationStake: iotago.BaseToken(i*100) - iotago.BaseToken(i*50),
-			FixedCost:       tpkg.RandMana(iotago.MaxMana),
-			StakeEndEpoch:   tpkg.RandEpoch(),
-		})
 
-		if i+topStakersSeatManager.SeatCount() > numCandidates {
-			expectedCommittee.Set(candidateAccountID, candidatePool)
-		}
+		// Make sure that the committee was assigned to the correct epoch.
+		_, exists = s.CommitteeInEpoch(1)
+		require.False(t, exists)
+
+		// Make sure that the committee members match the expected ones.
+		assertCommitteeInEpoch(t, s, testAPI, 0, expectedCommitteeInEpoch0)
+
+		// Make sure that the committee size is correct for this epoch
+		assertCommitteeSizeInEpoch(t, s, testAPI, 0, 3)
 	}
 
-	// Rotate the committee and make sure that the returned committee matches the expected.
-	newCommittee, err := topStakersSeatManager.RotateCommittee(1, accountsContext)
-	require.NoError(t, err)
-	assertCommittee(t, expectedCommittee, newCommittee)
+	expectedCommitteeInEpoch1 := account.NewAccounts()
+	// Design candidate list and expected committee members for epoch 1.
+	{
+		epoch := iotago.EpochIndex(1)
+		accountsData := make(accounts.AccountsData, 0)
+		numCandidates := 15
+		expectedCommitteeSize := testAPI.ProtocolParameters().TargetCommitteeSize()
+		require.EqualValues(t, expectedCommitteeSize, s.SeatCountInEpoch(epoch))
 
-	// Make sure that after committee rotation, the online committee is not changed.
-	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])))
+		s.SeatCountInEpoch(epoch)
 
-	accounts, err := newCommittee.Accounts()
-	require.NoError(t, err)
-	newCommitteeMemberIDs := accounts.IDs()
+		// Add some candidates that have the same fields to test sorting by secondary fields.
+		{
+			candidate0ID := tpkg.RandAccountID()
+			candidate0ID.RegisterAlias("candidate0")
+			accountsData = append(accountsData, &accounts.AccountData{
+				ID:              candidate0ID,
+				ValidatorStake:  100,
+				DelegationStake: 800 - 399,
+				FixedCost:       3,
+				StakeEndEpoch:   iotago.MaxEpochIndex,
+			})
 
-	// A new committee member appears online and makes the previously active committee seat inactive.
-	topStakersSeatManager.activityTracker.MarkSeatActive(lo.Return1(weightedSeats.GetSeat(newCommitteeMemberIDs[0])), newCommitteeMemberIDs[0], tpkg.TestAPI.TimeProvider().SlotEndTime(14))
-	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(), lo.Return1(weightedSeats.GetSeat(newCommitteeMemberIDs[0])))
+			candidate1ID := tpkg.RandAccountID()
+			candidate1ID.RegisterAlias("candidate1")
+			accountsData = append(accountsData, &accounts.AccountData{
+				ID:              candidate1ID,
+				ValidatorStake:  100,
+				DelegationStake: 800 - 399,
+				FixedCost:       3,
+				StakeEndEpoch:   iotago.MaxEpochIndex,
+			})
+		}
 
-	// Make sure that the committee retrieved from the committee store matches the expected.
-	committee, exists = topStakersSeatManager.CommitteeInEpoch(1)
+		for i := 2; i <= numCandidates; i++ {
+			candidateAccountID := tpkg.RandAccountID()
+			candidateAccountID.RegisterAlias(fmt.Sprintf("candidate%d", i))
+			candidatePool := &account.Pool{
+				PoolStake:      iotago.BaseToken(i * 100),
+				ValidatorStake: iotago.BaseToken(i * 50),
+				FixedCost:      iotago.Mana(i),
+			}
+			accountsData = append(accountsData, &accounts.AccountData{
+				ID:              candidateAccountID,
+				ValidatorStake:  iotago.BaseToken(i * 50),
+				DelegationStake: iotago.BaseToken(i*100) - iotago.BaseToken(i*50),
+				FixedCost:       tpkg.RandMana(iotago.MaxMana),
+				StakeEndEpoch:   tpkg.RandEpoch(),
+			})
+
+			if i+int(expectedCommitteeSize) > numCandidates {
+				require.NoError(t, expectedCommitteeInEpoch1.Set(candidateAccountID, candidatePool))
+			}
+		}
+
+		// Rotate the committee and make sure that the returned committee matches the expected.
+		rotatedCommitteeInEpoch1, err := s.RotateCommittee(epoch, accountsData)
+		require.NoError(t, err)
+		assertCommittee(t, expectedCommitteeInEpoch1, rotatedCommitteeInEpoch1)
+
+		// Make sure that after committee rotation, the online committee is not changed.
+		assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])))
+
+		committeeInEpoch1Accounts, err := rotatedCommitteeInEpoch1.Accounts()
+		require.NoError(t, err)
+		newCommitteeMemberIDs := committeeInEpoch1Accounts.IDs()
+
+		// A new committee member appears online and makes the previously active committee seat inactive.
+		s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(newCommitteeMemberIDs[0])), newCommitteeMemberIDs[0], testAPI.TimeProvider().SlotEndTime(14))
+		assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(newCommitteeMemberIDs[0])))
+
+		// Make sure that the committee retrieved from the committee store matches the expected.
+		assertCommitteeInEpoch(t, s, testAPI, 1, expectedCommitteeInEpoch1)
+		assertCommitteeSizeInEpoch(t, s, testAPI, 1, 10)
+
+		// Make sure that the previous committee was not modified and is still accessible.
+		assertCommitteeInEpoch(t, s, testAPI, 0, expectedCommitteeInEpoch0)
+		assertCommitteeSizeInEpoch(t, s, testAPI, 0, 3)
+	}
+
+	// Rotate committee again with fewer candidates than the target committee size.
+	{
+		epoch := iotago.EpochIndex(2)
+		accountsData := make(accounts.AccountsData, 0)
+		expectedCommitteeInEpoch2 := account.NewAccounts()
+
+		candidate0ID := tpkg.RandAccountID()
+		candidate0ID.RegisterAlias("candidate0-epoch2")
+		accountsData = append(accountsData, &accounts.AccountData{
+			ID:              candidate0ID,
+			ValidatorStake:  100,
+			DelegationStake: 800 - 399,
+			FixedCost:       3,
+			StakeEndEpoch:   iotago.MaxEpochIndex,
+		})
+		require.NoError(t, expectedCommitteeInEpoch2.Set(candidate0ID, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11}))
+
+		// Rotate the committee and make sure that the returned committee matches the expected.
+		rotatedCommitteeInEpoch2, err := s.RotateCommittee(epoch, accountsData)
+		require.NoError(t, err)
+		assertCommittee(t, expectedCommitteeInEpoch2, rotatedCommitteeInEpoch2)
+
+		assertCommitteeInEpoch(t, s, testAPI, 2, expectedCommitteeInEpoch2)
+		assertCommitteeSizeInEpoch(t, s, testAPI, 2, 1)
+
+		// Make sure that the committee retrieved from the committee store matches the expected.
+		assertCommitteeInEpoch(t, s, testAPI, 1, expectedCommitteeInEpoch1)
+		assertCommitteeSizeInEpoch(t, s, testAPI, 1, 10)
+
+		// Make sure that the previous committee was not modified and is still accessible.
+		assertCommitteeInEpoch(t, s, testAPI, 0, expectedCommitteeInEpoch0)
+		assertCommitteeSizeInEpoch(t, s, testAPI, 0, 3)
+	}
+}
+
+func addCommitteeMember(t *testing.T, committee *account.Accounts, pool *account.Pool) iotago.AccountID {
+	accountID := tpkg.RandAccountID()
+	require.NoError(t, committee.Set(accountID, pool))
+
+	return accountID
+}
+
+func assertCommitteeSizeInEpoch(t *testing.T, seatManager *SeatManager, testAPI iotago.API, epoch iotago.EpochIndex, expectedCommitteeSize int) {
+	require.Equal(t, expectedCommitteeSize, seatManager.SeatCountInEpoch(epoch))
+	require.Equal(t, expectedCommitteeSize, seatManager.SeatCountInSlot(testAPI.TimeProvider().EpochStart(epoch)))
+	require.Equal(t, expectedCommitteeSize, seatManager.SeatCountInSlot(testAPI.TimeProvider().EpochEnd(epoch)))
+}
+
+func assertCommitteeInEpoch(t *testing.T, seatManager *SeatManager, testAPI iotago.API, epoch iotago.EpochIndex, expectedCommittee *account.Accounts) {
+	committee, exists := seatManager.CommitteeInEpoch(epoch)
 	require.True(t, exists)
 	assertCommittee(t, expectedCommittee, committee)
 
-	committee, exists = topStakersSeatManager.CommitteeInSlot(tpkg.TestAPI.TimeProvider().EpochStart(1))
+	committee, exists = seatManager.CommitteeInSlot(testAPI.TimeProvider().EpochStart(epoch))
 	require.True(t, exists)
 	assertCommittee(t, expectedCommittee, committee)
 
-	// Make sure that the previous committee was not modified and is still accessible.
-	committee, exists = topStakersSeatManager.CommitteeInEpoch(0)
+	committee, exists = seatManager.CommitteeInSlot(testAPI.TimeProvider().EpochEnd(epoch))
 	require.True(t, exists)
-	assertCommittee(t, initialCommittee, committee)
-
-	committee, exists = topStakersSeatManager.CommitteeInSlot(tpkg.TestAPI.TimeProvider().EpochEnd(0))
-	require.True(t, exists)
-	assertCommittee(t, initialCommittee, committee)
+	assertCommittee(t, expectedCommittee, committee)
 }
 
 func assertCommittee(t *testing.T, expectedCommittee *account.Accounts, actualCommittee *account.SeatedAccounts) {
