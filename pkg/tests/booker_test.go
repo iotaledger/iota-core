@@ -21,9 +21,9 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	wallet := ts.AddGenesisWallet("default", node1)
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
 
-	tx1 := wallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
+	tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
 
-	tx2 := wallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "tx1:0")
+	tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "tx1:0")
 
 	ts.IssuePayloadWithOptions("block1", wallet, tx2)
 
@@ -65,8 +65,8 @@ func Test_DoubleSpend(t *testing.T) {
 
 	// Create and issue double spends
 	{
-		tx1 := wallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
-		tx2 := wallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "Genesis:0")
+		tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+		tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "Genesis:0")
 
 		ts.IssuePayloadWithOptions("block1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssuePayloadWithOptions("block2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
@@ -132,7 +132,7 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	// Create a transaction and issue it from both nodes, so that the conflict is accepted, but no attachment is included yet.
 	{
-		tx1 := wallet.CreateBasicOutputsEquallyFromInputs("tx1", 2, "Genesis:0")
+		tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 2, "Genesis:0")
 
 		ts.IssuePayloadWithOptions("A.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlockWithHeaderOptions("A.1.1", nodeA, mock.WithStrongParents(ts.BlockID("A.1")))
@@ -160,7 +160,7 @@ func Test_MultipleAttachments(t *testing.T) {
 
 	// Create a transaction that is included and whose conflict is accepted, but whose inputs are not accepted.
 	{
-		tx2 := wallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "tx1:1")
+		tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "tx1:1")
 
 		wallet.SetDefaultNode(nodeA)
 		ts.IssuePayloadWithOptions("A.3", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
@@ -259,8 +259,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Create and issue double spends
 	{
-		tx1 := wallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
-		tx2 := wallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "Genesis:0")
+		tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+		tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "Genesis:0")
 
 		wallet.SetDefaultNode(node1)
 		ts.SetCurrentSlot(1)
@@ -367,7 +367,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	commitment1 := lo.PanicOnErr(node2.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
 
 	// This should be booked on the rejected tx1 conflict
-	tx4 := wallet.CreateBasicOutputsEquallyFromInputs("tx4", 1, "tx1:0")
+	tx4 := wallet.CreateBasicOutputsEquallyFromInput("tx4", 1, "tx1:0")
 
 	// Issue TX3 on top of rejected TX1 and 1 commitment on node2 (committed to slot 1)
 	{
@@ -531,8 +531,8 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 	// Create and issue double spends
 	{
-		tx1 := wallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
-		tx2 := wallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "Genesis:0")
+		tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+		tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "Genesis:0")
 
 		wallet.SetDefaultNode(node2)
 		ts.SetCurrentSlot(1)

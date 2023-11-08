@@ -107,8 +107,6 @@ func (t *TestSuite) IssueBasicBlockWithOptions(blockName string, wallet *mock.Wa
 	timeProvider := t.API.TimeProvider()
 	issuingTime := timeProvider.SlotStartTime(t.currentSlot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
 	blockHeaderOptions := append(blockOpts, mock.WithIssuingTime(issuingTime))
-	t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, wallet.Node)
-	t.assertParentsExistFromBlockOptions(blockHeaderOptions, wallet.Node)
 
 	block := wallet.IssueBasicBlock(context.Background(), blockName, mock.WithBasicBlockHeader(blockHeaderOptions...), mock.WithPayload(payload))
 
@@ -175,9 +173,11 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 			if txCount == 1 {
 				inputName = "Genesis:0"
 			}
-			tx := t.DefaultWallet().CreateBasicOutputsEquallyFromInputs(txName, 1, inputName)
+			tx := t.DefaultWallet().CreateBasicOutputsEquallyFromInput(txName, 1, inputName)
 
 			issuingOptionsCopy[node.Name] = t.limitParentsCountInBlockOptions(issuingOptionsCopy[node.Name], iotago.BasicBlockMaxParents)
+			t.assertParentsCommitmentExistFromBlockOptions(issuingOptionsCopy[node.Name], node)
+			t.assertParentsExistFromBlockOptions(issuingOptionsCopy[node.Name], node)
 
 			t.DefaultWallet().SetDefaultNode(node)
 			b = t.IssueBasicBlockWithOptions(blockName, t.DefaultWallet(), tx, issuingOptionsCopy[node.Name]...)

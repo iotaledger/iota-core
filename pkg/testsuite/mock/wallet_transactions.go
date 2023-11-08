@@ -256,23 +256,25 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 	return signedTransaction
 }
 
-func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, outputCount int, inputNames ...string) *iotago.SignedTransaction {
-	inputStates := make([]*utxoledger.Output, 0, len(inputNames))
-	totalInputAmounts := iotago.BaseToken(0)
-	totalInputStoredMana := iotago.Mana(0)
+func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outputCount int, inputName string) *iotago.SignedTransaction {
+	totalInputMana := iotago.Mana(0)
 
-	for _, inputName := range inputNames {
-		output := w.Output(inputName)
-		inputStates = append(inputStates, output)
-		totalInputAmounts += output.BaseTokenAmount()
-		totalInputStoredMana += output.StoredMana()
-	}
+	manaDecayProvider := w.Node.Protocol.MainEngineInstance().APIForSlot(w.currentSlot).ManaDecayProvider()
 
-	manaAmount := totalInputStoredMana / iotago.Mana(outputCount)
-	remainderMana := totalInputStoredMana
+	inputState := w.Output(inputName)
+	inputAmount := inputState.BaseTokenAmount()
 
-	tokenAmount := totalInputAmounts / iotago.BaseToken(outputCount)
-	remainderFunds := totalInputAmounts
+	creationSlot := inputState.OutputID().CreationSlot()
+	// potential Mana generated
+	totalInputMana += lo.PanicOnErr(manaDecayProvider.ManaGenerationWithDecay(inputAmount, creationSlot, w.currentSlot))
+	// stored Mana
+	totalInputMana += lo.PanicOnErr(manaDecayProvider.ManaWithDecay(inputState.StoredMana(), creationSlot, w.currentSlot))
+
+	manaAmount := totalInputMana / iotago.Mana(outputCount)
+	remainderMana := totalInputMana
+
+	tokenAmount := inputAmount / iotago.BaseToken(outputCount)
+	remainderFunds := inputAmount
 
 	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
 	for i := 0; i < outputCount; i++ {
@@ -295,7 +297,7 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, out
 
 	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
 		transactionName,
-		WithInputs(inputStates),
+		WithInputs(utxoledger.Outputs{inputState}),
 		WithOutputs(outputStates),
 	))
 
