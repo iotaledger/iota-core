@@ -3,12 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/topstakers"
-	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
-	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -28,13 +23,7 @@ func Test_TopStakersRotation(t *testing.T) {
 				4,
 				5,
 			),
-		),
-		testsuite.WithSnapshotOptions(
-			snapshotcreator.WithSeatManagerProvider(
-				topstakers.NewProvider(
-					topstakers.WithSeatCount(3),
-				),
-			),
+			iotago.WithTargetCommitteeSize(3),
 		),
 	)
 	defer ts.Shutdown()
@@ -47,30 +36,8 @@ func Test_TopStakersRotation(t *testing.T) {
 	ts.AddValidatorNode("node6", 1_000_001)
 	ts.AddGenesisWallet("default", node1)
 
-	nodeOptions := make(map[string][]options.Option[protocol.Protocol])
+	ts.Run(true)
 
-	for _, node := range ts.Nodes() {
-		nodeOptions[node.Name] = []options.Option[protocol.Protocol]{protocol.WithSybilProtectionProvider(
-			sybilprotectionv1.NewProvider(
-				sybilprotectionv1.WithSeatManagerProvider(
-					topstakers.NewProvider(
-						topstakers.WithSeatCount(3),
-					),
-				),
-			),
-		)}
-	}
-	ts.Run(true, nodeOptions)
-
-	for _, node := range ts.Nodes() {
-		nodeOptions[node.Name] = []options.Option[protocol.Protocol]{protocol.WithSybilProtectionProvider(
-			sybilprotectionv1.NewProvider(
-				sybilprotectionv1.WithSeatManagerProvider(
-					topstakers.NewProvider(topstakers.WithSeatCount(3)),
-				),
-			),
-		)}
-	}
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
 		ts.Node("node1").Validator.AccountID,
 		ts.Node("node2").Validator.AccountID,

@@ -258,7 +258,7 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 	}
 
 	// Check whether the threshold for version was reached.
-	totalSeatCount := o.seatManager.SeatCount()
+	totalSeatCount := o.seatManager.SeatCountInEpoch(currentEpoch)
 	if !votes.IsThresholdReached(mostSupporters, totalSeatCount, votes.SuperMajority) {
 		return
 	}

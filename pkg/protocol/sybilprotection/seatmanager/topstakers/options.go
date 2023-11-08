@@ -19,9 +19,3 @@ func WithOnlineCommitteeStartup(optsOnlineCommittee ...iotago.AccountID) options
 		p.optsOnlineCommitteeStartup = optsOnlineCommittee
 	}
 }
-
-func WithSeatCount(optsSeatCount uint32) options.Option[SeatManager] {
-	return func(p *SeatManager) {
-		p.optsSeatCount = optsSeatCount
-	}
-}

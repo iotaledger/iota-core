@@ -9,7 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/topstakers"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -32,6 +32,7 @@ func TestConfirmationFlags(t *testing.T) {
 				20,
 				testsuite.DefaultEpochNearingThreshold,
 			),
+			iotago.WithTargetCommitteeSize(4),
 		),
 	)
 	defer ts.Shutdown()
@@ -47,55 +48,27 @@ func TestConfirmationFlags(t *testing.T) {
 		nodeC.Validator.AccountID,
 		nodeD.Validator.AccountID,
 	}
+
+	nodeOpts := []options.Option[protocol.Protocol]{
+		protocol.WithNotarizationProvider(
+			slotnotarization.NewProvider(),
+		),
+		protocol.WithSybilProtectionProvider(
+			sybilprotectionv1.NewProvider(
+				sybilprotectionv1.WithSeatManagerProvider(
+					topstakers.NewProvider(
+						topstakers.WithOnlineCommitteeStartup(nodeA.Validator.AccountID),
+						topstakers.WithActivityWindow(2*time.Minute),
+					),
+				),
+			),
+		),
+	}
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
-		"nodeA": {
-			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(),
-			),
-			protocol.WithSybilProtectionProvider(
-				sybilprotectionv1.NewProvider(
-					sybilprotectionv1.WithSeatManagerProvider(
-						poa.NewProvider(poa.WithOnlineCommitteeStartup(nodeA.Validator.AccountID), poa.WithActivityWindow(2*time.Minute)),
-					),
-				),
-			),
-		},
-		"nodeB": {
-			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(),
-			),
-			protocol.WithSybilProtectionProvider(
-				sybilprotectionv1.NewProvider(
-					sybilprotectionv1.WithSeatManagerProvider(
-						poa.NewProvider(poa.WithOnlineCommitteeStartup(nodeA.Validator.AccountID), poa.WithActivityWindow(2*time.Minute)),
-					),
-				),
-			),
-		},
-		"nodeC": {
-			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(),
-			),
-			protocol.WithSybilProtectionProvider(
-				sybilprotectionv1.NewProvider(
-					sybilprotectionv1.WithSeatManagerProvider(
-						poa.NewProvider(poa.WithOnlineCommitteeStartup(nodeA.Validator.AccountID), poa.WithActivityWindow(2*time.Minute)),
-					),
-				),
-			),
-		},
-		"nodeD": {
-			protocol.WithNotarizationProvider(
-				slotnotarization.NewProvider(),
-			),
-			protocol.WithSybilProtectionProvider(
-				sybilprotectionv1.NewProvider(
-					sybilprotectionv1.WithSeatManagerProvider(
-						poa.NewProvider(poa.WithOnlineCommitteeStartup(nodeA.Validator.AccountID), poa.WithActivityWindow(2*time.Minute)),
-					),
-				),
-			),
-		},
+		"nodeA": nodeOpts,
+		"nodeB": nodeOpts,
+		"nodeC": nodeOpts,
+		"nodeD": nodeOpts,
 	})
 
 	// Verify that nodes have the expected states.

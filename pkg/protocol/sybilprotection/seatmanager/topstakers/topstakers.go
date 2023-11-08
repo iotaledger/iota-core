@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -30,7 +31,6 @@ type SeatManager struct {
 	committeeMutex  syncutils.RWMutex
 	activityTracker activitytracker.ActivityTracker
 
-	optsSeatCount              uint32
 	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID
 
@@ -85,42 +85,17 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accoun
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	// If there are fewer candidates than required for epoch 0, then the previous committee cannot be copied.
-	if len(candidates) < s.SeatCount() && epoch == 0 {
-		return nil, ierrors.Errorf("at least %d candidates are required for committee in epoch 0, got %d", s.SeatCount(), len(candidates))
-	}
-
-	// If there are fewer candidates than required, then re-use the previous committee.
-	if len(candidates) < s.SeatCount() {
-		// TODO: what if staking period of a committee member ends in the next epoch?
-		committee, exists := s.committeeInEpoch(epoch - 1)
-		if !exists {
-			return nil, ierrors.Errorf("cannot re-use previous committee from epoch %d as it does not exist", epoch-1)
-		}
-
-		accounts, err := committee.Accounts()
-		if err != nil {
-			return nil, ierrors.Wrapf(err, "error while getting accounts from committee for epoch %d", epoch-1)
-		}
-
-		if err := s.committeeStore.Store(epoch, accounts); err != nil {
-			return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
-		}
-
-		return committee, nil
-	}
-
-	committee, err := s.selectNewCommittee(candidates)
+	committee, err := s.selectNewCommittee(epoch, candidates)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error while selecting new committee")
 	}
 
-	accounts, err := committee.Accounts()
+	committeeAccounts, err := committee.Accounts()
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "error while getting accounts for newly selected committee for epoch %d", epoch)
+		return nil, ierrors.Wrapf(err, "error while getting committeeAccounts for newly selected committee for epoch %d", epoch)
 	}
 
-	if err := s.committeeStore.Store(epoch, accounts); err != nil {
+	if err := s.committeeStore.Store(epoch, committeeAccounts); err != nil {
 		return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
 	}
 
@@ -161,8 +136,22 @@ func (s *SeatManager) OnlineCommittee() ds.Set[account.SeatIndex] {
 	return s.activityTracker.OnlineCommittee()
 }
 
-func (s *SeatManager) SeatCount() int {
-	return int(s.optsSeatCount)
+func (s *SeatManager) SeatCountInSlot(slot iotago.SlotIndex) int {
+	epoch := s.apiProvider.APIForSlot(slot).TimeProvider().EpochFromSlot(slot)
+
+	return s.SeatCountInEpoch(epoch)
+}
+
+func (s *SeatManager) SeatCountInEpoch(epoch iotago.EpochIndex) int {
+	s.committeeMutex.RLock()
+	defer s.committeeMutex.RUnlock()
+
+	// TODO: this function is a hot path as it is called for every single block. Maybe accessing the storage is too slow.
+	if committee, exists := s.committeeInEpoch(epoch); exists {
+		return committee.SeatCount()
+	}
+
+	return int(s.apiProvider.APIForEpoch(epoch).ProtocolParameters().TargetCommitteeSize())
 }
 
 func (s *SeatManager) Shutdown() {
@@ -202,10 +191,6 @@ func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	if validators.Size() != int(s.optsSeatCount) {
-		return ierrors.Errorf("invalid number of validators: %d, expected: %d", validators.Size(), s.optsSeatCount)
-	}
-
 	err := s.committeeStore.Store(epoch, validators)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to set committee for epoch %d", epoch)
@@ -214,7 +199,7 @@ func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.
 	return nil
 }
 
-func (s *SeatManager) selectNewCommittee(candidates accounts.AccountsData) (*account.SeatedAccounts, error) {
+func (s *SeatManager) selectNewCommittee(epoch iotago.EpochIndex, candidates accounts.AccountsData) (*account.SeatedAccounts, error) {
 	sort.Slice(candidates, func(i, j int) bool {
 		// Prioritize the candidate that has a larger pool stake.
 		if candidates[i].ValidatorStake+candidates[i].DelegationStake != candidates[j].ValidatorStake+candidates[j].DelegationStake {
@@ -240,10 +225,14 @@ func (s *SeatManager) selectNewCommittee(candidates accounts.AccountsData) (*acc
 		return bytes.Compare(candidates[i].ID[:], candidates[j].ID[:]) > 0
 	})
 
+	// We try to select up to targetCommitteeSize candidates to be part of the committee. If there are fewer candidates
+	// than required, then we select all of them and the committee size will be smaller than targetCommitteeSize.
+	committeeSize := lo.Min(len(candidates), int(s.apiProvider.APIForEpoch(epoch).ProtocolParameters().TargetCommitteeSize()))
+
 	// Create new Accounts instance that only included validators selected to be part of the committee.
 	newCommitteeAccounts := account.NewAccounts()
 
-	for _, candidateData := range candidates[:s.optsSeatCount] {
+	for _, candidateData := range candidates[:committeeSize] {
 		if err := newCommitteeAccounts.Set(candidateData.ID, &account.Pool{
 			PoolStake:      candidateData.ValidatorStake + candidateData.DelegationStake,
 			ValidatorStake: candidateData.ValidatorStake,

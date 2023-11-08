@@ -18,7 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/topstakers"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1/performance"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
@@ -51,7 +51,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 			events: sybilprotection.NewEvents(),
 
 			apiProvider:             e,
-			optsSeatManagerProvider: poa.NewProvider(),
+			optsSeatManagerProvider: topstakers.NewProvider(),
 		}, opts,
 			func(o *SybilProtection) {
 				o.seatManager = o.optsSeatManagerProvider(e)
