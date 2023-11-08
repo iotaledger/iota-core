@@ -138,7 +138,7 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 	}
 }
 
-func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot, rewardsRoot iotago.Identifier, err error) {
+func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot iotago.Identifier, rewardsRoot iotago.Identifier, err error) {
 	o.mutex.Lock()
 	defer o.mutex.Unlock()
 
@@ -226,6 +226,8 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 
 	committeeTree := ads.NewSet[iotago.Identifier](
 		mapdb.NewMapDB(),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
 	)
@@ -250,11 +252,11 @@ func (o *SybilProtection) SeatManager() seatmanager.SeatManager {
 	return o.seatManager
 }
 
-func (o *SybilProtection) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, actualEpochStart, actualEpochEnd iotago.EpochIndex, err error) {
+func (o *SybilProtection) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex) (validatorReward iotago.Mana, actualEpochStart iotago.EpochIndex, actualEpochEnd iotago.EpochIndex, err error) {
 	return o.performanceTracker.ValidatorReward(validatorID, stakeAmount, epochStart, epochEnd)
 }
 
-func (o *SybilProtection) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, actualEpochStart, actualEpochEnd iotago.EpochIndex, err error) {
+func (o *SybilProtection) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex) (delegatorsReward iotago.Mana, actualEpochStart iotago.EpochIndex, actualEpochEnd iotago.EpochIndex, err error) {
 	return o.performanceTracker.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd)
 }
 
@@ -376,7 +378,7 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 		return nil, ierrors.Wrapf(err, "failed to iterate over eligible validator candidates")
 	}
 	// sort candidates by stake
-	sort.Slice(validatorResp, func(i, j int) bool {
+	sort.Slice(validatorResp, func(i int, j int) bool {
 		return validatorResp[i].ValidatorStake > validatorResp[j].ValidatorStake
 	})
 

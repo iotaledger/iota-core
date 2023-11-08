@@ -20,7 +20,7 @@ func (t *Tracker) RewardsRoot(epoch iotago.EpochIndex) (iotago.Identifier, error
 	return m.Root(), nil
 }
 
-func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
+func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
@@ -109,7 +109,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 	return validatorReward, epochStart, epochEnd, nil
 }
 
-func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
+func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
@@ -190,6 +190,8 @@ func (t *Tracker) rewardsMap(epoch iotago.EpochIndex) (ads.Map[iotago.Identifier
 	}
 
 	return ads.NewMap[iotago.Identifier](kv,
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
 		(*model.PoolRewards).Bytes,
@@ -206,7 +208,7 @@ func (t *Tracker) rewardsForAccount(accountID iotago.AccountID, epoch iotago.Epo
 	return m.Get(accountID)
 }
 
-func (t *Tracker) poolReward(slot iotago.SlotIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, performanceFactor uint64) (iotago.Mana, error) {
+func (t *Tracker) poolReward(slot iotago.SlotIndex, totalValidatorsStake iotago.BaseToken, totalStake iotago.BaseToken, poolStake iotago.BaseToken, validatorStake iotago.BaseToken, performanceFactor uint64) (iotago.Mana, error) {
 	apiForSlot := t.apiProvider.APIForSlot(slot)
 	epoch := apiForSlot.TimeProvider().EpochFromSlot(slot)
 	params := apiForSlot.ProtocolParameters()
@@ -244,7 +246,7 @@ func (t *Tracker) poolReward(slot iotago.SlotIndex, totalValidatorsStake, totalS
 	return poolRewardFixedCost, nil
 }
 
-func (t *Tracker) calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorStake iotago.BaseToken, slot iotago.SlotIndex) (uint64, error) {
+func (t *Tracker) calculatePoolCoefficient(poolStake iotago.BaseToken, totalStake iotago.BaseToken, validatorStake iotago.BaseToken, totalValidatorStake iotago.BaseToken, slot iotago.SlotIndex) (uint64, error) {
 	poolCoeffExponent := t.apiProvider.APIForSlot(slot).ProtocolParameters().RewardsParameters().PoolCoefficientExponent
 	scaledUpPoolStake, err := safemath.SafeLeftShift(poolStake, poolCoeffExponent)
 	if err != nil {
@@ -275,7 +277,7 @@ func (t *Tracker) calculatePoolCoefficient(poolStake, totalStake, validatorStake
 }
 
 // calculateProfitMargin calculates a common profit margin for all validators by firstly increasing the accuracy of the given value, so the profit margin is moved to the power of 2^accuracyShift.
-func (t *Tracker) calculateProfitMargin(totalValidatorsStake, totalPoolStake iotago.BaseToken, epoch iotago.EpochIndex) (uint64, error) {
+func (t *Tracker) calculateProfitMargin(totalValidatorsStake iotago.BaseToken, totalPoolStake iotago.BaseToken, epoch iotago.EpochIndex) (uint64, error) {
 	scaledUpTotalValidatorStake, err := safemath.SafeLeftShift(totalValidatorsStake, t.apiProvider.APIForEpoch(epoch).ProtocolParameters().RewardsParameters().ProfitMarginExponent)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "failed to calculate profit margin due to overflow for epoch %d", epoch)

@@ -37,7 +37,7 @@ func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBefore
 }
 
 func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
-	tree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(), iotago.AccountID.Bytes, iotago.AccountIDFromBytes, (*iotago.Attestation).Bytes, iotago.AttestationFromBytes(c.engine))
+	tree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes, iotago.AccountID.Bytes, iotago.AccountIDFromBytes, (*iotago.Attestation).Bytes, iotago.AttestationFromBytes(c.engine))
 
 	for _, att := range attestations {
 		if setErr := tree.Set(att.Header.IssuerID, att); setErr != nil {

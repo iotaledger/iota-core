@@ -135,7 +135,7 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 			return
 		}
 
-		parentBlock.Booked().OnUpdateOnce(func(_, _ bool) {
+		parentBlock.Booked().OnUpdateOnce(func(_ bool, _ bool) {
 			if unbookedParentsCount.Add(-1) == 0 {
 				if err := b.book(block); err != nil {
 					if block.SetInvalid() {
@@ -145,7 +145,7 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 			}
 		})
 
-		parentBlock.Invalid().OnUpdateOnce(func(_, _ bool) {
+		parentBlock.Invalid().OnUpdateOnce(func(_ bool, _ bool) {
 			if block.SetInvalid() {
 				b.events.BlockInvalid.Trigger(block, ierrors.New("block marked as invalid in Booker"))
 			}

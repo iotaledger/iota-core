@@ -61,7 +61,7 @@ type dependencies struct {
 }
 
 type jsonProtocolParameters struct {
-	ProtocolParameters []iotago.ProtocolParameters `serix:"0,mapKey=protocolParameters"`
+	ProtocolParameters []iotago.ProtocolParameters `serix:""`
 }
 
 func readProtocolParameters() []iotago.ProtocolParameters {

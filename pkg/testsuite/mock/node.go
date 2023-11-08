@@ -290,8 +290,9 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 
 		rootsStorage, err := instance.Storage.Roots(details.Commitment.ID().Slot())
 		require.NoError(n.Testing, err, "roots storage for slot %d not found", details.Commitment.Slot())
-		roots, err := rootsStorage.Load(details.Commitment.ID())
+		roots, exists, err := rootsStorage.Load(details.Commitment.ID())
 		require.NoError(n.Testing, err)
+		require.True(n.Testing, exists)
 
 		attestationBlockIDs := make([]iotago.BlockID, 0)
 		tree, err := instance.Attestations.GetMap(details.Commitment.Slot())

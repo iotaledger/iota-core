@@ -21,7 +21,7 @@ type Commitment struct {
 }
 
 func NewEmptyCommitment(api iotago.API) *Commitment {
-	emptyCommitment := iotago.NewEmptyCommitment(api.ProtocolParameters().Version())
+	emptyCommitment := iotago.NewEmptyCommitment(api)
 	emptyCommitment.ReferenceManaCost = api.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 
 	return lo.PanicOnErr(CommitmentFromCommitment(emptyCommitment, api))
@@ -50,28 +50,39 @@ func CommitmentFromCommitment(iotaCommitment *iotago.Commitment, api iotago.API,
 	return newCommitment(commitmentID, iotaCommitment, data, api)
 }
 
-func CommitmentFromBytes(data []byte, apiProvider iotago.APIProvider, opts ...serix.Option) (*Commitment, error) {
-	version, _, err := iotago.VersionFromBytes(data)
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to determine version")
-	}
+func CommitmentFromBytes(apiProvider iotago.APIProvider) func([]byte) (*Commitment, int, error) {
+	return func(bytes []byte) (*Commitment, int, error) {
+		totalBytesRead := 0
 
-	apiForVersion, err := apiProvider.APIForVersion(version)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get API for version %d", version)
-	}
+		// We read the version byte here to determine the API to use, but then we decode the entire commitment again.
+		// Thus, we don't count the version byte as read bytes.
+		version, _, err := iotago.VersionFromBytes(bytes)
+		if err != nil {
+			return nil, 0, ierrors.Wrap(err, "failed to determine version")
+		}
 
-	iotaCommitment := new(iotago.Commitment)
-	if _, err := apiForVersion.Decode(data, iotaCommitment, opts...); err != nil {
-		return nil, err
-	}
+		apiForVersion, err := apiProvider.APIForVersion(version)
+		if err != nil {
+			return nil, 0, ierrors.Wrapf(err, "failed to get API for version %d", version)
+		}
 
-	commitmentID, err := iotaCommitment.ID()
-	if err != nil {
-		return nil, err
-	}
+		iotaCommitment := new(iotago.Commitment)
+		if totalBytesRead, err = apiForVersion.Decode(bytes, iotaCommitment, serix.WithValidation()); err != nil {
+			return nil, 0, ierrors.Wrap(err, "failed to decode commitment")
+		}
 
-	return newCommitment(commitmentID, iotaCommitment, data, apiForVersion)
+		commitmentID, err := iotaCommitment.ID()
+		if err != nil {
+			return nil, 0, ierrors.Wrap(err, "failed to determine commitment ID")
+		}
+
+		commitment, err := newCommitment(commitmentID, iotaCommitment, bytes, apiForVersion)
+		if err != nil {
+			return nil, 0, ierrors.Wrap(err, "failed to create commitment")
+		}
+
+		return commitment, totalBytesRead, nil
+	}
 }
 
 func (c *Commitment) ID() iotago.CommitmentID {
@@ -100,6 +111,10 @@ func (c *Commitment) ReferenceManaCost() iotago.Mana {
 
 func (c *Commitment) Data() []byte {
 	return c.data
+}
+
+func (c *Commitment) Bytes() ([]byte, error) {
+	return c.data, nil
 }
 
 func (c *Commitment) Commitment() *iotago.Commitment {

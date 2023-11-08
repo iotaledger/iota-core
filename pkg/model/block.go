@@ -77,6 +77,10 @@ func (blk *Block) ID() iotago.BlockID {
 	return blk.blockID
 }
 
+func (blk *Block) SlotCommitmentID() iotago.CommitmentID {
+	return blk.block.Header.SlotCommitmentID
+}
+
 func (blk *Block) Data() []byte {
 	return blk.data
 }

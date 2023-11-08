@@ -58,7 +58,7 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 	})
 }
 
-func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expectedBlocks iotago.BlockIDs, nodes ...*mock.Node) {
+func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expectedBlocksBySlotCommitmentID map[iotago.CommitmentID]iotago.BlockIDs, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	t.Eventually(func() error {
@@ -73,13 +73,21 @@ func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expecte
 				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error getting committed slot for commitment: %s", node.Name, storedCommitment.ID())
 			}
 
-			committedBlocks, err := committedSlot.BlockIDs()
+			committedBlocksBySlotCommitmentID, err := committedSlot.BlocksIDsBySlotCommitmentID()
 			if err != nil {
 				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error getting committed blocks for slot: %d", node.Name, slot)
 			}
 
-			if !assert.Equal(t.fakeTesting, committedBlocks, expectedBlocks) {
-				return ierrors.Errorf("AssertStorageCommitmentBlocks: %s: expected %s, got %s", node.Name, expectedBlocks, committedBlocks)
+			if len(committedBlocksBySlotCommitmentID) == 0 {
+				committedBlocksBySlotCommitmentID = nil
+			}
+
+			if len(expectedBlocksBySlotCommitmentID) == 0 {
+				expectedBlocksBySlotCommitmentID = nil
+			}
+
+			if !assert.Equal(t.fakeTesting, committedBlocksBySlotCommitmentID, expectedBlocksBySlotCommitmentID) {
+				return ierrors.Errorf("AssertStorageCommitmentBlocks: %s: expected %s, got %s", node.Name, expectedBlocksBySlotCommitmentID, committedBlocksBySlotCommitmentID)
 			}
 		}
 

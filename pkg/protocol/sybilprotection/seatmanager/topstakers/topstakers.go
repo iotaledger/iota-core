@@ -215,7 +215,7 @@ func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.
 }
 
 func (s *SeatManager) selectNewCommittee(candidates accounts.AccountsData) (*account.SeatedAccounts, error) {
-	sort.Slice(candidates, func(i, j int) bool {
+	sort.Slice(candidates, func(i int, j int) bool {
 		// Prioritize the candidate that has a larger pool stake.
 		if candidates[i].ValidatorStake+candidates[i].DelegationStake != candidates[j].ValidatorStake+candidates[j].DelegationStake {
 			return candidates[i].ValidatorStake+candidates[i].DelegationStake > candidates[j].ValidatorStake+candidates[j].DelegationStake

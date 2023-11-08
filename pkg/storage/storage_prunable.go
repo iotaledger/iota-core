@@ -57,6 +57,10 @@ func (s *Storage) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.Blo
 	return s.prunable.RootBlocks(slot)
 }
 
+func (s *Storage) GenesisRootBlockID() iotago.BlockID {
+	return s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisBlockID()
+}
+
 func (s *Storage) Mutations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
 	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
 		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing mutations")

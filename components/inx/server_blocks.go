@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -121,6 +122,33 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 	wp.ShutdownComplete.Wait()
 
 	return ctx.Err()
+}
+
+func (s *Server) ReadAcceptedBlocks(slot *inx.SlotIndex, srv inx.INX_ReadAcceptedBlocksServer) error {
+	blocksStore, err := deps.Protocol.MainEngineInstance().Storage.Blocks(slot.Unwrap())
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "failed to get blocks: %s", err.Error())
+	}
+
+	if err := blocksStore.ForEachBlockInSlot(func(block *model.Block) error {
+		metadata, err := getINXBlockMetadata(block.ID())
+		if err != nil {
+			return err
+		}
+
+		payload := &inx.BlockWithMetadata{
+			Metadata: metadata,
+			Block: &inx.RawBlock{
+				Data: block.Data(),
+			},
+		}
+
+		return srv.Send(payload)
+	}); err != nil {
+		return status.Errorf(codes.Internal, "failed to iterate blocks: %s", err.Error())
+	}
+
+	return nil
 }
 
 func (s *Server) SubmitBlock(ctx context.Context, rawBlock *inx.RawBlock) (*inx.BlockId, error) {

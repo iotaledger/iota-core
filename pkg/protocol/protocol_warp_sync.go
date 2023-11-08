@@ -59,15 +59,15 @@ func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 	})
 }
 
-func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDs iotago.BlockIDs, roots *iotago.Roots, transactionIDs iotago.TransactionIDs, to peer.ID) {
+func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, roots *iotago.Roots, transactionIDs iotago.TransactionIDs, to peer.ID) {
 	w.workerPool.Submit(func() {
-		w.protocol.Network.SendWarpSyncResponse(commitment.ID(), blockIDs, roots.TangleProof(), transactionIDs, roots.MutationProof(), to)
+		w.protocol.Network.SendWarpSyncResponse(commitment.ID(), blockIDsBySlotCommitment, roots.TangleProof(), transactionIDs, roots.MutationProof(), to)
 
 		w.LogTrace("sent response", "commitment", commitment.LogName(), "toPeer", to)
 	})
 }
 
-func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
+func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	w.workerPool.Submit(func() {
 		commitment, err := w.protocol.Commitment(commitmentID)
 		if err != nil {
@@ -107,18 +107,20 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				return requestedBlocksReceived
 			}
 
-			acceptedBlocks := ads.NewSet[iotago.Identifier](mapdb.NewMapDB(), iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
-			for _, blockID := range blockIDs {
-				_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
+			acceptedBlocks := ads.NewSet[iotago.Identifier](mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes, iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
+			for _, blockIDs := range blockIDsBySlotCommitment {
+				for _, blockID := range blockIDs {
+					_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
+				}
 			}
 
 			if !iotago.VerifyProof(proof, acceptedBlocks.Root(), commitment.RootsID()) {
-				w.LogError("failed to verify blocks proof", "commitment", commitment.LogName(), "blockIDs", blockIDs, "proof", proof, "fromPeer", from)
+				w.LogError("failed to verify blocks proof", "commitment", commitment.LogName(), "blockIDs", blockIDsBySlotCommitment, "proof", proof, "fromPeer", from)
 
 				return false
 			}
 
-			acceptedTransactionIDs := ads.NewSet[iotago.Identifier](mapdb.NewMapDB(), iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
+			acceptedTransactionIDs := ads.NewSet[iotago.Identifier](mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes, iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
 			for _, transactionID := range transactionIDs {
 				_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
 			}
@@ -149,7 +151,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			//   1. Mark all transactions as accepted
 			//   2. Mark all blocks as accepted
 			//   3. Force commitment of the slot
-			totalBlocks := uint32(len(blockIDs))
+			totalBlocks := uint32(len(blockIDsBySlotCommitment))
 			var bookedBlocks atomic.Uint32
 			var notarizedBlocks atomic.Uint32
 
@@ -170,7 +172,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				}
 			}
 
-			if len(blockIDs) == 0 {
+			if len(blockIDsBySlotCommitment) == 0 {
 				forceCommitmentFunc()
 
 				return true
@@ -187,41 +189,45 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				}
 
 				// 2. Mark all blocks as accepted
-				for _, blockID := range blockIDs {
-					block, exists := targetEngine.BlockCache.Block(blockID)
-					if !exists { // this should never happen as we just booked these blocks in this slot.
-						continue
-					}
-
-					targetEngine.BlockGadget.SetAccepted(block)
-
-					block.Notarized().OnUpdate(func(_, _ bool) {
-						// Wait for all blocks to be notarized before forcing the commitment of the slot.
-						if notarizedBlocks.Add(1) != totalBlocks {
-							return
+				for _, blockIDs := range blockIDsBySlotCommitment {
+					for _, blockID := range blockIDs {
+						block, exists := targetEngine.BlockCache.Block(blockID)
+						if !exists { // this should never happen as we just booked these blocks in this slot.
+							continue
 						}
 
-						forceCommitmentFunc()
-					})
+						targetEngine.BlockGadget.SetAccepted(block)
+
+						block.Notarized().OnUpdate(func(_, _ bool) {
+							// Wait for all blocks to be notarized before forcing the commitment of the slot.
+							if notarizedBlocks.Add(1) != totalBlocks {
+								return
+							}
+
+							forceCommitmentFunc()
+						})
+					}
 				}
 			}
 
-			for _, blockID := range blockIDs {
-				w.LogError("requesting block", "blockID", blockID)
+			for _, blockIDs := range blockIDsBySlotCommitment {
+				for _, blockID := range blockIDs {
+					w.LogError("requesting block", "blockID", blockID)
 
-				block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
-				if block == nil {
-					w.protocol.LogError("failed to request block", "blockID", blockID)
+					block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
+					if block == nil {
+						w.protocol.LogError("failed to request block", "blockID", blockID)
 
-					continue
+						continue
+					}
+
+					// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
+					// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
+					// block cache and thus if not root blocks no block in the next slot can become solid.
+					targetEngine.EvictionState.AddRootBlock(block.ID(), block.SlotCommitmentID())
+
+					block.Booked().OnUpdate(blockBookedFunc)
 				}
-
-				// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
-				// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
-				// block cache and thus if not root blocks no block in the next slot can become solid.
-				targetEngine.EvictionState.AddRootBlock(block.ID(), block.SlotCommitmentID())
-
-				block.Booked().OnUpdate(blockBookedFunc)
 			}
 
 			w.LogDebug("received response", "commitment", commitment.LogName())
@@ -265,7 +271,7 @@ func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from
 			return
 		}
 
-		blockIDs, err := committedSlot.BlockIDs()
+		blockIDsBySlotCommitment, err := committedSlot.BlocksIDsBySlotCommitmentID()
 		if err != nil {
 			w.LogTrace("failed to get block ids for warp-sync request", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from, "err", err)
 
@@ -286,7 +292,7 @@ func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from
 			return
 		}
 
-		w.SendResponse(commitment, blockIDs, roots, transactionIDs, from)
+		w.SendResponse(commitment, blockIDsBySlotCommitment, roots, transactionIDs, from)
 	})
 }
 

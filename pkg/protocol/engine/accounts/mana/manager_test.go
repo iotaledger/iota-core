@@ -72,7 +72,7 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 				ID: id,
 				Credits: &accounts.BlockIssuanceCredits{
 					Value:      iotago.MaxBlockIssuanceCredits/2 + iotago.MaxBlockIssuanceCredits/4,
-					UpdateTime: 1,
+					UpdateSlot: 1,
 				},
 				ExpirySlot:                            iotago.MaxSlotIndex,
 				OutputID:                              iotago.OutputID{},

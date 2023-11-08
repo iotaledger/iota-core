@@ -1,14 +1,14 @@
 package accountsledger
 
 import (
-	"encoding/binary"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -16,24 +16,23 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	var accountCount uint64
-	var slotDiffCount uint64
+	// populate the account tree, account tree should be empty at this point
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
+		accountData, err := stream.ReadObjectFromReader(reader, accounts.AccountDataFromReader)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to read account data at index %d", i)
+		}
 
-	// The number of accounts contained within this snapshot.
-	if err := binary.Read(reader, binary.LittleEndian, &accountCount); err != nil {
-		return ierrors.Wrap(err, "unable to read account count")
+		if err := m.accountsTree.Set(accountData.ID, accountData); err != nil {
+			return ierrors.Wrapf(err, "unable to set account %s", accountData.ID)
+		}
+
+		return nil
+	}); err != nil {
+		return ierrors.Wrap(err, "failed to read account data")
 	}
 
-	// The number of slot diffs contained within this snapshot.
-	if err := binary.Read(reader, binary.LittleEndian, &slotDiffCount); err != nil {
-		return ierrors.Wrap(err, "unable to read slot diffs count")
-	}
-
-	if err := m.importAccountTree(reader, accountCount); err != nil {
-		return ierrors.Wrap(err, "unable to import account tree")
-	}
-
-	if err := m.readSlotDiffs(reader, slotDiffCount); err != nil {
+	if err := m.readSlotDiffs(reader); err != nil {
 		return ierrors.Wrap(err, "unable to import slot diffs")
 	}
 
@@ -44,64 +43,42 @@ func (m *Manager) Export(writer io.WriteSeeker, targetIndex iotago.SlotIndex) er
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	var accountCount uint64
-	var slotDiffsCount uint64
-
-	pWriter := utils.NewPositionedWriter(writer)
-
-	if err := pWriter.WriteValue("accounts count", accountCount, true); err != nil {
-		return ierrors.Wrap(err, "unable to write accounts count")
-	}
-
-	if err := pWriter.WriteValue("slot diffs count", slotDiffsCount, true); err != nil {
-		return ierrors.Wrap(err, "unable to write slot diffs count")
-	}
-
-	accountCount, err := m.exportAccountTree(pWriter, targetIndex)
-	if err != nil {
-		return ierrors.Wrapf(err, "unable to export account for target index %d", targetIndex)
-	}
-
-	if err = pWriter.WriteValueAtBookmark("accounts count", accountCount); err != nil {
-		return ierrors.Wrap(err, "unable to write accounts count")
-	}
-
-	if slotDiffsCount, err = m.writeSlotDiffs(pWriter, targetIndex); err != nil {
-		return ierrors.Wrapf(err, "unable to export slot diffs for target index %d", targetIndex)
-	}
-
-	if err = pWriter.WriteValueAtBookmark("slot diffs count", slotDiffsCount); err != nil {
-		return ierrors.Wrap(err, "unable to write slot diffs count")
-	}
-
-	return nil
-}
-
-func (m *Manager) importAccountTree(reader io.ReadSeeker, accountCount uint64) error {
-	// populate the account tree, account tree should be empty at this point
-	for i := uint64(0); i < accountCount; i++ {
-		accountData := &accounts.AccountData{}
-		if err := accountData.FromReader(reader); err != nil {
-			return ierrors.Wrap(err, "unable to read account data")
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (int, error) {
+		elements, err := m.exportAccountTree(writer, targetIndex)
+		if err != nil {
+			return 0, ierrors.Wrap(err, "can't write account tree")
 		}
 
-		if err := m.accountsTree.Set(accountData.ID, accountData); err != nil {
-			return ierrors.Wrapf(err, "unable to set account %s", accountData.ID)
+		return elements, nil
+	}); err != nil {
+		return ierrors.Wrapf(err, "unable to export accounts for slot %d", targetIndex)
+	}
+
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (elementsCount int, err error) {
+		elementsCount, err = m.writeSlotDiffs(writer, targetIndex)
+		if err != nil {
+			return 0, ierrors.Wrap(err, "can't write slot diffs")
 		}
+
+		return elementsCount, nil
+	}); err != nil {
+		return ierrors.Wrapf(err, "unable to export slot diffs for slot %d", targetIndex)
 	}
 
 	return nil
 }
 
 // exportAccountTree exports the AccountTree at a certain target slot, returning the total amount of exported accounts.
-func (m *Manager) exportAccountTree(pWriter *utils.PositionedWriter, targetIndex iotago.SlotIndex) (accountCount uint64, err error) {
-	if err = m.accountsTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) error {
-		if _, err = m.rollbackAccountTo(accountData, targetIndex); err != nil {
+func (m *Manager) exportAccountTree(writer io.WriteSeeker, targetIndex iotago.SlotIndex) (int, error) {
+	var accountCount int
+
+	if err := m.accountsTree.Stream(func(accountID iotago.AccountID, accountData *accounts.AccountData) error {
+		if _, err := m.rollbackAccountTo(accountData, targetIndex); err != nil {
 			return ierrors.Wrapf(err, "unable to rollback account %s", accountID)
 		}
 
-		if err = writeAccountData(pWriter, accountData); err != nil {
-			return ierrors.Wrapf(err, "unable to write data for account %s", accountID)
+		if err := stream.WriteObject(writer, accountData, (*accounts.AccountData).Bytes); err != nil {
+			return ierrors.Wrapf(err, "unable to write account %s", accountID)
 		}
 
 		accountCount++
@@ -112,17 +89,18 @@ func (m *Manager) exportAccountTree(pWriter *utils.PositionedWriter, targetIndex
 	}
 
 	// we might have entries that were destroyed, that are present in diffs but not in the tree from the latestCommittedIndex we streamed above
-	recreatedAccountsCount, err := m.recreateDestroyedAccounts(pWriter, targetIndex)
+	recreatedAccountsCount, err := m.recreateDestroyedAccounts(writer, targetIndex)
 
 	return accountCount + recreatedAccountsCount, err
 }
 
-func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, targetSlot iotago.SlotIndex) (recreatedAccountsCount uint64, err error) {
+func (m *Manager) recreateDestroyedAccounts(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (int, error) {
+	var recreatedAccountsCount int
 	destroyedAccounts := make(map[iotago.AccountID]*accounts.AccountData)
 
 	for slot := m.latestCommittedSlot; slot > targetSlot; slot-- {
 		// it should be impossible that `m.slotDiff(slot)` returns an error, because it is impossible to export a pruned slot
-		err = lo.PanicOnErr(m.slotDiff(slot)).StreamDestroyed(func(accountID iotago.AccountID) bool {
+		err := lo.PanicOnErr(m.slotDiff(slot)).StreamDestroyed(func(accountID iotago.AccountID) bool {
 			// actual data will be filled in by rollbackAccountTo
 			accountData := accounts.NewAccountData(accountID)
 
@@ -143,136 +121,127 @@ func (m *Manager) recreateDestroyedAccounts(pWriter *utils.PositionedWriter, tar
 			return 0, ierrors.Errorf("account %s was not destroyed", accountID)
 		}
 
-		if err = writeAccountData(pWriter, accountData); err != nil {
-			return 0, ierrors.Wrapf(err, "unable to write account %s to snapshot", accountID)
+		if err := stream.WriteObject(writer, accountData, (*accounts.AccountData).Bytes); err != nil {
+			return 0, ierrors.Wrapf(err, "unable to write account %s", accountID)
 		}
 	}
 
 	return recreatedAccountsCount, nil
 }
 
-func writeAccountData(writer *utils.PositionedWriter, accountData *accounts.AccountData) error {
-	accountBytes, err := accountData.Bytes()
-	if err != nil {
-		return ierrors.Wrapf(err, "unable to get account data snapshot bytes for accountID %s", accountData.ID)
-	}
-
-	if err = writer.WriteBytes(accountBytes); err != nil {
-		return ierrors.Wrapf(err, "unable to write account data for accountID %s", accountData.ID)
-	}
-
-	return nil
-}
-
-func (m *Manager) readSlotDiffs(reader io.ReadSeeker, slotDiffCount uint64) error {
-	for i := uint64(0); i < slotDiffCount; i++ {
-		var slot iotago.SlotIndex
-		var accountsInDiffCount uint64
-
-		if err := binary.Read(reader, binary.LittleEndian, &slot); err != nil {
-			return ierrors.Wrap(err, "unable to read slot index")
-		}
-
-		if err := binary.Read(reader, binary.LittleEndian, &accountsInDiffCount); err != nil {
-			return ierrors.Wrap(err, "unable to read accounts in diff count")
-		}
-		if accountsInDiffCount == 0 {
-			continue
-		}
-
-		diffStore, err := m.slotDiff(slot)
+func (m *Manager) readSlotDiffs(reader io.ReadSeeker) error {
+	// Read all the slots.
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
+		slot, err := stream.Read[iotago.SlotIndex](reader)
 		if err != nil {
-			return ierrors.Errorf("unable to import account slot diffs for slot %d", slot)
+			return ierrors.Wrapf(err, "unable to read slot index at index %d", i)
 		}
 
-		for j := uint64(0); j < accountsInDiffCount; j++ {
-			var accountID iotago.AccountID
-			if _, err := io.ReadFull(reader, accountID[:]); err != nil {
+		// Read all the slot diffs within each slot.
+		if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(j int) error {
+			diffStore, err := m.slotDiff(slot)
+			if err != nil {
+				return ierrors.Wrapf(err, "unable to get account diff storage for slot %d", slot)
+			}
+
+			accountID, err := stream.Read[iotago.AccountID](reader)
+			if err != nil {
 				return ierrors.Wrapf(err, "unable to read accountID for index %d", j)
 			}
 
-			var destroyed bool
-			if err := binary.Read(reader, binary.LittleEndian, &destroyed); err != nil {
+			destroyed, err := stream.Read[bool](reader)
+			if err != nil {
 				return ierrors.Wrapf(err, "unable to read destroyed flag for accountID %s", accountID)
 			}
 
-			accountDiff := model.NewAccountDiff()
+			var accountDiff *model.AccountDiff
 			if !destroyed {
-				if err := accountDiff.FromReader(reader); err != nil {
+				if accountDiff, err = stream.ReadObjectFromReader(reader, model.AccountDiffFromReader); err != nil {
 					return ierrors.Wrapf(err, "unable to read account diff for accountID %s", accountID)
 				}
+			} else {
+				accountDiff = model.NewAccountDiff()
 			}
 
 			if err := diffStore.Store(accountID, accountDiff, destroyed); err != nil {
 				return ierrors.Wrapf(err, "unable to store slot diff for accountID %s", accountID)
 			}
+
+			return nil
+		}); err != nil {
+			return ierrors.Wrapf(err, "unable to read accounts in diff count at index %d", i)
 		}
+
+		return nil
+	}); err != nil {
+		return ierrors.Wrap(err, "failed to read slot diffs")
 	}
 
 	return nil
 }
 
-func (m *Manager) writeSlotDiffs(pWriter *utils.PositionedWriter, targetSlot iotago.SlotIndex) (slotDiffsCount uint64, err error) {
+func (m *Manager) writeSlotDiffs(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (int, error) {
+	var slotDiffsCount int
+
 	// write slot diffs until being able to reach targetSlot, where the exported tree is at
 	slot := iotago.SlotIndex(1)
 	maxCommittableAge := m.apiProvider.APIForSlot(targetSlot).ProtocolParameters().MaxCommittableAge()
-
 	if targetSlot > maxCommittableAge {
 		slot = targetSlot - maxCommittableAge
 	}
 
 	for ; slot <= targetSlot; slot++ {
-		var accountsInDiffCount uint64
+		var accountsInDiffCount int
 
-		// The index of the slot diffs.
-		if err = pWriter.WriteValue("slot index", slot); err != nil {
-			return 0, err
+		if err := stream.Write(writer, slot); err != nil {
+			return 0, ierrors.Wrapf(err, "unable to write slot %d", slot)
 		}
 
-		// The number of account entries within this slot diff.
-		if err = pWriter.WriteValue("inDiff accounts count", accountsInDiffCount, true); err != nil {
-			return 0, err
-		}
-
-		slotDiffsCount++
-
-		var innerErr error
 		slotDiffs, err := m.slotDiff(slot)
 		if err != nil {
 			// if slot is already pruned, then don't write anything
 			continue
 		}
 
-		if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff *model.AccountDiff, destroyed bool) bool {
-			if err = pWriter.WriteBytes(lo.PanicOnErr(accountID.Bytes())); err != nil {
-				innerErr = ierrors.Wrapf(err, "unable to write accountID for account %s", accountID)
-			}
+		if err = stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (int, error) {
+			var innerErr error
 
-			if err = pWriter.WriteValue("destroyed flag", destroyed); err != nil {
-				innerErr = ierrors.Wrapf(err, "unable to write destroyed flag for account %s", accountID)
-			}
+			if err = slotDiffs.Stream(func(accountID iotago.AccountID, accountDiff *model.AccountDiff, destroyed bool) bool {
 
-			if !destroyed {
-				if err = pWriter.WriteBytes(lo.PanicOnErr(accountDiff.Bytes())); err != nil {
-					innerErr = ierrors.Wrapf(err, "unable to write account diff for account %s", accountID)
+				if err = stream.Write(writer, accountID); err != nil {
+					innerErr = ierrors.Wrapf(err, "unable to write accountID for account %s", accountID)
+					return false
 				}
+
+				if err = stream.Write(writer, destroyed); err != nil {
+					innerErr = ierrors.Wrapf(err, "unable to write destroyed flag for account %s", accountID)
+					return false
+				}
+
+				if !destroyed {
+					if err = stream.WriteObject(writer, accountDiff, (*model.AccountDiff).Bytes); err != nil {
+						innerErr = ierrors.Wrapf(err, "unable to write account diff for account %s", accountID)
+						return false
+					}
+				}
+
+				accountsInDiffCount++
+
+				return true
+			}); err != nil {
+				return 0, ierrors.Wrapf(err, "unable to stream slot diff for index %d", slot)
 			}
 
-			accountsInDiffCount++
+			if innerErr != nil {
+				return 0, ierrors.Wrapf(innerErr, "unable to stream slot diff for index %d", slot)
+			}
 
-			return true
+			return accountsInDiffCount, nil
 		}); err != nil {
-			return 0, ierrors.Wrapf(err, "unable to stream slot diff for index %d", slot)
+			return 0, ierrors.Wrapf(err, "unable to write slot diff %d", slot)
 		}
 
-		if innerErr != nil {
-			return 0, ierrors.Wrapf(innerErr, "unable to write slot diff for index %d", slot)
-		}
-
-		// The number of diffs contained within this slot.
-		if err = pWriter.WriteValueAtBookmark("inDiff accounts count", accountsInDiffCount); err != nil {
-			return 0, err
-		}
+		slotDiffsCount++
 	}
 
 	return slotDiffsCount, nil

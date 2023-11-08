@@ -36,7 +36,7 @@ const (
              1 byte         +     34 bytes
 
    Value:
-       BlockID   +   iotago.SlotIndex  + TransactionCreationSlot (time.Time) + iotago.Output.Serialized()
+       BlockID   +   iotago.SlotIndex  + TransactionCreationSlot (time.Slot) + iotago.Output.Serialized()
        40 bytes  +    4 bytes   +                  8 byte      s           +   1 byte type + X bytes
 
    Spent Output:
@@ -46,7 +46,7 @@ const (
             1 byte         +     34 bytes
 
    Value:
-       TargetTransactionID (iotago.SignedTransactionID) + TransactionAcceptedSlotIndex (iotago.SlotIndex) + TransactionCreationSlot (time.Time)
+       TargetTransactionID (iotago.SignedTransactionID) + TransactionAcceptedSlotIndex (iotago.SlotIndex) + TransactionCreationSlot (time.Slot)
                   32 bytes                        +                    8 bytes                      +       8 bytes
 
    Unspent Output:
