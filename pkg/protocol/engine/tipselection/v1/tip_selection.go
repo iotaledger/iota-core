@@ -3,6 +3,8 @@ package tipselectionv1
 import (
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -119,6 +121,17 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 			}
 		}, amount); len(references[iotago.StrongParentType]) == 0 {
 			rootBlocks := t.rootBlocks()
+
+			// Sort the rootBlocks in descending order according to their slot.
+			slices.SortFunc(rootBlocks, func(i, j iotago.BlockID) int {
+				if i.Slot() == j.Slot() {
+					return 0
+				} else if i.Slot() < j.Slot() {
+					return 1
+				}
+
+				return -1
+			})
 
 			references[iotago.StrongParentType] = rootBlocks[:lo.Min(len(rootBlocks), t.optMaxStrongParents)]
 		}

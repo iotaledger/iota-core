@@ -20,6 +20,9 @@ type Options struct {
 	// ProtocolParameters provides the protocol parameters used for the network.
 	ProtocolParameters iotago.ProtocolParameters
 
+	// AddGenesisRootBlock defines whether a Genesis root block should be added.
+	AddGenesisRootBlock bool
+
 	// RootBlocks define the initial blocks to which new blocks can attach to.
 	RootBlocks map[iotago.BlockID]iotago.CommitmentID
 
@@ -81,6 +84,13 @@ func WithProtocolParameters(params iotago.ProtocolParameters) options.Option[Opt
 func WithRootBlocks(rootBlocks map[iotago.BlockID]iotago.CommitmentID) options.Option[Options] {
 	return func(m *Options) {
 		m.RootBlocks = rootBlocks
+	}
+}
+
+// WithAddGenesisRootBlock define whether a Genesis root block should be added.
+func WithAddGenesisRootBlock(add bool) options.Option[Options] {
+	return func(m *Options) {
+		m.AddGenesisRootBlock = add
 	}
 }
 

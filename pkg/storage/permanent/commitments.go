@@ -12,6 +12,10 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+var (
+	ErrCommitmentBeforeGenesis = ierrors.New("commitment is before genesis")
+)
+
 type Commitments struct {
 	apiProvider iotago.APIProvider
 	store       *kvstore.TypedStore[iotago.SlotIndex, *model.Commitment]
@@ -34,13 +38,18 @@ func (c *Commitments) Store(commitment *model.Commitment) error {
 }
 
 func (c *Commitments) Load(slot iotago.SlotIndex) (commitment *model.Commitment, err error) {
+	genesisSlot := c.apiProvider.CommittedAPI().ProtocolParameters().GenesisSlot()
+	if slot < genesisSlot {
+		return nil, ierrors.Wrapf(ErrCommitmentBeforeGenesis, "slot %d is before genesis slot %d", slot, genesisSlot)
+	}
+
 	return c.store.Get(slot)
 }
 
 func (c *Commitments) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
 	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
 		var count int
-		for slot := iotago.SlotIndex(0); slot <= targetSlot; slot++ {
+		for slot := c.apiProvider.CommittedAPI().ProtocolParameters().GenesisSlot(); slot <= targetSlot; slot++ {
 			commitmentBytes, err := c.store.KVStore().Get(lo.PanicOnErr(slot.Bytes()))
 			if err != nil {
 				return 0, ierrors.Wrapf(err, "failed to load commitment for slot %d", slot)

@@ -21,7 +21,7 @@ type Commitment struct {
 }
 
 func NewEmptyCommitment(api iotago.API) *Commitment {
-	emptyCommitment := iotago.NewEmptyCommitment(api.ProtocolParameters().Version())
+	emptyCommitment := iotago.NewEmptyCommitment(api)
 	emptyCommitment.ReferenceManaCost = api.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 
 	return lo.PanicOnErr(CommitmentFromCommitment(emptyCommitment, api))

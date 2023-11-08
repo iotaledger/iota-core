@@ -291,7 +291,7 @@ func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
 	latestFinalizedSlot, err := s.storeLatestFinalizedSlot.Get()
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			return 0
+			return s.apiProvider.CommittedAPI().ProtocolParameters().GenesisSlot()
 		}
 		panic(err)
 	}

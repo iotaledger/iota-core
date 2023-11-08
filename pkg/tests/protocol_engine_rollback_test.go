@@ -29,6 +29,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				3,
@@ -115,7 +116,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 	}
 
 	{
-		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
@@ -215,6 +216,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				3,
@@ -307,7 +309,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 	}
 
 	{
-		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
@@ -414,6 +416,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				3,
@@ -506,7 +509,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 	}
 
 	{
-		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
@@ -613,6 +616,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				3,
@@ -705,7 +709,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 	}
 
 	{
-		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
