@@ -52,6 +52,8 @@ type TestSuite struct {
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
 	mutex                               syncutils.RWMutex
 	genesisKeyManager                   *mock.KeyManager
+
+	currentSlot iotago.SlotIndex
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
@@ -129,6 +131,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			}),
 		}
 		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
+		// TODO: set this to protocolParams.GenesisSlot() when this is added.
+		t.currentSlot = 0
 	})
 }
 
@@ -325,6 +329,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 
 	node := mock.NewNode(t.Testing, t.network, partition, name, validator)
 	t.nodes.Set(name, node)
+	node.SetCurrentSlot(t.currentSlot)
 
 	amount := mock.MinValidatorAccountAmount
 	if len(optAmount) > 0 {
@@ -403,6 +408,7 @@ func (t *TestSuite) addWallet(name string, node *mock.Node, accountID iotago.Acc
 	newWallet := mock.NewWallet(t.Testing, name, node, keyManager)
 	newWallet.SetBlockIssuer(accountID)
 	t.wallets.Set(name, newWallet)
+	newWallet.SetCurrentSlot(t.currentSlot)
 
 	return newWallet
 }
@@ -414,6 +420,23 @@ func (t *TestSuite) DefaultWallet() *mock.Wallet {
 	}
 
 	return defaultWallet
+}
+
+// Update the global time of the test suite and all nodes and wallets.
+func (t *TestSuite) SetCurrentSlot(slot iotago.SlotIndex) {
+	t.currentSlot = slot
+	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
+		node.SetCurrentSlot(slot)
+		return true
+	})
+	t.wallets.ForEach(func(_ string, wallet *mock.Wallet) bool {
+		wallet.SetCurrentSlot(slot)
+		return true
+	})
+}
+
+func (t *TestSuite) CurrentSlot() iotago.SlotIndex {
+	return t.currentSlot
 }
 
 func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]options.Option[protocol.Protocol]) {

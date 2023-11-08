@@ -67,7 +67,7 @@ func WithAllotments(allotments iotago.Allotments) options.Option[builder.Transac
 	}
 }
 
-func WithSlotCreated(creationSlot iotago.SlotIndex) options.Option[builder.TransactionBuilder] {
+func WithCreationSlot(creationSlot iotago.SlotIndex) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		txBuilder.SetCreationSlot(creationSlot)
 	}
@@ -102,6 +102,12 @@ func WithOutputs(outputs iotago.Outputs[iotago.Output]) options.Option[builder.T
 func WithTaggedDataPayload(payload *iotago.TaggedData) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		txBuilder.AddTaggedDataPayload(payload)
+	}
+}
+
+func WithAllotAllManaToAccount(slot iotago.SlotIndex, accountID iotago.AccountID) options.Option[builder.TransactionBuilder] {
+	return func(txBuilder *builder.TransactionBuilder) {
+		txBuilder.AllotAllMana(slot, accountID)
 	}
 }
 

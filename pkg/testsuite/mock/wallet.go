@@ -29,6 +29,7 @@ type Wallet struct {
 
 	outputs      map[string]*utxoledger.Output
 	transactions map[string]*iotago.Transaction
+	currentSlot  iotago.SlotIndex
 }
 
 func NewWallet(t *testing.T, name string, node *Node, keyManager ...*KeyManager) *Wallet {
@@ -56,6 +57,10 @@ func (w *Wallet) SetBlockIssuer(accountID iotago.AccountID) {
 
 func (w *Wallet) SetDefaultNode(node *Node) {
 	w.Node = node
+}
+
+func (w *Wallet) SetCurrentSlot(slot iotago.SlotIndex) {
+	w.currentSlot = slot
 }
 
 func (w *Wallet) AddOutput(outputName string, output *utxoledger.Output) {
