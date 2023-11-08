@@ -58,26 +58,26 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
 		InSyncRange:                     reactive.NewVariable[bool](),
 		IsEvicted:                       reactive.NewEvent(),
-
-		protocol: protocol,
 	}
 
 	c.Logger = protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", commitment.Slot()), c.IsEvicted, func(entityLogger log.Logger) {
-		c.Parent.LogUpdates(entityLogger, log.LevelTrace, "Parent", (*Commitment).LogName)
-		// Children
+		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName)
+		// c.Children.LogUpdates(entityLogger, log.LevelTrace, "Children", (*Commitment).LogName)
 		c.MainChild.LogUpdates(entityLogger, log.LevelTrace, "MainChild", (*Commitment).LogName)
 		c.SpawnedChain.LogUpdates(entityLogger, log.LevelTrace, "SpawnedChain", (*Chain).LogName)
 		c.Chain.LogUpdates(entityLogger, log.LevelTrace, "Chain", (*Chain).LogName)
 		c.RequestAttestations.LogUpdates(entityLogger, log.LevelTrace, "RequestAttestations")
 		c.WarpSync.LogUpdates(entityLogger, log.LevelTrace, "WarpSync")
-		c.IsSolid.LogUpdates(entityLogger, log.LevelTrace, "IsSolid")
-		c.IsVerified.LogUpdates(entityLogger, log.LevelTrace, "IsVerified")
-		c.IsAttested.LogUpdates(entityLogger, log.LevelTrace, "IsAttested")
-		c.InSyncRange.LogUpdates(entityLogger, log.LevelTrace, "InSyncRange")
+		c.RequestedBlocksReceived.LogUpdates(entityLogger, log.LevelTrace, "RequestedBlocksReceived")
 		c.Weight.LogUpdates(entityLogger, log.LevelTrace, "Weight")
 		c.AttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "AttestedWeight")
 		c.CumulativeAttestedWeight.LogUpdates(entityLogger, log.LevelTrace, "CumulativeAttestedWeight")
 		c.IsRoot.LogUpdates(entityLogger, log.LevelTrace, "IsRoot")
+		c.IsSolid.LogUpdates(entityLogger, log.LevelTrace, "IsSolid")
+		c.IsAttested.LogUpdates(entityLogger, log.LevelTrace, "IsAttested")
+		c.IsVerified.LogUpdates(entityLogger, log.LevelTrace, "IsVerified")
+		c.InSyncRange.LogUpdates(entityLogger, log.LevelTrace, "InSyncRange")
+		c.IsEvicted.LogUpdates(entityLogger, log.LevelTrace, "IsEvicted")
 	})
 
 	unsubscribe := lo.Batch(
