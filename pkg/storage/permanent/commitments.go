@@ -38,7 +38,7 @@ func (c *Commitments) Load(slot iotago.SlotIndex) (commitment *model.Commitment,
 }
 
 func (c *Commitments) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) (err error) {
-	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint64, func() (elementsCount int, err error) {
+	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
 		var count int
 		for slot := iotago.SlotIndex(0); slot <= targetSlot; slot++ {
 			commitmentBytes, err := c.store.KVStore().Get(lo.PanicOnErr(slot.Bytes()))
@@ -62,7 +62,7 @@ func (c *Commitments) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex)
 }
 
 func (c *Commitments) Import(reader io.ReadSeeker) (err error) {
-	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint64, func(i int) error {
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
 		commitment, err := stream.ReadObjectWithSize[*model.Commitment](reader, serializer.SeriLengthPrefixTypeAsUint16, func(bytes []byte) (*model.Commitment, int, error) {
 			return model.CommitmentFromBytes(bytes, c.apiProvider)
 		})
