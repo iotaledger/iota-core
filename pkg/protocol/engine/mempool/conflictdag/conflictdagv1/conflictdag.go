@@ -86,7 +86,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) CreateConflict(id Confli
 
 			// attach to the acceptance state updated event and propagate that event to the outside.
 			// also need to remember the unhook method to properly evict the conflict.
-			c.conflictUnhooks.Set(id, newConflict.AcceptanceStateUpdated.Hook(func(oldState, newState acceptance.State) {
+			c.conflictUnhooks.Set(id, newConflict.AcceptanceStateUpdated.Hook(func(_ acceptance.State, newState acceptance.State) {
 				if newState.IsAccepted() {
 					c.events.ConflictAccepted.Trigger(newConflict.ID)
 					return
@@ -117,7 +117,6 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictingResourc
 
 		return conflict.JoinConflictSets(c.conflictSets(resourceIDs))
 	}()
-
 	if err != nil {
 		return ierrors.Errorf("conflict %s failed to join conflict sets: %w", id, err)
 	}
@@ -140,7 +139,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) ReadConsistent(callback 
 }
 
 // UpdateConflictParents updates the parents of the given Conflict and returns an error if the operation failed.
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictParents(conflictID ConflictID, addedParentIDs, removedParentIDs ds.Set[ConflictID]) error {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) UpdateConflictParents(conflictID ConflictID, addedParentIDs ds.Set[ConflictID], removedParentIDs ds.Set[ConflictID]) error {
 	newParents := ds.NewSet[ConflictID]()
 
 	updated, err := func() (bool, error) {
@@ -449,7 +448,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) conflictSets(resourceIDs
 }
 
 // determineVotes determines the Conflicts that are supported and revoked by the given ConflictIDs.
-func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) determineVotes(conflictIDs ds.Set[ConflictID]) (supportedConflicts, revokedConflicts ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]], err error) {
+func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) determineVotes(conflictIDs ds.Set[ConflictID]) (supportedConflicts ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]], revokedConflicts ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]], err error) {
 	supportedConflicts = ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]]()
 	revokedConflicts = ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]]()
 
@@ -498,7 +497,7 @@ func (c *ConflictDAG[ConflictID, ResourceID, VoteRank]) conflictSetFactory(resou
 	return func() *ConflictSet[ConflictID, ResourceID, VoteRank] {
 		conflictSet := NewConflictSet[ConflictID, ResourceID, VoteRank](resourceID)
 
-		conflictSet.OnAllMembersEvicted(func(prevValue, newValue bool) {
+		conflictSet.OnAllMembersEvicted(func(prevValue bool, newValue bool) {
 			if newValue && !prevValue {
 				c.conflictSetsByID.Delete(conflictSet.ID)
 			}

@@ -17,7 +17,7 @@ type EpochKVStore struct {
 	lastPrunedEpoch *model.PruningIndex
 }
 
-func NewEpochKVStore(storeRealm, pruningRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex) *EpochKVStore {
+func NewEpochKVStore(storeRealm kvstore.Realm, pruningRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex) *EpochKVStore {
 
 	return &EpochKVStore{
 		realm:           storeRealm,

@@ -370,7 +370,7 @@ func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) findLowerHeaviestPre
 }
 
 // swapNeighbors swaps the given members in the SortedConflicts.
-func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) swapNeighbors(heavierMember, lighterMember *sortedConflict[ConflictID, ResourceID, VoteRank]) {
+func (s *SortedConflicts[ConflictID, ResourceID, VoteRank]) swapNeighbors(heavierMember *sortedConflict[ConflictID, ResourceID, VoteRank], lighterMember *sortedConflict[ConflictID, ResourceID, VoteRank]) {
 	if heavierMember.lighterMember != nil {
 		heavierMember.lighterMember.heavierMember = lighterMember
 	}

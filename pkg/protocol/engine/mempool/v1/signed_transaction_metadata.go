@@ -49,7 +49,7 @@ func (s *SignedTransactionMetadata) TransactionMetadata() mempool.TransactionMet
 }
 
 func (s *SignedTransactionMetadata) OnSignaturesInvalid(callback func(error)) (unsubscribe func()) {
-	return s.signaturesInvalid.OnUpdate(func(_, err error) {
+	return s.signaturesInvalid.OnUpdate(func(_ error, err error) {
 		callback(err)
 	})
 }

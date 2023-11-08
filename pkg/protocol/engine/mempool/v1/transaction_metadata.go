@@ -169,7 +169,7 @@ func (t *TransactionMetadata) IsInvalid() bool {
 }
 
 func (t *TransactionMetadata) OnInvalid(callback func(error)) {
-	t.invalid.OnUpdate(func(oldValue, newValue error) {
+	t.invalid.OnUpdate(func(_ error, newValue error) {
 		callback(newValue)
 	})
 }
@@ -294,13 +294,13 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		t.conflictIDs.Replace(ds.NewSet(t.id))
 	})
 
-	t.allValidAttachmentsEvicted.OnUpdate(func(_, slot iotago.SlotIndex) {
+	t.allValidAttachmentsEvicted.OnUpdate(func(_ iotago.SlotIndex, slot iotago.SlotIndex) {
 		if !lo.Return2(t.CommittedSlot()) {
 			t.orphanedSlot.Set(slot)
 		}
 	})
 
-	t.OnEarliestIncludedAttachmentUpdated(func(previousIndex, newIndex iotago.BlockID) {
+	t.OnEarliestIncludedAttachmentUpdated(func(previousIndex iotago.BlockID, newIndex iotago.BlockID) {
 		if isIncluded, wasIncluded := newIndex.Slot() != 0, previousIndex.Slot() != 0; isIncluded != wasIncluded {
 			t.accepted.Set(isIncluded && t.AllInputsAccepted() && t.IsConflictAccepted())
 		}

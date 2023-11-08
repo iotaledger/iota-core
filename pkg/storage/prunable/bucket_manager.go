@@ -237,7 +237,7 @@ func (b *BucketManager) DeleteBucket(epoch iotago.EpochIndex) (deleted bool) {
 }
 
 // RollbackBucket removes data in the bucket in slots [targetSlotIndex+1; epochEndSlot].
-func (b *BucketManager) RollbackBucket(epoch iotago.EpochIndex, targetSlot, epochEndSlot iotago.SlotIndex) error {
+func (b *BucketManager) RollbackBucket(epoch iotago.EpochIndex, targetSlot iotago.SlotIndex, epochEndSlot iotago.SlotIndex) error {
 	oldBucketKvStore := b.getDBInstance(epoch).KVStore()
 	for clearSlot := targetSlot + 1; clearSlot <= epochEndSlot; clearSlot++ {
 		// delete slot prefix from forkedPrunable storage that will be eventually copied into the new engine
