@@ -226,6 +226,8 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 
 	committeeTree := ads.NewSet[iotago.Identifier](
 		mapdb.NewMapDB(),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
 	)

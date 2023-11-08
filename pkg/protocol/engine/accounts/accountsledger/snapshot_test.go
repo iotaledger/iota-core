@@ -3,9 +3,9 @@ package accountsledger_test
 import (
 	"testing"
 
-	"github.com/orcaman/writerseeker"
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -176,15 +176,15 @@ func TestManager_Import_Export(t *testing.T) {
 		},
 	})
 
-	//// Export and import the account ledger into new manager for the latest slot.
+	// Export and import the account ledger into new manager for the latest slot.
 	{
-		writer := &writerseeker.WriterSeeker{}
+		writer := stream.NewByteBuffer()
 
 		err := ts.Instance.Export(writer, iotago.SlotIndex(3))
 		require.NoError(t, err)
 
 		ts.Instance = ts.initAccountLedger()
-		err = ts.Instance.Import(writer.BytesReader())
+		err = ts.Instance.Import(writer.Reader())
 		require.NoError(t, err)
 		ts.Instance.SetLatestCommittedSlot(3)
 
@@ -193,13 +193,13 @@ func TestManager_Import_Export(t *testing.T) {
 
 	// Export and import for pre-latest slot.
 	{
-		writer := &writerseeker.WriterSeeker{}
+		writer := stream.NewByteBuffer()
 
 		err := ts.Instance.Export(writer, iotago.SlotIndex(2))
 		require.NoError(t, err)
 
 		ts.Instance = ts.initAccountLedger()
-		err = ts.Instance.Import(writer.BytesReader())
+		err = ts.Instance.Import(writer.Reader())
 		require.NoError(t, err)
 		ts.Instance.SetLatestCommittedSlot(2)
 

@@ -2,7 +2,9 @@ package utxoledger
 
 import (
 	"github.com/iotaledger/hive.go/kvstore"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -17,11 +19,13 @@ type OutputConsumer func(output *Output) bool
 type LookupKey []byte
 
 func lookupKeyUnspentOutput(outputID iotago.OutputID) LookupKey {
-	ms := marshalutil.New(iotago.OutputIDLength + 1)
-	ms.WriteByte(StoreKeyPrefixOutputUnspent) // 1 byte
-	ms.WriteBytes(outputID[:])                // iotago.OutputIDLength bytes
+	byteBuffer := stream.NewByteBuffer(serializer.OneByte + iotago.OutputIDLength)
 
-	return ms.Bytes()
+	// There can't be any errors.
+	_ = stream.Write(byteBuffer, StoreKeyPrefixOutputUnspent)
+	_ = stream.Write(byteBuffer, outputID)
+
+	return lo.PanicOnErr(byteBuffer.Bytes())
 }
 
 func (o *Output) UnspentLookupKey() LookupKey {
@@ -29,14 +33,10 @@ func (o *Output) UnspentLookupKey() LookupKey {
 }
 
 func outputIDFromDatabaseKey(key LookupKey) (iotago.OutputID, error) {
-	ms := marshalutil.New([]byte(key))
+	// Skip 1 byte prefix.
+	outputID, _, err := iotago.OutputIDFromBytes(key[1:])
 
-	// prefix
-	if _, err := ms.ReadByte(); err != nil {
-		return iotago.OutputID{}, err
-	}
-
-	return ParseOutputID(ms)
+	return outputID, err
 }
 
 func markAsUnspent(output *Output, mutations kvstore.BatchedMutations) error {

@@ -2,11 +2,12 @@ package account
 
 import (
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-const poolBytesLength = 3 * marshalutil.Uint64Size
+const poolBytesLength = 3 * serializer.UInt64ByteSize
 
 // Pool represents all the data we need for a given validator and epoch to calculate its rewards data.
 type Pool struct {
@@ -19,33 +20,35 @@ type Pool struct {
 
 func PoolFromBytes(bytes []byte) (*Pool, int, error) {
 	p := new(Pool)
-	m := marshalutil.New(bytes)
-	poolStake, err := m.ReadUint64()
-	if err != nil {
-		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse pool stake")
-	}
-	p.PoolStake = iotago.BaseToken(poolStake)
 
-	validatorStake, err := m.ReadUint64()
-	if err != nil {
-		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse validator stake")
-	}
-	p.ValidatorStake = iotago.BaseToken(validatorStake)
+	var err error
+	byteReader := stream.NewByteReader(bytes)
 
-	fixedCost, err := m.ReadUint64()
-	if err != nil {
-		return nil, m.ReadOffset(), ierrors.Wrap(err, "failed to parse fixed cost")
+	if p.PoolStake, err = stream.Read[iotago.BaseToken](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read PoolStake")
 	}
-	p.FixedCost = iotago.Mana(fixedCost)
+	if p.ValidatorStake, err = stream.Read[iotago.BaseToken](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read ValidatorStake")
+	}
+	if p.FixedCost, err = stream.Read[iotago.Mana](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read FixedCost")
+	}
 
-	return p, m.ReadOffset(), nil
+	return p, byteReader.BytesRead(), nil
 }
 
-func (p *Pool) Bytes() (bytes []byte, err error) {
-	m := marshalutil.New()
-	m.WriteUint64(uint64(p.PoolStake))
-	m.WriteUint64(uint64(p.ValidatorStake))
-	m.WriteUint64(uint64(p.FixedCost))
+func (p *Pool) Bytes() ([]byte, error) {
+	byteBuffer := stream.NewByteBuffer(poolBytesLength)
 
-	return m.Bytes(), nil
+	if err := stream.Write(byteBuffer, p.PoolStake); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write PoolStake")
+	}
+	if err := stream.Write(byteBuffer, p.ValidatorStake); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write ValidatorStake")
+	}
+	if err := stream.Write(byteBuffer, p.FixedCost); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write FixedCost")
+	}
+
+	return byteBuffer.Bytes()
 }

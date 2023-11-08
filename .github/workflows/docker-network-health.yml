@@ -62,5 +62,5 @@ jobs:
     - name: Cleanup
       run: |
         cd ./tools/docker-network
-        docker compose kill
-        docker compose down -v
+        docker compose kill || true
+        docker compose down -t 1 -v || true
