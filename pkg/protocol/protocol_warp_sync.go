@@ -36,7 +36,7 @@ func NewWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		c.protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-			commitment.WarpSync.OnUpdate(func(_, warpSyncBlocks bool) {
+			commitment.WarpSyncBlocks.OnUpdate(func(_, warpSyncBlocks bool) {
 				if warpSyncBlocks {
 					c.ticker.StartTicker(commitment.ID())
 				} else {
@@ -101,7 +101,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 		}
 
 		commitment.RequestedBlocksReceived.Compute(func(requestedBlocksReceived bool) bool {
-			if requestedBlocksReceived || !commitment.WarpSync.Get() {
+			if requestedBlocksReceived || !commitment.WarpSyncBlocks.Get() {
 				w.LogTrace("response for already synced commitment", "commitment", commitment.LogName(), "fromPeer", from)
 
 				return requestedBlocksReceived
