@@ -112,11 +112,11 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		return weaklyOrphanedWeakParents > 0
 	}, t.weaklyOrphanedWeakParents)
 
-	t.isStronglyOrphaned = reactive.NewDerivedVariable3[bool, bool, bool, bool](func(isMarkedOrphaned, anyStrongParentStronglyOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+	t.isStronglyOrphaned = reactive.NewDerivedVariable3[bool, bool, bool, bool](func(isMarkedOrphaned bool, anyStrongParentStronglyOrphaned bool, anyWeakParentWeaklyOrphaned bool) bool {
 		return isMarkedOrphaned || anyStrongParentStronglyOrphaned || anyWeakParentWeaklyOrphaned
 	}, t.isMarkedOrphaned, t.anyStrongParentStronglyOrphaned, t.anyWeakParentWeaklyOrphaned)
 
-	t.isWeaklyOrphaned = reactive.NewDerivedVariable2[bool, bool, bool](func(isMarkedOrphaned, anyWeakParentWeaklyOrphaned bool) bool {
+	t.isWeaklyOrphaned = reactive.NewDerivedVariable2[bool, bool, bool](func(isMarkedOrphaned bool, anyWeakParentWeaklyOrphaned bool) bool {
 		return isMarkedOrphaned || anyWeakParentWeaklyOrphaned
 	}, t.isMarkedOrphaned, t.anyWeakParentWeaklyOrphaned)
 
@@ -209,7 +209,7 @@ func (t *TipMetadata) connectStrongParent(strongParent *TipMetadata) {
 
 	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
 	unsubscribe := strongParent.stronglyConnectedStrongChildren.Monitor(t.isStronglyConnectedToTips)
-	strongParent.evicted.OnUpdate(func(_, _ bool) { unsubscribe() })
+	strongParent.evicted.OnUpdate(func(_ bool, _ bool) { unsubscribe() })
 }
 
 // connectWeakParent sets up the parent and children related properties for a weak parent.
@@ -218,7 +218,7 @@ func (t *TipMetadata) connectWeakParent(weakParent *TipMetadata) {
 
 	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
 	unsubscribe := weakParent.connectedWeakChildren.Monitor(t.isConnectedToTips)
-	weakParent.evicted.OnUpdate(func(_, _ bool) { unsubscribe() })
+	weakParent.evicted.OnUpdate(func(_ bool, _ bool) { unsubscribe() })
 }
 
 // String returns a human-readable representation of the TipMetadata.

@@ -201,7 +201,7 @@ func (t *Tracker) importCommittees(reader io.ReadSeeker) error {
 	return nil
 }
 
-func (t *Tracker) exportPerformanceFactor(writer io.WriteSeeker, startSlot, targetSlot iotago.SlotIndex) error {
+func (t *Tracker) exportPerformanceFactor(writer io.WriteSeeker, startSlot iotago.SlotIndex, targetSlot iotago.SlotIndex) error {
 	t.performanceFactorsMutex.RLock()
 	defer t.performanceFactorsMutex.RUnlock()
 
