@@ -100,7 +100,7 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		weaklyOrphanedWeakParents:       reactive.NewCounter[bool](),
 	}
 
-	t.isMarkedOrphaned = reactive.NewDerivedVariable2[bool, bool](func(_, isLivenessThresholdReached, isAccepted bool) bool {
+	t.isMarkedOrphaned = reactive.NewDerivedVariable2[bool, bool](func(_ bool, isLivenessThresholdReached bool, isAccepted bool) bool {
 		return isLivenessThresholdReached && !isAccepted
 	}, t.livenessThresholdReached, block.Accepted())
 
@@ -140,23 +140,23 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		return connectedWeakChildren > 0
 	}, t.connectedWeakChildren)
 
-	t.isReferencedByTips = reactive.NewDerivedVariable2[bool, bool, bool](func(_, isWeaklyReferencedByTips, isStronglyReferencedByTips bool) bool {
+	t.isReferencedByTips = reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isWeaklyReferencedByTips bool, isStronglyReferencedByTips bool) bool {
 		return isWeaklyReferencedByTips || isStronglyReferencedByTips
 	}, t.isWeaklyReferencedByTips, t.isStronglyReferencedByTips)
 
-	t.isStronglyConnectedToTips = reactive.NewDerivedVariable2(func(_, isStrongTipPoolMember, isStronglyReferencedByTips bool) bool {
+	t.isStronglyConnectedToTips = reactive.NewDerivedVariable2(func(_ bool, isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
 		return isStrongTipPoolMember || isStronglyReferencedByTips
 	}, t.isStrongTipPoolMember, t.isStronglyReferencedByTips)
 
-	t.isConnectedToTips = reactive.NewDerivedVariable3(func(_, isReferencedByTips, isStrongTipPoolMember, isWeakTipPoolMember bool) bool {
+	t.isConnectedToTips = reactive.NewDerivedVariable3(func(_ bool, isReferencedByTips bool, isStrongTipPoolMember bool, isWeakTipPoolMember bool) bool {
 		return isReferencedByTips || isStrongTipPoolMember || isWeakTipPoolMember
 	}, t.isReferencedByTips, t.isStrongTipPoolMember, t.isWeakTipPoolMember)
 
-	t.isStrongTip = reactive.NewDerivedVariable2[bool, bool, bool](func(_, isStrongTipPoolMember, isStronglyReferencedByTips bool) bool {
+	t.isStrongTip = reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isStrongTipPoolMember bool, isStronglyReferencedByTips bool) bool {
 		return isStrongTipPoolMember && !isStronglyReferencedByTips
 	}, t.isStrongTipPoolMember, t.isStronglyReferencedByTips)
 
-	t.isWeakTip = reactive.NewDerivedVariable2[bool, bool, bool](func(_, isWeakTipPoolMember, isReferencedByTips bool) bool {
+	t.isWeakTip = reactive.NewDerivedVariable2[bool, bool, bool](func(_ bool, isWeakTipPoolMember bool, isReferencedByTips bool) bool {
 		return isWeakTipPoolMember && !isReferencedByTips
 	}, t.isWeakTipPoolMember, t.isReferencedByTips)
 
