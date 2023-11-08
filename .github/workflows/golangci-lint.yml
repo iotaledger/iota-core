@@ -36,4 +36,4 @@ jobs:
           skip-cache: true
           version: latest
           install-mode: goinstall
-          args: --timeout=10m
+          args: --timeout=10m --enable typegroupingcheck
