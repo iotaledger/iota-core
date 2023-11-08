@@ -132,8 +132,8 @@ func (m *Manager) ReadLedgerIndexWithoutLocking() (iotago.SlotIndex, error) {
 	value, err := m.store.Get([]byte{StoreKeyPrefixLedgerSlotIndex})
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			// there is no ledger milestone yet => return 0
-			return 0, nil
+			// there is no ledger milestone yet => return genesis slot
+			return m.apiProvider.CommittedAPI().ProtocolParameters().GenesisSlot(), nil
 		}
 
 		return 0, ierrors.Errorf("failed to load ledger milestone index: %w", err)

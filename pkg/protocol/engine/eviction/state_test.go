@@ -22,20 +22,22 @@ func TestState_RootBlocks(t *testing.T) {
 		Directory: t.TempDir(),
 	}, api.SingleVersionProvider(tpkg.TestAPI), errorHandler)
 
-	ts := NewTestFramework(t, prunableStorage, eviction.NewState(mapdb.NewMapDB(), prunableStorage.RootBlocks, eviction.WithRootBlocksEvictionDelay(3)))
-	ts.CreateAndAddRootBlock("Genesis", 0, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID())
+	ts := NewTestFramework(t, prunableStorage, eviction.NewState(mapdb.NewMapDB(), prunableStorage.RootBlocks, func() iotago.BlockID {
+		return tpkg.TestAPI.ProtocolParameters().GenesisBlockID()
+	}, eviction.WithRootBlocksEvictionDelay(3)))
+	ts.CreateAndAddRootBlock("Genesis", 0, iotago.NewEmptyCommitment(tpkg.TestAPI).MustID())
 	ts.RequireActiveRootBlocks("Genesis")
 	ts.RequireLastEvictedSlot(0)
 
 	ts.Instance.Initialize(0)
 
-	ts.CreateAndAddRootBlock("Root1.0", 1, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID())
-	ts.CreateAndAddRootBlock("Root1.1", 1, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID())
-	ts.CreateAndAddRootBlock("Root2.0", 2, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID())
-	ts.CreateAndAddRootBlock("Root3.0", 3, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID())
-	ts.CreateAndAddRootBlock("Root4.0", 4, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID())
-	ts.CreateAndAddRootBlock("Root4.1", 4, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID())
-	ts.CreateAndAddRootBlock("Root5.0", 5, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID())
+	ts.CreateAndAddRootBlock("Root1.0", 1, iotago.NewEmptyCommitment(tpkg.TestAPI).MustID())
+	ts.CreateAndAddRootBlock("Root1.1", 1, iotago.NewEmptyCommitment(tpkg.TestAPI).MustID())
+	ts.CreateAndAddRootBlock("Root2.0", 2, iotago.NewEmptyCommitment(tpkg.TestAPI).MustID())
+	ts.CreateAndAddRootBlock("Root3.0", 3, iotago.NewEmptyCommitment(tpkg.TestAPI).MustID())
+	ts.CreateAndAddRootBlock("Root4.0", 4, iotago.NewEmptyCommitment(tpkg.TestAPI).MustID())
+	ts.CreateAndAddRootBlock("Root4.1", 4, iotago.NewEmptyCommitment(tpkg.TestAPI).MustID())
+	ts.CreateAndAddRootBlock("Root5.0", 5, iotago.NewEmptyCommitment(tpkg.TestAPI).MustID())
 
 	ts.RequireActiveRootBlocks("Genesis")
 	ts.RequireLastEvictedSlot(0)
