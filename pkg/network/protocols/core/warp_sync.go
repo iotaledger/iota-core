@@ -12,10 +12,10 @@ import (
 )
 
 type WarpSyncPayload struct {
-	BlockIDsBySlotCommitmentID map[iotago.CommitmentID]iotago.BlockIDs `serix:"0,lengthPrefixType=uint32"`
-	TangleMerkleProof          *merklehasher.Proof[iotago.Identifier]  `serix:"1"`
-	TransactionIDs             iotago.TransactionIDs                   `serix:"2"`
-	MutationsMerkleProof       *merklehasher.Proof[iotago.Identifier]  `serix:"3"`
+	BlockIDsBySlotCommitmentID map[iotago.CommitmentID]iotago.BlockIDs `serix:",lenPrefix=uint32"`
+	TangleMerkleProof          *merklehasher.Proof[iotago.Identifier]  `serix:""`
+	TransactionIDs             iotago.TransactionIDs                   `serix:""`
+	MutationsMerkleProof       *merklehasher.Proof[iotago.Identifier]  `serix:""`
 }
 
 func (p *Protocol) SendWarpSyncRequest(id iotago.CommitmentID, to ...peer.ID) {

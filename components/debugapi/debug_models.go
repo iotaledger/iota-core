@@ -37,16 +37,16 @@ type (
 	}
 
 	Validator struct {
-		AccountID      iotago.AccountID `serix:"0,mapKey=accountId"`
-		SeatIndex      uint8            `serix:"1,mapKey=seatIndex"`
-		PoolStake      iotago.BaseToken `serix:"2,mapKey=poolStake"`
-		ValidatorStake iotago.BaseToken `serix:"3,mapKey=validatorStake"`
-		FixedCost      iotago.Mana      `serix:"4,mapKey=fixedCost"`
+		AccountID      iotago.AccountID `serix:""`
+		SeatIndex      uint8            `serix:""`
+		PoolStake      iotago.BaseToken `serix:""`
+		ValidatorStake iotago.BaseToken `serix:""`
+		FixedCost      iotago.Mana      `serix:""`
 	}
 
 	ValidatorsSummaryResponse struct {
-		ValidatorSeats []*Validator `serix:"0,lengthPrefixType=uint8,mapKey=validatorSeats"`
-		ActiveSeats    []uint32     `serix:"1,lengthPrefixType=uint8,mapKey=activeSeats"`
+		ValidatorSeats []*Validator `serix:"lenPrefix=uint8"`
+		ActiveSeats    []uint32     `serix:"lenPrefix=uint8"`
 	}
 
 	BlockChangesResponse struct {
