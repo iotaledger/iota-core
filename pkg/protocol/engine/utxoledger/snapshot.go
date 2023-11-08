@@ -95,7 +95,7 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIPr
 		return nil, ierrors.Wrap(err, "unable to read slot diff index")
 	}
 
-	createdCount, err := stream.Peek(reader, serializer.SeriLengthPrefixTypeAsUint64)
+	createdCount, err := stream.PeekSize(reader, serializer.SeriLengthPrefixTypeAsUint64)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "unable to peek slot diff created count")
 	}
@@ -112,7 +112,7 @@ func ReadSlotDiffToSnapshotReader(reader io.ReadSeeker, apiProvider iotago.APIPr
 		return nil, ierrors.Wrap(err, "unable to read slot diff created collection")
 	}
 
-	consumedCount, err := stream.Peek(reader, serializer.SeriLengthPrefixTypeAsUint64)
+	consumedCount, err := stream.PeekSize(reader, serializer.SeriLengthPrefixTypeAsUint64)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "unable to peek slot diff consumed count")
 	}

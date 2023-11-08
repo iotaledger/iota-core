@@ -69,7 +69,7 @@ func (sd *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) e
 
 	byteReader := stream.NewByteReader(value)
 
-	outputsCount, err := stream.Peek(byteReader, serializer.SeriLengthPrefixTypeAsUint32)
+	outputsCount, err := stream.PeekSize(byteReader, serializer.SeriLengthPrefixTypeAsUint32)
 	if err != nil {
 		return ierrors.Wrap(err, "unable to peek outputs count")
 	}
@@ -93,7 +93,7 @@ func (sd *SlotDiff) kvStorableLoad(manager *Manager, key []byte, value []byte) e
 		return ierrors.Wrapf(err, "unable to read slot diff outputs")
 	}
 
-	spentsCount, err := stream.Peek(byteReader, serializer.SeriLengthPrefixTypeAsUint32)
+	spentsCount, err := stream.PeekSize(byteReader, serializer.SeriLengthPrefixTypeAsUint32)
 	if err != nil {
 		return ierrors.Wrap(err, "unable to peek spents count")
 	}
