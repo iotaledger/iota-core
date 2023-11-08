@@ -1,4 +1,4 @@
-package conflictdagv1
+package spenddagv1
 
 import (
 	"github.com/iotaledger/iota-core/pkg/core/vote"

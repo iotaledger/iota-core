@@ -1,4 +1,4 @@
-package conflictdag
+package spenddag
 
 import (
 	"github.com/iotaledger/hive.go/constraints"

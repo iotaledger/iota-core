@@ -20,7 +20,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 		e.HookConstructed(func() {
 			// wait for submodules to be constructed (so all of their properties are available)
 			module.OnAllConstructed(func() {
-				t.Construct(e.TipManager, e.Ledger.ConflictDAG(), e.Ledger.MemPool().TransactionMetadata, e.EvictionState.LatestRootBlocks, DynamicLivenessThreshold(e.SybilProtection.SeatManager().OnlineCommittee().Size))
+				t.Construct(e.TipManager, e.Ledger.SpendDAG(), e.Ledger.MemPool().TransactionMetadata, e.EvictionState.LatestRootBlocks, DynamicLivenessThreshold(e.SybilProtection.SeatManager().OnlineCommittee().Size))
 
 				e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
 					t.SetAcceptanceTime(block.IssuingTime())

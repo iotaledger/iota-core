@@ -298,7 +298,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 		// 1. Mark all transactions as accepted
 		for _, transactionID := range transactionIDs {
-			targetEngine.Ledger.ConflictDAG().SetAccepted(transactionID)
+			targetEngine.Ledger.SpendDAG().SetAccepted(transactionID)
 		}
 
 		// 2. Mark all blocks as accepted

@@ -141,15 +141,15 @@ func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*
 					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: block %s does not exist", node.Name, transactionID)
 				}
 
-				expectedConflictIDs := ds.NewSet(lo.Map(conflictAliases, t.DefaultWallet().TransactionID)...)
-				actualConflictIDs := transactionFromCache.ConflictIDs()
+				expectedSpendIDs := ds.NewSet(lo.Map(conflictAliases, t.DefaultWallet().TransactionID)...)
+				actualSpendIDs := transactionFromCache.SpendIDs()
 
-				if expectedConflictIDs.Size() != actualConflictIDs.Size() {
-					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s conflict count incorrect: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedConflictIDs, actualConflictIDs)
+				if expectedSpendIDs.Size() != actualSpendIDs.Size() {
+					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s conflict count incorrect: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedSpendIDs, actualSpendIDs)
 				}
 
-				if !actualConflictIDs.HasAll(expectedConflictIDs) {
-					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedConflictIDs, actualConflictIDs)
+				if !actualSpendIDs.HasAll(expectedSpendIDs) {
+					return ierrors.Errorf("AssertTransactionInCacheConflicts: %s: transaction %s: expected conflicts %v, got %v", node.Name, transactionFromCache.ID(), expectedSpendIDs, actualSpendIDs)
 				}
 
 				return nil

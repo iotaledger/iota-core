@@ -14,7 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -25,7 +25,7 @@ type TipSelection struct {
 	tipManager tipmanager.TipManager
 
 	// conflictDAG is the ConflictDAG that is used to track conflicts.
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
+	conflictDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 
 	// rootBlocks is a function that returns the current root blocks.
 	rootBlocks func() iotago.BlockIDs
@@ -76,7 +76,7 @@ func New(opts ...options.Option[TipSelection]) *TipSelection {
 //
 // This method is separated from the constructor so the TipSelection can be initialized lazily after all dependencies
 // are available.
-func (t *TipSelection) Construct(tipManager tipmanager.TipManager, conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
+func (t *TipSelection) Construct(tipManager tipmanager.TipManager, conflictDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
 	t.tipManager = tipManager
 	t.conflictDAG = conflictDAG
 	t.transactionMetadata = transactionMetadataRetriever
@@ -101,7 +101,7 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 	references = make(model.ParentReferences)
 	strongParents := ds.NewSet[iotago.BlockID]()
 	shallowLikesParents := ds.NewSet[iotago.BlockID]()
-	_ = t.conflictDAG.ReadConsistent(func(_ conflictdag.ReadLockedConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]) error {
+	_ = t.conflictDAG.ReadConsistent(func(_ spenddag.ReadLockedSpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]) error {
 		previousLikedInsteadConflicts := ds.NewSet[iotago.TransactionID]()
 
 		if t.collectReferences(references, iotago.StrongParentType, t.tipManager.StrongTips, func(tip tipmanager.TipMetadata) {
@@ -164,13 +164,13 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
 func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.TransactionID], tipMetadata tipmanager.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts ds.Set[iotago.TransactionID], err error) {
 	necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
-	if err = t.conflictDAG.LikedInstead(tipMetadata.Block().ConflictIDs()).ForEach(func(likedConflictID iotago.TransactionID) error {
-		transactionMetadata, exists := t.transactionMetadata(likedConflictID)
+	if err = t.conflictDAG.LikedInstead(tipMetadata.Block().SpendIDs()).ForEach(func(likedSpendID iotago.TransactionID) error {
+		transactionMetadata, exists := t.transactionMetadata(likedSpendID)
 		if !exists {
-			return ierrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedConflictID)
+			return ierrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedSpendID)
 		}
 
-		necessaryReferences[likedConflictID] = lo.First(transactionMetadata.ValidAttachments())
+		necessaryReferences[likedSpendID] = lo.First(transactionMetadata.ValidAttachments())
 
 		return nil
 	}); err != nil {
@@ -178,8 +178,8 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.Trans
 	}
 
 	references, updatedLikedConflicts = make([]iotago.BlockID, 0), likedConflicts.Clone()
-	for conflictID, attachmentID := range necessaryReferences {
-		if updatedLikedConflicts.Add(conflictID) {
+	for spendID, attachmentID := range necessaryReferences {
+		if updatedLikedConflicts.Add(spendID) {
 			references = append(references, attachmentID)
 		}
 	}
@@ -220,12 +220,12 @@ func (t *TipSelection) collectReferences(references model.ParentReferences, pare
 
 // isValidStrongTip checks if the given block is a valid strong tip.
 func (t *TipSelection) isValidStrongTip(block *blocks.Block) bool {
-	return !t.conflictDAG.AcceptanceState(block.ConflictIDs()).IsRejected()
+	return !t.conflictDAG.AcceptanceState(block.SpendIDs()).IsRejected()
 }
 
 // isValidWeakTip checks if the given block is a valid weak tip.
 func (t *TipSelection) isValidWeakTip(block *blocks.Block) bool {
-	return t.conflictDAG.LikedInstead(block.PayloadConflictIDs()).Size() == 0
+	return t.conflictDAG.LikedInstead(block.PayloadSpendIDs()).Size() == 0
 }
 
 // triggerLivenessThreshold triggers the liveness threshold for all tips that have reached the given threshold.

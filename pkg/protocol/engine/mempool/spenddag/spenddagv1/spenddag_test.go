@@ -1,4 +1,4 @@
-package conflictdagv1
+package spenddagv1
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/memanalyzer"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/tests"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -18,8 +18,8 @@ const (
 	TestTransactionCreationSlot = 0
 )
 
-// TestConflictDAG runs the generic tests for the ConflictDAG.
-func TestConflictDAG(t *testing.T) {
+// Testspenddag runs the generic tests for the spenddag.
+func TestSpendDAG(t *testing.T) {
 	tests.TestAll(t, newTestFramework)
 }
 
@@ -53,7 +53,7 @@ func TestMemoryRelease(t *testing.T) {
 	//t.Skip("skip memory test as for some reason it's failing")
 	tf := newTestFramework(t)
 
-	createConflictSets := func(startSlot, conflictSetCount, evictionDelay, conflictsInConflictSet int, prevConflictSetAlias string) (int, string) {
+	createSpendSets := func(startSlot, conflictSetCount, evictionDelay, conflictsInConflictSet int, prevConflictSetAlias string) (int, string) {
 		slot := startSlot
 		for ; slot < startSlot+conflictSetCount; slot++ {
 			conflictSetAlias := fmt.Sprintf("conflictSet-%d", slot)
@@ -61,7 +61,7 @@ func TestMemoryRelease(t *testing.T) {
 				conflictAlias := fmt.Sprintf("conflictSet-%d:%d", slot, conflictIndex)
 				require.NoError(t, tf.CreateOrUpdateConflict(conflictAlias, []string{conflictSetAlias}))
 				if prevConflictSetAlias != "" {
-					require.NoError(t, tf.UpdateConflictParents(conflictAlias, []string{fmt.Sprintf("%s:%d", prevConflictSetAlias, 0)}, []string{}))
+					require.NoError(t, tf.UpdateSpendParents(conflictAlias, []string{fmt.Sprintf("%s:%d", prevConflictSetAlias, 0)}, []string{}))
 				}
 			}
 			prevConflictSetAlias = conflictSetAlias
@@ -69,27 +69,27 @@ func TestMemoryRelease(t *testing.T) {
 			if slotToEvict := slot - evictionDelay; slotToEvict >= 0 {
 				for conflictIndex := 0; conflictIndex < conflictsInConflictSet; conflictIndex++ {
 					conflictAlias := fmt.Sprintf("conflictSet-%d:%d", slotToEvict, conflictIndex)
-					tf.EvictConflict(conflictAlias)
+					tf.EvictSpend(conflictAlias)
 				}
 			}
 		}
 
 		return slot, prevConflictSetAlias
 	}
-	_, prevAlias := createConflictSets(0, 30000, 1, 2, "")
+	_, prevAlias := createSpendSets(0, 30000, 1, 2, "")
 
-	tf.Instance.EvictConflict(tf.ConflictID(prevAlias + ":0"))
-	tf.Instance.EvictConflict(tf.ConflictID(prevAlias + ":1"))
+	tf.Instance.EvictSpend(tf.SpendID(prevAlias + ":0"))
+	tf.Instance.EvictSpend(tf.SpendID(prevAlias + ":1"))
 
 	iotago.UnregisterIdentifierAliases()
 
 	fmt.Println("Memory report before:")
 	fmt.Println(memanalyzer.MemoryReport(tf))
 	memStatsStart := memanalyzer.MemSize(tf)
-	_, alias := createConflictSets(0, 30000, 1, 2, "")
+	_, alias := createSpendSets(0, 30000, 1, 2, "")
 
-	tf.Instance.EvictConflict(tf.ConflictID(alias + ":0"))
-	tf.Instance.EvictConflict(tf.ConflictID(alias + ":1"))
+	tf.Instance.EvictSpend(tf.SpendID(alias + ":0"))
+	tf.Instance.EvictSpend(tf.SpendID(alias + ":1"))
 
 	tf.Instance.Shutdown()
 
@@ -97,9 +97,9 @@ func TestMemoryRelease(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictSetsByID.Size())
-	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictsByID.Size())
-	require.Equal(t, 0, tf.Instance.(*ConflictDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictUnhooks.Size())
+	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictSetsByID.Size())
+	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).spendsByID.Size())
+	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).spendUnhooks.Size())
 	memStatsEnd := memanalyzer.MemSize(tf)
 
 	fmt.Println("\n\nMemory report after:")

@@ -151,9 +151,9 @@ type ExplorerBlock struct {
 	LikedInsteadChildren []string `json:"shallowLikeChildren"`
 	// Solid defines the solid status of the block.
 	Solid                  bool     `json:"solid"`
-	ConflictIDs            []string `json:"conflictIDs"`
-	AddedConflictIDs       []string `json:"addedConflictIDs"`
-	SubtractedConflictIDs  []string `json:"subtractedConflictIDs"`
+	SpendIDs               []string `json:"spendIDs"`
+	AddedSpendIDs          []string `json:"addedSpendIDs"`
+	SubtractedSpendIDs     []string `json:"subtractedSpendIDs"`
 	Scheduled              bool     `json:"scheduled"`
 	Booked                 bool     `json:"booked"`
 	Orphaned               bool     `json:"orphaned"`

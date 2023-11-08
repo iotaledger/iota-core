@@ -47,10 +47,10 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 	routeGroup.GET("/output/:"+restapipkg.ParameterOutputID, getOutput)
 	// routeGroup.GET("/output/:outputID/metadata", ledgerstateAPI.GetOutputMetadata)
 	// routeGroup.GET("/output/:outputID/consumers", ledgerstateAPI.GetOutputConsumers)
-	// routeGroup.GET("/conflict/:conflictID", ledgerstateAPI.GetConflict)
-	// routeGroup.GET("/conflict/:conflictID/children", ledgerstateAPI.GetConflictChildren)
-	// routeGroup.GET("/conflict/:conflictID/conflicts", ledgerstateAPI.GetConflictConflicts)
-	// routeGroup.GET("/conflict/:conflictID/voters", ledgerstateAPI.GetConflictVoters)
+	// routeGroup.GET("/conflict/:spendID", ledgerstateAPI.GetConflict)
+	// routeGroup.GET("/conflict/:spendID/children", ledgerstateAPI.GetConflictChildren)
+	// routeGroup.GET("/conflict/:spendID/conflicts", ledgerstateAPI.GetConflictConflicts)
+	// routeGroup.GET("/conflict/:spendID/voters", ledgerstateAPI.GetConflictVoters)
 	routeGroup.GET("/slot/commitment/:"+restapipkg.ParameterCommitmentID, getSlotDetailsByID)
 
 	routeGroup.GET("/search/:search", func(c echo.Context) error {
@@ -172,8 +172,8 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 		t.LikedInsteadChildren = lo.Map(cachedBlock.ShallowLikeChildren(), func(childBlock *blocks.Block) string {
 			return childBlock.ID().ToHex()
 		})
-		t.ConflictIDs = lo.Map(cachedBlock.ConflictIDs().ToSlice(), func(conflictID iotago.TransactionID) string {
-			return conflictID.ToHex()
+		t.SpendIDs = lo.Map(cachedBlock.SpendIDs().ToSlice(), func(spendID iotago.TransactionID) string {
+			return spendID.ToHex()
 		})
 	} else {
 		switch metadata.BlockState {
@@ -233,7 +233,7 @@ func getTransactionMetadata(c echo.Context) error {
 		return ierrors.Errorf("tx metadata not found: %s", txID.ToHex())
 	}
 
-	conflicts, _ := deps.Protocol.MainEngineInstance().Ledger.ConflictDAG().ConflictingConflicts(txID)
+	conflicts, _ := deps.Protocol.MainEngineInstance().Ledger.SpendDAG().ConflictingSpends(txID)
 
 	return httpserver.JSONResponse(c, http.StatusOK, NewTransactionMetadata(txMetadata, conflicts))
 }

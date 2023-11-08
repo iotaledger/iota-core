@@ -8,16 +8,16 @@ import (
 
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 func TestAll(t *testing.T, frameworkProvider func(*testing.T) *Framework) {
 	for testName, testCase := range map[string]func(*testing.T, *Framework){
-		"CreateConflict":                    CreateConflict,
-		"ExistingConflictJoinsConflictSets": ExistingConflictJoinsConflictSets,
+		"CreateConflict":                    CreateSpend,
+		"ExistingConflictJoinsConflictSets": ExistingConflictJoinsSpendSets,
 		"JoinConflictSetTwice":              JoinConflictSetTwice,
-		"UpdateConflictParents":             UpdateConflictParents,
+		"UpdateConflictParents":             UpdateSpendParents,
 		"LikedInstead":                      LikedInstead,
 		"CreateConflictWithoutMembers":      CreateConflictWithoutMembers,
 		"ConflictAcceptance":                ConflictAcceptance,
@@ -31,7 +31,7 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *Framework) {
 	}
 }
 
-func ExistingConflictJoinsConflictSets(t *testing.T, tf *Framework) {
+func ExistingConflictJoinsSpendSets(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}))
 	tf.Assert.ConflictSetMembers("resource1", "conflict1", "conflict2")
@@ -50,22 +50,22 @@ func ExistingConflictJoinsConflictSets(t *testing.T, tf *Framework) {
 	tf.Assert.LikedInstead([]string{"conflict3"}, "conflict1")
 }
 
-func UpdateConflictParents(t *testing.T, tf *Framework) {
+func UpdateSpendParents(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource2"}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource1", "resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict3", []string{"conflict1", "conflict2"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict3", []string{"conflict1", "conflict2"}, []string{}))
 	tf.Assert.Children("conflict1", "conflict3")
 	tf.Assert.Parents("conflict3", "conflict1", "conflict2")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2.5", []string{"conflict2.5"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict2.5", []string{"conflict1", "conflict2"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict2.5", []string{"conflict1", "conflict2"}, []string{}))
 	tf.Assert.Children("conflict1", "conflict2.5", "conflict3")
 	tf.Assert.Children("conflict2", "conflict2.5", "conflict3")
 	tf.Assert.Parents("conflict2.5", "conflict1", "conflict2")
 
-	require.NoError(t, tf.UpdateConflictParents("conflict3", []string{"conflict2.5"}, []string{"conflict1", "conflict2"}))
+	require.NoError(t, tf.UpdateSpendParents("conflict3", []string{"conflict2.5"}, []string{"conflict1", "conflict2"}))
 
 	tf.Assert.Children("conflict1", "conflict2.5")
 	tf.Assert.Children("conflict2", "conflict2.5")
@@ -74,16 +74,16 @@ func UpdateConflictParents(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("conflict2.5", "conflict1", "conflict2")
 }
 
-func CreateConflict(t *testing.T, tf *Framework) {
+func CreateSpend(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}))
 	tf.Assert.ConflictSetMembers("resource1", "conflict1", "conflict2")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict3", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict3", []string{"conflict1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict4", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict4", []string{"conflict1"}, []string{}))
 
 	tf.Assert.ConflictSetMembers("resource2", "conflict3", "conflict4")
 	tf.Assert.Children("conflict1", "conflict3", "conflict4")
@@ -142,10 +142,10 @@ func LikedInstead(t *testing.T, tf *Framework) {
 	tf.Assert.LikedInstead([]string{"conflict1", "conflict2"}, "conflict1")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict3", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict3", []string{"conflict1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict4", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict4", []string{"conflict1"}, []string{}))
 
 	require.NoError(t, tf.CastVotes("zero-weight", 1, "conflict4"))
 	tf.Assert.LikedInstead([]string{"conflict1", "conflict2", "conflict3", "conflict4"}, "conflict1", "conflict4")
@@ -164,10 +164,10 @@ func ConflictAcceptance(t *testing.T, tf *Framework) {
 	tf.Assert.ConflictSets("conflict2", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict3", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict3", []string{"conflict1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict4", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict4", []string{"conflict1"}, []string{}))
 
 	tf.Assert.ConflictSetMembers("resource2", "conflict3", "conflict4")
 	tf.Assert.Children("conflict1", "conflict3", "conflict4")
@@ -199,10 +199,10 @@ func CastVotes(t *testing.T, tf *Framework) {
 	tf.Assert.ConflictSets("conflict2", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict3", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict3", []string{"conflict1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict4", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict4", []string{"conflict1"}, []string{}))
 
 	tf.Assert.ConflictSetMembers("resource2", "conflict3", "conflict4")
 	tf.Assert.Children("conflict1", "conflict3", "conflict4")
@@ -235,10 +235,10 @@ func CastVotesVoteRank(t *testing.T, tf *Framework) {
 
 	// create nested conflicts
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict3", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict3", []string{"conflict1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict4", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict4", []string{"conflict1"}, []string{}))
 
 	tf.Assert.ConflictSetMembers("resource2", "conflict3", "conflict4")
 	tf.Assert.Children("conflict1", "conflict3", "conflict4")
@@ -288,10 +288,10 @@ func CastVotesAcceptance(t *testing.T, tf *Framework) {
 	tf.Assert.ConflictSets("conflict2", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict3", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict3", []string{"conflict1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict4", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict4", []string{"conflict1"}, []string{}))
 
 	tf.Assert.ConflictSetMembers("resource2", "conflict3", "conflict4")
 	tf.Assert.Children("conflict1", "conflict3", "conflict4")
@@ -311,19 +311,19 @@ func CastVotesAcceptance(t *testing.T, tf *Framework) {
 	tf.Assert.Rejected("conflict5")
 
 	// Evict conflict and try to add non-existing parent to a rejected conflict - update is ignored because the parent is evicted.
-	tf.EvictConflict("conflict2")
-	require.NoError(t, tf.UpdateConflictParents("conflict4", []string{"conflict2"}, []string{}))
-	parents, exists := tf.Instance.ConflictParents(tf.ConflictID("conflict4"))
+	tf.EvictSpend("conflict2")
+	require.NoError(t, tf.UpdateSpendParents("conflict4", []string{"conflict2"}, []string{}))
+	parents, exists := tf.Instance.SpendParents(tf.SpendID("conflict4"))
 	require.True(t, exists)
-	require.False(t, parents.Has(tf.ConflictID("conflict2")))
+	require.False(t, parents.Has(tf.SpendID("conflict2")))
 
 	// Try to update parents of evicted conflict.
-	require.ErrorIs(t, tf.UpdateConflictParents("conflict2", []string{"conflict1"}, []string{}), conflictdag.ErrEntityEvicted)
+	require.ErrorIs(t, tf.UpdateSpendParents("conflict2", []string{"conflict1"}, []string{}), spenddag.ErrEntityEvicted)
 }
 
 func JoinConflictSetTwice(t *testing.T, tf *Framework) {
 	var conflictCreatedEventCount, resourceAddedEventCount int
-	tf.Instance.Events().ConflictCreated.Hook(func(id iotago.TransactionID) {
+	tf.Instance.Events().SpendCreated.Hook(func(id iotago.TransactionID) {
 		conflictCreatedEventCount++
 	})
 
@@ -366,10 +366,10 @@ func EvictAcceptedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.ConflictSets("conflict2", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict3", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict3", []string{"conflict1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict4", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict4", []string{"conflict1"}, []string{}))
 
 	tf.Assert.ConflictSetMembers("resource2", "conflict3", "conflict4")
 	tf.Assert.Children("conflict1", "conflict3", "conflict4")
@@ -377,10 +377,10 @@ func EvictAcceptedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("conflict4", "conflict1")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict5", []string{"resource3"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict5", []string{"conflict2"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict5", []string{"conflict2"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict6", []string{"resource3"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict6", []string{"conflict2"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict6", []string{"conflict2"}, []string{}))
 
 	tf.Assert.ConflictSetMembers("resource3", "conflict5", "conflict6")
 	tf.Assert.Children("conflict2", "conflict5", "conflict6")
@@ -398,13 +398,13 @@ func EvictAcceptedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Rejected("conflict4")
 	tf.Assert.Pending("conflict5", "conflict6")
 
-	tf.EvictConflict("conflict2")
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict1"))))
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict2"))))
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict3"))))
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict4"))))
-	require.True(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict5"))))
-	require.True(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict6"))))
+	tf.EvictSpend("conflict2")
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict1"))))
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict2"))))
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict3"))))
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict4"))))
+	require.True(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict5"))))
+	require.True(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict6"))))
 
 	require.False(t, lo.Return2(tf.Instance.ConflictSetMembers(tf.ResourceID("resource1"))))
 	require.False(t, lo.Return2(tf.Instance.ConflictSetMembers(tf.ResourceID("resource2"))))
@@ -416,7 +416,7 @@ func EvictAcceptedConflict(t *testing.T, tf *Framework) {
 
 func EvictRejectedConflict(t *testing.T, tf *Framework) {
 	conflictEvictedEventCount := 0
-	tf.Instance.Events().ConflictEvicted.Hook(func(id iotago.TransactionID) {
+	tf.Instance.Events().SpendEvicted.Hook(func(id iotago.TransactionID) {
 		conflictEvictedEventCount++
 	})
 
@@ -432,10 +432,10 @@ func EvictRejectedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.ConflictSets("conflict2", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict3", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict3", []string{"conflict1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict4", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict4", []string{"conflict1"}, []string{}))
 
 	tf.Assert.ConflictSetMembers("resource2", "conflict3", "conflict4")
 	tf.Assert.Children("conflict1", "conflict3", "conflict4")
@@ -443,10 +443,10 @@ func EvictRejectedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("conflict4", "conflict1")
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict5", []string{"resource3"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict5", []string{"conflict2"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict5", []string{"conflict2"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict6", []string{"resource3"}))
-	require.NoError(t, tf.UpdateConflictParents("conflict6", []string{"conflict2"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict6", []string{"conflict2"}, []string{}))
 
 	tf.Assert.ConflictSetMembers("resource3", "conflict5", "conflict6")
 	tf.Assert.Children("conflict2", "conflict5", "conflict6")
@@ -464,16 +464,16 @@ func EvictRejectedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Rejected("conflict4")
 	tf.Assert.Pending("conflict5", "conflict6")
 
-	tf.EvictConflict("conflict1")
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict1"))))
-	require.True(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict2"))))
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict3"))))
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict4"))))
-	require.True(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict5"))))
-	require.True(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict6"))))
+	tf.EvictSpend("conflict1")
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict1"))))
+	require.True(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict2"))))
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict3"))))
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict4"))))
+	require.True(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict5"))))
+	require.True(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict6"))))
 	require.Equal(t, 3, conflictEvictedEventCount)
 
-	tf.EvictConflict("conflict1")
+	tf.EvictSpend("conflict1")
 	require.Equal(t, 3, conflictEvictedEventCount)
 
 	tf.Assert.ConflictSetMembers("resource1", "conflict2")
@@ -482,13 +482,13 @@ func EvictRejectedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("conflict5", "conflict2")
 	tf.Assert.Parents("conflict6", "conflict2")
 
-	tf.EvictConflict("conflict6")
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict1"))))
-	require.True(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict2"))))
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict3"))))
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict4"))))
-	require.True(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict5"))))
-	require.False(t, lo.Return2(tf.Instance.ConflictingConflicts(tf.ConflictID("conflict6"))))
+	tf.EvictSpend("conflict6")
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict1"))))
+	require.True(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict2"))))
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict3"))))
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict4"))))
+	require.True(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict5"))))
+	require.False(t, lo.Return2(tf.Instance.ConflictingSpends(tf.SpendID("conflict6"))))
 	require.Equal(t, 4, conflictEvictedEventCount)
 
 	tf.Assert.ConflictSetMembers("resource1", "conflict2")
@@ -498,9 +498,9 @@ func EvictRejectedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Children("conflict2", "conflict5")
 
 	// Try to add non-existing parent to a pending conflict - nothing happens.
-	require.NoError(t, tf.UpdateConflictParents("conflict5", []string{"conflict1"}, []string{}))
+	require.NoError(t, tf.UpdateSpendParents("conflict5", []string{"conflict1"}, []string{}))
 
-	parents, exists := tf.Instance.ConflictParents(tf.ConflictID("conflict5"))
+	parents, exists := tf.Instance.SpendParents(tf.SpendID("conflict5"))
 	require.True(t, exists)
-	require.False(t, parents.Has(tf.ConflictID("conflict1")))
+	require.False(t, parents.Has(tf.SpendID("conflict1")))
 }

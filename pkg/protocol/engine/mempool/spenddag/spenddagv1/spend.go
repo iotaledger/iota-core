@@ -1,4 +1,4 @@
-package conflictdagv1
+package spenddagv1
 
 import (
 	"bytes"
@@ -16,25 +16,25 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/core/weight"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 )
 
-// Conflict is a conflict that is part of a Conflict DAG.
-type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.VoteRankType[VoteRank]] struct {
+// Spend is a conflict that is part of a Spend DAG.
+type Spend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]] struct {
 	// ID is the identifier of the Conflict.
-	ID ConflictID
+	ID SpendID
 
 	// Parents is the set of parents of the Conflict.
-	Parents ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]
+	Parents ds.Set[*Spend[SpendID, ResourceID, VoteRank]]
 
 	// Children is the set of children of the Conflict.
-	Children ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]
+	Children ds.Set[*Spend[SpendID, ResourceID, VoteRank]]
 
 	// ConflictSets is the set of ConflictSets that the Conflict is part of.
-	ConflictSets ds.Set[*ConflictSet[ConflictID, ResourceID, VoteRank]]
+	ConflictSets ds.Set[*ConflictSet[SpendID, ResourceID, VoteRank]]
 
-	// ConflictingConflicts is the set of conflicts that directly conflict with the Conflict.
-	ConflictingConflicts *SortedConflicts[ConflictID, ResourceID, VoteRank]
+	// ConflictingSpends is the set of conflicts that directly conflict with the Conflict.
+	ConflictingSpends *SortedSpends[SpendID, ResourceID, VoteRank]
 
 	// Weight is the Weight of the Conflict.
 	Weight *weight.Weight
@@ -46,19 +46,19 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	AcceptanceStateUpdated *event.Event2[acceptance.State, acceptance.State]
 
 	// PreferredInsteadUpdated is triggered when the preferred instead value of the Conflict is updated.
-	PreferredInsteadUpdated *event.Event1[*Conflict[ConflictID, ResourceID, VoteRank]]
+	PreferredInsteadUpdated *event.Event1[*Spend[SpendID, ResourceID, VoteRank]]
 
 	// LikedInsteadAdded is triggered when a liked instead reference is added to the Conflict.
-	LikedInsteadAdded *event.Event1[*Conflict[ConflictID, ResourceID, VoteRank]]
+	LikedInsteadAdded *event.Event1[*Spend[SpendID, ResourceID, VoteRank]]
 
 	// LikedInsteadRemoved is triggered when a liked instead reference is removed from the Conflict.
-	LikedInsteadRemoved *event.Event1[*Conflict[ConflictID, ResourceID, VoteRank]]
+	LikedInsteadRemoved *event.Event1[*Spend[SpendID, ResourceID, VoteRank]]
 
 	// childUnhookMethods is a mapping of children to their unhook functions.
-	childUnhookMethods *shrinkingmap.ShrinkingMap[ConflictID, func()]
+	childUnhookMethods *shrinkingmap.ShrinkingMap[SpendID, func()]
 
 	// preferredInstead is the preferred instead value of the Conflict.
-	preferredInstead *Conflict[ConflictID, ResourceID, VoteRank]
+	preferredInstead *Spend[SpendID, ResourceID, VoteRank]
 
 	// evicted
 	evicted atomic.Bool
@@ -67,10 +67,10 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	preferredInsteadMutex syncutils.RWMutex
 
 	// likedInstead is the set of liked instead Conflicts.
-	likedInstead ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]
+	likedInstead ds.Set[*Spend[SpendID, ResourceID, VoteRank]]
 
 	// likedInsteadSources is a mapping of liked instead Conflicts to the set of parents that inherited them.
-	likedInsteadSources *shrinkingmap.ShrinkingMap[ConflictID, ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]]
+	likedInsteadSources *shrinkingmap.ShrinkingMap[SpendID, ds.Set[*Spend[SpendID, ResourceID, VoteRank]]]
 
 	// likedInsteadMutex and structureMutex are sometimes locked in different order by different goroutines, which could result in a deadlock
 	//  however, it's impossible to deadlock if we fork all transactions upon booking
@@ -89,24 +89,24 @@ type Conflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.Vo
 	unhookAcceptanceMonitoring func()
 }
 
-// NewConflict creates a new Conflict.
-func NewConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag.VoteRankType[VoteRank]](id ConflictID, initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Conflict[ConflictID, ResourceID, VoteRank] {
-	c := &Conflict[ConflictID, ResourceID, VoteRank]{
+// NewSpend creates a new Spend.
+func NewSpend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]](id SpendID, initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Spend[SpendID, ResourceID, VoteRank] {
+	c := &Spend[SpendID, ResourceID, VoteRank]{
 		ID:                      id,
-		Parents:                 ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]](),
-		Children:                ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]](),
-		ConflictSets:            ds.NewSet[*ConflictSet[ConflictID, ResourceID, VoteRank]](),
+		Parents:                 ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]](),
+		Children:                ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]](),
+		ConflictSets:            ds.NewSet[*ConflictSet[SpendID, ResourceID, VoteRank]](),
 		Weight:                  initialWeight,
 		LatestVotes:             shrinkingmap.New[account.SeatIndex, *vote.Vote[VoteRank]](),
 		AcceptanceStateUpdated:  event.New2[acceptance.State, acceptance.State](),
-		PreferredInsteadUpdated: event.New1[*Conflict[ConflictID, ResourceID, VoteRank]](),
-		LikedInsteadAdded:       event.New1[*Conflict[ConflictID, ResourceID, VoteRank]](),
-		LikedInsteadRemoved:     event.New1[*Conflict[ConflictID, ResourceID, VoteRank]](),
+		PreferredInsteadUpdated: event.New1[*Spend[SpendID, ResourceID, VoteRank]](),
+		LikedInsteadAdded:       event.New1[*Spend[SpendID, ResourceID, VoteRank]](),
+		LikedInsteadRemoved:     event.New1[*Spend[SpendID, ResourceID, VoteRank]](),
 
-		childUnhookMethods:  shrinkingmap.New[ConflictID, func()](),
+		childUnhookMethods:  shrinkingmap.New[SpendID, func()](),
 		acceptanceThreshold: acceptanceThresholdProvider,
-		likedInstead:        ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]](),
-		likedInsteadSources: shrinkingmap.New[ConflictID, ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]](),
+		likedInstead:        ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]](),
+		likedInsteadSources: shrinkingmap.New[SpendID, ds.Set[*Spend[SpendID, ResourceID, VoteRank]]](),
 	}
 
 	c.preferredInstead = c
@@ -122,27 +122,27 @@ func NewConflict[ConflictID, ResourceID conflictdag.IDType, VoteRank conflictdag
 		c.setAcceptanceState(acceptance.Accepted)
 	}
 
-	c.ConflictingConflicts = NewSortedConflicts(c, pendingTasksCounter)
+	c.ConflictingSpends = NewSortedSpends(c, pendingTasksCounter)
 
 	return c
 }
 
 // JoinConflictSets registers the Conflict with the given ConflictSets.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSets ds.Set[*ConflictSet[ConflictID, ResourceID, VoteRank]]) (joinedConflictSets ds.Set[ResourceID], err error) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) JoinSpendSets(conflictSets ds.Set[*ConflictSet[SpendID, ResourceID, VoteRank]]) (joinedConflictSets ds.Set[ResourceID], err error) {
 	if conflictSets == nil {
 		return ds.NewSet[ResourceID](), nil
 	}
 
 	if c.evicted.Load() {
-		return nil, ierrors.Errorf("tried to join conflict sets of evicted conflict: %w", conflictdag.ErrEntityEvicted)
+		return nil, ierrors.Errorf("tried to join conflict sets of evicted conflict: %w", spenddag.ErrEntityEvicted)
 	}
 
-	registerConflictingConflict := func(c, conflict *Conflict[ConflictID, ResourceID, VoteRank]) {
+	registerConflictingSpend := func(c, spend *Spend[SpendID, ResourceID, VoteRank]) {
 		c.structureMutex.Lock()
 		defer c.structureMutex.Unlock()
 
-		if c.ConflictingConflicts.Add(conflict) {
-			if conflict.IsAccepted() {
+		if c.ConflictingSpends.Add(spend) {
+			if spend.IsAccepted() {
 				c.setAcceptanceState(acceptance.Rejected)
 			}
 		}
@@ -150,17 +150,17 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSe
 
 	joinedConflictSets = ds.NewSet[ResourceID]()
 
-	return joinedConflictSets, conflictSets.ForEach(func(conflictSet *ConflictSet[ConflictID, ResourceID, VoteRank]) error {
+	return joinedConflictSets, conflictSets.ForEach(func(conflictSet *ConflictSet[SpendID, ResourceID, VoteRank]) error {
 		otherConflicts, err := conflictSet.Add(c)
-		if err != nil && !ierrors.Is(err, conflictdag.ErrAlreadyPartOfConflictSet) {
+		if err != nil && !ierrors.Is(err, spenddag.ErrAlreadyPartOfConflictSet) {
 			return err
 		}
 
 		if c.ConflictSets.Add(conflictSet) {
 			if otherConflicts != nil {
-				otherConflicts.Range(func(otherConflict *Conflict[ConflictID, ResourceID, VoteRank]) {
-					registerConflictingConflict(c, otherConflict)
-					registerConflictingConflict(otherConflict, c)
+				otherConflicts.Range(func(otherConflict *Spend[SpendID, ResourceID, VoteRank]) {
+					registerConflictingSpend(c, otherConflict)
+					registerConflictingSpend(otherConflict, c)
 				})
 
 				joinedConflictSets.Add(conflictSet.ID)
@@ -171,7 +171,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSe
 	})
 }
 
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) removeParent(parent *Conflict[ConflictID, ResourceID, VoteRank]) (removed bool) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) removeParent(parent *Spend[SpendID, ResourceID, VoteRank]) (removed bool) {
 	if removed = c.Parents.Delete(parent); removed {
 		parent.unregisterChild(c)
 	}
@@ -180,18 +180,18 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) removeParent(parent *Confli
 }
 
 // UpdateParents updates the parents of the Conflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) UpdateParents(addedParents, removedParents ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]) (updated bool) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) UpdateParents(addedParents, removedParents ds.Set[*Spend[SpendID, ResourceID, VoteRank]]) (updated bool) {
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
 	if removedParents != nil {
-		removedParents.Range(func(removedParent *Conflict[ConflictID, ResourceID, VoteRank]) {
+		removedParents.Range(func(removedParent *Spend[SpendID, ResourceID, VoteRank]) {
 			updated = c.removeParent(removedParent) || updated
 		})
 	}
 
 	if addedParents != nil {
-		addedParents.Range(func(addedParent *Conflict[ConflictID, ResourceID, VoteRank]) {
+		addedParents.Range(func(addedParent *Spend[SpendID, ResourceID, VoteRank]) {
 			if c.Parents.Add(addedParent) {
 				addedParent.registerChild(c)
 
@@ -203,7 +203,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) UpdateParents(addedParents,
 	return updated
 }
 
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) ApplyVote(vote *vote.Vote[VoteRank]) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) ApplyVote(vote *vote.Vote[VoteRank]) {
 	// abort if the conflict has already been accepted or rejected
 	if !c.Weight.AcceptanceState().IsPending() {
 		return
@@ -231,22 +231,22 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) ApplyVote(vote *vote.Vote[V
 }
 
 // IsPending returns true if the Conflict is pending.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) IsPending() bool {
+func (c *Spend[SpendID, ResourceID, VoteRank]) IsPending() bool {
 	return c.Weight.Value().AcceptanceState().IsPending()
 }
 
 // IsAccepted returns true if the Conflict is accepted.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) IsAccepted() bool {
+func (c *Spend[SpendID, ResourceID, VoteRank]) IsAccepted() bool {
 	return c.Weight.Value().AcceptanceState().IsAccepted()
 }
 
 // IsRejected returns true if the Conflict is rejected.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) IsRejected() bool {
+func (c *Spend[SpendID, ResourceID, VoteRank]) IsRejected() bool {
 	return c.Weight.Value().AcceptanceState().IsRejected()
 }
 
 // IsPreferred returns true if the Conflict is preferred instead of its conflicting Conflicts.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) IsPreferred() bool {
+func (c *Spend[SpendID, ResourceID, VoteRank]) IsPreferred() bool {
 	c.preferredInsteadMutex.RLock()
 	defer c.preferredInsteadMutex.RUnlock()
 
@@ -254,7 +254,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) IsPreferred() bool {
 }
 
 // PreferredInstead returns the preferred instead value of the Conflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) PreferredInstead() *Conflict[ConflictID, ResourceID, VoteRank] {
+func (c *Spend[SpendID, ResourceID, VoteRank]) PreferredInstead() *Spend[SpendID, ResourceID, VoteRank] {
 	c.preferredInsteadMutex.RLock()
 	defer c.preferredInsteadMutex.RUnlock()
 
@@ -262,7 +262,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) PreferredInstead() *Conflic
 }
 
 // IsLiked returns true if the Conflict is liked instead of other conflicting Conflicts.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) IsLiked() bool {
+func (c *Spend[SpendID, ResourceID, VoteRank]) IsLiked() bool {
 	c.likedInsteadMutex.RLock()
 	defer c.likedInsteadMutex.RUnlock()
 
@@ -270,7 +270,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) IsLiked() bool {
 }
 
 // LikedInstead returns the set of liked instead Conflicts.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) LikedInstead() ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]] {
+func (c *Spend[SpendID, ResourceID, VoteRank]) LikedInstead() ds.Set[*Spend[SpendID, ResourceID, VoteRank]] {
 	c.likedInsteadMutex.RLock()
 	defer c.likedInsteadMutex.RUnlock()
 
@@ -278,12 +278,12 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) LikedInstead() ds.Set[*Conf
 }
 
 // Shutdown shuts down the Conflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) Shutdown() {
-	c.ConflictingConflicts.Shutdown()
+func (c *Spend[SpendID, ResourceID, VoteRank]) Shutdown() {
+	c.ConflictingSpends.Shutdown()
 }
 
 // Evict cleans up the sortedConflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) Evict() (evictedConflicts []ConflictID) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) Evict() (evictedConflicts []SpendID) {
 	if firstEvictCall := !c.evicted.Swap(true); !firstEvictCall {
 		return nil
 	}
@@ -293,12 +293,12 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) Evict() (evictedConflicts [
 	switch c.Weight.AcceptanceState() {
 	case acceptance.Rejected:
 		// evict the entire future cone of rejected conflicts
-		c.Children.Range(func(childConflict *Conflict[ConflictID, ResourceID, VoteRank]) {
+		c.Children.Range(func(childConflict *Spend[SpendID, ResourceID, VoteRank]) {
 			evictedConflicts = append(evictedConflicts, childConflict.Evict()...)
 		})
 	default:
 		// remove evicted conflict from parents of children (merge to master)
-		c.Children.Range(func(childConflict *Conflict[ConflictID, ResourceID, VoteRank]) {
+		c.Children.Range(func(childConflict *Spend[SpendID, ResourceID, VoteRank]) {
 			childConflict.structureMutex.Lock()
 			defer childConflict.structureMutex.Unlock()
 
@@ -309,20 +309,20 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) Evict() (evictedConflicts [
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
-	c.Parents.Range(func(parentConflict *Conflict[ConflictID, ResourceID, VoteRank]) {
+	c.Parents.Range(func(parentConflict *Spend[SpendID, ResourceID, VoteRank]) {
 		parentConflict.unregisterChild(c)
 	})
 	c.Parents.Clear()
 
-	c.ConflictSets.Range(func(conflictSet *ConflictSet[ConflictID, ResourceID, VoteRank]) {
+	c.ConflictSets.Range(func(conflictSet *ConflictSet[SpendID, ResourceID, VoteRank]) {
 		conflictSet.Remove(c)
 	})
 	c.ConflictSets.Clear()
 
-	for _, conflict := range c.ConflictingConflicts.Shutdown() {
+	for _, conflict := range c.ConflictingSpends.Shutdown() {
 		if conflict != c {
-			conflict.ConflictingConflicts.Remove(c.ID)
-			c.ConflictingConflicts.Remove(conflict.ID)
+			conflict.ConflictingSpends.Remove(c.ID)
+			c.ConflictingSpends.Remove(conflict.ID)
 
 			if c.IsAccepted() {
 				evictedConflicts = append(evictedConflicts, conflict.Evict()...)
@@ -330,7 +330,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) Evict() (evictedConflicts [
 		}
 	}
 
-	c.ConflictingConflicts.Remove(c.ID)
+	c.ConflictingSpends.Remove(c.ID)
 
 	c.preferredInsteadMutex.Lock()
 	defer c.preferredInsteadMutex.Unlock()
@@ -346,7 +346,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) Evict() (evictedConflicts [
 }
 
 // Compare compares the Conflict to the given other Conflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) Compare(other *Conflict[ConflictID, ResourceID, VoteRank]) int {
+func (c *Spend[SpendID, ResourceID, VoteRank]) Compare(other *Spend[SpendID, ResourceID, VoteRank]) int {
 	// no need to lock a mutex here, because the Weight is already thread-safe
 
 	if c == other {
@@ -369,7 +369,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) Compare(other *Conflict[Con
 }
 
 // String returns a human-readable representation of the Conflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) String() string {
+func (c *Spend[SpendID, ResourceID, VoteRank]) String() string {
 	// no need to lock a mutex here, because the Weight is already thread-safe
 
 	return stringify.Struct("Conflict",
@@ -379,7 +379,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) String() string {
 }
 
 // registerChild registers the given child Conflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) registerChild(child *Conflict[ConflictID, ResourceID, VoteRank]) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) registerChild(child *Spend[SpendID, ResourceID, VoteRank]) {
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
@@ -395,11 +395,11 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) registerChild(child *Confli
 				}
 			}).Unhook,
 
-			c.LikedInsteadRemoved.Hook(func(reference *Conflict[ConflictID, ResourceID, VoteRank]) {
+			c.LikedInsteadRemoved.Hook(func(reference *Spend[SpendID, ResourceID, VoteRank]) {
 				child.removeInheritedLikedInsteadReference(c, reference)
 			}).Unhook,
 
-			c.LikedInsteadAdded.Hook(func(conflict *Conflict[ConflictID, ResourceID, VoteRank]) {
+			c.LikedInsteadAdded.Hook(func(conflict *Spend[SpendID, ResourceID, VoteRank]) {
 				child.structureMutex.Lock()
 				defer child.structureMutex.Unlock()
 
@@ -418,7 +418,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) registerChild(child *Confli
 }
 
 // unregisterChild unregisters the given child Conflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) unregisterChild(conflict *Conflict[ConflictID, ResourceID, VoteRank]) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) unregisterChild(conflict *Spend[SpendID, ResourceID, VoteRank]) {
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
@@ -432,12 +432,12 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) unregisterChild(conflict *C
 }
 
 // addInheritedLikedInsteadReference adds the given reference as a liked instead reference from the given source.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) addInheritedLikedInsteadReference(source, reference *Conflict[ConflictID, ResourceID, VoteRank]) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) addInheritedLikedInsteadReference(source, reference *Spend[SpendID, ResourceID, VoteRank]) {
 	c.likedInsteadMutex.Lock()
 	defer c.likedInsteadMutex.Unlock()
 
 	// abort if the source already added the reference or if the source already existed
-	if sources := lo.Return1(c.likedInsteadSources.GetOrCreate(reference.ID, lo.NoVariadic(ds.NewSet[*Conflict[ConflictID, ResourceID, VoteRank]]))); !sources.Add(source) || !c.likedInstead.Add(reference) {
+	if sources := lo.Return1(c.likedInsteadSources.GetOrCreate(reference.ID, lo.NoVariadic(ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]]))); !sources.Add(source) || !c.likedInstead.Add(reference) {
 		return
 	}
 
@@ -451,7 +451,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) addInheritedLikedInsteadRef
 }
 
 // removeInheritedLikedInsteadReference removes the given reference as a liked instead reference from the given source.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) removeInheritedLikedInsteadReference(source, reference *Conflict[ConflictID, ResourceID, VoteRank]) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) removeInheritedLikedInsteadReference(source, reference *Spend[SpendID, ResourceID, VoteRank]) {
 	c.likedInsteadMutex.Lock()
 	defer c.likedInsteadMutex.Unlock()
 
@@ -473,7 +473,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) removeInheritedLikedInstead
 }
 
 // setPreferredInstead sets the preferred instead value of the Conflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) setPreferredInstead(preferredInstead *Conflict[ConflictID, ResourceID, VoteRank]) (previousPreferredInstead *Conflict[ConflictID, ResourceID, VoteRank]) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) setPreferredInstead(preferredInstead *Spend[SpendID, ResourceID, VoteRank]) (previousPreferredInstead *Spend[SpendID, ResourceID, VoteRank]) {
 	c.likedInsteadMutex.Lock()
 	defer c.likedInsteadMutex.Unlock()
 
@@ -506,14 +506,14 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) setPreferredInstead(preferr
 
 // setAcceptanceState sets the acceptance state of the Conflict and returns the previous acceptance state (it triggers
 // an AcceptanceStateUpdated event if the acceptance state was updated).
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) setAcceptanceState(newState acceptance.State) (previousState acceptance.State) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) setAcceptanceState(newState acceptance.State) (previousState acceptance.State) {
 	if previousState = c.Weight.SetAcceptanceState(newState); previousState == newState {
 		return previousState
 	}
 
 	// propagate acceptance to parents first
 	if newState.IsAccepted() {
-		c.Parents.Range(func(parent *Conflict[ConflictID, ResourceID, VoteRank]) {
+		c.Parents.Range(func(parent *Spend[SpendID, ResourceID, VoteRank]) {
 			parent.setAcceptanceState(acceptance.Accepted)
 		})
 	}

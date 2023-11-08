@@ -155,7 +155,7 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
 			wallet.Transaction("tx1"): {"tx1"},
 		}, ts.Nodes()...)
-		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1"}, acceptance.Accepted, ts.Nodes()...)
+		ts.AssertSpendsInCacheAcceptanceState([]string{"tx1"}, acceptance.Accepted, ts.Nodes()...)
 	}
 
 	// Create a transaction that is included and whose conflict is accepted, but whose inputs are not accepted.
@@ -191,7 +191,7 @@ func Test_MultipleAttachments(t *testing.T) {
 			wallet.Transaction("tx1"): {"tx1"},
 			wallet.Transaction("tx2"): {"tx2"},
 		}, nodeA, nodeB)
-		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, ts.Nodes()...)
+		ts.AssertSpendsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, ts.Nodes()...)
 	}
 
 	// Issue a block that includes tx1, and make sure that tx2 is accepted as well as a consequence.
@@ -221,7 +221,7 @@ func Test_MultipleAttachments(t *testing.T) {
 			wallet.Transaction("tx1"): {"tx1"},
 			wallet.Transaction("tx2"): {"tx2"},
 		}, nodeA, nodeB)
-		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, nodeA, nodeB)
+		ts.AssertSpendsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, nodeA, nodeB)
 	}
 }
 

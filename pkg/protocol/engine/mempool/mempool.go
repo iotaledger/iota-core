@@ -2,11 +2,11 @@ package mempool
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] interface {
+type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] interface {
 	AttachSignedTransaction(signedTransaction SignedTransaction, transaction Transaction, blockID iotago.BlockID) (signedTransactionMetadata SignedTransactionMetadata, err error)
 
 	OnSignedTransactionAttached(callback func(signedTransactionMetadata SignedTransactionMetadata), opts ...event.Option)

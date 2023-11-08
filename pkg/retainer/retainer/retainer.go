@@ -87,8 +87,8 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			r.RetainBlockFailure(b.ID(), apimodels.BlockFailureDroppedDueToCongestion)
 		})
 
-		e.Events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
-			txMetadata, exist := e.Ledger.MemPool().TransactionMetadata(conflictID)
+		e.Events.SpendDAG.SpendRejected.Hook(func(spendID iotago.TransactionID) {
+			txMetadata, exist := e.Ledger.MemPool().TransactionMetadata(spendID)
 			if !exist {
 				return
 			}
