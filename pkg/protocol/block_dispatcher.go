@@ -249,7 +249,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		iotago.TransactionID.Bytes,
 		iotago.TransactionIDFromBytes,
 	)
-	
+
 	for _, transactionID := range transactionIDs {
 		_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
 	}
