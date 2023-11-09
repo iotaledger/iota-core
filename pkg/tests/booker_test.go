@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -251,9 +250,6 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	wallet := ts.AddGenesisWallet("default", node1)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
-
-	node1.Protocol.SetLogLevel(log.LevelTrace)
-	//node2.Protocol.SetLogLevel(log.LevelTrace)
 
 	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
 		node1.Validator.AccountID,

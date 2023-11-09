@@ -25,7 +25,7 @@ func inxCommitment(commitment *model.Commitment) *inx.Commitment {
 
 func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_ListenToCommitmentsServer) error {
 	createCommitmentPayloadForSlotAndSend := func(slot iotago.SlotIndex) error {
-		commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
+		commitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
 		if err != nil {
 			if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 				return status.Errorf(codes.NotFound, "commitment slot %d not found", slot)
@@ -60,7 +60,7 @@ func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_List
 			return 0, nil
 		}
 
-		latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+		latestCommitment := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 
 		if startSlot > latestCommitment.Slot() {
 			// no need to send previous commitments
@@ -68,7 +68,7 @@ func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_List
 		}
 
 		// Stream all available commitments first
-		prunedEpoch, hasPruned := deps.Protocol.MainEngineInstance().SyncManager.LastPrunedEpoch()
+		prunedEpoch, hasPruned := deps.Protocol.Engines.Main.Get().SyncManager.LastPrunedEpoch()
 		if hasPruned && startSlot <= deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(prunedEpoch) {
 			return 0, status.Errorf(codes.InvalidArgument, "given startSlot %d is older than the current pruningSlot %d", startSlot, deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(prunedEpoch))
 		}

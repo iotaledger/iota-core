@@ -210,7 +210,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				}
 			}
 
-			for _, blockIDs := range blockIDsBySlotCommitment {
+			for slotCommitmentID, blockIDs := range blockIDsBySlotCommitment {
 				for _, blockID := range blockIDs {
 					w.LogError("requesting block", "blockID", blockID)
 
@@ -224,7 +224,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 					// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
 					// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
 					// block cache and thus if not root blocks no block in the next slot can become solid.
-					targetEngine.EvictionState.AddRootBlock(block.ID(), block.SlotCommitmentID())
+					targetEngine.EvictionState.AddRootBlock(block.ID(), slotCommitmentID)
 
 					block.Booked().OnUpdate(blockBookedFunc)
 				}

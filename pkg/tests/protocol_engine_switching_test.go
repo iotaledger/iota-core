@@ -9,7 +9,6 @@ import (
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -108,16 +107,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}
 
 	ts.Run(false, nodeOptions)
-
-	node0.Protocol.SetLogLevel(log.LevelTrace)
-	node1.Protocol.SetLogLevel(log.LevelTrace)
-	node2.Protocol.SetLogLevel(log.LevelTrace)
-	node3.Protocol.SetLogLevel(log.LevelTrace)
-	node4.Protocol.SetLogLevel(log.LevelTrace)
-	node5.Protocol.SetLogLevel(log.LevelTrace)
-	node6.Protocol.SetLogLevel(log.LevelTrace)
-	node7.Protocol.SetLogLevel(log.LevelTrace)
-	node8.Protocol.SetLogLevel(log.LevelTrace)
 
 	expectedCommittee := []iotago.AccountID{
 		node0.Validator.AccountID,

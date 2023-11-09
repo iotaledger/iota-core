@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -36,9 +37,10 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	node0 := ts.AddValidatorNode("node0")
 	ts.AddGenesisWallet("default", node0)
 	ts.AddValidatorNode("node1")
-	ts.AddNode("node2")
+	node2 := ts.AddNode("node2")
 
 	ts.Run(true, nil)
+	node2.Protocol.SetLogLevel(log.LevelTrace)
 
 	// Create snapshot to use later.
 	snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
@@ -81,6 +83,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 			protocol.WithSnapshotPath(snapshotPath),
 			protocol.WithBaseDirectory(ts.Directory.PathWithCreate(node3.Name)),
 		)
+		node3.Protocol.SetLogLevel(log.LevelTrace)
 		ts.Wait()
 	}
 

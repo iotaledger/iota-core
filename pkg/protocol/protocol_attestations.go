@@ -183,9 +183,13 @@ func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, 
 			return
 		}
 
-		roots, err := rootsStorage.Load(commitmentID)
+		roots, exists, err := rootsStorage.Load(commitmentID)
 		if err != nil {
-			a.LogError("failed to load roots for requested attestations", "commitment", commitment.LogName(), "fromPeer", from)
+			a.LogError("failed to load roots for requested attestations", "commitment", commitment.LogName(), "err", err, "fromPeer", from)
+
+			return
+		} else if !exists {
+			a.LogTrace("roots not found for requested attestations", "commitment", commitment.LogName(), "fromPeer", from)
 
 			return
 		}

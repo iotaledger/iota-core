@@ -125,7 +125,7 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 }
 
 func (s *Server) ReadAcceptedBlocks(slot *inx.SlotIndex, srv inx.INX_ReadAcceptedBlocksServer) error {
-	blocksStore, err := deps.Protocol.MainEngineInstance().Storage.Blocks(slot.Unwrap())
+	blocksStore, err := deps.Protocol.Engines.Main.Get().Storage.Blocks(slot.Unwrap())
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "failed to get blocks: %s", err.Error())
 	}

@@ -122,7 +122,6 @@ func Test_BookInCommittedSlot(t *testing.T) {
 
 func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		//testsuite.WithLogHandler(log.NewTextHandler(logFile)),
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
 				0,
