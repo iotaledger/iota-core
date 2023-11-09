@@ -60,7 +60,7 @@ func (f *Framework) CreateOrUpdateConflict(alias string, resourceAliases []strin
 }
 
 // UpdateConflictParents updates the parents of the conflict with the given alias.
-func (f *Framework) UpdateSpendParents(conflictAlias string, addedParentIDs, removedParentIDs []string) error {
+func (f *Framework) UpdateSpendParents(conflictAlias string, addedParentIDs []string, removedParentIDs []string) error {
 	return f.Instance.UpdateSpendParents(f.SpendID(conflictAlias), f.SpendIDs(addedParentIDs...), f.SpendIDs(removedParentIDs...))
 }
 

@@ -87,7 +87,7 @@ func (t *TipSelection) Construct(tipManager tipmanager.TipManager, conflictDAG s
 
 	t.TriggerConstructed()
 
-	t.acceptanceTime.OnUpdate(func(_, acceptanceTime time.Time) {
+	t.acceptanceTime.OnUpdate(func(_ time.Time, acceptanceTime time.Time) {
 		t.triggerLivenessThreshold(acceptanceTime)
 	})
 
@@ -123,7 +123,7 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 			rootBlocks := t.rootBlocks()
 
 			// Sort the rootBlocks in descending order according to their slot.
-			slices.SortFunc(rootBlocks, func(i, j iotago.BlockID) int {
+			slices.SortFunc(rootBlocks, func(i iotago.BlockID, j iotago.BlockID) int {
 				if i.Slot() == j.Slot() {
 					return 0
 				} else if i.Slot() < j.Slot() {

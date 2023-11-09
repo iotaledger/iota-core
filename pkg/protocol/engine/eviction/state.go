@@ -258,7 +258,7 @@ func (s *State) Import(reader io.ReadSeeker) error {
 	return nil
 }
 
-func (s *State) Rollback(lowerTarget, targetIndex iotago.SlotIndex) error {
+func (s *State) Rollback(lowerTarget iotago.SlotIndex, targetIndex iotago.SlotIndex) error {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
@@ -313,7 +313,7 @@ func (s *State) setLatestNonEmptySlot(slot iotago.SlotIndex) {
 	}
 }
 
-func (s *State) activeIndexRange() (startSlot, endSlot iotago.SlotIndex) {
+func (s *State) activeIndexRange() (startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) {
 	lastCommittedSlot := s.lastEvictedSlot
 	delayedSlot, valid := s.delayedBlockEvictionThreshold(lastCommittedSlot)
 

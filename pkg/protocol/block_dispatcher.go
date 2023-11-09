@@ -311,7 +311,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		}
 	}
 
-	blockBookedFunc := func(_, _ bool) {
+	blockBookedFunc := func(_ bool, _ bool) {
 		if bookedBlocks.Add(1) != totalBlocks {
 			return
 		}
@@ -330,7 +330,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 			targetEngine.BlockGadget.SetAccepted(block)
 
-			block.Notarized().OnUpdate(func(_, _ bool) {
+			block.Notarized().OnUpdate(func(_ bool, _ bool) {
 				// Wait for all blocks to be notarized before forcing the commitment of the slot.
 				if notarizedBlocks.Add(1) != totalBlocks {
 					return

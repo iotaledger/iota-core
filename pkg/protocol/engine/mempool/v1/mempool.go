@@ -238,7 +238,7 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 	}
 }
 
-func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTransaction, transaction mempool.Transaction, blockID iotago.BlockID) (storedSignedTransaction *SignedTransactionMetadata, isNewSignedTransaction, isNewTransaction bool, err error) {
+func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTransaction, transaction mempool.Transaction, blockID iotago.BlockID) (storedSignedTransaction *SignedTransactionMetadata, isNewSignedTransaction bool, isNewTransaction bool, err error) {
 	m.evictionMutex.RLock()
 	defer m.evictionMutex.RUnlock()
 
@@ -294,7 +294,7 @@ func (m *MemPool[VoteRank]) solidifyInputs(transaction *TransactionMetadata) {
 			}
 
 			if transaction.markInputSolid() {
-				transaction.executionContext.OnUpdate(func(_, executionContext context.Context) {
+				transaction.executionContext.OnUpdate(func(_ context.Context, executionContext context.Context) {
 					m.executeTransaction(executionContext, transaction)
 				})
 			}
@@ -464,7 +464,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 		})
 	})
 
-	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
+	transaction.OnEarliestIncludedAttachmentUpdated(func(prevBlock iotago.BlockID, newBlock iotago.BlockID) {
 		if err := m.updateStateDiffs(transaction, prevBlock.Slot(), newBlock.Slot()); err != nil {
 			m.errorHandler(ierrors.Wrap(err, "failed to update state diffs"))
 		}

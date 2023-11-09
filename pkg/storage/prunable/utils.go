@@ -41,7 +41,7 @@ func getSortedDBInstancesFromDisk(baseDir string) (dbInfos []*dbInstanceFileInfo
 	})
 	dbInfos = lo.Filter(dbInfos, func(info *dbInstanceFileInfo) bool { return info != nil })
 
-	sort.Slice(dbInfos, func(i, j int) bool {
+	sort.Slice(dbInfos, func(i int, j int) bool {
 		return dbInfos[i].baseEpoch < dbInfos[j].baseEpoch
 	})
 

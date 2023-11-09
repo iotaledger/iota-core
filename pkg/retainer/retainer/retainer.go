@@ -121,7 +121,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 						}
 					})
 
-					transactionMetadata.OnEarliestIncludedAttachmentUpdated(func(prevBlock, newBlock iotago.BlockID) {
+					transactionMetadata.OnEarliestIncludedAttachmentUpdated(func(prevBlock iotago.BlockID, newBlock iotago.BlockID) {
 						// if prevBlock is genesis, we do not need to update anything, bc the tx is included in the block we attached to at start.
 						if prevBlock.Slot() == 0 {
 							return
@@ -306,7 +306,7 @@ func (r *Retainer) onTransactionAccepted(blockID iotago.BlockID) error {
 	return store.StoreTransactionNoFailureStatus(blockID, apimodels.TransactionStateAccepted)
 }
 
-func (r *Retainer) onAttachmentUpdated(prevID, newID iotago.BlockID, accepted bool) error {
+func (r *Retainer) onAttachmentUpdated(prevID iotago.BlockID, newID iotago.BlockID, accepted bool) error {
 	store, err := r.store(prevID.Slot())
 	if err != nil {
 		return ierrors.Wrapf(err, "could not get retainer store for slot %d", prevID.Slot())

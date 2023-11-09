@@ -83,7 +83,7 @@ func (s *StateMetadata) AcceptedSpender() (mempool.TransactionMetadata, bool) {
 }
 
 func (s *StateMetadata) OnAcceptedSpenderUpdated(callback func(spender mempool.TransactionMetadata)) {
-	s.spendAccepted.OnUpdate(func(prevValue, newValue *TransactionMetadata) {
+	s.spendAccepted.OnUpdate(func(prevValue *TransactionMetadata, newValue *TransactionMetadata) {
 		if prevValue != newValue {
 			callback(newValue)
 		}
@@ -91,7 +91,7 @@ func (s *StateMetadata) OnAcceptedSpenderUpdated(callback func(spender mempool.T
 }
 
 func (s *StateMetadata) OnSpendCommitted(callback func(spender mempool.TransactionMetadata)) {
-	s.spendCommitted.OnUpdate(func(prevValue, newValue *TransactionMetadata) {
+	s.spendCommitted.OnUpdate(func(prevValue *TransactionMetadata, newValue *TransactionMetadata) {
 		if prevValue != newValue {
 			callback(newValue)
 		}

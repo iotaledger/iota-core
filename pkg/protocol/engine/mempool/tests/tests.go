@@ -454,7 +454,7 @@ func TestStoreAttachmentInEvictedSlot(t *testing.T, tf *TestFramework) {
 }
 
 func TestMemoryRelease(t *testing.T, tf *TestFramework) {
-	issueTransactions := func(startIndex, transactionCount int, prevStateAlias string) (int, string) {
+	issueTransactions := func(startIndex int, transactionCount int, prevStateAlias string) (int, string) {
 		index := startIndex
 		for ; index < startIndex+transactionCount; index++ {
 			signedTxAlias := fmt.Sprintf("tx%d-signed", index)

@@ -137,7 +137,7 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) JoinSpendSets(conflictSets ds.Set
 		return nil, ierrors.Errorf("tried to join conflict sets of evicted conflict: %w", spenddag.ErrEntityEvicted)
 	}
 
-	registerConflictingSpend := func(c, spend *Spend[SpendID, ResourceID, VoteRank]) {
+	registerConflictingSpend := func(c *Spend[SpendID, ResourceID, VoteRank], spend *Spend[SpendID, ResourceID, VoteRank]) {
 		c.structureMutex.Lock()
 		defer c.structureMutex.Unlock()
 
@@ -180,7 +180,7 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) removeParent(parent *Spend[SpendI
 }
 
 // UpdateParents updates the parents of the Conflict.
-func (c *Spend[SpendID, ResourceID, VoteRank]) UpdateParents(addedParents, removedParents ds.Set[*Spend[SpendID, ResourceID, VoteRank]]) (updated bool) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) UpdateParents(addedParents ds.Set[*Spend[SpendID, ResourceID, VoteRank]], removedParents ds.Set[*Spend[SpendID, ResourceID, VoteRank]]) (updated bool) {
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
@@ -389,7 +389,7 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) registerChild(child *Spend[SpendI
 		defer c.likedInsteadMutex.Unlock()
 
 		c.childUnhookMethods.Set(child.ID, lo.Batch(
-			c.AcceptanceStateUpdated.Hook(func(_, newState acceptance.State) {
+			c.AcceptanceStateUpdated.Hook(func(_ acceptance.State, newState acceptance.State) {
 				if newState.IsRejected() {
 					child.setAcceptanceState(newState)
 				}
@@ -432,7 +432,7 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) unregisterChild(conflict *Spend[S
 }
 
 // addInheritedLikedInsteadReference adds the given reference as a liked instead reference from the given source.
-func (c *Spend[SpendID, ResourceID, VoteRank]) addInheritedLikedInsteadReference(source, reference *Spend[SpendID, ResourceID, VoteRank]) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) addInheritedLikedInsteadReference(source *Spend[SpendID, ResourceID, VoteRank], reference *Spend[SpendID, ResourceID, VoteRank]) {
 	c.likedInsteadMutex.Lock()
 	defer c.likedInsteadMutex.Unlock()
 
@@ -451,7 +451,7 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) addInheritedLikedInsteadReference
 }
 
 // removeInheritedLikedInsteadReference removes the given reference as a liked instead reference from the given source.
-func (c *Spend[SpendID, ResourceID, VoteRank]) removeInheritedLikedInsteadReference(source, reference *Spend[SpendID, ResourceID, VoteRank]) {
+func (c *Spend[SpendID, ResourceID, VoteRank]) removeInheritedLikedInsteadReference(source *Spend[SpendID, ResourceID, VoteRank], reference *Spend[SpendID, ResourceID, VoteRank]) {
 	c.likedInsteadMutex.Lock()
 	defer c.likedInsteadMutex.Unlock()
 

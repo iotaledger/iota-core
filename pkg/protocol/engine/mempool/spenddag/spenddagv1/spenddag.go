@@ -86,7 +86,7 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) CreateSpend(id SpendID) {
 
 			// attach to the acceptance state updated event and propagate that event to the outside.
 			// also need to remember the unhook method to properly evict the spend.
-			c.spendUnhooks.Set(id, newSpend.AcceptanceStateUpdated.Hook(func(oldState, newState acceptance.State) {
+			c.spendUnhooks.Set(id, newSpend.AcceptanceStateUpdated.Hook(func(_ acceptance.State, newState acceptance.State) {
 				if newState.IsAccepted() {
 					c.events.SpendAccepted.Trigger(newSpend.ID)
 					return
@@ -140,7 +140,7 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) ReadConsistent(callback func(s
 }
 
 // UpdateSpendParents updates the parents of the given Spend and returns an error if the operation failed.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UpdateSpendParents(spendID SpendID, addedParentIDs, removedParentIDs ds.Set[SpendID]) error {
+func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UpdateSpendParents(spendID SpendID, addedParentIDs ds.Set[SpendID], removedParentIDs ds.Set[SpendID]) error {
 	newParents := ds.NewSet[SpendID]()
 
 	updated, err := func() (bool, error) {
@@ -449,7 +449,7 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) conflictSets(resourceIDs ds.Se
 }
 
 // determineVotes determines the Spends that are supported and revoked by the given SpendIDs.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) determineVotes(spendIDs ds.Set[SpendID]) (supportedSpends, revokedSpends ds.Set[*Spend[SpendID, ResourceID, VoteRank]], err error) {
+func (c *SpendDAG[SpendID, ResourceID, VoteRank]) determineVotes(spendIDs ds.Set[SpendID]) (supportedSpends ds.Set[*Spend[SpendID, ResourceID, VoteRank]], revokedSpends ds.Set[*Spend[SpendID, ResourceID, VoteRank]], err error) {
 	supportedSpends = ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]]()
 	revokedSpends = ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]]()
 
@@ -498,7 +498,7 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) conflictSetFactory(resourceID 
 	return func() *ConflictSet[SpendID, ResourceID, VoteRank] {
 		conflictSet := NewConflictSet[SpendID, ResourceID, VoteRank](resourceID)
 
-		conflictSet.OnAllMembersEvicted(func(prevValue, newValue bool) {
+		conflictSet.OnAllMembersEvicted(func(prevValue bool, newValue bool) {
 			if newValue && !prevValue {
 				c.conflictSetsByID.Delete(conflictSet.ID)
 			}

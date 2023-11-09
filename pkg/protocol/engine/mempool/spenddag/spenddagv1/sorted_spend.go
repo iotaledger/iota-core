@@ -119,7 +119,7 @@ func (s *sortedSpend[SpendID, ResourceID, VoteRank]) Unhook() {
 	}
 }
 
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) onAcceptanceStateUpdated(_, newState acceptance.State) {
+func (s *sortedSpend[SpendID, ResourceID, VoteRank]) onAcceptanceStateUpdated(_ acceptance.State, newState acceptance.State) {
 	if newState.IsAccepted() {
 		s.sortedSet.owner.setAcceptanceState(acceptance.Rejected)
 	}

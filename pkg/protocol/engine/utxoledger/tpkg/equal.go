@@ -57,13 +57,13 @@ func EqualOutputs(t *testing.T, expected utxoledger.Outputs, actual utxoledger.O
 	require.Equal(t, len(expected), len(actual))
 
 	// Sort Outputs by output ID.
-	sort.Slice(expected, func(i, j int) bool {
+	sort.Slice(expected, func(i int, j int) bool {
 		iOutputID := expected[i].OutputID()
 		jOutputID := expected[j].OutputID()
 
 		return bytes.Compare(iOutputID[:], jOutputID[:]) == -1
 	})
-	sort.Slice(actual, func(i, j int) bool {
+	sort.Slice(actual, func(i int, j int) bool {
 		iOutputID := actual[i].OutputID()
 		jOutputID := actual[j].OutputID()
 
@@ -79,13 +79,13 @@ func EqualSpents(t *testing.T, expected utxoledger.Spents, actual utxoledger.Spe
 	require.Equal(t, len(expected), len(actual))
 
 	// Sort Spents by output ID.
-	sort.Slice(expected, func(i, j int) bool {
+	sort.Slice(expected, func(i int, j int) bool {
 		iOutputID := expected[i].OutputID()
 		jOutputID := expected[j].OutputID()
 
 		return bytes.Compare(iOutputID[:], jOutputID[:]) == -1
 	})
-	sort.Slice(actual, func(i, j int) bool {
+	sort.Slice(actual, func(i int, j int) bool {
 		iOutputID := actual[i].OutputID()
 		jOutputID := actual[j].OutputID()
 

@@ -370,7 +370,7 @@ func (s *SortedSpends[SpendID, ResourceID, VoteRank]) findLowerHeaviestPreferred
 }
 
 // swapNeighbors swaps the given members in the SortedSpends.
-func (s *SortedSpends[SpendID, ResourceID, VoteRank]) swapNeighbors(heavierMember, lighterMember *sortedSpend[SpendID, ResourceID, VoteRank]) {
+func (s *SortedSpends[SpendID, ResourceID, VoteRank]) swapNeighbors(heavierMember *sortedSpend[SpendID, ResourceID, VoteRank], lighterMember *sortedSpend[SpendID, ResourceID, VoteRank]) {
 	if heavierMember.lighterMember != nil {
 		heavierMember.lighterMember.heavierMember = lighterMember
 	}
