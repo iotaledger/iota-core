@@ -15,11 +15,11 @@ import (
 )
 
 type Chains struct {
-	MainChain             reactive.Variable[*Chain]
-	HeaviestChain         reactive.Variable[*Chain]
-	HeaviestAttestedChain reactive.Variable[*Chain]
-	HeaviestVerifiedChain reactive.Variable[*Chain]
-	CommitmentCreated     *event.Event1[*Commitment]
+	Main              reactive.Variable[*Chain]
+	Heaviest          reactive.Variable[*Chain]
+	HeaviestAttested  reactive.Variable[*Chain]
+	HeaviestVerified  reactive.Variable[*Chain]
+	CommitmentCreated *event.Event1[*Commitment]
 
 	protocol    *Protocol
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
@@ -30,24 +30,24 @@ type Chains struct {
 
 func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
-		protocol:              protocol,
-		EvictionState:         reactive.NewEvictionState[iotago.SlotIndex](),
-		Set:                   reactive.NewSet[*Chain](),
-		MainChain:             reactive.NewVariable[*Chain](),
-		HeaviestChain:         reactive.NewVariable[*Chain](),
-		HeaviestAttestedChain: reactive.NewVariable[*Chain](),
-		HeaviestVerifiedChain: reactive.NewVariable[*Chain](),
-		commitments:           shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
-		CommitmentCreated:     event.New1[*Commitment](),
+		protocol:          protocol,
+		EvictionState:     reactive.NewEvictionState[iotago.SlotIndex](),
+		Set:               reactive.NewSet[*Chain](),
+		Main:              reactive.NewVariable[*Chain](),
+		Heaviest:          reactive.NewVariable[*Chain](),
+		HeaviestAttested:  reactive.NewVariable[*Chain](),
+		HeaviestVerified:  reactive.NewVariable[*Chain](),
+		commitments:       shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
+		CommitmentCreated: event.New1[*Commitment](),
 	}
 
-	c.HeaviestChain.LogUpdates(c.protocol, log.LevelTrace, "Unchecked Heavier Chain", (*Chain).LogName)
-	c.HeaviestAttestedChain.LogUpdates(c.protocol, log.LevelTrace, "Attested Heavier Chain", (*Chain).LogName)
+	c.Heaviest.LogUpdates(c.protocol, log.LevelTrace, "Unchecked Heavier Chain", (*Chain).LogName)
+	c.HeaviestAttested.LogUpdates(c.protocol, log.LevelTrace, "Attested Heavier Chain", (*Chain).LogName)
 
 	protocol.Constructed.OnTrigger(func() {
 		trackHeaviestChain := func(chainVariable reactive.Variable[*Chain], getWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
 			return getWeightVariable(candidate).OnUpdate(func(_ uint64, newChainWeight uint64) {
-				if heaviestChain := c.HeaviestVerifiedChain.Get(); heaviestChain != nil && newChainWeight < heaviestChain.VerifiedWeight.Get() {
+				if heaviestChain := c.HeaviestVerified.Get(); heaviestChain != nil && newChainWeight < heaviestChain.VerifiedWeight.Get() {
 					return
 				}
 
@@ -64,9 +64,9 @@ func newChains(protocol *Protocol) *Chains {
 		c.OnChainCreated(func(chain *Chain) {
 			c.publishEngineCommitments(chain)
 
-			trackHeaviestChain(c.HeaviestVerifiedChain, (*Chain).verifiedWeight, chain)
-			trackHeaviestChain(c.HeaviestAttestedChain, (*Chain).attestedWeight, chain)
-			trackHeaviestChain(c.HeaviestChain, (*Chain).claimedWeight, chain)
+			trackHeaviestChain(c.HeaviestVerified, (*Chain).verifiedWeight, chain)
+			trackHeaviestChain(c.HeaviestAttested, (*Chain).attestedWeight, chain)
+			trackHeaviestChain(c.Heaviest, (*Chain).claimedWeight, chain)
 		})
 
 		c.initChainSwitching()
@@ -130,7 +130,7 @@ func (c *Chains) initMainChain() {
 	mainChain.VerifyState.Set(true)
 	mainChain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
-	c.MainChain.Set(mainChain)
+	c.Main.Set(mainChain)
 	c.Add(mainChain)
 }
 
@@ -153,7 +153,7 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 }
 
 func (c *Chains) initChainSwitching() {
-	c.HeaviestChain.OnUpdate(func(prevHeaviestChain *Chain, heaviestChain *Chain) {
+	c.Heaviest.OnUpdate(func(prevHeaviestChain *Chain, heaviestChain *Chain) {
 		if prevHeaviestChain != nil {
 			prevHeaviestChain.VerifyAttestations.Set(false)
 		}
@@ -163,12 +163,12 @@ func (c *Chains) initChainSwitching() {
 		}
 	})
 
-	c.HeaviestAttestedChain.OnUpdate(func(_ *Chain, heaviestAttestedChain *Chain) {
+	c.HeaviestAttested.OnUpdate(func(_ *Chain, heaviestAttestedChain *Chain) {
 		heaviestAttestedChain.VerifyAttestations.Set(false)
 		heaviestAttestedChain.VerifyState.Set(true)
 	})
 
-	c.HeaviestVerifiedChain.OnUpdate(func(_ *Chain, heaviestVerifiedChain *Chain) {
+	c.HeaviestVerified.OnUpdate(func(_ *Chain, heaviestVerifiedChain *Chain) {
 		heaviestVerifiedChain.LatestVerifiedCommitment.OnUpdate(func(_ *Commitment, latestVerifiedCommitment *Commitment) {
 			forkingPoint := heaviestVerifiedChain.ForkingPoint.Get()
 			if forkingPoint == nil || latestVerifiedCommitment == nil {
@@ -177,7 +177,7 @@ func (c *Chains) initChainSwitching() {
 
 			distanceFromForkingPoint := latestVerifiedCommitment.ID().Slot() - forkingPoint.ID().Slot()
 			if distanceFromForkingPoint > c.protocol.Options.ChainSwitchingThreshold {
-				c.MainChain.Set(heaviestVerifiedChain)
+				c.Main.Set(heaviestVerifiedChain)
 			}
 		})
 	})
@@ -186,7 +186,7 @@ func (c *Chains) initChainSwitching() {
 func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment]) {
 	slotEvicted := c.EvictionEvent(commitmentID.Index())
 	if slotEvicted.WasTriggered() && c.LastEvictedSlot().Get() != 0 {
-		forkingPoint := c.MainChain.Get().ForkingPoint.Get()
+		forkingPoint := c.Main.Get().ForkingPoint.Get()
 
 		if forkingPoint == nil || commitmentID != forkingPoint.ID() {
 			return promise.New[*Commitment]().Reject(ErrorSlotEvicted)
