@@ -107,10 +107,13 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				return requestedBlocksReceived
 			}
 
+			totalBlocks := uint32(0)
 			acceptedBlocks := ads.NewSet[iotago.Identifier](mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes, iotago.BlockID.Bytes, iotago.BlockIDFromBytes)
 			for _, blockIDs := range blockIDsBySlotCommitment {
 				for _, blockID := range blockIDs {
 					_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
+
+					totalBlocks++
 				}
 			}
 
@@ -151,7 +154,6 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			//   1. Mark all transactions as accepted
 			//   2. Mark all blocks as accepted
 			//   3. Force commitment of the slot
-			totalBlocks := uint32(len(blockIDsBySlotCommitment))
 			var bookedBlocks atomic.Uint32
 			var notarizedBlocks atomic.Uint32
 
