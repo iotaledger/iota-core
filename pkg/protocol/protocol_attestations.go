@@ -53,8 +53,8 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 			})
 		})
 
-		protocol.Commitments.CommitmentCreated.Hook(func(commitment *Commitment) {
-			commitment.RequestAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
+		protocol.Commitments.WithElements(func(commitment *Commitment) (teardown func()) {
+			return commitment.RequestAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
 				if requestAttestations {
 					if commitment.CumulativeWeight() == 0 {
 						commitment.IsAttested.Set(true)

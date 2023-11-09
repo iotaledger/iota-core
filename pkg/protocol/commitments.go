@@ -5,7 +5,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -14,18 +13,15 @@ import (
 type Commitments struct {
 	reactive.Set[*Commitment]
 
-	CommitmentCreated *event.Event1[*Commitment]
-
 	protocol    *Protocol
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
 }
 
 func newCommitments(protocol *Protocol) *Commitments {
 	c := &Commitments{
-		Set:               reactive.NewSet[*Commitment](),
-		CommitmentCreated: event.New1[*Commitment](),
-		protocol:          protocol,
-		commitments:       shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
+		Set:         reactive.NewSet[*Commitment](),
+		protocol:    protocol,
+		commitments: shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 	}
 
 	return c
@@ -44,6 +40,8 @@ func (c *Commitments) Publish(commitment *model.Commitment) (commitmentMetadata 
 
 	if published = commitmentMetadata == publishedCommitmentMetadata; published {
 		commitmentMetadata.LogDebug("created", "id", commitment.ID())
+
+		c.Add(commitmentMetadata)
 	}
 
 	return commitmentMetadata, commitmentMetadata == publishedCommitmentMetadata, nil
@@ -117,5 +115,5 @@ func (c *Commitments) setupCommitment(commitment *Commitment, slotEvictedEvent r
 		commitment.IsEvicted.Trigger()
 	})
 
-	c.CommitmentCreated.Trigger(commitment)
+	c.Add(commitment)
 }
