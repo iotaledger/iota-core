@@ -35,7 +35,7 @@ func NewWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 	c.ticker.Events.Tick.Hook(c.SendRequest)
 
 	protocol.Constructed.OnTrigger(func() {
-		c.protocol.Chains.CommitmentCreated.Hook(func(commitment *Commitment) {
+		c.protocol.Commitments.CommitmentCreated.Hook(func(commitment *Commitment) {
 			commitment.WarpSyncBlocks.OnUpdate(func(_ bool, warpSyncBlocks bool) {
 				if warpSyncBlocks {
 					c.ticker.StartTicker(commitment.ID())
@@ -51,7 +51,7 @@ func NewWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 
 func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 	w.workerPool.Submit(func() {
-		if commitment, err := w.protocol.Chains.Commitment(commitmentID, false); err == nil {
+		if commitment, err := w.protocol.Commitments.Get(commitmentID, false); err == nil {
 			w.protocol.Network.SendWarpSyncRequest(commitmentID)
 
 			w.LogDebug("request", "commitment", commitment.LogName())
@@ -69,7 +69,7 @@ func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDsBySlotCo
 
 func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	w.workerPool.Submit(func() {
-		commitment, err := w.protocol.Chains.Commitment(commitmentID)
+		commitment, err := w.protocol.Commitments.Get(commitmentID)
 		if err != nil {
 			if !ierrors.Is(err, ErrorCommitmentNotFound) {
 				w.LogError("failed to load commitment for response", "commitmentID", commitmentID, "fromPeer", from, "err", err)
@@ -241,7 +241,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	w.workerPool.Submit(func() {
-		commitment, err := w.protocol.Chains.Commitment(commitmentID)
+		commitment, err := w.protocol.Commitments.Get(commitmentID)
 		if err != nil {
 			if !ierrors.Is(err, ErrorCommitmentNotFound) {
 				w.LogError("failed to load commitment for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)

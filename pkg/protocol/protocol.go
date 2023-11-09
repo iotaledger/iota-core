@@ -25,6 +25,8 @@ type Protocol struct {
 	Workers              *workerpool.Group
 	Network              *core.Protocol
 	NetworkClock         *NetworkClock
+	Commitments          *Commitments
+	Chains               *Chains
 	BlocksProtocol       *BlocksProtocol
 	CommitmentsProtocol  *CommitmentsProtocol
 	AttestationsProtocol *AttestationsProtocol
@@ -32,7 +34,6 @@ type Protocol struct {
 	Engines              *Engines
 	Options              *Options
 
-	Chains *Chains
 	*APIProvider
 
 	reactive.EvictionState[iotago.SlotIndex]
@@ -54,6 +55,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		p.CommitmentsProtocol = NewCommitmentsProtocol(p)
 		p.AttestationsProtocol = NewAttestationsProtocol(p)
 		p.WarpSyncProtocol = NewWarpSyncProtocol(p)
+		p.Commitments = newCommitments(p)
 		p.Chains = newChains(p)
 		p.Engines = NewEngines(p)
 		p.APIProvider = NewAPIProvider(p)
