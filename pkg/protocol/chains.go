@@ -15,7 +15,6 @@ import (
 
 type Chains struct {
 	reactive.Set[*Chain]
-	reactive.EvictionState[iotago.SlotIndex]
 
 	Main             reactive.Variable[*Chain]
 	Heaviest         reactive.Variable[*Chain]
@@ -32,7 +31,6 @@ type Chains struct {
 func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
 		Set:               reactive.NewSet[*Chain](),
-		EvictionState:     reactive.NewEvictionState[iotago.SlotIndex](),
 		Main:              reactive.NewVariable[*Chain](),
 		Heaviest:          reactive.NewVariable[*Chain](),
 		HeaviestAttested:  reactive.NewVariable[*Chain](),
@@ -186,8 +184,8 @@ func (c *Chains) initChainSwitching() {
 }
 
 func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment]) {
-	slotEvicted := c.EvictionEvent(commitmentID.Index())
-	if slotEvicted.WasTriggered() && c.LastEvictedSlot().Get() != 0 {
+	slotEvicted := c.protocol.EvictionEvent(commitmentID.Index())
+	if slotEvicted.WasTriggered() && c.protocol.LastEvictedSlot().Get() != 0 {
 		forkingPoint := c.Main.Get().ForkingPoint.Get()
 
 		if forkingPoint == nil || commitmentID != forkingPoint.ID() {

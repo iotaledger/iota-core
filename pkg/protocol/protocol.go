@@ -6,6 +6,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -15,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Protocol implements the meta-protocol that is responsible for syncing with the heaviest chain.
@@ -33,6 +35,7 @@ type Protocol struct {
 	Chains *Chains
 	*APIProvider
 
+	reactive.EvictionState[iotago.SlotIndex]
 	*module.ReactiveModule
 }
 
@@ -43,6 +46,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		Workers:        workers,
 		Options:        NewDefaultOptions(),
 		ReactiveModule: module.NewReactiveModule(logger),
+		EvictionState:  reactive.NewEvictionState[iotago.SlotIndex](),
 	}, opts, func(p *Protocol) {
 		p.Network = core.NewProtocol(networkEndpoint, workers.CreatePool("NetworkProtocol"), p)
 		p.NetworkClock = NewNetworkClock(p)
