@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/websocket v1.5.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20231108070813-497ebfef8258
+	github.com/iotaledger/hive.go/ads v0.0.0-20231108215351-f9dc9def4f75
 	github.com/iotaledger/hive.go/app v0.0.0-20231108215351-f9dc9def4f75
 	github.com/iotaledger/hive.go/constraints v0.0.0-20231108215351-f9dc9def4f75
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231108215351-f9dc9def4f75
@@ -19,7 +19,6 @@ require (
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20231108215351-f9dc9def4f75
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20231108215351-f9dc9def4f75
 	github.com/iotaledger/hive.go/lo v0.0.0-20231108215351-f9dc9def4f75
-	github.com/iotaledger/hive.go/log v0.0.0-20231108215351-f9dc9def4f75
 	github.com/iotaledger/hive.go/logger v0.0.0-20231108215351-f9dc9def4f75
 	github.com/iotaledger/hive.go/runtime v0.0.0-20231108215351-f9dc9def4f75
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231108215351-f9dc9def4f75
@@ -90,6 +89,7 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
+	github.com/iotaledger/hive.go/log v0.0.0-20231108215351-f9dc9def4f75 // indirect
 	github.com/ipfs/boxo v0.13.1 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect

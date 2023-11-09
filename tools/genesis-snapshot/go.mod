@@ -26,7 +26,7 @@ require (
 	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/hive.go/ads v0.0.0-20231108070813-497ebfef8258 // indirect
+	github.com/iotaledger/hive.go/ads v0.0.0-20231108215351-f9dc9def4f75 // indirect
 	github.com/iotaledger/hive.go/constraints v0.0.0-20231108215351-f9dc9def4f75 // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231108215351-f9dc9def4f75 // indirect
 	github.com/iotaledger/hive.go/ds v0.0.0-20231108215351-f9dc9def4f75 // indirect
