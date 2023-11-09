@@ -137,7 +137,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) JoinConflictSets(conflictSe
 		return nil, ierrors.Errorf("tried to join conflict sets of evicted conflict: %w", conflictdag.ErrEntityEvicted)
 	}
 
-	registerConflictingConflict := func(c, conflict *Conflict[ConflictID, ResourceID, VoteRank]) {
+	registerConflictingConflict := func(c *Conflict[ConflictID, ResourceID, VoteRank], conflict *Conflict[ConflictID, ResourceID, VoteRank]) {
 		c.structureMutex.Lock()
 		defer c.structureMutex.Unlock()
 
@@ -180,7 +180,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) removeParent(parent *Confli
 }
 
 // UpdateParents updates the parents of the Conflict.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) UpdateParents(addedParents, removedParents ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]) (updated bool) {
+func (c *Conflict[ConflictID, ResourceID, VoteRank]) UpdateParents(addedParents ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]], removedParents ds.Set[*Conflict[ConflictID, ResourceID, VoteRank]]) (updated bool) {
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
@@ -389,7 +389,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) registerChild(child *Confli
 		defer c.likedInsteadMutex.Unlock()
 
 		c.childUnhookMethods.Set(child.ID, lo.Batch(
-			c.AcceptanceStateUpdated.Hook(func(_, newState acceptance.State) {
+			c.AcceptanceStateUpdated.Hook(func(_ acceptance.State, newState acceptance.State) {
 				if newState.IsRejected() {
 					child.setAcceptanceState(newState)
 				}
@@ -432,7 +432,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) unregisterChild(conflict *C
 }
 
 // addInheritedLikedInsteadReference adds the given reference as a liked instead reference from the given source.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) addInheritedLikedInsteadReference(source, reference *Conflict[ConflictID, ResourceID, VoteRank]) {
+func (c *Conflict[ConflictID, ResourceID, VoteRank]) addInheritedLikedInsteadReference(source *Conflict[ConflictID, ResourceID, VoteRank], reference *Conflict[ConflictID, ResourceID, VoteRank]) {
 	c.likedInsteadMutex.Lock()
 	defer c.likedInsteadMutex.Unlock()
 
@@ -451,7 +451,7 @@ func (c *Conflict[ConflictID, ResourceID, VoteRank]) addInheritedLikedInsteadRef
 }
 
 // removeInheritedLikedInsteadReference removes the given reference as a liked instead reference from the given source.
-func (c *Conflict[ConflictID, ResourceID, VoteRank]) removeInheritedLikedInsteadReference(source, reference *Conflict[ConflictID, ResourceID, VoteRank]) {
+func (c *Conflict[ConflictID, ResourceID, VoteRank]) removeInheritedLikedInsteadReference(source *Conflict[ConflictID, ResourceID, VoteRank], reference *Conflict[ConflictID, ResourceID, VoteRank]) {
 	c.likedInsteadMutex.Lock()
 	defer c.likedInsteadMutex.Unlock()
 

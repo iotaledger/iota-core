@@ -185,7 +185,7 @@ type commitmentVerificationResult struct {
 	err                    error
 }
 
-func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.BlockIDs, shouldSwitch, banSource bool, err error) {
+func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.BlockIDs, shouldSwitch bool, banSource bool, err error) {
 	// Flow:
 	//  1. request attestations starting from forking point + AttestationCommitmentOffset
 	//  2. request 1 by 1

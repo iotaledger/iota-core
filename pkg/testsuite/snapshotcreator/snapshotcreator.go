@@ -241,7 +241,7 @@ func createOutput(address iotago.Address, tokenAmount iotago.BaseToken, mana iot
 	return &iotago.BasicOutput{
 		Amount: tokenAmount,
 		Mana:   mana,
-		Conditions: iotago.BasicOutputUnlockConditions{
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: address},
 		},
 	}
@@ -252,7 +252,7 @@ func createAccount(accountID iotago.AccountID, address iotago.Address, tokenAmou
 		Amount:    tokenAmount,
 		Mana:      mana,
 		AccountID: accountID,
-		Conditions: iotago.AccountOutputUnlockConditions{
+		UnlockConditions: iotago.AccountOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: address},
 		},
 		Features: iotago.AccountOutputFeatures{
