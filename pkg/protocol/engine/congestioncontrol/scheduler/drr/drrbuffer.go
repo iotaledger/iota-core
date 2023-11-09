@@ -42,6 +42,19 @@ func (b *BufferQueue) NumActiveIssuers() int {
 	return b.activeIssuers.Size()
 }
 
+func (b *BufferQueue) Clear() {
+	select {
+	case <-b.blockChan:
+	default:
+	}
+
+	b.activeIssuers.ForEachKey(func(issuedID iotago.AccountID) bool {
+		b.RemoveIssuerQueue(issuedID)
+
+		return true
+	})
+}
+
 // Size returns the total number of blocks in BufferQueue.
 func (b *BufferQueue) Size() int {
 	return b.size
