@@ -44,7 +44,7 @@ func (c *Collector) Collect() {
 // Update updates the value of the existing metric defined by the subsystem and metricName.
 // Note that the label values must be passed in the same order as they were defined in the metric, and must match the
 // number of labels defined in the metric.
-func (c *Collector) Update(subsystem, metricName string, metricValue float64, labelValues ...string) {
+func (c *Collector) Update(subsystem string, metricName string, metricValue float64, labelValues ...string) {
 	m := c.getMetric(subsystem, metricName)
 	if m != nil {
 		m.update(metricValue, labelValues...)
@@ -54,7 +54,7 @@ func (c *Collector) Update(subsystem, metricName string, metricValue float64, la
 // Increment increments the value of the existing metric defined by the subsystem and metricName.
 // Note that the label values must be passed in the same order as they were defined in the metric, and must match the
 // number of labels defined in the metric.
-func (c *Collector) Increment(subsystem, metricName string, labels ...string) {
+func (c *Collector) Increment(subsystem string, metricName string, labels ...string) {
 	m := c.getMetric(subsystem, metricName)
 	if m != nil {
 		m.increment(labels...)
@@ -62,7 +62,7 @@ func (c *Collector) Increment(subsystem, metricName string, labels ...string) {
 }
 
 // DeleteLabels deletes the metric with the given labels values.
-func (c *Collector) DeleteLabels(subsystem, metricName string, labelValues map[string]string) {
+func (c *Collector) DeleteLabels(subsystem string, metricName string, labelValues map[string]string) {
 	m := c.getMetric(subsystem, metricName)
 	if m != nil {
 		m.deleteLabels(labelValues)
@@ -85,7 +85,7 @@ func (c *Collector) Shutdown() {
 	}
 }
 
-func (c *Collector) getMetric(subsystem, metricName string) *Metric {
+func (c *Collector) getMetric(subsystem string, metricName string) *Metric {
 	col := c.getCollection(subsystem)
 	if col != nil {
 		return col.GetMetric(metricName)

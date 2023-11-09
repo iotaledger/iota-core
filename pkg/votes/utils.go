@@ -1,6 +1,6 @@
 package votes
 
-func IsThresholdReached(objectWeight, totalWeight int, threshold float64) bool {
+func IsThresholdReached(objectWeight int, totalWeight int, threshold float64) bool {
 	if totalWeight == 0 {
 		return false
 	}

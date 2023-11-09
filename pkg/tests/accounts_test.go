@@ -31,6 +31,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	}),
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(200, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				8,
@@ -101,7 +102,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	)
 
 	// default block issuer issues a block containing the transaction in slot 1.
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
 	latestParent := ts.CommitUntilSlot(ts.BlockID("block1").Slot(), block1)
@@ -158,6 +159,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				8,
@@ -220,7 +222,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		mock.WithAccountAmount(mock.MinIssuerAccountAmount),
 	)
 
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	block1 := ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, ts.DefaultWallet(), tx1)
 	latestParent := ts.CommitUntilSlot(block1Slot, block1)
@@ -333,6 +335,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				8,

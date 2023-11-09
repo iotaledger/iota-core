@@ -114,7 +114,7 @@ func New(
 		&Engine{
 			Events:        NewEvents(),
 			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks),
+			EvictionState: eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks, storageInstance.GenesisRootBlockID),
 			Workers:       workers,
 			errorHandler:  errorHandler,
 
@@ -183,7 +183,7 @@ func New(
 				}
 
 				// Only mark any pruning indexes if we loaded a non-genesis snapshot
-				if e.Storage.Settings().LatestFinalizedSlot() > 0 {
+				if e.Storage.Settings().LatestFinalizedSlot() > e.Storage.GenesisRootBlockID().Slot() {
 					if _, _, err := e.Storage.PruneByDepth(1); err != nil {
 						if !ierrors.Is(err, database.ErrNoPruningNeeded) &&
 							!ierrors.Is(err, database.ErrEpochPruned) {
@@ -199,7 +199,6 @@ func New(
 			} else {
 				// Restore from Disk
 				e.Storage.RestoreFromDisk()
-				e.EvictionState.PopulateFromStorage(e.Storage.Settings().LatestCommitment().Slot())
 
 				if err := e.Attestations.RestoreFromDisk(); err != nil {
 					panic(ierrors.Wrap(err, "failed to restore attestations from disk"))
@@ -488,11 +487,14 @@ func (e *Engine) setupPruning() {
 // chain beyond a window based on eviction, which in turn is based on acceptance. In case of a partition, this behavior is
 // clearly not desired.
 func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment *model.Commitment) {
-	maxCommittableAge := e.APIForSlot(lastFinalizedSlot).ProtocolParameters().MaxCommittableAge()
+	api := e.APIForSlot(lastFinalizedSlot)
+
+	genesisSlot := api.ProtocolParameters().GenesisSlot()
+	maxCommittableAge := api.ProtocolParameters().MaxCommittableAge()
 
 	var earliestRootCommitmentSlot iotago.SlotIndex
-	if lastFinalizedSlot <= maxCommittableAge {
-		earliestRootCommitmentSlot = 0
+	if lastFinalizedSlot <= genesisSlot+maxCommittableAge {
+		earliestRootCommitmentSlot = genesisSlot
 	} else {
 		earliestRootCommitmentSlot = lastFinalizedSlot - maxCommittableAge
 	}

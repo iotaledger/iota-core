@@ -119,7 +119,7 @@ func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) Unhook() {
 	}
 }
 
-func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) onAcceptanceStateUpdated(_, newState acceptance.State) {
+func (s *sortedConflict[ConflictID, ResourceID, VoteRank]) onAcceptanceStateUpdated(_ acceptance.State, newState acceptance.State) {
 	if newState.IsAccepted() {
 		s.sortedSet.owner.setAcceptanceState(acceptance.Rejected)
 	}

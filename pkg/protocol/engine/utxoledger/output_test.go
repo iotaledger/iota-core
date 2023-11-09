@@ -139,7 +139,7 @@ func TestBasicOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.T) 
 
 	iotaOutput := &iotago.BasicOutput{
 		Amount: amount,
-		Conditions: iotago.BasicOutputUnlockConditions{
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
 			},
@@ -177,7 +177,7 @@ func TestBasicOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) {
 
 	iotaOutput := &iotago.BasicOutput{
 		Amount: amount,
-		Conditions: iotago.BasicOutputUnlockConditions{
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
 			},
@@ -216,7 +216,7 @@ func TestNFTOutputSerialization(t *testing.T) {
 	iotaOutput := &iotago.NFTOutput{
 		Amount: amount,
 		NFTID:  nftID,
-		Conditions: iotago.NFTOutputUnlockConditions{
+		UnlockConditions: iotago.NFTOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
 			},
@@ -254,7 +254,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 	iotaOutput := &iotago.NFTOutput{
 		Amount: amount,
 		NFTID:  nftID,
-		Conditions: iotago.NFTOutputUnlockConditions{
+		UnlockConditions: iotago.NFTOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address.ToAddress(),
 			},
@@ -299,7 +299,7 @@ func TestAccountOutputSerialization(t *testing.T) {
 	iotaOutput := &iotago.AccountOutput{
 		Amount:    amount,
 		AccountID: aliasID,
-		Conditions: iotago.AccountOutputUnlockConditions{
+		UnlockConditions: iotago.AccountOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
 			},
@@ -342,7 +342,7 @@ func TestAnchorOutputSerialization(t *testing.T) {
 	iotaOutput := &iotago.AnchorOutput{
 		Amount:   amount,
 		AnchorID: aliasID,
-		Conditions: iotago.AnchorOutputUnlockConditions{
+		UnlockConditions: iotago.AnchorOutputUnlockConditions{
 			&iotago.StateControllerAddressUnlockCondition{
 				Address: stateController.ToAddress(),
 			},
@@ -391,7 +391,7 @@ func TestFoundryOutputSerialization(t *testing.T) {
 			MeltedTokens:  new(big.Int).SetBytes([]byte{0}),
 			MaximumSupply: supply,
 		},
-		Conditions: iotago.FoundryOutputUnlockConditions{
+		UnlockConditions: iotago.FoundryOutputUnlockConditions{
 			&iotago.ImmutableAccountUnlockCondition{
 				Address: aliasID.ToAddress().(*iotago.AccountAddress),
 			},
@@ -425,7 +425,7 @@ func TestDelegationOutputSerialization(t *testing.T) {
 		DelegationID:     iotago_tpkg.RandDelegationID(),
 		ValidatorAddress: utils.RandAddress(iotago.AddressAccount).(*iotago.AccountAddress),
 		StartEpoch:       iotago_tpkg.RandEpoch(),
-		Conditions: iotago.DelegationOutputUnlockConditions{
+		UnlockConditions: iotago.DelegationOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{
 				Address: address,
 			},

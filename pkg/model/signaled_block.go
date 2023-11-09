@@ -9,10 +9,10 @@ import (
 )
 
 type SignaledBlock struct {
-	ID                      iotago.BlockID    `serix:"0"`
-	IssuingTime             time.Time         `serix:"1"`
-	HighestSupportedVersion iotago.Version    `serix:"2"`
-	ProtocolParametersHash  iotago.Identifier `serix:"3"`
+	ID                      iotago.BlockID    `serix:""`
+	IssuingTime             time.Time         `serix:""`
+	HighestSupportedVersion iotago.Version    `serix:""`
+	ProtocolParametersHash  iotago.Identifier `serix:""`
 }
 
 func NewSignaledBlock(blockID iotago.BlockID, block *iotago.Block, validationBlock *iotago.ValidationBlockBody) *SignaledBlock {

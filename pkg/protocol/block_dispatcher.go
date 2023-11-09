@@ -154,9 +154,9 @@ func (b *BlockDispatcher) initNetworkConnection() {
 		}, b.warpSyncWorkers)
 	})
 
-	b.protocol.Events.Network.WarpSyncResponseReceived.Hook(func(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, tangleMerkleProof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationMerkleProof *merklehasher.Proof[iotago.Identifier], src peer.ID) {
+	b.protocol.Events.Network.WarpSyncResponseReceived.Hook(func(commitmentID iotago.CommitmentID, blockIDsBySlotCommitmentID map[iotago.CommitmentID]iotago.BlockIDs, tangleMerkleProof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationMerkleProof *merklehasher.Proof[iotago.Identifier], src peer.ID) {
 		b.runTask(func() {
-			b.protocol.HandleError(b.processWarpSyncResponse(commitmentID, blockIDs, tangleMerkleProof, transactionIDs, mutationMerkleProof, src))
+			b.protocol.HandleError(b.processWarpSyncResponse(commitmentID, blockIDsBySlotCommitmentID, tangleMerkleProof, transactionIDs, mutationMerkleProof, src))
 		}, b.warpSyncWorkers)
 	})
 }
@@ -177,7 +177,7 @@ func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentI
 		return ierrors.Wrapf(err, "commitment ID mismatch: %s != %s", commitment.ID(), commitmentID)
 	}
 
-	blockIDs, err := committedSlot.BlockIDs()
+	blocksIDsByCommitmentID, err := committedSlot.BlocksIDsBySlotCommitmentID()
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to get block IDs from slot %d", commitmentID.Slot())
 	}
@@ -192,13 +192,13 @@ func (b *BlockDispatcher) processWarpSyncRequest(commitmentID iotago.CommitmentI
 		return ierrors.Wrapf(err, "failed to get roots from slot %d", commitmentID.Slot())
 	}
 
-	b.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blockIDs, roots.TangleProof(), transactionIDs, roots.MutationProof(), src)
+	b.protocol.networkProtocol.SendWarpSyncResponse(commitmentID, blocksIDsByCommitmentID, roots.TangleProof(), transactionIDs, roots.MutationProof(), src)
 
 	return nil
 }
 
 // processWarpSyncResponse processes a WarpSync response.
-func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDs iotago.BlockIDs, tangleMerkleProof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationMerkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) error {
+func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.CommitmentID, blockIDsBySlotCommitmentID map[iotago.CommitmentID]iotago.BlockIDs, tangleMerkleProof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationMerkleProof *merklehasher.Proof[iotago.Identifier], _ peer.ID) error {
 	if b.processedWarpSyncRequests.Has(commitmentID) {
 		return nil
 	}
@@ -220,6 +220,12 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		return nil
 	}
 
+	// Flatten all blockIDs into a single slice.
+	var blockIDs iotago.BlockIDs
+	for _, ids := range blockIDsBySlotCommitmentID {
+		blockIDs = append(blockIDs, ids...)
+	}
+
 	acceptedBlocks := ads.NewSet[iotago.Identifier, iotago.BlockID](
 		mapdb.NewMapDB(),
 		iotago.Identifier.Bytes,
@@ -227,6 +233,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		iotago.BlockID.Bytes,
 		iotago.BlockIDFromBytes,
 	)
+
 	for _, blockID := range blockIDs {
 		_ = acceptedBlocks.Add(blockID) // a mapdb can newer return an error
 	}
@@ -242,6 +249,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		iotago.TransactionID.Bytes,
 		iotago.TransactionIDFromBytes,
 	)
+
 	for _, transactionID := range transactionIDs {
 		_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
 	}
@@ -303,7 +311,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		}
 	}
 
-	blockBookedFunc := func(_, _ bool) {
+	blockBookedFunc := func(_ bool, _ bool) {
 		if bookedBlocks.Add(1) != totalBlocks {
 			return
 		}
@@ -322,7 +330,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 			targetEngine.BlockGadget.SetAccepted(block)
 
-			block.Notarized().OnUpdate(func(_, _ bool) {
+			block.Notarized().OnUpdate(func(_ bool, _ bool) {
 				// Wait for all blocks to be notarized before forcing the commitment of the slot.
 				if notarizedBlocks.Add(1) != totalBlocks {
 					return
@@ -338,19 +346,21 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		return nil
 	}
 
-	for _, blockID := range blockIDs {
-		block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
-		if block == nil { // this should never happen as we're requesting the blocks for this slot so it can't be evicted.
-			b.protocol.HandleError(ierrors.Errorf("failed to get block %s", blockID))
-			continue
+	for slotCommitmentID, blockIDsForCommitment := range blockIDsBySlotCommitmentID {
+		for _, blockID := range blockIDsForCommitment {
+			block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
+			if block == nil { // this should never happen as we're requesting the blocks for this slot so it can't be evicted.
+				b.protocol.HandleError(ierrors.Errorf("failed to get block %s", blockID))
+				continue
+			}
+
+			// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
+			// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
+			// block cache and thus if not root blocks no block in the next slot can become solid.
+			targetEngine.EvictionState.AddRootBlock(blockID, slotCommitmentID)
+
+			block.Booked().OnUpdate(blockBookedFunc)
 		}
-
-		// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
-		// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
-		// block cache and thus if not root blocks no block in the next slot can become solid.
-		targetEngine.EvictionState.AddRootBlock(block.ID(), block.SlotCommitmentID())
-
-		block.Booked().OnUpdate(blockBookedFunc)
 	}
 
 	return nil
