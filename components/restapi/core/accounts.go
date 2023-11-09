@@ -133,6 +133,7 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
 	}
+	slotIndex, _ := httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
 
 	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
@@ -164,17 +165,28 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	case iotago.OutputDelegation:
 		//nolint:forcetypeassert
 		delegationOutput := utxoOutput.Output().(*iotago.DelegationOutput)
-		latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
-		stakingEnd := delegationOutput.EndEpoch
-		// the output is in delayed calaiming state if endEpoch is set, otherwise we use latest possible epoch
-		if delegationOutput.EndEpoch == 0 {
-			stakingEnd = deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
+		delegationEnd := delegationOutput.EndEpoch
+		// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
+		// "last epoch" for the rewards calculation.
+		// In this case the calculation must be consistent with the rewards calculation at execution time, so a client can specify
+		// a slot index explicitly, which should be equal to the slot it uses as the commitment input for the claiming transaction.
+		if delegationOutput.DelegationID.Empty() {
+			// The slot index may be unset for requests that do not want to issue a transaction, such as displaying estimated rewards,
+			// in which case we use latest committed slot.
+			if slotIndex == 0 {
+				slotIndex = deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
+			}
+
+			apiForSlot := deps.Protocol.APIForSlot(slotIndex)
+			futureBoundedSlotIndex := slotIndex + apiForSlot.ProtocolParameters().MinCommittableAge()
+			delegationEnd = apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex) - iotago.EpochIndex(1)
 		}
+
 		reward, actualStart, actualEnd, err = deps.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
 			delegationOutput.ValidatorAddress.AccountID(),
 			delegationOutput.DelegatedAmount,
 			delegationOutput.StartEpoch,
-			stakingEnd,
+			delegationEnd,
 		)
 	}
 	if err != nil {
