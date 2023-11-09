@@ -25,12 +25,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-func TestMemPoolV1_InterfaceWithoutForkingEverything(t *testing.T) {
-	mempooltests.TestAllWithoutForkingEverything(t, newTestFramework)
-}
-
 func TestMemPoolV1_InterfaceWithForkingEverything(t *testing.T) {
-	mempooltests.TestAllWithForkingEverything(t, newForkingTestFramework)
+	mempooltests.TestAllWithForkingEverything(t, newTestFramework)
 }
 
 func TestMempoolV1_ResourceCleanup(t *testing.T) {
@@ -142,21 +138,6 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 }
 
 func newTestFramework(t *testing.T) *mempooltests.TestFramework {
-	workers := workerpool.NewGroup(t.Name())
-
-	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
-	spenddag := spenddagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
-
-	mutationsFunc := func(index iotago.SlotIndex) (kvstore.KVStore, error) {
-		return mapdb.NewMapDB(), nil
-	}
-
-	return mempooltests.NewTestFramework(t, New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference)
-	}, mutationsFunc, workers, spenddag, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}), spenddag, ledgerState, workers)
-}
-
-func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
 	workers := workerpool.NewGroup(t.Name())
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
