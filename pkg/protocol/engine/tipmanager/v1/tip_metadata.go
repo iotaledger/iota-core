@@ -218,7 +218,7 @@ func (t *TipMetadata) connectWeakParent(weakParent *TipMetadata) {
 
 	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
 	unsubscribe := weakParent.connectedWeakChildren.Monitor(t.isConnectedToTips)
-	weakParent.evicted.OnUpdate(func(_, _ bool) { unsubscribe() })
+	weakParent.evicted.OnUpdate(func(_ bool, _ bool) { unsubscribe() })
 }
 
 // String returns a human-readable representation of the TipMetadata.
