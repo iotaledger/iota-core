@@ -157,10 +157,10 @@ func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockI
 func (b *Booker) book(block *blocks.Block) error {
 	spendsToInherit, err := b.inheritSpends(block)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
+		return ierrors.Wrapf(err, "failed to inherit spends for block %s", block.ID())
 	}
 
-	// The block does not inherit conflicts that have been orphaned with respect to its commitment.
+	// The block does not inherit spends that have been orphaned with respect to its commitment.
 	for it := spendsToInherit.Iterator(); it.HasNext(); {
 		spendID := it.Next()
 
@@ -170,7 +170,7 @@ func (b *Booker) book(block *blocks.Block) error {
 		}
 
 		if orphanedSlot, orphaned := txMetadata.OrphanedSlot(); orphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
-			// Merge-to-master orphaned conflicts.
+			// Merge-to-master orphaned spends.
 			spendsToInherit.Delete(spendID)
 		}
 	}
@@ -206,19 +206,19 @@ func (b *Booker) inheritSpends(block *blocks.Block) (spendIDs ds.Set[iotago.Tran
 			}
 
 			spendIDsToInherit.AddAll(parentBlock.PayloadSpendIDs())
-			//  remove all conflicting conflicts from spendIDsToInherit
+			//  remove all conflicting spends from spendIDsToInherit
 			for _, spendID := range parentBlock.PayloadSpendIDs().ToSlice() {
-				if conflictingConflicts, exists := b.spendDAG.ConflictingSpends(spendID); exists {
-					spendIDsToInherit.DeleteAll(b.spendDAG.FutureCone(conflictingConflicts))
+				if conflictingSpends, exists := b.spendDAG.ConflictingSpends(spendID); exists {
+					spendIDsToInherit.DeleteAll(b.spendDAG.FutureCone(conflictingSpends))
 				}
 			}
 		}
 	}
 
-	// Add all conflicts from the block's payload itself.
+	// Add all spends from the block's payload itself.
 	// Forking on booking: we determine the block's PayloadSpendIDs by treating each TX as a conflict.
 	spendIDsToInherit.AddAll(block.PayloadSpendIDs())
 
-	// Only inherit conflicts that are not yet accepted (aka merge to master).
+	// Only inherit spends that are not yet accepted (aka merge to master).
 	return b.spendDAG.UnacceptedSpends(spendIDsToInherit), nil
 }

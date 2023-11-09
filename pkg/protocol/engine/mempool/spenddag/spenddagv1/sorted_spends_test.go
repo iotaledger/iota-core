@@ -18,11 +18,11 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type SortedConflictSet = *SortedSpends[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
+type SortedSpendSet = *SortedSpends[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-var NewSortedConflictSet = NewSortedSpends[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
+var NewSortedSpendSet = NewSortedSpends[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-func TestSortedConflict(t *testing.T) {
+func TestSortedSpend(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
@@ -30,54 +30,54 @@ func TestSortedConflict(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	conflict1 := NewTestSpend(transactionID("conflict1"), nil, nil, weight.New().AddCumulativeWeight(12), pendingTasks, thresholdProvider)
-	conflict1.setAcceptanceState(acceptance.Rejected)
-	conflict2 := NewTestSpend(transactionID("conflict2"), nil, nil, weight.New().AddCumulativeWeight(10), pendingTasks, thresholdProvider)
-	conflict3 := NewTestSpend(transactionID("conflict3"), nil, nil, weight.New().AddCumulativeWeight(1), pendingTasks, thresholdProvider)
-	conflict3.setAcceptanceState(acceptance.Accepted)
-	conflict4 := NewTestSpend(transactionID("conflict4"), nil, nil, weight.New().AddCumulativeWeight(11), pendingTasks, thresholdProvider)
-	conflict4.setAcceptanceState(acceptance.Rejected)
-	conflict5 := NewTestSpend(transactionID("conflict5"), nil, nil, weight.New().AddCumulativeWeight(11), pendingTasks, thresholdProvider)
-	conflict6 := NewTestSpend(transactionID("conflict6"), nil, nil, weight.New().AddCumulativeWeight(2), pendingTasks, thresholdProvider)
-	conflict6.setAcceptanceState(acceptance.Accepted)
+	spend1 := NewTestSpend(transactionID("spend1"), nil, nil, weight.New().AddCumulativeWeight(12), pendingTasks, thresholdProvider)
+	spend1.setAcceptanceState(acceptance.Rejected)
+	spend2 := NewTestSpend(transactionID("spend2"), nil, nil, weight.New().AddCumulativeWeight(10), pendingTasks, thresholdProvider)
+	spend3 := NewTestSpend(transactionID("spend3"), nil, nil, weight.New().AddCumulativeWeight(1), pendingTasks, thresholdProvider)
+	spend3.setAcceptanceState(acceptance.Accepted)
+	spend4 := NewTestSpend(transactionID("spend4"), nil, nil, weight.New().AddCumulativeWeight(11), pendingTasks, thresholdProvider)
+	spend4.setAcceptanceState(acceptance.Rejected)
+	spend5 := NewTestSpend(transactionID("spend5"), nil, nil, weight.New().AddCumulativeWeight(11), pendingTasks, thresholdProvider)
+	spend6 := NewTestSpend(transactionID("spend6"), nil, nil, weight.New().AddCumulativeWeight(2), pendingTasks, thresholdProvider)
+	spend6.setAcceptanceState(acceptance.Accepted)
 
-	sortedConflicts := NewSortedConflictSet(conflict1, pendingTasks)
+	sortedSpends := NewSortedSpendSet(spend1, pendingTasks)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict1:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend1:0")
 
-	sortedConflicts.Add(conflict2)
+	sortedSpends.Add(spend2)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict2:0", "conflict1:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend2:0", "spend1:0")
 
-	sortedConflicts.Add(conflict3)
+	sortedSpends.Add(spend3)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict3:0", "conflict2:0", "conflict1:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend3:0", "spend2:0", "spend1:0")
 
-	sortedConflicts.Add(conflict4)
+	sortedSpends.Add(spend4)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict3:0", "conflict2:0", "conflict1:0", "conflict4:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend3:0", "spend2:0", "spend1:0", "spend4:0")
 
-	sortedConflicts.Add(conflict5)
+	sortedSpends.Add(spend5)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict3:0", "conflict5:0", "conflict2:0", "conflict1:0", "conflict4:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend3:0", "spend5:0", "spend2:0", "spend1:0", "spend4:0")
 
-	sortedConflicts.Add(conflict6)
+	sortedSpends.Add(spend6)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict6:0", "conflict3:0", "conflict5:0", "conflict2:0", "conflict1:0", "conflict4:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend6:0", "spend3:0", "spend5:0", "spend2:0", "spend1:0", "spend4:0")
 
-	conflict2.Weight.AddCumulativeWeight(3)
-	require.Equal(t, int64(13), conflict2.Weight.Value().CumulativeWeight())
+	spend2.Weight.AddCumulativeWeight(3)
+	require.Equal(t, int64(13), spend2.Weight.Value().CumulativeWeight())
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict6:0", "conflict3:0", "conflict2:0", "conflict5:0", "conflict1:0", "conflict4:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend6:0", "spend3:0", "spend2:0", "spend5:0", "spend1:0", "spend4:0")
 
-	conflict2.Weight.RemoveCumulativeWeight(3)
-	require.Equal(t, int64(10), conflict2.Weight.Value().CumulativeWeight())
+	spend2.Weight.RemoveCumulativeWeight(3)
+	require.Equal(t, int64(10), spend2.Weight.Value().CumulativeWeight())
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict6:0", "conflict3:0", "conflict5:0", "conflict2:0", "conflict1:0", "conflict4:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend6:0", "spend3:0", "spend5:0", "spend2:0", "spend1:0", "spend4:0")
 
-	conflict5.Weight.SetAcceptanceState(acceptance.Accepted)
+	spend5.Weight.SetAcceptanceState(acceptance.Accepted)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict5:0", "conflict6:0", "conflict3:0", "conflict2:0", "conflict1:0", "conflict4:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend5:0", "spend6:0", "spend3:0", "spend2:0", "spend1:0", "spend4:0")
 }
 
 func TestSortedDecreaseHeaviest(t *testing.T) {
@@ -88,26 +88,26 @@ func TestSortedDecreaseHeaviest(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	conflict1 := NewTestSpend(transactionID("conflict1"), nil, nil, weight.New().AddCumulativeWeight(1), pendingTasks, thresholdProvider)
-	conflict1.setAcceptanceState(acceptance.Accepted)
-	conflict2 := NewTestSpend(transactionID("conflict2"), nil, nil, weight.New().AddCumulativeWeight(2), pendingTasks, thresholdProvider)
+	spend1 := NewTestSpend(transactionID("spend1"), nil, nil, weight.New().AddCumulativeWeight(1), pendingTasks, thresholdProvider)
+	spend1.setAcceptanceState(acceptance.Accepted)
+	spend2 := NewTestSpend(transactionID("spend2"), nil, nil, weight.New().AddCumulativeWeight(2), pendingTasks, thresholdProvider)
 
-	sortedConflicts := NewSortedConflictSet(conflict1, pendingTasks)
+	sortedSpends := NewSortedSpendSet(spend1, pendingTasks)
 
-	sortedConflicts.Add(conflict1)
+	sortedSpends.Add(spend1)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict1:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend1:0")
 
-	sortedConflicts.Add(conflict2)
+	sortedSpends.Add(spend2)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict1:0", "conflict2:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend1:0", "spend2:0")
 
-	conflict1.Weight.SetAcceptanceState(acceptance.Pending)
+	spend1.Weight.SetAcceptanceState(acceptance.Pending)
 	pendingTasks.WaitIsZero()
-	assertSortedConflictsOrder(t, sortedConflicts, "conflict2:0", "conflict1:0")
+	assertSortedSpendsOrder(t, sortedSpends, "spend2:0", "spend1:0")
 }
 
-func TestSortedConflictParallel(t *testing.T) {
+func TestSortedSpendParallel(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
@@ -115,48 +115,48 @@ func TestSortedConflictParallel(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	const conflictCount = 1000
+	const spendCount = 1000
 	const updateCount = 100000
 
-	conflicts := make(map[string]TestSpend)
-	parallelConflicts := make(map[string]TestSpend)
-	for i := 0; i < conflictCount; i++ {
-		alias := "conflict" + strconv.Itoa(i)
+	spends := make(map[string]TestSpend)
+	parallelSpends := make(map[string]TestSpend)
+	for i := 0; i < spendCount; i++ {
+		alias := "spend" + strconv.Itoa(i)
 
-		conflicts[alias] = NewTestSpend(transactionID(alias), nil, nil, weight.New(), pendingTasks, thresholdProvider)
-		parallelConflicts[alias] = NewTestSpend(transactionID(alias), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+		spends[alias] = NewTestSpend(transactionID(alias), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+		parallelSpends[alias] = NewTestSpend(transactionID(alias), nil, nil, weight.New(), pendingTasks, thresholdProvider)
 	}
 
-	sortedConflicts := NewSortedConflictSet(conflicts["conflict0"], pendingTasks)
-	sortedParallelConflicts := NewSortedConflictSet(parallelConflicts["conflict0"], pendingTasks)
-	sortedParallelConflicts1 := NewSortedConflictSet(parallelConflicts["conflict0"], pendingTasks)
+	sortedSpends := NewSortedSpendSet(spends["spend0"], pendingTasks)
+	sortedParallelSpends := NewSortedSpendSet(parallelSpends["spend0"], pendingTasks)
+	sortedParallelSpends1 := NewSortedSpendSet(parallelSpends["spend0"], pendingTasks)
 
-	for i := 0; i < conflictCount; i++ {
-		alias := "conflict" + strconv.Itoa(i)
+	for i := 0; i < spendCount; i++ {
+		alias := "spend" + strconv.Itoa(i)
 
-		sortedConflicts.Add(conflicts[alias])
-		sortedParallelConflicts.Add(parallelConflicts[alias])
-		sortedParallelConflicts1.Add(parallelConflicts[alias])
+		sortedSpends.Add(spends[alias])
+		sortedParallelSpends.Add(parallelSpends[alias])
+		sortedParallelSpends1.Add(parallelSpends[alias])
 	}
 
-	originalSortingBefore := sortedConflicts.String()
-	parallelSortingBefore := sortedParallelConflicts.String()
+	originalSortingBefore := sortedSpends.String()
+	parallelSortingBefore := sortedParallelSpends.String()
 	require.Equal(t, originalSortingBefore, parallelSortingBefore)
 
-	permutations := make([]func(conflict TestSpend), 0)
+	permutations := make([]func(spend TestSpend), 0)
 	for i := 0; i < updateCount; i++ {
 		permutations = append(permutations, generateRandomWeightPermutation())
 	}
 
 	var wg sync.WaitGroup
 	for i, permutation := range permutations {
-		targetAlias := "conflict" + strconv.Itoa(i%conflictCount)
+		targetAlias := "spend" + strconv.Itoa(i%spendCount)
 
-		permutation(conflicts[targetAlias])
+		permutation(spends[targetAlias])
 
 		wg.Add(1)
-		go func(permutation func(conflict TestSpend)) {
-			permutation(parallelConflicts[targetAlias])
+		go func(permutation func(spend TestSpend)) {
+			permutation(parallelSpends[targetAlias])
 
 			wg.Done()
 		}(permutation)
@@ -166,45 +166,45 @@ func TestSortedConflictParallel(t *testing.T) {
 	wg.Wait()
 	pendingTasks.WaitIsZero()
 
-	originalSortingAfter := sortedConflicts.String()
-	parallelSortingAfter := sortedParallelConflicts.String()
+	originalSortingAfter := sortedSpends.String()
+	parallelSortingAfter := sortedParallelSpends.String()
 	require.Equal(t, originalSortingAfter, parallelSortingAfter)
 	require.NotEqualf(t, originalSortingBefore, originalSortingAfter, "original sorting should have changed")
 
 	pendingTasks.WaitIsZero()
 
-	parallelSortingAfter = sortedParallelConflicts1.String()
+	parallelSortingAfter = sortedParallelSpends1.String()
 	require.Equal(t, originalSortingAfter, parallelSortingAfter)
 	require.NotEqualf(t, originalSortingBefore, originalSortingAfter, "original sorting should have changed")
 }
 
-func generateRandomWeightPermutation() func(conflict TestSpend) {
+func generateRandomWeightPermutation() func(spend TestSpend) {
 	switch rand.Intn(2) {
 	case 0:
 		return generateRandomCumulativeWeightPermutation(int64(rand.Intn(100)))
 	default:
 		// return generateRandomConfirmationStatePermutation()
-		return func(conflict TestSpend) {
+		return func(spend TestSpend) {
 		}
 	}
 }
 
-func generateRandomCumulativeWeightPermutation(delta int64) func(conflict TestSpend) {
+func generateRandomCumulativeWeightPermutation(delta int64) func(spend TestSpend) {
 	updateType := rand.Intn(100)
 
-	return func(conflict TestSpend) {
+	return func(spend TestSpend) {
 		if updateType%2 == 0 {
-			conflict.Weight.AddCumulativeWeight(delta)
+			spend.Weight.AddCumulativeWeight(delta)
 		} else {
-			conflict.Weight.RemoveCumulativeWeight(delta)
+			spend.Weight.RemoveCumulativeWeight(delta)
 		}
 
-		conflict.Weight.AddCumulativeWeight(delta)
+		spend.Weight.AddCumulativeWeight(delta)
 	}
 }
 
-func assertSortedConflictsOrder(t *testing.T, sortedConflicts SortedConflictSet, aliases ...string) {
-	require.NoError(t, sortedConflicts.ForEach(func(c TestSpend) error {
+func assertSortedSpendsOrder(t *testing.T, sortedSpends SortedSpendSet, aliases ...string) {
+	require.NoError(t, sortedSpends.ForEach(func(c TestSpend) error {
 		currentAlias := aliases[0]
 		aliases = aliases[1:]
 

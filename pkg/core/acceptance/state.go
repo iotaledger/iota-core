@@ -5,13 +5,13 @@ import (
 )
 
 const (
-	// Pending is the state of pending conflicts.
+	// Pending is the state of pending spends.
 	Pending State = iota
 
-	// Accepted is the state of accepted conflicts.
+	// Accepted is the state of accepted spends.
 	Accepted
 
-	// Rejected is the state of rejected conflicts.
+	// Rejected is the state of rejected spends.
 	Rejected
 )
 

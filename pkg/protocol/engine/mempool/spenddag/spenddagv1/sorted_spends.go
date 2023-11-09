@@ -80,7 +80,7 @@ func NewSortedSpends[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.Vote
 }
 
 // Add adds the given Spend to the SortedSpends.
-func (s *SortedSpends[SpendID, ResourceID, VoteRank]) Add(conflict *Spend[SpendID, ResourceID, VoteRank]) bool {
+func (s *SortedSpends[SpendID, ResourceID, VoteRank]) Add(spend *Spend[SpendID, ResourceID, VoteRank]) bool {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -88,8 +88,8 @@ func (s *SortedSpends[SpendID, ResourceID, VoteRank]) Add(conflict *Spend[SpendI
 		return false
 	}
 
-	newMember, isNew := s.members.GetOrCreate(conflict.ID, func() *sortedSpend[SpendID, ResourceID, VoteRank] {
-		return newSortedSpend(s, conflict)
+	newMember, isNew := s.members.GetOrCreate(spend.ID, func() *sortedSpend[SpendID, ResourceID, VoteRank] {
+		return newSortedSpend(s, spend)
 	})
 	if !isNew {
 		return false
@@ -128,7 +128,7 @@ func (s *SortedSpends[SpendID, ResourceID, VoteRank]) Add(conflict *Spend[SpendI
 	if newMember.IsPreferred() && newMember.Compare(s.heaviestPreferredMember) == weight.Heavier {
 		s.heaviestPreferredMember = newMember
 
-		s.owner.setPreferredInstead(conflict)
+		s.owner.setPreferredInstead(spend)
 	}
 
 	return true

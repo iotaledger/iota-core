@@ -52,23 +52,23 @@ func NewFramework(
 	return f
 }
 
-// CreateOrUpdateConflict creates a new conflict or adds it to the given ConflictSets.
-func (f *Framework) CreateOrUpdateConflict(alias string, resourceAliases []string) error {
+// CreateOrUpdateSpend creates a new spend or adds it to the given ConflictSets.
+func (f *Framework) CreateOrUpdateSpend(alias string, resourceAliases []string) error {
 	f.Instance.CreateSpend(f.SpendID(alias))
 	return f.Instance.UpdateConflictingResources(f.SpendID(alias), f.ConflictSetIDs(resourceAliases...))
 
 }
 
-// UpdateConflictParents updates the parents of the conflict with the given alias.
-func (f *Framework) UpdateSpendParents(conflictAlias string, addedParentIDs []string, removedParentIDs []string) error {
-	return f.Instance.UpdateSpendParents(f.SpendID(conflictAlias), f.SpendIDs(addedParentIDs...), f.SpendIDs(removedParentIDs...))
+// UpdateConflictParents updates the parents of the spend with the given alias.
+func (f *Framework) UpdateSpendParents(spendAlias string, addedParentIDs []string, removedParentIDs []string) error {
+	return f.Instance.UpdateSpendParents(f.SpendID(spendAlias), f.SpendIDs(addedParentIDs...), f.SpendIDs(removedParentIDs...))
 }
 
-// LikedInstead returns the set of conflicts that are liked instead of the given conflicts.
-func (f *Framework) LikedInstead(conflictAliases ...string) ds.Set[iotago.TransactionID] {
+// LikedInstead returns the set of spends that are liked instead of the given spends.
+func (f *Framework) LikedInstead(spendAliases ...string) ds.Set[iotago.TransactionID] {
 	var result ds.Set[iotago.TransactionID]
 	_ = f.Instance.ReadConsistent(func(spendDAG spenddag.ReadLockedSpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]) error {
-		result = spendDAG.LikedInstead(f.SpendIDs(conflictAliases...))
+		result = spendDAG.LikedInstead(f.SpendIDs(spendAliases...))
 
 		return nil
 	})
@@ -76,19 +76,19 @@ func (f *Framework) LikedInstead(conflictAliases ...string) ds.Set[iotago.Transa
 	return result
 }
 
-// CastVotes casts the given votes for the given conflicts.
-func (f *Framework) CastVotes(nodeAlias string, voteRank int, conflictAliases ...string) error {
+// CastVotes casts the given votes for the given spends.
+func (f *Framework) CastVotes(nodeAlias string, voteRank int, spendAliases ...string) error {
 	seat, exists := f.Accounts.Get(nodeAlias)
 	if !exists {
 		return ierrors.Errorf("node with alias '%s' does not have a seat in the committee", nodeAlias)
 	}
 
-	return f.Instance.CastVotes(vote.NewVote[vote.MockedRank](seat, vote.MockedRank(voteRank)), f.SpendIDs(conflictAliases...))
+	return f.Instance.CastVotes(vote.NewVote[vote.MockedRank](seat, vote.MockedRank(voteRank)), f.SpendIDs(spendAliases...))
 }
 
-// EvictConflict evicts given conflict from the SpendDAG.
-func (f *Framework) EvictSpend(conflictAlias string) {
-	f.Instance.EvictSpend(f.SpendID(conflictAlias))
+// EvictSpend evicts given spend from the SpendDAG.
+func (f *Framework) EvictSpend(spendAlias string) {
+	f.Instance.EvictSpend(f.SpendID(spendAlias))
 }
 
 // SpendIDs translates the given aliases into an AdvancedSet of iotago.TransactionIDs.

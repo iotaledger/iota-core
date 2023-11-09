@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 )
 
-// heaviestConflict returns the largest Conflict from the given Conflicts.
+// heaviestConflict returns the largest Conflict from the given Spends.
 func heaviestConflict[SpendID, ResourceID spenddag.IDType, VoterPower spenddag.VoteRankType[VoterPower]](conflicts ds.Set[*Spend[SpendID, ResourceID, VoterPower]]) *Spend[SpendID, ResourceID, VoterPower] {
 	var result *Spend[SpendID, ResourceID, VoterPower]
 	conflicts.Range(func(conflict *Spend[SpendID, ResourceID, VoterPower]) {

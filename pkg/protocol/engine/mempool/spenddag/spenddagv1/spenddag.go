@@ -223,8 +223,8 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) ConflictingSpends(spendID Spen
 	}
 
 	conflictingSpends = ds.NewSet[SpendID]()
-	spend.ConflictingSpends.Range(func(conflictingConflict *Spend[SpendID, ResourceID, VoteRank]) {
-		conflictingSpends.Add(conflictingConflict.ID)
+	spend.ConflictingSpends.Range(func(conflictingSpend *Spend[SpendID, ResourceID, VoteRank]) {
+		conflictingSpends.Add(conflictingSpend.ID)
 	})
 
 	return conflictingSpends, true

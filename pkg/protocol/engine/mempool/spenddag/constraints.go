@@ -4,7 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/constraints"
 )
 
-// IDType is the constraint for the identifier of a conflict or a resource.
+// IDType is the constraint for the identifier of a spend or a resource.
 type IDType interface {
 	// comparable is a built-in constraint that ensures that the type can be used as a map key.
 	comparable

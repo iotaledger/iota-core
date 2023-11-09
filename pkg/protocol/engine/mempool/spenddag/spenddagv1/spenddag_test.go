@@ -53,13 +53,13 @@ func TestMemoryRelease(t *testing.T) {
 	//t.Skip("skip memory test as for some reason it's failing")
 	tf := newTestFramework(t)
 
-	createSpendSets := func(startSlot, conflictSetCount, evictionDelay, conflictsInConflictSet int, prevConflictSetAlias string) (int, string) {
+	createSpendSets := func(startSlot, conflictSetCount, evictionDelay, spendsInConflictSet int, prevConflictSetAlias string) (int, string) {
 		slot := startSlot
 		for ; slot < startSlot+conflictSetCount; slot++ {
 			conflictSetAlias := fmt.Sprintf("conflictSet-%d", slot)
-			for conflictIndex := 0; conflictIndex < conflictsInConflictSet; conflictIndex++ {
+			for conflictIndex := 0; conflictIndex < spendsInConflictSet; conflictIndex++ {
 				conflictAlias := fmt.Sprintf("conflictSet-%d:%d", slot, conflictIndex)
-				require.NoError(t, tf.CreateOrUpdateConflict(conflictAlias, []string{conflictSetAlias}))
+				require.NoError(t, tf.CreateOrUpdateSpend(conflictAlias, []string{conflictSetAlias}))
 				if prevConflictSetAlias != "" {
 					require.NoError(t, tf.UpdateSpendParents(conflictAlias, []string{fmt.Sprintf("%s:%d", prevConflictSetAlias, 0)}, []string{}))
 				}
@@ -67,7 +67,7 @@ func TestMemoryRelease(t *testing.T) {
 			prevConflictSetAlias = conflictSetAlias
 
 			if slotToEvict := slot - evictionDelay; slotToEvict >= 0 {
-				for conflictIndex := 0; conflictIndex < conflictsInConflictSet; conflictIndex++ {
+				for conflictIndex := 0; conflictIndex < spendsInConflictSet; conflictIndex++ {
 					conflictAlias := fmt.Sprintf("conflictSet-%d:%d", slotToEvict, conflictIndex)
 					tf.EvictSpend(conflictAlias)
 				}

@@ -37,7 +37,7 @@ type SpendDAG[SpendID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] inter
 type ReadLockedSpendDAG[SpendID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] interface {
 	LikedInstead(spendIDs ds.Set[SpendID]) ds.Set[SpendID]
 	FutureCone(spendIDs ds.Set[SpendID]) (futureCone ds.Set[SpendID])
-	ConflictingSpends(spendID SpendID) (conflictingConflicts ds.Set[SpendID], exists bool)
+	ConflictingSpends(spendID SpendID) (conflictingSpends ds.Set[SpendID], exists bool)
 	AcceptanceState(spendIDs ds.Set[SpendID]) acceptance.State
 	UnacceptedSpends(spendIDs ds.Set[SpendID]) ds.Set[SpendID]
 }
