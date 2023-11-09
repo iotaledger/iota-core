@@ -20,7 +20,7 @@ import (
 
 type TestFramework struct {
 	Instance mempool.MemPool[vote.MockedRank]
-	spenddag spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank]
+	SpendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank]
 
 	referencesByAlias        map[string]mempool.StateReference
 	stateIDByAlias           map[string]mempool.StateID
@@ -35,10 +35,10 @@ type TestFramework struct {
 	mutex syncutils.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank], spenddag spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank], spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
 	t := &TestFramework{
 		Instance:                 instance,
-		spenddag:                 spenddag,
+		SpendDAG:                 spendDAG,
 		referencesByAlias:        make(map[string]mempool.StateReference),
 		stateIDByAlias:           make(map[string]mempool.StateID),
 		signedTransactionByAlias: make(map[string]mempool.SignedTransaction),

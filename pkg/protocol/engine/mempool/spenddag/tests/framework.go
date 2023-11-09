@@ -10,16 +10,16 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// Framework is a test framework for the spenddag that allows to easily create and manipulate the DAG and its
+// Framework is a test framework for the SpendDAG that allows to easily create and manipulate the DAG and its
 // validators using human-readable aliases instead of actual IDs.
 type Framework struct {
-	// Instance is the spenddag instance that is used in the tests.
+	// Instance is the SpendDAG instance that is used in the tests.
 	Instance spenddag.SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
 	// Accounts is the AccountsTestFramework that is used in the tests.
 	Accounts *AccountsTestFramework
 
-	// Assert provides a set of assertions that can be used to verify the state of the spenddag.
+	// Assert provides a set of assertions that can be used to verify the state of the SpendDAG.
 	Assert *Assertions
 
 	// SpendID is a function that is used to translate a string alias into a (deterministic) iotago.TransactionID.
@@ -35,13 +35,13 @@ type Framework struct {
 // NewFramework creates a new instance of the Framework.
 func NewFramework(
 	t *testing.T,
-	spenddag spenddag.SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank],
+	spendDAG spenddag.SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank],
 	validators *AccountsTestFramework,
 	spendID func(string) iotago.TransactionID,
 	resourceID func(string) iotago.OutputID,
 ) *Framework {
 	f := &Framework{
-		Instance:   spenddag,
+		Instance:   spendDAG,
 		Accounts:   validators,
 		SpendID:    spendID,
 		ResourceID: resourceID,
@@ -67,8 +67,8 @@ func (f *Framework) UpdateSpendParents(conflictAlias string, addedParentIDs []st
 // LikedInstead returns the set of conflicts that are liked instead of the given conflicts.
 func (f *Framework) LikedInstead(conflictAliases ...string) ds.Set[iotago.TransactionID] {
 	var result ds.Set[iotago.TransactionID]
-	_ = f.Instance.ReadConsistent(func(spenddag spenddag.ReadLockedSpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]) error {
-		result = spenddag.LikedInstead(f.SpendIDs(conflictAliases...))
+	_ = f.Instance.ReadConsistent(func(spendDAG spenddag.ReadLockedSpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]) error {
+		result = spendDAG.LikedInstead(f.SpendIDs(conflictAliases...))
 
 		return nil
 	})
@@ -86,7 +86,7 @@ func (f *Framework) CastVotes(nodeAlias string, voteRank int, conflictAliases ..
 	return f.Instance.CastVotes(vote.NewVote[vote.MockedRank](seat, vote.MockedRank(voteRank)), f.SpendIDs(conflictAliases...))
 }
 
-// EvictConflict evicts given conflict from the spenddag.
+// EvictConflict evicts given conflict from the SpendDAG.
 func (f *Framework) EvictSpend(conflictAlias string) {
 	f.Instance.EvictSpend(f.SpendID(conflictAlias))
 }

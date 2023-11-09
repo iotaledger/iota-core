@@ -53,8 +53,8 @@ type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] struct {
 	// invalidate blocks that try to spend them.
 	delayedOutputStateEviction *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata]]
 
-	// spenddag is the DAG that is used to keep track of the conflicts between transactions.
-	spenddag spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, VoteRank]
+	// spendDAG is the DAG that is used to keep track of the conflicts between transactions.
+	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, VoteRank]
 
 	apiProvider iotago.APIProvider
 
@@ -80,7 +80,7 @@ func New[VoteRank spenddag.VoteRankType[VoteRank]](
 	stateResolver mempool.StateResolver,
 	mutationsFunc func(iotago.SlotIndex) (kvstore.KVStore, error),
 	workers *workerpool.Group,
-	spenddag spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, VoteRank],
+	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, VoteRank],
 	apiProvider iotago.APIProvider,
 	errorHandler func(error),
 	opts ...options.Option[MemPool[VoteRank]],
@@ -97,7 +97,7 @@ func New[VoteRank spenddag.VoteRankType[VoteRank]](
 		executionWorkers:           workers.CreatePool("executionWorkers", workerpool.WithWorkerCount(1)),
 		delayedTransactionEviction: shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.TransactionID]](),
 		delayedOutputStateEviction: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata]](),
-		spenddag:                   spenddag,
+		spendDAG:                   spendDAG,
 		apiProvider:                apiProvider,
 		errorHandler:               errorHandler,
 		signedTransactionAttached:  event.New1[mempool.SignedTransactionMetadata](),
@@ -334,7 +334,7 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 func (m *MemPool[VoteRank]) forkTransaction(transactionMetadata *TransactionMetadata, resourceIDs ds.Set[mempool.StateID]) {
 	transactionMetadata.conflicting.Trigger()
 
-	if err := m.spenddag.UpdateConflictingResources(transactionMetadata.ID(), resourceIDs); err != nil {
+	if err := m.spendDAG.UpdateConflictingResources(transactionMetadata.ID(), resourceIDs); err != nil {
 		// this is a hack, as with a reactive.Variable we cannot set it to 0 and still check if it was orphaned.
 		transactionMetadata.orphanedSlot.Set(1)
 
@@ -426,7 +426,7 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 }
 
 func (m *MemPool[VoteRank]) setup() {
-	m.spenddag.Events().SpendAccepted.Hook(func(id iotago.TransactionID) {
+	m.spendDAG.Events().SpendAccepted.Hook(func(id iotago.TransactionID) {
 		if transaction, exists := m.cachedTransactions.Get(id); exists {
 			transaction.setConflictAccepted()
 		}
@@ -449,10 +449,10 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	})
 
 	transaction.OnConflicting(func() {
-		m.spenddag.CreateSpend(transaction.ID())
+		m.spendDAG.CreateSpend(transaction.ID())
 
 		unsubscribe := transaction.parentSpendIDs.OnUpdate(func(appliedMutations ds.SetMutations[iotago.TransactionID]) {
-			if err := m.spenddag.UpdateSpendParents(transaction.ID(), appliedMutations.AddedElements(), appliedMutations.DeletedElements()); err != nil {
+			if err := m.spendDAG.UpdateSpendParents(transaction.ID(), appliedMutations.AddedElements(), appliedMutations.DeletedElements()); err != nil {
 				panic(err)
 			}
 		})
@@ -460,7 +460,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 		transaction.OnEvicted(func() {
 			unsubscribe()
 
-			m.spenddag.EvictSpend(transaction.ID())
+			m.spendDAG.EvictSpend(transaction.ID())
 		})
 	})
 

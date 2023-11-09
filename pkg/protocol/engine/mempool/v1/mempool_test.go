@@ -37,12 +37,12 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	}
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
-	spenddag := spenddagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](func() int { return 0 })
+	spendDAG := spenddagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](func() int { return 0 })
 	memPoolInstance := New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference)
-	}, mutationsFunc, workers, spenddag, api.SingleVersionProvider(tpkg.TestAPI), func(error) {})
+	}, mutationsFunc, workers, spendDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {})
 
-	tf := mempooltests.NewTestFramework(t, memPoolInstance, spenddag, ledgerState, workers)
+	tf := mempooltests.NewTestFramework(t, memPoolInstance, spendDAG, ledgerState, workers)
 
 	issueTransactions := func(startIndex, transactionCount int, prevStateAlias string) (int, string) {
 		index := startIndex
@@ -141,7 +141,7 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	workers := workerpool.NewGroup(t.Name())
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
-	spenddag := spenddagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
+	spendDAG := spenddagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
 	mutationsFunc := func(index iotago.SlotIndex) (kvstore.KVStore, error) {
 		return mapdb.NewMapDB(), nil
@@ -149,5 +149,5 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference)
-	}, mutationsFunc, workers, spenddag, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}), spenddag, ledgerState, workers)
+	}, mutationsFunc, workers, spendDAG, api.SingleVersionProvider(tpkg.TestAPI), func(error) {}), spendDAG, ledgerState, workers)
 }

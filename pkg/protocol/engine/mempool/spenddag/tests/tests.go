@@ -14,24 +14,24 @@ import (
 
 func TestAll(t *testing.T, frameworkProvider func(*testing.T) *Framework) {
 	for testName, testCase := range map[string]func(*testing.T, *Framework){
-		"CreateConflict":                    CreateSpend,
-		"ExistingConflictJoinsConflictSets": ExistingConflictJoinsSpendSets,
-		"JoinConflictSetTwice":              JoinConflictSetTwice,
-		"UpdateConflictParents":             UpdateSpendParents,
-		"LikedInstead":                      LikedInstead,
-		"CreateConflictWithoutMembers":      CreateConflictWithoutMembers,
-		"ConflictAcceptance":                ConflictAcceptance,
-		"CastVotes":                         CastVotes,
-		"CastVotes_VoteRank":                CastVotesVoteRank,
-		"CastVotesAcceptance":               CastVotesAcceptance,
-		"EvictAcceptedConflict":             EvictAcceptedConflict,
-		"EvictRejectedConflict":             EvictRejectedConflict,
+		"CreateSpend":                    CreateSpend,
+		"ExistingSpendJoinsConflictSets": ExistingSpendJoinsConflictSets,
+		"JoinConflictSetTwice":           JoinConflictSetTwice,
+		"UpdateSpendParents":             UpdateSpendParents,
+		"LikedInstead":                   LikedInstead,
+		"CreateSpendWithoutMembers":      CreateSpendWithoutMembers,
+		"SpendAcceptance":                SpendAcceptance,
+		"CastVotes":                      CastVotes,
+		"CastVotes_VoteRank":             CastVotesVoteRank,
+		"CastVotesAcceptance":            CastVotesAcceptance,
+		"EvictAcceptedSpend":             EvictAcceptedSpend,
+		"EvictRejectedSpend":             EvictRejectedSpend,
 	} {
 		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
 	}
 }
 
-func ExistingConflictJoinsSpendSets(t *testing.T, tf *Framework) {
+func ExistingSpendJoinsConflictSets(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateConflict("conflict2", []string{"resource1"}))
 	tf.Assert.ConflictSetMembers("resource1", "conflict1", "conflict2")
@@ -91,7 +91,7 @@ func CreateSpend(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("conflict4", "conflict1")
 }
 
-func CreateConflictWithoutMembers(t *testing.T, tf *Framework) {
+func CreateSpendWithoutMembers(t *testing.T, tf *Framework) {
 	tf.Accounts.CreateID("nodeID1")
 	tf.Accounts.CreateID("nodeID2")
 	tf.Accounts.CreateID("nodeID3")
@@ -151,7 +151,7 @@ func LikedInstead(t *testing.T, tf *Framework) {
 	tf.Assert.LikedInstead([]string{"conflict1", "conflict2", "conflict3", "conflict4"}, "conflict1", "conflict4")
 }
 
-func ConflictAcceptance(t *testing.T, tf *Framework) {
+func SpendAcceptance(t *testing.T, tf *Framework) {
 	tf.Accounts.CreateID("nodeID1")
 	tf.Accounts.CreateID("nodeID2")
 	tf.Accounts.CreateID("nodeID3")
@@ -353,7 +353,7 @@ func JoinConflictSetTwice(t *testing.T, tf *Framework) {
 	tf.Assert.ConflictSets("conflict1", "resource1", "resource2", "resource3", "resource4")
 }
 
-func EvictAcceptedConflict(t *testing.T, tf *Framework) {
+func EvictAcceptedSpend(t *testing.T, tf *Framework) {
 	tf.Accounts.CreateID("nodeID1")
 	tf.Accounts.CreateID("nodeID2")
 	tf.Accounts.CreateID("nodeID3")
@@ -414,7 +414,7 @@ func EvictAcceptedConflict(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("conflict6")
 }
 
-func EvictRejectedConflict(t *testing.T, tf *Framework) {
+func EvictRejectedSpend(t *testing.T, tf *Framework) {
 	conflictEvictedEventCount := 0
 	tf.Instance.Events().SpendEvicted.Hook(func(id iotago.TransactionID) {
 		conflictEvictedEventCount++

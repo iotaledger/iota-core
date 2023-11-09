@@ -26,8 +26,8 @@ type TipSelection struct {
 	// tipManager is the TipManager that is used to access the tip related metadata.
 	tipManager tipmanager.TipManager
 
-	// conflictDAG is the ConflictDAG that is used to track conflicts.
-	conflictDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
+	// spendDAG is the SpendDAG that is used to track spends.
+	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 
 	// rootBlocks is a function that returns the current root blocks.
 	rootBlocks func() iotago.BlockIDs
@@ -78,9 +78,9 @@ func New(opts ...options.Option[TipSelection]) *TipSelection {
 //
 // This method is separated from the constructor so the TipSelection can be initialized lazily after all dependencies
 // are available.
-func (t *TipSelection) Construct(tipManager tipmanager.TipManager, conflictDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
+func (t *TipSelection) Construct(tipManager tipmanager.TipManager, spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
 	t.tipManager = tipManager
-	t.conflictDAG = conflictDAG
+	t.spendDAG = spendDAG
 	t.transactionMetadata = transactionMetadataRetriever
 	t.rootBlocks = rootBlocksRetriever
 	t.livenessThreshold = livenessThresholdFunc
@@ -103,7 +103,7 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 	references = make(model.ParentReferences)
 	strongParents := ds.NewSet[iotago.BlockID]()
 	shallowLikesParents := ds.NewSet[iotago.BlockID]()
-	_ = t.conflictDAG.ReadConsistent(func(_ spenddag.ReadLockedSpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]) error {
+	_ = t.spendDAG.ReadConsistent(func(_ spenddag.ReadLockedSpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]) error {
 		previousLikedInsteadConflicts := ds.NewSet[iotago.TransactionID]()
 
 		if t.collectReferences(references, iotago.StrongParentType, t.tipManager.StrongTips, func(tip tipmanager.TipMetadata) {
@@ -177,7 +177,7 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
 func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.TransactionID], tipMetadata tipmanager.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts ds.Set[iotago.TransactionID], err error) {
 	necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
-	if err = t.conflictDAG.LikedInstead(tipMetadata.Block().SpendIDs()).ForEach(func(likedSpendID iotago.TransactionID) error {
+	if err = t.spendDAG.LikedInstead(tipMetadata.Block().SpendIDs()).ForEach(func(likedSpendID iotago.TransactionID) error {
 		transactionMetadata, exists := t.transactionMetadata(likedSpendID)
 		if !exists {
 			return ierrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedSpendID)
@@ -233,12 +233,12 @@ func (t *TipSelection) collectReferences(references model.ParentReferences, pare
 
 // isValidStrongTip checks if the given block is a valid strong tip.
 func (t *TipSelection) isValidStrongTip(block *blocks.Block) bool {
-	return !t.conflictDAG.AcceptanceState(block.SpendIDs()).IsRejected()
+	return !t.spendDAG.AcceptanceState(block.SpendIDs()).IsRejected()
 }
 
 // isValidWeakTip checks if the given block is a valid weak tip.
 func (t *TipSelection) isValidWeakTip(block *blocks.Block) bool {
-	return t.conflictDAG.LikedInstead(block.PayloadSpendIDs()).Size() == 0
+	return t.spendDAG.LikedInstead(block.PayloadSpendIDs()).Size() == 0
 }
 
 // triggerLivenessThreshold triggers the liveness threshold for all tips that have reached the given threshold.
