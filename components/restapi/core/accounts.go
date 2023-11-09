@@ -133,7 +133,23 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
 	}
-	slotIndex, _ := httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
+
+	var slotIndex iotago.SlotIndex
+	if len(c.QueryParam(restapipkg.ParameterSlotIndex)) > 0 {
+		var err error
+		slotIndex, err = httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to parse slot index %s", c.Param(restapipkg.ParameterSlotIndex))
+		}
+		genesisSlot := deps.Protocol.LatestAPI().ProtocolParameters().GenesisSlot()
+		if slotIndex < genesisSlot {
+			return nil, ierrors.Wrapf(echo.ErrBadRequest, "slot index (%d) before genesis slot (%d)", slotIndex, genesisSlot)
+		}
+	} else {
+		// The slot index may be unset for requests that do not want to issue a transaction, such as displaying estimated rewards,
+		// in which case we use latest committed slot.
+		slotIndex = deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
+	}
 
 	utxoOutput, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
 	if err != nil {
@@ -171,12 +187,6 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 		// In this case the calculation must be consistent with the rewards calculation at execution time, so a client can specify
 		// a slot index explicitly, which should be equal to the slot it uses as the commitment input for the claiming transaction.
 		if delegationOutput.DelegationID.Empty() {
-			// The slot index may be unset for requests that do not want to issue a transaction, such as displaying estimated rewards,
-			// in which case we use latest committed slot.
-			if slotIndex == 0 {
-				slotIndex = deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
-			}
-
 			apiForSlot := deps.Protocol.APIForSlot(slotIndex)
 			futureBoundedSlotIndex := slotIndex + apiForSlot.ProtocolParameters().MinCommittableAge()
 			delegationEnd = apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex) - iotago.EpochIndex(1)
