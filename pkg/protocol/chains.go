@@ -15,30 +15,33 @@ import (
 )
 
 type Chains struct {
-	Main              reactive.Variable[*Chain]
-	Heaviest          reactive.Variable[*Chain]
-	HeaviestAttested  reactive.Variable[*Chain]
-	HeaviestVerified  reactive.Variable[*Chain]
+	reactive.Set[*Chain]
+	reactive.EvictionState[iotago.SlotIndex]
+
+	Main             reactive.Variable[*Chain]
+	Heaviest         reactive.Variable[*Chain]
+	HeaviestAttested reactive.Variable[*Chain]
+	HeaviestVerified reactive.Variable[*Chain]
+
 	CommitmentCreated *event.Event1[*Commitment]
+	ChainCreated      *event.Event1[*Chain]
 
 	protocol    *Protocol
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
-
-	reactive.Set[*Chain]
-	reactive.EvictionState[iotago.SlotIndex]
 }
 
 func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
-		protocol:          protocol,
-		EvictionState:     reactive.NewEvictionState[iotago.SlotIndex](),
 		Set:               reactive.NewSet[*Chain](),
+		EvictionState:     reactive.NewEvictionState[iotago.SlotIndex](),
 		Main:              reactive.NewVariable[*Chain](),
 		Heaviest:          reactive.NewVariable[*Chain](),
 		HeaviestAttested:  reactive.NewVariable[*Chain](),
 		HeaviestVerified:  reactive.NewVariable[*Chain](),
-		commitments:       shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 		CommitmentCreated: event.New1[*Commitment](),
+		ChainCreated:      event.New1[*Chain](),
+		protocol:          protocol,
+		commitments:       shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 	}
 
 	c.Heaviest.LogUpdates(c.protocol, log.LevelTrace, "Unchecked Heavier Chain", (*Chain).LogName)
@@ -83,7 +86,7 @@ func (c *Chains) PublishCommitment(commitment *model.Commitment) (commitmentMeta
 		return nil, false, ierrors.Wrapf(request.Err(), "failed to request commitment %s", commitment.ID())
 	}
 
-	publishedCommitmentMetadata := NewCommitment(commitment, c.protocol)
+	publishedCommitmentMetadata := NewCommitment(commitment, c)
 	request.Resolve(publishedCommitmentMetadata).OnSuccess(func(resolvedMetadata *Commitment) {
 		commitmentMetadata = resolvedMetadata
 	})
@@ -123,7 +126,7 @@ func (c *Chains) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()
 func (c *Chains) initMainChain() {
 	c.protocol.LogDebug("initializing main chain")
 
-	mainChain := NewChain(c.protocol)
+	mainChain := NewChain(c)
 
 	//c.protocol.LogDebug("new chain created", "name", mainChain.LogName(), "forkingPoint", "<snapshot>")
 
@@ -131,6 +134,7 @@ func (c *Chains) initMainChain() {
 	mainChain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
 	c.Main.Set(mainChain)
+	c.ChainCreated.Trigger(mainChain)
 	c.Add(mainChain)
 }
 
@@ -143,13 +147,17 @@ func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reacti
 		commitment.IsEvicted.Trigger()
 	})
 
-	commitment.Chain.OnUpdate(func(_ *Chain, newChain *Chain) {
-		if newChain != nil {
-			c.Add(newChain)
-		}
-	})
-
 	c.CommitmentCreated.Trigger(commitment)
+}
+
+func (c *Chains) Fork(forkingPoint *Commitment) *Chain {
+	chain := NewChain(c)
+	chain.ForkingPoint.Set(forkingPoint)
+
+	c.ChainCreated.Trigger(chain)
+	c.Add(chain)
+
+	return chain
 }
 
 func (c *Chains) initChainSwitching() {

@@ -41,7 +41,7 @@ type Chain struct {
 	log.Logger
 }
 
-func NewChain(protocol *Protocol) *Chain {
+func NewChain(chains *Chains) *Chain {
 	c := &Chain{
 		ForkingPoint:             reactive.NewVariable[*Commitment](),
 		ParentChain:              reactive.NewVariable[*Chain](),
@@ -65,7 +65,7 @@ func NewChain(protocol *Protocol) *Chain {
 		SpawnedEngine: reactive.NewVariable[*engine.Engine](),
 	}
 
-	c.Logger = protocol.NewEntityLogger("Chain", c.IsEvicted, func(chainLogger log.Logger) {
+	c.Logger = chains.protocol.NewEntityLogger("Chain", c.IsEvicted, func(chainLogger log.Logger) {
 		chainLogger.LogDebug("created")
 
 		c.WarpSync.LogUpdates(chainLogger, log.LevelTrace, "WarpSync")
@@ -90,7 +90,7 @@ func NewChain(protocol *Protocol) *Chain {
 	c.initEngine()
 	c.initWarpSync()
 
-	protocol.NetworkClock.OnUpdate(func(_ time.Time, now time.Time) {
+	chains.protocol.NetworkClock.OnUpdate(func(_ time.Time, now time.Time) {
 		if engineInstance := c.Engine.Get(); engineInstance != nil {
 			c.NetworkClockSlot.Set(engineInstance.LatestAPI().TimeProvider().SlotFromTime(now))
 		}

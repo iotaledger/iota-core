@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -358,6 +359,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	wallet := ts.AddGenesisWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true)
+	node1.Protocol.SetLogLevel(log.LevelTrace)
 
 	// assert validator and block issuer accounts in genesis snapshot.
 	// validator node account.

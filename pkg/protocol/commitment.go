@@ -33,7 +33,7 @@ type Commitment struct {
 	log.Logger
 }
 
-func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment {
+func NewCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
 	return (&Commitment{
 		Commitment:                      commitment,
 		Parent:                          reactive.NewVariable[*Commitment](),
@@ -53,7 +53,7 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
 		ReplayDroppedBlocks:             reactive.NewVariable[bool](),
 		IsEvicted:                       reactive.NewEvent(),
-	}).initLogging(protocol).initBehavior(protocol)
+	}).initLogging(chains).initBehavior(chains)
 }
 
 func (c *Commitment) Engine() *engine.Engine {
@@ -64,8 +64,8 @@ func (c *Commitment) Engine() *engine.Engine {
 	return nil
 }
 
-func (c *Commitment) initLogging(protocol *Protocol) (self *Commitment) {
-	c.Logger = protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()), c.IsEvicted, func(_ log.Logger) {})
+func (c *Commitment) initLogging(chains *Chains) (self *Commitment) {
+	c.Logger = chains.protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()), c.IsEvicted, func(_ log.Logger) {})
 
 	teardownLogging := lo.Batch(
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
@@ -91,7 +91,7 @@ func (c *Commitment) initLogging(protocol *Protocol) (self *Commitment) {
 	return c
 }
 
-func (c *Commitment) initBehavior(protocol *Protocol) (self *Commitment) {
+func (c *Commitment) initBehavior(chains *Chains) (self *Commitment) {
 	teardownBehavior := lo.Batch(
 		c.IsSolid.InheritFrom(c.IsRoot),
 		c.IsAttested.InheritFrom(c.IsRoot),
@@ -110,8 +110,7 @@ func (c *Commitment) initBehavior(protocol *Protocol) (self *Commitment) {
 
 					if c != mainChild {
 						if chain == nil {
-							chain = NewChain(protocol)
-							chain.ForkingPoint.Set(c)
+							chain = chains.Fork(c)
 						}
 
 						return chain
