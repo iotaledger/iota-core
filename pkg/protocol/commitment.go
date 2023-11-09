@@ -124,15 +124,15 @@ func (c *Commitment) initBehavior(protocol *Protocol) (self *Commitment) {
 					return spawnedChain
 				}, c.IsRoot, parent.MainChild, c.SpawnedChain.Get())),
 
-				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(_, parentChain, spawnedChain *Chain) *Chain {
+				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ *Chain, parentChain, spawnedChain *Chain) *Chain {
 					return lo.Cond(spawnedChain != nil, spawnedChain, parentChain)
 				}, parent.Chain, c.SpawnedChain)),
 
-				c.CumulativeAttestedWeight.DeriveValueFrom(reactive.NewDerivedVariable2(func(_, parentCumulativeAttestedWeight, attestedWeight uint64) uint64 {
+				c.CumulativeAttestedWeight.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ uint64, parentCumulativeAttestedWeight uint64, attestedWeight uint64) uint64 {
 					return parentCumulativeAttestedWeight + attestedWeight
 				}, parent.CumulativeAttestedWeight, c.AttestedWeight)),
 
-				c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_, parentAboveLatestVerifiedCommitment, parentIsVerified, isVerified bool) bool {
+				c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, parentAboveLatestVerifiedCommitment bool, parentIsVerified bool, isVerified bool) bool {
 					return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
 				}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified)),
 

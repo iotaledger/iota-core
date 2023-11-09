@@ -128,7 +128,7 @@ func (c *ChainManager) initMainChain() {
 	//c.protocol.LogDebug("new chain created", "name", mainChain.LogName(), "forkingPoint", "<snapshot>")
 
 	mainChain.VerifyState.Set(true)
-	mainChain.Engine.OnUpdate(func(_, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
+	mainChain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
 	c.MainChain.Set(mainChain)
 	c.Chains.Add(mainChain)
@@ -143,7 +143,7 @@ func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent 
 		commitment.IsEvicted.Trigger()
 	})
 
-	commitment.SpawnedChain.OnUpdate(func(_, newChain *Chain) {
+	commitment.SpawnedChain.OnUpdate(func(_ *Chain, newChain *Chain) {
 		if newChain != nil {
 			c.Chains.Add(newChain)
 		}
@@ -163,13 +163,13 @@ func (c *ChainManager) initChainSwitching() {
 		}
 	})
 
-	c.HeaviestAttestedChain.OnUpdate(func(_, heaviestAttestedChain *Chain) {
+	c.HeaviestAttestedChain.OnUpdate(func(_ *Chain, heaviestAttestedChain *Chain) {
 		heaviestAttestedChain.VerifyAttestations.Set(false)
 		heaviestAttestedChain.VerifyState.Set(true)
 	})
 
-	c.HeaviestVerifiedChain.OnUpdate(func(_, heaviestVerifiedChain *Chain) {
-		heaviestVerifiedChain.LatestVerifiedCommitment.OnUpdate(func(_, latestVerifiedCommitment *Commitment) {
+	c.HeaviestVerifiedChain.OnUpdate(func(_ *Chain, heaviestVerifiedChain *Chain) {
+		heaviestVerifiedChain.LatestVerifiedCommitment.OnUpdate(func(_ *Commitment, latestVerifiedCommitment *Commitment) {
 			forkingPoint := heaviestVerifiedChain.ForkingPoint.Get()
 			if forkingPoint == nil || latestVerifiedCommitment == nil {
 				return
@@ -224,7 +224,7 @@ func (c *ChainManager) requestCommitment(commitmentID iotago.CommitmentID, reque
 }
 
 func (c *ChainManager) publishEngineCommitments(chain *Chain) {
-	chain.SpawnedEngine.OnUpdateWithContext(func(_, engine *engine.Engine, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+	chain.SpawnedEngine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
 		if engine != nil {
 			var latestPublishedSlot iotago.SlotIndex
 
@@ -260,7 +260,7 @@ func (c *ChainManager) publishEngineCommitments(chain *Chain) {
 							latestPublishedSlot = forkingPoint.Slot() - 1
 						}
 
-						return engine.LatestCommitment.OnUpdate(func(_, latestCommitment *model.Commitment) {
+						return engine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {
 							for latestPublishedSlot < latestCommitment.Slot() {
 								commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedSlot + 1)
 								if err != nil {
