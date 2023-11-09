@@ -158,13 +158,13 @@ func (n *Node) hookEvents() {
 
 			n.forkDetectedCount.Add(1)
 
-			heaviestAttestedChain.SpawnedEngine.OnUpdate(func(prevEngine, newEngine *engine.Engine) {
+			heaviestAttestedChain.SpawnedEngine.OnUpdate(func(prevEngine *engine.Engine, newEngine *engine.Engine) {
 				n.candidateEngineActivatedCount.Add(1)
 			})
 		}
 	})
 
-	n.Protocol.MainChain.OnUpdate(func(prevChain, newChain *protocol.Chain) {
+	n.Protocol.MainChain.OnUpdate(func(prevChain *protocol.Chain, newChain *protocol.Chain) {
 		if prevChain != nil {
 			n.mainEngineSwitchedCount.Add(1)
 		}
@@ -174,7 +174,7 @@ func (n *Node) hookEvents() {
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	n.Protocol.ChainManager.Chains.OnUpdate(func(mutations ds.SetMutations[*protocol.Chain]) {
 		mutations.AddedElements().Range(func(chain *protocol.Chain) {
-			chain.SpawnedEngine.OnUpdate(func(_, newEngine *engine.Engine) {
+			chain.SpawnedEngine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) {
 				if newEngine != nil {
 					n.attachEngineLogs(failOnBlockFiltered, newEngine)
 				}
