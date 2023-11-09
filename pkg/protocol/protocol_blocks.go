@@ -35,9 +35,9 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
 			commitment.ReplayDroppedBlocks.OnUpdate(func(_ bool, replayBlocks bool) {
 				if replayBlocks {
-					b.LogDebug("replaying blocks", "commitmentID", commitment.ID())
-
 					for _, droppedBlock := range b.droppedBlocksBuffer.GetValues(commitment.ID()) {
+						b.LogTrace("replaying dropped block", "commitmentID", commitment.ID(), "blockID", droppedBlock.A.ID())
+
 						b.ProcessResponse(droppedBlock.A, droppedBlock.B)
 					}
 				}

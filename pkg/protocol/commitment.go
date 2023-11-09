@@ -14,7 +14,6 @@ type Commitment struct {
 	Parent                          reactive.Variable[*Commitment]
 	Children                        reactive.Set[*Commitment]
 	MainChild                       reactive.Variable[*Commitment]
-	SpawnedChain                    reactive.Variable[*Chain]
 	Chain                           reactive.Variable[*Chain]
 	RequestAttestations             reactive.Variable[bool]
 	WarpSyncBlocks                  reactive.Variable[bool]
@@ -40,7 +39,6 @@ func NewCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		Parent:                          reactive.NewVariable[*Commitment](),
 		Children:                        reactive.NewSet[*Commitment](),
 		MainChild:                       reactive.NewVariable[*Commitment](),
-		SpawnedChain:                    reactive.NewVariable[*Chain](),
 		Chain:                           reactive.NewVariable[*Chain](),
 		RequestAttestations:             reactive.NewVariable[bool](),
 		WarpSyncBlocks:                  reactive.NewVariable[bool](),
@@ -73,7 +71,6 @@ func (c *Commitment) initLogging(protocol *Protocol) (self *Commitment) {
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
 		// c.Children.LogUpdates(c, log.LevelTrace, "Children", (*Commitment).LogName),
 		c.MainChild.LogUpdates(c, log.LevelTrace, "MainChild", (*Commitment).LogName),
-		c.SpawnedChain.LogUpdates(c, log.LevelTrace, "SpawnedChain", (*Chain).LogName),
 		c.Chain.LogUpdates(c, log.LevelTrace, "Chain", (*Chain).LogName),
 		c.RequestAttestations.LogUpdates(c, log.LevelTrace, "RequestAttestations"),
 		c.WarpSyncBlocks.LogUpdates(c, log.LevelTrace, "WarpSyncBlocks"),
@@ -106,27 +103,26 @@ func (c *Commitment) initBehavior(protocol *Protocol) (self *Commitment) {
 			return lo.Batch(
 				parent.registerChild(c),
 
-				c.SpawnedChain.DeriveValueFrom(reactive.NewDerivedVariable2(func(spawnedChain *Chain, isRoot bool, mainChild *Commitment) *Chain {
-					if !isRoot { // do not adjust the chain of the root commitment
-						if mainChild != c {
-							if spawnedChain == nil {
-								spawnedChain = NewChain(protocol)
-								spawnedChain.ForkingPoint.Set(c)
-							}
-						} else {
-							if spawnedChain != nil {
-								spawnedChain.IsEvicted.Trigger()
-								spawnedChain = nil
-							}
-						}
+				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable3(func(chain *Chain, isRoot bool, mainChild *Commitment, parentChain *Chain) *Chain {
+					if isRoot {
+						return chain
 					}
 
-					return spawnedChain
-				}, c.IsRoot, parent.MainChild, c.SpawnedChain.Get())),
+					if c != mainChild {
+						if chain == nil {
+							chain = NewChain(protocol)
+							chain.ForkingPoint.Set(c)
+						}
 
-				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ *Chain, parentChain *Chain, spawnedChain *Chain) *Chain {
-					return lo.Cond(spawnedChain != nil, spawnedChain, parentChain)
-				}, parent.Chain, c.SpawnedChain)),
+						return chain
+					}
+
+					if chain != nil && chain != parentChain {
+						chain.IsEvicted.Trigger()
+					}
+
+					return parentChain
+				}, c.IsRoot, parent.MainChild, parent.Chain, c.Chain.Get())),
 
 				c.CumulativeAttestedWeight.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ uint64, parentCumulativeAttestedWeight uint64, attestedWeight uint64) uint64 {
 					return parentCumulativeAttestedWeight + attestedWeight
@@ -188,11 +184,7 @@ func (c *Commitment) registerChild(child *Commitment) (unregisterChild func()) {
 
 func (c *Commitment) setChain(targetChain *Chain) {
 	if currentChain := c.Chain.Get(); currentChain != targetChain {
-		if currentChain == nil {
-			// since we only call setChain for commitments coming from an engine (which by definition are solid), this
-			// can only happen if the commitment is the root commitment of the main chain that is the first commitment
-			// ever published (which means that we can just set the chain that we want it to have).
-			c.SpawnedChain.Set(targetChain)
+		if currentChain == nil { // the root commitment doesn't inherit a chain from its parents
 			c.Chain.Set(targetChain)
 		} else if parent := c.Parent.Get(); parent.Chain.Get() == targetChain {
 			parent.MainChild.Set(c)

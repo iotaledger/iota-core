@@ -65,6 +65,25 @@ func NewChain(protocol *Protocol) *Chain {
 		SpawnedEngine: reactive.NewVariable[*engine.Engine](),
 	}
 
+	c.Logger = protocol.NewEntityLogger("Chain", c.IsEvicted, func(chainLogger log.Logger) {
+		chainLogger.LogDebug("created")
+
+		c.WarpSync.LogUpdates(chainLogger, log.LevelTrace, "WarpSync")
+		c.NetworkClockSlot.LogUpdates(chainLogger, log.LevelTrace, "NetworkClockSlot")
+		c.WarpSyncThreshold.LogUpdates(chainLogger, log.LevelTrace, "WarpSyncThreshold")
+		c.OutOfSyncThreshold.LogUpdates(chainLogger, log.LevelTrace, "OutOfSyncThreshold")
+		c.ForkingPoint.LogUpdates(chainLogger, log.LevelTrace, "ForkingPoint", (*Commitment).LogName)
+		c.ClaimedWeight.LogUpdates(chainLogger, log.LevelTrace, "ClaimedWeight")
+		c.AttestedWeight.LogUpdates(chainLogger, log.LevelTrace, "AttestedWeight")
+		c.VerifiedWeight.LogUpdates(chainLogger, log.LevelTrace, "VerifiedWeight")
+		c.LatestCommitment.LogUpdates(chainLogger, log.LevelTrace, "LatestCommitment", (*Commitment).LogName)
+		c.LatestVerifiedCommitment.LogUpdates(chainLogger, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
+		c.VerifyAttestations.LogUpdates(chainLogger, log.LevelTrace, "VerifyAttestations")
+		c.VerifyState.LogUpdates(chainLogger, log.LevelDebug, "VerifyState")
+		c.SpawnedEngine.LogUpdates(chainLogger, log.LevelDebug, "SpawnedEngine", (*engine.Engine).LogName)
+		c.IsEvicted.LogUpdates(chainLogger, log.LevelDebug, "IsEvicted")
+	})
+
 	c.initClaimedWeight()
 	c.initAttestedWeight()
 	c.initVerifiedWeight()
@@ -119,29 +138,11 @@ func NewChain(protocol *Protocol) *Chain {
 		})
 	})
 
-	c.Logger = protocol.NewEntityLogger("Chain", c.IsEvicted, func(chainLogger log.Logger) {
-		chainLogger.LogDebug("created")
-
-		c.WarpSync.LogUpdates(chainLogger, log.LevelTrace, "WarpSync")
-		c.NetworkClockSlot.LogUpdates(chainLogger, log.LevelTrace, "NetworkClockSlot")
-		c.WarpSyncThreshold.LogUpdates(chainLogger, log.LevelTrace, "WarpSyncThreshold")
-		c.OutOfSyncThreshold.LogUpdates(chainLogger, log.LevelTrace, "OutOfSyncThreshold")
-		c.ForkingPoint.LogUpdates(chainLogger, log.LevelTrace, "ForkingPoint", (*Commitment).LogName)
-		c.ClaimedWeight.LogUpdates(chainLogger, log.LevelTrace, "ClaimedWeight")
-		c.AttestedWeight.LogUpdates(chainLogger, log.LevelTrace, "AttestedWeight")
-		c.VerifiedWeight.LogUpdates(chainLogger, log.LevelTrace, "VerifiedWeight")
-		c.LatestCommitment.LogUpdates(chainLogger, log.LevelTrace, "LatestCommitment", (*Commitment).LogName)
-		c.LatestVerifiedCommitment.LogUpdates(chainLogger, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
-		c.VerifyAttestations.LogUpdates(chainLogger, log.LevelTrace, "VerifyAttestations")
-		c.VerifyState.LogUpdates(chainLogger, log.LevelDebug, "VerifyState")
-		c.SpawnedEngine.LogUpdates(chainLogger, log.LevelDebug, "SpawnedEngine", (*engine.Engine).LogName)
-	})
-
 	return c
 }
 
 func (c *Chain) initClaimedWeight() {
-	c.ClaimedWeight.InheritFrom(reactive.NewDerivedVariable(func(_ uint64, c *Commitment) uint64 {
+	c.ClaimedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, c *Commitment) uint64 {
 		if c == nil {
 			return 0
 		}
@@ -163,7 +164,7 @@ func (c *Chain) initAttestedWeight() {
 }
 
 func (c *Chain) initVerifiedWeight() {
-	c.VerifiedWeight.InheritFrom(reactive.NewDerivedVariable(func(_ uint64, c *Commitment) uint64 {
+	c.VerifiedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, c *Commitment) uint64 {
 		if c == nil {
 			return 0
 		}
@@ -174,15 +175,15 @@ func (c *Chain) initVerifiedWeight() {
 
 func (c *Chain) initWarpSync() {
 	enableWarpSyncIfNecessary := func() (unsubscribe func()) {
-		return c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(_ bool, latestVerifiedCommitment *Commitment, outOfSyncThreshold iotago.SlotIndex) bool {
+		return c.WarpSync.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ bool, latestVerifiedCommitment *Commitment, outOfSyncThreshold iotago.SlotIndex) bool {
 			return latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < outOfSyncThreshold
-		}, c.LatestVerifiedCommitment, c.OutOfSyncThreshold))
+		}, c.LatestVerifiedCommitment, c.OutOfSyncThreshold, c.WarpSync.Get()))
 	}
 
 	disableWarpSyncIfNecessary := func() (unsubscribe func()) {
-		return c.WarpSync.InheritFrom(reactive.NewDerivedVariable2(func(_ bool, latestVerifiedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex) bool {
+		return c.WarpSync.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ bool, latestVerifiedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex) bool {
 			return latestVerifiedCommitment != nil && latestVerifiedCommitment.ID().Slot() < warpSyncThreshold
-		}, c.LatestVerifiedCommitment, c.WarpSyncThreshold))
+		}, c.LatestVerifiedCommitment, c.WarpSyncThreshold, c.WarpSync.Get()))
 	}
 
 	warpSyncTogglePool := workerpool.New("WarpSync toggle", workerpool.WithWorkerCount(1)).Start()
@@ -214,7 +215,7 @@ func (c *Chain) initEngine() {
 				return c.Engine.InheritFrom(c.SpawnedEngine)
 			}
 
-			return c.Engine.InheritFrom(reactive.NewDerivedVariable2(func(_ *engine.Engine, spawnedEngine *engine.Engine, parentEngine *engine.Engine) *engine.Engine {
+			return c.Engine.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ *engine.Engine, spawnedEngine *engine.Engine, parentEngine *engine.Engine) *engine.Engine {
 				if spawnedEngine != nil {
 					return spawnedEngine
 				}
