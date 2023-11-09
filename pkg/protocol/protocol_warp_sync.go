@@ -36,7 +36,7 @@ func NewWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		c.protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-			commitment.WarpSyncBlocks.OnUpdate(func(_, warpSyncBlocks bool) {
+			commitment.WarpSyncBlocks.OnUpdate(func(_ bool, warpSyncBlocks bool) {
 				if warpSyncBlocks {
 					c.ticker.StartTicker(commitment.ID())
 				} else {
@@ -180,7 +180,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				return true
 			}
 
-			blockBookedFunc := func(_, _ bool) {
+			blockBookedFunc := func(_ bool, _ bool) {
 				if bookedBlocks.Add(1) != totalBlocks {
 					return
 				}
@@ -200,7 +200,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 						targetEngine.BlockGadget.SetAccepted(block)
 
-						block.Notarized().OnUpdate(func(_, _ bool) {
+						block.Notarized().OnUpdate(func(_ bool, _ bool) {
 							// Wait for all blocks to be notarized before forcing the commitment of the slot.
 							if notarizedBlocks.Add(1) != totalBlocks {
 								return

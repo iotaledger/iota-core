@@ -33,7 +33,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-			commitment.ReplayDroppedBlocks.OnUpdate(func(_, replayBlocks bool) {
+			commitment.ReplayDroppedBlocks.OnUpdate(func(_ bool, replayBlocks bool) {
 				if replayBlocks {
 					b.LogDebug("replaying blocks", "commitmentID", commitment.ID())
 
@@ -46,7 +46,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 
 		protocol.ChainManager.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
 			mutations.AddedElements().Range(func(chain *Chain) {
-				chain.Engine.OnUpdate(func(_, engine *engine.Engine) {
+				chain.Engine.OnUpdate(func(_ *engine.Engine, engine *engine.Engine) {
 					unsubscribe := engine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
 
 					engine.Shutdown.OnTrigger(unsubscribe)
@@ -54,7 +54,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 			})
 		})
 
-		protocol.MainChain.Get().Engine.OnUpdateWithContext(func(_, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
+		protocol.MainChain.Get().Engine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
 			if engine != nil {
 				unsubscribeOnEngineChange(func() (unsubscribe func()) {
 					return lo.Batch(

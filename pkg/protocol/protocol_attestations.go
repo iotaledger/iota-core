@@ -37,7 +37,7 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.OnChainCreated(func(chain *Chain) {
-			chain.VerifyAttestations.OnUpdate(func(_, requestAttestations bool) {
+			chain.VerifyAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
 				forkingPoint := chain.ForkingPoint.Get()
 
 				if requestAttestations {
@@ -54,7 +54,7 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 		})
 
 		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
-			commitment.RequestAttestations.OnUpdate(func(_, requestAttestations bool) {
+			commitment.RequestAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
 				if requestAttestations {
 					if commitment.CumulativeWeight() == 0 {
 						commitment.IsAttested.Set(true)
