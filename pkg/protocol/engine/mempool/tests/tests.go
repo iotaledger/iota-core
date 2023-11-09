@@ -18,22 +18,6 @@ const (
 	TestMemoryReleaseMaxMemoryIncreaseFactor = 1.20
 )
 
-func TestAllWithoutForkingEverything(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
-	for testName, testCase := range map[string]func(*testing.T, *TestFramework){
-		"TestProcessTransaction":                   TestProcessTransaction,
-		"TestProcessTransactionsOutOfOrder":        TestProcessTransactionsOutOfOrder,
-		"TestSetInclusionSlot":                     TestSetInclusionSlot,
-		"TestSetTransactionOrphanage":              TestSetTransactionOrphanage,
-		"TestStateDiff":                            TestStateDiff,
-		"TestMemoryRelease":                        TestMemoryRelease,
-		"TestInvalidTransaction":                   TestInvalidTransaction,
-		"TestStoreAttachmentInEvictedSlot":         TestStoreAttachmentInEvictedSlot,
-		"TestConflictPropagationForkOnDoubleSpend": TestConflictPropagationForkOnDoubleSpend,
-	} {
-		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
-	}
-}
-
 func TestAllWithForkingEverything(t *testing.T, frameworkProvider func(*testing.T) *TestFramework) {
 	for testName, testCase := range map[string]func(*testing.T, *TestFramework){
 		"TestConflictPropagationForkAll":           TestConflictPropagationForkAll,
