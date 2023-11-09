@@ -237,7 +237,7 @@ func (t *TestSuite) SlotsForEpoch(epoch iotago.EpochIndex) []iotago.SlotIndex {
 	return slots
 }
 
-func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block) *blocks.Block {
+func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.BlockID) []iotago.BlockID {
 
 	// we need to get accepted tangle time up to slot + minCA + 1
 	// first issue a chain of blocks with step size minCA up until slot + minCA + 1
@@ -246,10 +246,10 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 
 	latestCommittedSlot := activeValidators[0].Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot()
 	if latestCommittedSlot >= slot {
-		return parent
+		return parents
 	}
 	t.SetCurrentSlot(lo.Min(slot+t.API.ProtocolParameters().MinCommittableAge(), latestCommittedSlot+t.API.ProtocolParameters().MinCommittableAge()))
-	tip := parent
+	tips := parents
 	chainIndex := 0
 	for {
 		// preacceptance of nextBlockSlot
@@ -258,9 +258,9 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 			committeeAtBlockSlot, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)
 			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, t.currentSlot)
 			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
-				blockName := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex, node.Name)
+				blockName := fmt.Sprintf("chain-%s-%d-%s", parents[0].Alias(), chainIndex, node.Name)
 				latestCommitment := node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
-				tip = t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tip.ID()))
+				tips = []iotago.BlockID{t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...)).ID()}
 			}
 		}
 		// acceptance of nextBlockSlot
@@ -268,9 +268,9 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 			committeeAtBlockSlot, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)
 			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, t.currentSlot)
 			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
-				blockName := fmt.Sprintf("chain-%s-%d-%s", parent.ID().Alias(), chainIndex+1, node.Name)
+				blockName := fmt.Sprintf("chain-%s-%d-%s", parents[0].Alias(), chainIndex+1, node.Name)
 				latestCommitment := node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
-				tip = t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tip.ID()))
+				tips = []iotago.BlockID{t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...)).ID()}
 			}
 		}
 
@@ -290,5 +290,5 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parent *blocks.Block)
 		t.AssertLatestCommitmentSlotIndex(slot, node)
 	}
 
-	return tip
+	return tips
 }
