@@ -14,9 +14,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type ChainManager struct {
+type Chains struct {
 	MainChain             reactive.Variable[*Chain]
-	Chains                reactive.Set[*Chain]
 	HeaviestChain         reactive.Variable[*Chain]
 	HeaviestAttestedChain reactive.Variable[*Chain]
 	HeaviestVerifiedChain reactive.Variable[*Chain]
@@ -25,15 +24,16 @@ type ChainManager struct {
 	protocol    *Protocol
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
 
+	reactive.Set[*Chain]
 	reactive.EvictionState[iotago.SlotIndex]
 }
 
-func newChainManager(protocol *Protocol) *ChainManager {
-	c := &ChainManager{
+func newChains(protocol *Protocol) *Chains {
+	c := &Chains{
 		protocol:              protocol,
 		EvictionState:         reactive.NewEvictionState[iotago.SlotIndex](),
+		Set:                   reactive.NewSet[*Chain](),
 		MainChain:             reactive.NewVariable[*Chain](),
-		Chains:                reactive.NewSet[*Chain](),
 		HeaviestChain:         reactive.NewVariable[*Chain](),
 		HeaviestAttestedChain: reactive.NewVariable[*Chain](),
 		HeaviestVerifiedChain: reactive.NewVariable[*Chain](),
@@ -77,7 +77,7 @@ func newChainManager(protocol *Protocol) *ChainManager {
 	return c
 }
 
-func (c *ChainManager) PublishCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment, published bool, err error) {
+func (c *Chains) PublishCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment, published bool, err error) {
 	request := c.requestCommitment(commitment.ID(), false)
 	if request.WasRejected() {
 		return nil, false, ierrors.Wrapf(request.Err(), "failed to request commitment %s", commitment.ID())
@@ -95,7 +95,7 @@ func (c *ChainManager) PublishCommitment(commitment *model.Commitment) (commitme
 	return commitmentMetadata, commitmentMetadata == publishedCommitmentMetadata, nil
 }
 
-func (c *ChainManager) Commitment(commitmentID iotago.CommitmentID, requestMissing ...bool) (commitment *Commitment, err error) {
+func (c *Chains) Commitment(commitmentID iotago.CommitmentID, requestMissing ...bool) (commitment *Commitment, err error) {
 	commitmentRequest, exists := c.commitments.Get(commitmentID)
 	if !exists && lo.First(requestMissing) {
 		if commitmentRequest = c.requestCommitment(commitmentID, true); commitmentRequest.WasRejected() {
@@ -114,13 +114,13 @@ func (c *ChainManager) Commitment(commitmentID iotago.CommitmentID, requestMissi
 	return commitmentRequest.Result(), nil
 }
 
-func (c *ChainManager) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
-	return c.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
+func (c *Chains) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
+	return c.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
 		mutations.AddedElements().Range(callback)
 	})
 }
 
-func (c *ChainManager) initMainChain() {
+func (c *Chains) initMainChain() {
 	c.protocol.LogDebug("initializing main chain")
 
 	mainChain := NewChain(c.protocol)
@@ -131,10 +131,10 @@ func (c *ChainManager) initMainChain() {
 	mainChain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
 	c.MainChain.Set(mainChain)
-	c.Chains.Add(mainChain)
+	c.Add(mainChain)
 }
 
-func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
+func (c *Chains) setupCommitment(commitment *Commitment, slotEvictedEvent reactive.Event) {
 	c.requestCommitment(commitment.PreviousCommitmentID(), true, lo.Void(commitment.Parent.Set)).OnError(func(err error) {
 		c.protocol.LogDebug("failed to request previous commitment", "prevId", commitment.PreviousCommitmentID(), "error", err)
 	})
@@ -145,14 +145,14 @@ func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent 
 
 	commitment.Chain.OnUpdate(func(_ *Chain, newChain *Chain) {
 		if newChain != nil {
-			c.Chains.Add(newChain)
+			c.Add(newChain)
 		}
 	})
 
 	c.CommitmentCreated.Trigger(commitment)
 }
 
-func (c *ChainManager) initChainSwitching() {
+func (c *Chains) initChainSwitching() {
 	c.HeaviestChain.OnUpdate(func(prevHeaviestChain *Chain, heaviestChain *Chain) {
 		if prevHeaviestChain != nil {
 			prevHeaviestChain.VerifyAttestations.Set(false)
@@ -183,7 +183,7 @@ func (c *ChainManager) initChainSwitching() {
 	})
 }
 
-func (c *ChainManager) requestCommitment(commitmentID iotago.CommitmentID, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment]) {
+func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment]) {
 	slotEvicted := c.EvictionEvent(commitmentID.Index())
 	if slotEvicted.WasTriggered() && c.LastEvictedSlot().Get() != 0 {
 		forkingPoint := c.MainChain.Get().ForkingPoint.Get()
@@ -223,7 +223,7 @@ func (c *ChainManager) requestCommitment(commitmentID iotago.CommitmentID, reque
 	return commitmentRequest
 }
 
-func (c *ChainManager) publishEngineCommitments(chain *Chain) {
+func (c *Chains) publishEngineCommitments(chain *Chain) {
 	chain.SpawnedEngine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
 		if engine != nil {
 			var latestPublishedSlot iotago.SlotIndex

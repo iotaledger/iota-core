@@ -67,7 +67,7 @@ func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, nodes
 			}
 
 			// Make sure the commitment is also available in the ChainManager.
-			if node.Protocol.MainChain.Get().LatestCommitment.Get().ID().Slot() < slot {
+			if node.Protocol.Chains.MainChain.Get().LatestCommitment.Get().ID().Slot() < slot {
 				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found in ChainManager", node.Name, slot)
 			}
 
@@ -123,7 +123,7 @@ func (t *TestSuite) AssertChainID(expectedChainID iotago.CommitmentID, nodes ...
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			actualChainID := node.Protocol.MainChain.Get().ForkingPoint.Get().ID()
+			actualChainID := node.Protocol.Chains.MainChain.Get().ForkingPoint.Get().ID()
 			if expectedChainID != actualChainID {
 				return ierrors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID, expectedChainID.Slot(), actualChainID, actualChainID.Slot())
 			}

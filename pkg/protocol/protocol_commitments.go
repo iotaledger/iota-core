@@ -51,7 +51,7 @@ func (c *CommitmentsProtocol) SendResponse(commitment *Commitment, to peer.ID) {
 
 func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment, from peer.ID) {
 	c.workerPool.Submit(func() {
-		if commitment, published, err := c.protocol.PublishCommitment(commitmentModel); err != nil {
+		if commitment, published, err := c.protocol.Chains.PublishCommitment(commitmentModel); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
 		} else if published {
 			c.LogTrace("received response", "commitment", commitment.LogName(), "fromPeer", from)
@@ -61,7 +61,7 @@ func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment,
 
 func (c *CommitmentsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	c.workerPool.Submit(func() {
-		commitment, err := c.protocol.Commitment(commitmentID)
+		commitment, err := c.protocol.Chains.Commitment(commitmentID)
 		if err != nil {
 			logLevel := lo.Cond(ierrors.Is(err, ErrorCommitmentNotFound), log.LevelTrace, log.LevelError)
 

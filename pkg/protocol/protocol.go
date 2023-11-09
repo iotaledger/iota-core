@@ -30,7 +30,7 @@ type Protocol struct {
 	Engines              *Engines
 	Options              *Options
 
-	*ChainManager
+	Chains *Chains
 	*APIProvider
 
 	*module.ReactiveModule
@@ -50,7 +50,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		p.CommitmentsProtocol = NewCommitmentsProtocol(p)
 		p.AttestationsProtocol = NewAttestationsProtocol(p)
 		p.WarpSyncProtocol = NewWarpSyncProtocol(p)
-		p.ChainManager = newChainManager(p)
+		p.Chains = newChains(p)
 		p.Engines = NewEngines(p)
 		p.APIProvider = NewAPIProvider(p)
 

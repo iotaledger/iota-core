@@ -32,7 +32,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 	}
 
 	protocol.Constructed.OnTrigger(func() {
-		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
+		protocol.Chains.CommitmentCreated.Hook(func(commitment *Commitment) {
 			commitment.ReplayDroppedBlocks.OnUpdate(func(_ bool, replayBlocks bool) {
 				if replayBlocks {
 					for _, droppedBlock := range b.droppedBlocksBuffer.GetValues(commitment.ID()) {
@@ -44,7 +44,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 			})
 		})
 
-		protocol.ChainManager.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
+		protocol.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
 			mutations.AddedElements().Range(func(chain *Chain) {
 				chain.Engine.OnUpdate(func(_ *engine.Engine, engine *engine.Engine) {
 					unsubscribe := engine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
@@ -54,7 +54,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 			})
 		})
 
-		protocol.MainChain.Get().Engine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
+		protocol.Chains.MainChain.Get().Engine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
 			if engine != nil {
 				unsubscribeOnEngineChange(func() (unsubscribe func()) {
 					return lo.Batch(
@@ -87,7 +87,7 @@ func (b *BlocksProtocol) SendResponse(block *model.Block) {
 
 func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 	b.workerPool.Submit(func() {
-		commitmentRequest := b.protocol.requestCommitment(block.ProtocolBlock().Header.SlotCommitmentID, true)
+		commitmentRequest := b.protocol.Chains.requestCommitment(block.ProtocolBlock().Header.SlotCommitmentID, true)
 		if commitmentRequest.WasRejected() {
 			b.LogError("dropped block referencing unsolidifiable commitment", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID(), "err", commitmentRequest.Err())
 

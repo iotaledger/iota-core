@@ -190,7 +190,7 @@ func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *sto
 }
 
 func (e *Engines) syncMainEngineFromMainChain() (unsubscribe func()) {
-	return e.protocol.MainChain.OnUpdateWithContext(func(_ *Chain, mainChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+	return e.protocol.Chains.MainChain.OnUpdateWithContext(func(_ *Chain, mainChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
 		unsubscribeOnUpdate(func() func() {
 			return e.Main.InheritFrom(mainChain.SpawnedEngine)
 		})
@@ -208,7 +208,7 @@ func (e *Engines) syncMainEngineInfoFile() (unsubscribe func()) {
 }
 
 func (e *Engines) injectEngineInstances() (unsubscribe func()) {
-	return e.protocol.OnChainCreated(func(chain *Chain) {
+	return e.protocol.Chains.OnChainCreated(func(chain *Chain) {
 		chain.VerifyState.OnUpdate(func(_ bool, instantiate bool) {
 			e.worker.Submit(func() {
 				if !instantiate {

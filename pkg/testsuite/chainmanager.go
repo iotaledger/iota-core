@@ -10,7 +10,7 @@ func (t *TestSuite) AssertChainManagerIsSolid(nodes ...*mock.Node) {
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			chain := node.Protocol.MainChain.Get()
+			chain := node.Protocol.Chains.MainChain.Get()
 			if chain == nil {
 				return ierrors.Errorf("AssertChainManagerIsSolid: %s: chain is nil", node.Name)
 			}

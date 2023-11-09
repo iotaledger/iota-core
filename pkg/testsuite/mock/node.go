@@ -152,7 +152,7 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 }
 
 func (n *Node) hookEvents() {
-	n.Protocol.HeaviestAttestedChain.OnUpdate(func(prevHeaviestAttestedChain *protocol.Chain, heaviestAttestedChain *protocol.Chain) {
+	n.Protocol.Chains.HeaviestAttestedChain.OnUpdate(func(prevHeaviestAttestedChain *protocol.Chain, heaviestAttestedChain *protocol.Chain) {
 		if prevHeaviestAttestedChain != nil {
 			n.Protocol.LogError("WHAT HeaviestAttestedChain", "from", prevHeaviestAttestedChain.LogName(), "to", heaviestAttestedChain.LogName())
 
@@ -164,7 +164,7 @@ func (n *Node) hookEvents() {
 		}
 	})
 
-	n.Protocol.MainChain.OnUpdate(func(prevChain *protocol.Chain, newChain *protocol.Chain) {
+	n.Protocol.Chains.MainChain.OnUpdate(func(prevChain *protocol.Chain, newChain *protocol.Chain) {
 		if prevChain != nil {
 			n.mainEngineSwitchedCount.Add(1)
 		}
@@ -172,7 +172,7 @@ func (n *Node) hookEvents() {
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
-	n.Protocol.ChainManager.Chains.OnUpdate(func(mutations ds.SetMutations[*protocol.Chain]) {
+	n.Protocol.Chains.OnUpdate(func(mutations ds.SetMutations[*protocol.Chain]) {
 		mutations.AddedElements().Range(func(chain *protocol.Chain) {
 			chain.SpawnedEngine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) {
 				if newEngine != nil {

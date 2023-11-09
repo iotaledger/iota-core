@@ -36,7 +36,7 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 	a.ticker.Events.Tick.Hook(a.sendRequest)
 
 	protocol.Constructed.OnTrigger(func() {
-		protocol.OnChainCreated(func(chain *Chain) {
+		protocol.Chains.OnChainCreated(func(chain *Chain) {
 			chain.VerifyAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
 				forkingPoint := chain.ForkingPoint.Get()
 
@@ -53,7 +53,7 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 			})
 		})
 
-		protocol.CommitmentCreated.Hook(func(commitment *Commitment) {
+		protocol.Chains.CommitmentCreated.Hook(func(commitment *Commitment) {
 			commitment.RequestAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
 				if requestAttestations {
 					if commitment.CumulativeWeight() == 0 {
@@ -73,7 +73,7 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 
 func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	a.workerPool.Submit(func() {
-		commitment, _, err := a.protocol.PublishCommitment(commitmentModel)
+		commitment, _, err := a.protocol.Chains.PublishCommitment(commitmentModel)
 		if err != nil {
 			a.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitmentModel.ID(), "peer", from, "error", err)
 
@@ -121,7 +121,7 @@ func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment
 
 func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	a.workerPool.Submit(func() {
-		commitment, err := a.protocol.Commitment(commitmentID, false)
+		commitment, err := a.protocol.Chains.Commitment(commitmentID, false)
 		if err != nil {
 			if !ierrors.Is(err, ErrorCommitmentNotFound) {
 				a.LogError("failed to load requested commitment", "commitmentID", commitmentID, "fromPeer", from, "err", err)
@@ -209,7 +209,7 @@ func (a *AttestationsProtocol) Shutdown() {
 
 func (a *AttestationsProtocol) sendRequest(commitmentID iotago.CommitmentID) {
 	a.workerPool.Submit(func() {
-		if commitment, err := a.protocol.Commitment(commitmentID, false); err == nil {
+		if commitment, err := a.protocol.Chains.Commitment(commitmentID, false); err == nil {
 			a.protocol.Network.RequestAttestations(commitmentID)
 
 			a.LogDebug("request", "commitment", commitment.LogName())
