@@ -25,7 +25,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 
 	tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "tx1:0")
 
-	ts.IssuePayloadWithOptions("block1", wallet, tx2)
+	ts.IssueBasicBlockWithOptions("block1", wallet, tx2)
 
 	ts.AssertTransactionsExist(wallet.Transactions("tx2"), true, node1)
 	ts.AssertTransactionsExist(wallet.Transactions("tx1"), false, node1)
@@ -33,7 +33,7 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx2"), false, node1)
 	// make sure that the block is not booked
 
-	ts.IssuePayloadWithOptions("block2", wallet, tx1)
+	ts.IssueBasicBlockWithOptions("block2", wallet, tx1)
 
 	ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1)
 	ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, node1)
@@ -68,8 +68,8 @@ func Test_DoubleSpend(t *testing.T) {
 		tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
 		tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "Genesis:0")
 
-		ts.IssuePayloadWithOptions("block1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssuePayloadWithOptions("block2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockWithOptions("block1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockWithOptions("block2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, node1, node2)
@@ -134,12 +134,13 @@ func Test_MultipleAttachments(t *testing.T) {
 	{
 		tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 2, "Genesis:0")
 
-		ts.IssuePayloadWithOptions("A.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockWithOptions("A.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlockWithHeaderOptions("A.1.1", nodeA, mock.WithStrongParents(ts.BlockID("A.1")))
 		wallet.SetDefaultNode(nodeB)
-		ts.IssuePayloadWithOptions("B.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockWithOptions("B.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlockWithHeaderOptions("B.1.1", nodeB, mock.WithStrongParents(ts.BlockID("B.1")))
 
+		nodeA.Wait()
 		ts.IssueValidationBlockWithHeaderOptions("A.2", nodeA, mock.WithStrongParents(ts.BlockID("B.1.1")))
 		ts.IssueValidationBlockWithHeaderOptions("B.2", nodeB, mock.WithStrongParents(ts.BlockID("A.1.1")))
 
@@ -163,7 +164,7 @@ func Test_MultipleAttachments(t *testing.T) {
 		tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "tx1:1")
 
 		wallet.SetDefaultNode(nodeA)
-		ts.IssuePayloadWithOptions("A.3", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockWithOptions("A.3", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.IssueValidationBlockWithHeaderOptions("A.3.1", nodeA, mock.WithStrongParents(ts.BlockID("A.3")))
 		ts.IssueValidationBlockWithHeaderOptions("B.3", nodeB, mock.WithStrongParents(ts.BlockID("A.3.1")))
 		ts.IssueValidationBlockWithHeaderOptions("A.4", nodeA, mock.WithStrongParents(ts.BlockID("B.3")))

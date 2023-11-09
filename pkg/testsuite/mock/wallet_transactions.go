@@ -11,6 +11,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
+	"github.com/iotaledger/iota.go/v4/vm"
 )
 
 // Functionality for creating transactions in the mock wallet.
@@ -257,18 +258,14 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 }
 
 func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outputCount int, inputName string) *iotago.SignedTransaction {
-	totalInputMana := iotago.Mana(0)
-
-	manaDecayProvider := w.Node.Protocol.MainEngineInstance().APIForSlot(w.currentSlot).ManaDecayProvider()
+	apiForSlot := w.Node.Protocol.MainEngineInstance().APIForSlot(w.currentSlot)
+	manaDecayProvider := apiForSlot.ManaDecayProvider()
+	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
 	inputState := w.Output(inputName)
 	inputAmount := inputState.BaseTokenAmount()
 
-	creationSlot := inputState.OutputID().CreationSlot()
-	// potential Mana generated
-	totalInputMana += lo.PanicOnErr(manaDecayProvider.ManaGenerationWithDecay(inputAmount, creationSlot, w.currentSlot))
-	// stored Mana
-	totalInputMana += lo.PanicOnErr(manaDecayProvider.ManaWithDecay(inputState.StoredMana(), creationSlot, w.currentSlot))
+	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{inputState.OutputID(): inputState.Output()}, vm.RewardsInputSet{}))
 
 	manaAmount := totalInputMana / iotago.Mana(outputCount)
 	remainderMana := totalInputMana

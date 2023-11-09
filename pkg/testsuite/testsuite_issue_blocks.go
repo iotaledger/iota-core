@@ -62,6 +62,8 @@ func (t *TestSuite) registerBlock(blockName string, block *blocks.Block) {
 }
 
 func (t *TestSuite) IssueValidationBlockWithHeaderOptions(blockName string, node *mock.Node, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+	// wait for node to receive the parents, then check it has them.
+	node.Wait()
 	t.assertParentsExistFromBlockOptions(blockHeaderOpts, node)
 
 	t.mutex.Lock()
@@ -115,30 +117,15 @@ func (t *TestSuite) IssueBasicBlockWithOptions(blockName string, wallet *mock.Wa
 	return block
 }
 
-func (t *TestSuite) IssuePayloadWithOptions(blockName string, wallet *mock.Wallet, payload iotago.Payload, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
-	t.assertParentsExistFromBlockOptions(blockHeaderOpts, wallet.Node)
-
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-
-	block := wallet.IssueBasicBlock(context.Background(), blockName, mock.WithPayload(payload), mock.WithBasicBlockHeader(blockHeaderOpts...))
-
-	t.registerBlock(blockName, block)
-
-	return block
-}
-
 func (t *TestSuite) IssueCandidacyAnnouncementInSlot(alias string, slot iotago.SlotIndex, parentsPrefixAlias string, wallet *mock.Wallet, issuingOptions ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
-	timeProvider := t.API.TimeProvider()
-	issuingTime := timeProvider.SlotStartTime(slot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
+	t.SetCurrentSlot(slot)
 
-	return t.IssuePayloadWithOptions(
+	return t.IssueBasicBlockWithOptions(
 		alias,
 		wallet,
 		&iotago.CandidacyAnnouncement{},
 		append(issuingOptions,
 			mock.WithStrongParents(t.BlockIDsWithPrefix(parentsPrefixAlias)...),
-			mock.WithIssuingTime(issuingTime),
 		)...,
 	)
 }
