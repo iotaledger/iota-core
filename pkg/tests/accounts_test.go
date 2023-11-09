@@ -453,7 +453,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	ts.Wait(ts.Nodes()...)
 }
 
-func Test_NegativeBIC(t *testing.T) {
+func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
@@ -642,39 +642,209 @@ func Test_NegativeBIC(t *testing.T) {
 	}
 }
 
-/*
-For Mana allotment and stored:
-1. Collect potential and stored on the input side.
-2. Add options to allot amounts to accounts upon TX creation.
-3. Add option to store mana on the output side.
-4. Optionally add option to split amount on outputs unevenly.
+func Test_NegativeBIC_LockedAccountOutput(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				testsuite.GenesisTimeWithOffsetBySlots(200, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				8,
+			),
+			iotago.WithLivenessOptions(
+				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
+				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
+				testsuite.DefaultMinCommittableAge,
+				100,
+				testsuite.DefaultEpochNearingThreshold,
+			),
+		),
+	)
+	defer ts.Shutdown()
 
-WithAllotments
-{
-	A1: amount
-	A3: amount
+	// Add a validator node to the network. This will add a validator account to the snapshot.
+	node1 := ts.AddValidatorNode("node1")
+	_ = ts.AddNode("node2")
+
+	wallet1BIC := iotago.BlockIssuanceCredits(-1)
+	wallet2BIC := iotago.MaxBlockIssuanceCredits / 2
+	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
+	wallet1 := ts.AddGenesisWallet("wallet 1", node1, wallet1BIC)
+	wallet2 := ts.AddGenesisWallet("wallet 2", node1, wallet2BIC)
+
+	ts.Run(true)
+
+	// check that the accounts added in the genesis snapshot were added to the account manager correctly.
+	// validator node account.
+	validatorAccountOutput := ts.AccountOutput("Genesis:1")
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:              node1.Validator.AccountID,
+		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
+		OutputID:        validatorAccountOutput.OutputID(),
+		ExpirySlot:      iotago.MaxSlotIndex,
+		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
+		StakeEndEpoch:   iotago.MaxEpochIndex,
+		ValidatorStake:  mock.MinValidatorAccountAmount,
+	}, ts.Nodes()...)
+	// default wallet block issuer account.
+	wallet1AccountOutput := ts.AccountOutput("Genesis:2")
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:              wallet1.BlockIssuer.AccountID,
+		Credits:         accounts.NewBlockIssuanceCredits(-1, 0),
+		OutputID:        wallet1AccountOutput.OutputID(),
+		ExpirySlot:      iotago.MaxSlotIndex,
+		BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
+	}, ts.Nodes()...)
+	wallet2AccountOutput := ts.AccountOutput("Genesis:3")
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:              wallet2.BlockIssuer.AccountID,
+		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
+		OutputID:        wallet2AccountOutput.OutputID(),
+		ExpirySlot:      iotago.MaxSlotIndex,
+		BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
+	}, ts.Nodes()...)
+
+	// MODIFY EXISTING GENESIS ACCOUNT
+	newWallet1IssuerKey := utils.RandBlockIssuerKey()
+	var block1Slot iotago.SlotIndex = 1
+	var latestParent *blocks.Block
+	// set the expiry of the genesis account to be the block slot + max committable age.
+	newExpirySlot := block1Slot + ts.API.ProtocolParameters().MaxCommittableAge()
+	{
+		// Prepare a transaction that will try to spend an AccountOutput of a locked account.
+		tx1 := ts.DefaultWallet().TransitionAccount(
+			"TX1",
+			"Genesis:2",
+			mock.WithAddBlockIssuerKey(newWallet1IssuerKey),
+			mock.WithBlockIssuerExpirySlot(newExpirySlot),
+		)
+
+		// default block issuer issues a block containing the transaction in slot 1.
+		genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+		genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
+
+		// Wallet 2, which has non-negative BIC issues the block.
+		ts.IssueBasicBlockAtSlotWithOptions("block1", block1Slot, wallet2, tx1, mock.WithSlotCommitment(genesisCommitment))
+
+		ts.AssertTransactionsInCacheInvalid([]*iotago.Transaction{tx1.Transaction}, true, node1)
+
+		latestParent = ts.CommitUntilSlot(block1Slot, ts.Block("Genesis"))
+
+		// The outputID of wallet1 and wallet2 account should remain the same as neither was successfully spent.
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:              wallet1.BlockIssuer.AccountID,
+			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, 0),
+			OutputID:        wallet1AccountOutput.OutputID(),
+			ExpirySlot:      iotago.MaxSlotIndex,
+			BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
+		}, ts.Nodes()...)
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:              wallet2.BlockIssuer.AccountID,
+			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, 0),
+			OutputID:        wallet2AccountOutput.OutputID(),
+			ExpirySlot:      iotago.MaxSlotIndex,
+			BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
+		}, ts.Nodes()...)
+	}
+
+	block2Slot := latestParent.ID().Slot()
+
+	// Allot some mana to the locked account to unlock it.
+	// The locked wallet 2 is preparing and signs the transaction, but it's issued by wallet 1 whose account is not locked.
+	{
+		allottedBIC := iotago.BlockIssuanceCredits(10001)
+		tx2 := wallet1.AllotManaFromInputs("TX2",
+			iotago.Allotments{&iotago.Allotment{
+				AccountID: wallet1.BlockIssuer.AccountID,
+				Mana:      iotago.Mana(allottedBIC),
+			}}, "Genesis:0")
+
+		block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		// Wallet 1 whose account is not locked is issuing the block to unlock the account of wallet 2.
+		block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, wallet2, tx2, mock.WithStrongParents(latestParent.ID()), mock.WithSlotCommitment(block2Commitment))
+
+		latestParent = ts.CommitUntilSlot(block2Slot, block2)
+
+		wallet1BIC += allottedBIC
+		wallet2BIC -= iotago.BlockIssuanceCredits(block2.WorkScore()) * iotago.BlockIssuanceCredits(ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost)
+
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:              wallet1.BlockIssuer.AccountID,
+			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, block2Slot),
+			OutputID:        wallet1AccountOutput.OutputID(),
+			ExpirySlot:      iotago.MaxSlotIndex,
+			BlockIssuerKeys: wallet1.BlockIssuer.BlockIssuerKeys(),
+		}, ts.Nodes()...)
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:              wallet2.BlockIssuer.AccountID,
+			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block2Slot),
+			ExpirySlot:      iotago.MaxSlotIndex,
+			OutputID:        wallet2AccountOutput.OutputID(),
+			BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
+		}, ts.Nodes()...)
+	}
+
+	block3Slot := latestParent.ID().Slot()
+	newExpirySlot = block3Slot + ts.API.ProtocolParameters().MaxCommittableAge()
+	{
+		// Prepare a transaction that will try to spend an AccountOutput of an already unlocked account.
+		tx3 := wallet1.TransitionAccount(
+			"TX3",
+			"Genesis:2",
+			mock.WithAddBlockIssuerKey(newWallet1IssuerKey),
+			mock.WithBlockIssuerExpirySlot(newExpirySlot),
+		)
+
+		// Wallet 1, which already has non-negative BIC issues the block.
+		block3 := ts.IssueBasicBlockAtSlotWithOptions("block3", block3Slot, wallet1, tx3, mock.WithStrongParents(latestParent.ID()))
+		latestParent = ts.CommitUntilSlot(block3Slot, block3)
+
+		wallet1BIC -= iotago.BlockIssuanceCredits(block3.WorkScore()) * iotago.BlockIssuanceCredits(ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost)
+
+		// The outputID of wallet1 and wallet2 account should remain the same as neither was successfully spent.
+		// The mana on wallet2 account should be subtracted
+		// because it issued the block with a transaction that didn't mutate the ledger.
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:              wallet1.BlockIssuer.AccountID,
+			Credits:         accounts.NewBlockIssuanceCredits(wallet1BIC, block3Slot),
+			OutputID:        wallet1.AccountOutput("TX3:0").OutputID(),
+			ExpirySlot:      newExpirySlot,
+			BlockIssuerKeys: iotago.NewBlockIssuerKeys(wallet1.BlockIssuer.BlockIssuerKeys()[0], newWallet1IssuerKey),
+		}, ts.Nodes()...)
+		ts.AssertAccountData(&accounts.AccountData{
+			ID:              wallet2.BlockIssuer.AccountID,
+			Credits:         accounts.NewBlockIssuanceCredits(wallet2BIC, block2Slot),
+			OutputID:        wallet2AccountOutput.OutputID(),
+			ExpirySlot:      iotago.MaxSlotIndex,
+			BlockIssuerKeys: wallet2.BlockIssuer.BlockIssuerKeys(),
+		}, ts.Nodes()...)
+	}
+
+	// DESTROY WALLET 1 ACCOUNT
+	{
+		// commit until the expiry slot of the transitioned genesis account plus one.
+		latestParent = ts.CommitUntilSlot(newExpirySlot+1, latestParent)
+
+		block4Slot := latestParent.ID().Slot()
+
+		// create a transaction which destroys the genesis account.
+		tx4 := wallet1.DestroyAccount("TX4", "TX3:0", block4Slot)
+		block4 := ts.IssueBasicBlockAtSlotWithOptions("block4", block4Slot, wallet2, tx4, mock.WithStrongParents(latestParent.ID()))
+		latestParent = ts.CommitUntilSlot(block4Slot, block4)
+
+		// assert diff of the destroyed account.
+		ts.AssertAccountDiff(wallet1.BlockIssuer.AccountID, block4Slot, &model.AccountDiff{
+			BICChange:              -iotago.BlockIssuanceCredits(9500),
+			PreviousUpdatedSlot:    21,
+			NewExpirySlot:          0,
+			PreviousExpirySlot:     newExpirySlot,
+			NewOutputID:            iotago.EmptyOutputID,
+			PreviousOutputID:       wallet1.Output("TX3:0").OutputID(),
+			BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(),
+			BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(wallet1.BlockIssuer.BlockIssuerKeys()[0], newWallet1IssuerKey),
+			ValidatorStakeChange:   0,
+			StakeEndEpochChange:    0,
+			FixedCostChange:        0,
+			DelegationStakeChange:  0,
+		}, true, ts.Nodes()...)
+	}
 }
-WithStoredOnOutput
-{
-	0: amount
-	3: amount
-}
-*/
-
-/*
-TX involving Accounts:
-1. Add option to add accounts as inputs.
-2. Add option to add accounts as outputs.
-3. Create account.
-4. Destroy accounts.
-5. Accounts w/out and w/ BIC.
-
-Testcases:
-1. Create account w/out BIC from normal UTXO.
-2. Create account w/ BIC from normal UTXO.
-3. Transition non-BIC account to BIC account.
-4. Transition BIC account to non-BIC account.
-5. Transition BIC account to BIC account changing amount/keys/expiry.
-6. Destroy account w/out BIC feature.
-7. Destroy account w/ BIC feature.
-*/

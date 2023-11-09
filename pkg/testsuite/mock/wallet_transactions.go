@@ -358,6 +358,8 @@ func (w *Wallet) AllotManaFromInputs(transactionName string, allotments iotago.A
 		WithOutputs(outputStates),
 	))
 
+	w.registerOutputs(transactionName, signedTransaction.Transaction)
+
 	return signedTransaction
 }
 
