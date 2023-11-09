@@ -46,7 +46,7 @@ func newChainManager(protocol *Protocol) *ChainManager {
 
 	protocol.Constructed.OnTrigger(func() {
 		trackHeaviestChain := func(chainVariable reactive.Variable[*Chain], getWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
-			return getWeightVariable(candidate).OnUpdate(func(_, newChainWeight uint64) {
+			return getWeightVariable(candidate).OnUpdate(func(_ uint64, newChainWeight uint64) {
 				if heaviestChain := c.HeaviestVerifiedChain.Get(); heaviestChain != nil && newChainWeight < heaviestChain.VerifiedWeight.Get() {
 					return
 				}

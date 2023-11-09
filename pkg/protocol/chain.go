@@ -71,13 +71,13 @@ func NewChain(protocol *Protocol) *Chain {
 	c.initEngine()
 	c.initWarpSync()
 
-	protocol.NetworkClock.OnUpdate(func(_, now time.Time) {
+	protocol.NetworkClock.OnUpdate(func(_ time.Time, now time.Time) {
 		if engineInstance := c.Engine.Get(); engineInstance != nil {
 			c.NetworkClockSlot.Set(engineInstance.LatestAPI().TimeProvider().SlotFromTime(now))
 		}
 	})
 
-	c.NetworkClockSlot.OnUpdate(func(_, slot iotago.SlotIndex) {
+	c.NetworkClockSlot.OnUpdate(func(_ iotago.SlotIndex, slot iotago.SlotIndex) {
 		engineInstance := c.Engine.Get()
 		if engineInstance == nil {
 			return
@@ -99,7 +99,7 @@ func NewChain(protocol *Protocol) *Chain {
 		}
 	})
 
-	c.ParentChain.OnUpdate(func(prevParent, newParent *Chain) {
+	c.ParentChain.OnUpdate(func(prevParent *Chain, newParent *Chain) {
 		if prevParent != nil {
 			prevParent.ChildChains.Delete(c)
 		}
@@ -109,9 +109,9 @@ func NewChain(protocol *Protocol) *Chain {
 		}
 	})
 
-	c.ForkingPoint.OnUpdateWithContext(func(_, forkingPoint *Commitment, forkingPointContext func(subscriptionFactory func() (unsubscribe func()))) {
+	c.ForkingPoint.OnUpdateWithContext(func(_ *Commitment, forkingPoint *Commitment, forkingPointContext func(subscriptionFactory func() (unsubscribe func()))) {
 		forkingPointContext(func() func() {
-			return forkingPoint.Parent.OnUpdate(func(_, parent *Commitment) {
+			return forkingPoint.Parent.OnUpdate(func(_ *Commitment, parent *Commitment) {
 				forkingPointContext(func() func() {
 					return c.ParentChain.InheritFrom(parent.Chain)
 				})
@@ -151,7 +151,7 @@ func (c *Chain) initClaimedWeight() {
 }
 
 func (c *Chain) initAttestedWeight() {
-	c.LatestAttestedCommitment.OnUpdateWithContext(func(_, latestAttestedCommitment *Commitment, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+	c.LatestAttestedCommitment.OnUpdateWithContext(func(_ *Commitment, latestAttestedCommitment *Commitment, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
 		if latestAttestedCommitment != nil {
 			setupInheritance := func() func() {
 				return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
@@ -190,7 +190,7 @@ func (c *Chain) initWarpSync() {
 
 	var unsubscribe func()
 
-	c.WarpSync.OnUpdate(func(_, warpSync bool) {
+	c.WarpSync.OnUpdate(func(_ bool, warpSync bool) {
 		if !c.IsEvicted.Get() {
 			warpSyncTogglePool.Submit(func() {
 				if unsubscribe != nil {
@@ -208,13 +208,13 @@ func (c *Chain) initWarpSync() {
 }
 
 func (c *Chain) initEngine() {
-	c.ParentChain.OnUpdateWithContext(func(_, parentChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+	c.ParentChain.OnUpdateWithContext(func(_ *Chain, parentChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
 		unsubscribeOnUpdate(func() func() {
 			if parentChain == nil {
 				return c.Engine.InheritFrom(c.SpawnedEngine)
 			}
 
-			return c.Engine.InheritFrom(reactive.NewDerivedVariable2(func(_, spawnedEngine, parentEngine *engine.Engine) *engine.Engine {
+			return c.Engine.InheritFrom(reactive.NewDerivedVariable2(func(_ *engine.Engine, spawnedEngine *engine.Engine, parentEngine *engine.Engine) *engine.Engine {
 				if spawnedEngine != nil {
 					return spawnedEngine
 				}
