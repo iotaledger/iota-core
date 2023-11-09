@@ -284,7 +284,7 @@ func (t *TipSelection) resetAcceptanceTime() {
 
 	t.acceptanceTime = reactive.NewVariable[time.Time](monotonicallyIncreasing)
 
-	t.acceptanceTime.OnUpdate(func(_, acceptanceTime time.Time) {
+	t.acceptanceTime.OnUpdate(func(_ time.Time, acceptanceTime time.Time) {
 		t.triggerLivenessThreshold(acceptanceTime)
 	})
 }
