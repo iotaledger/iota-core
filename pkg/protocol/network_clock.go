@@ -35,7 +35,7 @@ func NewNetworkClock(protocol *Protocol) *NetworkClock {
 			}),
 
 			protocol.OnChainCreated(func(chain *Chain) {
-				unsubscribe := chain.LatestCommitment.OnUpdate(func(_, latestCommitment *Commitment) {
+				unsubscribe := chain.LatestCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
 					if engineInstance := chain.Engine.Get(); engineInstance != nil {
 						n.Set(engineInstance.LatestAPI().TimeProvider().SlotEndTime(latestCommitment.Slot()))
 					}

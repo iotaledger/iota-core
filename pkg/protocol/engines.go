@@ -190,7 +190,7 @@ func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *sto
 }
 
 func (e *Engines) syncMainEngineFromMainChain() (unsubscribe func()) {
-	return e.protocol.MainChain.OnUpdateWithContext(func(_, mainChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+	return e.protocol.MainChain.OnUpdateWithContext(func(_ *Chain, mainChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
 		unsubscribeOnUpdate(func() func() {
 			return e.Main.InheritFrom(mainChain.SpawnedEngine)
 		})
@@ -198,7 +198,7 @@ func (e *Engines) syncMainEngineFromMainChain() (unsubscribe func()) {
 }
 
 func (e *Engines) syncMainEngineInfoFile() (unsubscribe func()) {
-	return e.Main.OnUpdate(func(_, mainEngine *engine.Engine) {
+	return e.Main.OnUpdate(func(_ *engine.Engine, mainEngine *engine.Engine) {
 		if mainEngine != nil {
 			if err := ioutils.WriteJSONToFile(e.infoFilePath(), &engineInfo{Name: filepath.Base(mainEngine.Storage.Directory())}, 0o644); err != nil {
 				e.LogError("unable to write engine info file", "err", err)
@@ -209,7 +209,7 @@ func (e *Engines) syncMainEngineInfoFile() (unsubscribe func()) {
 
 func (e *Engines) injectEngineInstances() (unsubscribe func()) {
 	return e.protocol.OnChainCreated(func(chain *Chain) {
-		chain.VerifyState.OnUpdate(func(_, instantiate bool) {
+		chain.VerifyState.OnUpdate(func(_ bool, instantiate bool) {
 			e.worker.Submit(func() {
 				if !instantiate {
 					chain.SpawnedEngine.Set(nil)

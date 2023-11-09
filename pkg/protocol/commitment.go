@@ -124,7 +124,7 @@ func (c *Commitment) initBehavior(protocol *Protocol) (self *Commitment) {
 					return spawnedChain
 				}, c.IsRoot, parent.MainChild, c.SpawnedChain.Get())),
 
-				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ *Chain, parentChain, spawnedChain *Chain) *Chain {
+				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ *Chain, parentChain *Chain, spawnedChain *Chain) *Chain {
 					return lo.Cond(spawnedChain != nil, spawnedChain, parentChain)
 				}, parent.Chain, c.SpawnedChain)),
 
@@ -140,15 +140,15 @@ func (c *Commitment) initBehavior(protocol *Protocol) (self *Commitment) {
 
 				c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
 					return lo.Batch(
-						c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, spawnedEngine *engine.Engine, warpSyncing, isAboveLatestVerifiedCommitment bool) bool {
+						c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, spawnedEngine *engine.Engine, warpSyncing bool, isAboveLatestVerifiedCommitment bool) bool {
 							return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
 						}, chain.SpawnedEngine, chain.WarpSync, c.IsAboveLatestVerifiedCommitment)),
 
-						c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync, parentIsVerified, isVerified bool) bool {
+						c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
 							return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
 						}, chain.SpawnedEngine, chain.WarpSync, parent.IsVerified, c.IsVerified)),
 
-						c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, verifyAttestations, parentIsAttested, isAttested bool) bool {
+						c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, verifyAttestations bool, parentIsAttested bool, isAttested bool) bool {
 							return verifyAttestations && parentIsAttested && !isAttested
 						}, chain.VerifyAttestations, parent.IsAttested, c.IsAttested)),
 					)

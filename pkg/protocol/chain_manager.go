@@ -153,7 +153,7 @@ func (c *ChainManager) setupCommitment(commitment *Commitment, slotEvictedEvent 
 }
 
 func (c *ChainManager) initChainSwitching() {
-	c.HeaviestChain.OnUpdate(func(prevHeaviestChain, heaviestChain *Chain) {
+	c.HeaviestChain.OnUpdate(func(prevHeaviestChain *Chain, heaviestChain *Chain) {
 		if prevHeaviestChain != nil {
 			prevHeaviestChain.VerifyAttestations.Set(false)
 		}

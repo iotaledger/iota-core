@@ -109,7 +109,7 @@ func (p *Protocol) waitEngineInitialized() {
 	var waitInitialized sync.WaitGroup
 
 	waitInitialized.Add(1)
-	p.Engines.Main.OnUpdateOnce(func(_, engine *engine.Engine) {
+	p.Engines.Main.OnUpdateOnce(func(_ *engine.Engine, engine *engine.Engine) {
 		engine.Initialized.OnTrigger(waitInitialized.Done)
 	})
 	waitInitialized.Wait()
