@@ -36,8 +36,8 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 	a.ticker.Events.Tick.Hook(a.sendRequest)
 
 	protocol.Constructed.OnTrigger(func() {
-		protocol.Chains.OnChainCreated(func(chain *Chain) {
-			chain.VerifyAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
+		protocol.Chains.WithElements(func(chain *Chain) (teardown func()) {
+			return chain.VerifyAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
 				forkingPoint := chain.ForkingPoint.Get()
 
 				if requestAttestations {

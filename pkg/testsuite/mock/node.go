@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
 
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -170,13 +169,11 @@ func (n *Node) hookEvents() {
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
-	n.Protocol.Chains.OnUpdate(func(mutations ds.SetMutations[*protocol.Chain]) {
-		mutations.AddedElements().Range(func(chain *protocol.Chain) {
-			chain.SpawnedEngine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) {
-				if newEngine != nil {
-					n.attachEngineLogs(failOnBlockFiltered, newEngine)
-				}
-			})
+	n.Protocol.Chains.WithElements(func(chain *protocol.Chain) (teardown func()) {
+		return chain.SpawnedEngine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) {
+			if newEngine != nil {
+				n.attachEngineLogs(failOnBlockFiltered, newEngine)
+			}
 		})
 	})
 }

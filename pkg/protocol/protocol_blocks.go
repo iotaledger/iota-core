@@ -3,7 +3,6 @@ package protocol
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
@@ -44,13 +43,11 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 			})
 		})
 
-		protocol.Chains.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
-			mutations.AddedElements().Range(func(chain *Chain) {
-				chain.Engine.OnUpdate(func(_ *engine.Engine, engine *engine.Engine) {
-					unsubscribe := engine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
+		protocol.Chains.WithElements(func(chain *Chain) func() {
+			return chain.Engine.OnUpdate(func(_ *engine.Engine, engine *engine.Engine) {
+				unsubscribe := engine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
 
-					engine.Shutdown.OnTrigger(unsubscribe)
-				})
+				engine.Shutdown.OnTrigger(unsubscribe)
 			})
 		})
 

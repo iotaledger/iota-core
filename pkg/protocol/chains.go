@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -64,12 +63,14 @@ func newChains(protocol *Protocol) *Chains {
 			}, true)
 		}
 
-		c.OnChainCreated(func(chain *Chain) {
-			c.publishEngineCommitments(chain)
+		c.WithElements(func(chain *Chain) (teardown func()) {
+			return lo.Batch(
+				c.publishEngineCommitments(chain),
 
-			trackHeaviestChain(c.HeaviestVerified, (*Chain).verifiedWeight, chain)
-			trackHeaviestChain(c.HeaviestAttested, (*Chain).attestedWeight, chain)
-			trackHeaviestChain(c.Heaviest, (*Chain).claimedWeight, chain)
+				trackHeaviestChain(c.HeaviestVerified, (*Chain).verifiedWeight, chain),
+				trackHeaviestChain(c.HeaviestAttested, (*Chain).attestedWeight, chain),
+				trackHeaviestChain(c.Heaviest, (*Chain).claimedWeight, chain),
+			)
 		})
 
 		c.initChainSwitching()
@@ -117,12 +118,6 @@ func (c *Chains) Commitment(commitmentID iotago.CommitmentID, requestMissing ...
 	return commitmentRequest.Result(), nil
 }
 
-func (c *Chains) OnChainCreated(callback func(chain *Chain)) (unsubscribe func()) {
-	return c.OnUpdate(func(mutations ds.SetMutations[*Chain]) {
-		mutations.AddedElements().Range(callback)
-	})
-}
-
 func (c *Chains) initMainChain() {
 	c.protocol.LogDebug("initializing main chain")
 
@@ -134,7 +129,7 @@ func (c *Chains) initMainChain() {
 	mainChain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
 	c.Main.Set(mainChain)
-	c.ChainCreated.Trigger(mainChain)
+
 	c.Add(mainChain)
 }
 
@@ -154,7 +149,6 @@ func (c *Chains) Fork(forkingPoint *Commitment) *Chain {
 	chain := NewChain(c)
 	chain.ForkingPoint.Set(forkingPoint)
 
-	c.ChainCreated.Trigger(chain)
 	c.Add(chain)
 
 	return chain
@@ -231,8 +225,8 @@ func (c *Chains) requestCommitment(commitmentID iotago.CommitmentID, requestFrom
 	return commitmentRequest
 }
 
-func (c *Chains) publishEngineCommitments(chain *Chain) {
-	chain.SpawnedEngine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
+func (c *Chains) publishEngineCommitments(chain *Chain) (unsubscribe func()) {
+	return chain.SpawnedEngine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
 		if engine != nil {
 			var latestPublishedSlot iotago.SlotIndex
 

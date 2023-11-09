@@ -34,14 +34,12 @@ func NewNetworkClock(protocol *Protocol) *NetworkClock {
 				n.Set(block.ProtocolBlock().Header.IssuingTime)
 			}),
 
-			protocol.Chains.OnChainCreated(func(chain *Chain) {
-				unsubscribe := chain.LatestCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
+			protocol.Chains.WithElements(func(chain *Chain) (teardown func()) {
+				return chain.LatestCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
 					if engineInstance := chain.Engine.Get(); engineInstance != nil {
 						n.Set(engineInstance.LatestAPI().TimeProvider().SlotEndTime(latestCommitment.Slot()))
 					}
 				})
-
-				chain.IsEvicted.OnTrigger(unsubscribe)
 			}),
 		)
 

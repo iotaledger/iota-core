@@ -208,8 +208,8 @@ func (e *Engines) syncMainEngineInfoFile() (unsubscribe func()) {
 }
 
 func (e *Engines) injectEngineInstances() (unsubscribe func()) {
-	return e.protocol.Chains.OnChainCreated(func(chain *Chain) {
-		chain.VerifyState.OnUpdate(func(_ bool, instantiate bool) {
+	return e.protocol.Chains.WithElements(func(chain *Chain) (teardown func()) {
+		return chain.VerifyState.OnUpdate(func(_ bool, instantiate bool) {
 			e.worker.Submit(func() {
 				if !instantiate {
 					chain.SpawnedEngine.Set(nil)
