@@ -82,15 +82,11 @@ func (p *Prunable) ValidatorPerformances(slot iotago.SlotIndex) (*slotstore.Stor
 		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get performance factors with slot %d", slot)
 	}
 
-	apiForSlot := p.apiProvider.APIForSlot(slot)
-
 	return slotstore.NewStore(slot, kv,
 		iotago.AccountID.Bytes,
 		iotago.AccountIDFromBytes,
-		func(s *model.ValidatorPerformance) ([]byte, error) {
-			return s.Bytes(apiForSlot)
-		},
-		model.ValidatorPerformanceFromBytes(apiForSlot),
+		(*model.ValidatorPerformance).Bytes,
+		model.ValidatorPerformanceFromBytes,
 	), nil
 }
 

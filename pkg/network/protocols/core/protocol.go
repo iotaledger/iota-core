@@ -1,8 +1,6 @@
 package core
 
 import (
-	"encoding/binary"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/protobuf/proto"
 
@@ -14,8 +12,8 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
-	"github.com/iotaledger/hive.go/serializer/v2/serix"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	nwmodels "github.com/iotaledger/iota-core/pkg/network/protocols/core/models"
@@ -73,16 +71,23 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...peer.ID) {
 }
 
 func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...peer.ID) {
-	encodedAttestations := marshalutil.New()
-	encodedAttestations.WriteUint32(uint32(len(attestations)))
-	for _, att := range attestations {
-		iotagoAPI := lo.PanicOnErr(p.apiProvider.APIForVersion(att.Header.ProtocolVersion))
-		encodedAttestations.WriteBytes(lo.PanicOnErr(iotagoAPI.Encode(att)))
+	byteBuffer := stream.NewByteBuffer()
+
+	if err := stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
+		for _, att := range attestations {
+			if err = stream.WriteObjectWithSize(byteBuffer, att, serializer.SeriLengthPrefixTypeAsUint16, (*iotago.Attestation).Bytes); err != nil {
+				return 0, ierrors.Wrapf(err, "failed to write attestation %v", att)
+			}
+		}
+
+		return len(attestations), nil
+	}); err != nil {
+		panic(err)
 	}
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
 		Commitment:   cm.Data(),
-		Attestations: encodedAttestations.Bytes(),
+		Attestations: lo.PanicOnErr(byteBuffer.Bytes()),
 		MerkleProof:  lo.PanicOnErr(merkleProof.Bytes()),
 	}}}, to...)
 }
@@ -172,7 +177,7 @@ func (p *Protocol) onBlockRequest(idBytes []byte, id peer.ID) {
 }
 
 func (p *Protocol) onSlotCommitment(commitmentBytes []byte, id peer.ID) {
-	receivedCommitment, err := model.CommitmentFromBytes(commitmentBytes, p.apiProvider, serix.WithValidation())
+	receivedCommitment, err := lo.DropCount(model.CommitmentFromBytes(p.apiProvider)(commitmentBytes))
 	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize slot commitment"), id)
 
@@ -193,35 +198,38 @@ func (p *Protocol) onSlotCommitmentRequest(idBytes []byte, id peer.ID) {
 }
 
 func (p *Protocol) onAttestations(commitmentBytes []byte, attestationsBytes []byte, merkleProof []byte, id peer.ID) {
-	cm, err := model.CommitmentFromBytes(commitmentBytes, p.apiProvider, serix.WithValidation())
+	cm, err := lo.DropCount(model.CommitmentFromBytes(p.apiProvider)(commitmentBytes))
 	if err != nil {
 		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize commitment"), id)
 
 		return
 	}
 
-	if len(attestationsBytes) < 4 {
-		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize attestations, invalid attestation count"), id)
+	reader := stream.NewByteReader(attestationsBytes)
+
+	attestationsCount, err := stream.PeekSize(reader, serializer.SeriLengthPrefixTypeAsUint32)
+	if err != nil {
+		p.Events.Error.Trigger(ierrors.Errorf("failed peek attestations count"), id)
 
 		return
 	}
 
-	attestationCount := binary.LittleEndian.Uint32(attestationsBytes[0:4])
-	readOffset := 4
-	attestations := make([]*iotago.Attestation, attestationCount)
-	for i := uint32(0); i < attestationCount; i++ {
-		attestation, consumed, err := iotago.AttestationFromBytes(p.apiProvider)(attestationsBytes[readOffset:])
+	attestations := make([]*iotago.Attestation, attestationsCount)
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
+		attestations[i], err = stream.ReadObjectWithSize(reader, serializer.SeriLengthPrefixTypeAsUint16, iotago.AttestationFromBytes(p.apiProvider))
 		if err != nil {
-			p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
-
-			return
+			return ierrors.Wrapf(err, "failed to deserialize attestation %d", i)
 		}
 
-		readOffset += consumed
-		attestations[i] = attestation
+		return nil
+	}); err != nil {
+		p.Events.Error.Trigger(ierrors.Wrap(err, "failed to deserialize attestations"), id)
+
+		return
 	}
-	if readOffset != len(attestationsBytes) {
-		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize attestations: %d bytes remaining", len(attestationsBytes)-readOffset), id)
+
+	if reader.BytesRead() != len(attestationsBytes) {
+		p.Events.Error.Trigger(ierrors.Errorf("failed to deserialize attestations: %d bytes remaining", len(attestationsBytes)-reader.BytesRead()), id)
 
 		return
 	}

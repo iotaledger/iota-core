@@ -4,7 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/serializer/v2/marshalutil"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
@@ -20,28 +20,32 @@ type BlockRetainerData struct {
 }
 
 func (b *BlockRetainerData) Bytes() ([]byte, error) {
-	marshalUtil := marshalutil.New(2)
-	marshalUtil.WriteUint8(uint8(b.State))
-	marshalUtil.WriteUint8(uint8(b.FailureReason))
+	byteBuffer := stream.NewByteBuffer(2)
 
-	return marshalUtil.Bytes(), nil
+	if err := stream.Write(byteBuffer, b.State); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write block state")
+	}
+	if err := stream.Write(byteBuffer, b.FailureReason); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write block failure reason")
+	}
+
+	return byteBuffer.Bytes()
 }
 
-func (b *BlockRetainerData) FromBytes(bytes []byte) (int, error) {
-	marshalUtil := marshalutil.New(bytes)
-	state, err := marshalUtil.ReadUint8()
-	if err != nil {
-		return 0, err
-	}
-	b.State = apimodels.BlockState(state)
+func BlockRetainerDataFromBytes(bytes []byte) (*BlockRetainerData, int, error) {
+	byteReader := stream.NewByteReader(bytes)
 
-	reason, err := marshalUtil.ReadUint8()
-	if err != nil {
-		return 0, err
-	}
-	b.FailureReason = apimodels.BlockFailureReason(reason)
+	var err error
+	b := new(BlockRetainerData)
 
-	return marshalUtil.ReadOffset(), nil
+	if b.State, err = stream.Read[apimodels.BlockState](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read block state")
+	}
+	if b.FailureReason, err = stream.Read[apimodels.BlockFailureReason](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read block failure reason")
+	}
+
+	return b, byteReader.BytesRead(), nil
 }
 
 type TransactionRetainerData struct {
@@ -50,28 +54,32 @@ type TransactionRetainerData struct {
 }
 
 func (t *TransactionRetainerData) Bytes() ([]byte, error) {
-	marshalUtil := marshalutil.New(2)
-	marshalUtil.WriteUint8(uint8(t.State))
-	marshalUtil.WriteUint8(uint8(t.FailureReason))
+	byteBuffer := stream.NewByteBuffer(2)
 
-	return marshalUtil.Bytes(), nil
+	if err := stream.Write(byteBuffer, t.State); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write transaction state")
+	}
+	if err := stream.Write(byteBuffer, t.FailureReason); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write transaction failure reason")
+	}
+
+	return byteBuffer.Bytes()
 }
 
-func (t *TransactionRetainerData) FromBytes(bytes []byte) (int, error) {
-	marshalUtil := marshalutil.New(bytes)
-	state, err := marshalUtil.ReadUint8()
-	if err != nil {
-		return 0, err
-	}
-	t.State = apimodels.TransactionState(state)
+func TransactionRetainerDataFromBytes(bytes []byte) (*TransactionRetainerData, int, error) {
+	byteReader := stream.NewByteReader(bytes)
 
-	reason, err := marshalUtil.ReadUint8()
-	if err != nil {
-		return 0, err
-	}
-	t.FailureReason = apimodels.TransactionFailureReason(reason)
+	var err error
+	t := new(TransactionRetainerData)
 
-	return marshalUtil.ReadOffset(), nil
+	if t.State, err = stream.Read[apimodels.TransactionState](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read transaction state")
+	}
+	if t.FailureReason, err = stream.Read[apimodels.TransactionFailureReason](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read transaction failure reason")
+	}
+
+	return t, byteReader.BytesRead(), nil
 }
 
 type Retainer struct {
@@ -88,23 +96,13 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 			iotago.BlockID.Bytes,
 			iotago.BlockIDFromBytes,
 			(*BlockRetainerData).Bytes,
-			func(bytes []byte) (*BlockRetainerData, int, error) {
-				b := new(BlockRetainerData)
-				c, err := b.FromBytes(bytes)
-
-				return b, c, err
-			},
+			BlockRetainerDataFromBytes,
 		),
 		transactionStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionStorePrefix})),
 			iotago.BlockID.Bytes,
 			iotago.BlockIDFromBytes,
 			(*TransactionRetainerData).Bytes,
-			func(bytes []byte) (*TransactionRetainerData, int, error) {
-				t := new(TransactionRetainerData)
-				c, err := t.FromBytes(bytes)
-
-				return t, c, err
-			},
+			TransactionRetainerDataFromBytes,
 		),
 	}
 }
