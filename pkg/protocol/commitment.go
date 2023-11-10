@@ -65,7 +65,8 @@ func (c *Commitment) Engine() *engine.Engine {
 }
 
 func (c *Commitment) initLogging(chains *Chains) (self *Commitment) {
-	c.Logger = chains.protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()), c.IsEvicted, func(_ log.Logger) {})
+	var shutdownLogger func()
+	c.Logger, shutdownLogger = chains.protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))
 
 	teardownLogging := lo.Batch(
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
@@ -84,6 +85,8 @@ func (c *Commitment) initLogging(chains *Chains) (self *Commitment) {
 		c.IsVerified.LogUpdates(c, log.LevelTrace, "IsVerified"),
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
+
+		shutdownLogger,
 	)
 
 	c.IsEvicted.OnTrigger(teardownLogging)

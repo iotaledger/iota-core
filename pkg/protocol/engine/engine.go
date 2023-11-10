@@ -567,17 +567,16 @@ func (e *Engine) initLatestCommitment() {
 }
 
 func (e *Engine) initReactiveModule(logger log.Logger) (reactiveModule *module.ReactiveModule) {
-	stopLogging := reactive.NewEvent()
+	logger, stopLogging := logger.NewEntityLogger("Engine")
+	reactiveModule = module.NewReactiveModule(logger)
 
-	reactiveModule = module.NewReactiveModule(logger.NewEntityLogger("Engine", stopLogging, func(l log.Logger) {
-		e.RootCommitment.LogUpdates(l, log.LevelTrace, "RootCommitment")
-		e.LatestCommitment.LogUpdates(l, log.LevelTrace, "LatestCommitment")
-	}))
+	e.RootCommitment.LogUpdates(reactiveModule, log.LevelTrace, "RootCommitment")
+	e.LatestCommitment.LogUpdates(reactiveModule, log.LevelTrace, "LatestCommitment")
 
 	reactiveModule.Shutdown.OnTrigger(func() {
 		reactiveModule.LogDebug("shutting down")
 
-		stopLogging.Trigger()
+		stopLogging()
 
 		e.BlockRequester.Shutdown()
 		e.Attestations.Shutdown()
