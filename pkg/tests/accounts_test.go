@@ -34,6 +34,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	}),
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(200, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				8,
@@ -105,7 +106,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	)
 
 	// default block issuer issues a block containing the transaction in slot 1.
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
 	latestParents := ts.CommitUntilSlot(ts.BlockID("block1").Slot(), block1.ID())
@@ -165,6 +166,7 @@ func Test_StakeAndDelegate(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				8,
@@ -228,7 +230,7 @@ func Test_StakeAndDelegate(t *testing.T) {
 		mock.WithAccountAmount(mock.MinIssuerAccountAmount),
 	)
 
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API.ProtocolParameters().Version())
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
@@ -351,6 +353,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				8,

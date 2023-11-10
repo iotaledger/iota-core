@@ -30,7 +30,7 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 		remainderOutput := &iotago.BasicOutput{
 			Amount: input.BaseTokenAmount() - accountOutput.Amount,
 			Mana:   input.StoredMana() - accountOutput.Mana,
-			Conditions: iotago.BasicOutputUnlockConditions{
+			UnlockConditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: recipientWallet.Address()},
 			},
 			Features: iotago.BasicOutputFeatures{},
@@ -76,7 +76,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 		outputStates = append(outputStates, &iotago.BasicOutput{
 			Amount: input.BaseTokenAmount() - delegationOutput.Amount,
 			Mana:   input.StoredMana(),
-			Conditions: iotago.BasicOutputUnlockConditions{
+			UnlockConditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: w.Address()},
 			},
 			Features: iotago.BasicOutputFeatures{},
@@ -166,7 +166,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string) *iotag
 	destructionOutputs := iotago.Outputs[iotago.Output]{&iotago.BasicOutput{
 		Amount: input.BaseTokenAmount(),
 		Mana:   input.StoredMana(),
-		Conditions: iotago.BasicOutputUnlockConditions{
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: w.Address()},
 		},
 		Features: iotago.BasicOutputFeatures{},
@@ -194,7 +194,7 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 	implicitAccountOutput := &iotago.BasicOutput{
 		Amount: MinIssuerAccountAmount,
 		Mana:   AccountConversionManaCost,
-		Conditions: iotago.BasicOutputUnlockConditions{
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: recipientWallet.ImplicitAccountCreationAddress()},
 		},
 		Features: iotago.BasicOutputFeatures{},
@@ -203,7 +203,7 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 	remainderBasicOutput := &iotago.BasicOutput{
 		Amount: input.BaseTokenAmount() - MinIssuerAccountAmount,
 		Mana:   input.StoredMana() - AccountConversionManaCost,
-		Conditions: iotago.BasicOutputUnlockConditions{
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: input.Output().UnlockConditionSet().Address().Address},
 		},
 		Features: iotago.BasicOutputFeatures{},
@@ -285,7 +285,7 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outp
 		outputStates = append(outputStates, &iotago.BasicOutput{
 			Amount: tokenAmount,
 			Mana:   manaAmount,
-			Conditions: iotago.BasicOutputUnlockConditions{
+			UnlockConditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: w.Address()},
 			},
 			Features: iotago.BasicOutputFeatures{},

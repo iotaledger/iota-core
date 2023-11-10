@@ -53,6 +53,8 @@ func NewTestFramework(test *testing.T) *TestFramework {
 			iotago.CommitmentID.Bytes,
 			iotago.CommitmentIDFromBytes,
 		), nil
+	}, func() iotago.BlockID {
+		return tpkg.TestAPI.ProtocolParameters().GenesisBlockID()
 	})
 
 	t.blockCache = blocks.New(evictionState, api.SingleVersionProvider(tpkg.TestAPI))
@@ -63,7 +65,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t.Events = instance.Events()
 	t.Instance = instance
 
-	genesisBlock := blocks.NewRootBlock(iotago.EmptyBlockID, iotago.NewEmptyCommitment(tpkg.TestAPI.Version()).MustID(), time.Unix(tpkg.TestAPI.TimeProvider().GenesisUnixTime(), 0))
+	genesisBlock := blocks.NewRootBlock(tpkg.TestAPI.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(tpkg.TestAPI).MustID(), time.Unix(tpkg.TestAPI.TimeProvider().GenesisUnixTime(), 0))
 	t.blocks.Set("Genesis", genesisBlock)
 	genesisBlock.ID().RegisterAlias("Genesis")
 	evictionState.AddRootBlock(genesisBlock.ID(), genesisBlock.SlotCommitmentID())

@@ -46,7 +46,7 @@ func (p *Protocol) processAttestationsRequest(commitmentID iotago.CommitmentID, 
 		p.HandleError(ierrors.Errorf("failed to get roots storage for commitment %s", commitmentID))
 		return
 	}
-	roots, err := rootsStorage.Load(commitmentID)
+	roots, _, err := rootsStorage.Load(commitmentID)
 	if err != nil {
 		p.HandleError(ierrors.Wrapf(err, "failed to load roots for commitment %s", commitmentID))
 		return
@@ -185,7 +185,7 @@ type commitmentVerificationResult struct {
 	err                    error
 }
 
-func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.BlockIDs, shouldSwitch, banSource bool, err error) {
+func (p *Protocol) processFork(fork *chainmanager.Fork) (anchorBlockIDs iotago.BlockIDs, shouldSwitch bool, banSource bool, err error) {
 	// Flow:
 	//  1. request attestations starting from forking point + AttestationCommitmentOffset
 	//  2. request 1 by 1

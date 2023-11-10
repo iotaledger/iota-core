@@ -187,7 +187,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 		fmt.Printf("%s > Network.AttestationsRequestReceived: from %s %s\n", n.Name, source, id)
 	})
 
-	events.Network.WarpSyncResponseReceived.Hook(func(id iotago.CommitmentID, ds iotago.BlockIDs, m *merklehasher.Proof[iotago.Identifier], ds2 iotago.TransactionIDs, m2 *merklehasher.Proof[iotago.Identifier], id2 peer.ID) {
+	events.Network.WarpSyncResponseReceived.Hook(func(id iotago.CommitmentID, ds map[iotago.CommitmentID]iotago.BlockIDs, m *merklehasher.Proof[iotago.Identifier], ds2 iotago.TransactionIDs, m2 *merklehasher.Proof[iotago.Identifier], id2 peer.ID) {
 		fmt.Printf("%s > Network.WarpSyncResponseReceived: from %s %s\n", n.Name, id2, id)
 	})
 
@@ -339,8 +339,9 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 
 		rootsStorage, err := instance.Storage.Roots(details.Commitment.ID().Slot())
 		require.NoError(n.Testing, err, "roots storage for slot %d not found", details.Commitment.Slot())
-		roots, err := rootsStorage.Load(details.Commitment.ID())
+		roots, exists, err := rootsStorage.Load(details.Commitment.ID())
 		require.NoError(n.Testing, err)
+		require.True(n.Testing, exists)
 
 		attestationBlockIDs := make([]iotago.BlockID, 0)
 		tree, err := instance.Attestations.GetMap(details.Commitment.Slot())

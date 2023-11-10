@@ -17,6 +17,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				3,
@@ -101,6 +102,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				3,
@@ -194,6 +196,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
+				0,
 				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				3,

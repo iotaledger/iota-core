@@ -35,7 +35,7 @@ func NewSeatedAccounts(accounts *Accounts, optMembers ...iotago.AccountID) *Seat
 		accounts:       accounts,
 		seatsByAccount: shrinkingmap.New[iotago.AccountID, SeatIndex](),
 	}
-	sort.Slice(optMembers, func(i, j int) bool {
+	sort.Slice(optMembers, func(i int, j int) bool {
 		return bytes.Compare(optMembers[i][:], optMembers[j][:]) < 0
 	})
 

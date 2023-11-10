@@ -41,6 +41,10 @@ func (s *Storage) RootBlocks(slot iotago.SlotIndex) (*slotstore.Store[iotago.Blo
 	return s.prunable.RootBlocks(slot)
 }
 
+func (s *Storage) GenesisRootBlockID() iotago.BlockID {
+	return s.Settings().APIProvider().CommittedAPI().ProtocolParameters().GenesisBlockID()
+}
+
 func (s *Storage) Mutations(slot iotago.SlotIndex) (kvstore.KVStore, error) {
 	return s.prunable.Mutations(slot)
 }

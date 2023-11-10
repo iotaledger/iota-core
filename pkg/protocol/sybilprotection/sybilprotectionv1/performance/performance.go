@@ -232,9 +232,14 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 				continue
 			}
 
-			validatorPerformance, err := validatorSlotPerformances.Load(accountID)
+			validatorPerformance, exists, err := validatorSlotPerformances.Load(accountID)
 			if err != nil {
 				panic(ierrors.Wrapf(err, "failed to load performance factor for account %s", accountID))
+			}
+
+			// key not found
+			if !exists {
+				validatorPerformance = model.NewValidatorPerformance()
 			}
 
 			validatorPerformances = append(validatorPerformances, validatorPerformance)
@@ -326,7 +331,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 		return
 	}
 
-	validatorPerformance, err := validatorPerformances.Load(block.ProtocolBlock().Header.IssuerID)
+	validatorPerformance, exists, err := validatorPerformances.Load(block.ProtocolBlock().Header.IssuerID)
 	if err != nil {
 		t.errHandler(ierrors.Errorf("failed to load performance factor for account %s", block.ProtocolBlock().Header.IssuerID))
 
@@ -334,7 +339,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	}
 
 	// key not found
-	if validatorPerformance == nil {
+	if !exists {
 		validatorPerformance = model.NewValidatorPerformance()
 	}
 

@@ -28,7 +28,7 @@ func newInclusionFlags() *inclusionFlags {
 		committedSlot: reactive.NewVariable[iotago.SlotIndex](),
 		rejected:      promise.NewEvent(),
 		// Make sure the oldest orphaned index doesn't get overridden by newer TX spending the orphaned conflict further.
-		orphanedSlot: reactive.NewVariable[iotago.SlotIndex](func(currentValue, newValue iotago.SlotIndex) iotago.SlotIndex {
+		orphanedSlot: reactive.NewVariable[iotago.SlotIndex](func(currentValue iotago.SlotIndex, newValue iotago.SlotIndex) iotago.SlotIndex {
 			if currentValue != 0 {
 				return currentValue
 			}
@@ -49,7 +49,7 @@ func (s *inclusionFlags) IsAccepted() bool {
 
 // OnAccepted registers a callback that gets triggered when the entity gets accepted.
 func (s *inclusionFlags) OnAccepted(callback func()) {
-	s.accepted.OnUpdate(func(wasAccepted, isAccepted bool) {
+	s.accepted.OnUpdate(func(wasAccepted bool, isAccepted bool) {
 		if isAccepted && !wasAccepted {
 			callback()
 		}
@@ -58,7 +58,7 @@ func (s *inclusionFlags) OnAccepted(callback func()) {
 
 // OnPending registers a callback that gets triggered when the entity gets pending.
 func (s *inclusionFlags) OnPending(callback func()) {
-	s.accepted.OnUpdate(func(wasAccepted, isAccepted bool) {
+	s.accepted.OnUpdate(func(wasAccepted bool, isAccepted bool) {
 		if !isAccepted && wasAccepted {
 			callback()
 		}
@@ -82,7 +82,7 @@ func (s *inclusionFlags) CommittedSlot() (slot iotago.SlotIndex, isCommitted boo
 
 // OnCommitted registers a callback that gets triggered when the entity gets committed.
 func (s *inclusionFlags) OnCommittedSlotUpdated(callback func(slot iotago.SlotIndex)) {
-	s.committedSlot.OnUpdate(func(_, newValue iotago.SlotIndex) {
+	s.committedSlot.OnUpdate(func(_ iotago.SlotIndex, newValue iotago.SlotIndex) {
 		callback(newValue)
 	})
 }
@@ -94,7 +94,7 @@ func (s *inclusionFlags) OrphanedSlot() (slot iotago.SlotIndex, isOrphaned bool)
 
 // OnOrphaned registers a callback that gets triggered when the entity gets orphaned.
 func (s *inclusionFlags) OnOrphanedSlotUpdated(callback func(slot iotago.SlotIndex)) {
-	s.orphanedSlot.OnUpdate(func(_, newValue iotago.SlotIndex) {
+	s.orphanedSlot.OnUpdate(func(_ iotago.SlotIndex, newValue iotago.SlotIndex) {
 		callback(newValue)
 	})
 }

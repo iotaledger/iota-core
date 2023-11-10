@@ -56,7 +56,7 @@ func (e *Ed25519Account) PrivateKey() ed25519.PrivateKey {
 	return e.privateKey
 }
 
-func AccountFromParams(accountHex, privateKey string) Account {
+func AccountFromParams(accountHex string, privateKey string) Account {
 	accountID, err := iotago.AccountIDFromHexString(accountHex)
 	if err != nil {
 		panic(fmt.Sprintln("invalid accountID hex string", err))

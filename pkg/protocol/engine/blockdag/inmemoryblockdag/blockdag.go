@@ -82,7 +82,7 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 			return
 		}
 
-		parentBlock.Solid().OnUpdateOnce(func(_, _ bool) {
+		parentBlock.Solid().OnUpdateOnce(func(_ bool, _ bool) {
 			if unsolidParentsCount.Add(-1) == 0 {
 				if block.SetSolid() {
 					b.events.BlockSolid.Trigger(block)
@@ -90,7 +90,7 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 			}
 		})
 
-		parentBlock.Invalid().OnUpdateOnce(func(_, _ bool) {
+		parentBlock.Invalid().OnUpdateOnce(func(_ bool, _ bool) {
 			if block.SetInvalid() {
 				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("parent block %s is marked as invalid", parent.ID))
 			}
