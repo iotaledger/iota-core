@@ -224,7 +224,9 @@ func TestNFTOutputSerialization(t *testing.T) {
 		Features: iotago.NFTOutputFeatures{},
 		ImmutableFeatures: iotago.NFTOutputImmFeatures{
 			&iotago.MetadataFeature{
-				Data: utils.RandBytes(12),
+				Entries: iotago.MetadataFeatureEntries{
+					"data": utils.RandBytes(12),
+				},
 			},
 		},
 	}
@@ -266,7 +268,9 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 		Features: iotago.NFTOutputFeatures{},
 		ImmutableFeatures: iotago.NFTOutputImmFeatures{
 			&iotago.MetadataFeature{
-				Data: utils.RandBytes(12),
+				Entries: iotago.MetadataFeatureEntries{
+					"data": utils.RandBytes(12),
+				},
 			},
 			&iotago.IssuerFeature{
 				Address: issuerAddress,
@@ -350,7 +354,6 @@ func TestAnchorOutputSerialization(t *testing.T) {
 				Address: governor,
 			},
 		},
-		StateMetadata: make([]byte, 0),
 		Features: iotago.AnchorOutputFeatures{
 			&iotago.SenderFeature{
 				Address: sender.ToAddress(),

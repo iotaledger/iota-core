@@ -216,7 +216,6 @@ func RandOutputOnAddressWithAmount(outputType iotago.OutputType, address iotago.
 					Address: address,
 				},
 			},
-			StateMetadata:     make([]byte, 0),
 			Features:          iotago.AnchorOutputFeatures{},
 			ImmutableFeatures: iotago.AnchorOutputImmFeatures{},
 		}
