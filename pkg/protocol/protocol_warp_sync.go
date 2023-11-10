@@ -88,7 +88,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			return
 		}
 
-		if !chain.WarpSync.Get() {
+		if !chain.WarpSyncMode.Get() {
 			w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
 
 			return
@@ -139,7 +139,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			targetEngine.Workers.WaitChildren()
 
-			if !chain.WarpSync.Get() {
+			if !chain.WarpSyncMode.Get() {
 				w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
 
 				return blocksToWarpSync

@@ -12,10 +12,10 @@ import (
 type Chains struct {
 	reactive.Set[*Chain]
 
-	Heaviest         reactive.Variable[*Chain]
 	HeaviestClaimed  reactive.Variable[*Chain]
 	HeaviestAttested reactive.Variable[*Chain]
 	HeaviestVerified reactive.Variable[*Chain]
+	Main             reactive.Variable[*Chain]
 
 	protocol *Protocol
 }
@@ -23,7 +23,7 @@ type Chains struct {
 func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
 		Set:              reactive.NewSet[*Chain](),
-		Heaviest:         reactive.NewVariable[*Chain](),
+		Main:             reactive.NewVariable[*Chain](),
 		HeaviestClaimed:  reactive.NewVariable[*Chain](),
 		HeaviestAttested: reactive.NewVariable[*Chain](),
 		HeaviestVerified: reactive.NewVariable[*Chain](),
@@ -33,14 +33,14 @@ func newChains(protocol *Protocol) *Chains {
 	c.HeaviestClaimed.LogUpdates(c.protocol, log.LevelTrace, "Unchecked Heavier Chain", (*Chain).LogName)
 	c.HeaviestAttested.LogUpdates(c.protocol, log.LevelTrace, "Attested Heavier Chain", (*Chain).LogName)
 
-	trackHeaviestChain := func(targetWeight reactive.Variable[*Chain], weight func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
-		return weight(candidate).OnUpdate(func(_ uint64, newWeight uint64) {
+	trackHeaviestChain := func(targetChainVariable reactive.Variable[*Chain], weightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
+		return weightVariable(candidate).OnUpdate(func(_ uint64, newWeight uint64) {
 			if heaviestChain := c.HeaviestVerified.Get(); heaviestChain != nil && newWeight < heaviestChain.VerifiedWeight.Get() {
 				return
 			}
 
-			targetWeight.Compute(func(currentCandidate *Chain) *Chain {
-				if currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newWeight > weight(currentCandidate).Get() {
+			targetChainVariable.Compute(func(currentCandidate *Chain) *Chain {
+				if currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newWeight > weightVariable(currentCandidate).Get() {
 					return candidate
 				}
 
@@ -81,7 +81,7 @@ func (c *Chains) initMainChain() {
 	mainChain.VerifyState.Set(true)
 	mainChain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
-	c.Heaviest.Set(mainChain)
+	c.Main.Set(mainChain)
 
 	c.Add(mainChain)
 }
@@ -111,7 +111,7 @@ func (c *Chains) initChainSwitching() {
 
 			distanceFromForkingPoint := latestVerifiedCommitment.ID().Slot() - forkingPoint.ID().Slot()
 			if distanceFromForkingPoint > c.protocol.Options.ChainSwitchingThreshold {
-				c.Heaviest.Set(heaviestVerifiedChain)
+				c.Main.Set(heaviestVerifiedChain)
 			}
 		})
 	})

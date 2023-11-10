@@ -51,7 +51,7 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 			})
 		})
 
-		protocol.Chains.Heaviest.Get().Engine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
+		protocol.Chains.Main.Get().Engine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
 			if engine != nil {
 				unsubscribeOnEngineChange(func() (unsubscribe func()) {
 					return lo.Batch(

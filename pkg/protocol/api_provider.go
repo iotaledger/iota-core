@@ -21,7 +21,7 @@ func NewAPIProvider(protocol *Protocol) *APIProvider {
 // APIForVersion returns the API for the given version.
 func (a *APIProvider) APIForVersion(version iotago.Version) (api iotago.API, err error) {
 	if mainEngineInstance := a.Engines.Main.Get(); mainEngineInstance != nil {
-		return a.Engines.Main.Get().APIForVersion(version)
+		return mainEngineInstance.APIForVersion(version)
 	}
 
 	return nil, ierrors.New("no engine instance available")

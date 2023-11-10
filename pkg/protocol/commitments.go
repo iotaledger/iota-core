@@ -71,7 +71,7 @@ func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestMissing ...bo
 func (c *Commitments) requestCommitment(commitmentID iotago.CommitmentID, requestFromPeers bool, optSuccessCallbacks ...func(metadata *Commitment)) (commitmentRequest *promise.Promise[*Commitment]) {
 	slotEvicted := c.protocol.EvictionEvent(commitmentID.Index())
 	if slotEvicted.WasTriggered() && c.protocol.LastEvictedSlot().Get() != 0 {
-		forkingPoint := c.protocol.Chains.Heaviest.Get().ForkingPoint.Get()
+		forkingPoint := c.protocol.Chains.Main.Get().ForkingPoint.Get()
 
 		if forkingPoint == nil || commitmentID != forkingPoint.ID() {
 			return promise.New[*Commitment]().Reject(ErrorSlotEvicted)

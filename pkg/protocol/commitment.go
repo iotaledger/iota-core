@@ -141,11 +141,11 @@ func (c *Commitment) initBehavior(chains *Chains) (self *Commitment) {
 					return lo.Batch(
 						c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, spawnedEngine *engine.Engine, warpSyncing bool, isAboveLatestVerifiedCommitment bool) bool {
 							return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
-						}, chain.SpawnedEngine, chain.WarpSync, c.IsAboveLatestVerifiedCommitment)),
+						}, chain.SpawnedEngine, chain.WarpSyncMode, c.IsAboveLatestVerifiedCommitment)),
 
 						c.RequestBlocksToWarpSync.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
 							return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
-						}, chain.SpawnedEngine, chain.WarpSync, parent.IsVerified, c.IsVerified)),
+						}, chain.SpawnedEngine, chain.WarpSyncMode, parent.IsVerified, c.IsVerified)),
 
 						c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, verifyAttestations bool, parentIsAttested bool, isAttested bool) bool {
 							return verifyAttestations && parentIsAttested && !isAttested

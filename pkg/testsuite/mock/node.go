@@ -161,7 +161,7 @@ func (n *Node) hookEvents() {
 		}
 	})
 
-	n.Protocol.Chains.Heaviest.OnUpdate(func(prevChain *protocol.Chain, newChain *protocol.Chain) {
+	n.Protocol.Chains.Main.OnUpdate(func(prevChain *protocol.Chain, newChain *protocol.Chain) {
 		if prevChain != nil {
 			n.mainEngineSwitchedCount.Add(1)
 		}

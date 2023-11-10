@@ -87,7 +87,13 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 
 		p.Constructed.Trigger()
 
-		p.waitEngineInitialized()
+		// wait for the main engine to be initialized
+		var waitInitialized sync.WaitGroup
+		waitInitialized.Add(1)
+		p.Engines.Main.OnUpdateOnce(func(_ *engine.Engine, engine *engine.Engine) {
+			engine.Initialized.OnTrigger(waitInitialized.Done)
+		})
+		waitInitialized.Wait()
 	})
 }
 
@@ -109,14 +115,4 @@ func (p *Protocol) Run(ctx context.Context) error {
 	p.Stopped.Trigger()
 
 	return ctx.Err()
-}
-
-func (p *Protocol) waitEngineInitialized() {
-	var waitInitialized sync.WaitGroup
-
-	waitInitialized.Add(1)
-	p.Engines.Main.OnUpdateOnce(func(_ *engine.Engine, engine *engine.Engine) {
-		engine.Initialized.OnTrigger(waitInitialized.Done)
-	})
-	waitInitialized.Wait()
 }
