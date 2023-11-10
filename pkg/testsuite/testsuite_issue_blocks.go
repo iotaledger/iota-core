@@ -62,9 +62,9 @@ func (t *TestSuite) registerBlock(blockName string, block *blocks.Block) {
 }
 
 func (t *TestSuite) IssueValidationBlockWithHeaderOptions(blockName string, node *mock.Node, blockHeaderOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
-	// wait for node to receive the parents, then check it has them.
-	node.Wait()
+	t.Wait(t.Nodes()...)
 	t.assertParentsExistFromBlockOptions(blockHeaderOpts, node)
+	t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOpts, node)
 
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
@@ -103,6 +103,10 @@ func (t *TestSuite) IssueValidationBlockWithOptions(blockName string, node *mock
 }
 
 func (t *TestSuite) IssueBasicBlockWithOptions(blockName string, wallet *mock.Wallet, payload iotago.Payload, blockOpts ...options.Option[mock.BlockHeaderParams]) *blocks.Block {
+	t.Wait(t.Nodes()...)
+	t.assertParentsExistFromBlockOptions(blockOpts, wallet.Node)
+	t.assertParentsCommitmentExistFromBlockOptions(blockOpts, wallet.Node)
+
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 

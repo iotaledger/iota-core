@@ -160,6 +160,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 
 // Starts with an account already existing in snapshot (default wallet).
 // 1. Use default wallet to create a new account with staking feature from genesis basic output.
+// 2. Use default wallet to create a new account for a delegator wallet.
 // 2. Use default wallet to create a delegation to the new account from a basic output.
 // 3. Use default wallet to transition the delegation to delayed claiming.
 func Test_StakeAndDelegate(t *testing.T) {

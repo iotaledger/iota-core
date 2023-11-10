@@ -539,8 +539,8 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 		wallet.SetDefaultNode(node2)
 		ts.SetCurrentSlot(1)
-		ts.IssueBasicBlockWithOptions("block1.1", wallet, tx1)
-		ts.IssueBasicBlockWithOptions("block1.2", wallet, tx2)
+		ts.IssueBasicBlockWithOptions("block1.1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockWithOptions("block1.2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, node1, node2)
