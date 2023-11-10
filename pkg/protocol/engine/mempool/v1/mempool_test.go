@@ -56,6 +56,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 			tf.RequireBooked(txAlias)
 
 			tf.MarkAttachmentIncluded(blockAlias)
+			tf.SpendDAG.SetAccepted(tf.TransactionID(txAlias))
 
 			prevStateAlias = fmt.Sprintf("tx%d:0", index)
 
