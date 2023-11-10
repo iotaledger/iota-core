@@ -237,6 +237,8 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
 }
 
 func (c *Chain) registerCommitment(newCommitment *Commitment) (unregister func()) {
+	// if a commitment for this slot already exists, then this is a newly forked commitment, that only got associated
+	// with this chain because it temporarily inherited it through its parent before forking its own chain
 	if c.commitments.Compute(newCommitment.Slot(), func(currentCommitment *Commitment, exists bool) *Commitment {
 		return lo.Cond(exists, currentCommitment, newCommitment)
 	}) != newCommitment {

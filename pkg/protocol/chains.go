@@ -30,8 +30,9 @@ func newChains(protocol *Protocol) *Chains {
 		protocol:         protocol,
 	}
 
-	c.HeaviestClaimed.LogUpdates(c.protocol, log.LevelTrace, "Unchecked Heavier Chain", (*Chain).LogName)
-	c.HeaviestAttested.LogUpdates(c.protocol, log.LevelTrace, "Attested Heavier Chain", (*Chain).LogName)
+	c.Main.LogUpdates(c.protocol, log.LevelTrace, "Main", (*Chain).LogName)
+	c.HeaviestClaimed.LogUpdates(c.protocol, log.LevelTrace, "HeaviestClaimed", (*Chain).LogName)
+	c.HeaviestAttested.LogUpdates(c.protocol, log.LevelTrace, "HeaviestAttested", (*Chain).LogName)
 
 	trackHeaviestChain := func(targetChainVariable reactive.Variable[*Chain], weightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
 		return weightVariable(candidate).OnUpdate(func(_ uint64, newWeight uint64) {
@@ -129,8 +130,8 @@ func (c *Chains) publishEngineCommitments(chain *Chain) (unsubscribe func()) {
 				}
 
 				publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
-				publishedCommitment.IsAttested.Trigger()
-				publishedCommitment.IsVerified.Trigger()
+				publishedCommitment.IsAttested.Set(true)
+				publishedCommitment.IsVerified.Set(true)
 
 				latestPublishedSlot = commitment.Slot()
 
@@ -145,8 +146,9 @@ func (c *Chains) publishEngineCommitments(chain *Chain) (unsubscribe func()) {
 				return engine.Ledger.HookInitialized(func() {
 					unsubscribeOnUpdate(func() (unsubscribe func()) {
 						if forkingPoint := chain.ForkingPoint.Get(); forkingPoint == nil {
+							// publish the root commitment (very first commitment ever)
 							rootCommitment, _ := publishCommitment(engine.RootCommitment.Get())
-							rootCommitment.IsRoot.Trigger()
+							rootCommitment.IsRoot.Set(true)
 							rootCommitment.setChain(chain)
 
 							chain.ForkingPoint.Set(rootCommitment)

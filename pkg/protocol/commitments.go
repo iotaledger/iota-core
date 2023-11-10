@@ -18,13 +18,11 @@ type Commitments struct {
 }
 
 func newCommitments(protocol *Protocol) *Commitments {
-	c := &Commitments{
+	return &Commitments{
 		Set:         reactive.NewSet[*Commitment](),
 		protocol:    protocol,
 		commitments: shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 	}
-
-	return c
 }
 
 func (c *Commitments) Publish(commitment *model.Commitment) (commitmentMetadata *Commitment, published bool, err error) {
