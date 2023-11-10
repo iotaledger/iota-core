@@ -253,13 +253,24 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
 	}
 
 	for _, chain := range append([]*Chain{c}, c.ChildChains.ToSlice()...) {
-		if chain.VerifyState.Get() {
-			if targetEngine := chain.Engine.Get(); targetEngine != nil && !chain.WarpSync.Get() || targetEngine.BlockRequester.HasTicker(block.ID()) {
-				targetEngine.ProcessBlockFromPeer(block, src)
+		if !chain.VerifyState.Get() {
+			continue
+		}
 
-				success = true
+		targetEngine := chain.Engine.Get()
+		if targetEngine == nil {
+			continue
+		} else if issuingTime := block.ProtocolBlock().Header.IssuingTime; chain.WarpSync.Get() {
+			if targetCommitment, exists := chain.Commitment(targetEngine.APIForTime(issuingTime).TimeProvider().SlotFromTime(issuingTime)); !exists {
+				continue
+			} else if blocksToWarpSync := targetCommitment.BlocksToWarpSync.Get(); blocksToWarpSync == nil || !blocksToWarpSync.Has(block.ID()) {
+				continue
 			}
 		}
+
+		targetEngine.ProcessBlockFromPeer(block, src)
+
+		success = true
 	}
 
 	return success

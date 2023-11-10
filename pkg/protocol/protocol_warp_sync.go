@@ -7,6 +7,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
@@ -36,7 +37,7 @@ func NewWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		c.protocol.Commitments.WithElements(func(commitment *Commitment) (teardown func()) {
-			return commitment.WarpSyncBlocks.OnUpdate(func(_ bool, warpSyncBlocks bool) {
+			return commitment.RequestBlocksToWarpSync.OnUpdate(func(_ bool, warpSyncBlocks bool) {
 				if warpSyncBlocks {
 					c.ticker.StartTicker(commitment.ID())
 				} else {
@@ -100,11 +101,11 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			return
 		}
 
-		commitment.RequestedBlocksReceived.Compute(func(requestedBlocksReceived bool) bool {
-			if requestedBlocksReceived || !commitment.WarpSyncBlocks.Get() {
+		commitment.BlocksToWarpSync.Compute(func(blocksToWarpSync ds.Set[iotago.BlockID]) ds.Set[iotago.BlockID] {
+			if blocksToWarpSync != nil || !commitment.RequestBlocksToWarpSync.Get() {
 				w.LogTrace("response for already synced commitment", "commitment", commitment.LogName(), "fromPeer", from)
 
-				return requestedBlocksReceived
+				return blocksToWarpSync
 			}
 
 			totalBlocks := uint32(0)
@@ -120,7 +121,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			if !iotago.VerifyProof(proof, acceptedBlocks.Root(), commitment.RootsID()) {
 				w.LogError("failed to verify blocks proof", "commitment", commitment.LogName(), "blockIDs", blockIDsBySlotCommitment, "proof", proof, "fromPeer", from)
 
-				return false
+				return blocksToWarpSync
 			}
 
 			acceptedTransactionIDs := ads.NewSet[iotago.Identifier](mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes, iotago.TransactionID.Bytes, iotago.TransactionIDFromBytes)
@@ -131,7 +132,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			if !iotago.VerifyProof(mutationProof, acceptedTransactionIDs.Root(), commitment.RootsID()) {
 				w.LogError("failed to verify mutations proof", "commitment", commitment.LogName(), "transactionIDs", transactionIDs, "proof", mutationProof, "fromPeer", from)
 
-				return false
+				return blocksToWarpSync
 			}
 
 			w.ticker.StopTicker(commitmentID)
@@ -141,12 +142,12 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			if !chain.WarpSync.Get() {
 				w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
 
-				return false
+				return blocksToWarpSync
 			}
 
 			// make sure the engine is clean and requires a warp-sync before we start processing the blocks
 			if targetEngine.Workers.WaitChildren(); targetEngine.Storage.Settings().LatestCommitment().ID().Slot() > commitmentID.Slot() {
-				return true
+				return blocksToWarpSync
 			}
 			targetEngine.Reset()
 
@@ -174,10 +175,10 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				}
 			}
 
-			if len(blockIDsBySlotCommitment) == 0 {
+			if totalBlocks == 0 {
 				forceCommitmentFunc()
 
-				return true
+				return blocksToWarpSync
 			}
 
 			blockBookedFunc := func(_ bool, _ bool) {
@@ -212,8 +213,11 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				}
 			}
 
+			blocksToWarpSync = ds.NewSet[iotago.BlockID]()
 			for slotCommitmentID, blockIDs := range blockIDsBySlotCommitment {
 				for _, blockID := range blockIDs {
+					blocksToWarpSync.Add(blockID)
+
 					w.LogError("requesting block", "blockID", blockID)
 
 					block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
@@ -234,7 +238,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			w.LogDebug("received response", "commitment", commitment.LogName())
 
-			return true
+			return blocksToWarpSync
 		})
 	})
 }

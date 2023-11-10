@@ -3,11 +3,13 @@ package protocol
 import (
 	"fmt"
 
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Commitment struct {
@@ -16,8 +18,8 @@ type Commitment struct {
 	MainChild                       reactive.Variable[*Commitment]
 	Chain                           reactive.Variable[*Chain]
 	RequestAttestations             reactive.Variable[bool]
-	WarpSyncBlocks                  reactive.Variable[bool]
-	RequestedBlocksReceived         reactive.Variable[bool]
+	RequestBlocksToWarpSync         reactive.Variable[bool]
+	BlocksToWarpSync                reactive.Variable[ds.Set[iotago.BlockID]]
 	Weight                          reactive.Variable[uint64]
 	AttestedWeight                  reactive.Variable[uint64]
 	CumulativeAttestedWeight        reactive.Variable[uint64]
@@ -41,8 +43,8 @@ func NewCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
 		MainChild:                       reactive.NewVariable[*Commitment](),
 		Chain:                           reactive.NewVariable[*Chain](),
 		RequestAttestations:             reactive.NewVariable[bool](),
-		WarpSyncBlocks:                  reactive.NewVariable[bool](),
-		RequestedBlocksReceived:         reactive.NewVariable[bool](),
+		RequestBlocksToWarpSync:         reactive.NewVariable[bool](),
+		BlocksToWarpSync:                reactive.NewVariable[ds.Set[iotago.BlockID]](),
 		Weight:                          reactive.NewVariable[uint64](),
 		AttestedWeight:                  reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
@@ -74,8 +76,7 @@ func (c *Commitment) initLogging(chains *Chains) (self *Commitment) {
 		c.MainChild.LogUpdates(c, log.LevelTrace, "MainChild", (*Commitment).LogName),
 		c.Chain.LogUpdates(c, log.LevelTrace, "Chain", (*Chain).LogName),
 		c.RequestAttestations.LogUpdates(c, log.LevelTrace, "RequestAttestations"),
-		c.WarpSyncBlocks.LogUpdates(c, log.LevelTrace, "WarpSyncBlocks"),
-		c.RequestedBlocksReceived.LogUpdates(c, log.LevelTrace, "RequestedBlocksReceived"),
+		c.RequestBlocksToWarpSync.LogUpdates(c, log.LevelTrace, "RequestBlocksToWarpSync"),
 		c.Weight.LogUpdates(c, log.LevelTrace, "Weight"),
 		c.AttestedWeight.LogUpdates(c, log.LevelTrace, "AttestedWeight"),
 		c.CumulativeAttestedWeight.LogUpdates(c, log.LevelTrace, "CumulativeAttestedWeight"),
@@ -142,7 +143,7 @@ func (c *Commitment) initBehavior(chains *Chains) (self *Commitment) {
 							return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
 						}, chain.SpawnedEngine, chain.WarpSync, c.IsAboveLatestVerifiedCommitment)),
 
-						c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
+						c.RequestBlocksToWarpSync.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
 							return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
 						}, chain.SpawnedEngine, chain.WarpSync, parent.IsVerified, c.IsVerified)),
 

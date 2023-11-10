@@ -41,7 +41,9 @@ func (c *Commitments) Publish(commitment *model.Commitment) (commitmentMetadata 
 	if published = commitmentMetadata == publishedCommitmentMetadata; published {
 		commitmentMetadata.LogDebug("created", "id", commitment.ID())
 
-		c.Add(commitmentMetadata)
+		if c.Add(commitmentMetadata) {
+			commitmentMetadata.IsEvicted.OnTrigger(func() { c.Delete(commitmentMetadata) })
+		}
 	}
 
 	return commitmentMetadata, commitmentMetadata == publishedCommitmentMetadata, nil
