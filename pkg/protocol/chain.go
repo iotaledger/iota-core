@@ -17,7 +17,6 @@ import (
 
 type Chain struct {
 	ForkingPoint             reactive.Variable[*Commitment]
-	ParentChain              reactive.Variable[*Chain]
 	ChildChains              reactive.Set[*Chain]
 	LatestCommitment         reactive.Variable[*Commitment]
 	LatestAttestedCommitment reactive.Variable[*Commitment]
@@ -42,9 +41,8 @@ type Chain struct {
 }
 
 func NewChain(chains *Chains) *Chain {
-	c := &Chain{
+	c := (&Chain{
 		ForkingPoint:             reactive.NewVariable[*Commitment](),
-		ParentChain:              reactive.NewVariable[*Chain](),
 		ChildChains:              reactive.NewSet[*Chain](),
 		LatestCommitment:         reactive.NewVariable[*Commitment](),
 		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
@@ -63,30 +61,11 @@ func NewChain(chains *Chains) *Chain {
 		commitments:   shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 		VerifyState:   reactive.NewVariable[bool](),
 		SpawnedEngine: reactive.NewVariable[*engine.Engine](),
-	}
-
-	c.Logger, _ = chains.protocol.NewEntityLogger("Chain")
-	c.LogDebug("created")
-
-	c.WarpSync.LogUpdates(c, log.LevelTrace, "WarpSync")
-	c.NetworkClockSlot.LogUpdates(c, log.LevelTrace, "NetworkClockSlot")
-	c.WarpSyncThreshold.LogUpdates(c, log.LevelTrace, "WarpSyncThreshold")
-	c.OutOfSyncThreshold.LogUpdates(c, log.LevelTrace, "OutOfSyncThreshold")
-	c.ForkingPoint.LogUpdates(c, log.LevelTrace, "ForkingPoint", (*Commitment).LogName)
-	c.ClaimedWeight.LogUpdates(c, log.LevelTrace, "ClaimedWeight")
-	c.AttestedWeight.LogUpdates(c, log.LevelTrace, "AttestedWeight")
-	c.VerifiedWeight.LogUpdates(c, log.LevelTrace, "VerifiedWeight")
-	c.LatestCommitment.LogUpdates(c, log.LevelTrace, "LatestCommitment", (*Commitment).LogName)
-	c.LatestVerifiedCommitment.LogUpdates(c, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName)
-	c.VerifyAttestations.LogUpdates(c, log.LevelTrace, "VerifyAttestations")
-	c.VerifyState.LogUpdates(c, log.LevelDebug, "VerifyState")
-	c.SpawnedEngine.LogUpdates(c, log.LevelDebug, "SpawnedEngine", (*engine.Engine).LogName)
-	c.IsEvicted.LogUpdates(c, log.LevelDebug, "IsEvicted")
+	}).initLogging(chains)
 
 	c.initClaimedWeight()
 	c.initAttestedWeight()
 	c.initVerifiedWeight()
-	c.initEngine()
 	c.initWarpSync()
 
 	chains.protocol.NetworkClock.OnUpdate(func(_ time.Time, now time.Time) {
@@ -117,25 +96,65 @@ func NewChain(chains *Chains) *Chain {
 		}
 	})
 
-	c.ParentChain.OnUpdate(func(prevParent *Chain, newParent *Chain) {
-		if prevParent != nil {
-			prevParent.ChildChains.Delete(c)
+	c.ForkingPoint.WithValue(func(forkingPoint *Commitment) (teardown func()) {
+		if forkingPoint == nil {
+			return c.Engine.InheritFrom(c.SpawnedEngine)
 		}
 
-		if newParent != nil {
-			newParent.ChildChains.Add(c)
-		}
-	})
+		return forkingPoint.Parent.WithValue(func(parent *Commitment) (teardown func()) {
+			if parent == nil {
+				return c.Engine.InheritFrom(c.SpawnedEngine)
+			}
 
-	c.ForkingPoint.OnUpdateWithContext(func(_ *Commitment, forkingPoint *Commitment, forkingPointContext func(subscriptionFactory func() (unsubscribe func()))) {
-		forkingPointContext(func() func() {
-			return forkingPoint.Parent.OnUpdate(func(_ *Commitment, parent *Commitment) {
-				forkingPointContext(func() func() {
-					return c.ParentChain.InheritFrom(parent.Chain)
-				})
+			return parent.Chain.WithValue(func(parentChain *Chain) (teardown func()) {
+				if parentChain == nil {
+					return c.Engine.InheritFrom(c.SpawnedEngine)
+				}
+
+				return lo.Batch(
+					parentChain.registerChild(c),
+
+					c.Engine.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ *engine.Engine, spawnedEngine *engine.Engine, parentEngine *engine.Engine) *engine.Engine {
+						if spawnedEngine != nil {
+							return spawnedEngine
+						}
+
+						return parentEngine
+					}, c.SpawnedEngine, parentChain.Engine)),
+				)
 			})
 		})
 	})
+
+	return c
+}
+
+func (c *Chain) initLogging(chains *Chains) (self *Chain) {
+	var shutdownLogger func()
+	c.Logger, shutdownLogger = chains.protocol.NewEntityLogger("Chain")
+
+	teardownLogging := lo.Batch(
+		c.Engine.LogUpdates(c, log.LevelError, "Engine", (*engine.Engine).LogName),
+		c.WarpSync.LogUpdates(c, log.LevelTrace, "WarpSync"),
+		c.NetworkClockSlot.LogUpdates(c, log.LevelTrace, "NetworkClockSlot"),
+		c.WarpSyncThreshold.LogUpdates(c, log.LevelTrace, "WarpSyncThreshold"),
+		c.OutOfSyncThreshold.LogUpdates(c, log.LevelTrace, "OutOfSyncThreshold"),
+		c.ForkingPoint.LogUpdates(c, log.LevelTrace, "ForkingPoint", (*Commitment).LogName),
+		c.ClaimedWeight.LogUpdates(c, log.LevelTrace, "ClaimedWeight"),
+		c.AttestedWeight.LogUpdates(c, log.LevelTrace, "AttestedWeight"),
+		c.VerifiedWeight.LogUpdates(c, log.LevelTrace, "VerifiedWeight"),
+		c.LatestCommitment.LogUpdates(c, log.LevelTrace, "LatestCommitment", (*Commitment).LogName),
+		c.LatestVerifiedCommitment.LogUpdates(c, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName),
+		c.VerifyAttestations.LogUpdates(c, log.LevelTrace, "VerifyAttestations"),
+		c.VerifyState.LogUpdates(c, log.LevelDebug, "VerifyState"),
+		c.SpawnedEngine.LogUpdates(c, log.LevelTrace, "SpawnedEngine", (*engine.Engine).LogName),
+		c.Engine.LogUpdates(c, log.LevelTrace, "SpawnedEngine", (*engine.Engine).LogName),
+		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
+
+		shutdownLogger,
+	)
+
+	c.IsEvicted.OnTrigger(teardownLogging)
 
 	return c
 }
@@ -258,24 +277,6 @@ func (c *Chain) initWarpSync() {
 	})
 }
 
-func (c *Chain) initEngine() {
-	c.ParentChain.OnUpdateWithContext(func(_ *Chain, parentChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
-		unsubscribeOnUpdate(func() func() {
-			if parentChain == nil {
-				return c.Engine.InheritFrom(c.SpawnedEngine)
-			}
-
-			return c.Engine.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ *engine.Engine, spawnedEngine *engine.Engine, parentEngine *engine.Engine) *engine.Engine {
-				if spawnedEngine != nil {
-					return spawnedEngine
-				}
-
-				return parentEngine
-			}, c.SpawnedEngine, parentChain.Engine))
-		})
-	}, true)
-}
-
 func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
 	if c.commitments.Compute(commitment.Slot(), func(currentCommitment *Commitment, exists bool) *Commitment {
 		if !exists {
@@ -321,5 +322,13 @@ func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
 		c.LatestCommitment.Compute(resetToParent)
 		c.LatestAttestedCommitment.Compute(resetToParent)
 		c.LatestVerifiedCommitment.Compute(resetToParent)
+	}
+}
+
+func (c *Chain) registerChild(child *Chain) (unregisterChild func()) {
+	c.ChildChains.Add(child)
+
+	return func() {
+		c.ChildChains.Delete(child)
 	}
 }
