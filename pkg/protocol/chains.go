@@ -33,54 +33,36 @@ func newChains(protocol *Protocol) *Chains {
 	c.HeaviestClaimed.LogUpdates(c.protocol, log.LevelTrace, "Unchecked Heavier Chain", (*Chain).LogName)
 	c.HeaviestAttested.LogUpdates(c.protocol, log.LevelTrace, "Attested Heavier Chain", (*Chain).LogName)
 
-	protocol.Constructed.OnTrigger(func() {
-		trackHeaviestChain := func(chainVariable reactive.Variable[*Chain], getWeightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
-			return getWeightVariable(candidate).OnUpdate(func(_ uint64, newChainWeight uint64) {
-				if heaviestChain := c.HeaviestVerified.Get(); heaviestChain != nil && newChainWeight < heaviestChain.VerifiedWeight.Get() {
-					return
+	trackHeaviestChain := func(targetWeight reactive.Variable[*Chain], weight func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
+		return weight(candidate).OnUpdate(func(_ uint64, newWeight uint64) {
+			if heaviestChain := c.HeaviestVerified.Get(); heaviestChain != nil && newWeight < heaviestChain.VerifiedWeight.Get() {
+				return
+			}
+
+			targetWeight.Compute(func(currentCandidate *Chain) *Chain {
+				if currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newWeight > weight(currentCandidate).Get() {
+					return candidate
 				}
 
-				chainVariable.Compute(func(currentCandidate *Chain) *Chain {
-					if currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newChainWeight > getWeightVariable(currentCandidate).Get() {
-						return candidate
-					}
+				return currentCandidate
+			})
+		}, true)
+	}
 
-					return currentCandidate
-				})
-			}, true)
-		}
+	c.WithElements(func(chain *Chain) (teardown func()) {
+		return lo.Batch(
+			c.publishEngineCommitments(chain),
 
-		c.WithElements(func(chain *Chain) (teardown func()) {
-			return lo.Batch(
-				c.publishEngineCommitments(chain),
-
-				trackHeaviestChain(c.HeaviestVerified, (*Chain).verifiedWeight, chain),
-				trackHeaviestChain(c.HeaviestAttested, (*Chain).attestedWeight, chain),
-				trackHeaviestChain(c.HeaviestClaimed, (*Chain).claimedWeight, chain),
-			)
-		})
-
-		c.initChainSwitching()
+			trackHeaviestChain(c.HeaviestVerified, func(chain *Chain) reactive.Variable[uint64] { return chain.VerifiedWeight }, chain),
+			trackHeaviestChain(c.HeaviestAttested, func(chain *Chain) reactive.Variable[uint64] { return chain.AttestedWeight }, chain),
+			trackHeaviestChain(c.HeaviestClaimed, func(chain *Chain) reactive.Variable[uint64] { return chain.ClaimedWeight }, chain),
+		)
 	})
 
+	c.initChainSwitching()
 	c.initMainChain()
 
 	return c
-}
-
-func (c *Chains) initMainChain() {
-	c.protocol.LogDebug("initializing main chain")
-
-	mainChain := NewChain(c)
-
-	//c.protocol.LogDebug("new chain created", "name", mainChain.LogName(), "forkingPoint", "<snapshot>")
-
-	mainChain.VerifyState.Set(true)
-	mainChain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
-
-	c.Heaviest.Set(mainChain)
-
-	c.Add(mainChain)
 }
 
 func (c *Chains) Fork(forkingPoint *Commitment) *Chain {
@@ -90,6 +72,18 @@ func (c *Chains) Fork(forkingPoint *Commitment) *Chain {
 	c.Add(chain)
 
 	return chain
+}
+
+func (c *Chains) initMainChain() {
+	c.protocol.LogTrace("initializing main chain")
+
+	mainChain := NewChain(c)
+	mainChain.VerifyState.Set(true)
+	mainChain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
+
+	c.Heaviest.Set(mainChain)
+
+	c.Add(mainChain)
 }
 
 func (c *Chains) initChainSwitching() {

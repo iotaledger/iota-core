@@ -140,6 +140,57 @@ func NewChain(chains *Chains) *Chain {
 	return c
 }
 
+func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exists bool) {
+	for currentChain := c; currentChain != nil; {
+		switch forkingPoint := currentChain.ForkingPoint.Get(); {
+		case forkingPoint == nil:
+			return nil, false // this should never happen, but we can handle it gracefully anyway
+		case forkingPoint.Slot() == slot:
+			return forkingPoint, true
+		case slot > forkingPoint.Slot():
+			return currentChain.commitments.Get(slot)
+		default:
+			parent := forkingPoint.Parent.Get()
+			if parent == nil {
+				return nil, false
+			}
+
+			currentChain = parent.Chain.Get()
+		}
+	}
+
+	return nil, false
+}
+
+func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
+	if c == nil {
+		return false
+	}
+
+	for _, chain := range append([]*Chain{c}, c.ChildChains.ToSlice()...) {
+		if !chain.VerifyState.Get() {
+			continue
+		}
+
+		targetEngine := chain.Engine.Get()
+		if targetEngine == nil {
+			continue
+		} else if issuingTime := block.ProtocolBlock().Header.IssuingTime; chain.WarpSync.Get() {
+			if targetCommitment, exists := chain.Commitment(targetEngine.APIForTime(issuingTime).TimeProvider().SlotFromTime(issuingTime)); !exists {
+				continue
+			} else if blocksToWarpSync := targetCommitment.BlocksToWarpSync.Get(); blocksToWarpSync == nil || !blocksToWarpSync.Has(block.ID()) {
+				continue
+			}
+		}
+
+		targetEngine.ProcessBlockFromPeer(block, src)
+
+		success = true
+	}
+
+	return success
+}
+
 func (c *Chain) initClaimedWeight() {
 	c.ClaimedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, c *Commitment) uint64 {
 		if c == nil {
@@ -225,57 +276,6 @@ func (c *Chain) initEngine() {
 	}, true)
 }
 
-func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exists bool) {
-	for currentChain := c; currentChain != nil; {
-		switch forkingPoint := currentChain.ForkingPoint.Get(); {
-		case forkingPoint == nil:
-			return nil, false // this should never happen, but we can handle it gracefully anyway
-		case forkingPoint.Slot() == slot:
-			return forkingPoint, true
-		case slot > forkingPoint.Slot():
-			return currentChain.commitments.Get(slot)
-		default:
-			parent := forkingPoint.Parent.Get()
-			if parent == nil {
-				return nil, false
-			}
-
-			currentChain = parent.Chain.Get()
-		}
-	}
-
-	return nil, false
-}
-
-func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
-	if c == nil {
-		return false
-	}
-
-	for _, chain := range append([]*Chain{c}, c.ChildChains.ToSlice()...) {
-		if !chain.VerifyState.Get() {
-			continue
-		}
-
-		targetEngine := chain.Engine.Get()
-		if targetEngine == nil {
-			continue
-		} else if issuingTime := block.ProtocolBlock().Header.IssuingTime; chain.WarpSync.Get() {
-			if targetCommitment, exists := chain.Commitment(targetEngine.APIForTime(issuingTime).TimeProvider().SlotFromTime(issuingTime)); !exists {
-				continue
-			} else if blocksToWarpSync := targetCommitment.BlocksToWarpSync.Get(); blocksToWarpSync == nil || !blocksToWarpSync.Has(block.ID()) {
-				continue
-			}
-		}
-
-		targetEngine.ProcessBlockFromPeer(block, src)
-
-		success = true
-	}
-
-	return success
-}
-
 func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
 	if c.commitments.Compute(commitment.Slot(), func(currentCommitment *Commitment, exists bool) *Commitment {
 		if !exists {
@@ -322,16 +322,4 @@ func (c *Chain) registerCommitment(commitment *Commitment) (unregister func()) {
 		c.LatestAttestedCommitment.Compute(resetToParent)
 		c.LatestVerifiedCommitment.Compute(resetToParent)
 	}
-}
-
-func (c *Chain) claimedWeight() reactive.Variable[uint64] {
-	return c.ClaimedWeight
-}
-
-func (c *Chain) attestedWeight() reactive.Variable[uint64] {
-	return c.AttestedWeight
-}
-
-func (c *Chain) verifiedWeight() reactive.Variable[uint64] {
-	return c.VerifiedWeight
 }
