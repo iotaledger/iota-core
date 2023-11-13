@@ -2,6 +2,7 @@ package drr
 
 import (
 	"math"
+	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/core/safemath"
@@ -40,6 +41,7 @@ type Scheduler struct {
 
 	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, Deficit]
 
+	workersWg      sync.WaitGroup
 	shutdownSignal chan struct{}
 
 	blockCache *blocks.Blocks
@@ -103,7 +105,6 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 				s.AddBlock(block)
 				s.selectBlockToScheduleWithLocking()
-
 			})
 			e.Events.Ledger.AccountCreated.Hook(func(accountID iotago.AccountID) {
 				s.bufferMutex.Lock()
@@ -144,11 +145,14 @@ func (s *Scheduler) Shutdown() {
 	})
 	close(s.shutdownSignal)
 	s.TriggerStopped()
+
+	s.workersWg.Wait()
 }
 
 // Start starts the scheduler.
 func (s *Scheduler) Start() {
 	s.shutdownSignal = make(chan struct{}, 1)
+	s.workersWg.Add(1)
 	go s.basicBlockLoop()
 
 	s.TriggerInitialized()
@@ -321,6 +325,7 @@ loop:
 		select {
 		// on close, exit the loop
 		case <-s.shutdownSignal:
+			s.workersWg.Done()
 			break loop
 		// when a block is pushed by the buffer
 		case blockToSchedule = <-s.basicBuffer.blockChan:
@@ -344,6 +349,7 @@ loop:
 		select {
 		// on close, exit the loop
 		case <-validatorQueue.shutdownSignal:
+			s.workersWg.Done()
 			break loop
 		// when a block is pushed by this validator queue.
 		case blockToSchedule = <-validatorQueue.blockChan:
@@ -400,7 +406,6 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 		return true
 	})
 	s.selectBasicBlockWithoutLocking()
-
 }
 
 func (s *Scheduler) selectValidationBlockWithoutLocking(validatorQueue *ValidatorQueue) bool {
@@ -724,6 +729,7 @@ func (s *Scheduler) deficitFromWork(work iotago.WorkScore) Deficit {
 func (s *Scheduler) addValidator(accountID iotago.AccountID) *ValidatorQueue {
 	validatorQueue := NewValidatorQueue(accountID)
 	s.validatorBuffer.Set(accountID, validatorQueue)
+	s.workersWg.Add(1)
 	go s.validatorLoop(validatorQueue)
 
 	return validatorQueue
