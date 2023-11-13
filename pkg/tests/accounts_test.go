@@ -1018,7 +1018,7 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 
 	// UNLOCK THE ACCOUNT
 	// The locked wallet 2 is preparing and signs the transaction,
-	// but it's issued by wallet 1 whose account is not locked.
+	// but it's issued by wallet 2 whose account is not locked.
 	{
 		allottedBIC := iotago.BlockIssuanceCredits(10001)
 		tx3 := wallet1.AllotManaFromInputs("TX3",
