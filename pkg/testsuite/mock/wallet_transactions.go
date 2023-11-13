@@ -350,11 +350,11 @@ func (w *Wallet) SendFundsToAccount(transactionName string, accountID iotago.Acc
 		Features: iotago.BasicOutputFeatures{},
 	}
 
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 		WithInputs(inputStates),
 		WithOutputs(iotago.Outputs[iotago.Output]{targetOutput}),
-	))
+	)
 
 	w.registerOutputs(transactionName, signedTransaction.Transaction)
 	fmt.Println(lo.Keys(w.outputs))
@@ -390,15 +390,17 @@ func (w *Wallet) SendFundsFromAccount(transactionName string, accountOutputName 
 		},
 		Features: iotago.BasicOutputFeatures{},
 	}}
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 		WithInputs(inputStates),
-		WithContextInputs(iotago.TxEssenceContextInputs{
-			&iotago.BlockIssuanceCreditInput{AccountID: accountOutput.AccountID},
-			&iotago.CommitmentInput{CommitmentID: commitmentID},
+		WithCommitmentInput(&iotago.CommitmentInput{
+			CommitmentID: commitmentID,
+		}),
+		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
+			AccountID: accountOutput.AccountID,
 		}),
 		WithOutputs(targetOutputs),
-	))
+	)
 
 	w.registerOutputs(transactionName, signedTransaction.Transaction)
 
@@ -467,12 +469,12 @@ func (w *Wallet) AllotManaFromInputs(transactionName string, allotments iotago.A
 		outputStates = append(outputStates, outputBuilder.MustBuild())
 	}
 
-	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 		WithAllotments(allotments),
 		WithInputs(inputStates),
 		WithOutputs(outputStates),
-	))
+	)
 
 	w.registerOutputs(transactionName, signedTransaction.Transaction)
 
