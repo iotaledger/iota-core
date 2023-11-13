@@ -262,7 +262,7 @@ func (s *Scheduler) Reset() {
 	defer s.bufferMutex.Unlock()
 
 	// Validator workers need to be signaled to exit.
-	s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+	s.validatorBuffer.buffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 		s.shutdownValidatorQueue(validatorQueue)
 
 		return true
