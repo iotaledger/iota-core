@@ -288,6 +288,8 @@ func (s *State) Rollback(lowerTarget iotago.SlotIndex, targetIndex iotago.SlotIn
 	return nil
 }
 
+func (s *State) Reset() { /* nothing to reset but comply with interface */ }
+
 // latestNonEmptySlot returns the latest slot that contains a rootblock.
 func (s *State) latestNonEmptySlot() iotago.SlotIndex {
 	latestNonEmptySlotBytes, err := s.latestNonEmptyStore.Get([]byte{latestNonEmptySlotKey})

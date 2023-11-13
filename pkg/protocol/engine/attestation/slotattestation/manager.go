@@ -319,6 +319,15 @@ func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 	return nil
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (m *Manager) Reset() {
+	m.commitmentMutex.Lock()
+	defer m.commitmentMutex.Unlock()
+
+	// only reset future attestations as pending ones are only updated on commitment and accordingly in a "clean state".
+	m.futureAttestations.Clear()
+}
+
 func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cutoffSlot iotago.SlotIndex, isValid bool) {
 	if slot < m.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge() {
 		return 0, false

@@ -21,7 +21,7 @@ import (
 )
 
 func TestTopStakers_InitializeCommittee(t *testing.T) {
-	committeeStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
+	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
 
 	topStakersSeatManager := &SeatManager{
 		apiProvider:     api.SingleVersionProvider(tpkg.TestAPI),
@@ -58,7 +58,7 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 }
 
 func TestTopStakers_RotateCommittee(t *testing.T) {
-	committeeStore := epochstore.NewStore(kvstore.Realm{}, kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
+	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
 
 	topStakersSeatManager := &SeatManager{
 		apiProvider:     api.SingleVersionProvider(tpkg.TestAPI),

@@ -15,5 +15,8 @@ type Notarization interface {
 
 	AcceptedBlocksCount(index iotago.SlotIndex) int
 
+	// Reset resets the component to a clean state as if it was created at the last commitment.
+	Reset()
+
 	module.Interface
 }
