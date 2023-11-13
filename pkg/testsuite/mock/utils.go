@@ -10,6 +10,7 @@ import (
 const MinIssuerAccountAmount = iotago.BaseToken(372900)
 const MinValidatorAccountAmount = iotago.BaseToken(722800)
 const AccountConversionManaCost = iotago.Mana(1000000)
+const MaxBlockManaCost = iotago.Mana(1000000)
 
 // TransactionBuilder options
 

@@ -159,10 +159,10 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 }
 
 // Starts with an account already existing in snapshot (default wallet).
-// 1. Use default wallet to create a new account with staking feature from genesis basic output.
-// 2. Use default wallet to create a new account for a delegator wallet.
-// 2. Use default wallet to create a delegation to the new account from a basic output.
-// 3. Use default wallet to transition the delegation to delayed claiming.
+//  1. Use default wallet to create a new account with staking feature from genesis basic output.
+//     Use default wallet to create a new account for a delegator wallet.
+//  2. Use delegator wallet to create a delegation to the new account from a basic output.
+//  3. Use default wallet to transition the delegation to delayed claiming.
 func Test_StakeAndDelegate(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
@@ -216,9 +216,15 @@ func Test_StakeAndDelegate(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// 1. CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
-	newAccountBlockIssuerKey := utils.RandBlockIssuerKey()
-	// set the expiry slot of the new account to note expire
-	newAccountExpirySlot := iotago.MaxSlotIndex
+	// CREATE DELEGATOR ACCOUNT WITH BLOCK ISSUER FEATURE FROM BASIC UTXO
+	// create wallet for the delegator.
+	delegatorWallet := ts.AddWallet("delegator", node1, iotago.EmptyAccountID)
+	// random block issuer key for the staker, and
+	stakerBlockIssuerKey := utils.RandBlockIssuerKey()
+	delegatorBlockIssuerKey := delegatorWallet.BlockIssuer.BlockIssuerKey()
+	// set the expiry slot of the new accounts to not expire
+	stakerBlockIssuerExpirySlot := iotago.MaxSlotIndex
+	delegatorBlockIssuerExpirySlot := iotago.MaxSlotIndex
 
 	var block1Slot iotago.SlotIndex = 1
 	ts.SetCurrentSlot(block1Slot)
@@ -226,27 +232,39 @@ func Test_StakeAndDelegate(t *testing.T) {
 		"TX1",
 		"Genesis:0",
 		ts.DefaultWallet(),
-		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
+		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{stakerBlockIssuerKey}, stakerBlockIssuerExpirySlot),
 		mock.WithStakingFeature(10000, 421, 0, 10),
 		mock.WithAccountAmount(mock.MinIssuerAccountAmount),
 	)
-
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
 	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
-	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
+	ts.SetCurrentSlot(2)
+	tx2 := ts.DefaultWallet().CreateAccountFromInput(
+		"TX2",
+		"TX1:1",
+		delegatorWallet,
+		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{delegatorBlockIssuerKey}, delegatorBlockIssuerExpirySlot),
+		mock.WithAccountAmount(mock.MinIssuerAccountAmount),
+		mock.WithAccountMana(mock.MaxBlockManaCost),
+	)
 
-	newAccount := ts.DefaultWallet().AccountOutput("TX1:0")
-	newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
+	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(block1.ID()))
+	latestParents := ts.CommitUntilSlot(block1Slot, block2.ID())
 
-	ts.AssertAccountDiff(newAccountOutput.AccountID, block1Slot, &model.AccountDiff{
+	stakerAccount := ts.DefaultWallet().AccountOutput("TX1:0")
+	stakerAccountOutput := stakerAccount.Output().(*iotago.AccountOutput)
+	delegatorAccount := delegatorWallet.AccountOutput("TX2:0")
+	delegatorAccountOutput := delegatorAccount.Output().(*iotago.AccountOutput)
+
+	ts.AssertAccountDiff(stakerAccountOutput.AccountID, block1Slot, &model.AccountDiff{
 		BICChange:              0,
 		PreviousUpdatedSlot:    0,
-		NewExpirySlot:          newAccountExpirySlot,
+		NewExpirySlot:          stakerBlockIssuerExpirySlot,
 		PreviousExpirySlot:     0,
-		NewOutputID:            newAccount.OutputID(),
+		NewOutputID:            stakerAccount.OutputID(),
 		PreviousOutputID:       iotago.EmptyOutputID,
-		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
+		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(stakerBlockIssuerKey),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
 		ValidatorStakeChange:   10000,
 		StakeEndEpochChange:    10,
@@ -255,34 +273,56 @@ func Test_StakeAndDelegate(t *testing.T) {
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              newAccountOutput.AccountID,
+		ID:              stakerAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
-		ExpirySlot:      newAccountExpirySlot,
-		OutputID:        newAccount.OutputID(),
-		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
+		ExpirySlot:      stakerBlockIssuerExpirySlot,
+		OutputID:        stakerAccount.OutputID(),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(stakerBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: 0,
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
+	ts.AssertAccountDiff(delegatorAccountOutput.AccountID, block1Slot, &model.AccountDiff{
+		BICChange:              0,
+		PreviousUpdatedSlot:    0,
+		NewExpirySlot:          delegatorBlockIssuerExpirySlot,
+		PreviousExpirySlot:     0,
+		NewOutputID:            delegatorAccount.OutputID(),
+		PreviousOutputID:       iotago.EmptyOutputID,
+		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(delegatorBlockIssuerKey),
+		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
+	}, false, ts.Nodes()...)
+
+	ts.AssertAccountData(&accounts.AccountData{
+		ID:              delegatorAccountOutput.AccountID,
+		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
+		ExpirySlot:      delegatorBlockIssuerExpirySlot,
+		OutputID:        delegatorAccount.OutputID(),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(delegatorBlockIssuerKey),
+	}, ts.Nodes()...)
+
 	// 2. CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
-	accountAddress := iotago.AccountAddress(newAccountOutput.AccountID)
-	block2Slot := ts.CurrentSlot()
+	accountAddress := iotago.AccountAddress(stakerAccountOutput.AccountID)
+	block3Slot := ts.CurrentSlot()
+	fmt.Println("block3Slot", block3Slot)
 	delegationStartEpoch := iotago.EpochIndex(1)
 
-	tx2 := ts.DefaultWallet().CreateDelegationFromInput(
-		"TX2",
-		"TX1:1",
+	// set the new delegator accountID as the block issuer for the delegator wallet
+	delegatorWallet.SetBlockIssuer(delegatorAccountOutput.AccountID)
+	tx3 := delegatorWallet.CreateDelegationFromInput(
+		"TX3",
+		"TX2:1",
 		mock.WithDelegatedValidatorAddress(&accountAddress),
 		mock.WithDelegationStartEpoch(delegationStartEpoch),
 	)
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
+	block3 := ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
 
-	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
-	delegatedAmount := ts.DefaultWallet().Output("TX1:1").BaseTokenAmount()
+	latestParents = ts.CommitUntilSlot(block3Slot, block3.ID())
+	delegatedAmount := ts.DefaultWallet().Output("TX2:1").BaseTokenAmount()
 
-	ts.AssertAccountDiff(newAccountOutput.AccountID, block2Slot, &model.AccountDiff{
+	ts.AssertAccountDiff(stakerAccountOutput.AccountID, block3Slot, &model.AccountDiff{
 		BICChange:              0,
 		PreviousUpdatedSlot:    0,
 		NewOutputID:            iotago.EmptyOutputID,
@@ -296,26 +336,26 @@ func Test_StakeAndDelegate(t *testing.T) {
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              newAccountOutput.AccountID,
+		ID:              stakerAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
-		ExpirySlot:      newAccountExpirySlot,
-		OutputID:        newAccount.OutputID(),
-		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
+		ExpirySlot:      stakerBlockIssuerExpirySlot,
+		OutputID:        stakerAccount.OutputID(),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(stakerBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(delegatedAmount),
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
-	// 3. TRANSITION DELEGATION TO DELAYED CLAIMING
-	block3Slot := ts.CurrentSlot()
-	tx3 := ts.DefaultWallet().DelayedClaimingTransition("TX3", "TX2:0", 0)
-	block3 := ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
+	// 4. TRANSITION DELEGATION TO DELAYED CLAIMING
+	block4Slot := ts.CurrentSlot()
+	tx4 := ts.DefaultWallet().DelayedClaimingTransition("TX4", "TX3:0", 0)
+	block4 := ts.IssueBasicBlockWithOptions("block4", ts.DefaultWallet(), tx4, mock.WithStrongParents(latestParents...))
 
-	latestParents = ts.CommitUntilSlot(block3Slot, block3.ID())
+	latestParents = ts.CommitUntilSlot(block4Slot, block4.ID())
 
 	// Transitioning to delayed claiming effectively removes the delegation, so we expect a negative delegation stake change.
-	ts.AssertAccountDiff(newAccountOutput.AccountID, block3Slot, &model.AccountDiff{
+	ts.AssertAccountDiff(stakerAccountOutput.AccountID, block4Slot, &model.AccountDiff{
 		BICChange:              0,
 		PreviousUpdatedSlot:    0,
 		NewOutputID:            iotago.EmptyOutputID,
@@ -329,11 +369,11 @@ func Test_StakeAndDelegate(t *testing.T) {
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
-		ID:              newAccountOutput.AccountID,
+		ID:              stakerAccountOutput.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
-		ExpirySlot:      newAccountExpirySlot,
-		OutputID:        newAccount.OutputID(),
-		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
+		ExpirySlot:      stakerBlockIssuerExpirySlot,
+		OutputID:        stakerAccount.OutputID(),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(stakerBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(0),

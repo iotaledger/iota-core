@@ -363,7 +363,7 @@ func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, o
 func (t *TestSuite) AddValidatorNode(name string, optAmount ...iotago.BaseToken) *mock.Node {
 	node := t.addNodeToPartition(name, mock.NetworkMainPartition, true, optAmount...)
 	// create a wallet for each validator node which uses the validator account as a block issuer
-	t.addWallet(name, node, node.Validator.AccountID, node.KeyManager)
+	t.AddWallet(name, node, node.Validator.AccountID, node.KeyManager)
 
 	return node
 }
@@ -383,7 +383,7 @@ func (t *TestSuite) RemoveNode(name string) {
 // AddGenesisWallet adds a wallet to the test suite with a block issuer in the genesis snapshot and access to the genesis seed.
 // If no block issuance credits are provided, the wallet will be assigned half of the maximum block issuance credits.
 func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
-	newWallet := t.addWallet(name, node, iotago.EmptyAccountID, t.genesisKeyManager)
+	newWallet := t.AddWallet(name, node, iotago.EmptyAccountID, t.genesisKeyManager)
 	var bic iotago.BlockIssuanceCredits
 	if len(blockIssuanceCredits) == 0 {
 		bic = iotago.MaxBlockIssuanceCredits / 2
@@ -405,8 +405,8 @@ func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuance
 	return newWallet
 }
 
-func (t *TestSuite) addWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager *mock.KeyManager) *mock.Wallet {
-	newWallet := mock.NewWallet(t.Testing, name, node, keyManager)
+func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*mock.KeyManager) *mock.Wallet {
+	newWallet := mock.NewWallet(t.Testing, name, node, keyManager...)
 	newWallet.SetBlockIssuer(accountID)
 	t.wallets.Set(name, newWallet)
 	newWallet.SetCurrentSlot(t.currentSlot)

@@ -439,7 +439,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		})
 
 		transactionMetadata.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
-			fmt.Printf("%s > [%s] MemPool.TransactiOnOrphanedSlotUpdated in slot %d: %s\n", n.Name, engineName, slot, transactionMetadata.ID())
+			fmt.Printf("%s > [%s] MemPool.TransactionOrphanedSlotUpdated in slot %d: %s\n", n.Name, engineName, slot, transactionMetadata.ID())
 		})
 
 		transactionMetadata.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
