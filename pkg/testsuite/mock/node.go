@@ -69,9 +69,10 @@ type Node struct {
 	candidateEngineActivatedCount atomic.Uint32
 	mainEngineSwitchedCount       atomic.Uint32
 
-	mutex          syncutils.RWMutex
-	attachedBlocks []*blocks.Block
-	currentSlot    iotago.SlotIndex
+	mutex               syncutils.RWMutex
+	attachedBlocks      []*blocks.Block
+	currentSlot         iotago.SlotIndex
+	filteredBlockEvents []*commitmentfilter.BlockFilteredEvent
 }
 
 func NewNode(t *testing.T, net *Network, partition string, name string, validator bool) *Node {
@@ -319,6 +320,10 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		if failOnBlockFiltered {
 			n.Testing.Fatal("no blocks should be filtered")
 		}
+
+		n.mutex.Lock()
+		defer n.mutex.Unlock()
+		n.filteredBlockEvents = append(n.filteredBlockEvents, event)
 	})
 
 	events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
@@ -443,7 +448,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		})
 
 		transactionMetadata.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
-			fmt.Printf("%s > [%s] MemPool.TransactiOnCommittedSlotUpdated in slot %d: %s\n", n.Name, engineName, slot, transactionMetadata.ID())
+			fmt.Printf("%s > [%s] MemPool.TransactionCommittedSlotUpdated in slot %d: %s\n", n.Name, engineName, slot, transactionMetadata.ID())
 		})
 
 		transactionMetadata.OnPending(func() {
@@ -510,6 +515,13 @@ func (n *Node) ForkDetectedCount() int {
 
 func (n *Node) CandidateEngineActivatedCount() int {
 	return int(n.candidateEngineActivatedCount.Load())
+}
+
+func (n *Node) FilteredBlocks() []*commitmentfilter.BlockFilteredEvent {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+
+	return n.filteredBlockEvents
 }
 
 func (n *Node) MainEngineSwitchedCount() int {

@@ -220,7 +220,7 @@ func WithAccountImmutableFeatures(features iotago.AccountOutputImmFeatures) opti
 			switch feature.Type() {
 			case iotago.FeatureMetadata:
 				//nolint:forcetypeassert
-				accountBuilder.ImmutableMetadata(feature.(*iotago.MetadataFeature).Data)
+				accountBuilder.ImmutableMetadata(feature.(*iotago.MetadataFeature).Entries)
 			case iotago.FeatureSender:
 				//nolint:forcetypeassert
 				accountBuilder.ImmutableSender(feature.(*iotago.SenderFeature).Address)
