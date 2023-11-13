@@ -43,10 +43,6 @@ import (
 // | node1       | node1       |
 // | node2       | node2       |.
 
-const (
-	GenesisTransactionCreationSlot = 0
-)
-
 var GenesisTransactionCommitment = iotago.IdentifierFromData([]byte("genesis"))
 
 func CreateSnapshot(opts ...options.Option[Options]) error {
@@ -160,7 +156,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 
 	var accountLedgerOutputs utxoledger.Outputs
 	for idx, output := range genesisTransactionOutputs {
-		proof, err := iotago.NewOutputIDProof(engineInstance.LatestAPI(), GenesisTransactionCommitment, GenesisTransactionCreationSlot, genesisTransactionOutputs, uint16(idx))
+		proof, err := iotago.NewOutputIDProof(engineInstance.LatestAPI(), GenesisTransactionCommitment, api.ProtocolParameters().GenesisSlot(), genesisTransactionOutputs, uint16(idx))
 		if err != nil {
 			return err
 		}
@@ -171,7 +167,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 			return err
 		}
 
-		utxoOutput := utxoledger.CreateOutput(engineInstance, outputID, api.ProtocolParameters().GenesisBlockID(), GenesisTransactionCreationSlot, output, proof)
+		utxoOutput := utxoledger.CreateOutput(engineInstance, outputID, api.ProtocolParameters().GenesisBlockID(), api.ProtocolParameters().GenesisSlot(), output, proof)
 		if err := engineInstance.Ledger.AddGenesisUnspentOutput(utxoOutput); err != nil {
 			return err
 		}
