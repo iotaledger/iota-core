@@ -173,9 +173,11 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 		return ierrors.Wrapf(err, "failed to load PoA committee for epoch %d", epoch)
 	}
 
-	s.committee = committeeAccounts.SelectCommittee(committeeAccounts.IDs()...)
+	committeeAccountsIDs := committeeAccounts.IDs()
+	s.committee = committeeAccounts.SelectCommittee(committeeAccountsIDs...)
 
-	onlineValidators := committeeAccounts.IDs()
+	// Set validators that are part of the committee as active.
+	onlineValidators := committeeAccountsIDs
 	if len(s.optsOnlineCommitteeStartup) > 0 {
 		onlineValidators = s.optsOnlineCommitteeStartup
 	}

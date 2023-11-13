@@ -34,7 +34,16 @@ type Tracker struct {
 	mutex                   syncutils.RWMutex
 }
 
-func NewTracker(rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error), poolStatsStore *epochstore.Store[*model.PoolsStats], committeeStore *epochstore.Store[*account.Accounts], committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error), validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error), latestAppliedEpoch iotago.EpochIndex, apiProvider iotago.APIProvider, errHandler func(error)) *Tracker {
+func NewTracker(
+	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error),
+	poolStatsStore *epochstore.Store[*model.PoolsStats],
+	committeeStore *epochstore.Store[*account.Accounts],
+	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error),
+	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
+	latestAppliedEpoch iotago.EpochIndex,
+	apiProvider iotago.APIProvider,
+	errHandler func(error),
+) *Tracker {
 	return &Tracker{
 		nextEpochCommitteeCandidates:   shrinkingmap.New[iotago.AccountID, iotago.SlotIndex](),
 		rewardsStorePerEpochFunc:       rewardsStorePerEpochFunc,
@@ -80,11 +89,11 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	blockEpoch := t.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochFromSlot(block.ID().Slot())
-
 	if block.Payload().PayloadType() != iotago.PayloadCandidacyAnnouncement {
 		return
 	}
+
+	blockEpoch := t.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochFromSlot(block.ID().Slot())
 
 	var rollback bool
 	t.nextEpochCommitteeCandidates.Compute(block.ProtocolBlock().Header.IssuerID, func(currentValue iotago.SlotIndex, exists bool) iotago.SlotIndex {
