@@ -68,7 +68,7 @@ func run() error {
 		Component.LogInfo("Starting Dashboard ... done")
 
 		stopped := make(chan struct{})
-		go func() {
+		go func(ctx context.Context) {
 			server.Server.BaseContext = func(_ net.Listener) context.Context {
 				// set BaseContext to be the same as the plugin, so that requests being processed don't hang the shutdown procedure
 				return ctx
@@ -81,7 +81,7 @@ func run() error {
 				}
 				close(stopped)
 			}
-		}()
+		}(ctx)
 
 		// stop if we are shutting down or the server could not be started
 		select {
