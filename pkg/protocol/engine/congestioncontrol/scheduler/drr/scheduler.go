@@ -71,6 +71,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 				if s.apiProvider.APIForSlot(commitment.Slot()).TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
 					s.bufferMutex.Lock()
 					defer s.bufferMutex.Unlock()
+
 					committee, exists := s.seatManager.CommitteeInSlot(commitment.Slot() + 1)
 					if !exists {
 						s.errorHandler(ierrors.Errorf("committee does not exist in committed slot %d", commitment.Slot()+1))
@@ -81,11 +82,12 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 					s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 						if !committee.HasAccount(accountID) {
 							s.shutdownValidatorQueue(validatorQueue)
-							s.validatorBuffer.Delete(accountID)
 						}
 
 						return true
 					})
+
+					s.validatorBuffer.Clear()
 				}
 			})
 			e.Ledger.HookInitialized(func() {
@@ -138,11 +140,17 @@ func New(apiProvider iotago.APIProvider, opts ...options.Option[Scheduler]) *Sch
 }
 
 func (s *Scheduler) Shutdown() {
-	s.validatorBuffer.buffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+	s.bufferMutex.Lock()
+	defer s.bufferMutex.Unlock()
+
+	// validator workers need to be shut down first, otherwise they will hang on the shutdown channel.
+	s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 		s.shutdownValidatorQueue(validatorQueue)
 
 		return true
 	})
+	s.validatorBuffer.Clear()
+
 	close(s.shutdownSignal)
 	s.TriggerStopped()
 
@@ -252,6 +260,13 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 func (s *Scheduler) Reset() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
+
+	// Validator workers need to be signaled to exit.
+	s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+		s.shutdownValidatorQueue(validatorQueue)
+
+		return true
+	})
 
 	s.basicBuffer.Clear()
 	s.validatorBuffer.Clear()
@@ -736,5 +751,5 @@ func (s *Scheduler) addValidator(accountID iotago.AccountID) *ValidatorQueue {
 }
 
 func (s *Scheduler) shutdownValidatorQueue(validatorQueue *ValidatorQueue) {
-	validatorQueue.shutdownSignal <- struct{}{}
+	close(validatorQueue.shutdownSignal)
 }
