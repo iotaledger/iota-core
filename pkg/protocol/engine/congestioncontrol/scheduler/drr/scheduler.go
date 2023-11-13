@@ -319,13 +319,13 @@ func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
 }
 
 func (s *Scheduler) basicBlockLoop() {
+	defer s.workersWg.Done()
 	var blockToSchedule *blocks.Block
 loop:
 	for {
 		select {
 		// on close, exit the loop
 		case <-s.shutdownSignal:
-			s.workersWg.Done()
 			break loop
 		// when a block is pushed by the buffer
 		case blockToSchedule = <-s.basicBuffer.blockChan:
@@ -343,13 +343,13 @@ loop:
 }
 
 func (s *Scheduler) validatorLoop(validatorQueue *ValidatorQueue) {
+	defer s.workersWg.Done()
 	var blockToSchedule *blocks.Block
 loop:
 	for {
 		select {
 		// on close, exit the loop
 		case <-validatorQueue.shutdownSignal:
-			s.workersWg.Done()
 			break loop
 		// when a block is pushed by this validator queue.
 		case blockToSchedule = <-validatorQueue.blockChan:
