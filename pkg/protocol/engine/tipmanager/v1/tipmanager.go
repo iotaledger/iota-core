@@ -105,6 +105,16 @@ func (t *TipManager) Evict(slot iotago.SlotIndex) {
 	}
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (t *TipManager) Reset() {
+	t.evictionMutex.Lock()
+	defer t.evictionMutex.Unlock()
+
+	t.tipMetadataStorage.Clear()
+	lo.ForEach(t.strongTipSet.Keys(), func(id iotago.BlockID) { t.strongTipSet.Delete(id) })
+	lo.ForEach(t.weakTipSet.Keys(), func(id iotago.BlockID) { t.strongTipSet.Delete(id) })
+}
+
 // Shutdown marks the TipManager as shutdown.
 func (t *TipManager) Shutdown() {
 	t.TriggerShutdown()

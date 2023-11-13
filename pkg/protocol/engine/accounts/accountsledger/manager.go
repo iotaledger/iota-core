@@ -353,6 +353,15 @@ func (m *Manager) AddAccount(output *utxoledger.Output, blockIssuanceCredits iot
 	return nil
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (m *Manager) Reset() {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	m.blockBurns.Clear()
+	m.latestSupportedVersionSignals.Clear()
+}
+
 func (m *Manager) rollbackAccountTo(accountData *accounts.AccountData, targetSlot iotago.SlotIndex) (wasDestroyed bool, err error) {
 	// to reach targetSlot, we need to rollback diffs from the current latestCommittedSlot down to targetSlot + 1
 	for diffSlot := m.latestCommittedSlot; diffSlot > targetSlot; diffSlot-- {

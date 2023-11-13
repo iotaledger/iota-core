@@ -349,6 +349,12 @@ func (l *Ledger) RMCManager() *rmc.Manager {
 	return l.rmcManager
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (l *Ledger) Reset() {
+	l.memPool.Reset()
+	l.accountsLedger.Reset()
+}
+
 func (l *Ledger) Shutdown() {
 	l.TriggerStopped()
 	l.conflictDAG.Shutdown()

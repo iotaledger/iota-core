@@ -13,7 +13,6 @@ const (
 	epochPrefixPoolRewards
 	epochPrefixPoolStats
 	epochPrefixCommittee
-	lastPrunedEpochKey
 )
 
 const (

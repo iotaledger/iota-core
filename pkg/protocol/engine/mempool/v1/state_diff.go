@@ -104,6 +104,30 @@ func (s *StateDiff) RollbackTransaction(transaction *TransactionMetadata) error 
 	return nil
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (s *StateDiff) Reset() error {
+	s.spentOutputs = shrinkingmap.New[mempool.StateID, mempool.StateMetadata]()
+	s.createdOutputs = shrinkingmap.New[mempool.StateID, mempool.StateMetadata]()
+	s.executedTransactions = orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata]()
+	s.stateUsageCounters = shrinkingmap.New[mempool.StateID, int]()
+
+	transactionIDs := make([]iotago.TransactionID, 0)
+	if err := s.mutations.Stream(func(transactionID iotago.TransactionID) error {
+		transactionIDs = append(transactionIDs, transactionID)
+		return nil
+	}); err != nil {
+		return ierrors.Wrapf(err, "failed to stream mutations from state diff")
+	}
+
+	for _, transactionID := range transactionIDs {
+		if _, err := s.mutations.Delete(transactionID); err != nil {
+			return ierrors.Wrapf(err, "failed to delete transaction with %s from state diff", transactionID)
+		}
+	}
+
+	return nil
+}
+
 func (s *StateDiff) compactStateChanges(stateMetadata *StateMetadata, usageCounter int) {
 	switch {
 	case usageCounter > 0:

@@ -149,6 +149,11 @@ func (b *BlockDAG) GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Bloc
 	})
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (b *BlockDAG) Reset() {
+	b.uncommittedSlotBlocks.Reset()
+}
+
 func (b *BlockDAG) Shutdown() {
 	b.TriggerStopped()
 	b.workers.Shutdown()
