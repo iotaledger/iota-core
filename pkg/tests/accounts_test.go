@@ -178,17 +178,17 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
-	// add a validator node to the network. This will add a validator account to the snapshot.
+	// Add a validator node to the network. This will add a validator account to the snapshot.
 	node1 := ts.AddValidatorNode("node1")
-	// add a non-validator node to the network. This will not add any accounts to the snapshot.
+	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
-	// add a default block issuer to the network. This will add another block issuer account to the snapshot.
+	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
 	wallet := ts.AddGenesisWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true)
 
-	// assert validator and block issuer accounts in genesis snapshot.
-	// validator node account.
+	// Assert validator and block issuer accounts in genesis snapshot.
+	// Validator node account.
 	validatorAccountOutput := ts.AccountOutput("Genesis:1")
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              node1.Validator.AccountID,
@@ -199,7 +199,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		StakeEndEpoch:   iotago.MaxEpochIndex,
 		ValidatorStake:  mock.MinValidatorAccountAmount,
 	}, ts.Nodes()...)
-	// default wallet block issuer account.
+	// Default wallet block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:2")
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              wallet.BlockIssuer.AccountID,
@@ -354,11 +354,11 @@ func Test_ImplicitAccounts(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
-	// add a validator node to the network. This will add a validator account to the snapshot.
+	// Add a validator node to the network. This will add a validator account to the snapshot.
 	node1 := ts.AddValidatorNode("node1")
-	// add a non-validator node to the network. This will not add any accounts to the snapshot.
+	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
-	// add a default block issuer to the network. This will add another block issuer account to the snapshot.
+	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
 	wallet := ts.AddGenesisWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true)
@@ -760,7 +760,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 	block2Slot := latestParent.ID().Slot()
 
 	// Allot some mana to the locked account to unlock it.
-	// The locked wallet 2 is preparing and signs the transaction, but it's issued by wallet 1 whose account is not locked.
+	// The locked wallet 1 is preparing and signs the transaction, but it's issued by wallet 2 whose account is not locked.
 	{
 		allottedBIC := iotago.BlockIssuanceCredits(10001)
 		tx2 := wallet1.AllotManaFromInputs("TX2",
@@ -770,7 +770,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 			}}, "Genesis:0")
 
 		block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
-		// Wallet 1 whose account is not locked is issuing the block to unlock the account of wallet 2.
+		// Wallet 2 whose account is not locked is issuing the block to unlock the account of wallet 1.
 		block2 := ts.IssueBasicBlockAtSlotWithOptions("block2", block2Slot, wallet2, tx2, mock.WithStrongParents(latestParent.ID()), mock.WithSlotCommitment(block2Commitment))
 
 		latestParent = ts.CommitUntilSlot(block2Slot, block2)
@@ -1017,7 +1017,8 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 	block3Slot := latestParent.ID().Slot()
 
 	// UNLOCK THE ACCOUNT
-	// The locked wallet 2 is preparing and signs the transaction, but it's issued by wallet 1 whose account is not locked.
+	// The locked wallet 2 is preparing and signs the transaction,
+	// but it's issued by wallet 1 whose account is not locked.
 	{
 		allottedBIC := iotago.BlockIssuanceCredits(10001)
 		tx3 := wallet1.AllotManaFromInputs("TX3",
@@ -1028,7 +1029,7 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 
 		block3Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 
-		// Wallet 1 whose account is not locked is issuing the block to unlock the account of wallet 2.
+		// Wallet 2 whose account is not locked is issuing the block to unlock the account of wallet 1.
 		block3 := ts.IssueBasicBlockAtSlotWithOptions("block3", block3Slot, wallet2, tx3, mock.WithStrongParents(latestParent.ID()), mock.WithSlotCommitment(block3Commitment))
 
 		ts.AssertTransactionsInCacheBooked([]*iotago.Transaction{tx3.Transaction}, true, ts.Nodes()...)
@@ -1068,7 +1069,7 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 			"TX1:0",
 		)
 
-		// Wallet 2, which has non-negative BIC issues the block.
+		// Wallet 1, which has non-negative BIC issues the block.
 		block4 := ts.IssueBasicBlockAtSlotWithOptions("block4", block4Slot, wallet1, tx4, mock.WithStrongParents(latestParent.ID()), mock.WithSlotCommitment(block4Commitment))
 
 		ts.AssertTransactionsInCacheBooked([]*iotago.Transaction{tx4.Transaction}, true, node1)
