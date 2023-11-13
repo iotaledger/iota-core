@@ -250,7 +250,7 @@ func Test_StakeAndDelegate(t *testing.T) {
 	)
 
 	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(block1.ID()))
-	latestParents := ts.CommitUntilSlot(block1Slot, block2.ID())
+	latestParents := ts.CommitUntilSlot(ts.CurrentSlot(), block2.ID())
 
 	stakerAccount := ts.DefaultWallet().AccountOutput("TX1:0")
 	stakerAccountOutput := stakerAccount.Output().(*iotago.AccountOutput)
@@ -284,7 +284,7 @@ func Test_StakeAndDelegate(t *testing.T) {
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
-	ts.AssertAccountDiff(delegatorAccountOutput.AccountID, block1Slot, &model.AccountDiff{
+	ts.AssertAccountDiff(delegatorAccountOutput.AccountID, block2.ID().Slot(), &model.AccountDiff{
 		BICChange:              0,
 		PreviousUpdatedSlot:    0,
 		NewExpirySlot:          delegatorBlockIssuerExpirySlot,
@@ -297,7 +297,7 @@ func Test_StakeAndDelegate(t *testing.T) {
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              delegatorAccountOutput.AccountID,
-		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
+		Credits:         accounts.NewBlockIssuanceCredits(0, block2.ID().Slot()),
 		ExpirySlot:      delegatorBlockIssuerExpirySlot,
 		OutputID:        delegatorAccount.OutputID(),
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(delegatorBlockIssuerKey),
@@ -320,7 +320,7 @@ func Test_StakeAndDelegate(t *testing.T) {
 	block3 := ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
 
 	latestParents = ts.CommitUntilSlot(block3Slot, block3.ID())
-	delegatedAmount := ts.DefaultWallet().Output("TX2:1").BaseTokenAmount()
+	delegatedAmount := delegatorWallet.Output("TX2:1").BaseTokenAmount()
 
 	ts.AssertAccountDiff(stakerAccountOutput.AccountID, block3Slot, &model.AccountDiff{
 		BICChange:              0,
@@ -343,13 +343,13 @@ func Test_StakeAndDelegate(t *testing.T) {
 		BlockIssuerKeys: iotago.NewBlockIssuerKeys(stakerBlockIssuerKey),
 		StakeEndEpoch:   10,
 		FixedCost:       421,
-		DelegationStake: iotago.BaseToken(delegatedAmount),
+		DelegationStake: delegatedAmount,
 		ValidatorStake:  10000,
 	}, ts.Nodes()...)
 
 	// 4. TRANSITION DELEGATION TO DELAYED CLAIMING
 	block4Slot := ts.CurrentSlot()
-	tx4 := ts.DefaultWallet().DelayedClaimingTransition("TX4", "TX3:0", 0)
+	tx4 := delegatorWallet.DelayedClaimingTransition("TX4", "TX3:0", 0)
 	block4 := ts.IssueBasicBlockWithOptions("block4", ts.DefaultWallet(), tx4, mock.WithStrongParents(latestParents...))
 
 	latestParents = ts.CommitUntilSlot(block4Slot, block4.ID())
