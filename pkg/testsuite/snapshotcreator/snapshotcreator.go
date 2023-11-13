@@ -82,9 +82,11 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 			ed25519PubKey := blockIssuerKeyEd25519.ToEd25519PublicKey()
 			accountID := blake2b.Sum256(ed25519PubKey[:])
 			committeeAccountsData = append(committeeAccountsData, &accounts.AccountData{
-				ID:                                    accountID,
-				Credits:                               &accounts.BlockIssuanceCredits{Value: snapshotAccountDetails.BlockIssuanceCredits, UpdateSlot: 0},
-				ExpirySlot:                            snapshotAccountDetails.ExpirySlot,
+				ID:         accountID,
+				Credits:    &accounts.BlockIssuanceCredits{Value: snapshotAccountDetails.BlockIssuanceCredits, UpdateSlot: 0},
+				ExpirySlot: snapshotAccountDetails.ExpirySlot,
+				// OutputID is not used when selecting an initial committee,
+				// so it's safe to use an empty one that is different from the actual outputID in the UTXO Ledger.
 				OutputID:                              iotago.OutputID{},
 				BlockIssuerKeys:                       iotago.BlockIssuerKeys{snapshotAccountDetails.IssuerKey},
 				ValidatorStake:                        snapshotAccountDetails.StakedAmount,
