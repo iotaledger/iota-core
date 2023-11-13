@@ -40,6 +40,10 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 		activityTracker: activitytrackerv1.NewActivityTracker(time.Second * 30),
 	}
 
+	// Try setting an empty committee.
+	err := topStakersSeatManager.SetCommittee(0, account.NewAccounts())
+	require.Error(t, err)
+
 	// Create committee for epoch 0
 	initialCommittee := account.NewAccounts()
 	for i := 0; i < 3; i++ {
@@ -51,18 +55,24 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Try setting committee that is too small - should return an error.
-	err := topStakersSeatManager.SetCommittee(0, initialCommittee)
+
+	// Set committee for epoch 0.
+	err = topStakersSeatManager.SetCommittee(0, initialCommittee)
 	require.NoError(t, err)
 	weightedSeats, exists := topStakersSeatManager.CommitteeInEpoch(0)
 	require.True(t, exists)
 	initialCommitteeAccountIDs := initialCommittee.IDs()
 
-	// Make sure that the online committee is handled correctly.
+	// Online committee should be empty.
 	require.True(t, topStakersSeatManager.OnlineCommittee().IsEmpty())
 
+	// After initialization, the online committee should contain the seats of the initial committee.
 	require.NoError(t, topStakersSeatManager.InitializeCommittee(0, time.Time{}))
-	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[0])), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])), lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])))
+	assertOnlineCommittee(t, topStakersSeatManager.OnlineCommittee(),
+		lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[0])),
+		lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])),
+		lo.Return1(weightedSeats.GetSeat(initialCommitteeAccountIDs[2])),
+	)
 }
 
 func TestTopStakers_RotateCommittee(t *testing.T) {
@@ -219,10 +229,10 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 	}
 
 	// Rotate committee again with fewer candidates than the target committee size.
+	expectedCommitteeInEpoch2 := account.NewAccounts()
 	{
 		epoch := iotago.EpochIndex(2)
 		accountsData := make(accounts.AccountsData, 0)
-		expectedCommitteeInEpoch2 := account.NewAccounts()
 
 		candidate0ID := tpkg.RandAccountID()
 		candidate0ID.RegisterAlias("candidate0-epoch2")
@@ -250,6 +260,32 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 		// Make sure that the previous committee was not modified and is still accessible.
 		assertCommitteeInEpoch(t, s, testAPI, 0, expectedCommitteeInEpoch0)
 		assertCommitteeSizeInEpoch(t, s, testAPI, 0, 3)
+	}
+
+	// Try to rotate committee with no candidates. Instead, set reuse of committee.
+	{
+		epoch := iotago.EpochIndex(3)
+		accountsData := make(accounts.AccountsData, 0)
+
+		_, err := s.RotateCommittee(epoch, accountsData)
+		require.Error(t, err)
+
+		// Set reuse of committee manually.
+		expectedCommitteeInEpoch2.SetReused()
+		err = s.SetCommittee(epoch, expectedCommitteeInEpoch2)
+		require.NoError(t, err)
+
+		assertCommitteeInEpoch(t, s, testAPI, 3, expectedCommitteeInEpoch2)
+		assertCommitteeSizeInEpoch(t, s, testAPI, 3, 1)
+
+		assertCommitteeInEpoch(t, s, testAPI, 2, expectedCommitteeInEpoch2)
+		assertCommitteeSizeInEpoch(t, s, testAPI, 2, 1)
+
+		// Make sure that the committee retrieved from the committee store matches the expected (with reused flag set).
+		loadedCommittee, err := s.committeeStore.Load(epoch)
+		require.NoError(t, err)
+		require.True(t, loadedCommittee.IsReused())
+		assertCommittee(t, expectedCommitteeInEpoch2, loadedCommittee.SelectCommittee(loadedCommittee.IDs()...))
 	}
 }
 

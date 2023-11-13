@@ -85,6 +85,10 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accoun
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
+	if len(candidates) == 0 {
+		return nil, ierrors.New("candidates must not be empty")
+	}
+
 	committee, err := s.selectNewCommittee(epoch, candidates)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error while selecting new committee")
@@ -190,6 +194,10 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
+
+	if validators.Size() == 0 {
+		return ierrors.New("committee must not be empty")
+	}
 
 	err := s.committeeStore.Store(epoch, validators)
 	if err != nil {
