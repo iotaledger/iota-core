@@ -19,6 +19,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/topstakers"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -81,6 +83,16 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 						return nil, ierrors.Errorf("can't create API due to unsupported protocol version: %d", protocolParameters.Version())
 					}),
+				),
+			),
+		),
+		protocol.WithSybilProtectionProvider(
+			sybilprotectionv1.NewProvider(
+				sybilprotectionv1.WithSeatManagerProvider(
+					topstakers.NewProvider(
+						// We need to make sure that inactive nodes are evicted from the committee to continue acceptance.
+						topstakers.WithActivityWindow(15 * time.Second),
+					),
 				),
 			),
 		),
@@ -213,10 +225,10 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// check that rollback is correct
-	account, exists, err := ts.Node("nodeA").Protocol.MainEngineInstance().Ledger.Account(ts.Node("nodeA").Validator.AccountID, 7)
+	pastAccounts, err := ts.Node("nodeA").Protocol.MainEngineInstance().Ledger.PastAccounts(iotago.AccountIDs{ts.Node("nodeA").Validator.AccountID}, 7)
 	require.NoError(t, err)
-	require.True(t, exists)
-	require.Equal(t, model.VersionAndHash{Version: 4, Hash: hash2}, account.LatestSupportedProtocolVersionAndHash)
+	require.Contains(t, pastAccounts, ts.Node("nodeA").Validator.AccountID)
+	require.Equal(t, model.VersionAndHash{Version: 4, Hash: hash2}, pastAccounts[ts.Node("nodeA").Validator.AccountID].LatestSupportedProtocolVersionAndHash)
 
 	ts.IssueBlocksAtEpoch("", 2, 4, "15.3", ts.Nodes(), true, nil)
 	ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, nil)
@@ -399,7 +411,8 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	// Check that issuing still produces the same commitments on the nodes that upgraded. The nodes that did not upgrade
 	// should not be able to issue and process blocks with the new version.
-	ts.IssueBlocksAtEpoch("", 8, 4, "63.3", ts.Nodes("nodeB", "nodeC"), false, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{64, 65}, 4, "63.3", ts.Nodes("nodeB", "nodeC"), false, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{66, 67, 68, 69, 70, 71}, 4, "65.3", ts.Nodes("nodeB", "nodeC"), true, nil)
 
 	// Nodes that did not set up the new protocol parameters are not able to process blocks with the new version.
 	ts.AssertNodeState(ts.Nodes("nodeA", "nodeD", "nodeF", "nodeG"),

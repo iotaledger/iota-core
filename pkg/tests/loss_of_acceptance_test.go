@@ -27,7 +27,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 				10,
 				2,
 				4,
-				2,
+				5,
 			),
 		),
 	)
@@ -113,7 +113,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 				10,
 				2,
 				4,
-				2,
+				5,
 			),
 		),
 	)
@@ -208,7 +208,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 				10,
 				2,
 				4,
-				2,
+				5,
 			),
 		),
 	)

@@ -28,8 +28,8 @@ func TestConfirmationFlags(t *testing.T) {
 			iotago.WithLivenessOptions(
 				10,
 				10,
-				10,
-				20,
+				testsuite.DefaultMinCommittableAge,
+				testsuite.DefaultMaxCommittableAge,
 				testsuite.DefaultEpochNearingThreshold,
 			),
 			iotago.WithTargetCommitteeSize(4),
