@@ -81,6 +81,17 @@ func (c *RelativeTime) Advance(newTime time.Time) (updated bool) {
 	return true
 }
 
+// Reset resets the time value to the given time (resetting monotonicity of the relative time).
+func (c *RelativeTime) Reset(newTime time.Time) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.timeUpdateOffset = time.Now()
+	c.time = newTime
+
+	c.OnUpdated.Trigger(c.time)
+}
+
 // determineTimeUpdateOffset determines the new timeUpdateOffset that is in sync with the monotonic clock.
 func (c *RelativeTime) determineTimeUpdateOffset(newTime time.Time) time.Time {
 	diff := time.Since(c.timeUpdateOffset)

@@ -71,3 +71,6 @@ func (s *Scheduler) AddBlock(block *blocks.Block) {
 		s.events.BlockScheduled.Trigger(block)
 	}
 }
+
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (s *Scheduler) Reset() { /* nothing to reset but comply with interface */ }

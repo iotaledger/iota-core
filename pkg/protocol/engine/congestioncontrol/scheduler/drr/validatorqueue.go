@@ -226,3 +226,11 @@ func (b *ValidatorBuffer) Delete(accountID iotago.AccountID) {
 
 	b.buffer.Delete(accountID)
 }
+
+func (b *ValidatorBuffer) Clear() {
+	b.buffer.ForEachKey(func(accountID iotago.AccountID) bool {
+		b.Delete(accountID)
+
+		return true
+	})
+}

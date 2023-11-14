@@ -129,6 +129,11 @@ func (m *Manager) ForceCommitUntil(commitUntilSlot iotago.SlotIndex) error {
 	return nil
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (m *Manager) Reset() {
+	m.slotMutations.Reset()
+}
+
 // IsBootstrapped returns if the Manager finished committing all pending slots up to the current acceptance time.
 func (m *Manager) IsBootstrapped() bool {
 	// If acceptance time is somewhere in the middle of slot 10, then the latest committable index is 4 (with minCommittableAge=6),

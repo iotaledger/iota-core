@@ -14,16 +14,17 @@ type EpochKVStore struct {
 	kv           kvstore.KVStore
 	pruningDelay iotago.EpochIndex
 
-	lastPrunedEpoch *model.PruningIndex
+	lastAccessedEpoch *kvstore.TypedValue[iotago.EpochIndex]
+	lastPrunedEpoch   *model.PruningIndex
 }
 
-func NewEpochKVStore(storeRealm kvstore.Realm, pruningRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex) *EpochKVStore {
-
+func NewEpochKVStore(storeRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex) *EpochKVStore {
 	return &EpochKVStore{
-		realm:           storeRealm,
-		kv:              lo.PanicOnErr(kv.WithExtendedRealm(storeRealm)),
-		pruningDelay:    pruningDelay,
-		lastPrunedEpoch: model.NewPruningIndex(lo.PanicOnErr(kv.WithExtendedRealm(pruningRealm)), storeRealm),
+		realm:             storeRealm,
+		kv:                lo.PanicOnErr(kv.WithExtendedRealm(append(storeRealm, entriesKey))),
+		pruningDelay:      pruningDelay,
+		lastAccessedEpoch: kvstore.NewTypedValue(kv, append(storeRealm, lastAccessedEpochKey), iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes),
+		lastPrunedEpoch:   model.NewPruningIndex(lo.PanicOnErr(kv.WithExtendedRealm(storeRealm)), kvstore.Realm{lastPrunedEpochKey}),
 	}
 }
 
@@ -37,11 +38,31 @@ func (e *EpochKVStore) RestoreLastPrunedEpoch() error {
 	return e.lastPrunedEpoch.RestoreFromDisk()
 }
 
+func (e *EpochKVStore) LastAccessedEpoch() (lastAccessedEpoch iotago.EpochIndex, err error) {
+	if lastAccessedEpoch, err = e.lastAccessedEpoch.Get(); err != nil {
+		if !ierrors.Is(err, kvstore.ErrKeyNotFound) {
+			err = ierrors.Wrap(err, "failed to get last accessed epoch")
+		} else {
+			err = nil
+		}
+	}
+
+	return lastAccessedEpoch, err
+}
+
 func (e *EpochKVStore) LastPrunedEpoch() (iotago.EpochIndex, bool) {
 	return e.lastPrunedEpoch.Index()
 }
 
 func (e *EpochKVStore) GetEpoch(epoch iotago.EpochIndex) (kvstore.KVStore, error) {
+	_, _ = e.lastAccessedEpoch.Compute(func(lastAccessedEpoch iotago.EpochIndex, exists bool) (newValue iotago.EpochIndex, err error) {
+		if lastAccessedEpoch >= epoch {
+			return lastAccessedEpoch, kvstore.ErrTypedValueNotChanged
+		}
+
+		return epoch, nil
+	})
+
 	if e.isTooOld(epoch) {
 		return nil, ierrors.Wrapf(database.ErrEpochPruned, "epoch %d is too old", epoch)
 	}
@@ -80,4 +101,19 @@ func (e *EpochKVStore) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago
 	}
 
 	return nil
+}
+
+func (e *EpochKVStore) RollbackEpochs(epoch iotago.EpochIndex) (lastPrunedEpoch iotago.EpochIndex, err error) {
+	lastAccessedEpoch, err := e.LastAccessedEpoch()
+	if err != nil {
+		return lastAccessedEpoch, ierrors.Wrap(err, "failed to get last accessed epoch")
+	}
+
+	for epochToPrune := epoch; epochToPrune <= lastAccessedEpoch; epochToPrune++ {
+		if err = e.DeleteEpoch(epochToPrune); err != nil {
+			return epochToPrune, ierrors.Wrapf(err, "error while deleting epoch %d", epochToPrune)
+		}
+	}
+
+	return lastAccessedEpoch, nil
 }

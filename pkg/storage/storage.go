@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -40,6 +41,7 @@ type Storage struct {
 	pruningLock        sync.RWMutex
 	lastPrunedEpoch    *model.EvictionIndex[iotago.EpochIndex]
 	lastPrunedSizeTime time.Time
+	lastAccessedBlocks reactive.Variable[iotago.SlotIndex]
 
 	optsDBEngine                       hivedb.Engine
 	optsAllowedDBEngines               []hivedb.Engine
@@ -58,6 +60,7 @@ func New(directory string, errorHandler func(error), opts ...options.Option[Stor
 		dir:                                utils.NewDirectory(directory, true),
 		errorHandler:                       errorHandler,
 		lastPrunedEpoch:                    model.NewEvictionIndex[iotago.EpochIndex](),
+		lastAccessedBlocks:                 reactive.NewVariable[iotago.SlotIndex](),
 		optsDBEngine:                       hivedb.EngineRocksDB,
 		optsPruningDelay:                   30,
 		optPruningSizeEnabled:              false,

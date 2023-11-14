@@ -11,5 +11,8 @@ type Filter interface {
 	// ProcessReceivedBlock processes block from the given source.
 	ProcessReceivedBlock(block *model.Block, source peer.ID)
 
+	// Reset resets the component to a clean state as if it was created at the last commitment.
+	Reset()
+
 	module.Interface
 }
