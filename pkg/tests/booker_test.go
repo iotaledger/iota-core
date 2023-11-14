@@ -48,6 +48,95 @@ func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
 	}, node1)
 }
 
+func Test_WeightPropagation(t *testing.T) {
+	ts := testsuite.NewTestSuite(t)
+	defer ts.Shutdown()
+
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddValidatorNode("node2")
+
+	wallet := ts.AddGenesisWallet("default", node1)
+
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
+
+	ts.AssertSybilProtectionCommittee(0, []iotago.AccountID{
+		node1.Validator.AccountID,
+		node2.Validator.AccountID,
+	}, ts.Nodes()...)
+
+	// Create and issue double spends
+	{
+		tx1 := wallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
+		tx2 := wallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "Genesis:0")
+
+		ts.IssuePayloadWithOptions("block1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssuePayloadWithOptions("block2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+
+		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block1"): {"tx1"},
+			ts.Block("block2"): {"tx2"},
+		}, node1, node2)
+
+		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+			wallet.Transaction("tx2"): {"tx2"},
+			wallet.Transaction("tx1"): {"tx1"},
+		}, node1, node2)
+	}
+
+	// Issue some more blocks and assert that conflicts are propagated to blocks.
+	{
+
+		ts.IssuePayloadWithOptions("block3-basic", ts.Wallet("node1"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("block1")))
+		ts.IssuePayloadWithOptions("block4-basic", ts.Wallet("node2"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("block2")))
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block3-basic"): {"tx1"},
+			ts.Block("block4-basic"): {"tx2"},
+		}, node1, node2)
+		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Pending, ts.Nodes()...)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+	}
+
+	// Issue valid blocks that should resolve the conflict, but basic blocks don't carry any weight..
+	{
+		ts.IssuePayloadWithOptions("block5-basic", ts.Wallet("node1"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockIDs("block4-basic")...), mock.WithShallowLikeParents(ts.BlockID("block2")))
+		ts.IssuePayloadWithOptions("block6-basic", ts.Wallet("node2"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockIDs("block5-basic")...))
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block6-basic"): {"tx2"},
+		}, ts.Nodes()...)
+
+		// Make sure that neither approval (conflict weight),
+		// nor witness (block weight) was not propagated using basic blocks and caused acceptance.
+		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Pending, ts.Nodes()...)
+		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("tx2"), false, node1, node2)
+		ts.AssertTransactionsInCacheRejected(wallet.Transactions("tx1"), false, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("block3-basic", "block4-basic", "block5-basic", "block6-basic"), false, ts.Nodes()...)
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("block3-basic", "block4-basic", "block5-basic", "block6-basic"), false, ts.Nodes()...)
+	}
+
+	// Issue validator blocks that are subjectively invalid, but accept the basic blocks. Make sure that the pre-accepted basic blocks do not apply witness weight.
+	{
+		ts.IssueValidationBlock("block8", node1, mock.WithStrongParents(ts.BlockIDs("block3-basic", "block6-basic")...))
+		ts.IssueValidationBlock("block9", node2, mock.WithStrongParents(ts.BlockID("block8")))
+		ts.IssueValidationBlock("block10", node1, mock.WithStrongParents(ts.BlockID("block9")))
+
+		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+			ts.Block("block8"):  {"tx1", "tx2"},
+			ts.Block("block9"):  {"tx1", "tx2"},
+			ts.Block("block10"): {"tx1", "tx2"},
+		}, node1, node2)
+
+		ts.AssertBlocksInCachePreAccepted(ts.Blocks("block3-basic", "block4-basic", "block5-basic", "block6-basic"), true, node1, node2)
+		ts.AssertBlocksInCacheAccepted(ts.Blocks("block3-basic", "block4-basic", "block5-basic", "block6-basic"), true, node1, node2)
+		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
+	}
+}
+
 func Test_DoubleSpend(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
