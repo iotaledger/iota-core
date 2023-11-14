@@ -100,7 +100,7 @@ func Test_TopStakersRotation(t *testing.T) {
 		ts.IssueCandidacyAnnouncementInSlot("node5-candidacy:2", 11, "node4-candidacy:3", ts.Wallet("node3"))
 
 		// Assert that only candidates that issued before slot 11 are considered.
-		ts.AssertSybilProtectionCandidates(1, []iotago.AccountID{
+		ts.AssertSybilProtectionCandidates(0, []iotago.AccountID{
 			ts.Node("node1").Validator.AccountID,
 			ts.Node("node4").Validator.AccountID,
 			ts.Node("node5").Validator.AccountID,
@@ -121,7 +121,7 @@ func Test_TopStakersRotation(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("wave-5:", []iotago.SlotIndex{18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30}, 4, "wave-4:17.3", ts.Nodes(), true, nil)
 
-		ts.AssertSybilProtectionCandidates(2, []iotago.AccountID{}, ts.Nodes()...)
+		ts.AssertSybilProtectionCandidates(1, []iotago.AccountID{}, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(28, ts.Nodes()...)
 		ts.AssertLatestFinalizedSlot(27, ts.Nodes()...)
 		ts.AssertSybilProtectionCommittee(2, []iotago.AccountID{
@@ -144,7 +144,7 @@ func Test_TopStakersRotation(t *testing.T) {
 
 		ts.AssertLatestCommitmentSlotIndex(43, ts.Nodes()...)
 		// Even though we have a candidate, the committee should be reused as we did not finalize at epochNearingThreshold before epoch end - maxCommittableAge was committed
-		ts.AssertSybilProtectionCandidates(3, []iotago.AccountID{
+		ts.AssertSybilProtectionCandidates(2, []iotago.AccountID{
 			ts.Node("node6").Validator.AccountID,
 		}, ts.Nodes()...)
 		// Check that the committee is reused.
@@ -166,7 +166,7 @@ func Test_TopStakersRotation(t *testing.T) {
 		ts.AssertLatestCommitmentSlotIndex(59, ts.Nodes()...)
 		ts.AssertLatestFinalizedSlot(58, ts.Nodes()...)
 		// We finalized at epochEnd-epochNearingThreshold, so the committee should be rotated even if there is just one candidate.
-		ts.AssertSybilProtectionCandidates(4, []iotago.AccountID{
+		ts.AssertSybilProtectionCandidates(3, []iotago.AccountID{
 			ts.Node("node3").Validator.AccountID,
 		}, ts.Nodes()...)
 		ts.AssertSybilProtectionCommittee(4, []iotago.AccountID{

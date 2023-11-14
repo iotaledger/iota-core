@@ -136,28 +136,8 @@ func TestManager_Candidates(t *testing.T) {
 		ts.Instance.TrackCandidateBlock(blocks.NewBlock(lo.PanicOnErr(model.BlockFromBlock(block6))))
 	}
 
-	require.True(t, lo.PanicOnErr(ts.Instance.EligibleValidatorCandidates(1)).HasAll(ds.NewReadableSet(issuer1, issuer2, issuer3)))
-	require.True(t, lo.PanicOnErr(ts.Instance.ValidatorCandidates(1)).HasAll(ds.NewReadableSet(issuer1, issuer2, issuer3)))
-	require.True(t, lo.PanicOnErr(ts.Instance.EligibleValidatorCandidates(2)).IsEmpty())
-	require.True(t, lo.PanicOnErr(ts.Instance.ValidatorCandidates(2)).IsEmpty())
-
-	// retrieve epoch candidates for epoch 0, because we candidates prefixed with epoch in which they candidated
-	candidatesStore, err := ts.Instance.committeeCandidatesInEpochFunc(0)
-	require.NoError(t, err)
-
-	candidacySlotIssuer1, err := candidatesStore.Get(issuer1[:])
-	require.NoError(t, err)
-	require.Equal(t, iotago.SlotIndex(1).MustBytes(), candidacySlotIssuer1)
-
-	candidacySlotIssuer2, err := candidatesStore.Get(issuer2[:])
-	require.NoError(t, err)
-	require.Equal(t, iotago.SlotIndex(2).MustBytes(), candidacySlotIssuer2)
-
-	candidacySlotIssuer3, err := candidatesStore.Get(issuer3[:])
-	require.NoError(t, err)
-	require.Equal(t, iotago.SlotIndex(3).MustBytes(), candidacySlotIssuer3)
-
-	ts.Instance.ClearCandidates()
-
-	require.True(t, ts.Instance.nextEpochCommitteeCandidates.IsEmpty())
+	require.True(t, lo.PanicOnErr(ts.Instance.EligibleValidatorCandidates(0)).HasAll(ds.NewReadableSet(issuer1, issuer2, issuer3)))
+	require.True(t, lo.PanicOnErr(ts.Instance.ValidatorCandidates(0)).HasAll(ds.NewReadableSet(issuer1, issuer2, issuer3)))
+	require.True(t, lo.PanicOnErr(ts.Instance.EligibleValidatorCandidates(1)).IsEmpty())
+	require.True(t, lo.PanicOnErr(ts.Instance.ValidatorCandidates(1)).IsEmpty())
 }

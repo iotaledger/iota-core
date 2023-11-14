@@ -401,7 +401,9 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Ac
 	timeProvider := o.apiProvider.APIForSlot(slot).TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
-	candidates, err := o.performanceTracker.EligibleValidatorCandidates(nextEpoch)
+
+	// We get the list of candidates for the next epoch. They are registered in the current epoch.
+	candidates, err := o.performanceTracker.EligibleValidatorCandidates(currentEpoch)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to retrieve candidates for epoch %d", nextEpoch)
 	}

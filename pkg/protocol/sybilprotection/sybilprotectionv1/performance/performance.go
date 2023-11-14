@@ -134,6 +134,7 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 
 }
 
+// EligibleValidatorCandidates returns the eligible validator candidates registered in the given epoch for the next epoch.
 func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago.AccountID], error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
@@ -141,7 +142,7 @@ func (t *Tracker) EligibleValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[i
 	return t.getValidatorCandidates(epoch)
 }
 
-// ValidatorCandidates returns the registered validator candidates for the given epoch.
+// ValidatorCandidates returns the eligible validator candidates registered in the given epoch for the next epoch.
 func (t *Tracker) ValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago.AccountID], error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
@@ -152,14 +153,7 @@ func (t *Tracker) ValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago.Ac
 func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago.AccountID], error) {
 	candidates := ds.NewSet[iotago.AccountID]()
 
-	// Epoch 0 has no candidates as it's the genesis committee.
-	if epoch == 0 {
-		return candidates, nil
-	}
-
-	// we store candidates in the store for the epoch of their activity, but the passed argument points to the target epoch,
-	// so it's necessary to subtract one epoch from the passed value
-	candidateStore, err := t.committeeCandidatesInEpochFunc(epoch - 1)
+	candidateStore, err := t.committeeCandidatesInEpochFunc(epoch)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "error while retrieving candidates for epoch %d", epoch)
 	}
