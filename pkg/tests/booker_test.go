@@ -119,7 +119,9 @@ func Test_WeightPropagation(t *testing.T) {
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("block3-basic", "block4-basic", "block5-basic", "block6-basic"), false, ts.Nodes()...)
 	}
 
-	// Issue validator blocks that are subjectively invalid, but accept the basic blocks. Make sure that the pre-accepted basic blocks do not apply witness weight.
+	// Issue validator blocks that are subjectively invalid, but accept the basic blocks.
+	// Make sure that the pre-accepted basic blocks do not apply approval weight - the conflicts should remain unresolved.
+	// If basic blocks carry approval or witness weight, then the test will fail.
 	{
 		ts.IssueValidationBlock("block8", node1, mock.WithStrongParents(ts.BlockIDs("block3-basic", "block6-basic")...))
 		ts.IssueValidationBlock("block9", node2, mock.WithStrongParents(ts.BlockID("block8")))
