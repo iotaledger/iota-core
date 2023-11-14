@@ -128,7 +128,6 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 		return
 	}
 
-	fmt.Println("tracking block 1", block.ProtocolBlock().Header.IssuerID, block.ID(), accountData.StakeEndEpoch, blockEpoch, block.ID().Slot(), o.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochEnd(blockEpoch))
 	// if a candidate block is issued in the stake end epoch,
 	// or if block is issued after EpochEndSlot - EpochNearingThreshold, because candidates can register only until that point.
 	// then don't consider it because the validator can't be part of the committee in the next epoch
@@ -138,7 +137,6 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 		return
 	}
 
-	fmt.Println("tracking block 2", block.ProtocolBlock().Header.IssuerID, block.ID(), accountData.StakeEndEpoch, blockEpoch, block.ID().Slot(), o.apiProvider.APIForSlot(block.ID().Slot()).TimeProvider().EpochEnd(blockEpoch))
 	o.performanceTracker.TrackCandidateBlock(block)
 }
 
@@ -159,7 +157,6 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot iotag
 		if _, committeeExists := o.seatManager.CommitteeInEpoch(nextEpoch); !committeeExists {
 			// If the committee for the epoch wasn't set before due to finalization of a slot,
 			// we promote the current committee to also serve in the next epoch.
-			fmt.Println("reusing committee through MaxCommittableAge", nextEpoch, "slot", slot, maxCommittableAge)
 			committeeAccounts, err := o.reuseCommittee(currentEpoch, nextEpoch)
 			if err != nil {
 				return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to reuse committee for epoch %d", nextEpoch)
@@ -390,7 +387,6 @@ func (o *SybilProtection) reuseCommittee(currentEpoch iotago.EpochIndex, targetE
 		return nil, ierrors.Wrapf(err, "failed to set committee for epoch %d", targetEpoch)
 	}
 
-	fmt.Println("clearing candidates for epoch", currentEpoch, targetEpoch)
 	o.performanceTracker.ClearCandidates()
 
 	return committeeAccounts, nil
@@ -407,7 +403,6 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Ac
 
 	// If there's no candidate, reuse the current committee.
 	if candidates.Size() == 0 {
-		fmt.Println("no candidates for epoch", nextEpoch, "reusing committee", currentEpoch, "slot", slot)
 		committeeAccounts, err := o.reuseCommittee(currentEpoch, nextEpoch)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to reuse committee (due to no candidates) for epoch %d", nextEpoch)
