@@ -321,6 +321,123 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, out
 	return signedTransaction
 }
 
+func (w *Wallet) SendFundsToAccount(transactionName string, accountID iotago.AccountID, inputNames ...string) *iotago.SignedTransaction {
+	inputStates := make([]*utxoledger.Output, 0, len(inputNames))
+	totalInputAmounts := iotago.BaseToken(0)
+	totalInputStoredMana := iotago.Mana(0)
+	for _, inputName := range inputNames {
+		output := w.Output(inputName)
+		inputStates = append(inputStates, output)
+		totalInputAmounts += output.BaseTokenAmount()
+		totalInputStoredMana += output.StoredMana()
+	}
+
+	targetOutput := &iotago.BasicOutput{
+		Amount: totalInputAmounts,
+		Mana:   totalInputStoredMana,
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: accountID.ToAddress()},
+		},
+		Features: iotago.BasicOutputFeatures{},
+	}
+
+	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
+		WithInputs(inputStates),
+		WithOutputs(iotago.Outputs[iotago.Output]{targetOutput}),
+	))
+
+	w.registerOutputs(transactionName, signedTransaction.Transaction)
+	fmt.Println(lo.Keys(w.outputs))
+
+	return signedTransaction
+}
+
+func (w *Wallet) SendFundsFromAccount(transactionName string, accountOutputName string, commitmentID iotago.CommitmentID, inputNames ...string) *iotago.SignedTransaction {
+	inputStates := make([]*utxoledger.Output, 0, len(inputNames))
+	totalInputAmounts := iotago.BaseToken(0)
+	totalInputStoredMana := iotago.Mana(0)
+
+	sourceOutput := w.AccountOutput(accountOutputName)
+	inputStates = append(inputStates, sourceOutput)
+
+	for _, inputName := range inputNames {
+		output := w.Output(inputName)
+		inputStates = append(inputStates, output)
+		totalInputAmounts += output.BaseTokenAmount()
+		totalInputStoredMana += output.StoredMana()
+	}
+
+	accountOutput, ok := sourceOutput.Output().(*iotago.AccountOutput)
+	if !ok {
+		panic("accountOutputName is not an AccountOutput type")
+	}
+
+	targetOutputs := iotago.Outputs[iotago.Output]{accountOutput, &iotago.BasicOutput{
+		Amount: totalInputAmounts,
+		Mana:   totalInputStoredMana,
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: w.Address()},
+		},
+		Features: iotago.BasicOutputFeatures{},
+	}}
+	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
+		WithInputs(inputStates),
+		WithContextInputs(iotago.TxEssenceContextInputs{
+			&iotago.BlockIssuanceCreditInput{AccountID: accountOutput.AccountID},
+			&iotago.CommitmentInput{CommitmentID: commitmentID},
+		}),
+		WithOutputs(targetOutputs),
+	))
+
+	w.registerOutputs(transactionName, signedTransaction.Transaction)
+
+	return signedTransaction
+}
+
+func (w *Wallet) AllotManaFromInputs(transactionName string, allotments iotago.Allotments, inputNames ...string) *iotago.SignedTransaction {
+	inputStates := make([]*utxoledger.Output, 0, len(inputNames))
+	outputStates := make(iotago.Outputs[iotago.Output], 0, len(inputNames))
+	manaToAllot := iotago.Mana(0)
+	for _, allotment := range allotments {
+		manaToAllot += allotment.Mana
+	}
+
+	for _, inputName := range inputNames {
+		output := w.Output(inputName)
+		inputStates = append(inputStates, output)
+		basicOutput, ok := output.Output().(*iotago.BasicOutput)
+		if !ok {
+			panic("allotting is only supported from BasicOutputs")
+		}
+
+		// Subtract stored mana from source outputs to fund Allotment.
+		outputBuilder := builder.NewBasicOutputBuilderFromPrevious(basicOutput)
+		if manaToAllot > 0 {
+			if manaToAllot >= basicOutput.StoredMana() {
+				outputBuilder.Mana(0)
+			} else {
+				outputBuilder.Mana(basicOutput.StoredMana() - manaToAllot)
+			}
+			manaToAllot -= basicOutput.StoredMana()
+		}
+
+		outputStates = append(outputStates, outputBuilder.MustBuild())
+	}
+
+	signedTransaction := lo.PanicOnErr(w.createSignedTransactionWithOptions(
+		transactionName,
+		WithAllotments(allotments),
+		WithInputs(inputStates),
+		WithOutputs(outputStates),
+	))
+
+	w.registerOutputs(transactionName, signedTransaction.Transaction)
+
+	return signedTransaction
+}
+
 func (w *Wallet) createSignedTransactionWithOptions(transactionName string, opts ...options.Option[builder.TransactionBuilder]) (*iotago.SignedTransaction, error) {
 	currentAPI := w.Node.Protocol.CommittedAPI()
 
@@ -332,11 +449,14 @@ func (w *Wallet) createSignedTransactionWithOptions(transactionName string, opts
 
 	addrSigner := w.AddressSigner()
 	signedTransaction, err := options.Apply(txBuilder, opts).Build(addrSigner)
+	if err != nil {
+		return nil, err
+	}
 
 	// register the outputs in the wallet
 	w.registerOutputs(transactionName, signedTransaction.Transaction)
 
-	return signedTransaction, err
+	return signedTransaction, nil
 }
 
 func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Transaction) {
@@ -348,7 +468,7 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 		// register the output if it belongs to this wallet
 		addressUC := output.UnlockConditionSet().Address()
 		stateControllerUC := output.UnlockConditionSet().StateControllerAddress()
-		if addressUC != nil && w.HasAddress(addressUC.Address) || stateControllerUC != nil && w.HasAddress(stateControllerUC.Address) {
+		if addressUC != nil && (w.HasAddress(addressUC.Address) || addressUC.Address.Type() == iotago.AddressAccount && addressUC.Address.String() == w.BlockIssuer.AccountID.ToAddress().String()) || stateControllerUC != nil && w.HasAddress(stateControllerUC.Address) {
 			clonedOutput := output.Clone()
 			actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
 			if clonedOutput.Type() == iotago.OutputAccount {
