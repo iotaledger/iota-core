@@ -15,6 +15,7 @@ import (
 
 func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
+		testsuite.WithWaitFor(15*time.Second),
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
 				0,
