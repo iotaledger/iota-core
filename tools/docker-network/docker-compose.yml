@@ -194,6 +194,19 @@ services:
       --inx.address=node-1-validator:9029
       --restAPI.bindAddress=inx-indexer:9011
 
+  inx-mqtt:
+    image: iotaledger/inx-mqtt:2.0-alpha
+    stop_grace_period: 1m
+    restart: unless-stopped
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
+    networks:
+      - iota-core
+    command: >
+      --inx.address=node-1-validator:9029
+      --mqtt.websocket.bindAddress=inx-mqtt:1888
+
   inx-blockissuer:
     image: iotaledger/inx-blockissuer:1.0-alpha
     stop_grace_period: 1m
