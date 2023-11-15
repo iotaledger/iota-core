@@ -55,18 +55,19 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 				asyncOpt := event.WithWorkerPool(c.workerPool)
 				c.HookStopped(lo.Batch(
 					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-						c.advanceAccepted(block.IssuingTime())
+						c.acceptedTime.Advance(block.IssuingTime())
 					}, asyncOpt).Unhook,
 
 					e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-						c.advanceConfirmed(block.IssuingTime())
+						c.confirmedTime.Advance(block.IssuingTime())
 					}, asyncOpt).Unhook,
 
 					e.Events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
 						timeProvider := e.APIForSlot(slot).TimeProvider()
 						slotEndTime := timeProvider.SlotEndTime(slot)
 
-						c.onSlotFinalized(slotEndTime)
+						c.acceptedTime.Advance(slotEndTime)
+						c.confirmedTime.Advance(slotEndTime)
 					}, asyncOpt).Unhook,
 				))
 			})
@@ -98,29 +99,13 @@ func (c *Clock) Snapshot() *clock.Snapshot {
 	}
 }
 
+// Reset resets the time values tracked in the clock to the given time.
+func (c *Clock) Reset(newTime time.Time) {
+	c.acceptedTime.Reset(newTime)
+	c.confirmedTime.Reset(newTime)
+}
+
 func (c *Clock) Shutdown() {
 	c.workerPool.Shutdown()
 	c.TriggerStopped()
-}
-
-func (c *Clock) advanceAccepted(time time.Time) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.acceptedTime.Advance(time)
-}
-
-func (c *Clock) advanceConfirmed(time time.Time) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.confirmedTime.Advance(time)
-}
-
-func (c *Clock) onSlotFinalized(slotEndTime time.Time) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.acceptedTime.Advance(slotEndTime)
-	c.confirmedTime.Advance(slotEndTime)
 }

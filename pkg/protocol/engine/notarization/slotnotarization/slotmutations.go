@@ -61,15 +61,9 @@ func (m *SlotMutations) Evict(index iotago.SlotIndex) error {
 	return nil
 }
 
-func (m *SlotMutations) Reset(index iotago.SlotIndex) {
-	m.evictionMutex.Lock()
-	defer m.evictionMutex.Unlock()
-
-	for i := m.latestCommittedIndex; i > index; i-- {
-		m.acceptedBlocksBySlot.Delete(i)
-	}
-
-	m.latestCommittedIndex = index
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (m *SlotMutations) Reset() {
+	m.acceptedBlocksBySlot.Clear()
 }
 
 // AcceptedBlocks returns the set of accepted blocks for the given slot.

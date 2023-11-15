@@ -132,15 +132,21 @@ func (s *StateMetadata) setupSpender(spender *TransactionMetadata) {
 	s.increaseSpenderCount()
 
 	spender.OnAccepted(func() {
-		s.spendAccepted.Set(spender)
+		if !s.state.IsReadOnly() {
+			s.spendAccepted.Set(spender)
+		}
 	})
 
 	spender.OnPending(func() {
-		s.spendAccepted.Set(nil)
+		if !s.state.IsReadOnly() {
+			s.spendAccepted.Set(nil)
+		}
 	})
 
 	spender.OnCommittedSlotUpdated(func(_ iotago.SlotIndex) {
-		s.spendCommitted.Set(spender)
+		if !s.state.IsReadOnly() {
+			s.spendCommitted.Set(spender)
+		}
 
 		s.decreaseSpenderCount()
 	})

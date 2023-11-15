@@ -16,6 +16,9 @@ type Retainer interface {
 	RetainBlockFailure(iotago.BlockID, apimodels.BlockFailureReason)
 	RetainTransactionFailure(iotago.BlockID, error)
 
+	// Reset resets the component to a clean state as if it was created at the last commitment.
+	Reset()
+
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface
 }

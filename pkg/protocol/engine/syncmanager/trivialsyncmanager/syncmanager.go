@@ -149,6 +149,11 @@ func (s *SyncManager) SyncStatus() *syncmanager.SyncStatus {
 	}
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (s *SyncManager) Reset() {
+	// TODO: reset last accepted block slot and so on ...
+}
+
 func (s *SyncManager) Shutdown() {
 	s.TriggerStopped()
 }

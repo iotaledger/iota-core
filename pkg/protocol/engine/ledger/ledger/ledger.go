@@ -349,6 +349,12 @@ func (l *Ledger) RMCManager() *rmc.Manager {
 	return l.rmcManager
 }
 
+// Reset resets the component to a clean state as if it was created at the last commitment.
+func (l *Ledger) Reset() {
+	l.memPool.Reset()
+	l.accountsLedger.Reset()
+}
+
 func (l *Ledger) Shutdown() {
 	l.TriggerStopped()
 	l.spendDAG.Shutdown()
@@ -749,6 +755,10 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
+	if _, isValidationBlock := block.ValidationBlock(); !isValidationBlock {
+		return
+	}
+
 	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().Header.IssuingTime)
 
 	committee, exists := l.sybilProtection.SeatManager().CommitteeInSlot(block.ID().Slot())

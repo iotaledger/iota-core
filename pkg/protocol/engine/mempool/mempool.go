@@ -28,4 +28,7 @@ type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] interface {
 	StateDiff(slot iotago.SlotIndex) (StateDiff, error)
 
 	Evict(slot iotago.SlotIndex)
+
+	// Reset resets the component to a clean state as if it was created at the last commitment.
+	Reset()
 }
