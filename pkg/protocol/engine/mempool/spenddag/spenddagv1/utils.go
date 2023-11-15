@@ -6,12 +6,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 )
 
-// heaviestConflict returns the largest Conflict from the given Spends.
-func heaviestConflict[SpendID, ResourceID spenddag.IDType, VoterPower spenddag.VoteRankType[VoterPower]](conflicts ds.Set[*Spend[SpendID, ResourceID, VoterPower]]) *Spend[SpendID, ResourceID, VoterPower] {
+// heaviestSpend returns the largest Spend from the given Spends.
+func heaviestSpend[SpendID, ResourceID spenddag.IDType, VoterPower spenddag.VoteRankType[VoterPower]](spends ds.Set[*Spend[SpendID, ResourceID, VoterPower]]) *Spend[SpendID, ResourceID, VoterPower] {
 	var result *Spend[SpendID, ResourceID, VoterPower]
-	conflicts.Range(func(conflict *Spend[SpendID, ResourceID, VoterPower]) {
-		if conflict.Compare(result) == weight.Heavier {
-			result = conflict
+	spends.Range(func(spend *Spend[SpendID, ResourceID, VoterPower]) {
+		if spend.Compare(result) == weight.Heavier {
+			result = spend
 		}
 	})
 

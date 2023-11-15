@@ -172,8 +172,8 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UpdateSpendParents(spendID Spe
 
 		updated := currentSpend.UpdateParents(addedParents, removedParents)
 		if updated {
-			_ = currentSpend.Parents.ForEach(func(parentConflict *Spend[SpendID, ResourceID, VoteRank]) (err error) {
-				newParents.Add(parentConflict.ID)
+			_ = currentSpend.Parents.ForEach(func(parentSpend *Spend[SpendID, ResourceID, VoteRank]) (err error) {
+				newParents.Add(parentSpend.ID)
 				return nil
 			})
 		}
@@ -195,9 +195,9 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UpdateSpendParents(spendID Spe
 func (c *SpendDAG[SpendID, ResourceID, VoteRank]) LikedInstead(spendIDs ds.Set[SpendID]) ds.Set[SpendID] {
 	likedInstead := ds.NewSet[SpendID]()
 	spendIDs.Range(func(spendID SpendID) {
-		if currentConflict, exists := c.spendsByID.Get(spendID); exists {
-			if likedConflict := heaviestConflict(currentConflict.LikedInstead()); likedConflict != nil {
-				likedInstead.Add(likedConflict.ID)
+		if currentSpend, exists := c.spendsByID.Get(spendID); exists {
+			if likedSpend := heaviestSpend(currentSpend.LikedInstead()); likedSpend != nil {
+				likedInstead.Add(likedSpend.ID)
 			}
 		}
 	})
@@ -238,7 +238,7 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) AllSpendsSupported(seat accoun
 	}) == nil
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendVoters(spendID SpendID) (conflictVoters ds.Set[account.SeatIndex]) {
+func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendVoters(spendID SpendID) (spendVoters ds.Set[account.SeatIndex]) {
 	if spend, exists := c.spendsByID.Get(spendID); exists {
 		return spend.Weight.Voters.Clone()
 	}
@@ -291,19 +291,19 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendChildren(spendID SpendID)
 	return spendChildren, true
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) ConflictSetMembers(conflictSetID ResourceID) (conflicts ds.Set[SpendID], exists bool) {
+func (c *SpendDAG[SpendID, ResourceID, VoteRank]) ConflictSetMembers(conflictSetID ResourceID) (spends ds.Set[SpendID], exists bool) {
 	conflictSet, exists := c.conflictSetsByID.Get(conflictSetID)
 	if !exists {
 		return nil, false
 	}
 
-	conflicts = ds.NewSet[SpendID]()
+	spends = ds.NewSet[SpendID]()
 	_ = conflictSet.ForEach(func(parent *Spend[SpendID, ResourceID, VoteRank]) error {
-		conflicts.Add(parent.ID)
+		spends.Add(parent.ID)
 		return nil
 	})
 
-	return conflicts, true
+	return spends, true
 }
 
 func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendWeight(spendID SpendID) int64 {
@@ -385,7 +385,7 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UnacceptedSpends(spendIDs ds.S
 	return pendingSpendIDs
 }
 
-// EvictConflict removes spend with given SpendID from spenddag.
+// EvictSpend removes spend with given SpendID from spenddag.
 func (c *SpendDAG[SpendID, ResourceID, VoteRank]) EvictSpend(spendID SpendID) {
 	for _, evictedSpendID := range func() []SpendID {
 		c.mutex.RLock()
@@ -406,7 +406,7 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) evictSpend(spendID SpendID) []
 
 	evictedSpendIDs := spend.Evict()
 
-	// remove the conflicts from the spenddag dictionary
+	// remove the spends from the spenddag dictionary
 	for _, evictedSpendID := range evictedSpendIDs {
 		c.spendsByID.Delete(evictedSpendID)
 	}
@@ -454,40 +454,40 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) determineVotes(spendIDs ds.Set
 	revokedSpends = ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]]()
 
 	revokedWalker := walker.New[*Spend[SpendID, ResourceID, VoteRank]]()
-	revokeConflict := func(revokedConflict *Spend[SpendID, ResourceID, VoteRank]) error {
-		if revokedSpends.Add(revokedConflict) {
-			if supportedSpends.Has(revokedConflict) {
-				return ierrors.Errorf("applied conflicting votes (%s is supported and revoked)", revokedConflict.ID)
+	revokeSpend := func(revokedSpend *Spend[SpendID, ResourceID, VoteRank]) error {
+		if revokedSpends.Add(revokedSpend) {
+			if supportedSpends.Has(revokedSpend) {
+				return ierrors.Errorf("applied conflicting votes (%s is supported and revoked)", revokedSpend.ID)
 			}
 
-			revokedWalker.PushAll(revokedConflict.Children.ToSlice()...)
+			revokedWalker.PushAll(revokedSpend.Children.ToSlice()...)
 		}
 
 		return nil
 	}
 
 	supportedWalker := walker.New[*Spend[SpendID, ResourceID, VoteRank]]()
-	supportConflict := func(supportedConflict *Spend[SpendID, ResourceID, VoteRank]) error {
-		if supportedSpends.Add(supportedConflict) {
-			if err := supportedConflict.ConflictingSpends.ForEach(revokeConflict); err != nil {
-				return ierrors.Errorf("failed to collect conflicting conflicts: %w", err)
+	supportSpend := func(supportedSpend *Spend[SpendID, ResourceID, VoteRank]) error {
+		if supportedSpends.Add(supportedSpend) {
+			if err := supportedSpend.ConflictingSpends.ForEach(revokeSpend); err != nil {
+				return ierrors.Errorf("failed to collect conflicting spends: %w", err)
 			}
 
-			supportedWalker.PushAll(supportedConflict.Parents.ToSlice()...)
+			supportedWalker.PushAll(supportedSpend.Parents.ToSlice()...)
 		}
 
 		return nil
 	}
 
 	for supportedWalker.PushAll(lo.Return1(c.spends(spendIDs, true)).ToSlice()...); supportedWalker.HasNext(); {
-		if err := supportConflict(supportedWalker.Next()); err != nil {
-			return nil, nil, ierrors.Errorf("failed to collect supported conflicts: %w", err)
+		if err := supportSpend(supportedWalker.Next()); err != nil {
+			return nil, nil, ierrors.Errorf("failed to collect supported spends: %w", err)
 		}
 	}
 
 	for revokedWalker.HasNext() {
-		if revokedConflict := revokedWalker.Next(); revokedSpends.Add(revokedConflict) {
-			revokedWalker.PushAll(revokedConflict.Children.ToSlice()...)
+		if revokedSpend := revokedWalker.Next(); revokedSpends.Add(revokedSpend) {
+			revokedWalker.PushAll(revokedSpend.Children.ToSlice()...)
 		}
 	}
 

@@ -34,9 +34,9 @@ export class Block {
     weakChildren: Array<string>;
     shallowLikeChildren: Array<string>;
     solid: boolean;
-    conflictIDs: Array<string>;
-    addedConflictIDs: Array<string>;
-    subtractedConflictIDs: Array<string>;
+    spendIDs: Array<string>;
+    addedSpendIDs: Array<string>;
+    subtractedSpendIDs: Array<string>;
     scheduled: boolean;
     booked: boolean;
     orphaned: boolean;
@@ -88,7 +88,7 @@ class OutputID {
 
 export class OutputMetadata {
     outputID: OutputID;
-    conflictIDs: Array<string>;
+    spendIDs: Array<string>;
     consumerCount: number;
     confirmedConsumer: string // tx id of confirmed consumer
     confirmationState: number
@@ -107,7 +107,7 @@ class OutputConsumers {
 
 class TransactionMetadata {
     transactionID: string;
-    conflictIDs: string[];
+    spendIDs: string[];
     booked: boolean;
     bookedTime: number;
     confirmationState: string;
@@ -124,7 +124,7 @@ class PendingMana {
 class Conflict {
     id: string;
     parents: Array<string>;
-    conflictIDs: Array<string>;
+    spendIDs: Array<string>;
     confirmationState: number;
 }
 
@@ -140,7 +140,7 @@ class ConflictChild {
 
 class ConflictConflict {
     outputID: OutputID;
-    conflictIDs: Array<string>;
+    spendIDs: Array<string>;
 }
 
 class ConflictConflicts {
@@ -411,9 +411,9 @@ export class ExplorerStore {
     @action
     updateBlock = (blk: Block) => {
         this.blk = blk;
-        this.blk.conflictIDs = this.blk.conflictIDs ? this.blk.conflictIDs : []
-        this.blk.addedConflictIDs = this.blk.addedConflictIDs ? this.blk.addedConflictIDs : []
-        this.blk.subtractedConflictIDs = this.blk.subtractedConflictIDs ? this.blk.subtractedConflictIDs : []
+        this.blk.spendIDs = this.blk.spendIDs ? this.blk.spendIDs : []
+        this.blk.addedSpendIDs = this.blk.addedSpendIDs ? this.blk.addedSpendIDs : []
+        this.blk.subtractedSpendIDs = this.blk.subtractedSpendIDs ? this.blk.subtractedSpendIDs : []
         this.blk.strongChildren = this.blk.strongChildren ? this.blk.strongChildren : []
         this.blk.weakChildren = this.blk.weakChildren ? this.blk.weakChildren : []
         this.blk.shallowLikeChildren = this.blk.shallowLikeChildren ? this.blk.shallowLikeChildren : []

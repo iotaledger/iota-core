@@ -55,8 +55,8 @@ export class ExplorerConflictQueryResult extends React.Component<Props, any> {
                         </ListGroup>
                     </ListGroup.Item>
                     {<ListGroup.Item>Conflicts:
-                        {conflict.conflictIDs && <ListGroup>
-                            {conflict.conflictIDs.map((c,i) => <ListGroup.Item key={i}><a href={`/explorer/output/${c}`}>{c}</a></ListGroup.Item>)}
+                        {conflict.spendIDs && <ListGroup>
+                            {conflict.spendIDs.map((c,i) => <ListGroup.Item key={i}><a href={`/explorer/output/${c}`}>{c}</a></ListGroup.Item>)}
                         </ListGroup>}
                     </ListGroup.Item>}
                     <ListGroup.Item>ConfirmationState: {resolveConfirmationState(conflict.confirmationState)}</ListGroup.Item>
@@ -70,7 +70,7 @@ export class ExplorerConflictQueryResult extends React.Component<Props, any> {
                                 {conflictConflicts.conflicts.map((c,i) => <div key={i}>
                                     OutputID: <a href={`/explorer/output/${c.outputID.base58}`}>{c.outputID.base58}</a>
                                     <ListGroup className={"mb-2"}>
-                                        {c.conflictIDs.map((b,j) => <ListGroup.Item key={j}>
+                                        {c.spendIDs.map((b,j) => <ListGroup.Item key={j}>
                                             <a href={`/explorer/conflict/${b}`}>{resolveBase58ConflictID(b)}</a>
                                         </ListGroup.Item>)}
                                     </ListGroup>

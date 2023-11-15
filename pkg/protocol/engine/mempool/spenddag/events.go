@@ -9,22 +9,22 @@ import (
 
 // Events is a container that acts as a dictionary for the events of a SpendDAG.
 type Events[SpendID, ResourceID comparable] struct {
-	// SpendCreated is triggered when a new Conflict is created.
+	// SpendCreated is triggered when a new Spend is created.
 	SpendCreated *event.Event1[SpendID]
 
-	// SpendEvicted is triggered when a Conflict is evicted from the SpendDAG.
+	// SpendEvicted is triggered when a Spend is evicted from the SpendDAG.
 	SpendEvicted *event.Event1[SpendID]
 
-	// ConflictingResourcesAdded is triggered when the Conflict is added to a new ConflictSet.
+	// ConflictingResourcesAdded is triggered when the Spend is added to a new ConflictSet.
 	ConflictingResourcesAdded *event.Event2[SpendID, ds.Set[ResourceID]]
 
-	// SpendParentsUpdated is triggered when the parents of a Conflict are updated.
+	// SpendParentsUpdated is triggered when the parents of a Spend are updated.
 	SpendParentsUpdated *event.Event2[SpendID, ds.Set[SpendID]]
 
-	// SpendAccepted is an event that gets triggered whenever a Conflict is confirmed.
+	// SpendAccepted is an event that gets triggered whenever a Spend is confirmed.
 	SpendAccepted *event.Event1[SpendID]
 
-	// SpendRejected is an event that gets triggered whenever a Conflict is rejected.
+	// SpendRejected is an event that gets triggered whenever a Spend is rejected.
 	SpendRejected *event.Event1[SpendID]
 
 	event.Group[Events[SpendID, ResourceID], *Events[SpendID, ResourceID]]

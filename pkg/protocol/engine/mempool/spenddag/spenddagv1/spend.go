@@ -74,8 +74,8 @@ type Spend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[V
 
 	// likedInsteadMutex and structureMutex are sometimes locked in different order by different goroutines, which could result in a deadlock
 	//  however, it's impossible to deadlock if we fork all transactions upon booking
-	//  deadlock happens when the likedInstead conflict changes and parents are updated at the same time, which is impossible in the current setup
-	//  because we won't process votes on a conflict we're just creating.
+	//  deadlock happens when the likedInstead spend changes and parents are updated at the same time, which is impossible in the current setup
+	//  because we won't process votes on a spend we're just creating.
 	// likedInsteadMutex is used to synchronize access to the liked instead value of the Spend.
 	likedInsteadMutex syncutils.RWMutex
 
@@ -117,7 +117,7 @@ func NewSpend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankTyp
 		}
 	}).Unhook
 
-	// in case the initial weight is enough to accept the conflict, accept it immediately
+	// in case the initial weight is enough to accept the spend, accept it immediately
 	if threshold := c.acceptanceThreshold(); initialWeight.Value().ValidatorsWeight() >= threshold {
 		c.setAcceptanceState(acceptance.Accepted)
 	}
@@ -127,7 +127,7 @@ func NewSpend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankTyp
 	return c
 }
 
-// JoinConflictSets registers the Spend with the given ConflictSets.
+// JoinSpendSets registers the Spend with the given ConflictSets.
 func (c *Spend[SpendID, ResourceID, VoteRank]) JoinSpendSets(conflictSets ds.Set[*ConflictSet[SpendID, ResourceID, VoteRank]]) (joinedConflictSets ds.Set[ResourceID], err error) {
 	if conflictSets == nil {
 		return ds.NewSet[ResourceID](), nil
@@ -282,8 +282,8 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) Shutdown() {
 	c.ConflictingSpends.Shutdown()
 }
 
-// Evict cleans up the sortedConflict.
-func (c *Spend[SpendID, ResourceID, VoteRank]) Evict() (evictedConflicts []SpendID) {
+// Evict cleans up the sortedSpend.
+func (c *Spend[SpendID, ResourceID, VoteRank]) Evict() (evictedSpends []SpendID) {
 	if firstEvictCall := !c.evicted.Swap(true); !firstEvictCall {
 		return nil
 	}
@@ -293,24 +293,24 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) Evict() (evictedConflicts []Spend
 	switch c.Weight.AcceptanceState() {
 	case acceptance.Rejected:
 		// evict the entire future cone of rejected spends
-		c.Children.Range(func(childConflict *Spend[SpendID, ResourceID, VoteRank]) {
-			evictedConflicts = append(evictedConflicts, childConflict.Evict()...)
+		c.Children.Range(func(childSpend *Spend[SpendID, ResourceID, VoteRank]) {
+			evictedSpends = append(evictedSpends, childSpend.Evict()...)
 		})
 	default:
 		// remove evicted spend from parents of children (merge to master)
-		c.Children.Range(func(childConflict *Spend[SpendID, ResourceID, VoteRank]) {
-			childConflict.structureMutex.Lock()
-			defer childConflict.structureMutex.Unlock()
+		c.Children.Range(func(childSpend *Spend[SpendID, ResourceID, VoteRank]) {
+			childSpend.structureMutex.Lock()
+			defer childSpend.structureMutex.Unlock()
 
-			childConflict.removeParent(c)
+			childSpend.removeParent(c)
 		})
 	}
 
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
-	c.Parents.Range(func(parentConflict *Spend[SpendID, ResourceID, VoteRank]) {
-		parentConflict.unregisterChild(c)
+	c.Parents.Range(func(parentSpend *Spend[SpendID, ResourceID, VoteRank]) {
+		parentSpend.unregisterChild(c)
 	})
 	c.Parents.Clear()
 
@@ -319,13 +319,13 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) Evict() (evictedConflicts []Spend
 	})
 	c.ConflictSets.Clear()
 
-	for _, conflict := range c.ConflictingSpends.Shutdown() {
-		if conflict != c {
-			conflict.ConflictingSpends.Remove(c.ID)
-			c.ConflictingSpends.Remove(conflict.ID)
+	for _, spend := range c.ConflictingSpends.Shutdown() {
+		if spend != c {
+			spend.ConflictingSpends.Remove(c.ID)
+			c.ConflictingSpends.Remove(spend.ID)
 
 			if c.IsAccepted() {
-				evictedConflicts = append(evictedConflicts, conflict.Evict()...)
+				evictedSpends = append(evictedSpends, spend.Evict()...)
 			}
 		}
 	}
@@ -340,9 +340,9 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) Evict() (evictedConflicts []Spend
 	c.likedInsteadSources.Clear()
 	c.preferredInstead = nil
 
-	evictedConflicts = append(evictedConflicts, c.ID)
+	evictedSpends = append(evictedSpends, c.ID)
 
-	return evictedConflicts
+	return evictedSpends
 }
 
 // Compare compares the Spend to the given other Spend.
@@ -399,16 +399,16 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) registerChild(child *Spend[SpendI
 				child.removeInheritedLikedInsteadReference(c, reference)
 			}).Unhook,
 
-			c.LikedInsteadAdded.Hook(func(conflict *Spend[SpendID, ResourceID, VoteRank]) {
+			c.LikedInsteadAdded.Hook(func(spend *Spend[SpendID, ResourceID, VoteRank]) {
 				child.structureMutex.Lock()
 				defer child.structureMutex.Unlock()
 
-				child.addInheritedLikedInsteadReference(c, conflict)
+				child.addInheritedLikedInsteadReference(c, spend)
 			}).Unhook,
 		))
 
-		for conflicts := c.likedInstead.Iterator(); conflicts.HasNext(); {
-			child.addInheritedLikedInsteadReference(c, conflicts.Next())
+		for spends := c.likedInstead.Iterator(); spends.HasNext(); {
+			child.addInheritedLikedInsteadReference(c, spends.Next())
 		}
 
 		if c.IsRejected() {

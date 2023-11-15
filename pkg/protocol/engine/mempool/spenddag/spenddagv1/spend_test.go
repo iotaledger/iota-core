@@ -24,19 +24,19 @@ type TestSpend = *Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
 //var NewTestSpend = NewSpend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-func NewTestSpend(id iotago.TransactionID, parentConflicts ds.Set[*Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], SpendSets ds.Set[*ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank] {
+func NewTestSpend(id iotago.TransactionID, parentSpends ds.Set[*Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], SpendSets ds.Set[*ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank] {
 	spend := NewSpend[iotago.TransactionID, iotago.OutputID, vote.MockedRank](id, initialWeight, pendingTasksCounter, acceptanceThresholdProvider)
 	_, err := spend.JoinSpendSets(SpendSets)
 	if err != nil {
 		// TODO: change this
 		panic(err)
 	}
-	spend.UpdateParents(parentConflicts, ds.NewSet[*Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]]())
+	spend.UpdateParents(parentSpends, ds.NewSet[*Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]]())
 
 	return spend
 }
 
-func TestConflict_SetRejected(t *testing.T) {
+func TestSpend_SetRejected(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
@@ -44,20 +44,20 @@ func TestConflict_SetRejected(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	Spend1 := NewTestSpend(transactionID("Conflict1"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
-	Spend2 := NewTestSpend(transactionID("Conflict2"), ds.NewSet(Spend1), nil, weight.New(), pendingTasks, thresholdProvider)
-	Spend3 := NewTestSpend(transactionID("Conflict3"), ds.NewSet(Spend2), nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend1 := NewTestSpend(transactionID("Spend1"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend2 := NewTestSpend(transactionID("Spend2"), ds.NewSet(Spend1), nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend3 := NewTestSpend(transactionID("Spend3"), ds.NewSet(Spend2), nil, weight.New(), pendingTasks, thresholdProvider)
 
 	Spend1.setAcceptanceState(acceptance.Rejected)
 	require.True(t, Spend1.IsRejected())
 	require.True(t, Spend2.IsRejected())
 	require.True(t, Spend3.IsRejected())
 
-	Spend4 := NewTestSpend(transactionID("Conflict4"), ds.NewSet(Spend1), nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend4 := NewTestSpend(transactionID("Spend4"), ds.NewSet(Spend1), nil, weight.New(), pendingTasks, thresholdProvider)
 	require.True(t, Spend4.IsRejected())
 }
 
-func TestConflict_UpdateParents(t *testing.T) {
+func TestSpend_UpdateParents(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
@@ -65,15 +65,15 @@ func TestConflict_UpdateParents(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	Spend1 := NewTestSpend(transactionID("Conflict1"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
-	Spend2 := NewTestSpend(transactionID("Conflict2"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
-	Spend3 := NewTestSpend(transactionID("Conflict3"), ds.NewSet(Spend1, Spend2), nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend1 := NewTestSpend(transactionID("Spend1"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend2 := NewTestSpend(transactionID("Spend2"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend3 := NewTestSpend(transactionID("Spend3"), ds.NewSet(Spend1, Spend2), nil, weight.New(), pendingTasks, thresholdProvider)
 
 	require.True(t, Spend3.Parents.Has(Spend1))
 	require.True(t, Spend3.Parents.Has(Spend2))
 }
 
-func TestConflict_SetAccepted(t *testing.T) {
+func TestSpend_SetAccepted(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
@@ -82,12 +82,12 @@ func TestConflict_SetAccepted(t *testing.T) {
 	})
 
 	{
-		SpendSet1 := NewTestConflictSet(id("ConflictSet1"))
-		SpendSet2 := NewTestConflictSet(id("ConflictSet2"))
+		ConflictSet1 := NewTestConflictSet(id("ConflictSet1"))
+		ConflictSet2 := NewTestConflictSet(id("ConflictSet2"))
 
-		Spend1 := NewTestSpend(transactionID("Conflict1"), nil, ds.NewSet(SpendSet1), weight.New(), pendingTasks, thresholdProvider)
-		Spend2 := NewTestSpend(transactionID("Conflict2"), nil, ds.NewSet(SpendSet1, SpendSet2), weight.New(), pendingTasks, thresholdProvider)
-		Spend3 := NewTestSpend(transactionID("Conflict3"), nil, ds.NewSet(SpendSet2), weight.New(), pendingTasks, thresholdProvider)
+		Spend1 := NewTestSpend(transactionID("Spend1"), nil, ds.NewSet(ConflictSet1), weight.New(), pendingTasks, thresholdProvider)
+		Spend2 := NewTestSpend(transactionID("Spend2"), nil, ds.NewSet(ConflictSet1, ConflictSet2), weight.New(), pendingTasks, thresholdProvider)
+		Spend3 := NewTestSpend(transactionID("Spend3"), nil, ds.NewSet(ConflictSet2), weight.New(), pendingTasks, thresholdProvider)
 
 		require.Equal(t, acceptance.Pending, Spend1.setAcceptanceState(acceptance.Accepted))
 		require.True(t, Spend1.IsAccepted())
@@ -106,9 +106,9 @@ func TestConflict_SetAccepted(t *testing.T) {
 		SpendSet1 := NewTestConflictSet(id("ConflictSet1"))
 		SpendSet2 := NewTestConflictSet(id("ConflictSet2"))
 
-		Spend1 := NewTestSpend(transactionID("Conflict1"), nil, ds.NewSet(SpendSet1), weight.New(), pendingTasks, thresholdProvider)
-		Spend2 := NewTestSpend(transactionID("Conflict2"), nil, ds.NewSet(SpendSet1, SpendSet2), weight.New(), pendingTasks, thresholdProvider)
-		Spend3 := NewTestSpend(transactionID("Conflict3"), nil, ds.NewSet(SpendSet2), weight.New(), pendingTasks, thresholdProvider)
+		Spend1 := NewTestSpend(transactionID("Spend1"), nil, ds.NewSet(SpendSet1), weight.New(), pendingTasks, thresholdProvider)
+		Spend2 := NewTestSpend(transactionID("Spend2"), nil, ds.NewSet(SpendSet1, SpendSet2), weight.New(), pendingTasks, thresholdProvider)
+		Spend3 := NewTestSpend(transactionID("Spend3"), nil, ds.NewSet(SpendSet2), weight.New(), pendingTasks, thresholdProvider)
 
 		Spend2.setAcceptanceState(acceptance.Accepted)
 		require.True(t, Spend1.IsRejected())
@@ -117,7 +117,7 @@ func TestConflict_SetAccepted(t *testing.T) {
 	}
 }
 
-func TestConflict_SpendSets(t *testing.T) {
+func TestSpend_ConflictSets(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
@@ -211,32 +211,32 @@ func TestConflict_SpendSets(t *testing.T) {
 	assertCorrectOrder(t, SpendA, SpendB, SpendC, SpendD, SpendE, SpendF)
 }
 
-func TestConflictParallel(t *testing.T) {
+func TestSpendParallel(t *testing.T) {
 	sequentialPendingTasks := syncutils.NewCounter()
 	parallelPendingTasks := syncutils.NewCounter()
 
-	sequentialConflicts := createConflicts(sequentialPendingTasks)
+	sequentialSpends := createSpends(sequentialPendingTasks)
 	sequentialPendingTasks.WaitIsZero()
 
-	parallelConflicts := createConflicts(parallelPendingTasks)
+	parallelSpends := createSpends(parallelPendingTasks)
 	parallelPendingTasks.WaitIsZero()
 
 	const updateCount = 100000
 
 	permutations := make([]func(Spend TestSpend), 0)
 	for i := 0; i < updateCount; i++ {
-		permutations = append(permutations, generateRandomConflictPermutation())
+		permutations = append(permutations, generateRandomSpendPermutation())
 	}
 
 	var wg sync.WaitGroup
 	for _, permutation := range permutations {
-		targetAlias := lo.Keys(parallelConflicts)[rand.Intn(len(parallelConflicts))]
+		targetAlias := lo.Keys(parallelSpends)[rand.Intn(len(parallelSpends))]
 
-		permutation(sequentialConflicts[targetAlias])
+		permutation(sequentialSpends[targetAlias])
 
 		wg.Add(1)
 		go func(permutation func(Spend TestSpend)) {
-			permutation(parallelConflicts[targetAlias])
+			permutation(parallelSpends[targetAlias])
 
 			wg.Done()
 		}(permutation)
@@ -248,12 +248,12 @@ func TestConflictParallel(t *testing.T) {
 
 	parallelPendingTasks.WaitIsZero()
 
-	lo.ForEach(lo.Keys(parallelConflicts), func(SpendAlias string) {
-		assert.EqualValuesf(t, sequentialConflicts[SpendAlias].PreferredInstead().ID, parallelConflicts[SpendAlias].PreferredInstead().ID, "parallel Spend %s prefers %s, but sequential Spend prefers %s", SpendAlias, parallelConflicts[SpendAlias].PreferredInstead().ID, sequentialConflicts[SpendAlias].PreferredInstead().ID)
+	lo.ForEach(lo.Keys(parallelSpends), func(SpendAlias string) {
+		assert.EqualValuesf(t, sequentialSpends[SpendAlias].PreferredInstead().ID, parallelSpends[SpendAlias].PreferredInstead().ID, "parallel Spend %s prefers %s, but sequential Spend prefers %s", SpendAlias, parallelSpends[SpendAlias].PreferredInstead().ID, sequentialSpends[SpendAlias].PreferredInstead().ID)
 	})
 
-	assertCorrectOrder(t, lo.Values(sequentialConflicts)...)
-	assertCorrectOrder(t, lo.Values(parallelConflicts)...)
+	assertCorrectOrder(t, lo.Values(sequentialSpends)...)
+	assertCorrectOrder(t, lo.Values(parallelSpends)...)
 }
 
 func TestLikedInstead1(t *testing.T) {
@@ -460,13 +460,13 @@ func TestConflictSet_AllMembersEvicted(t *testing.T) {
 	})
 
 	Spend1 := NewTestSpend(transactionID("Spend1"), nil, ds.NewSet(yellow), weight.New(), pendingTasks, thresholdProvider)
-	evictedConflicts := Spend1.Evict()
-	require.Len(t, evictedConflicts, 1)
-	require.Contains(t, evictedConflicts, Spend1.ID)
+	evictedSpends := Spend1.Evict()
+	require.Len(t, evictedSpends, 1)
+	require.Contains(t, evictedSpends, Spend1.ID)
 
 	// evict the Spend another time and make sure that none Spends were evicted
-	evictedConflicts = Spend1.Evict()
-	require.Len(t, evictedConflicts, 0)
+	evictedSpends = Spend1.Evict()
+	require.Len(t, evictedSpends, 0)
 
 	// Spend tries to join Spendset who's all members were evicted
 	Spend2 := NewSpend[iotago.TransactionID, iotago.OutputID, vote.MockedRank](transactionID("Spend1"), weight.New(), pendingTasks, thresholdProvider)
@@ -478,7 +478,7 @@ func TestConflictSet_AllMembersEvicted(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestConflict_Compare(t *testing.T) {
+func TestSpend_Compare(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
@@ -495,7 +495,7 @@ func TestConflict_Compare(t *testing.T) {
 	require.Equal(t, weight.Equal, Spend2.Compare(nil))
 }
 
-func TestConflict_Inheritance(t *testing.T) {
+func TestSpend_Inheritance(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 
 	pendingTasks := syncutils.NewCounter()
@@ -538,34 +538,34 @@ func assertCorrectOrder(t *testing.T, spends ...TestSpend) {
 		return spends[i].Compare(spends[j]) == weight.Heavier
 	})
 
-	preferredConflicts := ds.NewSet[TestSpend]()
-	unPreferredConflicts := ds.NewSet[TestSpend]()
+	preferredSpends := ds.NewSet[TestSpend]()
+	unPreferredSpends := ds.NewSet[TestSpend]()
 
 	for _, spend := range spends {
-		if !unPreferredConflicts.Has(spend) {
-			preferredConflicts.Add(spend)
+		if !unPreferredSpends.Has(spend) {
+			preferredSpends.Add(spend)
 			spend.ConflictingSpends.Range(func(conflictingSpend *Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]) {
 				if spend != conflictingSpend {
-					unPreferredConflicts.Add(conflictingSpend)
+					unPreferredSpends.Add(conflictingSpend)
 				}
 			}, true)
 		}
 	}
 
 	for _, Spend := range spends {
-		if preferredConflicts.Has(Spend) {
+		if preferredSpends.Has(Spend) {
 			require.True(t, Spend.IsPreferred(), "Spend %s should be preferred", Spend.ID)
 		}
-		if unPreferredConflicts.Has(Spend) {
+		if unPreferredSpends.Has(Spend) {
 			require.False(t, Spend.IsPreferred(), "Spend %s should be unPreferred", Spend.ID)
 		}
 	}
 
-	_ = unPreferredConflicts.ForEach(func(unPreferredConflict TestSpend) (err error) {
+	_ = unPreferredSpends.ForEach(func(unPreferredSpend TestSpend) (err error) {
 		// iterating in descending order, so the first preferred Spend
-		return unPreferredConflict.ConflictingSpends.ForEach(func(SpendingConflict TestSpend) error {
-			if SpendingConflict != unPreferredConflict && SpendingConflict.IsPreferred() {
-				require.Equal(t, SpendingConflict, unPreferredConflict.PreferredInstead())
+		return unPreferredSpend.ConflictingSpends.ForEach(func(ConflictingSpend TestSpend) error {
+			if ConflictingSpend != unPreferredSpend && ConflictingSpend.IsPreferred() {
+				require.Equal(t, ConflictingSpend, unPreferredSpend.PreferredInstead())
 
 				return ierrors.New("break the loop")
 			}
@@ -575,20 +575,20 @@ func assertCorrectOrder(t *testing.T, spends ...TestSpend) {
 	})
 }
 
-func generateRandomConflictPermutation() func(Spend TestSpend) {
+func generateRandomSpendPermutation() func(spend TestSpend) {
 	updateType := rand.Intn(100)
 	delta := rand.Intn(100)
 
-	return func(Spend TestSpend) {
+	return func(spend TestSpend) {
 		if updateType%2 == 0 {
-			Spend.Weight.AddCumulativeWeight(int64(delta))
+			spend.Weight.AddCumulativeWeight(int64(delta))
 		} else {
-			Spend.Weight.RemoveCumulativeWeight(int64(delta))
+			spend.Weight.RemoveCumulativeWeight(int64(delta))
 		}
 	}
 }
 
-func createConflicts(pendingTasks *syncutils.Counter) map[string]TestSpend {
+func createSpends(pendingTasks *syncutils.Counter) map[string]TestSpend {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -616,7 +616,7 @@ func createConflicts(pendingTasks *syncutils.Counter) map[string]TestSpend {
 }
 
 func assertPreferredInstead(t *testing.T, preferredInsteadMap map[TestSpend]TestSpend) {
-	for Spend, preferredInsteadConflict := range preferredInsteadMap {
-		assert.Equalf(t, preferredInsteadConflict.ID, Spend.PreferredInstead().ID, "Spend %s should prefer %s instead of %s", Spend.ID, preferredInsteadConflict.ID, Spend.PreferredInstead().ID)
+	for Spend, preferredInsteadSpend := range preferredInsteadMap {
+		assert.Equalf(t, preferredInsteadSpend.ID, Spend.PreferredInstead().ID, "Spend %s should prefer %s instead of %s", Spend.ID, preferredInsteadSpend.ID, Spend.PreferredInstead().ID)
 	}
 }

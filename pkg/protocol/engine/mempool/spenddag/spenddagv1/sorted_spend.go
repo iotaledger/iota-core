@@ -160,17 +160,17 @@ func (s *sortedSpend[SpendID, ResourceID, VoteRank]) weightUpdateApplied() bool 
 }
 
 // queuePreferredInsteadUpdate notifies the sortedSet that the preferred instead flag of the Spend was updated.
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) queuePreferredInsteadUpdate(conflict *Spend[SpendID, ResourceID, VoteRank]) {
+func (s *sortedSpend[SpendID, ResourceID, VoteRank]) queuePreferredInsteadUpdate(spend *Spend[SpendID, ResourceID, VoteRank]) {
 	s.preferredInsteadMutex.Lock()
 	defer s.preferredInsteadMutex.Unlock()
 
-	if (s.queuedPreferredInstead == nil && s.currentPreferredInstead == conflict) ||
-		(s.queuedPreferredInstead != nil && s.queuedPreferredInstead == conflict) ||
-		s.sortedSet.owner.Spend == conflict {
+	if (s.queuedPreferredInstead == nil && s.currentPreferredInstead == spend) ||
+		(s.queuedPreferredInstead != nil && s.queuedPreferredInstead == spend) ||
+		s.sortedSet.owner.Spend == spend {
 		return
 	}
 
-	s.queuedPreferredInstead = conflict
+	s.queuedPreferredInstead = spend
 	s.sortedSet.notifyPendingPreferredInsteadUpdate(s)
 }
 

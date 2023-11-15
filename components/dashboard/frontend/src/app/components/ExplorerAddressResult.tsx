@@ -222,10 +222,10 @@ class OutputMeta extends React.Component<omProps, any> {
         let pendingMana = this.props.pendingMana;
         return (
             <ListGroup>
-                ConflictIDs: 
+                spendIDs: 
                 <ListGroup>
                     {
-                        metadata.conflictIDs.map((value, index) => {
+                        metadata.spendIDs.map((value, index) => {
                             return (
                                 <ListGroup.Item key={"ConflictID" + index + 1} className="text-break">
                                     <Link to={`/explorer/conflict/${value}`}>

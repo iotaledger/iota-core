@@ -26,7 +26,7 @@ import (
 )
 
 func TestMemPoolV1_InterfaceWithForkingEverything(t *testing.T) {
-	mempooltests.TestAllWithForkingEverything(t, newTestFramework)
+	mempooltests.TestAll(t, newTestFramework)
 }
 
 func TestMempoolV1_ResourceCleanup(t *testing.T) {

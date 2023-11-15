@@ -124,10 +124,10 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                         Sequence Number: {blk.sequenceNumber}
                                     </ListGroup.Item>
                                     <ListGroup.Item>
-                                        ConflictIDs:
+                                        spendIDs:
                                         <ListGroup>
                                             {
-                                                blk.conflictIDs.map((value, index) => {
+                                                blk.spendIDs.map((value, index) => {
                                                     return (
                                                         <ListGroup.Item key={"ConflictID" + index + 1}
                                                             className="text-break">
@@ -141,10 +141,10 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                         </ListGroup>
                                     </ListGroup.Item>
                                     <ListGroup.Item>
-                                        AddedConflictIDs:
+                                        AddedspendIDs:
                                         <ListGroup>
                                             {
-                                                blk.addedConflictIDs.map((value, index) => {
+                                                blk.addedSpendIDs.map((value, index) => {
                                                     return (
                                                         <ListGroup.Item key={"AddedConflictID" + index + 1}
                                                             className="text-break">
@@ -158,10 +158,10 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                         </ListGroup>
                                     </ListGroup.Item>
                                     <ListGroup.Item>
-                                        SubtractedConflictIDs:
+                                        SubtractedspendIDs:
                                         <ListGroup>
                                             {
-                                                blk.subtractedConflictIDs.map((value, index) => {
+                                                blk.subtractedSpendIDs.map((value, index) => {
                                                     return (
                                                         <ListGroup.Item key={"SubtractedConflictID" + index + 1}
                                                             className="text-break">

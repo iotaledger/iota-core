@@ -267,14 +267,14 @@ func (s *SortedSpends[SpendID, ResourceID, VoteRank]) applyWeightUpdate(member *
 
 // fixMemberPosition fixes the position of the given member in the SortedSpends.
 func (s *SortedSpends[SpendID, ResourceID, VoteRank]) fixMemberPosition(member *sortedSpend[SpendID, ResourceID, VoteRank]) {
-	preferredConflict := member.PreferredInstead()
+	preferredSpend := member.PreferredInstead()
 	memberIsPreferred := member.IsPreferred()
 
 	// the member needs to be moved up in the list
 	for currentMember := member.heavierMember; currentMember != nil && currentMember.Compare(member) == weight.Lighter; currentMember = member.heavierMember {
 		s.swapNeighbors(member, currentMember)
 
-		if currentMember == s.heaviestPreferredMember && (preferredConflict == currentMember.Spend || memberIsPreferred || member == s.owner) {
+		if currentMember == s.heaviestPreferredMember && (preferredSpend == currentMember.Spend || memberIsPreferred || member == s.owner) {
 			s.heaviestPreferredMember = member
 			s.owner.setPreferredInstead(member.Spend)
 		}

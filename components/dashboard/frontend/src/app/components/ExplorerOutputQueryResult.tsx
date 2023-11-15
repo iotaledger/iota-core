@@ -76,10 +76,10 @@ export class ExplorerOutputQueryResult extends React.Component<Props, any> {
                 {outputMetadata && <div className={"mb-2"}>
                     <ListGroup>
                         <ListGroup.Item>Transaction ID: <a href={`/explorer/transaction/${outputMetadata.outputID.transactionID}`}>{outputMetadata.outputID.transactionID}</a> </ListGroup.Item>
-                        ConflictIDs: 
+                        spendIDs: 
                         <ListGroup>
                             {
-                                outputMetadata.conflictIDs.map((value, index) => {
+                                outputMetadata.spendIDs.map((value, index) => {
                                     return (
                                         <ListGroup.Item key={"ConflictID" + index + 1} className="text-break">
                                             <Link to={`/explorer/conflict/${value}`}>
