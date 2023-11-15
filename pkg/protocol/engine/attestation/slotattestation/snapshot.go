@@ -15,7 +15,6 @@ func (m *Manager) Import(reader io.ReadSeeker) error {
 
 	var attestations []*iotago.Attestation
 	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
-
 		attestation, err := stream.ReadObjectWithSize[*iotago.Attestation](reader, serializer.SeriLengthPrefixTypeAsUint16, iotago.AttestationFromBytes(m.apiProvider))
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to read attestation %d", i)
@@ -51,7 +50,9 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 	}
 
 	if _, isValid := m.computeAttestationCommitmentOffset(targetSlot); !isValid {
-		if err := stream.Write(writer, uint32(0)); err != nil {
+		if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (int, error) {
+			return 0, nil
+		}); err != nil {
 			return ierrors.Wrap(err, "failed to write 0 attestation count")
 		}
 
