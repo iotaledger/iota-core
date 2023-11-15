@@ -530,10 +530,12 @@ func (e *Engine) ErrorHandler(componentName string) func(error) {
 
 func (e *Engine) initRootCommitment() {
 	updateRootCommitment := func(lastFinalizedSlot iotago.SlotIndex) {
-		maxCommittableAge := e.APIForSlot(lastFinalizedSlot).ProtocolParameters().MaxCommittableAge()
+		protocolParams := e.APIForSlot(lastFinalizedSlot).ProtocolParameters()
+		maxCommittableAge := protocolParams.MaxCommittableAge()
+		genesisSlot := protocolParams.GenesisSlot()
 
 		e.RootCommitment.Compute(func(rootCommitment *model.Commitment) *model.Commitment {
-			return lo.Return1(e.Storage.Commitments().Load(lo.Cond(lastFinalizedSlot < maxCommittableAge, 0, lastFinalizedSlot-maxCommittableAge)))
+			return lo.Return1(e.Storage.Commitments().Load(lo.Cond(lastFinalizedSlot < genesisSlot+maxCommittableAge, genesisSlot, lastFinalizedSlot-maxCommittableAge)))
 		})
 	}
 
