@@ -6,7 +6,6 @@ import (
 	"github.com/zyedidia/generic/cache"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
-	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
@@ -18,7 +17,7 @@ import (
 )
 
 type BucketManager struct {
-	openDBsCache *cache.Cache[iotago.EpochIndex, types.Empty]
+	openDBsCache *cache.Cache[iotago.EpochIndex, *database.DBInstance]
 	openDBs      *shrinkingmap.ShrinkingMap[iotago.EpochIndex, *database.DBInstance]
 
 	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
@@ -44,11 +43,9 @@ func NewBucketManager(dbConfig database.Config, errorHandler func(error), opts .
 		lastPrunedEpoch: model.NewEvictionIndex[iotago.EpochIndex](),
 	}, opts, func(m *BucketManager) {
 		// We use an LRU cache to try closing unnecessary databases.
-		m.openDBsCache = cache.New[iotago.EpochIndex, types.Empty](m.optsMaxOpenDBs)
-		m.openDBsCache.SetEvictCallback(func(baseIndex iotago.EpochIndex, _ types.Empty) {
-			if db, exits := m.openDBs.Get(baseIndex); exits {
-				db.Close()
-			}
+		m.openDBsCache = cache.New[iotago.EpochIndex, *database.DBInstance](m.optsMaxOpenDBs)
+		m.openDBsCache.SetEvictCallback(func(baseIndex iotago.EpochIndex, db *database.DBInstance) {
+			db.Close()
 		})
 	})
 }
@@ -179,7 +176,7 @@ func (b *BucketManager) getDBInstance(epoch iotago.EpochIndex) *database.DBInsta
 	}))
 
 	// Mark the db as used in the cache
-	b.openDBsCache.Put(epoch, types.Void)
+	b.openDBsCache.Put(epoch, db)
 
 	return db
 }
