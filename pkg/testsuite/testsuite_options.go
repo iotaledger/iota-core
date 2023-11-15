@@ -65,7 +65,7 @@ const (
 	DefaultLivenessThresholdUpperBoundInSeconds uint16           = 30
 	DefaultMinCommittableAge                    iotago.SlotIndex = 10
 	DefaultMaxCommittableAge                    iotago.SlotIndex = 20
-	DefaultEpochNearingThreshold                iotago.SlotIndex = 16
+	DefaultEpochNearingThreshold                iotago.SlotIndex = 24
 
 	DefaultMinReferenceManaCost iotago.Mana      = 500
 	DefaultRMCIncrease          iotago.Mana      = 500
