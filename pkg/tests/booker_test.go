@@ -66,11 +66,11 @@ func Test_WeightPropagation(t *testing.T) {
 
 	// Create and issue double spends
 	{
-		tx1 := wallet.CreateBasicOutputsEquallyFromInputs("tx1", 1, "Genesis:0")
-		tx2 := wallet.CreateBasicOutputsEquallyFromInputs("tx2", 1, "Genesis:0")
+		tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+		tx2 := wallet.CreateBasicOutputsEquallyFromInput("tx2", 1, "Genesis:0")
 
-		ts.IssuePayloadWithOptions("block1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
-		ts.IssuePayloadWithOptions("block2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockWithOptions("block1", wallet, tx1, mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockWithOptions("block2", wallet, tx2, mock.WithStrongParents(ts.BlockID("Genesis")))
 
 		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCacheBooked(wallet.Transactions("tx1", "tx2"), true, node1, node2)
@@ -89,8 +89,8 @@ func Test_WeightPropagation(t *testing.T) {
 	// Issue some more blocks and assert that conflicts are propagated to blocks.
 	{
 
-		ts.IssuePayloadWithOptions("block3-basic", ts.Wallet("node1"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("block1")))
-		ts.IssuePayloadWithOptions("block4-basic", ts.Wallet("node2"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("block2")))
+		ts.IssueBasicBlockWithOptions("block3-basic", ts.Wallet("node1"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("block1")))
+		ts.IssueBasicBlockWithOptions("block4-basic", ts.Wallet("node2"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("block2")))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block3-basic"): {"tx1"},
@@ -102,8 +102,8 @@ func Test_WeightPropagation(t *testing.T) {
 
 	// Issue valid blocks that should resolve the conflict, but basic blocks don't carry any weight..
 	{
-		ts.IssuePayloadWithOptions("block5-basic", ts.Wallet("node1"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockIDs("block4-basic")...), mock.WithShallowLikeParents(ts.BlockID("block2")))
-		ts.IssuePayloadWithOptions("block6-basic", ts.Wallet("node2"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockIDs("block5-basic")...))
+		ts.IssueBasicBlockWithOptions("block5-basic", ts.Wallet("node1"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockIDs("block4-basic")...), mock.WithShallowLikeParents(ts.BlockID("block2")))
+		ts.IssueBasicBlockWithOptions("block6-basic", ts.Wallet("node2"), &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockIDs("block5-basic")...))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block6-basic"): {"tx2"},
@@ -123,9 +123,9 @@ func Test_WeightPropagation(t *testing.T) {
 	// Make sure that the pre-accepted basic blocks do not apply approval weight - the conflicts should remain unresolved.
 	// If basic blocks carry approval or witness weight, then the test will fail.
 	{
-		ts.IssueValidationBlock("block8", node1, mock.WithStrongParents(ts.BlockIDs("block3-basic", "block6-basic")...))
-		ts.IssueValidationBlock("block9", node2, mock.WithStrongParents(ts.BlockID("block8")))
-		ts.IssueValidationBlock("block10", node1, mock.WithStrongParents(ts.BlockID("block9")))
+		ts.IssueValidationBlockWithHeaderOptions("block8", node1, mock.WithStrongParents(ts.BlockIDs("block3-basic", "block6-basic")...))
+		ts.IssueValidationBlockWithHeaderOptions("block9", node2, mock.WithStrongParents(ts.BlockID("block8")))
+		ts.IssueValidationBlockWithHeaderOptions("block10", node1, mock.WithStrongParents(ts.BlockID("block9")))
 
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block8"):  {"tx1", "tx2"},

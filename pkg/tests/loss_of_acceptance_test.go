@@ -30,6 +30,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 				2,
 			),
 		),
+		testsuite.WithWaitFor(15*time.Second),
 	)
 	defer ts.Shutdown()
 
