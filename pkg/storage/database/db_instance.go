@@ -13,6 +13,7 @@ type DBInstance struct {
 	healthTracker *kvstore.StoreHealthTracker
 	dbConfig      Config
 	isClosed      atomic.Bool
+	isShutdown    atomic.Bool
 }
 
 func NewDBInstance(dbConfig Config) *DBInstance {
@@ -44,31 +45,56 @@ func NewDBInstance(dbConfig Config) *DBInstance {
 	return dbInstance
 }
 
+func (d *DBInstance) Shutdown() {
+	d.isShutdown.Store(true)
+
+	d.Close()
+}
+
+func (d *DBInstance) Flush() {
+	d.store.Lock()
+	defer d.store.Unlock()
+
+	if !d.isClosed.Load() {
+		_ = d.store.instance().Flush()
+	}
+}
+
 func (d *DBInstance) Close() {
 	d.store.Lock()
 	defer d.store.Unlock()
 
 	d.CloseWithoutLocking()
-
-	d.isClosed.Store(true)
 }
 
 func (d *DBInstance) CloseWithoutLocking() {
-	if err := d.healthTracker.MarkHealthy(); err != nil {
-		panic(err)
-	}
+	if !d.isClosed.Load() {
+		if err := d.healthTracker.MarkHealthy(); err != nil {
+			panic(err)
+		}
 
-	if err := FlushAndClose(d.store); err != nil {
-		panic(err)
-	}
+		if err := FlushAndClose(d.store); err != nil {
+			panic(err)
+		}
 
-	d.isClosed.Store(true)
+		d.isClosed.Store(true)
+	}
 }
 
 // Open re-opens a closed DBInstance. It must only be called while holding a lock on DBInstance,
 // otherwise it might cause a race condition and corruption of node's state.
 func (d *DBInstance) Open() {
+	if !d.isClosed.Load() {
+		panic("cannot open DBInstance that is not closed")
+	}
+
+	if d.isShutdown.Load() {
+		panic("cannot open DBInstance that is shutdown")
+	}
+
 	d.store.Replace(lo.PanicOnErr(StoreWithDefaultSettings(d.dbConfig.Directory, false, d.dbConfig.Engine)))
+
+	d.isClosed.Store(false)
 
 	if err := d.healthTracker.MarkCorrupted(); err != nil {
 		panic(err)

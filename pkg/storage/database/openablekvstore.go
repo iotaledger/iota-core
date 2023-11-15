@@ -25,16 +25,22 @@ func newOpenableKVStore(storeInstance kvstore.KVStore, dbInstance *DBInstance) *
 	}
 }
 
+func (s *openableKVStore) topParent() *openableKVStore {
+	current := s
+	for current.parentStore != nil {
+		current = current.parentStore
+	}
+	return current
+}
+
 func (s *openableKVStore) instance() kvstore.KVStore {
-	if s.dbInstance.isClosed.Load() {
-		s.dbInstance.Open()
+	parent := s.topParent()
+
+	if parent.dbInstance.isClosed.Load() {
+		parent.dbInstance.Open()
 	}
 
-	if s.storeInstance != nil {
-		return s.storeInstance
-	}
-
-	return s.parentStore.instance()
+	return parent.storeInstance
 }
 
 func (s *openableKVStore) Replace(newKVStore kvstore.KVStore) {
@@ -53,6 +59,7 @@ func (s *openableKVStore) WithRealm(realm kvstore.Realm) (kvstore.KVStore, error
 
 func (s *openableKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return &openableKVStore{
+		dbInstance:    nil,
 		storeInstance: nil,
 		parentStore:   s,
 		dbPrefix:      realm,
@@ -108,7 +115,8 @@ func (s *openableKVStore) Flush() error {
 }
 
 func (s *openableKVStore) Close() error {
-	return s.instance().Close()
+	s.topParent().dbInstance.CloseWithoutLocking()
+	return nil
 }
 
 func (s *openableKVStore) Batched() (kvstore.BatchedMutations, error) {
