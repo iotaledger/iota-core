@@ -58,6 +58,22 @@ func (t *TestSuite) AssertBlocksExist(blocks []*blocks.Block, expectedExist bool
 	}
 }
 
+func (t *TestSuite) AssertBlockFiltered(blocks []*blocks.Block, reason error, node *mock.Node) {
+	for _, block := range blocks {
+		t.Eventually(func() error {
+			for _, filteredBlockEvent := range node.FilteredBlocks() {
+				if filteredBlockEvent.Block.ID() == block.ID() {
+					if ierrors.Is(filteredBlockEvent.Reason, reason) {
+						return nil
+					}
+				}
+			}
+
+			return ierrors.Errorf("AssertBlockFiltered: %s: block %s was not filtered by the CommitmentFilter", node.Name, block.ID())
+		})
+	}
+}
+
 func (t *TestSuite) assertBlocksInCacheWithFunc(expectedBlocks []*blocks.Block, propertyName string, expectedPropertyState bool, propertyFunc func(*blocks.Block) bool, nodes ...*mock.Node) {
 	mustNodes(nodes)
 

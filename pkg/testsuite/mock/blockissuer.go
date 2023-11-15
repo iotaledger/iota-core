@@ -66,7 +66,7 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *KeyManager, accountID
 	priv, pub := keyManager.KeyPair()
 
 	if accountID == iotago.EmptyAccountID {
-		accountID = iotago.AccountID(blake2b.Sum256(pub))
+		accountID = blake2b.Sum256(pub)
 	}
 	accountID.RegisterAlias(name)
 
