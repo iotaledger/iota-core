@@ -96,7 +96,7 @@ func Test_WeightPropagation(t *testing.T) {
 			ts.Block("block3-basic"): {"tx1"},
 			ts.Block("block4-basic"): {"tx2"},
 		}, node1, node2)
-		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Pending, ts.Nodes()...)
+		ts.AssertSpendsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Pending, ts.Nodes()...)
 		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
@@ -111,7 +111,7 @@ func Test_WeightPropagation(t *testing.T) {
 
 		// Make sure that neither approval (conflict weight),
 		// nor witness (block weight) was not propagated using basic blocks and caused acceptance.
-		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Pending, ts.Nodes()...)
+		ts.AssertSpendsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Pending, ts.Nodes()...)
 		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("tx2"), false, node1, node2)
 		ts.AssertTransactionsInCacheRejected(wallet.Transactions("tx1"), false, node1, node2)
 		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
