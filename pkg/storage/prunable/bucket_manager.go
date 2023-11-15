@@ -78,6 +78,7 @@ func (b *BucketManager) Shutdown() {
 	defer b.openDBsMutex.Unlock()
 
 	b.openDBs.Each(func(epoch iotago.EpochIndex, db *database.DBInstance) {
+		// TODO: Finally Close
 		db.Close()
 		b.openDBs.Remove(epoch)
 	})

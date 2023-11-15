@@ -10,13 +10,15 @@ import (
 )
 
 type openableKVStore struct {
+	dbInstance    *DBInstance
 	storeInstance kvstore.KVStore // KVStore that is used to access the DB instance
 	parentStore   *openableKVStore
 	dbPrefix      kvstore.KeyPrefix
 }
 
-func newOpenableKVStore(storeInstance kvstore.KVStore) *openableKVStore {
+func newOpenableKVStore(storeInstance kvstore.KVStore, dbInstance *DBInstance) *openableKVStore {
 	return &openableKVStore{
+		dbInstance:    dbInstance,
 		storeInstance: storeInstance,
 		parentStore:   nil,
 		dbPrefix:      kvstore.EmptyPrefix,
@@ -24,6 +26,10 @@ func newOpenableKVStore(storeInstance kvstore.KVStore) *openableKVStore {
 }
 
 func (s *openableKVStore) instance() kvstore.KVStore {
+	if s.dbInstance.isClosed.Load() {
+		s.dbInstance.Open()
+	}
+
 	if s.storeInstance != nil {
 		return s.storeInstance
 	}
@@ -44,6 +50,7 @@ func (s *openableKVStore) Replace(newKVStore kvstore.KVStore) {
 func (s *openableKVStore) WithRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return s.withRealm(realm)
 }
+
 func (s *openableKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return &openableKVStore{
 		storeInstance: nil,
@@ -51,6 +58,7 @@ func (s *openableKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error
 		dbPrefix:      realm,
 	}, nil
 }
+
 func (s *openableKVStore) WithExtendedRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return s.withRealm(s.buildKeyPrefix(realm))
 }
@@ -98,6 +106,7 @@ func (s *openableKVStore) DeletePrefix(prefix kvstore.KeyPrefix) error {
 func (s *openableKVStore) Flush() error {
 	return s.instance().Flush()
 }
+
 func (s *openableKVStore) Close() error {
 	return s.instance().Close()
 }
