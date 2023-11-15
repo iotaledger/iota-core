@@ -30,6 +30,7 @@ func (s *openableKVStore) topParent() *openableKVStore {
 	for current.parentStore != nil {
 		current = current.parentStore
 	}
+
 	return current
 }
 

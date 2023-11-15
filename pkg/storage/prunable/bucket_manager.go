@@ -75,6 +75,7 @@ func (b *BucketManager) Shutdown() {
 	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
 		db.Shutdown()
 		b.openDBs.Delete(epoch)
+
 		return true
 	})
 }
@@ -244,6 +245,7 @@ func (b *BucketManager) Flush() error {
 		if err := db.KVStore().Flush(); err != nil {
 			innerErr = err
 		}
+
 		return true
 	})
 
