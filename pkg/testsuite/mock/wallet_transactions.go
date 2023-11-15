@@ -533,7 +533,6 @@ func (w *Wallet) createSignedTransactionWithOptions(transactionName string, opts
 	txBuilder := builder.NewTransactionBuilder(currentAPI)
 	// Use the wallet's current slot as creation slot by default.
 	txBuilder.SetCreationSlot(w.currentSlot)
-	fmt.Println("w.currentSlot = ", w.currentSlot)
 	// Set the transaction capabilities to be able to do anything.
 	txBuilder.WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything()))
 	// Always add a random payload to randomize transaction ID.

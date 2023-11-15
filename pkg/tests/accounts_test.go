@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -165,7 +164,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 // Starts with an account already existing in snapshot (default wallet).
 //  1. Use default wallet to create a new account with staking feature from genesis basic output.
 //     Use default wallet to create a new account for a delegator wallet.
-//  2. Use delegator wallet to create a delegation to the new account from a basic output.
+//  2. Use delegator wallet to create a delegation to the new staker account from a basic output.
 //  3. Use default wallet to transition the delegation to delayed claiming.
 func Test_StakeAndDelegate(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
@@ -210,7 +209,6 @@ func Test_StakeAndDelegate(t *testing.T) {
 	}, ts.Nodes()...)
 	// Default wallet block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:2")
-	fmt.Println(wallet.BlockIssuer.AccountID)
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:              wallet.BlockIssuer.AccountID,
 		Credits:         accounts.NewBlockIssuanceCredits(iotago.MaxBlockIssuanceCredits/2, 0),
@@ -310,7 +308,6 @@ func Test_StakeAndDelegate(t *testing.T) {
 	// 2. CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
 	accountAddress := iotago.AccountAddress(stakerAccountOutput.AccountID)
 	block3Slot := ts.CurrentSlot()
-	fmt.Println("block3Slot", block3Slot)
 	delegationStartEpoch := iotago.EpochIndex(1)
 
 	// set the new delegator accountID as the block issuer for the delegator wallet
