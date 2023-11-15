@@ -755,6 +755,10 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 }
 
 func (l *Ledger) blockPreAccepted(block *blocks.Block) {
+	if _, isValidationBlock := block.ValidationBlock(); !isValidationBlock {
+		return
+	}
+
 	voteRank := ledger.NewBlockVoteRank(block.ID(), block.ProtocolBlock().Header.IssuingTime)
 
 	committee, exists := l.sybilProtection.SeatManager().CommitteeInSlot(block.ID().Slot())

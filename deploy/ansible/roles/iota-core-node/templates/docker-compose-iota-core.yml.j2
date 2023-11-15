@@ -77,6 +77,18 @@ services:
       --indexer.db.sqlite.path=database/indexer
       --restAPI.bindAddress=inx-indexer:9091
 
+  inx-mqtt:
+    container_name: inx-mqtt
+    image: iotaledger/inx-mqtt:2.0-alpha
+    stop_grace_period: 1m
+    restart: unless-stopped
+    depends_on:
+      iota-core:
+        condition: service_healthy
+    command: >
+      --inx.address=iota-core:9029
+      --mqtt.websocket.bindAddress=inx-mqtt:1888
+
 {% if 'node-04' in inventory_hostname %}
   inx-blockissuer:
     container_name: inx-blockissuer
