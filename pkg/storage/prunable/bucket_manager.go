@@ -233,8 +233,7 @@ func (b *BucketManager) PruneSlots(epoch iotago.EpochIndex, pruningRange [2]iota
 		}
 	}
 
-	// shutting down the storage does not prevent this storage from being used again and only forces a flush.
-	b.Shutdown()
+	_ = b.Flush()
 
 	return nil
 }
