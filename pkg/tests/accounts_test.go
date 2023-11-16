@@ -45,7 +45,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
 				testsuite.DefaultMinCommittableAge,
 				100,
-				testsuite.DefaultEpochNearingThreshold,
+				120,
 			),
 		),
 	)
@@ -173,7 +173,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
 				testsuite.DefaultMinCommittableAge,
 				100,
-				testsuite.DefaultEpochNearingThreshold,
+				120,
 			),
 		),
 	)
@@ -210,7 +210,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
-	//CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
+	// CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
 	newAccountBlockIssuerKey := utils.RandBlockIssuerKey()
 	// set the expiry slot of the transitioned genesis account to the latest committed + MaxCommittableAge
 	newAccountExpirySlot := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
@@ -349,7 +349,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
 				testsuite.DefaultMinCommittableAge,
 				100,
-				testsuite.DefaultEpochNearingThreshold,
+				120,
 			),
 		),
 	)

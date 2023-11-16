@@ -143,6 +143,8 @@ func (s *Scheduler) Shutdown() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
+	s.TriggerShutdown()
+
 	// validator workers need to be shut down first, otherwise they will hang on the shutdown channel.
 	s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 		s.shutdownValidatorQueue(validatorQueue)
@@ -152,9 +154,10 @@ func (s *Scheduler) Shutdown() {
 	s.validatorBuffer.Clear()
 
 	close(s.shutdownSignal)
-	s.TriggerStopped()
 
 	s.workersWg.Wait()
+
+	s.TriggerStopped()
 }
 
 // Start starts the scheduler.
