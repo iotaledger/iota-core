@@ -242,7 +242,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("feature", "rms"),
 			iotago.WithSupplyOptions(4_600_000_000_000_000, 100, 1, 10, 100, 100, 100),
-			iotago.WithTimeProviderOptions(666666, time.Now().Unix(), 10, 13),
+			iotago.WithTimeProviderOptions(666666, time.Now().Unix()-100_000, 10, 13), // Let's fix genesis at 10_000 slots back.
 			iotago.WithLivenessOptions(30, 30, 10, 20, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
 			iotago.WithCongestionControlOptions(500, 500, 500, 800000, 500000, 100000, 1000, 100),
