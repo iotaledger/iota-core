@@ -46,6 +46,31 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
 
+      - uses: actions/setup-go@v4
+        with:
+          go-version-file: 'tools/genesis-snapshot/go.mod'
+          cache: false
+
+      - name: Print Go version
+        run: go version
+
+      - name: Generate genesis snapshot
+        working-directory: tools/genesis-snapshot
+        run: go run -tags=rocksdb . --config feature --seed 7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih --filename genesis-snapshot.bin
+
+      - name: Upload genesis snapshot
+        uses: actions/upload-artifact@v3
+        with:
+          name: snapshot.bin
+          path: tools/genesis-snapshot/genesis-snapshot.bin
+
+      - name: Get artifact URL
+        id: get-snapshot-url
+        run: |
+          ARTIFACT_URL=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" | jq -r '.artifacts[] | select(.name=="snapshot.bin") | .archive_download_url')
+          echo "::set-output name=artifact_url::$ARTIFACT_URL"
+
       - # Temp fix
         # https://github.com/docker/build-push-action/issues/252
         # https://github.com/moby/buildkit/issues/1896
@@ -70,7 +95,7 @@ jobs:
       - name: Ansible deploy
         env:
           CUSTOM_SNAPSHOT_URL: '${{ github.event.inputs.snapshotUrl }}'
-          DEFAULT_SNAPSHOT_URL: 'https://0x0.st/HywH.bin'
+          DEFAULT_SNAPSHOT_URL: '${{ steps.get-snapshot-url.outputs.artifact_url }}'
           NETWORK_ENVIRONMENT: '${{ secrets.NETWORK_ENVIRONMENT }}'
           IOTA_CORE_DOCKER_IMAGE_REPO: 'iotaledger/iota-core'
           IOTA_CORE_DOCKER_IMAGE_TAG: 'feature'
