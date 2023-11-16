@@ -17,8 +17,10 @@ import (
 )
 
 type BucketManager struct {
-	openDBsCache *cache.Cache[iotago.EpochIndex, *database.DBInstance]
-	openDBs      *shrinkingmap.ShrinkingMap[iotago.EpochIndex, *database.DBInstance]
+	openDBsCache      *cache.Cache[iotago.EpochIndex, *database.DBInstance]
+	openDBsCacheMutex syncutils.RWMutex
+
+	openDBs *shrinkingmap.ShrinkingMap[iotago.EpochIndex, *database.DBInstance]
 
 	lastPrunedEpoch *model.EvictionIndex[iotago.EpochIndex]
 	lastPrunedMutex syncutils.RWMutex
@@ -69,8 +71,12 @@ func (b *BucketManager) Get(epoch iotago.EpochIndex, realm kvstore.Realm) (kvsto
 }
 
 func (b *BucketManager) Shutdown() {
+	b.openDBsCacheMutex.Lock()
+	defer b.openDBsCacheMutex.Unlock()
+
 	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
 		db.Shutdown()
+		b.openDBsCache.Remove(epoch)
 		b.openDBs.Delete(epoch)
 
 		return true
@@ -165,6 +171,9 @@ func (b *BucketManager) getDBInstance(epoch iotago.EpochIndex) *database.DBInsta
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
+	b.openDBsCacheMutex.Lock()
+	defer b.openDBsCacheMutex.Unlock()
+
 	// check if exists again, as other goroutine might have created it in parallel
 	db := lo.Return1(b.openDBs.GetOrCreate(epoch, func() *database.DBInstance {
 		db := database.NewDBInstance(b.dbConfig.WithDirectory(dbPathFromIndex(b.dbConfig.Directory, epoch)))
@@ -199,6 +208,9 @@ func (b *BucketManager) Prune(epoch iotago.EpochIndex) error {
 // DeleteBucket deletes directory that stores the data for the given bucket and returns boolean
 // flag indicating whether a directory for that bucket existed.
 func (b *BucketManager) DeleteBucket(epoch iotago.EpochIndex) (deleted bool) {
+	b.openDBsCacheMutex.Lock()
+	defer b.openDBsCacheMutex.Unlock()
+
 	if exists, err := PathExists(dbPathFromIndex(b.dbConfig.Directory, epoch)); err != nil {
 		panic(err)
 	} else if !exists {
@@ -208,6 +220,7 @@ func (b *BucketManager) DeleteBucket(epoch iotago.EpochIndex) (deleted bool) {
 	db, exists := b.openDBs.Get(epoch)
 	if exists {
 		db.Shutdown()
+		b.openDBsCache.Remove(epoch)
 		b.openDBs.Delete(epoch)
 	}
 
