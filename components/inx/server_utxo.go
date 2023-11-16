@@ -353,7 +353,8 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 		if err := transactionMetadata.Inputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
 			spentOutput, ok := stateMetadata.State().(*utxoledger.Output)
 			if !ok {
-				return ierrors.Errorf("unexpected state metadata type: %T", stateMetadata.State())
+				// not an Output, so we don't need to send it (could be MockedState, Commitment, BlockIssuanceCreditInput, RewardInput, etc.)
+				return nil
 			}
 
 			inxSpent, err := NewLedgerSpent(utxoledger.NewSpent(spentOutput, transactionMetadata.ID(), slot))
@@ -372,7 +373,8 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 		if err := transactionMetadata.Outputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
 			output, ok := stateMetadata.State().(*utxoledger.Output)
 			if !ok {
-				return ierrors.Errorf("unexpected state metadata type: %T", stateMetadata.State())
+				// not an Output, so we don't need to send it (could be MockedState, Commitment, BlockIssuanceCreditInput, RewardInput, etc.)
+				return nil
 			}
 
 			inxOutput, err := NewLedgerOutput(output)
