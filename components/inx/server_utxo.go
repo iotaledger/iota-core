@@ -29,7 +29,7 @@ func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
 	}
 
 	includedSlot := o.SlotBooked()
-	if includedSlot <= latestCommitment.Slot() {
+	if includedSlot > 0 && includedSlot <= latestCommitment.Slot() {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", includedSlot)
@@ -54,7 +54,7 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 
 	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 	spentSlot := s.SlotSpent()
-	if spentSlot <= latestCommitment.Slot() {
+	if spentSlot > 0 && spentSlot <= latestCommitment.Slot() {
 		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", spentSlot)
@@ -367,6 +367,8 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 		}); err != nil {
 			Component.LogErrorf("error creating payload: %v", err)
 			cancel()
+
+			return
 		}
 
 		var created []*inx.LedgerOutput
@@ -387,6 +389,8 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 		}); err != nil {
 			Component.LogErrorf("error creating payload: %v", err)
 			cancel()
+
+			return
 		}
 
 		payload := &inx.AcceptedTransaction{
@@ -395,6 +399,12 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 			Consumed:      consumed,
 			Created:       created,
 		}
+
+		if ctx.Err() != nil {
+			// context is done, so we don't need to send the payload
+			return
+		}
+
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
 			cancel()
