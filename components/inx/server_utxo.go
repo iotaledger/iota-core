@@ -367,6 +367,8 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 		}); err != nil {
 			Component.LogErrorf("error creating payload: %v", err)
 			cancel()
+
+			return
 		}
 
 		var created []*inx.LedgerOutput
@@ -387,6 +389,8 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 		}); err != nil {
 			Component.LogErrorf("error creating payload: %v", err)
 			cancel()
+
+			return
 		}
 
 		payload := &inx.AcceptedTransaction{
@@ -395,6 +399,12 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 			Consumed:      consumed,
 			Created:       created,
 		}
+
+		if ctx.Err() != nil {
+			// context is done, so we don't need to send the payload
+			return
+		}
+
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
 			cancel()
