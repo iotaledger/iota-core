@@ -289,6 +289,17 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 			b.protocol.HandleError(ierrors.Errorf("producedCommitment ID mismatch: %s != %s", producedCommitment.ID(), commitmentID))
 			return
 		}
+
+		// 5. We add all blocks as root blocks. We can only do it after the commitment of the slot because otherwise
+		//    confirmation of the blocks can't be properly propagated (as it skips propagation to root blocks).
+		for slotCommitmentID, blockIDsForCommitment := range blockIDsBySlotCommitmentID {
+			for _, blockID := range blockIDsForCommitment {
+				// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
+				// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
+				// block cache and thus if not root blocks no block in the next slot can become solid.
+				targetEngine.EvictionState.AddRootBlock(blockID, slotCommitmentID)
+			}
+		}
 	}
 
 	blockBookedFunc := func(_ bool, _ bool) {
@@ -316,6 +327,9 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 					return
 				}
 
+				// TODO: fix this
+				time.Sleep(1 * time.Second)
+
 				forceCommitmentFunc()
 			})
 		}
@@ -326,18 +340,13 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 		return nil
 	}
 
-	for slotCommitmentID, blockIDsForCommitment := range blockIDsBySlotCommitmentID {
+	for _, blockIDsForCommitment := range blockIDsBySlotCommitmentID {
 		for _, blockID := range blockIDsForCommitment {
 			block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
 			if block == nil { // this should never happen as we're requesting the blocks for this slot so it can't be evicted.
 				b.protocol.HandleError(ierrors.Errorf("failed to get block %s", blockID))
 				continue
 			}
-
-			// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
-			// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
-			// block cache and thus if not root blocks no block in the next slot can become solid.
-			targetEngine.EvictionState.AddRootBlock(blockID, slotCommitmentID)
 
 			block.Booked().OnUpdate(blockBookedFunc)
 		}
