@@ -38,7 +38,7 @@ services:
     command: >
       -c
       config.json
-      --logger.level=trace
+      --logger.level=debug
       --logger.disableCaller=false
       --p2p.peers=/dns/node-01.feature/tcp/14666/p2p/12D3KooWCrjmh4dUCWfGVQT6ivzArieJB9Z3eKdy2mdEEN95NDPS
       --p2p.externalMultiAddresses={{ ips | join(',') }}
