@@ -238,22 +238,7 @@ func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochInde
 		return ierrors.Wrap(err, "failed to get candidates store")
 	}
 
-	var innerErr error
-	if err = candidates.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
-		accountID, _, err := iotago.AccountIDFromBytes(key)
-		if err != nil {
-			innerErr = err
-
-			return false
-		}
-
-		candidacySlot, _, err := iotago.SlotIndexFromBytes(value)
-		if err != nil {
-			innerErr = err
-
-			return false
-		}
-
+	if err = candidates.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, candidacySlot iotago.SlotIndex) bool {
 		if candidacySlot > targetSlot {
 			candidatesToRollback = append(candidatesToRollback, accountID)
 		}
@@ -263,13 +248,9 @@ func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochInde
 		return ierrors.Wrap(err, "failed to collect candidates to rollback")
 	}
 
-	if innerErr != nil {
-		return ierrors.Wrap(innerErr, "failed to iterate through candidates")
-	}
-
 	for _, candidateToRollback := range candidatesToRollback {
-		if err = candidates.Delete(candidateToRollback[:]); err != nil {
-			return ierrors.Wrapf(innerErr, "failed to rollback candidate %s", candidateToRollback)
+		if err = candidates.Delete(candidateToRollback); err != nil {
+			return ierrors.Wrapf(err, "failed to rollback candidate %s", candidateToRollback)
 		}
 	}
 

@@ -30,7 +30,7 @@ func (s *Storage) Committee() *epochstore.Store[*account.Accounts] {
 	return s.prunable.Committee()
 }
 
-func (s *Storage) CommitteeCandidates(epoch iotago.EpochIndex) (kvstore.KVStore, error) {
+func (s *Storage) CommitteeCandidates(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error) {
 	return s.prunable.CommitteeCandidates(epoch)
 }
 
