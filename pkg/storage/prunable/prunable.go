@@ -253,7 +253,7 @@ func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochInde
 			return false
 		}
 
-		if candidacySlot < targetSlot {
+		if candidacySlot > targetSlot {
 			candidatesToRollback = append(candidatesToRollback, accountID)
 		}
 
