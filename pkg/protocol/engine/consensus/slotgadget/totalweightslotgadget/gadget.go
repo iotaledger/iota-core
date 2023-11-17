@@ -120,7 +120,6 @@ func (g *Gadget) trackVotes(block *blocks.Block) {
 }
 
 func (g *Gadget) refreshSlotFinalization(tracker *slottracker.SlotTracker, previousLatestSlotIndex iotago.SlotIndex, newLatestSlotIndex iotago.SlotIndex) (finalizedSlots []iotago.SlotIndex) {
-
 	for i := lo.Max(g.lastFinalizedSlot, previousLatestSlotIndex) + 1; i <= newLatestSlotIndex; i++ {
 		committeeTotalSeats := g.seatManager.SeatCountInSlot(i)
 		attestorsTotalSeats := len(tracker.Voters(i))
