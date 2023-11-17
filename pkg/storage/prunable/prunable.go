@@ -142,16 +142,17 @@ func (p *Prunable) Flush() {
 	}
 }
 
-func (p *Prunable) Rollback(targetEpoch iotago.EpochIndex, pruningRange [2]iotago.SlotIndex) error {
-	if err := p.prunableSlotStore.PruneSlots(targetEpoch, pruningRange); err != nil {
-		return ierrors.Wrapf(err, "failed to prune slots in range [%d, %d] from target epoch %d", pruningRange[0], pruningRange[1], targetEpoch)
+func (p *Prunable) Rollback(targetEpoch iotago.EpochIndex, startPruneRange iotago.SlotIndex, endPruneRange iotago.SlotIndex) error {
+	if err := p.prunableSlotStore.PruneSlots(targetEpoch, startPruneRange, endPruneRange); err != nil {
+		return ierrors.Wrapf(err, "failed to prune slots in range [%d, %d] from target epoch %d", startPruneRange, endPruneRange, targetEpoch)
 	}
 
-	if err := p.rollbackCommitteesCandidates(targetEpoch, pruningRange[0]-1); err != nil {
+	// TODO: need to check which slot is supposed to be pruned. startPruneRange-1 or startPruneRange?
+	if err := p.rollbackCommitteesCandidates(targetEpoch, startPruneRange-1); err != nil {
 		return ierrors.Wrapf(err, "failed to rollback committee candidates to target epoch %d", targetEpoch)
 	}
 
-	lastPrunedCommitteeEpoch, err := p.rollbackCommitteeEpochs(targetEpoch+1, pruningRange[0]-1)
+	lastPrunedCommitteeEpoch, err := p.rollbackCommitteeEpochs(targetEpoch+1, startPruneRange-1)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to rollback committee epochs to target epoch %d", targetEpoch)
 	}
