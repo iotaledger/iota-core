@@ -65,11 +65,11 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 	return l, nil
 }
 
-func NewLedgerUpdateBatchBegin(slot iotago.SlotIndex, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
+func NewLedgerUpdateBatchBegin(commitmentID iotago.CommitmentID, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
 	return &inx.LedgerUpdate{
 		Op: &inx.LedgerUpdate_BatchMarker{
 			BatchMarker: &inx.LedgerUpdate_Marker{
-				Slot:          uint32(slot),
+				CommitmentId:  inx.NewCommitmentId(commitmentID),
 				MarkerType:    inx.LedgerUpdate_Marker_BEGIN,
 				CreatedCount:  uint32(newOutputsCount),
 				ConsumedCount: uint32(newSpentsCount),
@@ -78,11 +78,11 @@ func NewLedgerUpdateBatchBegin(slot iotago.SlotIndex, newOutputsCount int, newSp
 	}
 }
 
-func NewLedgerUpdateBatchEnd(slot iotago.SlotIndex, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
+func NewLedgerUpdateBatchEnd(commitmentID iotago.CommitmentID, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
 	return &inx.LedgerUpdate{
 		Op: &inx.LedgerUpdate_BatchMarker{
 			BatchMarker: &inx.LedgerUpdate_Marker{
-				Slot:          uint32(slot),
+				CommitmentId:  inx.NewCommitmentId(commitmentID),
 				MarkerType:    inx.LedgerUpdate_Marker_END,
 				CreatedCount:  uint32(newOutputsCount),
 				ConsumedCount: uint32(newSpentsCount),
@@ -191,8 +191,13 @@ func (s *Server) ReadUnspentOutputs(_ *inx.NoParams, srv inx.INX_ReadUnspentOutp
 
 func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_ListenToLedgerUpdatesServer) error {
 	createLedgerUpdatePayloadAndSend := func(slot iotago.SlotIndex, outputs utxoledger.Outputs, spents utxoledger.Spents) error {
+		commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
+		if err != nil {
+			return status.Errorf(codes.NotFound, "commitment for slot %d not found", slot)
+		}
+
 		// Send Begin
-		if err := srv.Send(NewLedgerUpdateBatchBegin(slot, len(outputs), len(spents))); err != nil {
+		if err := srv.Send(NewLedgerUpdateBatchBegin(commitment.ID(), len(outputs), len(spents))); err != nil {
 			return fmt.Errorf("send error: %w", err)
 		}
 
@@ -221,7 +226,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		}
 
 		// Send End
-		if err := srv.Send(NewLedgerUpdateBatchEnd(slot, len(outputs), len(spents))); err != nil {
+		if err := srv.Send(NewLedgerUpdateBatchEnd(commitment.ID(), len(outputs), len(spents))); err != nil {
 			return fmt.Errorf("send error: %w", err)
 		}
 
