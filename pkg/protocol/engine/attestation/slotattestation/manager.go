@@ -259,14 +259,20 @@ func (m *Manager) Commit(slot iotago.SlotIndex) (newCW uint64, attestationsRoot 
 		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get attestation storage when committing slot %d", slot)
 	}
 
-	// Add all attestations to the tree and calculate the new cumulative weight.
-	committee, exists := m.committeeFunc(slot)
-	if !exists {
-		return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get committee when committing slot %d", slot)
-	}
-
 	for _, a := range attestations {
-		// TODO: which weight are we using here? The current one? Or the one of the slot of the attestation/commitmentID?
+		blockID, err := a.BlockID()
+		if err != nil {
+			return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get blockID of attestation %s", a.Header.IssuerID)
+		}
+
+		// We use the committee of the slot of the attestation in contrast to the slot that we're committing right now.
+		// This is because at the time the attestation was created, the committee might have been different from the current one (due to rotation at epoch boundary).
+		committee, exists := m.committeeFunc(blockID.Slot())
+		if !exists {
+			return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get committee when committing slot %d", slot)
+		}
+
+		// Add all attestations to the tree and calculate the new cumulative weight.
 		if _, exists := committee.GetSeat(a.Header.IssuerID); exists {
 			if err := tree.Set(a.Header.IssuerID, a); err != nil {
 				return 0, iotago.Identifier{}, ierrors.Wrapf(err, "failed to set attestation %s in tree", a.Header.IssuerID)

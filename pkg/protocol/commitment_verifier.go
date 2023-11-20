@@ -137,12 +137,14 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 			return nil, 0, ierrors.Errorf("issuerID %s contained in multiple attestations", att.Header.IssuerID)
 		}
 
-		// TODO: this might differ if we have a Accounts with changing weights depending on the Slot/epoch
 		attestationBlockID, err := att.BlockID()
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")
 		}
 
+		// We need to make sure that the issuer is actually part of the committee for the slot of the attestation (issuance of the block).
+		// Note: here we're explicitly not using the slot of the commitment we're verifying, but the slot of the attestation.
+		// This is because at the time the attestation was created, the committee might have been different from the one at commitment time (due to rotation at epoch boundary).
 		committee, exists := c.engine.SybilProtection.SeatManager().CommitteeInSlot(attestationBlockID.Slot())
 		if !exists {
 			return nil, 0, ierrors.Errorf("committee for slot %d does not exist", attestationBlockID.Slot())
