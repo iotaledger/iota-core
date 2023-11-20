@@ -60,6 +60,11 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		p.Engines = NewEngines(p)
 		p.APIProvider = NewAPIProvider(p)
 
+		p.Commitments.Root.OnUpdate(func(_ *Commitment, rootCommitment *Commitment) {
+			// TODO: DECIDE ON DATA AVAILABILITY TIMESPAN / EVICTION STRATEGY
+			//p.Evict(rootCommitment.Slot() - 1)
+		})
+
 		p.Initialized.OnTrigger(func() {
 			unsubscribeFromNetwork := lo.Batch(
 				p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),

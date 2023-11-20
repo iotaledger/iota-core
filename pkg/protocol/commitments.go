@@ -7,22 +7,47 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type Commitments struct {
 	reactive.Set[*Commitment]
 
+	Root reactive.Variable[*Commitment]
+
 	protocol    *Protocol
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
 }
 
 func newCommitments(protocol *Protocol) *Commitments {
-	return &Commitments{
+	c := &Commitments{
 		Set:         reactive.NewSet[*Commitment](),
+		Root:        reactive.NewVariable[*Commitment](),
 		protocol:    protocol,
 		commitments: shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 	}
+
+	protocol.Constructed.OnTrigger(func() {
+		protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (teardown func()) {
+			return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, newRootCommitmentModel *model.Commitment) {
+				c.Root.Compute(func(currentRootCommitment *Commitment) *Commitment {
+					newRootCommitment, err := protocol.Commitments.Get(newRootCommitmentModel.ID(), false)
+					if err != nil {
+						protocol.LogError("failed to retrieve new root commitment", "id", newRootCommitment.ID(), "error", err)
+
+						return currentRootCommitment
+					}
+
+					newRootCommitment.IsRoot.Set(true)
+
+					return newRootCommitment
+				})
+			})
+		})
+	})
+
+	return c
 }
 
 func (c *Commitments) Publish(commitment *model.Commitment) (commitmentMetadata *Commitment, published bool, err error) {
@@ -111,9 +136,11 @@ func (c *Commitments) setupCommitment(commitment *Commitment, slotEvictedEvent r
 		c.protocol.LogDebug("failed to request previous commitment", "prevId", commitment.PreviousCommitmentID(), "error", err)
 	})
 
-	slotEvictedEvent.OnTrigger(func() {
-		commitment.IsEvicted.Trigger()
-	})
+	if c.Add(commitment) {
+		slotEvictedEvent.OnTrigger(func() {
+			commitment.IsEvicted.Trigger()
 
-	c.Add(commitment)
+			c.Delete(commitment)
+		})
+	}
 }
