@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -322,8 +323,8 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	wp := workerpool.New("ListenToLedgerUpdates", workerpool.WithWorkerCount(workerCount)).Start()
 
-	unhook := deps.Protocol.Events.Engine.Ledger.StateDiffApplied.Hook(func(slot iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) {
-		done, err := handleRangedSend2(slot, newOutputs, newSpents, stream, catchUpFunc, sendFunc)
+	unhook := deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
+		done, err := handleRangedSend2(scd.Commitment.Slot(), scd.OutputsCreated, scd.OutputsConsumed, stream, catchUpFunc, sendFunc)
 		switch {
 		case err != nil:
 			innerErr = err

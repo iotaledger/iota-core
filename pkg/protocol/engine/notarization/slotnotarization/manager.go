@@ -192,7 +192,7 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 		return nil, ierrors.Wrap(err, "failed to commit attestations")
 	}
 
-	stateRoot, mutationRoot, accountRoot, err := m.ledger.CommitSlot(slot)
+	stateRoot, mutationRoot, accountRoot, created, consumed, err := m.ledger.CommitSlot(slot)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to commit ledger")
 	}
@@ -255,6 +255,8 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 		Commitment:            newModelCommitment,
 		AcceptedBlocks:        acceptedBlocks,
 		ActiveValidatorsCount: 0,
+		OutputsCreated:        created,
+		OutputsConsumed:       consumed,
 	})
 
 	if err = m.storage.Settings().SetLatestCommitment(newModelCommitment); err != nil {
