@@ -147,8 +147,7 @@ func (p *Prunable) Rollback(targetEpoch iotago.EpochIndex, startPruneRange iotag
 		return ierrors.Wrapf(err, "failed to prune slots in range [%d, %d] from target epoch %d", startPruneRange, endPruneRange, targetEpoch)
 	}
 
-	// TODO: need to check which slot is supposed to be pruned. startPruneRange-1 or startPruneRange?
-	if err := p.rollbackCommitteesCandidates(targetEpoch, startPruneRange-1); err != nil {
+	if err := p.rollbackCommitteesCandidates(targetEpoch, startPruneRange); err != nil {
 		return ierrors.Wrapf(err, "failed to rollback committee candidates to target epoch %d", targetEpoch)
 	}
 
@@ -230,7 +229,7 @@ func (p *Prunable) shouldRollbackCommittee(epoch iotago.EpochIndex, targetSlot i
 	return true, nil
 }
 
-func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochIndex, targetSlot iotago.SlotIndex) error {
+func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochIndex, deletionStartSlot iotago.SlotIndex) error {
 	candidatesToRollback := make([]iotago.AccountID, 0)
 
 	candidates, err := p.CommitteeCandidates(targetSlotEpoch)
@@ -239,7 +238,7 @@ func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochInde
 	}
 
 	if err = candidates.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, candidacySlot iotago.SlotIndex) bool {
-		if candidacySlot > targetSlot {
+		if candidacySlot >= deletionStartSlot {
 			candidatesToRollback = append(candidatesToRollback, accountID)
 		}
 
