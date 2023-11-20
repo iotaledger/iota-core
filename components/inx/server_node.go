@@ -112,12 +112,11 @@ func (s *Server) ReadNodeConfiguration(context.Context, *inx.NoParams) (*inx.Nod
 
 	return &inx.NodeConfiguration{
 		BaseToken: &inx.BaseToken{
-			Name:            deps.BaseToken.Name,
-			TickerSymbol:    deps.BaseToken.TickerSymbol,
-			Unit:            deps.BaseToken.Unit,
-			Subunit:         deps.BaseToken.Subunit,
-			Decimals:        deps.BaseToken.Decimals,
-			UseMetricPrefix: deps.BaseToken.UseMetricPrefix,
+			Name:         deps.BaseToken.Name,
+			TickerSymbol: deps.BaseToken.TickerSymbol,
+			Unit:         deps.BaseToken.Unit,
+			Subunit:      deps.BaseToken.Subunit,
+			Decimals:     deps.BaseToken.Decimals,
 		},
 		ProtocolParameters: protoParams,
 	}, nil

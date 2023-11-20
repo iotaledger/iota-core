@@ -341,14 +341,13 @@ Example:
 
 ### <a id="protocol_basetoken"></a> BaseToken
 
-| Name            | Description                           | Type    | Default value |
-| --------------- | ------------------------------------- | ------- | ------------- |
-| name            | The base token name                   | string  | "Shimmer"     |
-| tickerSymbol    | The base token ticker symbol          | string  | "SMR"         |
-| unit            | The base token unit                   | string  | "SMR"         |
-| subunit         | The base token subunit                | string  | "glow"        |
-| decimals        | The base token amount of decimals     | uint    | 6             |
-| useMetricPrefix | The base token uses the metric prefix | boolean | false         |
+| Name         | Description                       | Type   | Default value |
+| ------------ | --------------------------------- | ------ | ------------- |
+| name         | The base token name               | string | "Shimmer"     |
+| tickerSymbol | The base token ticker symbol      | string | "SMR"         |
+| unit         | The base token unit               | string | "SMR"         |
+| subunit      | The base token subunit            | string | "glow"        |
+| decimals     | The base token amount of decimals | uint   | 6             |
 
 Example:
 
@@ -368,8 +367,7 @@ Example:
         "tickerSymbol": "SMR",
         "unit": "SMR",
         "subunit": "glow",
-        "decimals": 6,
-        "useMetricPrefix": false
+        "decimals": 6
       }
     }
   }
