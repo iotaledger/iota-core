@@ -3,8 +3,8 @@ package spenddag
 import "github.com/iotaledger/hive.go/ierrors"
 
 var (
-	ErrExpected                 = ierrors.New("expected error")
-	ErrAlreadyPartOfConflictSet = ierrors.New("spend already part of ConflictSet")
-	ErrEntityEvicted            = ierrors.New("tried to operate on evicted entity")
-	ErrFatal                    = ierrors.New("fatal error")
+	ErrExpected              = ierrors.New("expected error")
+	ErrAlreadyPartOfSpendSet = ierrors.New("spend already part of SpendSet")
+	ErrEntityEvicted         = ierrors.New("tried to operate on evicted entity")
+	ErrFatal                 = ierrors.New("fatal error")
 )

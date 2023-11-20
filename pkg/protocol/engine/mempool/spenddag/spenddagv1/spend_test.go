@@ -24,7 +24,7 @@ type TestSpend = *Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
 //var NewTestSpend = NewSpend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-func NewTestSpend(id iotago.TransactionID, parentSpends ds.Set[*Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], SpendSets ds.Set[*ConflictSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank] {
+func NewTestSpend(id iotago.TransactionID, parentSpends ds.Set[*Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], SpendSets ds.Set[*SpendSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank] {
 	spend := NewSpend[iotago.TransactionID, iotago.OutputID, vote.MockedRank](id, initialWeight, pendingTasksCounter, acceptanceThresholdProvider)
 	_, err := spend.JoinSpendSets(SpendSets)
 	if err != nil {
@@ -82,12 +82,12 @@ func TestSpend_SetAccepted(t *testing.T) {
 	})
 
 	{
-		ConflictSet1 := NewTestConflictSet(id("ConflictSet1"))
-		ConflictSet2 := NewTestConflictSet(id("ConflictSet2"))
+		SpendSet1 := NewTestSpendSet(id("SpendSet1"))
+		SpendSet2 := NewTestSpendSet(id("SpendSet2"))
 
-		Spend1 := NewTestSpend(transactionID("Spend1"), nil, ds.NewSet(ConflictSet1), weight.New(), pendingTasks, thresholdProvider)
-		Spend2 := NewTestSpend(transactionID("Spend2"), nil, ds.NewSet(ConflictSet1, ConflictSet2), weight.New(), pendingTasks, thresholdProvider)
-		Spend3 := NewTestSpend(transactionID("Spend3"), nil, ds.NewSet(ConflictSet2), weight.New(), pendingTasks, thresholdProvider)
+		Spend1 := NewTestSpend(transactionID("Spend1"), nil, ds.NewSet(SpendSet1), weight.New(), pendingTasks, thresholdProvider)
+		Spend2 := NewTestSpend(transactionID("Spend2"), nil, ds.NewSet(SpendSet1, SpendSet2), weight.New(), pendingTasks, thresholdProvider)
+		Spend3 := NewTestSpend(transactionID("Spend3"), nil, ds.NewSet(SpendSet2), weight.New(), pendingTasks, thresholdProvider)
 
 		require.Equal(t, acceptance.Pending, Spend1.setAcceptanceState(acceptance.Accepted))
 		require.True(t, Spend1.IsAccepted())
@@ -103,8 +103,8 @@ func TestSpend_SetAccepted(t *testing.T) {
 	}
 
 	{
-		SpendSet1 := NewTestConflictSet(id("ConflictSet1"))
-		SpendSet2 := NewTestConflictSet(id("ConflictSet2"))
+		SpendSet1 := NewTestSpendSet(id("SpendSet1"))
+		SpendSet2 := NewTestSpendSet(id("SpendSet2"))
 
 		Spend1 := NewTestSpend(transactionID("Spend1"), nil, ds.NewSet(SpendSet1), weight.New(), pendingTasks, thresholdProvider)
 		Spend2 := NewTestSpend(transactionID("Spend2"), nil, ds.NewSet(SpendSet1, SpendSet2), weight.New(), pendingTasks, thresholdProvider)
@@ -117,7 +117,7 @@ func TestSpend_SetAccepted(t *testing.T) {
 	}
 }
 
-func TestSpend_ConflictSets(t *testing.T) {
+func TestSpend_SpendSets(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 	pendingTasks := syncutils.NewCounter()
 
@@ -125,10 +125,10 @@ func TestSpend_ConflictSets(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	red := NewTestConflictSet(id("red"))
-	blue := NewTestConflictSet(id("blue"))
-	green := NewTestConflictSet(id("green"))
-	yellow := NewTestConflictSet(id("yellow"))
+	red := NewTestSpendSet(id("red"))
+	blue := NewTestSpendSet(id("blue"))
+	green := NewTestSpendSet(id("green"))
+	yellow := NewTestSpendSet(id("yellow"))
 
 	SpendA := NewTestSpend(transactionID("A"), nil, ds.NewSet(red), weight.New().AddCumulativeWeight(7), pendingTasks, thresholdProvider)
 	SpendB := NewTestSpend(transactionID("B"), nil, ds.NewSet(red, blue), weight.New().AddCumulativeWeight(3), pendingTasks, thresholdProvider)
@@ -268,7 +268,7 @@ func TestLikedInstead1(t *testing.T) {
 	require.True(t, masterBranch.IsLiked())
 	require.True(t, masterBranch.LikedInstead().IsEmpty())
 
-	SpendSet1 := NewTestConflictSet(id("O1"))
+	SpendSet1 := NewTestSpendSet(id("O1"))
 
 	Spend1 := NewTestSpend(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(6), pendingTasks, thresholdProvider)
 	Spend2 := NewTestSpend(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(3), pendingTasks, thresholdProvider)
@@ -295,7 +295,7 @@ func TestLikedInsteadFromPreferredInstead(t *testing.T) {
 	require.True(t, masterBranch.IsLiked())
 	require.True(t, masterBranch.LikedInstead().IsEmpty())
 
-	SpendSet1 := NewTestConflictSet(id("O1"))
+	SpendSet1 := NewTestSpendSet(id("O1"))
 	SpendA := NewTestSpend(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
 	SpendB := NewTestSpend(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
 
@@ -308,7 +308,7 @@ func TestLikedInsteadFromPreferredInstead(t *testing.T) {
 	require.Equal(t, 1, SpendB.LikedInstead().Size())
 	require.True(t, SpendB.LikedInstead().Has(SpendA))
 
-	SpendSet2 := NewTestConflictSet(id("O2"))
+	SpendSet2 := NewTestSpendSet(id("O2"))
 	SpendC := NewTestSpend(transactionID("TxC"), ds.NewSet(SpendA), ds.NewSet(SpendSet2), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
 	SpendD := NewTestSpend(transactionID("TxD"), ds.NewSet(SpendA), ds.NewSet(SpendSet2), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
 
@@ -372,7 +372,7 @@ func TestLikedInstead21(t *testing.T) {
 	require.True(t, masterBranch.IsLiked())
 	require.True(t, masterBranch.LikedInstead().IsEmpty())
 
-	SpendSet1 := NewTestConflictSet(id("O1"))
+	SpendSet1 := NewTestSpendSet(id("O1"))
 	SpendA := NewTestSpend(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
 	SpendB := NewTestSpend(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
 
@@ -385,7 +385,7 @@ func TestLikedInstead21(t *testing.T) {
 	require.Equal(t, 1, SpendB.LikedInstead().Size())
 	require.True(t, SpendB.LikedInstead().Has(SpendA))
 
-	SpendSet4 := NewTestConflictSet(id("O4"))
+	SpendSet4 := NewTestSpendSet(id("O4"))
 	SpendF := NewTestSpend(transactionID("TxF"), ds.NewSet(SpendA), ds.NewSet(SpendSet4), weight.New().SetCumulativeWeight(20), pendingTasks, thresholdProvider)
 	SpendG := NewTestSpend(transactionID("TxG"), ds.NewSet(SpendA), ds.NewSet(SpendSet4), weight.New().SetCumulativeWeight(10), pendingTasks, thresholdProvider)
 
@@ -398,7 +398,7 @@ func TestLikedInstead21(t *testing.T) {
 	require.Equal(t, 1, SpendG.LikedInstead().Size())
 	require.True(t, SpendG.LikedInstead().Has(SpendF))
 
-	SpendSet2 := NewTestConflictSet(id("O2"))
+	SpendSet2 := NewTestSpendSet(id("O2"))
 	SpendC := NewTestSpend(transactionID("TxC"), ds.NewSet(masterBranch), ds.NewSet(SpendSet2), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
 	SpendH := NewTestSpend(transactionID("TxH"), ds.NewSet(masterBranch, SpendA), ds.NewSet(SpendSet2, SpendSet4), weight.New().SetCumulativeWeight(150), pendingTasks, thresholdProvider)
 
@@ -411,7 +411,7 @@ func TestLikedInstead21(t *testing.T) {
 	require.Equal(t, 1, SpendH.LikedInstead().Size())
 	require.True(t, SpendH.LikedInstead().Has(SpendC))
 
-	SpendSet3 := NewTestConflictSet(id("O12"))
+	SpendSet3 := NewTestSpendSet(id("O12"))
 	SpendI := NewTestSpend(transactionID("TxI"), ds.NewSet(SpendF), ds.NewSet(SpendSet3), weight.New().SetCumulativeWeight(5), pendingTasks, thresholdProvider)
 	SpendJ := NewTestSpend(transactionID("TxJ"), ds.NewSet(SpendF), ds.NewSet(SpendSet3), weight.New().SetCumulativeWeight(15), pendingTasks, thresholdProvider)
 
@@ -448,12 +448,12 @@ func TestLikedInstead21(t *testing.T) {
 	require.True(t, SpendJ.LikedInstead().Has(SpendH))
 }
 
-func TestConflictSet_AllMembersEvicted(t *testing.T) {
+func TestSpendSet_AllMembersEvicted(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 
 	pendingTasks := syncutils.NewCounter()
-	yellow := NewTestConflictSet(id("yellow"))
-	green := NewTestConflictSet(id("green"))
+	yellow := NewTestSpendSet(id("yellow"))
+	green := NewTestSpendSet(id("green"))
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
 		return int64(weights.SeatCount())
@@ -499,8 +499,8 @@ func TestSpend_Inheritance(t *testing.T) {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 
 	pendingTasks := syncutils.NewCounter()
-	yellow := NewTestConflictSet(id("yellow"))
-	green := NewTestConflictSet(id("green"))
+	yellow := NewTestSpendSet(id("yellow"))
+	green := NewTestSpendSet(id("green"))
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
 		return int64(weights.SeatCount())
@@ -595,10 +595,10 @@ func createSpends(pendingTasks *syncutils.Counter) map[string]TestSpend {
 		return int64(weights.SeatCount())
 	})
 
-	red := NewTestConflictSet(id("red"))
-	blue := NewTestConflictSet(id("blue"))
-	green := NewTestConflictSet(id("green"))
-	yellow := NewTestConflictSet(id("yellow"))
+	red := NewTestSpendSet(id("red"))
+	blue := NewTestSpendSet(id("blue"))
+	green := NewTestSpendSet(id("green"))
+	yellow := NewTestSpendSet(id("yellow"))
 
 	SpendA := NewTestSpend(transactionID("A"), nil, ds.NewSet(red), weight.New(), pendingTasks, thresholdProvider)
 	SpendB := NewTestSpend(transactionID("B"), nil, ds.NewSet(red, blue), weight.New(), pendingTasks, thresholdProvider)

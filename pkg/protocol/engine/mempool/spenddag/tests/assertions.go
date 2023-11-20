@@ -38,25 +38,25 @@ func (a *Assertions) LikedInstead(spendAliases []string, likedInsteadAliases ...
 	require.Equal(a.f.test, len(likedInsteadAliases), likedInsteadSpends.Size(), "LikedInstead returns wrong number of spends %d instead of %d", likedInsteadSpends.Size(), len(likedInsteadAliases))
 }
 
-// ConflictSetMembers asserts that the given resource has the given spend set members.
-func (a *Assertions) ConflictSetMembers(resourceAlias string, spendAliases ...string) {
-	conflictSetMembers, exists := a.f.Instance.ConflictSetMembers(a.f.ResourceID(resourceAlias))
+// SpendSetMembers asserts that the given resource has the given spend set members.
+func (a *Assertions) SpendSetMembers(resourceAlias string, spendAliases ...string) {
+	spendSetMembers, exists := a.f.Instance.SpendSetMembers(a.f.ResourceID(resourceAlias))
 	require.True(a.f.test, exists, "Resource %s does not exist", resourceAlias)
 
-	require.Equal(a.f.test, len(spendAliases), conflictSetMembers.Size(), "Resource %s has wrong number of parents", resourceAlias)
+	require.Equal(a.f.test, len(spendAliases), spendSetMembers.Size(), "Resource %s has wrong number of parents", resourceAlias)
 	for _, spendAlias := range spendAliases {
-		require.True(a.f.test, conflictSetMembers.Has(a.f.SpendID(spendAlias)), "Resource %s does not have parent %s", resourceAlias, spendAlias)
+		require.True(a.f.test, spendSetMembers.Has(a.f.SpendID(spendAlias)), "Resource %s does not have parent %s", resourceAlias, spendAlias)
 	}
 }
 
-// ConflictSets asserts that the given spend has the given conflict sets.
-func (a *Assertions) ConflictSets(spendAlias string, resourceAliases ...string) {
-	conflictSets, exists := a.f.Instance.ConflictSets(a.f.SpendID(spendAlias))
+// SpendSets asserts that the given spend has the given conflict sets.
+func (a *Assertions) SpendSets(spendAlias string, resourceAliases ...string) {
+	spendSets, exists := a.f.Instance.SpendSets(a.f.SpendID(spendAlias))
 	require.True(a.f.test, exists, "Spend %s does not exist", spendAlias)
 
-	require.Equal(a.f.test, len(resourceAliases), conflictSets.Size(), "Spend %s has wrong number of conflict sets", spendAlias)
+	require.Equal(a.f.test, len(resourceAliases), spendSets.Size(), "Spend %s has wrong number of conflict sets", spendAlias)
 	for _, resourceAlias := range resourceAliases {
-		require.True(a.f.test, conflictSets.Has(a.f.ResourceID(resourceAlias)), "Spend %s does not have conflict set %s", spendAlias, resourceAlias)
+		require.True(a.f.test, spendSets.Has(a.f.ResourceID(resourceAlias)), "Spend %s does not have conflict set %s", spendAlias, resourceAlias)
 	}
 }
 

@@ -25,9 +25,9 @@ type SpendDAG[SpendID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] inter
 	AllSpendsSupported(seat account.SeatIndex, spendIDs ds.Set[SpendID]) bool
 	EvictSpend(spendID SpendID)
 
-	ConflictSets(spendID SpendID) (conflictSetIDs ds.Set[ResourceID], exists bool)
+	SpendSets(spendID SpendID) (spendSetIDs ds.Set[ResourceID], exists bool)
 	SpendParents(spendID SpendID) (spendIDs ds.Set[SpendID], exists bool)
-	ConflictSetMembers(conflictSetID ResourceID) (spendIDs ds.Set[SpendID], exists bool)
+	SpendSetMembers(spendSetID ResourceID) (spendIDs ds.Set[SpendID], exists bool)
 	SpendWeight(spendID SpendID) int64
 	SpendChildren(spendID SpendID) (spendIDs ds.Set[SpendID], exists bool)
 	SpendVoters(spendID SpendID) (voters ds.Set[account.SeatIndex])

@@ -29,8 +29,8 @@ type SpendDAG[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankTyp
 
 	spendUnhooks *shrinkingmap.ShrinkingMap[SpendID, func()]
 
-	// conflictSetsByID is a mapping of ResourceIDs to ConflictSets.
-	conflictSetsByID *shrinkingmap.ShrinkingMap[ResourceID, *ConflictSet[SpendID, ResourceID, VoteRank]]
+	// spendSetsByID is a mapping of ResourceIDs to SpendSets.
+	spendSetsByID *shrinkingmap.ShrinkingMap[ResourceID, *SpendSet[SpendID, ResourceID, VoteRank]]
 
 	// pendingTasks is a counter that keeps track of the number of pending tasks.
 	pendingTasks *syncutils.Counter
@@ -47,12 +47,12 @@ func New[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[Vot
 	return &SpendDAG[SpendID, ResourceID, VoteRank]{
 		events: spenddag.NewEvents[SpendID, ResourceID](),
 
-		seatCount:        seatCount,
-		spendsByID:       shrinkingmap.New[SpendID, *Spend[SpendID, ResourceID, VoteRank]](),
-		spendUnhooks:     shrinkingmap.New[SpendID, func()](),
-		conflictSetsByID: shrinkingmap.New[ResourceID, *ConflictSet[SpendID, ResourceID, VoteRank]](),
-		pendingTasks:     syncutils.NewCounter(),
-		votingMutex:      syncutils.NewDAGMutex[account.SeatIndex](),
+		seatCount:     seatCount,
+		spendsByID:    shrinkingmap.New[SpendID, *Spend[SpendID, ResourceID, VoteRank]](),
+		spendUnhooks:  shrinkingmap.New[SpendID, func()](),
+		spendSetsByID: shrinkingmap.New[ResourceID, *SpendSet[SpendID, ResourceID, VoteRank]](),
+		pendingTasks:  syncutils.NewCounter(),
+		votingMutex:   syncutils.NewDAGMutex[account.SeatIndex](),
 	}
 }
 
@@ -106,7 +106,7 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) CreateSpend(id SpendID) {
 }
 
 func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UpdateConflictingResources(id SpendID, resourceIDs ds.Set[ResourceID]) error {
-	joinedConflictSets, err := func() (ds.Set[ResourceID], error) {
+	joinedSpendSets, err := func() (ds.Set[ResourceID], error) {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
@@ -115,15 +115,15 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UpdateConflictingResources(id 
 			return nil, ierrors.Errorf("spend already evicted: %w", spenddag.ErrEntityEvicted)
 		}
 
-		return spend.JoinSpendSets(c.conflictSets(resourceIDs))
+		return spend.JoinSpendSets(c.spendSets(resourceIDs))
 	}()
 
 	if err != nil {
 		return ierrors.Errorf("spend %s failed to join spend sets: %w", id, err)
 	}
 
-	if !joinedConflictSets.IsEmpty() {
-		c.events.ConflictingResourcesAdded.Trigger(id, joinedConflictSets)
+	if !joinedSpendSets.IsEmpty() {
+		c.events.ConflictingResourcesAdded.Trigger(id, joinedSpendSets)
 	}
 
 	return nil
@@ -246,15 +246,15 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendVoters(spendID SpendID) (
 	return ds.NewSet[account.SeatIndex]()
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) ConflictSets(spendID SpendID) (spendSets ds.Set[ResourceID], exists bool) {
+func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendSets(spendID SpendID) (spendSets ds.Set[ResourceID], exists bool) {
 	spend, exists := c.spendsByID.Get(spendID)
 	if !exists {
 		return nil, false
 	}
 
 	spendSets = ds.NewSet[ResourceID]()
-	_ = spend.ConflictSets.ForEach(func(conflictSet *ConflictSet[SpendID, ResourceID, VoteRank]) error {
-		spendSets.Add(conflictSet.ID)
+	_ = spend.SpendSets.ForEach(func(spendSet *SpendSet[SpendID, ResourceID, VoteRank]) error {
+		spendSets.Add(spendSet.ID)
 		return nil
 	})
 
@@ -291,14 +291,14 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendChildren(spendID SpendID)
 	return spendChildren, true
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) ConflictSetMembers(conflictSetID ResourceID) (spends ds.Set[SpendID], exists bool) {
-	conflictSet, exists := c.conflictSetsByID.Get(conflictSetID)
+func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendSetMembers(spendSetID ResourceID) (spends ds.Set[SpendID], exists bool) {
+	spendSet, exists := c.spendSetsByID.Get(spendSetID)
 	if !exists {
 		return nil, false
 	}
 
 	spends = ds.NewSet[SpendID]()
-	_ = conflictSet.ForEach(func(parent *Spend[SpendID, ResourceID, VoteRank]) error {
+	_ = spendSet.ForEach(func(parent *Spend[SpendID, ResourceID, VoteRank]) error {
 		spends.Add(parent.ID)
 		return nil
 	})
@@ -436,16 +436,16 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) spends(ids ds.Set[SpendID], ig
 	})
 }
 
-// conflictSets returns the ConflictSets that are associated with the given ResourceIDs. If createMissing is set to
-// true, it will create an empty ConflictSets for each missing ResourceID.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) conflictSets(resourceIDs ds.Set[ResourceID]) ds.Set[*ConflictSet[SpendID, ResourceID, VoteRank]] {
-	conflictSets := ds.NewSet[*ConflictSet[SpendID, ResourceID, VoteRank]]()
+// spendSets returns the SpendSets that are associated with the given ResourceIDs. If createMissing is set to
+// true, it will create an empty SpendSets for each missing ResourceID.
+func (c *SpendDAG[SpendID, ResourceID, VoteRank]) spendSets(resourceIDs ds.Set[ResourceID]) ds.Set[*SpendSet[SpendID, ResourceID, VoteRank]] {
+	spendSets := ds.NewSet[*SpendSet[SpendID, ResourceID, VoteRank]]()
 
 	resourceIDs.Range(func(resourceID ResourceID) {
-		conflictSets.Add(lo.Return1(c.conflictSetsByID.GetOrCreate(resourceID, c.conflictSetFactory(resourceID))))
+		spendSets.Add(lo.Return1(c.spendSetsByID.GetOrCreate(resourceID, c.spendSetFactory(resourceID))))
 	})
 
-	return conflictSets
+	return spendSets
 }
 
 // determineVotes determines the Spends that are supported and revoked by the given SpendIDs.
@@ -494,16 +494,16 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) determineVotes(spendIDs ds.Set
 	return supportedSpends, revokedSpends, nil
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) conflictSetFactory(resourceID ResourceID) func() *ConflictSet[SpendID, ResourceID, VoteRank] {
-	return func() *ConflictSet[SpendID, ResourceID, VoteRank] {
-		conflictSet := NewConflictSet[SpendID, ResourceID, VoteRank](resourceID)
+func (c *SpendDAG[SpendID, ResourceID, VoteRank]) spendSetFactory(resourceID ResourceID) func() *SpendSet[SpendID, ResourceID, VoteRank] {
+	return func() *SpendSet[SpendID, ResourceID, VoteRank] {
+		spendSet := NewSpendSet[SpendID, ResourceID, VoteRank](resourceID)
 
-		conflictSet.OnAllMembersEvicted(func(prevValue bool, newValue bool) {
+		spendSet.OnAllMembersEvicted(func(prevValue bool, newValue bool) {
 			if newValue && !prevValue {
-				c.conflictSetsByID.Delete(conflictSet.ID)
+				c.spendSetsByID.Delete(spendSet.ID)
 			}
 		})
 
-		return conflictSet
+		return spendSet
 	}
 }

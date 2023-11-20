@@ -53,28 +53,28 @@ func TestMemoryRelease(t *testing.T) {
 	//t.Skip("skip memory test as for some reason it's failing")
 	tf := newTestFramework(t)
 
-	createSpendSets := func(startSlot, conflictSetCount, evictionDelay, spendsInConflictSet int, prevConflictSetAlias string) (int, string) {
+	createSpendSets := func(startSlot, spendSetCount, evictionDelay, spendsInSpendSet int, prevSpendSetAlias string) (int, string) {
 		slot := startSlot
-		for ; slot < startSlot+conflictSetCount; slot++ {
-			conflictSetAlias := fmt.Sprintf("conflictSet-%d", slot)
-			for conflictIndex := 0; conflictIndex < spendsInConflictSet; conflictIndex++ {
-				conflictAlias := fmt.Sprintf("conflictSet-%d:%d", slot, conflictIndex)
-				require.NoError(t, tf.CreateOrUpdateSpend(conflictAlias, []string{conflictSetAlias}))
-				if prevConflictSetAlias != "" {
-					require.NoError(t, tf.UpdateSpendParents(conflictAlias, []string{fmt.Sprintf("%s:%d", prevConflictSetAlias, 0)}, []string{}))
+		for ; slot < startSlot+spendSetCount; slot++ {
+			spendSetAlias := fmt.Sprintf("spendSet-%d", slot)
+			for conflictIndex := 0; conflictIndex < spendsInSpendSet; conflictIndex++ {
+				conflictAlias := fmt.Sprintf("spendSet-%d:%d", slot, conflictIndex)
+				require.NoError(t, tf.CreateOrUpdateSpend(conflictAlias, []string{spendSetAlias}))
+				if prevSpendSetAlias != "" {
+					require.NoError(t, tf.UpdateSpendParents(conflictAlias, []string{fmt.Sprintf("%s:%d", prevSpendSetAlias, 0)}, []string{}))
 				}
 			}
-			prevConflictSetAlias = conflictSetAlias
+			prevSpendSetAlias = spendSetAlias
 
 			if slotToEvict := slot - evictionDelay; slotToEvict >= 0 {
-				for conflictIndex := 0; conflictIndex < spendsInConflictSet; conflictIndex++ {
-					conflictAlias := fmt.Sprintf("conflictSet-%d:%d", slotToEvict, conflictIndex)
+				for conflictIndex := 0; conflictIndex < spendsInSpendSet; conflictIndex++ {
+					conflictAlias := fmt.Sprintf("spendSet-%d:%d", slotToEvict, conflictIndex)
 					tf.EvictSpend(conflictAlias)
 				}
 			}
 		}
 
-		return slot, prevConflictSetAlias
+		return slot, prevSpendSetAlias
 	}
 	_, prevAlias := createSpendSets(0, 30000, 1, 2, "")
 
@@ -97,7 +97,7 @@ func TestMemoryRelease(t *testing.T) {
 
 	time.Sleep(time.Second)
 
-	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).conflictSetsByID.Size())
+	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).spendSetsByID.Size())
 	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).spendsByID.Size())
 	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).spendUnhooks.Size())
 	memStatsEnd := memanalyzer.MemSize(tf)

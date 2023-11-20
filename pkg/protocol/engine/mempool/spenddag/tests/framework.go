@@ -52,10 +52,10 @@ func NewFramework(
 	return f
 }
 
-// CreateOrUpdateSpend creates a new spend or adds it to the given ConflictSets.
+// CreateOrUpdateSpend creates a new spend or adds it to the given SpendSets.
 func (f *Framework) CreateOrUpdateSpend(alias string, resourceAliases []string) error {
 	f.Instance.CreateSpend(f.SpendID(alias))
-	return f.Instance.UpdateConflictingResources(f.SpendID(alias), f.ConflictSetIDs(resourceAliases...))
+	return f.Instance.UpdateConflictingResources(f.SpendID(alias), f.SpendSetIDs(resourceAliases...))
 
 }
 
@@ -101,12 +101,12 @@ func (f *Framework) SpendIDs(aliases ...string) ds.Set[iotago.TransactionID] {
 	return spendIDs
 }
 
-// ConflictSetIDs translates the given aliases into an AdvancedSet of iotago.OutputIDs.
-func (f *Framework) ConflictSetIDs(aliases ...string) ds.Set[iotago.OutputID] {
-	conflictSetIDs := ds.NewSet[iotago.OutputID]()
+// SpendSetIDs translates the given aliases into an AdvancedSet of iotago.OutputIDs.
+func (f *Framework) SpendSetIDs(aliases ...string) ds.Set[iotago.OutputID] {
+	spendSetIDs := ds.NewSet[iotago.OutputID]()
 	for _, alias := range aliases {
-		conflictSetIDs.Add(f.ResourceID(alias))
+		spendSetIDs.Add(f.ResourceID(alias))
 	}
 
-	return conflictSetIDs
+	return spendSetIDs
 }

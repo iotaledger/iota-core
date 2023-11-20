@@ -30,8 +30,8 @@ type Spend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[V
 	// Children is the set of children of the Spend.
 	Children ds.Set[*Spend[SpendID, ResourceID, VoteRank]]
 
-	// ConflictSets is the set of ConflictSets that the Spend is part of.
-	ConflictSets ds.Set[*ConflictSet[SpendID, ResourceID, VoteRank]]
+	// SpendSets is the set of SpendSets that the Spend is part of.
+	SpendSets ds.Set[*SpendSet[SpendID, ResourceID, VoteRank]]
 
 	// ConflictingSpends is the set of spends that directly conflict with the Spend.
 	ConflictingSpends *SortedSpends[SpendID, ResourceID, VoteRank]
@@ -95,7 +95,7 @@ func NewSpend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankTyp
 		ID:                      id,
 		Parents:                 ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]](),
 		Children:                ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]](),
-		ConflictSets:            ds.NewSet[*ConflictSet[SpendID, ResourceID, VoteRank]](),
+		SpendSets:               ds.NewSet[*SpendSet[SpendID, ResourceID, VoteRank]](),
 		Weight:                  initialWeight,
 		LatestVotes:             shrinkingmap.New[account.SeatIndex, *vote.Vote[VoteRank]](),
 		AcceptanceStateUpdated:  event.New2[acceptance.State, acceptance.State](),
@@ -127,9 +127,9 @@ func NewSpend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankTyp
 	return c
 }
 
-// JoinSpendSets registers the Spend with the given ConflictSets.
-func (c *Spend[SpendID, ResourceID, VoteRank]) JoinSpendSets(conflictSets ds.Set[*ConflictSet[SpendID, ResourceID, VoteRank]]) (joinedConflictSets ds.Set[ResourceID], err error) {
-	if conflictSets == nil {
+// JoinSpendSets registers the Spend with the given SpendSets.
+func (c *Spend[SpendID, ResourceID, VoteRank]) JoinSpendSets(spendSets ds.Set[*SpendSet[SpendID, ResourceID, VoteRank]]) (joinedSpendSets ds.Set[ResourceID], err error) {
+	if spendSets == nil {
 		return ds.NewSet[ResourceID](), nil
 	}
 
@@ -148,22 +148,22 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) JoinSpendSets(conflictSets ds.Set
 		}
 	}
 
-	joinedConflictSets = ds.NewSet[ResourceID]()
+	joinedSpendSets = ds.NewSet[ResourceID]()
 
-	return joinedConflictSets, conflictSets.ForEach(func(conflictSet *ConflictSet[SpendID, ResourceID, VoteRank]) error {
-		otherConflicts, err := conflictSet.Add(c)
-		if err != nil && !ierrors.Is(err, spenddag.ErrAlreadyPartOfConflictSet) {
+	return joinedSpendSets, spendSets.ForEach(func(spendSet *SpendSet[SpendID, ResourceID, VoteRank]) error {
+		otherConflicts, err := spendSet.Add(c)
+		if err != nil && !ierrors.Is(err, spenddag.ErrAlreadyPartOfSpendSet) {
 			return err
 		}
 
-		if c.ConflictSets.Add(conflictSet) {
+		if c.SpendSets.Add(spendSet) {
 			if otherConflicts != nil {
 				otherConflicts.Range(func(otherConflict *Spend[SpendID, ResourceID, VoteRank]) {
 					registerConflictingSpend(c, otherConflict)
 					registerConflictingSpend(otherConflict, c)
 				})
 
-				joinedConflictSets.Add(conflictSet.ID)
+				joinedSpendSets.Add(spendSet.ID)
 			}
 		}
 
@@ -314,10 +314,10 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) Evict() (evictedSpends []SpendID)
 	})
 	c.Parents.Clear()
 
-	c.ConflictSets.Range(func(conflictSet *ConflictSet[SpendID, ResourceID, VoteRank]) {
-		conflictSet.Remove(c)
+	c.SpendSets.Range(func(spendSet *SpendSet[SpendID, ResourceID, VoteRank]) {
+		spendSet.Remove(c)
 	})
-	c.ConflictSets.Clear()
+	c.SpendSets.Clear()
 
 	for _, spend := range c.ConflictingSpends.Shutdown() {
 		if spend != c {

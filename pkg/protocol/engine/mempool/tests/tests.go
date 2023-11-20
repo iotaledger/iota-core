@@ -110,15 +110,15 @@ func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
 		return nil
 	})
 
-	conflictSetsTx1, exists := tf.SpendDAG.ConflictSets(tf.TransactionID("tx1"))
+	spendSetsTx1, exists := tf.SpendDAG.SpendSets(tf.TransactionID("tx1"))
 	require.True(t, exists)
-	require.Equal(t, 1, conflictSetsTx1.Size())
-	require.True(t, conflictSetsTx1.Has(tf.StateID("genesis")))
+	require.Equal(t, 1, spendSetsTx1.Size())
+	require.True(t, spendSetsTx1.Has(tf.StateID("genesis")))
 
-	conflictSetsTx2, exists := tf.SpendDAG.ConflictSets(tf.TransactionID("tx2"))
+	spendSetsTx2, exists := tf.SpendDAG.SpendSets(tf.TransactionID("tx2"))
 	require.True(t, exists)
-	require.Equal(t, 1, conflictSetsTx2.Size())
-	require.True(t, conflictSetsTx2.Has(tf.StateID("tx1:0")))
+	require.Equal(t, 1, spendSetsTx2.Size())
+	require.True(t, spendSetsTx2.Has(tf.StateID("tx1:0")))
 }
 
 func TestProcessTransactionsOutOfOrder(t *testing.T, tf *TestFramework) {
@@ -237,9 +237,9 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 	require.False(t, lo.Return2(tx2Metadata.OrphanedSlot()))
 	require.False(t, lo.Return2(tx3Metadata.OrphanedSlot()))
 
-	require.True(t, lo.Return2(tf.SpendDAG.ConflictSets(tf.TransactionID("tx1"))))
-	require.True(t, lo.Return2(tf.SpendDAG.ConflictSets(tf.TransactionID("tx2"))))
-	require.True(t, lo.Return2(tf.SpendDAG.ConflictSets(tf.TransactionID("tx3"))))
+	require.True(t, lo.Return2(tf.SpendDAG.SpendSets(tf.TransactionID("tx1"))))
+	require.True(t, lo.Return2(tf.SpendDAG.SpendSets(tf.TransactionID("tx2"))))
+	require.True(t, lo.Return2(tf.SpendDAG.SpendSets(tf.TransactionID("tx3"))))
 
 	tf.Instance.Evict(2)
 
@@ -248,9 +248,9 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 	require.True(t, lo.Return2(tx3Metadata.OrphanedSlot()))
 
 	// All conflicts still exist, as they are kept around until MCA
-	require.True(t, lo.Return2(tf.SpendDAG.ConflictSets(tf.TransactionID("tx1"))))
-	require.True(t, lo.Return2(tf.SpendDAG.ConflictSets(tf.TransactionID("tx2"))))
-	require.True(t, lo.Return2(tf.SpendDAG.ConflictSets(tf.TransactionID("tx3"))))
+	require.True(t, lo.Return2(tf.SpendDAG.SpendSets(tf.TransactionID("tx1"))))
+	require.True(t, lo.Return2(tf.SpendDAG.SpendSets(tf.TransactionID("tx2"))))
+	require.True(t, lo.Return2(tf.SpendDAG.SpendSets(tf.TransactionID("tx3"))))
 
 	tf.RequireTransactionsEvicted(map[string]bool{"tx1": false, "tx2": false, "tx3": false})
 

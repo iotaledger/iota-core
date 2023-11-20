@@ -15,7 +15,7 @@ type Events[SpendID, ResourceID comparable] struct {
 	// SpendEvicted is triggered when a Spend is evicted from the SpendDAG.
 	SpendEvicted *event.Event1[SpendID]
 
-	// ConflictingResourcesAdded is triggered when the Spend is added to a new ConflictSet.
+	// ConflictingResourcesAdded is triggered when the Spend is added to a new SpendSet.
 	ConflictingResourcesAdded *event.Event2[SpendID, ds.Set[ResourceID]]
 
 	// SpendParentsUpdated is triggered when the parents of a Spend are updated.
