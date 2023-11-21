@@ -224,9 +224,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteBlockIssuance, func(c echo.Context) error {
-		index, _ := httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
-
-		resp, err := blockIssuanceBySlot(index)
+		resp, err := blockIssuance()
 		if err != nil {
 			return err
 		}
