@@ -40,6 +40,7 @@ type Block struct {
 	preConfirmed          bool
 	confirmationRatifiers ds.Set[account.SeatIndex]
 	confirmed             bool
+	weightPropagated      reactive.Variable[bool]
 
 	// Scheduler block
 	scheduled bool
@@ -86,6 +87,7 @@ func NewBlock(data *model.Block) *Block {
 		invalid:               reactive.NewVariable[bool](),
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
+		weightPropagated:      reactive.NewVariable[bool](),
 		notarized:             reactive.NewVariable[bool](),
 		workScore:             data.WorkScore(),
 	}
@@ -104,18 +106,20 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 			commitmentID: commitmentID,
 			issuingTime:  issuingTime,
 		},
-		solid:       reactive.NewVariable[bool](),
-		invalid:     reactive.NewVariable[bool](),
-		booked:      reactive.NewVariable[bool](),
-		preAccepted: true,
-		accepted:    reactive.NewVariable[bool](),
-		notarized:   reactive.NewVariable[bool](),
-		scheduled:   true,
+		solid:            reactive.NewVariable[bool](),
+		invalid:          reactive.NewVariable[bool](),
+		booked:           reactive.NewVariable[bool](),
+		preAccepted:      true,
+		accepted:         reactive.NewVariable[bool](),
+		weightPropagated: reactive.NewVariable[bool](),
+		notarized:        reactive.NewVariable[bool](),
+		scheduled:        true,
 	}
 
 	// This should be true since we commit and evict on acceptance.
 	b.solid.Set(true)
 	b.booked.Set(true)
+	b.weightPropagated.Set(true)
 	b.notarized.Set(true)
 	b.accepted.Set(true)
 
@@ -135,6 +139,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 		invalid:               reactive.NewVariable[bool](),
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
+		weightPropagated:      reactive.NewVariable[bool](),
 		notarized:             reactive.NewVariable[bool](),
 	}
 }
@@ -605,6 +610,18 @@ func (b *Block) SetPreConfirmed() (wasUpdated bool) {
 	return wasUpdated
 }
 
+func (b *Block) WeightPropagated() reactive.Variable[bool] {
+	return b.weightPropagated
+}
+
+func (b *Block) IsWeightPropagated() bool {
+	return b.weightPropagated.Get()
+}
+
+func (b *Block) SetWeightPropagated() (wasUpdated bool) {
+	return !b.weightPropagated.Set(true)
+}
+
 func (b *Block) Notarized() reactive.Variable[bool] {
 	return b.notarized
 }
@@ -633,6 +650,7 @@ func (b *Block) String() string {
 	builder.AddField(stringify.NewStructField("PreConfirmed", b.preConfirmed))
 	builder.AddField(stringify.NewStructField("ConfirmationRatifiers", b.confirmationRatifiers.String()))
 	builder.AddField(stringify.NewStructField("Confirmed", b.confirmed))
+	builder.AddField(stringify.NewStructField("WeightPropagated", b.weightPropagated.Get()))
 	builder.AddField(stringify.NewStructField("Scheduled", b.scheduled))
 	builder.AddField(stringify.NewStructField("Dropped", b.dropped))
 	builder.AddField(stringify.NewStructField("Skipped", b.skipped))

@@ -268,7 +268,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 	}
 	targetEngine.Reset()
 
-	// Once all blocks are booked we
+	// Once all blocks are booked and their weight propagated we
 	//   1. Mark all transactions as accepted
 	//   2. Mark all blocks as accepted
 	//   3. Force commitment of the slot
@@ -327,9 +327,6 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 					return
 				}
 
-				// TODO: fix this
-				time.Sleep(1 * time.Second)
-
 				forceCommitmentFunc()
 			})
 		}
@@ -348,7 +345,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 				continue
 			}
 
-			block.Booked().OnUpdate(blockBookedFunc)
+			block.WeightPropagated().OnUpdate(blockBookedFunc)
 		}
 	}
 

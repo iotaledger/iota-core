@@ -4,11 +4,9 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -19,8 +17,7 @@ import (
 )
 
 type Gadget struct {
-	events  *slotgadget.Events
-	workers *workerpool.Group
+	events *slotgadget.Events
 
 	// Keep track of votes on slots (from commitments) per slot of blocks. I.e. a slot can only be finalized if
 	// optsSlotFinalizationThreshold is reached within a slot.
@@ -49,13 +46,12 @@ func NewProvider(opts ...options.Option[Gadget]) module.Provider[*engine.Engine,
 			g.slotTrackers = shrinkingmap.New[iotago.SlotIndex, *slottracker.SlotTracker]()
 
 			e.Events.SlotGadget.LinkTo(g.events)
-			g.workers = e.Workers.CreateGroup("SlotGadget")
 
 			e.HookConstructed(func() {
 				g.seatManager = e.SybilProtection.SeatManager()
 				g.TriggerConstructed()
 
-				e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes, event.WithWorkerPool(g.workers.CreatePool("TrackAndRefresh", workerpool.WithWorkerCount(1)))) // Using just 1 worker to avoid contention
+				e.Events.BlockGadget.BlockConfirmed.Hook(g.trackVotes)
 			})
 
 			g.storeLastFinalizedSlotFunc = func(slot iotago.SlotIndex) {
@@ -87,7 +83,6 @@ func (g *Gadget) Reset() {
 
 func (g *Gadget) Shutdown() {
 	g.TriggerStopped()
-	g.workers.Shutdown()
 }
 
 func (g *Gadget) setLastFinalizedSlot(i iotago.SlotIndex) {
