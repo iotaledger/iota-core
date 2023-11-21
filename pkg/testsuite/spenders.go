@@ -7,7 +7,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 )
 
-func (t *TestSuite) AssertSpendsInCacheAcceptanceState(expectedConflictAliases []string, expectedState acceptance.State, nodes ...*mock.Node) {
+func (t *TestSuite) AssertSpendersInCacheAcceptanceState(expectedConflictAliases []string, expectedState acceptance.State, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {

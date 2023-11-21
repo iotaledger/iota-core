@@ -14,24 +14,24 @@ import (
 
 func TestAll(t *testing.T, frameworkProvider func(*testing.T) *Framework) {
 	for testName, testCase := range map[string]func(*testing.T, *Framework){
-		"CreateSpender":               CreateSpender,
-		"ExistingSpendJoinsSpendSets": ExistingSpendJoinsSpendSets,
-		"JoinSpendSetTwice":           JoinSpendSetTwice,
-		"UpdateSpendParents":          UpdateSpendParents,
-		"LikedInstead":                LikedInstead,
-		"CreateSpendWithoutMembers":   CreateSpendWithoutMembers,
-		"SpendAcceptance":             SpendAcceptance,
-		"CastVotes":                   CastVotes,
-		"CastVotes_VoteRank":          CastVotesVoteRank,
-		"CastVotesAcceptance":         CastVotesAcceptance,
-		"EvictAcceptedSpender":        EvictAcceptedSpender,
-		"EvictRejectedSpender":        EvictRejectedSpender,
+		"CreateSpender":                 CreateSpender,
+		"ExistingSpenderJoinsSpendSets": ExistingSpenderJoinsSpendSets,
+		"JoinSpendSetTwice":             JoinSpendSetTwice,
+		"UpdateSpendParents":            UpdateSpendParents,
+		"LikedInstead":                  LikedInstead,
+		"CreateSpendWithoutMembers":     CreateSpendWithoutMembers,
+		"SpendAcceptance":               SpendAcceptance,
+		"CastVotes":                     CastVotes,
+		"CastVotes_VoteRank":            CastVotesVoteRank,
+		"CastVotesAcceptance":           CastVotesAcceptance,
+		"EvictAcceptedSpender":          EvictAcceptedSpender,
+		"EvictRejectedSpender":          EvictRejectedSpender,
 	} {
 		t.Run(testName, func(t *testing.T) { testCase(t, frameworkProvider(t)) })
 	}
 }
 
-func ExistingSpendJoinsSpendSets(t *testing.T, tf *Framework) {
+func ExistingSpenderJoinsSpendSets(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CreateOrUpdateSpender("spender1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateSpender("spender2", []string{"resource1"}))
 	tf.Assert.SpendSetMembers("resource1", "spender1", "spender2")

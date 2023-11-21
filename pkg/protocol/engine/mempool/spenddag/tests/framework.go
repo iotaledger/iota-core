@@ -52,7 +52,7 @@ func NewFramework(
 	return f
 }
 
-// CreateOrUpdateSpend creates a new spend or adds it to the given SpendSets.
+// CreateOrUpdateSpend creates a new spender or adds it to the given SpendSets.
 func (f *Framework) CreateOrUpdateSpender(alias string, resourceAliases []string) error {
 	f.Instance.CreateSpender(f.SpenderID(alias))
 	return f.Instance.UpdateSpentResources(f.SpenderID(alias), f.SpendSetIDs(resourceAliases...))

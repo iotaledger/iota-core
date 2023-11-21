@@ -128,7 +128,7 @@ func NewSpender[SpenderID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRan
 	return c
 }
 
-// JoinSpendSets registers the Spend with the given SpendSets.
+// JoinSpendSets registers the Spender with the given SpendSets.
 func (c *Spender[SpenderID, ResourceID, VoteRank]) JoinSpendSets(spendSets ds.Set[*SpendSet[SpenderID, ResourceID, VoteRank]]) (joinedSpendSets ds.Set[ResourceID], err error) {
 	if spendSets == nil {
 		return ds.NewSet[ResourceID](), nil

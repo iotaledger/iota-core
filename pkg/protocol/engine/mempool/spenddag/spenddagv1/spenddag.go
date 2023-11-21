@@ -115,7 +115,9 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) UpdateSpentResources(id Spen
 			return nil, ierrors.Errorf("spender already evicted: %w", spenddag.ErrEntityEvicted)
 		}
 
-		return spender.JoinSpendSets(c.spendSets(resourceIDs))
+		existingSpendSets := c.spendSets(resourceIDs)
+
+		return spender.JoinSpendSets(existingSpendSets)
 	}()
 
 	if err != nil {

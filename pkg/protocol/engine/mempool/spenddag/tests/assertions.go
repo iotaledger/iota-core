@@ -49,7 +49,7 @@ func (a *Assertions) SpendSetMembers(resourceAlias string, spendAliases ...strin
 	}
 }
 
-// SpendSets asserts that the given spender has the given conflict sets.
+// SpendSets asserts that the given spender has the given spend sets.
 func (a *Assertions) SpendSets(spenderAlias string, resourceAliases ...string) {
 	spendSets, exists := a.f.Instance.SpendSets(a.f.SpenderID(spenderAlias))
 	require.True(a.f.test, exists, "Spender %s does not exist", spenderAlias)

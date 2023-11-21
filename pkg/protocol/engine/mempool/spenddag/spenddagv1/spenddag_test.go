@@ -57,8 +57,8 @@ func TestMemoryRelease(t *testing.T) {
 		slot := startSlot
 		for ; slot < startSlot+spendSetCount; slot++ {
 			spendSetAlias := fmt.Sprintf("spendSet-%d", slot)
-			for conflictIndex := 0; conflictIndex < spendersInSpendSet; conflictIndex++ {
-				conflictAlias := fmt.Sprintf("spendSet-%d:%d", slot, conflictIndex)
+			for spendIndex := 0; spendIndex < spendersInSpendSet; spendIndex++ {
+				conflictAlias := fmt.Sprintf("spendSet-%d:%d", slot, spendIndex)
 				require.NoError(t, tf.CreateOrUpdateSpender(conflictAlias, []string{spendSetAlias}))
 				if prevSpendSetAlias != "" {
 					require.NoError(t, tf.UpdateSpendParents(conflictAlias, []string{fmt.Sprintf("%s:%d", prevSpendSetAlias, 0)}, []string{}))
@@ -67,8 +67,8 @@ func TestMemoryRelease(t *testing.T) {
 			prevSpendSetAlias = spendSetAlias
 
 			if slotToEvict := slot - evictionDelay; slotToEvict >= 0 {
-				for conflictIndex := 0; conflictIndex < spendersInSpendSet; conflictIndex++ {
-					conflictAlias := fmt.Sprintf("spendSet-%d:%d", slotToEvict, conflictIndex)
+				for spendIndex := 0; spendIndex < spendersInSpendSet; spendIndex++ {
+					conflictAlias := fmt.Sprintf("spendSet-%d:%d", slotToEvict, spendIndex)
 					tf.EvictSpender(conflictAlias)
 				}
 			}
