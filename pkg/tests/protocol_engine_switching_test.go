@@ -40,7 +40,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 				10,
 				2,
 				4,
-				2,
+				5,
 			),
 		),
 

@@ -87,7 +87,7 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 }
 
 func (g *Gadget) shouldPreAcceptAndPreConfirm(block *blocks.Block) (preAccept bool, preConfirm bool) {
-	committeeTotalSeats := g.seatManager.SeatCount()
+	committeeTotalSeats := g.seatManager.SeatCountInSlot(block.ID().Slot())
 	blockSeats := len(block.Witnesses())
 
 	onlineCommitteeTotalSeats := g.seatManager.OnlineCommittee().Size()

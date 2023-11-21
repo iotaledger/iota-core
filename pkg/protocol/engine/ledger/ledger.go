@@ -37,7 +37,7 @@ type Ledger interface {
 	ManaManager() *mana.Manager
 	RMCManager() *rmc.Manager
 
-	CommitSlot(slot iotago.SlotIndex) (stateRoot, mutationRoot, accountRoot iotago.Identifier, err error)
+	CommitSlot(slot iotago.SlotIndex) (stateRoot, mutationRoot, accountRoot iotago.Identifier, created utxoledger.Outputs, consumed utxoledger.Spents, err error)
 
 	Import(reader io.ReadSeeker) error
 	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error

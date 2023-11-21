@@ -18,7 +18,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/poa"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/topstakers"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1/performance"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
@@ -51,7 +51,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 			events: sybilprotection.NewEvents(),
 
 			apiProvider:             e,
-			optsSeatManagerProvider: poa.NewProvider(),
+			optsSeatManagerProvider: topstakers.NewProvider(),
 		}, opts,
 			func(o *SybilProtection) {
 				o.seatManager = o.optsSeatManagerProvider(e)
@@ -106,6 +106,10 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 		return
 	}
 
+	if block.Payload().PayloadType() != iotago.PayloadCandidacyAnnouncement {
+		return
+	}
+
 	accountData, exists, err := o.ledger.Account(block.ProtocolBlock().Header.IssuerID, block.SlotCommitmentID().Slot())
 	if err != nil {
 		o.errHandler(ierrors.Wrapf(err, "error while retrieving account from account %s in slot %d from accounts ledger", block.ProtocolBlock().Header.IssuerID, block.SlotCommitmentID().Slot()))
@@ -133,9 +137,7 @@ func (o *SybilProtection) TrackBlock(block *blocks.Block) {
 		return
 	}
 
-	if block.Payload().PayloadType() == iotago.PayloadCandidacyAnnouncement {
-		o.performanceTracker.TrackCandidateBlock(block)
-	}
+	o.performanceTracker.TrackCandidateBlock(block)
 }
 
 func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot iotago.Identifier, rewardsRoot iotago.Identifier, err error) {
@@ -155,22 +157,10 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot iotag
 		if _, committeeExists := o.seatManager.CommitteeInEpoch(nextEpoch); !committeeExists {
 			// If the committee for the epoch wasn't set before due to finalization of a slot,
 			// we promote the current committee to also serve in the next epoch.
-			committee, exists := o.seatManager.CommitteeInEpoch(currentEpoch)
-			if !exists {
-				// that should never happen as it is already the fallback strategy
-				panic(fmt.Sprintf("committee for current epoch %d not found", currentEpoch))
-			}
-
-			committeeAccounts, err := committee.Accounts()
+			committeeAccounts, err := o.reuseCommittee(currentEpoch, nextEpoch)
 			if err != nil {
-				return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to get accounts from committee for epoch %d", currentEpoch)
+				return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to reuse committee for epoch %d", nextEpoch)
 			}
-
-			committeeAccounts.SetReused()
-			if err = o.seatManager.SetCommittee(nextEpoch, committeeAccounts); err != nil {
-				return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to set committee for epoch %d", nextEpoch)
-			}
-			o.performanceTracker.ClearCandidates()
 
 			o.events.CommitteeSelected.Trigger(committeeAccounts, nextEpoch)
 		}
@@ -363,7 +353,7 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 		}
 		active := activeCandidates.Has(candidate)
 		validatorResp = append(validatorResp, &apimodels.ValidatorResponse{
-			AccountID:                      accountData.ID,
+			AddressBech32:                  accountData.ID.ToAddress().Bech32(o.apiProvider.CommittedAPI().ProtocolParameters().Bech32HRP()),
 			StakingEpochEnd:                accountData.StakeEndEpoch,
 			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 			ValidatorStake:                 accountData.ValidatorStake,
@@ -385,13 +375,47 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 	return validatorResp, nil
 }
 
+func (o *SybilProtection) reuseCommittee(currentEpoch iotago.EpochIndex, targetEpoch iotago.EpochIndex) (*account.Accounts, error) {
+	committee, exists := o.seatManager.CommitteeInEpoch(currentEpoch)
+	if !exists {
+		// that should never happen as it is already the fallback strategy
+		panic(fmt.Sprintf("committee for current epoch %d not found", currentEpoch))
+	}
+
+	committeeAccounts, err := committee.Accounts()
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get accounts from committee for epoch %d", currentEpoch)
+	}
+
+	committeeAccounts.SetReused()
+	if err = o.seatManager.SetCommittee(targetEpoch, committeeAccounts); err != nil {
+		return nil, ierrors.Wrapf(err, "failed to set committee for epoch %d", targetEpoch)
+	}
+
+	o.performanceTracker.ClearCandidates()
+
+	return committeeAccounts, nil
+}
+
 func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Accounts, error) {
 	timeProvider := o.apiProvider.APIForSlot(slot).TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
-	candidates, err := o.performanceTracker.EligibleValidatorCandidates(nextEpoch)
+
+	// We get the list of candidates for the next epoch. They are registered in the current epoch.
+	candidates, err := o.performanceTracker.EligibleValidatorCandidates(currentEpoch)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to retrieve candidates for epoch %d", nextEpoch)
+	}
+
+	// If there's no candidate, reuse the current committee.
+	if candidates.Size() == 0 {
+		committeeAccounts, err := o.reuseCommittee(currentEpoch, nextEpoch)
+		if err != nil {
+			return nil, ierrors.Wrapf(err, "failed to reuse committee (due to no candidates) for epoch %d", nextEpoch)
+		}
+
+		return committeeAccounts, nil
 	}
 
 	candidateAccounts := make(accounts.AccountsData, 0)

@@ -12,7 +12,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-func blockByID(c echo.Context) (*model.Block, error) {
+func blockByID(c echo.Context) (*iotago.Block, error) {
 	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(restapi.ParameterBlockID))
@@ -23,7 +23,7 @@ func blockByID(c echo.Context) (*model.Block, error) {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
 	}
 
-	return block, nil
+	return block.ProtocolBlock(), nil
 }
 
 func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
@@ -42,6 +42,28 @@ func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error)
 	}
 
 	return blockMetadataByBlockID(blockID)
+}
+
+func blockWithMetadataByID(c echo.Context) (*apimodels.BlockWithMetadataResponse, error) {
+	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(restapi.ParameterBlockID))
+	}
+
+	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	if !exists {
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
+	}
+
+	blockMetadata, err := blockMetadataByBlockID(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &apimodels.BlockWithMetadataResponse{
+		Block:    block.ProtocolBlock(),
+		Metadata: blockMetadata,
+	}, nil
 }
 
 func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHeaderResponse, error) {

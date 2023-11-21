@@ -1,9 +1,9 @@
 package database
 
 func FlushAndClose(store *lockedKVStore) error {
-	if err := store.FlushWithoutLocking(); err != nil {
+	if err := store.instance().Flush(); err != nil {
 		return err
 	}
 
-	return store.CloseWithoutLocking()
+	return store.instance().Close()
 }

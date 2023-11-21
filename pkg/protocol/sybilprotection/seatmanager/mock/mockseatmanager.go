@@ -159,7 +159,10 @@ func (m *ManualPOA) OnlineCommittee() ds.Set[account.SeatIndex] {
 	return m.online
 }
 
-func (m *ManualPOA) SeatCount() int {
+func (m *ManualPOA) SeatCountInSlot(_ iotago.SlotIndex) int {
+	return m.committee.SeatCount()
+}
+func (m *ManualPOA) SeatCountInEpoch(_ iotago.EpochIndex) int {
 	return m.committee.SeatCount()
 }
 

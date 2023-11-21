@@ -17,11 +17,17 @@ func (t *TestSuite) AssertSybilProtectionCommittee(epoch iotago.EpochIndex, expe
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			accounts, err := lo.Return1(node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInEpoch(epoch)).Accounts()
-			if err != nil {
-				t.Testing.Fatal(err)
+			committeeInEpoch, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInEpoch(epoch)
+			if !exists {
+				return ierrors.Errorf("AssertSybilProtectionCommittee: %s: failed to get committee in epoch %d", node.Name, epoch)
 			}
-			accountIDs := accounts.IDs()
+
+			committeeInEpochAccounts, err := committeeInEpoch.Accounts()
+			if err != nil {
+				return ierrors.Errorf("AssertSybilProtectionCommittee: %s: failed to get accounts in committee in epoch %d: %w", node.Name, epoch, err)
+			}
+
+			accountIDs := committeeInEpochAccounts.IDs()
 			if !assert.ElementsMatch(t.fakeTesting, expectedAccounts, accountIDs) {
 				return ierrors.Errorf("AssertSybilProtectionCommittee: %s: expected %s, got %s", node.Name, expectedAccounts, accountIDs)
 			}

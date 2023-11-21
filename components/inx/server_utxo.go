@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -29,7 +30,7 @@ func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
 	}
 
 	includedSlot := o.SlotBooked()
-	if includedSlot <= latestCommitment.Slot() {
+	if includedSlot > 0 && includedSlot <= latestCommitment.Slot() {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", includedSlot)
@@ -54,7 +55,7 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 
 	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 	spentSlot := s.SlotSpent()
-	if spentSlot <= latestCommitment.Slot() {
+	if spentSlot > 0 && spentSlot <= latestCommitment.Slot() {
 		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to load commitment with slot: %d", spentSlot)
@@ -65,11 +66,11 @@ func NewLedgerSpent(s *utxoledger.Spent) (*inx.LedgerSpent, error) {
 	return l, nil
 }
 
-func NewLedgerUpdateBatchBegin(slot iotago.SlotIndex, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
+func NewLedgerUpdateBatchBegin(commitmentID iotago.CommitmentID, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
 	return &inx.LedgerUpdate{
 		Op: &inx.LedgerUpdate_BatchMarker{
 			BatchMarker: &inx.LedgerUpdate_Marker{
-				Slot:          uint32(slot),
+				CommitmentId:  inx.NewCommitmentId(commitmentID),
 				MarkerType:    inx.LedgerUpdate_Marker_BEGIN,
 				CreatedCount:  uint32(newOutputsCount),
 				ConsumedCount: uint32(newSpentsCount),
@@ -78,11 +79,11 @@ func NewLedgerUpdateBatchBegin(slot iotago.SlotIndex, newOutputsCount int, newSp
 	}
 }
 
-func NewLedgerUpdateBatchEnd(slot iotago.SlotIndex, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
+func NewLedgerUpdateBatchEnd(commitmentID iotago.CommitmentID, newOutputsCount int, newSpentsCount int) *inx.LedgerUpdate {
 	return &inx.LedgerUpdate{
 		Op: &inx.LedgerUpdate_BatchMarker{
 			BatchMarker: &inx.LedgerUpdate_Marker{
-				Slot:          uint32(slot),
+				CommitmentId:  inx.NewCommitmentId(commitmentID),
 				MarkerType:    inx.LedgerUpdate_Marker_END,
 				CreatedCount:  uint32(newOutputsCount),
 				ConsumedCount: uint32(newSpentsCount),
@@ -191,8 +192,13 @@ func (s *Server) ReadUnspentOutputs(_ *inx.NoParams, srv inx.INX_ReadUnspentOutp
 
 func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_ListenToLedgerUpdatesServer) error {
 	createLedgerUpdatePayloadAndSend := func(slot iotago.SlotIndex, outputs utxoledger.Outputs, spents utxoledger.Spents) error {
+		commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
+		if err != nil {
+			return status.Errorf(codes.NotFound, "commitment for slot %d not found", slot)
+		}
+
 		// Send Begin
-		if err := srv.Send(NewLedgerUpdateBatchBegin(slot, len(outputs), len(spents))); err != nil {
+		if err := srv.Send(NewLedgerUpdateBatchBegin(commitment.ID(), len(outputs), len(spents))); err != nil {
 			return fmt.Errorf("send error: %w", err)
 		}
 
@@ -221,7 +227,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		}
 
 		// Send End
-		if err := srv.Send(NewLedgerUpdateBatchEnd(slot, len(outputs), len(spents))); err != nil {
+		if err := srv.Send(NewLedgerUpdateBatchEnd(commitment.ID(), len(outputs), len(spents))); err != nil {
 			return fmt.Errorf("send error: %w", err)
 		}
 
@@ -317,8 +323,8 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 
 	wp := workerpool.New("ListenToLedgerUpdates", workerpool.WithWorkerCount(workerCount)).Start()
 
-	unhook := deps.Protocol.Events.Engine.Ledger.StateDiffApplied.Hook(func(slot iotago.SlotIndex, newOutputs utxoledger.Outputs, newSpents utxoledger.Spents) {
-		done, err := handleRangedSend2(slot, newOutputs, newSpents, stream, catchUpFunc, sendFunc)
+	unhook := deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
+		done, err := handleRangedSend2(scd.Commitment.Slot(), scd.OutputsCreated, scd.OutputsConsumed, stream, catchUpFunc, sendFunc)
 		switch {
 		case err != nil:
 			innerErr = err
@@ -353,7 +359,8 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 		if err := transactionMetadata.Inputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
 			spentOutput, ok := stateMetadata.State().(*utxoledger.Output)
 			if !ok {
-				return ierrors.Errorf("unexpected state metadata type: %T", stateMetadata.State())
+				// not an Output, so we don't need to send it (could be MockedState, Commitment, BlockIssuanceCreditInput, RewardInput, etc.)
+				return nil
 			}
 
 			inxSpent, err := NewLedgerSpent(utxoledger.NewSpent(spentOutput, transactionMetadata.ID(), slot))
@@ -366,13 +373,16 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 		}); err != nil {
 			Component.LogErrorf("error creating payload: %v", err)
 			cancel()
+
+			return
 		}
 
 		var created []*inx.LedgerOutput
 		if err := transactionMetadata.Outputs().ForEach(func(stateMetadata mempool.StateMetadata) error {
 			output, ok := stateMetadata.State().(*utxoledger.Output)
 			if !ok {
-				return ierrors.Errorf("unexpected state metadata type: %T", stateMetadata.State())
+				// not an Output, so we don't need to send it (could be MockedState, Commitment, BlockIssuanceCreditInput, RewardInput, etc.)
+				return nil
 			}
 
 			inxOutput, err := NewLedgerOutput(output)
@@ -385,6 +395,8 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 		}); err != nil {
 			Component.LogErrorf("error creating payload: %v", err)
 			cancel()
+
+			return
 		}
 
 		payload := &inx.AcceptedTransaction{
@@ -393,6 +405,12 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 			Consumed:      consumed,
 			Created:       created,
 		}
+
+		if ctx.Err() != nil {
+			// context is done, so we don't need to send the payload
+			return
+		}
+
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
 			cancel()
