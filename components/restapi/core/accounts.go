@@ -16,7 +16,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
+func congestionByAccountAddress(c echo.Context) (*apimodels.CongestionResponse, error) {
 	commitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, restapipkg.ParameterCommitmentID)
 	if err != nil {
 		return nil, err
@@ -32,14 +32,14 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	}
 
 	hrp := deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()
-	address, err := httpserver.ParseBech32AddressParam(c, hrp, restapipkg.ParameterBech32Address)
+	address, err := httpserver.ParseBech32AddressParam(c, hrp, restapipkg.ParameterAddress)
 	if err != nil {
 		return nil, err
 	}
 
 	accountAddress, ok := address.(*iotago.AccountAddress)
 	if !ok {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to parse bech32 address %s", c.Param(restapipkg.ParameterBech32Address))
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to assert account address %s", c.Param(restapipkg.ParameterAddress))
 	}
 
 	accountID := accountAddress.AccountID()
@@ -114,13 +114,21 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	return resp, nil
 }
 
-func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
-	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterBech32Address)
+func validatorByAccountAddress(c echo.Context) (*apimodels.ValidatorResponse, error) {
+	hrp := deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()
+	address, err := httpserver.ParseBech32AddressQueryParam(c, hrp, restapipkg.ParameterAddress)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse account ID %s", c.Param(restapipkg.ParameterBech32Address))
+		return nil, ierrors.Wrapf(err, "failed to parse account address %s", c.Param(restapipkg.ParameterAddress))
 	}
+
+	accountAddress, ok := address.(*iotago.AccountAddress)
+	if !ok {
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to assert account address %s", c.Param(restapipkg.ParameterAddress))
+	}
+
 	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
+	accountID := accountAddress.AccountID()
 	accountData, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)
@@ -128,6 +136,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	if !exists {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "account %s not found for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
+
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
 	active, err := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, nextEpoch)
