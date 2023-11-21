@@ -32,14 +32,14 @@ func congestionByAccountAddress(c echo.Context) (*apimodels.CongestionResponse, 
 	}
 
 	hrp := deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()
-	address, err := httpserver.ParseBech32AddressParam(c, hrp, restapipkg.ParameterAddress)
+	address, err := httpserver.ParseBech32AddressParam(c, hrp, restapipkg.ParameterBech32Address)
 	if err != nil {
 		return nil, err
 	}
 
 	accountAddress, ok := address.(*iotago.AccountAddress)
 	if !ok {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to assert account address %s", c.Param(restapipkg.ParameterAddress))
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(restapipkg.ParameterBech32Address))
 	}
 
 	accountID := accountAddress.AccountID()
@@ -116,14 +116,14 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 
 func validatorByAccountAddress(c echo.Context) (*apimodels.ValidatorResponse, error) {
 	hrp := deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()
-	address, err := httpserver.ParseBech32AddressQueryParam(c, hrp, restapipkg.ParameterAddress)
+	address, err := httpserver.ParseBech32AddressParam(c, hrp, restapipkg.ParameterBech32Address)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse account address %s", c.Param(restapipkg.ParameterAddress))
+		return nil, err
 	}
 
 	accountAddress, ok := address.(*iotago.AccountAddress)
 	if !ok {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to assert account address %s", c.Param(restapipkg.ParameterAddress))
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(restapipkg.ParameterBech32Address))
 	}
 
 	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()

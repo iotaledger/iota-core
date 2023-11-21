@@ -112,10 +112,10 @@ const (
 	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
 	// RouteCongestion is the route for getting the current congestion state and all account related useful details as block issuance credits.
-	// GET returns the congestion state related to the specified account. (optional query parameters: "commitmentID" to specify the used commitment)
+	// GET returns the congestion state related to the specified account address. (optional query parameters: "commitmentID" to specify the used commitment)
 	// MIMEApplicationJSON => json.
 	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteCongestion = "/accounts/:" + restapipkg.ParameterAddress + "/congestion"
+	RouteCongestion = "/accounts/:" + restapipkg.ParameterBech32Address + "/congestion"
 
 	// RouteValidators is the route for getting informations about the current validators.
 	// GET returns the paginated response with the list of validators.
@@ -127,7 +127,7 @@ const (
 	// GET returns the validator details.
 	// MIMEApplicationJSON => json.
 	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterAddress
+	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterBech32Address
 
 	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
 	// Rewards are decayed up to returned epochEnd index.
