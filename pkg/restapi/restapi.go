@@ -27,9 +27,6 @@ const (
 	// ParameterCommitmentID is used to identify a slot commitment by its ID.
 	ParameterCommitmentID = "commitmentID"
 
-	// ParameterAccountID is used to identify an account by its ID.
-	ParameterAccountID = "accountID"
-
 	// ParameterBech32Address is used to identify an account address by its bech32 address.
 	ParameterBech32Address = "bech32Address"
 

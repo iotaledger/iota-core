@@ -127,7 +127,7 @@ const (
 	// GET returns the validator details.
 	// MIMEApplicationJSON => json.
 	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterAccountID
+	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterBech32Address
 
 	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
 	// Rewards are decayed up to returned epochEnd index.

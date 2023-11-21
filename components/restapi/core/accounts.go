@@ -34,10 +34,10 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	hrp := deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()
 	address, err := httpserver.ParseBech32AddressParam(c, hrp, restapipkg.ParameterBech32Address)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse bech32 address %s", c.Param(restapipkg.ParameterBech32Address))
+		return nil, err
 	}
 
-	accountAddress, ok := address.Clone().(*iotago.AccountAddress)
+	accountAddress, ok := address.(*iotago.AccountAddress)
 	if !ok {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to parse bech32 address %s", c.Param(restapipkg.ParameterBech32Address))
 	}
@@ -115,9 +115,9 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 }
 
 func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
-	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
+	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterBech32Address)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse account ID %s", c.Param(restapipkg.ParameterAccountID))
+		return nil, ierrors.Wrapf(err, "failed to parse account ID %s", c.Param(restapipkg.ParameterBech32Address))
 	}
 	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
