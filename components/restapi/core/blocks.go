@@ -6,7 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
@@ -66,23 +65,10 @@ func blockWithMetadataByID(c echo.Context) (*apimodels.BlockWithMetadataResponse
 	}, nil
 }
 
-func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHeaderResponse, error) {
+func blockIssuance() (*apimodels.IssuanceBlockHeaderResponse, error) {
 	references := deps.Protocol.MainEngineInstance().TipSelection.SelectTips(iotago.BasicBlockMaxParents)
-
-	var slotCommitment *model.Commitment
-	var err error
-	// by default we use latest commitment
-	if slotIndex == 0 {
-		slotCommitment = deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
-	} else {
-		slotCommitment, err = deps.Protocol.MainEngineInstance().Storage.Commitments().Load(slotIndex)
-		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to load commitment for requested slot %d: %s", slotIndex, err)
-		}
-	}
-
 	if len(references[iotago.StrongParentType]) == 0 {
-		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "get references failed")
+		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "no strong parents available")
 	}
 
 	resp := &apimodels.IssuanceBlockHeaderResponse{
@@ -90,7 +76,7 @@ func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHe
 		WeakParents:         references[iotago.WeakParentType],
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType],
 		LatestFinalizedSlot: deps.Protocol.MainEngineInstance().SyncManager.LatestFinalizedSlot(),
-		Commitment:          slotCommitment.Commitment(),
+		Commitment:          deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Commitment(),
 	}
 
 	return resp, nil

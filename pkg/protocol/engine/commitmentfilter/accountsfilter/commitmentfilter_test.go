@@ -39,13 +39,6 @@ func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter .
 	}
 	tf.CommitmentFilter = New(apiProvider, optsFilter...)
 
-	tf.CommitmentFilter.commitmentFunc = func(slot iotago.SlotIndex) (*model.Commitment, error) {
-		if commitment, ok := tf.commitments[slot]; ok {
-			return commitment, nil
-		}
-		return nil, ierrors.Errorf("no commitment available for slot index %d", slot)
-	}
-
 	tf.CommitmentFilter.accountRetrieveFunc = func(accountID iotago.AccountID, targetSlot iotago.SlotIndex) (*accounts.AccountData, bool, error) {
 		if accountData, ok := tf.accountData[accountID]; ok {
 			return accountData, true, nil

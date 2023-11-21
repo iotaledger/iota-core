@@ -22,7 +22,19 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		return nil, err
 	}
 
+	commitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, restapipkg.ParameterCommitmentID)
+	if err != nil {
+		return nil, err
+	}
+
 	commitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+	if commitmentID != iotago.EmptyCommitmentID {
+		// a commitment ID was provided, so we use the commitment for that ID
+		commitment, err = getCommitmentByID(commitmentID, commitment)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, commitment.Slot())
 	if err != nil {
