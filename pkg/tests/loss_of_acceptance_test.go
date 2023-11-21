@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
@@ -126,6 +127,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	node2 := ts.AddNode("node2")
 
 	ts.Run(true, nil)
+	node2.Protocol.SetLogLevel(log.LevelTrace)
 
 	// Issue up to slot 10, committing slot 8.
 	{
@@ -221,6 +223,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	node2 := ts.AddNode("node2")
 
 	ts.Run(true, nil)
+	node2.Protocol.SetLogLevel(log.LevelTrace)
 
 	// Issue up to slot 10, committing slot 8.
 	{
