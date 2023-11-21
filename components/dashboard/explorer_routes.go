@@ -172,7 +172,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 		t.LikedInsteadChildren = lo.Map(cachedBlock.ShallowLikeChildren(), func(childBlock *blocks.Block) string {
 			return childBlock.ID().ToHex()
 		})
-		t.SpendIDs = lo.Map(cachedBlock.SpendIDs().ToSlice(), func(spendID iotago.TransactionID) string {
+		t.SpendIDs = lo.Map(cachedBlock.SpenderIDs().ToSlice(), func(spendID iotago.TransactionID) string {
 			return spendID.ToHex()
 		})
 	} else {
@@ -233,7 +233,7 @@ func getTransactionMetadata(c echo.Context) error {
 		return ierrors.Errorf("tx metadata not found: %s", txID.ToHex())
 	}
 
-	conflicts, _ := deps.Protocol.MainEngineInstance().Ledger.SpendDAG().ConflictingSpends(txID)
+	conflicts, _ := deps.Protocol.MainEngineInstance().Ledger.SpendDAG().ConflictingSpenders(txID)
 
 	return httpserver.JSONResponse(c, http.StatusOK, NewTransactionMetadata(txMetadata, conflicts))
 }

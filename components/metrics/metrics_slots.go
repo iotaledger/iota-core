@@ -93,7 +93,7 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 				deps.Collector.Update(slotNamespace, createdConflicts, 0, strconv.Itoa(eventSlot))
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.Events.Engine.SpendDAG.SpendCreated.Hook(func(spendID iotago.TransactionID) {
+			deps.Protocol.Events.Engine.SpendDAG.SpenderCreated.Hook(func(spendID iotago.TransactionID) {
 				if txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadata(spendID); exists {
 					for _, attachment := range txMetadata.ValidAttachments() {
 						deps.Collector.Increment(slotNamespace, createdConflicts, strconv.Itoa(int(attachment.Slot())))
@@ -115,7 +115,7 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 				deps.Collector.Update(slotNamespace, acceptedConflicts, 0, strconv.Itoa(eventSlot))
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.Events.Engine.SpendDAG.SpendAccepted.Hook(func(spendID iotago.TransactionID) {
+			deps.Protocol.Events.Engine.SpendDAG.SpenderAccepted.Hook(func(spendID iotago.TransactionID) {
 				if txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadata(spendID); exists {
 					for _, attachmentBlockID := range txMetadata.ValidAttachments() {
 						if attachment, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(attachmentBlockID); exists && attachment.IsAccepted() {
@@ -139,7 +139,7 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 				deps.Collector.Update(slotNamespace, rejectedConflicts, 0, strconv.Itoa(eventSlot))
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.Events.Engine.SpendDAG.SpendRejected.Hook(func(spendID iotago.TransactionID) {
+			deps.Protocol.Events.Engine.SpendDAG.SpenderRejected.Hook(func(spendID iotago.TransactionID) {
 				if txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.TransactionMetadata(spendID); exists {
 					for _, attachmentBlockID := range txMetadata.ValidAttachments() {
 						if attachment, exists := deps.Protocol.MainEngineInstance().BlockCache.Block(attachmentBlockID); exists && attachment.IsAccepted() {

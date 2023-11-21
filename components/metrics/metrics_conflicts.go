@@ -21,7 +21,7 @@ var ConflictMetrics = collector.NewCollection(conflictNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Time since transaction issuance to the conflict acceptance"),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.SpendDAG.SpendAccepted.Hook(func(spendID iotago.TransactionID) {
+			deps.Protocol.Events.Engine.SpendDAG.SpenderAccepted.Hook(func(spendID iotago.TransactionID) {
 				if txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(spendID); exists {
 					firstAttachmentID := txMetadata.EarliestIncludedAttachment()
 					if block, blockExists := deps.Protocol.MainEngineInstance().BlockFromCache(firstAttachmentID); blockExists {
@@ -37,7 +37,7 @@ var ConflictMetrics = collector.NewCollection(conflictNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Number of resolved (accepted) conflicts"),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.SpendDAG.SpendAccepted.Hook(func(spendID iotago.TransactionID) {
+			deps.Protocol.Events.Engine.SpendDAG.SpenderAccepted.Hook(func(spendID iotago.TransactionID) {
 				deps.Collector.Increment(conflictNamespace, resolvedConflictCount)
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
@@ -46,7 +46,7 @@ var ConflictMetrics = collector.NewCollection(conflictNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Number of created conflicts"),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.SpendDAG.SpendCreated.Hook(func(spendID iotago.TransactionID) {
+			deps.Protocol.Events.Engine.SpendDAG.SpenderCreated.Hook(func(spendID iotago.TransactionID) {
 				deps.Collector.Increment(conflictNamespace, allConflictCounts)
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),
