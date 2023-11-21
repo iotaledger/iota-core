@@ -365,7 +365,7 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 func (m *MemPool[VoteRank]) forkTransaction(transactionMetadata *TransactionMetadata, resourceIDs ds.Set[mempool.StateID]) {
 	transactionMetadata.conflicting.Trigger()
 
-	if err := m.spendDAG.UpdateConflictingResources(transactionMetadata.ID(), resourceIDs); err != nil {
+	if err := m.spendDAG.UpdateSpentResources(transactionMetadata.ID(), resourceIDs); err != nil {
 		// this is a hack, as with a reactive.Variable we cannot set it to 0 and still check if it was orphaned.
 		transactionMetadata.orphanedSlot.Set(1)
 
@@ -457,7 +457,7 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 }
 
 func (m *MemPool[VoteRank]) setup() {
-	m.spendDAG.Events().SpendAccepted.Hook(func(id iotago.TransactionID) {
+	m.spendDAG.Events().SpenderAccepted.Hook(func(id iotago.TransactionID) {
 		if transaction, exists := m.cachedTransactions.Get(id); exists {
 			transaction.setConflictAccepted()
 		}
@@ -480,9 +480,9 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	})
 
 	transaction.OnConflicting(func() {
-		m.spendDAG.CreateSpend(transaction.ID())
+		m.spendDAG.CreateSpender(transaction.ID())
 
-		unsubscribe := transaction.parentSpendIDs.OnUpdate(func(appliedMutations ds.SetMutations[iotago.TransactionID]) {
+		unsubscribe := transaction.parentSpenderIDs.OnUpdate(func(appliedMutations ds.SetMutations[iotago.TransactionID]) {
 			if err := m.spendDAG.UpdateSpendParents(transaction.ID(), appliedMutations.AddedElements(), appliedMutations.DeletedElements()); err != nil {
 				panic(err)
 			}
@@ -491,7 +491,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 		transaction.OnEvicted(func() {
 			unsubscribe()
 
-			m.spendDAG.EvictSpend(transaction.ID())
+			m.spendDAG.EvictSpender(transaction.ID())
 		})
 	})
 

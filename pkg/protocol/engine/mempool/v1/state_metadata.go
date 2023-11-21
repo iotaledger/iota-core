@@ -22,7 +22,7 @@ type StateMetadata struct {
 	spendCommitted     reactive.Variable[*TransactionMetadata]
 	allSpendersRemoved *event.Event
 
-	spendIDs reactive.DerivedSet[iotago.TransactionID]
+	spenderIDs reactive.DerivedSet[iotago.TransactionID]
 
 	*inclusionFlags
 }
@@ -37,7 +37,7 @@ func NewStateMetadata(state mempool.State, optSource ...*TransactionMetadata) *S
 		spendCommitted:     reactive.NewVariable[*TransactionMetadata](),
 		allSpendersRemoved: event.New(),
 
-		spendIDs: reactive.NewDerivedSet[iotago.TransactionID](),
+		spenderIDs: reactive.NewDerivedSet[iotago.TransactionID](),
 
 		inclusionFlags: newInclusionFlags(),
 	}).setup(optSource...)
@@ -49,7 +49,7 @@ func (s *StateMetadata) setup(optSource ...*TransactionMetadata) *StateMetadata 
 	}
 	source := optSource[0]
 
-	s.spendIDs.InheritFrom(source.spendIDs)
+	s.spenderIDs.InheritFrom(source.spenderIDs)
 
 	source.OnPending(func() { s.accepted.Set(false) })
 	source.OnAccepted(func() { s.accepted.Set(true) })
@@ -64,8 +64,8 @@ func (s *StateMetadata) State() mempool.State {
 	return s.state
 }
 
-func (s *StateMetadata) SpendIDs() reactive.Set[iotago.TransactionID] {
-	return s.spendIDs
+func (s *StateMetadata) SpenderIDs() reactive.Set[iotago.TransactionID] {
+	return s.spenderIDs
 }
 
 func (s *StateMetadata) IsDoubleSpent() bool {

@@ -274,19 +274,19 @@ func TestSpendPropagation(t *testing.T, tf *TestFramework) {
 	require.NoError(t, tf.AttachTransaction("tx1-signed", "tx1", "block1", 1))
 
 	tf.RequireBooked("tx1", "tx2", "tx3")
-	tf.RequireSpendIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx3"}})
+	tf.RequireSpenderIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx3"}})
 
 	require.NoError(t, tf.AttachTransaction("tx3*-signed", "tx3*", "block3*", 3))
 	require.NoError(t, tf.AttachTransaction("tx2*-signed", "tx2*", "block2*", 2))
 	require.NoError(t, tf.AttachTransaction("tx1*-signed", "tx1*", "block1*", 1))
 
 	tf.RequireBooked("tx1*", "tx2*", "tx3*")
-	tf.RequireSpendIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx3"}, "tx1*": {"tx1*"}, "tx2*": {"tx2*"}, "tx3*": {"tx3*"}})
+	tf.RequireSpenderIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx3"}, "tx1*": {"tx1*"}, "tx2*": {"tx2*"}, "tx3*": {"tx3*"}})
 
 	require.NoError(t, tf.AttachTransaction("tx4-signed", "tx4", "block4", 2))
 
 	tf.RequireBooked("tx4")
-	tf.RequireSpendIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx3"}, "tx4": {"tx4"}, "tx1*": {"tx1*"}, "tx2*": {"tx2*"}, "tx3*": {"tx3*"}})
+	tf.RequireSpenderIDs(map[string][]string{"tx1": {"tx1"}, "tx2": {"tx2"}, "tx3": {"tx3"}, "tx4": {"tx4"}, "tx1*": {"tx1*"}, "tx2*": {"tx2*"}, "tx3*": {"tx3*"}})
 }
 
 func TestInvalidTransaction(t *testing.T, tf *TestFramework) {

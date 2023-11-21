@@ -29,11 +29,11 @@ type (
 		Confirmed    bool `json:"confirmed"`
 
 		Witnesses []string `json:"witnesses"`
-		// spendIDs are the all spendIDs of the block inherited from the parents + payloadSpendIDs.
-		SpendIDs []iotago.TransactionID `json:"spendIDs"`
-		// payloadSpendIDs are the spendIDs of the block's payload (in case it is a transaction, otherwise empty).
-		PayloadSpendIDs []iotago.TransactionID `json:"payloadSpendIDs"`
-		String          string                 `json:"string"`
+		// spenderIDs are the all spenderIDs of the block inherited from the parents + payloadSpenderIDs.
+		SpenderIDs []iotago.TransactionID `json:"spenderIDs"`
+		// payloadSpenderIDs are the spenderIDs of the block's payload (in case it is a transaction, otherwise empty).
+		PayloadSpenderIDs []iotago.TransactionID `json:"payloadSpenderIDs"`
+		String            string                 `json:"string"`
 	}
 
 	Validator struct {
@@ -82,8 +82,8 @@ func BlockMetadataResponseFromBlock(block *blocks.Block) *BlockMetadataResponse 
 		PreConfirmed:       block.IsPreConfirmed(),
 		Confirmed:          block.IsConfirmed(),
 		Witnesses:          lo.Map(block.Witnesses(), func(seatIndex account.SeatIndex) string { return fmt.Sprintf("%d", seatIndex) }),
-		SpendIDs:           block.SpendIDs().ToSlice(),
-		PayloadSpendIDs:    block.PayloadSpendIDs().ToSlice(),
+		SpenderIDs:         block.SpenderIDs().ToSlice(),
+		PayloadSpenderIDs:  block.PayloadSpenderIDs().ToSlice(),
 		String:             block.String(),
 	}
 }

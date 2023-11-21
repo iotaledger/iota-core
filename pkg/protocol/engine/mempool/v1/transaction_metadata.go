@@ -15,13 +15,13 @@ import (
 )
 
 type TransactionMetadata struct {
-	id              iotago.TransactionID
-	inputReferences []mempool.StateReference
-	inputs          []*StateMetadata
-	outputs         []*StateMetadata
-	transaction     mempool.Transaction
-	parentSpendIDs  reactive.DerivedSet[iotago.TransactionID]
-	spendIDs        reactive.DerivedSet[iotago.TransactionID]
+	id               iotago.TransactionID
+	inputReferences  []mempool.StateReference
+	inputs           []*StateMetadata
+	outputs          []*StateMetadata
+	transaction      mempool.Transaction
+	parentSpenderIDs reactive.DerivedSet[iotago.TransactionID]
+	spenderIDs       reactive.DerivedSet[iotago.TransactionID]
 
 	// lifecycle events
 	unsolidInputsCount uint64
@@ -65,12 +65,12 @@ func NewTransactionMetadata(transaction mempool.Transaction, referencedInputs []
 	}
 
 	return (&TransactionMetadata{
-		id:              transactionID,
-		inputReferences: referencedInputs,
-		inputs:          make([]*StateMetadata, len(referencedInputs)),
-		transaction:     transaction,
-		parentSpendIDs:  reactive.NewDerivedSet[iotago.TransactionID](),
-		spendIDs:        reactive.NewDerivedSet[iotago.TransactionID](),
+		id:               transactionID,
+		inputReferences:  referencedInputs,
+		inputs:           make([]*StateMetadata, len(referencedInputs)),
+		transaction:      transaction,
+		parentSpenderIDs: reactive.NewDerivedSet[iotago.TransactionID](),
+		spenderIDs:       reactive.NewDerivedSet[iotago.TransactionID](),
 
 		unsolidInputsCount: uint64(len(referencedInputs)),
 		booked:             reactive.NewEvent(),
@@ -127,8 +127,8 @@ func (t *TransactionMetadata) Outputs() ds.Set[mempool.StateMetadata] {
 	return outputs
 }
 
-func (t *TransactionMetadata) SpendIDs() reactive.Set[iotago.TransactionID] {
-	return t.spendIDs
+func (t *TransactionMetadata) SpenderIDs() reactive.Set[iotago.TransactionID] {
+	return t.spenderIDs
 }
 
 func (t *TransactionMetadata) publishInput(index int, input *StateMetadata) {
@@ -247,7 +247,7 @@ func (t *TransactionMetadata) setConflictAccepted() {
 }
 
 func (t *TransactionMetadata) setupInput(input *StateMetadata) {
-	t.parentSpendIDs.InheritFrom(input.spendIDs)
+	t.parentSpenderIDs.InheritFrom(input.spenderIDs)
 
 	input.OnRejected(func() { t.rejected.Trigger() })
 	input.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
@@ -286,12 +286,12 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 }
 
 func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
-	cancelConflictInheritance := t.spendIDs.InheritFrom(t.parentSpendIDs)
+	cancelConflictInheritance := t.spenderIDs.InheritFrom(t.parentSpenderIDs)
 
 	t.OnConflicting(func() {
 		cancelConflictInheritance()
 
-		t.spendIDs.Replace(ds.NewSet(t.id))
+		t.spenderIDs.Replace(ds.NewSet(t.id))
 	})
 
 	t.allValidAttachmentsEvicted.OnUpdate(func(_ iotago.SlotIndex, slot iotago.SlotIndex) {

@@ -20,20 +20,20 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type TestSpend = *Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
+type TestSpender = *Spender[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-//var NewTestSpend = NewSpend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
+//var NewTestSpend = NewSpender[iotago.TransactionID, iotago.OutputID, vote.MockedRank]
 
-func NewTestSpend(id iotago.TransactionID, parentSpends ds.Set[*Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], SpendSets ds.Set[*SpendSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank] {
-	spend := NewSpend[iotago.TransactionID, iotago.OutputID, vote.MockedRank](id, initialWeight, pendingTasksCounter, acceptanceThresholdProvider)
-	_, err := spend.JoinSpendSets(SpendSets)
+func NewTestSpender(id iotago.TransactionID, parentSpends ds.Set[*Spender[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], SpendSets ds.Set[*SpendSet[iotago.TransactionID, iotago.OutputID, vote.MockedRank]], initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Spender[iotago.TransactionID, iotago.OutputID, vote.MockedRank] {
+	spender := NewSpender[iotago.TransactionID, iotago.OutputID, vote.MockedRank](id, initialWeight, pendingTasksCounter, acceptanceThresholdProvider)
+	_, err := spender.JoinSpendSets(SpendSets)
 	if err != nil {
 		// TODO: change this
 		panic(err)
 	}
-	spend.UpdateParents(parentSpends, ds.NewSet[*Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]]())
+	spender.UpdateParents(parentSpends, ds.NewSet[*Spender[iotago.TransactionID, iotago.OutputID, vote.MockedRank]]())
 
-	return spend
+	return spender
 }
 
 func TestSpend_SetRejected(t *testing.T) {
@@ -44,16 +44,16 @@ func TestSpend_SetRejected(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	Spend1 := NewTestSpend(transactionID("Spend1"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
-	Spend2 := NewTestSpend(transactionID("Spend2"), ds.NewSet(Spend1), nil, weight.New(), pendingTasks, thresholdProvider)
-	Spend3 := NewTestSpend(transactionID("Spend3"), ds.NewSet(Spend2), nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend1 := NewTestSpender(transactionID("Spend1"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend2 := NewTestSpender(transactionID("Spend2"), ds.NewSet(Spend1), nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend3 := NewTestSpender(transactionID("Spend3"), ds.NewSet(Spend2), nil, weight.New(), pendingTasks, thresholdProvider)
 
 	Spend1.setAcceptanceState(acceptance.Rejected)
 	require.True(t, Spend1.IsRejected())
 	require.True(t, Spend2.IsRejected())
 	require.True(t, Spend3.IsRejected())
 
-	Spend4 := NewTestSpend(transactionID("Spend4"), ds.NewSet(Spend1), nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend4 := NewTestSpender(transactionID("Spend4"), ds.NewSet(Spend1), nil, weight.New(), pendingTasks, thresholdProvider)
 	require.True(t, Spend4.IsRejected())
 }
 
@@ -65,9 +65,9 @@ func TestSpend_UpdateParents(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	Spend1 := NewTestSpend(transactionID("Spend1"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
-	Spend2 := NewTestSpend(transactionID("Spend2"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
-	Spend3 := NewTestSpend(transactionID("Spend3"), ds.NewSet(Spend1, Spend2), nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend1 := NewTestSpender(transactionID("Spend1"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend2 := NewTestSpender(transactionID("Spend2"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend3 := NewTestSpender(transactionID("Spend3"), ds.NewSet(Spend1, Spend2), nil, weight.New(), pendingTasks, thresholdProvider)
 
 	require.True(t, Spend3.Parents.Has(Spend1))
 	require.True(t, Spend3.Parents.Has(Spend2))
@@ -85,9 +85,9 @@ func TestSpend_SetAccepted(t *testing.T) {
 		SpendSet1 := NewTestSpendSet(id("SpendSet1"))
 		SpendSet2 := NewTestSpendSet(id("SpendSet2"))
 
-		Spend1 := NewTestSpend(transactionID("Spend1"), nil, ds.NewSet(SpendSet1), weight.New(), pendingTasks, thresholdProvider)
-		Spend2 := NewTestSpend(transactionID("Spend2"), nil, ds.NewSet(SpendSet1, SpendSet2), weight.New(), pendingTasks, thresholdProvider)
-		Spend3 := NewTestSpend(transactionID("Spend3"), nil, ds.NewSet(SpendSet2), weight.New(), pendingTasks, thresholdProvider)
+		Spend1 := NewTestSpender(transactionID("Spend1"), nil, ds.NewSet(SpendSet1), weight.New(), pendingTasks, thresholdProvider)
+		Spend2 := NewTestSpender(transactionID("Spend2"), nil, ds.NewSet(SpendSet1, SpendSet2), weight.New(), pendingTasks, thresholdProvider)
+		Spend3 := NewTestSpender(transactionID("Spend3"), nil, ds.NewSet(SpendSet2), weight.New(), pendingTasks, thresholdProvider)
 
 		require.Equal(t, acceptance.Pending, Spend1.setAcceptanceState(acceptance.Accepted))
 		require.True(t, Spend1.IsAccepted())
@@ -106,9 +106,9 @@ func TestSpend_SetAccepted(t *testing.T) {
 		SpendSet1 := NewTestSpendSet(id("SpendSet1"))
 		SpendSet2 := NewTestSpendSet(id("SpendSet2"))
 
-		Spend1 := NewTestSpend(transactionID("Spend1"), nil, ds.NewSet(SpendSet1), weight.New(), pendingTasks, thresholdProvider)
-		Spend2 := NewTestSpend(transactionID("Spend2"), nil, ds.NewSet(SpendSet1, SpendSet2), weight.New(), pendingTasks, thresholdProvider)
-		Spend3 := NewTestSpend(transactionID("Spend3"), nil, ds.NewSet(SpendSet2), weight.New(), pendingTasks, thresholdProvider)
+		Spend1 := NewTestSpender(transactionID("Spend1"), nil, ds.NewSet(SpendSet1), weight.New(), pendingTasks, thresholdProvider)
+		Spend2 := NewTestSpender(transactionID("Spend2"), nil, ds.NewSet(SpendSet1, SpendSet2), weight.New(), pendingTasks, thresholdProvider)
+		Spend3 := NewTestSpender(transactionID("Spend3"), nil, ds.NewSet(SpendSet2), weight.New(), pendingTasks, thresholdProvider)
 
 		Spend2.setAcceptanceState(acceptance.Accepted)
 		require.True(t, Spend1.IsRejected())
@@ -130,13 +130,13 @@ func TestSpend_SpendSets(t *testing.T) {
 	green := NewTestSpendSet(id("green"))
 	yellow := NewTestSpendSet(id("yellow"))
 
-	SpendA := NewTestSpend(transactionID("A"), nil, ds.NewSet(red), weight.New().AddCumulativeWeight(7), pendingTasks, thresholdProvider)
-	SpendB := NewTestSpend(transactionID("B"), nil, ds.NewSet(red, blue), weight.New().AddCumulativeWeight(3), pendingTasks, thresholdProvider)
-	SpendC := NewTestSpend(transactionID("C"), nil, ds.NewSet(blue, green), weight.New().AddCumulativeWeight(5), pendingTasks, thresholdProvider)
-	SpendD := NewTestSpend(transactionID("D"), nil, ds.NewSet(green, yellow), weight.New().AddCumulativeWeight(7), pendingTasks, thresholdProvider)
-	SpendE := NewTestSpend(transactionID("E"), nil, ds.NewSet(yellow), weight.New().AddCumulativeWeight(9), pendingTasks, thresholdProvider)
+	SpendA := NewTestSpender(transactionID("A"), nil, ds.NewSet(red), weight.New().AddCumulativeWeight(7), pendingTasks, thresholdProvider)
+	SpendB := NewTestSpender(transactionID("B"), nil, ds.NewSet(red, blue), weight.New().AddCumulativeWeight(3), pendingTasks, thresholdProvider)
+	SpendC := NewTestSpender(transactionID("C"), nil, ds.NewSet(blue, green), weight.New().AddCumulativeWeight(5), pendingTasks, thresholdProvider)
+	SpendD := NewTestSpender(transactionID("D"), nil, ds.NewSet(green, yellow), weight.New().AddCumulativeWeight(7), pendingTasks, thresholdProvider)
+	SpendE := NewTestSpender(transactionID("E"), nil, ds.NewSet(yellow), weight.New().AddCumulativeWeight(9), pendingTasks, thresholdProvider)
 
-	preferredInsteadMap := map[TestSpend]TestSpend{
+	preferredInsteadMap := map[TestSpender]TestSpender{
 		SpendA: SpendA,
 		SpendB: SpendA,
 		SpendC: SpendC,
@@ -150,7 +150,7 @@ func TestSpend_SpendSets(t *testing.T) {
 	SpendD.Weight.SetCumulativeWeight(10)
 	pendingTasks.WaitIsZero()
 
-	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpend]TestSpend{
+	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpender]TestSpender{
 		SpendC: SpendD,
 		SpendD: SpendD,
 		SpendE: SpendD,
@@ -159,7 +159,7 @@ func TestSpend_SpendSets(t *testing.T) {
 	SpendD.Weight.SetCumulativeWeight(0)
 	pendingTasks.WaitIsZero()
 
-	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpend]TestSpend{
+	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpender]TestSpender{
 		SpendC: SpendC,
 		SpendD: SpendE,
 		SpendE: SpendE,
@@ -168,14 +168,14 @@ func TestSpend_SpendSets(t *testing.T) {
 	SpendC.Weight.SetCumulativeWeight(8)
 	pendingTasks.WaitIsZero()
 
-	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpend]TestSpend{
+	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpender]TestSpender{
 		SpendB: SpendC,
 	}))
 
 	SpendC.Weight.SetCumulativeWeight(8)
 	pendingTasks.WaitIsZero()
 
-	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpend]TestSpend{
+	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpender]TestSpender{
 		SpendB: SpendC,
 	}))
 
@@ -187,22 +187,22 @@ func TestSpend_SpendSets(t *testing.T) {
 	SpendE.Weight.SetCumulativeWeight(1)
 	pendingTasks.WaitIsZero()
 
-	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpend]TestSpend{
+	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpender]TestSpender{
 		SpendD: SpendC,
 	}))
 
 	SpendE.Weight.SetCumulativeWeight(9)
 	pendingTasks.WaitIsZero()
 
-	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpend]TestSpend{
+	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpender]TestSpender{
 		SpendD: SpendE,
 	}))
 
-	SpendF := NewTestSpend(transactionID("F"), nil, ds.NewSet(yellow), weight.New().AddCumulativeWeight(19), pendingTasks, thresholdProvider)
+	SpendF := NewTestSpender(transactionID("F"), nil, ds.NewSet(yellow), weight.New().AddCumulativeWeight(19), pendingTasks, thresholdProvider)
 
 	pendingTasks.WaitIsZero()
 
-	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpend]TestSpend{
+	assertPreferredInstead(t, lo.MergeMaps(preferredInsteadMap, map[TestSpender]TestSpender{
 		SpendD: SpendF,
 		SpendE: SpendF,
 		SpendF: SpendF,
@@ -215,28 +215,28 @@ func TestSpendParallel(t *testing.T) {
 	sequentialPendingTasks := syncutils.NewCounter()
 	parallelPendingTasks := syncutils.NewCounter()
 
-	sequentialSpends := createSpends(sequentialPendingTasks)
+	sequentialSpenders := createSpenders(sequentialPendingTasks)
 	sequentialPendingTasks.WaitIsZero()
 
-	parallelSpends := createSpends(parallelPendingTasks)
+	parallelSpenders := createSpenders(parallelPendingTasks)
 	parallelPendingTasks.WaitIsZero()
 
 	const updateCount = 100000
 
-	permutations := make([]func(Spend TestSpend), 0)
+	permutations := make([]func(Spend TestSpender), 0)
 	for i := 0; i < updateCount; i++ {
 		permutations = append(permutations, generateRandomSpendPermutation())
 	}
 
 	var wg sync.WaitGroup
 	for _, permutation := range permutations {
-		targetAlias := lo.Keys(parallelSpends)[rand.Intn(len(parallelSpends))]
+		targetAlias := lo.Keys(parallelSpenders)[rand.Intn(len(parallelSpenders))]
 
-		permutation(sequentialSpends[targetAlias])
+		permutation(sequentialSpenders[targetAlias])
 
 		wg.Add(1)
-		go func(permutation func(Spend TestSpend)) {
-			permutation(parallelSpends[targetAlias])
+		go func(permutation func(Spend TestSpender)) {
+			permutation(parallelSpenders[targetAlias])
 
 			wg.Done()
 		}(permutation)
@@ -248,12 +248,12 @@ func TestSpendParallel(t *testing.T) {
 
 	parallelPendingTasks.WaitIsZero()
 
-	lo.ForEach(lo.Keys(parallelSpends), func(SpendAlias string) {
-		assert.EqualValuesf(t, sequentialSpends[SpendAlias].PreferredInstead().ID, parallelSpends[SpendAlias].PreferredInstead().ID, "parallel Spend %s prefers %s, but sequential Spend prefers %s", SpendAlias, parallelSpends[SpendAlias].PreferredInstead().ID, sequentialSpends[SpendAlias].PreferredInstead().ID)
+	lo.ForEach(lo.Keys(parallelSpenders), func(SpendAlias string) {
+		assert.EqualValuesf(t, sequentialSpenders[SpendAlias].PreferredInstead().ID, parallelSpenders[SpendAlias].PreferredInstead().ID, "parallel Spend %s prefers %s, but sequential Spend prefers %s", SpendAlias, parallelSpenders[SpendAlias].PreferredInstead().ID, sequentialSpenders[SpendAlias].PreferredInstead().ID)
 	})
 
-	assertCorrectOrder(t, lo.Values(sequentialSpends)...)
-	assertCorrectOrder(t, lo.Values(parallelSpends)...)
+	assertCorrectOrder(t, lo.Values(sequentialSpenders)...)
+	assertCorrectOrder(t, lo.Values(parallelSpenders)...)
 }
 
 func TestLikedInstead1(t *testing.T) {
@@ -264,14 +264,14 @@ func TestLikedInstead1(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	masterBranch := NewTestSpend(transactionID("M"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+	masterBranch := NewTestSpender(transactionID("M"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
 	require.True(t, masterBranch.IsLiked())
 	require.True(t, masterBranch.LikedInstead().IsEmpty())
 
 	SpendSet1 := NewTestSpendSet(id("O1"))
 
-	Spend1 := NewTestSpend(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(6), pendingTasks, thresholdProvider)
-	Spend2 := NewTestSpend(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(3), pendingTasks, thresholdProvider)
+	Spend1 := NewTestSpender(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(6), pendingTasks, thresholdProvider)
+	Spend2 := NewTestSpender(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(3), pendingTasks, thresholdProvider)
 
 	require.True(t, Spend1.IsPreferred())
 	require.True(t, Spend1.IsLiked())
@@ -291,13 +291,13 @@ func TestLikedInsteadFromPreferredInstead(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	masterBranch := NewTestSpend(transactionID("M"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+	masterBranch := NewTestSpender(transactionID("M"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
 	require.True(t, masterBranch.IsLiked())
 	require.True(t, masterBranch.LikedInstead().IsEmpty())
 
 	SpendSet1 := NewTestSpendSet(id("O1"))
-	SpendA := NewTestSpend(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
-	SpendB := NewTestSpend(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
+	SpendA := NewTestSpender(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
+	SpendB := NewTestSpender(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
 
 	require.True(t, SpendA.IsPreferred())
 	require.True(t, SpendA.IsLiked())
@@ -309,8 +309,8 @@ func TestLikedInsteadFromPreferredInstead(t *testing.T) {
 	require.True(t, SpendB.LikedInstead().Has(SpendA))
 
 	SpendSet2 := NewTestSpendSet(id("O2"))
-	SpendC := NewTestSpend(transactionID("TxC"), ds.NewSet(SpendA), ds.NewSet(SpendSet2), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
-	SpendD := NewTestSpend(transactionID("TxD"), ds.NewSet(SpendA), ds.NewSet(SpendSet2), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
+	SpendC := NewTestSpender(transactionID("TxC"), ds.NewSet(SpendA), ds.NewSet(SpendSet2), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
+	SpendD := NewTestSpender(transactionID("TxD"), ds.NewSet(SpendA), ds.NewSet(SpendSet2), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
 
 	require.True(t, SpendC.IsPreferred())
 	require.True(t, SpendC.IsLiked())
@@ -368,13 +368,13 @@ func TestLikedInstead21(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	masterBranch := NewTestSpend(transactionID("M"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+	masterBranch := NewTestSpender(transactionID("M"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
 	require.True(t, masterBranch.IsLiked())
 	require.True(t, masterBranch.LikedInstead().IsEmpty())
 
 	SpendSet1 := NewTestSpendSet(id("O1"))
-	SpendA := NewTestSpend(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
-	SpendB := NewTestSpend(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
+	SpendA := NewTestSpender(transactionID("TxA"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
+	SpendB := NewTestSpender(transactionID("TxB"), ds.NewSet(masterBranch), ds.NewSet(SpendSet1), weight.New().SetCumulativeWeight(100), pendingTasks, thresholdProvider)
 
 	require.True(t, SpendA.IsPreferred())
 	require.True(t, SpendA.IsLiked())
@@ -386,8 +386,8 @@ func TestLikedInstead21(t *testing.T) {
 	require.True(t, SpendB.LikedInstead().Has(SpendA))
 
 	SpendSet4 := NewTestSpendSet(id("O4"))
-	SpendF := NewTestSpend(transactionID("TxF"), ds.NewSet(SpendA), ds.NewSet(SpendSet4), weight.New().SetCumulativeWeight(20), pendingTasks, thresholdProvider)
-	SpendG := NewTestSpend(transactionID("TxG"), ds.NewSet(SpendA), ds.NewSet(SpendSet4), weight.New().SetCumulativeWeight(10), pendingTasks, thresholdProvider)
+	SpendF := NewTestSpender(transactionID("TxF"), ds.NewSet(SpendA), ds.NewSet(SpendSet4), weight.New().SetCumulativeWeight(20), pendingTasks, thresholdProvider)
+	SpendG := NewTestSpender(transactionID("TxG"), ds.NewSet(SpendA), ds.NewSet(SpendSet4), weight.New().SetCumulativeWeight(10), pendingTasks, thresholdProvider)
 
 	require.True(t, SpendF.IsPreferred())
 	require.True(t, SpendF.IsLiked())
@@ -399,8 +399,8 @@ func TestLikedInstead21(t *testing.T) {
 	require.True(t, SpendG.LikedInstead().Has(SpendF))
 
 	SpendSet2 := NewTestSpendSet(id("O2"))
-	SpendC := NewTestSpend(transactionID("TxC"), ds.NewSet(masterBranch), ds.NewSet(SpendSet2), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
-	SpendH := NewTestSpend(transactionID("TxH"), ds.NewSet(masterBranch, SpendA), ds.NewSet(SpendSet2, SpendSet4), weight.New().SetCumulativeWeight(150), pendingTasks, thresholdProvider)
+	SpendC := NewTestSpender(transactionID("TxC"), ds.NewSet(masterBranch), ds.NewSet(SpendSet2), weight.New().SetCumulativeWeight(200), pendingTasks, thresholdProvider)
+	SpendH := NewTestSpender(transactionID("TxH"), ds.NewSet(masterBranch, SpendA), ds.NewSet(SpendSet2, SpendSet4), weight.New().SetCumulativeWeight(150), pendingTasks, thresholdProvider)
 
 	require.True(t, SpendC.IsPreferred())
 	require.True(t, SpendC.IsLiked())
@@ -412,8 +412,8 @@ func TestLikedInstead21(t *testing.T) {
 	require.True(t, SpendH.LikedInstead().Has(SpendC))
 
 	SpendSet3 := NewTestSpendSet(id("O12"))
-	SpendI := NewTestSpend(transactionID("TxI"), ds.NewSet(SpendF), ds.NewSet(SpendSet3), weight.New().SetCumulativeWeight(5), pendingTasks, thresholdProvider)
-	SpendJ := NewTestSpend(transactionID("TxJ"), ds.NewSet(SpendF), ds.NewSet(SpendSet3), weight.New().SetCumulativeWeight(15), pendingTasks, thresholdProvider)
+	SpendI := NewTestSpender(transactionID("TxI"), ds.NewSet(SpendF), ds.NewSet(SpendSet3), weight.New().SetCumulativeWeight(5), pendingTasks, thresholdProvider)
+	SpendJ := NewTestSpender(transactionID("TxJ"), ds.NewSet(SpendF), ds.NewSet(SpendSet3), weight.New().SetCumulativeWeight(15), pendingTasks, thresholdProvider)
 
 	require.True(t, SpendJ.IsPreferred())
 	require.True(t, SpendJ.IsLiked())
@@ -459,7 +459,7 @@ func TestSpendSet_AllMembersEvicted(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	Spend1 := NewTestSpend(transactionID("Spend1"), nil, ds.NewSet(yellow), weight.New(), pendingTasks, thresholdProvider)
+	Spend1 := NewTestSpender(transactionID("Spend1"), nil, ds.NewSet(yellow), weight.New(), pendingTasks, thresholdProvider)
 	evictedSpends := Spend1.Evict()
 	require.Len(t, evictedSpends, 1)
 	require.Contains(t, evictedSpends, Spend1.ID)
@@ -469,7 +469,7 @@ func TestSpendSet_AllMembersEvicted(t *testing.T) {
 	require.Len(t, evictedSpends, 0)
 
 	// Spend tries to join Spendset who's all members were evicted
-	Spend2 := NewSpend[iotago.TransactionID, iotago.OutputID, vote.MockedRank](transactionID("Spend1"), weight.New(), pendingTasks, thresholdProvider)
+	Spend2 := NewSpender[iotago.TransactionID, iotago.OutputID, vote.MockedRank](transactionID("Spend1"), weight.New(), pendingTasks, thresholdProvider)
 	_, err := Spend2.JoinSpendSets(ds.NewSet(yellow))
 	require.Error(t, err)
 
@@ -486,9 +486,9 @@ func TestSpend_Compare(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	var Spend1, Spend2 TestSpend
+	var Spend1, Spend2 TestSpender
 
-	Spend1 = NewTestSpend(transactionID("M"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend1 = NewTestSpender(transactionID("M"), nil, nil, weight.New(), pendingTasks, thresholdProvider)
 
 	require.Equal(t, weight.Heavier, Spend1.Compare(nil))
 	require.Equal(t, weight.Lighter, Spend2.Compare(Spend1))
@@ -506,10 +506,10 @@ func TestSpend_Inheritance(t *testing.T) {
 		return int64(weights.SeatCount())
 	})
 
-	Spend1 := NewTestSpend(transactionID("Spend1"), nil, ds.NewSet(yellow), weight.New().SetCumulativeWeight(1), pendingTasks, thresholdProvider)
-	Spend2 := NewTestSpend(transactionID("Spend2"), nil, ds.NewSet(green), weight.New().SetCumulativeWeight(1), pendingTasks, thresholdProvider)
-	Spend3 := NewTestSpend(transactionID("Spend3"), ds.NewSet(Spend1, Spend2), nil, weight.New(), pendingTasks, thresholdProvider)
-	Spend4 := NewTestSpend(transactionID("Spend4"), nil, ds.NewSet(yellow, green), weight.New(), pendingTasks, thresholdProvider)
+	Spend1 := NewTestSpender(transactionID("Spend1"), nil, ds.NewSet(yellow), weight.New().SetCumulativeWeight(1), pendingTasks, thresholdProvider)
+	Spend2 := NewTestSpender(transactionID("Spend2"), nil, ds.NewSet(green), weight.New().SetCumulativeWeight(1), pendingTasks, thresholdProvider)
+	Spend3 := NewTestSpender(transactionID("Spend3"), ds.NewSet(Spend1, Spend2), nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend4 := NewTestSpender(transactionID("Spend4"), nil, ds.NewSet(yellow, green), weight.New(), pendingTasks, thresholdProvider)
 
 	pendingTasks.WaitIsZero()
 	require.True(t, Spend3.LikedInstead().IsEmpty())
@@ -524,7 +524,7 @@ func TestSpend_Inheritance(t *testing.T) {
 	require.True(t, Spend3.LikedInstead().Has(Spend4))
 
 	// make sure that inheritance of LikedInstead works correctly for newly created Spends
-	Spend5 := NewTestSpend(transactionID("Spend5"), ds.NewSet(Spend3), nil, weight.New(), pendingTasks, thresholdProvider)
+	Spend5 := NewTestSpender(transactionID("Spend5"), ds.NewSet(Spend3), nil, weight.New(), pendingTasks, thresholdProvider)
 	pendingTasks.WaitIsZero()
 	require.True(t, Spend5.LikedInstead().Has(Spend4))
 
@@ -533,39 +533,39 @@ func TestSpend_Inheritance(t *testing.T) {
 	require.True(t, Spend3.LikedInstead().IsEmpty())
 }
 
-func assertCorrectOrder(t *testing.T, spends ...TestSpend) {
-	sort.Slice(spends, func(i, j int) bool {
-		return spends[i].Compare(spends[j]) == weight.Heavier
+func assertCorrectOrder(t *testing.T, spenders ...TestSpender) {
+	sort.Slice(spenders, func(i, j int) bool {
+		return spenders[i].Compare(spenders[j]) == weight.Heavier
 	})
 
-	preferredSpends := ds.NewSet[TestSpend]()
-	unPreferredSpends := ds.NewSet[TestSpend]()
+	preferredSpenders := ds.NewSet[TestSpender]()
+	unPreferredSpenders := ds.NewSet[TestSpender]()
 
-	for _, spend := range spends {
-		if !unPreferredSpends.Has(spend) {
-			preferredSpends.Add(spend)
-			spend.ConflictingSpends.Range(func(conflictingSpend *Spend[iotago.TransactionID, iotago.OutputID, vote.MockedRank]) {
-				if spend != conflictingSpend {
-					unPreferredSpends.Add(conflictingSpend)
+	for _, spender := range spenders {
+		if !unPreferredSpenders.Has(spender) {
+			preferredSpenders.Add(spender)
+			spender.ConflictingSpenders.Range(func(conflictingSpender *Spender[iotago.TransactionID, iotago.OutputID, vote.MockedRank]) {
+				if spender != conflictingSpender {
+					unPreferredSpenders.Add(conflictingSpender)
 				}
 			}, true)
 		}
 	}
 
-	for _, Spend := range spends {
-		if preferredSpends.Has(Spend) {
-			require.True(t, Spend.IsPreferred(), "Spend %s should be preferred", Spend.ID)
+	for _, spender := range spenders {
+		if preferredSpenders.Has(spender) {
+			require.True(t, spender.IsPreferred(), "spender %s should be preferred", spender.ID)
 		}
-		if unPreferredSpends.Has(Spend) {
-			require.False(t, Spend.IsPreferred(), "Spend %s should be unPreferred", Spend.ID)
+		if unPreferredSpenders.Has(spender) {
+			require.False(t, spender.IsPreferred(), "spender %s should be unPreferred", spender.ID)
 		}
 	}
 
-	_ = unPreferredSpends.ForEach(func(unPreferredSpend TestSpend) (err error) {
+	_ = unPreferredSpenders.ForEach(func(unPreferredSpender TestSpender) (err error) {
 		// iterating in descending order, so the first preferred Spend
-		return unPreferredSpend.ConflictingSpends.ForEach(func(ConflictingSpend TestSpend) error {
-			if ConflictingSpend != unPreferredSpend && ConflictingSpend.IsPreferred() {
-				require.Equal(t, ConflictingSpend, unPreferredSpend.PreferredInstead())
+		return unPreferredSpender.ConflictingSpenders.ForEach(func(conflictingSpender TestSpender) error {
+			if conflictingSpender != unPreferredSpender && conflictingSpender.IsPreferred() {
+				require.Equal(t, conflictingSpender, unPreferredSpender.PreferredInstead())
 
 				return ierrors.New("break the loop")
 			}
@@ -575,20 +575,20 @@ func assertCorrectOrder(t *testing.T, spends ...TestSpend) {
 	})
 }
 
-func generateRandomSpendPermutation() func(spend TestSpend) {
+func generateRandomSpendPermutation() func(spender TestSpender) {
 	updateType := rand.Intn(100)
 	delta := rand.Intn(100)
 
-	return func(spend TestSpend) {
+	return func(spender TestSpender) {
 		if updateType%2 == 0 {
-			spend.Weight.AddCumulativeWeight(int64(delta))
+			spender.Weight.AddCumulativeWeight(int64(delta))
 		} else {
-			spend.Weight.RemoveCumulativeWeight(int64(delta))
+			spender.Weight.RemoveCumulativeWeight(int64(delta))
 		}
 	}
 }
 
-func createSpends(pendingTasks *syncutils.Counter) map[string]TestSpend {
+func createSpenders(pendingTasks *syncutils.Counter) map[string]TestSpender {
 	weights := account.NewSeatedAccounts(account.NewAccounts())
 
 	thresholdProvider := acceptance.ThresholdProvider(func() int64 {
@@ -600,13 +600,13 @@ func createSpends(pendingTasks *syncutils.Counter) map[string]TestSpend {
 	green := NewTestSpendSet(id("green"))
 	yellow := NewTestSpendSet(id("yellow"))
 
-	SpendA := NewTestSpend(transactionID("A"), nil, ds.NewSet(red), weight.New(), pendingTasks, thresholdProvider)
-	SpendB := NewTestSpend(transactionID("B"), nil, ds.NewSet(red, blue), weight.New(), pendingTasks, thresholdProvider)
-	SpendC := NewTestSpend(transactionID("C"), nil, ds.NewSet(green, blue), weight.New(), pendingTasks, thresholdProvider)
-	SpendD := NewTestSpend(transactionID("D"), nil, ds.NewSet(green, yellow), weight.New(), pendingTasks, thresholdProvider)
-	SpendE := NewTestSpend(transactionID("E"), nil, ds.NewSet(yellow), weight.New(), pendingTasks, thresholdProvider)
+	SpendA := NewTestSpender(transactionID("A"), nil, ds.NewSet(red), weight.New(), pendingTasks, thresholdProvider)
+	SpendB := NewTestSpender(transactionID("B"), nil, ds.NewSet(red, blue), weight.New(), pendingTasks, thresholdProvider)
+	SpendC := NewTestSpender(transactionID("C"), nil, ds.NewSet(green, blue), weight.New(), pendingTasks, thresholdProvider)
+	SpendD := NewTestSpender(transactionID("D"), nil, ds.NewSet(green, yellow), weight.New(), pendingTasks, thresholdProvider)
+	SpendE := NewTestSpender(transactionID("E"), nil, ds.NewSet(yellow), weight.New(), pendingTasks, thresholdProvider)
 
-	return map[string]TestSpend{
+	return map[string]TestSpender{
 		"SpendA": SpendA,
 		"SpendB": SpendB,
 		"SpendC": SpendC,
@@ -615,8 +615,8 @@ func createSpends(pendingTasks *syncutils.Counter) map[string]TestSpend {
 	}
 }
 
-func assertPreferredInstead(t *testing.T, preferredInsteadMap map[TestSpend]TestSpend) {
-	for Spend, preferredInsteadSpend := range preferredInsteadMap {
-		assert.Equalf(t, preferredInsteadSpend.ID, Spend.PreferredInstead().ID, "Spend %s should prefer %s instead of %s", Spend.ID, preferredInsteadSpend.ID, Spend.PreferredInstead().ID)
+func assertPreferredInstead(t *testing.T, preferredInsteadMap map[TestSpender]TestSpender) {
+	for spender, preferredInsteadSpender := range preferredInsteadMap {
+		assert.Equalf(t, preferredInsteadSpender.ID, spender.PreferredInstead().ID, "Spend %s should prefer %s instead of %s", spender.ID, preferredInsteadSpender.ID, spender.PreferredInstead().ID)
 	}
 }

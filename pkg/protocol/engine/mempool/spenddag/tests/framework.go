@@ -22,8 +22,8 @@ type Framework struct {
 	// Assert provides a set of assertions that can be used to verify the state of the SpendDAG.
 	Assert *Assertions
 
-	// SpendID is a function that is used to translate a string alias into a (deterministic) iotago.TransactionID.
-	SpendID func(string) iotago.TransactionID
+	// SpenderID is a function that is used to translate a string alias into a (deterministic) iotago.TransactionID.
+	SpenderID func(string) iotago.TransactionID
 
 	// ResourceID is a function that is used to translate a string alias into a (deterministic) iotago.OutputID.
 	ResourceID func(string) iotago.OutputID
@@ -37,13 +37,13 @@ func NewFramework(
 	t *testing.T,
 	spendDAG spenddag.SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank],
 	validators *AccountsTestFramework,
-	spendID func(string) iotago.TransactionID,
+	spenderID func(string) iotago.TransactionID,
 	resourceID func(string) iotago.OutputID,
 ) *Framework {
 	f := &Framework{
 		Instance:   spendDAG,
 		Accounts:   validators,
-		SpendID:    spendID,
+		SpenderID:  spenderID,
 		ResourceID: resourceID,
 		test:       t,
 	}
@@ -53,22 +53,22 @@ func NewFramework(
 }
 
 // CreateOrUpdateSpend creates a new spend or adds it to the given SpendSets.
-func (f *Framework) CreateOrUpdateSpend(alias string, resourceAliases []string) error {
-	f.Instance.CreateSpend(f.SpendID(alias))
-	return f.Instance.UpdateConflictingResources(f.SpendID(alias), f.SpendSetIDs(resourceAliases...))
+func (f *Framework) CreateOrUpdateSpender(alias string, resourceAliases []string) error {
+	f.Instance.CreateSpender(f.SpenderID(alias))
+	return f.Instance.UpdateSpentResources(f.SpenderID(alias), f.SpendSetIDs(resourceAliases...))
 
 }
 
 // UpdateConflictParents updates the parents of the spend with the given alias.
 func (f *Framework) UpdateSpendParents(spendAlias string, addedParentIDs []string, removedParentIDs []string) error {
-	return f.Instance.UpdateSpendParents(f.SpendID(spendAlias), f.SpendIDs(addedParentIDs...), f.SpendIDs(removedParentIDs...))
+	return f.Instance.UpdateSpendParents(f.SpenderID(spendAlias), f.SpenderIDs(addedParentIDs...), f.SpenderIDs(removedParentIDs...))
 }
 
-// LikedInstead returns the set of spends that are liked instead of the given spends.
+// LikedInstead returns the set of spenders that are liked instead of the given spenders.
 func (f *Framework) LikedInstead(spendAliases ...string) ds.Set[iotago.TransactionID] {
 	var result ds.Set[iotago.TransactionID]
 	_ = f.Instance.ReadConsistent(func(spendDAG spenddag.ReadLockedSpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]) error {
-		result = spendDAG.LikedInstead(f.SpendIDs(spendAliases...))
+		result = spendDAG.LikedInstead(f.SpenderIDs(spendAliases...))
 
 		return nil
 	})
@@ -76,29 +76,29 @@ func (f *Framework) LikedInstead(spendAliases ...string) ds.Set[iotago.Transacti
 	return result
 }
 
-// CastVotes casts the given votes for the given spends.
-func (f *Framework) CastVotes(nodeAlias string, voteRank int, spendAliases ...string) error {
+// CastVotes casts the given votes for the given spenders.
+func (f *Framework) CastVotes(nodeAlias string, voteRank int, spenderAliases ...string) error {
 	seat, exists := f.Accounts.Get(nodeAlias)
 	if !exists {
 		return ierrors.Errorf("node with alias '%s' does not have a seat in the committee", nodeAlias)
 	}
 
-	return f.Instance.CastVotes(vote.NewVote[vote.MockedRank](seat, vote.MockedRank(voteRank)), f.SpendIDs(spendAliases...))
+	return f.Instance.CastVotes(vote.NewVote[vote.MockedRank](seat, vote.MockedRank(voteRank)), f.SpenderIDs(spenderAliases...))
 }
 
 // EvictSpend evicts given spend from the SpendDAG.
-func (f *Framework) EvictSpend(spendAlias string) {
-	f.Instance.EvictSpend(f.SpendID(spendAlias))
+func (f *Framework) EvictSpender(spendAlias string) {
+	f.Instance.EvictSpender(f.SpenderID(spendAlias))
 }
 
-// SpendIDs translates the given aliases into an AdvancedSet of iotago.TransactionIDs.
-func (f *Framework) SpendIDs(aliases ...string) ds.Set[iotago.TransactionID] {
-	spendIDs := ds.NewSet[iotago.TransactionID]()
+// SpenderIDs translates the given aliases into an AdvancedSet of iotago.TransactionIDs.
+func (f *Framework) SpenderIDs(aliases ...string) ds.Set[iotago.TransactionID] {
+	spenderIDs := ds.NewSet[iotago.TransactionID]()
 	for _, alias := range aliases {
-		spendIDs.Add(f.SpendID(alias))
+		spenderIDs.Add(f.SpenderID(alias))
 	}
 
-	return spendIDs
+	return spenderIDs
 }
 
 // SpendSetIDs translates the given aliases into an AdvancedSet of iotago.OutputIDs.

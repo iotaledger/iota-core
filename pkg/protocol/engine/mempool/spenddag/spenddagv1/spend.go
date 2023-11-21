@@ -19,67 +19,68 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 )
 
-// Spend is a spend that is part of a Spend DAG.
-type Spend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]] struct {
-	// ID is the identifier of the Spend.
-	ID SpendID
+// Spender is a spender of resources that is part of a Spend DAG.
+// An example of a spender is a transaction, and the resource it spends is a utxo.
+type Spender[SpenderID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]] struct {
+	// ID is the identifier of the Spender.
+	ID SpenderID
 
-	// Parents is the set of parents of the Spend.
-	Parents ds.Set[*Spend[SpendID, ResourceID, VoteRank]]
+	// Parents is the set of parents of the Spender.
+	Parents ds.Set[*Spender[SpenderID, ResourceID, VoteRank]]
 
-	// Children is the set of children of the Spend.
-	Children ds.Set[*Spend[SpendID, ResourceID, VoteRank]]
+	// Children is the set of children of the Spender.
+	Children ds.Set[*Spender[SpenderID, ResourceID, VoteRank]]
 
 	// SpendSets is the set of SpendSets that the Spend is part of.
-	SpendSets ds.Set[*SpendSet[SpendID, ResourceID, VoteRank]]
+	SpendSets ds.Set[*SpendSet[SpenderID, ResourceID, VoteRank]]
 
-	// ConflictingSpends is the set of spends that directly conflict with the Spend.
-	ConflictingSpends *SortedSpends[SpendID, ResourceID, VoteRank]
+	// ConflictingSpenders is the set of spenders that try to spend one of more of the same resources as this Spender.
+	ConflictingSpenders *SortedSpenders[SpenderID, ResourceID, VoteRank]
 
-	// Weight is the Weight of the Spend.
+	// Weight is the Weight of the Spender.
 	Weight *weight.Weight
 
-	// LatestVotes is the set of the latest votes of the Spend.
+	// LatestVotes is the set of the latest votes of the Spender.
 	LatestVotes *shrinkingmap.ShrinkingMap[account.SeatIndex, *vote.Vote[VoteRank]]
 
-	// AcceptanceStateUpdated is triggered when the AcceptanceState of the Spend is updated.
+	// AcceptanceStateUpdated is triggered when the AcceptanceState of the Spender is updated.
 	AcceptanceStateUpdated *event.Event2[acceptance.State, acceptance.State]
 
-	// PreferredInsteadUpdated is triggered when the preferred instead value of the Spend is updated.
-	PreferredInsteadUpdated *event.Event1[*Spend[SpendID, ResourceID, VoteRank]]
+	// PreferredInsteadUpdated is triggered when the preferred instead value of the Spender is updated.
+	PreferredInsteadUpdated *event.Event1[*Spender[SpenderID, ResourceID, VoteRank]]
 
-	// LikedInsteadAdded is triggered when a liked instead reference is added to the Spend.
-	LikedInsteadAdded *event.Event1[*Spend[SpendID, ResourceID, VoteRank]]
+	// LikedInsteadAdded is triggered when a liked instead reference is added to the Spender.
+	LikedInsteadAdded *event.Event1[*Spender[SpenderID, ResourceID, VoteRank]]
 
-	// LikedInsteadRemoved is triggered when a liked instead reference is removed from the Spend.
-	LikedInsteadRemoved *event.Event1[*Spend[SpendID, ResourceID, VoteRank]]
+	// LikedInsteadRemoved is triggered when a liked instead reference is removed from the Spender.
+	LikedInsteadRemoved *event.Event1[*Spender[SpenderID, ResourceID, VoteRank]]
 
 	// childUnhookMethods is a mapping of children to their unhook functions.
-	childUnhookMethods *shrinkingmap.ShrinkingMap[SpendID, func()]
+	childUnhookMethods *shrinkingmap.ShrinkingMap[SpenderID, func()]
 
-	// preferredInstead is the preferred instead value of the Spend.
-	preferredInstead *Spend[SpendID, ResourceID, VoteRank]
+	// preferredInstead is the preferred instead value of the Spender.
+	preferredInstead *Spender[SpenderID, ResourceID, VoteRank]
 
 	// evicted
 	evicted atomic.Bool
 
-	// preferredInsteadMutex is used to synchronize access to the preferred instead value of the Spend.
+	// preferredInsteadMutex is used to synchronize access to the preferred instead value of the Spender.
 	preferredInsteadMutex syncutils.RWMutex
 
-	// likedInstead is the set of liked instead Spends.
-	likedInstead ds.Set[*Spend[SpendID, ResourceID, VoteRank]]
+	// likedInstead is the set of liked instead Spenders.
+	likedInstead ds.Set[*Spender[SpenderID, ResourceID, VoteRank]]
 
 	// likedInsteadSources is a mapping of liked instead Spends to the set of parents that inherited them.
-	likedInsteadSources *shrinkingmap.ShrinkingMap[SpendID, ds.Set[*Spend[SpendID, ResourceID, VoteRank]]]
+	likedInsteadSources *shrinkingmap.ShrinkingMap[SpenderID, ds.Set[*Spender[SpenderID, ResourceID, VoteRank]]]
 
 	// likedInsteadMutex and structureMutex are sometimes locked in different order by different goroutines, which could result in a deadlock
 	//  however, it's impossible to deadlock if we fork all transactions upon booking
 	//  deadlock happens when the likedInstead spend changes and parents are updated at the same time, which is impossible in the current setup
 	//  because we won't process votes on a spend we're just creating.
-	// likedInsteadMutex is used to synchronize access to the liked instead value of the Spend.
+	// likedInsteadMutex is used to synchronize access to the liked instead value of the Spender.
 	likedInsteadMutex syncutils.RWMutex
 
-	// structureMutex is used to synchronize access to the structure of the Spend.
+	// structureMutex is used to synchronize access to the structure of the Spender.
 	structureMutex syncutils.RWMutex
 
 	// acceptanceThreshold is the function that is used to retrieve the acceptance threshold of the committee.
@@ -89,24 +90,24 @@ type Spend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[V
 	unhookAcceptanceMonitoring func()
 }
 
-// NewSpend creates a new Spend.
-func NewSpend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]](id SpendID, initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Spend[SpendID, ResourceID, VoteRank] {
-	c := &Spend[SpendID, ResourceID, VoteRank]{
+// NewSpend creates a new Spender.
+func NewSpender[SpenderID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]](id SpenderID, initialWeight *weight.Weight, pendingTasksCounter *syncutils.Counter, acceptanceThresholdProvider func() int64) *Spender[SpenderID, ResourceID, VoteRank] {
+	c := &Spender[SpenderID, ResourceID, VoteRank]{
 		ID:                      id,
-		Parents:                 ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]](),
-		Children:                ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]](),
-		SpendSets:               ds.NewSet[*SpendSet[SpendID, ResourceID, VoteRank]](),
+		Parents:                 ds.NewSet[*Spender[SpenderID, ResourceID, VoteRank]](),
+		Children:                ds.NewSet[*Spender[SpenderID, ResourceID, VoteRank]](),
+		SpendSets:               ds.NewSet[*SpendSet[SpenderID, ResourceID, VoteRank]](),
 		Weight:                  initialWeight,
 		LatestVotes:             shrinkingmap.New[account.SeatIndex, *vote.Vote[VoteRank]](),
 		AcceptanceStateUpdated:  event.New2[acceptance.State, acceptance.State](),
-		PreferredInsteadUpdated: event.New1[*Spend[SpendID, ResourceID, VoteRank]](),
-		LikedInsteadAdded:       event.New1[*Spend[SpendID, ResourceID, VoteRank]](),
-		LikedInsteadRemoved:     event.New1[*Spend[SpendID, ResourceID, VoteRank]](),
+		PreferredInsteadUpdated: event.New1[*Spender[SpenderID, ResourceID, VoteRank]](),
+		LikedInsteadAdded:       event.New1[*Spender[SpenderID, ResourceID, VoteRank]](),
+		LikedInsteadRemoved:     event.New1[*Spender[SpenderID, ResourceID, VoteRank]](),
 
-		childUnhookMethods:  shrinkingmap.New[SpendID, func()](),
+		childUnhookMethods:  shrinkingmap.New[SpenderID, func()](),
 		acceptanceThreshold: acceptanceThresholdProvider,
-		likedInstead:        ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]](),
-		likedInsteadSources: shrinkingmap.New[SpendID, ds.Set[*Spend[SpendID, ResourceID, VoteRank]]](),
+		likedInstead:        ds.NewSet[*Spender[SpenderID, ResourceID, VoteRank]](),
+		likedInsteadSources: shrinkingmap.New[SpenderID, ds.Set[*Spender[SpenderID, ResourceID, VoteRank]]](),
 	}
 
 	c.preferredInstead = c
@@ -122,27 +123,27 @@ func NewSpend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankTyp
 		c.setAcceptanceState(acceptance.Accepted)
 	}
 
-	c.ConflictingSpends = NewSortedSpends(c, pendingTasksCounter)
+	c.ConflictingSpenders = NewSortedSpenders(c, pendingTasksCounter)
 
 	return c
 }
 
 // JoinSpendSets registers the Spend with the given SpendSets.
-func (c *Spend[SpendID, ResourceID, VoteRank]) JoinSpendSets(spendSets ds.Set[*SpendSet[SpendID, ResourceID, VoteRank]]) (joinedSpendSets ds.Set[ResourceID], err error) {
+func (c *Spender[SpenderID, ResourceID, VoteRank]) JoinSpendSets(spendSets ds.Set[*SpendSet[SpenderID, ResourceID, VoteRank]]) (joinedSpendSets ds.Set[ResourceID], err error) {
 	if spendSets == nil {
 		return ds.NewSet[ResourceID](), nil
 	}
 
 	if c.evicted.Load() {
-		return nil, ierrors.Errorf("tried to join conflict sets of evicted spend: %w", spenddag.ErrEntityEvicted)
+		return nil, ierrors.Errorf("tried to join spend sets of evicted spender: %w", spenddag.ErrEntityEvicted)
 	}
 
-	registerConflictingSpend := func(c *Spend[SpendID, ResourceID, VoteRank], spend *Spend[SpendID, ResourceID, VoteRank]) {
+	registerConflictingSpender := func(c *Spender[SpenderID, ResourceID, VoteRank], spender *Spender[SpenderID, ResourceID, VoteRank]) {
 		c.structureMutex.Lock()
 		defer c.structureMutex.Unlock()
 
-		if c.ConflictingSpends.Add(spend) {
-			if spend.IsAccepted() {
+		if c.ConflictingSpenders.Add(spender) {
+			if spender.IsAccepted() {
 				c.setAcceptanceState(acceptance.Rejected)
 			}
 		}
@@ -150,7 +151,7 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) JoinSpendSets(spendSets ds.Set[*S
 
 	joinedSpendSets = ds.NewSet[ResourceID]()
 
-	return joinedSpendSets, spendSets.ForEach(func(spendSet *SpendSet[SpendID, ResourceID, VoteRank]) error {
+	return joinedSpendSets, spendSets.ForEach(func(spendSet *SpendSet[SpenderID, ResourceID, VoteRank]) error {
 		otherConflicts, err := spendSet.Add(c)
 		if err != nil && !ierrors.Is(err, spenddag.ErrAlreadyPartOfSpendSet) {
 			return err
@@ -158,9 +159,9 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) JoinSpendSets(spendSets ds.Set[*S
 
 		if c.SpendSets.Add(spendSet) {
 			if otherConflicts != nil {
-				otherConflicts.Range(func(otherConflict *Spend[SpendID, ResourceID, VoteRank]) {
-					registerConflictingSpend(c, otherConflict)
-					registerConflictingSpend(otherConflict, c)
+				otherConflicts.Range(func(otherConflict *Spender[SpenderID, ResourceID, VoteRank]) {
+					registerConflictingSpender(c, otherConflict)
+					registerConflictingSpender(otherConflict, c)
 				})
 
 				joinedSpendSets.Add(spendSet.ID)
@@ -171,7 +172,7 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) JoinSpendSets(spendSets ds.Set[*S
 	})
 }
 
-func (c *Spend[SpendID, ResourceID, VoteRank]) removeParent(parent *Spend[SpendID, ResourceID, VoteRank]) (removed bool) {
+func (c *Spender[SpenderID, ResourceID, VoteRank]) removeParent(parent *Spender[SpenderID, ResourceID, VoteRank]) (removed bool) {
 	if removed = c.Parents.Delete(parent); removed {
 		parent.unregisterChild(c)
 	}
@@ -179,19 +180,19 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) removeParent(parent *Spend[SpendI
 	return removed
 }
 
-// UpdateParents updates the parents of the Spend.
-func (c *Spend[SpendID, ResourceID, VoteRank]) UpdateParents(addedParents ds.Set[*Spend[SpendID, ResourceID, VoteRank]], removedParents ds.Set[*Spend[SpendID, ResourceID, VoteRank]]) (updated bool) {
+// UpdateParents updates the parents of the Spender.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) UpdateParents(addedParents ds.Set[*Spender[SpenderID, ResourceID, VoteRank]], removedParents ds.Set[*Spender[SpenderID, ResourceID, VoteRank]]) (updated bool) {
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
 	if removedParents != nil {
-		removedParents.Range(func(removedParent *Spend[SpendID, ResourceID, VoteRank]) {
+		removedParents.Range(func(removedParent *Spender[SpenderID, ResourceID, VoteRank]) {
 			updated = c.removeParent(removedParent) || updated
 		})
 	}
 
 	if addedParents != nil {
-		addedParents.Range(func(addedParent *Spend[SpendID, ResourceID, VoteRank]) {
+		addedParents.Range(func(addedParent *Spender[SpenderID, ResourceID, VoteRank]) {
 			if c.Parents.Add(addedParent) {
 				addedParent.registerChild(c)
 
@@ -203,7 +204,7 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) UpdateParents(addedParents ds.Set
 	return updated
 }
 
-func (c *Spend[SpendID, ResourceID, VoteRank]) ApplyVote(vote *vote.Vote[VoteRank]) {
+func (c *Spender[SpenderID, ResourceID, VoteRank]) ApplyVote(vote *vote.Vote[VoteRank]) {
 	// abort if the spend has already been accepted or rejected
 	if !c.Weight.AcceptanceState().IsPending() {
 		return
@@ -231,59 +232,59 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) ApplyVote(vote *vote.Vote[VoteRan
 }
 
 // IsPending returns true if the Spend is pending.
-func (c *Spend[SpendID, ResourceID, VoteRank]) IsPending() bool {
+func (c *Spender[SpenderID, ResourceID, VoteRank]) IsPending() bool {
 	return c.Weight.Value().AcceptanceState().IsPending()
 }
 
 // IsAccepted returns true if the Spend is accepted.
-func (c *Spend[SpendID, ResourceID, VoteRank]) IsAccepted() bool {
+func (c *Spender[SpenderID, ResourceID, VoteRank]) IsAccepted() bool {
 	return c.Weight.Value().AcceptanceState().IsAccepted()
 }
 
 // IsRejected returns true if the Spend is rejected.
-func (c *Spend[SpendID, ResourceID, VoteRank]) IsRejected() bool {
+func (c *Spender[SpenderID, ResourceID, VoteRank]) IsRejected() bool {
 	return c.Weight.Value().AcceptanceState().IsRejected()
 }
 
-// IsPreferred returns true if the Spend is preferred instead of its conflicting Spend.
-func (c *Spend[SpendID, ResourceID, VoteRank]) IsPreferred() bool {
+// IsPreferred returns true if the Spend is preferred instead of its conflicting Spender.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) IsPreferred() bool {
 	c.preferredInsteadMutex.RLock()
 	defer c.preferredInsteadMutex.RUnlock()
 
 	return c.preferredInstead == c
 }
 
-// PreferredInstead returns the preferred instead value of the Spend.
-func (c *Spend[SpendID, ResourceID, VoteRank]) PreferredInstead() *Spend[SpendID, ResourceID, VoteRank] {
+// PreferredInstead returns the preferred instead value of the Spender.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) PreferredInstead() *Spender[SpenderID, ResourceID, VoteRank] {
 	c.preferredInsteadMutex.RLock()
 	defer c.preferredInsteadMutex.RUnlock()
 
 	return c.preferredInstead
 }
 
-// IsLiked returns true if the Spend is liked instead of other conflicting Spends.
-func (c *Spend[SpendID, ResourceID, VoteRank]) IsLiked() bool {
+// IsLiked returns true if the Spend is liked instead of other conflicting Spenders.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) IsLiked() bool {
 	c.likedInsteadMutex.RLock()
 	defer c.likedInsteadMutex.RUnlock()
 
 	return c.IsPreferred() && c.likedInstead.IsEmpty()
 }
 
-// LikedInstead returns the set of liked instead Spends.
-func (c *Spend[SpendID, ResourceID, VoteRank]) LikedInstead() ds.Set[*Spend[SpendID, ResourceID, VoteRank]] {
+// LikedInstead returns the set of liked instead Spenders.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) LikedInstead() ds.Set[*Spender[SpenderID, ResourceID, VoteRank]] {
 	c.likedInsteadMutex.RLock()
 	defer c.likedInsteadMutex.RUnlock()
 
 	return c.likedInstead.Clone()
 }
 
-// Shutdown shuts down the Spend.
-func (c *Spend[SpendID, ResourceID, VoteRank]) Shutdown() {
-	c.ConflictingSpends.Shutdown()
+// Shutdown shuts down the Spender.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) Shutdown() {
+	c.ConflictingSpenders.Shutdown()
 }
 
-// Evict cleans up the sortedSpend.
-func (c *Spend[SpendID, ResourceID, VoteRank]) Evict() (evictedSpends []SpendID) {
+// Evict cleans up the sortedSpender.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) Evict() (evictedSpends []SpenderID) {
 	if firstEvictCall := !c.evicted.Swap(true); !firstEvictCall {
 		return nil
 	}
@@ -292,45 +293,45 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) Evict() (evictedSpends []SpendID)
 
 	switch c.Weight.AcceptanceState() {
 	case acceptance.Rejected:
-		// evict the entire future cone of rejected spends
-		c.Children.Range(func(childSpend *Spend[SpendID, ResourceID, VoteRank]) {
-			evictedSpends = append(evictedSpends, childSpend.Evict()...)
+		// evict the entire future cone of rejected spenders
+		c.Children.Range(func(childSpender *Spender[SpenderID, ResourceID, VoteRank]) {
+			evictedSpends = append(evictedSpends, childSpender.Evict()...)
 		})
 	default:
-		// remove evicted spend from parents of children (merge to master)
-		c.Children.Range(func(childSpend *Spend[SpendID, ResourceID, VoteRank]) {
-			childSpend.structureMutex.Lock()
-			defer childSpend.structureMutex.Unlock()
+		// remove evicted spender from parents of children (merge to master)
+		c.Children.Range(func(childSpender *Spender[SpenderID, ResourceID, VoteRank]) {
+			childSpender.structureMutex.Lock()
+			defer childSpender.structureMutex.Unlock()
 
-			childSpend.removeParent(c)
+			childSpender.removeParent(c)
 		})
 	}
 
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
-	c.Parents.Range(func(parentSpend *Spend[SpendID, ResourceID, VoteRank]) {
-		parentSpend.unregisterChild(c)
+	c.Parents.Range(func(parentSpender *Spender[SpenderID, ResourceID, VoteRank]) {
+		parentSpender.unregisterChild(c)
 	})
 	c.Parents.Clear()
 
-	c.SpendSets.Range(func(spendSet *SpendSet[SpendID, ResourceID, VoteRank]) {
+	c.SpendSets.Range(func(spendSet *SpendSet[SpenderID, ResourceID, VoteRank]) {
 		spendSet.Remove(c)
 	})
 	c.SpendSets.Clear()
 
-	for _, spend := range c.ConflictingSpends.Shutdown() {
-		if spend != c {
-			spend.ConflictingSpends.Remove(c.ID)
-			c.ConflictingSpends.Remove(spend.ID)
+	for _, spender := range c.ConflictingSpenders.Shutdown() {
+		if spender != c {
+			spender.ConflictingSpenders.Remove(c.ID)
+			c.ConflictingSpenders.Remove(spender.ID)
 
 			if c.IsAccepted() {
-				evictedSpends = append(evictedSpends, spend.Evict()...)
+				evictedSpends = append(evictedSpends, spender.Evict()...)
 			}
 		}
 	}
 
-	c.ConflictingSpends.Remove(c.ID)
+	c.ConflictingSpenders.Remove(c.ID)
 
 	c.preferredInsteadMutex.Lock()
 	defer c.preferredInsteadMutex.Unlock()
@@ -345,8 +346,8 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) Evict() (evictedSpends []SpendID)
 	return evictedSpends
 }
 
-// Compare compares the Spend to the given other Spend.
-func (c *Spend[SpendID, ResourceID, VoteRank]) Compare(other *Spend[SpendID, ResourceID, VoteRank]) int {
+// Compare compares the Spender to the given other Spender.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) Compare(other *Spender[SpenderID, ResourceID, VoteRank]) int {
 	// no need to lock a mutex here, because the Weight is already thread-safe
 
 	if c == other {
@@ -368,18 +369,18 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) Compare(other *Spend[SpendID, Res
 	return bytes.Compare(lo.PanicOnErr(c.ID.Bytes()), lo.PanicOnErr(other.ID.Bytes()))
 }
 
-// String returns a human-readable representation of the Spend.
-func (c *Spend[SpendID, ResourceID, VoteRank]) String() string {
+// String returns a human-readable representation of the Spender.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) String() string {
 	// no need to lock a mutex here, because the Weight is already thread-safe
 
-	return stringify.Struct("Spend",
+	return stringify.Struct("Spender",
 		stringify.NewStructField("id", c.ID),
 		stringify.NewStructField("weight", c.Weight),
 	)
 }
 
-// registerChild registers the given child Spend.
-func (c *Spend[SpendID, ResourceID, VoteRank]) registerChild(child *Spend[SpendID, ResourceID, VoteRank]) {
+// registerChild registers the given child Spender.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) registerChild(child *Spender[SpenderID, ResourceID, VoteRank]) {
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
@@ -395,11 +396,11 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) registerChild(child *Spend[SpendI
 				}
 			}).Unhook,
 
-			c.LikedInsteadRemoved.Hook(func(reference *Spend[SpendID, ResourceID, VoteRank]) {
+			c.LikedInsteadRemoved.Hook(func(reference *Spender[SpenderID, ResourceID, VoteRank]) {
 				child.removeInheritedLikedInsteadReference(c, reference)
 			}).Unhook,
 
-			c.LikedInsteadAdded.Hook(func(spend *Spend[SpendID, ResourceID, VoteRank]) {
+			c.LikedInsteadAdded.Hook(func(spend *Spender[SpenderID, ResourceID, VoteRank]) {
 				child.structureMutex.Lock()
 				defer child.structureMutex.Unlock()
 
@@ -407,8 +408,8 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) registerChild(child *Spend[SpendI
 			}).Unhook,
 		))
 
-		for spends := c.likedInstead.Iterator(); spends.HasNext(); {
-			child.addInheritedLikedInsteadReference(c, spends.Next())
+		for spenders := c.likedInstead.Iterator(); spenders.HasNext(); {
+			child.addInheritedLikedInsteadReference(c, spenders.Next())
 		}
 
 		if c.IsRejected() {
@@ -417,14 +418,14 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) registerChild(child *Spend[SpendI
 	}
 }
 
-// unregisterChild unregisters the given child Spend.
-func (c *Spend[SpendID, ResourceID, VoteRank]) unregisterChild(spend *Spend[SpendID, ResourceID, VoteRank]) {
+// unregisterChild unregisters the given child Spender.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) unregisterChild(spender *Spender[SpenderID, ResourceID, VoteRank]) {
 	c.structureMutex.Lock()
 	defer c.structureMutex.Unlock()
 
-	if c.Children.Delete(spend) {
-		if unhookFunc, exists := c.childUnhookMethods.Get(spend.ID); exists {
-			c.childUnhookMethods.Delete(spend.ID)
+	if c.Children.Delete(spender) {
+		if unhookFunc, exists := c.childUnhookMethods.Get(spender.ID); exists {
+			c.childUnhookMethods.Delete(spender.ID)
 
 			unhookFunc()
 		}
@@ -432,12 +433,12 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) unregisterChild(spend *Spend[Spen
 }
 
 // addInheritedLikedInsteadReference adds the given reference as a liked instead reference from the given source.
-func (c *Spend[SpendID, ResourceID, VoteRank]) addInheritedLikedInsteadReference(source *Spend[SpendID, ResourceID, VoteRank], reference *Spend[SpendID, ResourceID, VoteRank]) {
+func (c *Spender[SpenderID, ResourceID, VoteRank]) addInheritedLikedInsteadReference(source *Spender[SpenderID, ResourceID, VoteRank], reference *Spender[SpenderID, ResourceID, VoteRank]) {
 	c.likedInsteadMutex.Lock()
 	defer c.likedInsteadMutex.Unlock()
 
 	// abort if the source already added the reference or if the source already existed
-	if sources := lo.Return1(c.likedInsteadSources.GetOrCreate(reference.ID, lo.NoVariadic(ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]]))); !sources.Add(source) || !c.likedInstead.Add(reference) {
+	if sources := lo.Return1(c.likedInsteadSources.GetOrCreate(reference.ID, lo.NoVariadic(ds.NewSet[*Spender[SpenderID, ResourceID, VoteRank]]))); !sources.Add(source) || !c.likedInstead.Add(reference) {
 		return
 	}
 
@@ -451,7 +452,7 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) addInheritedLikedInsteadReference
 }
 
 // removeInheritedLikedInsteadReference removes the given reference as a liked instead reference from the given source.
-func (c *Spend[SpendID, ResourceID, VoteRank]) removeInheritedLikedInsteadReference(source *Spend[SpendID, ResourceID, VoteRank], reference *Spend[SpendID, ResourceID, VoteRank]) {
+func (c *Spender[SpenderID, ResourceID, VoteRank]) removeInheritedLikedInsteadReference(source *Spender[SpenderID, ResourceID, VoteRank], reference *Spender[SpenderID, ResourceID, VoteRank]) {
 	c.likedInsteadMutex.Lock()
 	defer c.likedInsteadMutex.Unlock()
 
@@ -472,8 +473,8 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) removeInheritedLikedInsteadRefere
 	}
 }
 
-// setPreferredInstead sets the preferred instead value of the Spend.
-func (c *Spend[SpendID, ResourceID, VoteRank]) setPreferredInstead(preferredInstead *Spend[SpendID, ResourceID, VoteRank]) (previousPreferredInstead *Spend[SpendID, ResourceID, VoteRank]) {
+// setPreferredInstead sets the preferred instead value of the Spender.
+func (c *Spender[SpenderID, ResourceID, VoteRank]) setPreferredInstead(preferredInstead *Spender[SpenderID, ResourceID, VoteRank]) (previousPreferredInstead *Spender[SpenderID, ResourceID, VoteRank]) {
 	c.likedInsteadMutex.Lock()
 	defer c.likedInsteadMutex.Unlock()
 
@@ -506,14 +507,14 @@ func (c *Spend[SpendID, ResourceID, VoteRank]) setPreferredInstead(preferredInst
 
 // setAcceptanceState sets the acceptance state of the Spend and returns the previous acceptance state (it triggers
 // an AcceptanceStateUpdated event if the acceptance state was updated).
-func (c *Spend[SpendID, ResourceID, VoteRank]) setAcceptanceState(newState acceptance.State) (previousState acceptance.State) {
+func (c *Spender[SpenderID, ResourceID, VoteRank]) setAcceptanceState(newState acceptance.State) (previousState acceptance.State) {
 	if previousState = c.Weight.SetAcceptanceState(newState); previousState == newState {
 		return previousState
 	}
 
 	// propagate acceptance to parents first
 	if newState.IsAccepted() {
-		c.Parents.Range(func(parent *Spend[SpendID, ResourceID, VoteRank]) {
+		c.Parents.Range(func(parent *Spender[SpenderID, ResourceID, VoteRank]) {
 			parent.setAcceptanceState(acceptance.Accepted)
 		})
 	}

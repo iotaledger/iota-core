@@ -8,31 +8,31 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 )
 
-// SpendSet represents a set of Spends of a Resource.
-// If there's more than 1 Spend in a SpendSet, they are conflicting with each other over the shared Resource.
-type SpendSet[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]] struct {
-	// ID is the ID of the Resource that the Spends in this SpendSet are conflicting over.
+// SpendSet represents a set of Spenders of a Resource.
+// If there's more than 1 spender in a SpendSet, they are conflicting with each other over the shared Resource.
+type SpendSet[SpenderID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]] struct {
+	// ID is the ID of the Resource being spent.
 	ID ResourceID
 
-	// members is the set of Spends that are conflicting over the shared resource.
-	members ds.Set[*Spend[SpendID, ResourceID, VoteRank]]
+	// spenders is the set of spenders (e.g. transactions) that spend the resource (e.g. a utxo).
+	spenders ds.Set[*Spender[SpenderID, ResourceID, VoteRank]]
 
 	allMembersEvicted reactive.Variable[bool]
 
 	mutex syncutils.RWMutex
 }
 
-// NewSpendSet creates a new SpendSet of Spends that are conflicting with each other over the given Resource.
-func NewSpendSet[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]](id ResourceID) *SpendSet[SpendID, ResourceID, VoteRank] {
-	return &SpendSet[SpendID, ResourceID, VoteRank]{
+// NewSpendSet creates a new SpendSet containing spenders (e.g. a transaction) of a common resource (e.g. a utxo).
+func NewSpendSet[SpenderID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]](id ResourceID) *SpendSet[SpenderID, ResourceID, VoteRank] {
+	return &SpendSet[SpenderID, ResourceID, VoteRank]{
 		ID:                id,
 		allMembersEvicted: reactive.NewVariable[bool](),
-		members:           ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]](),
+		spenders:          ds.NewSet[*Spender[SpenderID, ResourceID, VoteRank]](),
 	}
 }
 
-// Add adds a Spend to the SpendSet and returns all other members of the set.
-func (c *SpendSet[SpendID, ResourceID, VoteRank]) Add(addedConflict *Spend[SpendID, ResourceID, VoteRank]) (otherMembers ds.Set[*Spend[SpendID, ResourceID, VoteRank]], err error) {
+// Add adds a Spender to the SpendSet and returns all other members of the set.
+func (c *SpendSet[SpenderID, ResourceID, VoteRank]) Add(addedSpender *Spender[SpenderID, ResourceID, VoteRank]) (otherMembers ds.Set[*Spender[SpenderID, ResourceID, VoteRank]], err error) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -40,7 +40,7 @@ func (c *SpendSet[SpendID, ResourceID, VoteRank]) Add(addedConflict *Spend[Spend
 		return nil, ierrors.New("cannot join a SpendSet whose all members are evicted")
 	}
 
-	if otherMembers = c.members.Clone(); !c.members.Add(addedConflict) {
+	if otherMembers = c.spenders.Clone(); !c.spenders.Add(addedSpender) {
 		return nil, spenddag.ErrAlreadyPartOfSpendSet
 	}
 
@@ -49,25 +49,25 @@ func (c *SpendSet[SpendID, ResourceID, VoteRank]) Add(addedConflict *Spend[Spend
 }
 
 // Remove removes a Spend from the SpendSet and returns all remaining members of the set.
-func (c *SpendSet[SpendID, ResourceID, VoteRank]) Remove(removedConflict *Spend[SpendID, ResourceID, VoteRank]) (removed bool) {
+func (c *SpendSet[SpenderID, ResourceID, VoteRank]) Remove(removedSpender *Spender[SpenderID, ResourceID, VoteRank]) (removed bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if removed = c.members.Delete(removedConflict); removed && c.members.IsEmpty() {
+	if removed = c.spenders.Delete(removedSpender); removed && c.spenders.IsEmpty() {
 		c.allMembersEvicted.Set(true)
 	}
 
 	return removed
 }
 
-func (c *SpendSet[SpendID, ResourceID, VoteRank]) ForEach(callback func(parent *Spend[SpendID, ResourceID, VoteRank]) error) error {
+func (c *SpendSet[SpenderID, ResourceID, VoteRank]) ForEach(callback func(parent *Spender[SpenderID, ResourceID, VoteRank]) error) error {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	return c.members.ForEach(callback)
+	return c.spenders.ForEach(callback)
 }
 
 // OnAllMembersEvicted executes a callback when all members of the SpendSet are evicted and the SpendSet itself can be evicted.
-func (c *SpendSet[SpendID, ResourceID, VoteRank]) OnAllMembersEvicted(callback func(prevValue, newValue bool)) {
+func (c *SpendSet[SpenderID, ResourceID, VoteRank]) OnAllMembersEvicted(callback func(prevValue, newValue bool)) {
 	c.allMembersEvicted.OnUpdate(callback)
 }

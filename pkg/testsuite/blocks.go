@@ -146,15 +146,15 @@ func (t *TestSuite) AssertBlocksInCacheConflicts(blockConflicts map[*blocks.Bloc
 					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s is root block", node.Name, blockFromCache.ID())
 				}
 
-				expectedSpendIDs := ds.NewSet(lo.Map(conflictAliases, t.DefaultWallet().TransactionID)...)
-				actualSpendIDs := blockFromCache.SpendIDs()
+				expectedSpenderIDs := ds.NewSet(lo.Map(conflictAliases, t.DefaultWallet().TransactionID)...)
+				actualSpenderIDs := blockFromCache.SpenderIDs()
 
-				if expectedSpendIDs.Size() != actualSpendIDs.Size() {
-					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s conflict count incorrect: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedSpendIDs, actualSpendIDs)
+				if expectedSpenderIDs.Size() != actualSpenderIDs.Size() {
+					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s conflict count incorrect: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedSpenderIDs, actualSpenderIDs)
 				}
 
-				if !actualSpendIDs.HasAll(expectedSpendIDs) {
-					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedSpendIDs, actualSpendIDs)
+				if !actualSpenderIDs.HasAll(expectedSpenderIDs) {
+					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedSpenderIDs, actualSpenderIDs)
 				}
 
 				return nil

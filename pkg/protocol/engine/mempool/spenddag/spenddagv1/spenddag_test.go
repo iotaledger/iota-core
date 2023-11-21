@@ -53,13 +53,13 @@ func TestMemoryRelease(t *testing.T) {
 	//t.Skip("skip memory test as for some reason it's failing")
 	tf := newTestFramework(t)
 
-	createSpendSets := func(startSlot, spendSetCount, evictionDelay, spendsInSpendSet int, prevSpendSetAlias string) (int, string) {
+	createSpendSets := func(startSlot, spendSetCount, evictionDelay, spendersInSpendSet int, prevSpendSetAlias string) (int, string) {
 		slot := startSlot
 		for ; slot < startSlot+spendSetCount; slot++ {
 			spendSetAlias := fmt.Sprintf("spendSet-%d", slot)
-			for conflictIndex := 0; conflictIndex < spendsInSpendSet; conflictIndex++ {
+			for conflictIndex := 0; conflictIndex < spendersInSpendSet; conflictIndex++ {
 				conflictAlias := fmt.Sprintf("spendSet-%d:%d", slot, conflictIndex)
-				require.NoError(t, tf.CreateOrUpdateSpend(conflictAlias, []string{spendSetAlias}))
+				require.NoError(t, tf.CreateOrUpdateSpender(conflictAlias, []string{spendSetAlias}))
 				if prevSpendSetAlias != "" {
 					require.NoError(t, tf.UpdateSpendParents(conflictAlias, []string{fmt.Sprintf("%s:%d", prevSpendSetAlias, 0)}, []string{}))
 				}
@@ -67,9 +67,9 @@ func TestMemoryRelease(t *testing.T) {
 			prevSpendSetAlias = spendSetAlias
 
 			if slotToEvict := slot - evictionDelay; slotToEvict >= 0 {
-				for conflictIndex := 0; conflictIndex < spendsInSpendSet; conflictIndex++ {
+				for conflictIndex := 0; conflictIndex < spendersInSpendSet; conflictIndex++ {
 					conflictAlias := fmt.Sprintf("spendSet-%d:%d", slotToEvict, conflictIndex)
-					tf.EvictSpend(conflictAlias)
+					tf.EvictSpender(conflictAlias)
 				}
 			}
 		}
@@ -78,8 +78,8 @@ func TestMemoryRelease(t *testing.T) {
 	}
 	_, prevAlias := createSpendSets(0, 30000, 1, 2, "")
 
-	tf.Instance.EvictSpend(tf.SpendID(prevAlias + ":0"))
-	tf.Instance.EvictSpend(tf.SpendID(prevAlias + ":1"))
+	tf.Instance.EvictSpender(tf.SpenderID(prevAlias + ":0"))
+	tf.Instance.EvictSpender(tf.SpenderID(prevAlias + ":1"))
 
 	iotago.UnregisterIdentifierAliases()
 
@@ -88,8 +88,8 @@ func TestMemoryRelease(t *testing.T) {
 	memStatsStart := memanalyzer.MemSize(tf)
 	_, alias := createSpendSets(0, 30000, 1, 2, "")
 
-	tf.Instance.EvictSpend(tf.SpendID(alias + ":0"))
-	tf.Instance.EvictSpend(tf.SpendID(alias + ":1"))
+	tf.Instance.EvictSpender(tf.SpenderID(alias + ":0"))
+	tf.Instance.EvictSpender(tf.SpenderID(alias + ":1"))
 
 	tf.Instance.Shutdown()
 
@@ -98,7 +98,7 @@ func TestMemoryRelease(t *testing.T) {
 	time.Sleep(time.Second)
 
 	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).spendSetsByID.Size())
-	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).spendsByID.Size())
+	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).spendersByID.Size())
 	require.Equal(t, 0, tf.Instance.(*SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]).spendUnhooks.Size())
 	memStatsEnd := memanalyzer.MemSize(tf)
 

@@ -17,20 +17,20 @@ import (
 
 // SpendDAG represents a data structure that tracks causal relationships between Spends and that allows to
 // efficiently manage these Spends (and vote on their fate).
-type SpendDAG[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]] struct {
+type SpendDAG[SpenderID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]] struct {
 	// events contains the events of the spenddag.
-	events *spenddag.Events[SpendID, ResourceID]
+	events *spenddag.Events[SpenderID, ResourceID]
 
 	// seatCount is a function that returns the number of seats.
 	seatCount func() int
 
-	// spendsByID is a mapping of SpendIDs to Spends.
-	spendsByID *shrinkingmap.ShrinkingMap[SpendID, *Spend[SpendID, ResourceID, VoteRank]]
+	// spendersByID is a mapping of SpenderIDs to Spenders.
+	spendersByID *shrinkingmap.ShrinkingMap[SpenderID, *Spender[SpenderID, ResourceID, VoteRank]]
 
-	spendUnhooks *shrinkingmap.ShrinkingMap[SpendID, func()]
+	spendUnhooks *shrinkingmap.ShrinkingMap[SpenderID, func()]
 
 	// spendSetsByID is a mapping of ResourceIDs to SpendSets.
-	spendSetsByID *shrinkingmap.ShrinkingMap[ResourceID, *SpendSet[SpendID, ResourceID, VoteRank]]
+	spendSetsByID *shrinkingmap.ShrinkingMap[ResourceID, *SpendSet[SpenderID, ResourceID, VoteRank]]
 
 	// pendingTasks is a counter that keeps track of the number of pending tasks.
 	pendingTasks *syncutils.Counter
@@ -43,14 +43,14 @@ type SpendDAG[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankTyp
 }
 
 // New creates a new spenddag.
-func New[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]](seatCount func() int) *SpendDAG[SpendID, ResourceID, VoteRank] {
-	return &SpendDAG[SpendID, ResourceID, VoteRank]{
-		events: spenddag.NewEvents[SpendID, ResourceID](),
+func New[SpenderID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]](seatCount func() int) *SpendDAG[SpenderID, ResourceID, VoteRank] {
+	return &SpendDAG[SpenderID, ResourceID, VoteRank]{
+		events: spenddag.NewEvents[SpenderID, ResourceID](),
 
 		seatCount:     seatCount,
-		spendsByID:    shrinkingmap.New[SpendID, *Spend[SpendID, ResourceID, VoteRank]](),
-		spendUnhooks:  shrinkingmap.New[SpendID, func()](),
-		spendSetsByID: shrinkingmap.New[ResourceID, *SpendSet[SpendID, ResourceID, VoteRank]](),
+		spendersByID:  shrinkingmap.New[SpenderID, *Spender[SpenderID, ResourceID, VoteRank]](),
+		spendUnhooks:  shrinkingmap.New[SpenderID, func()](),
+		spendSetsByID: shrinkingmap.New[ResourceID, *SpendSet[SpenderID, ResourceID, VoteRank]](),
 		pendingTasks:  syncutils.NewCounter(),
 		votingMutex:   syncutils.NewDAGMutex[account.SeatIndex](),
 	}
@@ -59,78 +59,78 @@ func New[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[Vot
 var _ spenddag.SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank] = &SpendDAG[iotago.TransactionID, iotago.OutputID, vote.MockedRank]{}
 
 // Shutdown shuts down the SpendDAG.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) Shutdown() {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) Shutdown() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	c.spendsByID.ForEach(func(spendID SpendID, spend *Spend[SpendID, ResourceID, VoteRank]) bool {
-		spend.Shutdown()
+	c.spendersByID.ForEach(func(spenderID SpenderID, spender *Spender[SpenderID, ResourceID, VoteRank]) bool {
+		spender.Shutdown()
 
 		return true
 	})
 }
 
 // Events returns the events of the spenddag.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) Events() *spenddag.Events[SpendID, ResourceID] {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) Events() *spenddag.Events[SpenderID, ResourceID] {
 	return c.events
 }
 
-// CreateSpend creates a new Spend.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) CreateSpend(id SpendID) {
+// CreateSpender creates a new Spender.
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) CreateSpender(id SpenderID) {
 	if func() (created bool) {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
-		_, isNewSpend := c.spendsByID.GetOrCreate(id, func() *Spend[SpendID, ResourceID, VoteRank] {
-			newSpend := NewSpend[SpendID, ResourceID, VoteRank](id, weight.New(), c.pendingTasks, acceptance.ThresholdProvider(func() int64 { return int64(c.seatCount()) }))
+		_, isNewSpend := c.spendersByID.GetOrCreate(id, func() *Spender[SpenderID, ResourceID, VoteRank] {
+			newSpender := NewSpender[SpenderID, ResourceID, VoteRank](id, weight.New(), c.pendingTasks, acceptance.ThresholdProvider(func() int64 { return int64(c.seatCount()) }))
 
 			// attach to the acceptance state updated event and propagate that event to the outside.
-			// also need to remember the unhook method to properly evict the spend.
-			c.spendUnhooks.Set(id, newSpend.AcceptanceStateUpdated.Hook(func(_ acceptance.State, newState acceptance.State) {
+			// also need to remember the unhook method to properly evict the spender.
+			c.spendUnhooks.Set(id, newSpender.AcceptanceStateUpdated.Hook(func(_ acceptance.State, newState acceptance.State) {
 				if newState.IsAccepted() {
-					c.events.SpendAccepted.Trigger(newSpend.ID)
+					c.events.SpenderAccepted.Trigger(newSpender.ID)
 					return
 				}
 				if newState.IsRejected() {
-					c.events.SpendRejected.Trigger(newSpend.ID)
+					c.events.SpenderRejected.Trigger(newSpender.ID)
 				}
 			}).Unhook)
 
-			return newSpend
+			return newSpender
 		})
 
 		return isNewSpend
 	}() {
-		c.events.SpendCreated.Trigger(id)
+		c.events.SpenderCreated.Trigger(id)
 	}
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UpdateConflictingResources(id SpendID, resourceIDs ds.Set[ResourceID]) error {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) UpdateSpentResources(id SpenderID, resourceIDs ds.Set[ResourceID]) error {
 	joinedSpendSets, err := func() (ds.Set[ResourceID], error) {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
-		spend, exists := c.spendsByID.Get(id)
+		spender, exists := c.spendersByID.Get(id)
 		if !exists {
-			return nil, ierrors.Errorf("spend already evicted: %w", spenddag.ErrEntityEvicted)
+			return nil, ierrors.Errorf("spender already evicted: %w", spenddag.ErrEntityEvicted)
 		}
 
-		return spend.JoinSpendSets(c.spendSets(resourceIDs))
+		return spender.JoinSpendSets(c.spendSets(resourceIDs))
 	}()
 
 	if err != nil {
-		return ierrors.Errorf("spend %s failed to join spend sets: %w", id, err)
+		return ierrors.Errorf("spender %s failed to join spend sets: %w", id, err)
 	}
 
 	if !joinedSpendSets.IsEmpty() {
-		c.events.ConflictingResourcesAdded.Trigger(id, joinedSpendSets)
+		c.events.SpentResourcesAdded.Trigger(id, joinedSpendSets)
 	}
 
 	return nil
 }
 
 // ReadConsistent write locks the spenddag and exposes read-only methods to the callback to perform multiple reads while maintaining the same spenddag state.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) ReadConsistent(callback func(spenddag spenddag.ReadLockedSpendDAG[SpendID, ResourceID, VoteRank]) error) error {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) ReadConsistent(callback func(spenddag spenddag.ReadLockedSpendDAG[SpenderID, ResourceID, VoteRank]) error) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -140,23 +140,23 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) ReadConsistent(callback func(s
 }
 
 // UpdateSpendParents updates the parents of the given Spend and returns an error if the operation failed.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UpdateSpendParents(spendID SpendID, addedParentIDs ds.Set[SpendID], removedParentIDs ds.Set[SpendID]) error {
-	newParents := ds.NewSet[SpendID]()
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) UpdateSpendParents(spenderID SpenderID, addedParentIDs ds.Set[SpenderID], removedParentIDs ds.Set[SpenderID]) error {
+	newParents := ds.NewSet[SpenderID]()
 
 	updated, err := func() (bool, error) {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
-		currentSpend, currentSpendExists := c.spendsByID.Get(spendID)
+		currentSpender, currentSpendExists := c.spendersByID.Get(spenderID)
 		if !currentSpendExists {
-			return false, ierrors.Errorf("tried to modify evicted spend with %s: %w", spendID, spenddag.ErrEntityEvicted)
+			return false, ierrors.Errorf("tried to modify evicted spend with %s: %w", spenderID, spenddag.ErrEntityEvicted)
 		}
 
-		addedParents := ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]]()
+		addedParents := ds.NewSet[*Spender[SpenderID, ResourceID, VoteRank]]()
 
-		if err := addedParentIDs.ForEach(func(addedParentID SpendID) error {
+		if err := addedParentIDs.ForEach(func(addedParentID SpenderID) error {
 			// If we cannot load the parent it is because it has been already evicted
-			if addedParent, addedParentExists := c.spendsByID.Get(addedParentID); addedParentExists {
+			if addedParent, addedParentExists := c.spendersByID.Get(addedParentID); addedParentExists {
 				addedParents.Add(addedParent)
 			}
 
@@ -165,15 +165,15 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UpdateSpendParents(spendID Spe
 			return false, err
 		}
 
-		removedParents, err := c.spends(removedParentIDs, !currentSpend.IsRejected())
+		removedParents, err := c.spenders(removedParentIDs, !currentSpender.IsRejected())
 		if err != nil {
 			return false, ierrors.Errorf("failed to update spend parents: %w", err)
 		}
 
-		updated := currentSpend.UpdateParents(addedParents, removedParents)
+		updated := currentSpender.UpdateParents(addedParents, removedParents)
 		if updated {
-			_ = currentSpend.Parents.ForEach(func(parentSpend *Spend[SpendID, ResourceID, VoteRank]) (err error) {
-				newParents.Add(parentSpend.ID)
+			_ = currentSpender.Parents.ForEach(func(parentSpender *Spender[SpenderID, ResourceID, VoteRank]) (err error) {
+				newParents.Add(parentSpender.ID)
 				return nil
 			})
 		}
@@ -185,19 +185,19 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UpdateSpendParents(spendID Spe
 	}
 
 	if updated {
-		c.events.SpendParentsUpdated.Trigger(spendID, newParents)
+		c.events.SpenderParentsUpdated.Trigger(spenderID, newParents)
 	}
 
 	return nil
 }
 
-// LikedInstead returns the SpendIDs of the Spends that are liked instead of the Spends.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) LikedInstead(spendIDs ds.Set[SpendID]) ds.Set[SpendID] {
-	likedInstead := ds.NewSet[SpendID]()
-	spendIDs.Range(func(spendID SpendID) {
-		if currentSpend, exists := c.spendsByID.Get(spendID); exists {
-			if likedSpend := heaviestSpend(currentSpend.LikedInstead()); likedSpend != nil {
-				likedInstead.Add(likedSpend.ID)
+// LikedInstead returns the SpenderIDs of the Spenders that are liked instead of the Spenders.
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) LikedInstead(spenderIDs ds.Set[SpenderID]) ds.Set[SpenderID] {
+	likedInstead := ds.NewSet[SpenderID]()
+	spenderIDs.Range(func(spenderID SpenderID) {
+		if currentSpender, exists := c.spendersByID.Get(spenderID); exists {
+			if likedSpender := heaviestSpender(currentSpender.LikedInstead()); likedSpender != nil {
+				likedInstead.Add(likedSpender.ID)
 			}
 		}
 	})
@@ -205,55 +205,55 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) LikedInstead(spendIDs ds.Set[S
 	return likedInstead
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) FutureCone(spendIDs ds.Set[SpendID]) (futureCone ds.Set[SpendID]) {
-	futureCone = ds.NewSet[SpendID]()
-	for futureConeWalker := walker.New[*Spend[SpendID, ResourceID, VoteRank]]().PushAll(lo.Return1(c.spends(spendIDs, true)).ToSlice()...); futureConeWalker.HasNext(); {
-		if spend := futureConeWalker.Next(); futureCone.Add(spend.ID) {
-			futureConeWalker.PushAll(spend.Children.ToSlice()...)
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) FutureCone(spenderIDs ds.Set[SpenderID]) (futureCone ds.Set[SpenderID]) {
+	futureCone = ds.NewSet[SpenderID]()
+	for futureConeWalker := walker.New[*Spender[SpenderID, ResourceID, VoteRank]]().PushAll(lo.Return1(c.spenders(spenderIDs, true)).ToSlice()...); futureConeWalker.HasNext(); {
+		if spender := futureConeWalker.Next(); futureCone.Add(spender.ID) {
+			futureConeWalker.PushAll(spender.Children.ToSlice()...)
 		}
 	}
 
 	return futureCone
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) ConflictingSpends(spendID SpendID) (conflictingSpends ds.Set[SpendID], exists bool) {
-	spend, exists := c.spendsByID.Get(spendID)
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) ConflictingSpenders(spenderID SpenderID) (conflictingSpenders ds.Set[SpenderID], exists bool) {
+	spender, exists := c.spendersByID.Get(spenderID)
 	if !exists {
 		return nil, false
 	}
 
-	conflictingSpends = ds.NewSet[SpendID]()
-	spend.ConflictingSpends.Range(func(conflictingSpend *Spend[SpendID, ResourceID, VoteRank]) {
-		conflictingSpends.Add(conflictingSpend.ID)
+	conflictingSpenders = ds.NewSet[SpenderID]()
+	spender.ConflictingSpenders.Range(func(conflictingSpender *Spender[SpenderID, ResourceID, VoteRank]) {
+		conflictingSpenders.Add(conflictingSpender.ID)
 	})
 
-	return conflictingSpends, true
+	return conflictingSpenders, true
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) AllSpendsSupported(seat account.SeatIndex, spendIDs ds.Set[SpendID]) bool {
-	return lo.Return1(c.spends(spendIDs, true)).ForEach(func(spend *Spend[SpendID, ResourceID, VoteRank]) (err error) {
-		lastVote, exists := spend.LatestVotes.Get(seat)
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) AllSpendsSupported(seat account.SeatIndex, spenderIDs ds.Set[SpenderID]) bool {
+	return lo.Return1(c.spenders(spenderIDs, true)).ForEach(func(spender *Spender[SpenderID, ResourceID, VoteRank]) (err error) {
+		lastVote, exists := spender.LatestVotes.Get(seat)
 
-		return lo.Cond(exists && lastVote.IsLiked(), nil, ierrors.Errorf("spend with %s is not supported by seat %d", spend.ID, seat))
+		return lo.Cond(exists && lastVote.IsLiked(), nil, ierrors.Errorf("spender %s is not supported by seat %d", spender.ID, seat))
 	}) == nil
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendVoters(spendID SpendID) (spendVoters ds.Set[account.SeatIndex]) {
-	if spend, exists := c.spendsByID.Get(spendID); exists {
-		return spend.Weight.Voters.Clone()
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendVoters(spenderID SpenderID) (spendVoters ds.Set[account.SeatIndex]) {
+	if spender, exists := c.spendersByID.Get(spenderID); exists {
+		return spender.Weight.Voters.Clone()
 	}
 
 	return ds.NewSet[account.SeatIndex]()
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendSets(spendID SpendID) (spendSets ds.Set[ResourceID], exists bool) {
-	spend, exists := c.spendsByID.Get(spendID)
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendSets(spenderID SpenderID) (spendSets ds.Set[ResourceID], exists bool) {
+	spender, exists := c.spendersByID.Get(spenderID)
 	if !exists {
 		return nil, false
 	}
 
 	spendSets = ds.NewSet[ResourceID]()
-	_ = spend.SpendSets.ForEach(func(spendSet *SpendSet[SpendID, ResourceID, VoteRank]) error {
+	_ = spender.SpendSets.ForEach(func(spendSet *SpendSet[SpenderID, ResourceID, VoteRank]) error {
 		spendSets.Add(spendSet.ID)
 		return nil
 	})
@@ -261,14 +261,14 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendSets(spendID SpendID) (sp
 	return spendSets, true
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendParents(spendID SpendID) (spendParents ds.Set[SpendID], exists bool) {
-	spend, exists := c.spendsByID.Get(spendID)
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendParents(spenderID SpenderID) (spendParents ds.Set[SpenderID], exists bool) {
+	spender, exists := c.spendersByID.Get(spenderID)
 	if !exists {
 		return nil, false
 	}
 
-	spendParents = ds.NewSet[SpendID]()
-	_ = spend.Parents.ForEach(func(parent *Spend[SpendID, ResourceID, VoteRank]) error {
+	spendParents = ds.NewSet[SpenderID]()
+	_ = spender.Parents.ForEach(func(parent *Spender[SpenderID, ResourceID, VoteRank]) error {
 		spendParents.Add(parent.ID)
 		return nil
 	})
@@ -276,14 +276,14 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendParents(spendID SpendID) 
 	return spendParents, true
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendChildren(spendID SpendID) (spendChildren ds.Set[SpendID], exists bool) {
-	spend, exists := c.spendsByID.Get(spendID)
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendChildren(spenderID SpenderID) (spendChildren ds.Set[SpenderID], exists bool) {
+	spender, exists := c.spendersByID.Get(spenderID)
 	if !exists {
 		return nil, false
 	}
 
-	spendChildren = ds.NewSet[SpendID]()
-	_ = spend.Children.ForEach(func(parent *Spend[SpendID, ResourceID, VoteRank]) error {
+	spendChildren = ds.NewSet[SpenderID]()
+	_ = spender.Children.ForEach(func(parent *Spender[SpenderID, ResourceID, VoteRank]) error {
 		spendChildren.Add(parent.ID)
 		return nil
 	})
@@ -291,67 +291,67 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendChildren(spendID SpendID)
 	return spendChildren, true
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendSetMembers(spendSetID ResourceID) (spends ds.Set[SpendID], exists bool) {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendSetMembers(spendSetID ResourceID) (spenders ds.Set[SpenderID], exists bool) {
 	spendSet, exists := c.spendSetsByID.Get(spendSetID)
 	if !exists {
 		return nil, false
 	}
 
-	spends = ds.NewSet[SpendID]()
-	_ = spendSet.ForEach(func(parent *Spend[SpendID, ResourceID, VoteRank]) error {
-		spends.Add(parent.ID)
+	spenders = ds.NewSet[SpenderID]()
+	_ = spendSet.ForEach(func(parent *Spender[SpenderID, ResourceID, VoteRank]) error {
+		spenders.Add(parent.ID)
 		return nil
 	})
 
-	return spends, true
+	return spenders, true
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SpendWeight(spendID SpendID) int64 {
-	if spend, exists := c.spendsByID.Get(spendID); exists {
-		return spend.Weight.Value().ValidatorsWeight()
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendWeight(spenderID SpenderID) int64 {
+	if spender, exists := c.spendersByID.Get(spenderID); exists {
+		return spender.Weight.Value().ValidatorsWeight()
 	}
 
 	return 0
 }
 
 // CastVotes applies the given votes to the spenddag.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) CastVotes(vote *vote.Vote[VoteRank], spendIDs ds.Set[SpendID]) error {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) CastVotes(vote *vote.Vote[VoteRank], spenderIDs ds.Set[SpenderID]) error {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	c.votingMutex.Lock(vote.Voter)
 	defer c.votingMutex.Unlock(vote.Voter)
 
-	supportedSpends, revokedSpends, err := c.determineVotes(spendIDs)
+	supportedSpenders, revokedSpenders, err := c.determineVotes(spenderIDs)
 	if err != nil {
 		return ierrors.Errorf("failed to determine votes: %w", err)
 	}
 
-	for supportedSpend := supportedSpends.Iterator(); supportedSpend.HasNext(); {
-		supportedSpend.Next().ApplyVote(vote.WithLiked(true))
+	for supportedSpender := supportedSpenders.Iterator(); supportedSpender.HasNext(); {
+		supportedSpender.Next().ApplyVote(vote.WithLiked(true))
 	}
 
-	for revokedSpend := revokedSpends.Iterator(); revokedSpend.HasNext(); {
-		revokedSpend.Next().ApplyVote(vote.WithLiked(false))
+	for revokedSpender := revokedSpenders.Iterator(); revokedSpender.HasNext(); {
+		revokedSpender.Next().ApplyVote(vote.WithLiked(false))
 	}
 
 	return nil
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) AcceptanceState(spendIDs ds.Set[SpendID]) acceptance.State {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) AcceptanceState(spenderIDs ds.Set[SpenderID]) acceptance.State {
 	lowestObservedState := acceptance.Accepted
-	if err := spendIDs.ForEach(func(spendID SpendID) error {
-		spend, exists := c.spendsByID.Get(spendID)
+	if err := spenderIDs.ForEach(func(spenderID SpenderID) error {
+		spender, exists := c.spendersByID.Get(spenderID)
 		if !exists {
 			return ierrors.Errorf("tried to retrieve non-existing spend: %w", spenddag.ErrFatal)
 		}
 
-		if spend.IsRejected() {
+		if spender.IsRejected() {
 			lowestObservedState = acceptance.Rejected
 
 			return spenddag.ErrExpected
 		}
 
-		if spend.IsPending() {
+		if spender.IsPending() {
 			lowestObservedState = acceptance.Pending
 		}
 
@@ -363,73 +363,73 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) AcceptanceState(spendIDs ds.Se
 	return lowestObservedState
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) SetAccepted(spendID SpendID) {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SetAccepted(spenderID SpenderID) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	if spend, exists := c.spendsByID.Get(spendID); exists {
-		spend.setAcceptanceState(acceptance.Accepted)
+	if spender, exists := c.spendersByID.Get(spenderID); exists {
+		spender.setAcceptanceState(acceptance.Accepted)
 	}
 }
 
-// UnacceptedSpends takes a set of SpendIDs and removes all the accepted Spends (leaving only the
+// UnacceptedSpends takes a set of SpenderIDs and removes all the accepted Spends (leaving only the
 // pending or rejected ones behind).
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) UnacceptedSpends(spendIDs ds.Set[SpendID]) ds.Set[SpendID] {
-	pendingSpendIDs := ds.NewSet[SpendID]()
-	spendIDs.Range(func(currentSpendID SpendID) {
-		if spend, exists := c.spendsByID.Get(currentSpendID); exists && !spend.IsAccepted() {
-			pendingSpendIDs.Add(currentSpendID)
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) UnacceptedSpenders(spenderIDs ds.Set[SpenderID]) ds.Set[SpenderID] {
+	pendingSpenderIDs := ds.NewSet[SpenderID]()
+	spenderIDs.Range(func(currentSpenderID SpenderID) {
+		if spender, exists := c.spendersByID.Get(currentSpenderID); exists && !spender.IsAccepted() {
+			pendingSpenderIDs.Add(currentSpenderID)
 		}
 	})
 
-	return pendingSpendIDs
+	return pendingSpenderIDs
 }
 
-// EvictSpend removes spend with given SpendID from spenddag.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) EvictSpend(spendID SpendID) {
-	for _, evictedSpendID := range func() []SpendID {
+// EvictSpend removes spend with given SpenderID from spenddag.
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) EvictSpender(spenderID SpenderID) {
+	for _, evictedSpenderID := range func() []SpenderID {
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
-		return c.evictSpend(spendID)
+		return c.evictSpender(spenderID)
 	}() {
-		c.events.SpendEvicted.Trigger(evictedSpendID)
+		c.events.SpenderEvicted.Trigger(evictedSpenderID)
 	}
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) evictSpend(spendID SpendID) []SpendID {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) evictSpender(spenderID SpenderID) []SpenderID {
 	// evicting an already evicted spend is fine
-	spend, exists := c.spendsByID.Get(spendID)
+	spender, exists := c.spendersByID.Get(spenderID)
 	if !exists {
 		return nil
 	}
 
-	evictedSpendIDs := spend.Evict()
+	evictedSpenderIDs := spender.Evict()
 
-	// remove the spends from the spenddag dictionary
-	for _, evictedSpendID := range evictedSpendIDs {
-		c.spendsByID.Delete(evictedSpendID)
+	// remove the spenders from the spenddag dictionary
+	for _, evictedSpenderID := range evictedSpenderIDs {
+		c.spendersByID.Delete(evictedSpenderID)
 	}
 
 	// unhook the spend events and remove the unhook method from the storage
-	unhookFunc, unhookExists := c.spendUnhooks.Get(spendID)
+	unhookFunc, unhookExists := c.spendUnhooks.Get(spenderID)
 	if unhookExists {
 		unhookFunc()
-		c.spendUnhooks.Delete(spendID)
+		c.spendUnhooks.Delete(spenderID)
 	}
 
-	return evictedSpendIDs
+	return evictedSpenderIDs
 }
 
-// spends returns the Spends that are associated with the given SpendIDs. If ignoreMissing is set to true, it
-// will ignore missing Spends instead of returning an ErrEntityEvicted error.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) spends(ids ds.Set[SpendID], ignoreMissing bool) (ds.Set[*Spend[SpendID, ResourceID, VoteRank]], error) {
-	spends := ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]]()
+// spenders returns the Spenders that are associated with the given SpenderIDs. If ignoreMissing is set to true, it
+// will ignore missing Spenders instead of returning an ErrEntityEvicted error.
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) spenders(ids ds.Set[SpenderID], ignoreMissing bool) (ds.Set[*Spender[SpenderID, ResourceID, VoteRank]], error) {
+	spenders := ds.NewSet[*Spender[SpenderID, ResourceID, VoteRank]]()
 
-	return spends, ids.ForEach(func(id SpendID) (err error) {
-		existingSpend, exists := c.spendsByID.Get(id)
+	return spenders, ids.ForEach(func(id SpenderID) (err error) {
+		existingSpend, exists := c.spendersByID.Get(id)
 		if exists {
-			spends.Add(existingSpend)
+			spenders.Add(existingSpend)
 		}
 
 		return lo.Cond(exists || ignoreMissing, nil, ierrors.Errorf("tried to retrieve a non-existing spend with %s: %w", id, spenddag.ErrEntityEvicted))
@@ -438,8 +438,8 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) spends(ids ds.Set[SpendID], ig
 
 // spendSets returns the SpendSets that are associated with the given ResourceIDs. If createMissing is set to
 // true, it will create an empty SpendSets for each missing ResourceID.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) spendSets(resourceIDs ds.Set[ResourceID]) ds.Set[*SpendSet[SpendID, ResourceID, VoteRank]] {
-	spendSets := ds.NewSet[*SpendSet[SpendID, ResourceID, VoteRank]]()
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) spendSets(resourceIDs ds.Set[ResourceID]) ds.Set[*SpendSet[SpenderID, ResourceID, VoteRank]] {
+	spendSets := ds.NewSet[*SpendSet[SpenderID, ResourceID, VoteRank]]()
 
 	resourceIDs.Range(func(resourceID ResourceID) {
 		spendSets.Add(lo.Return1(c.spendSetsByID.GetOrCreate(resourceID, c.spendSetFactory(resourceID))))
@@ -448,55 +448,55 @@ func (c *SpendDAG[SpendID, ResourceID, VoteRank]) spendSets(resourceIDs ds.Set[R
 	return spendSets
 }
 
-// determineVotes determines the Spends that are supported and revoked by the given SpendIDs.
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) determineVotes(spendIDs ds.Set[SpendID]) (supportedSpends ds.Set[*Spend[SpendID, ResourceID, VoteRank]], revokedSpends ds.Set[*Spend[SpendID, ResourceID, VoteRank]], err error) {
-	supportedSpends = ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]]()
-	revokedSpends = ds.NewSet[*Spend[SpendID, ResourceID, VoteRank]]()
+// determineVotes determines the Spends that are supported and revoked by the given SpenderIDs.
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) determineVotes(spenderIDs ds.Set[SpenderID]) (supportedSpenders ds.Set[*Spender[SpenderID, ResourceID, VoteRank]], revokedSpenders ds.Set[*Spender[SpenderID, ResourceID, VoteRank]], err error) {
+	supportedSpenders = ds.NewSet[*Spender[SpenderID, ResourceID, VoteRank]]()
+	revokedSpenders = ds.NewSet[*Spender[SpenderID, ResourceID, VoteRank]]()
 
-	revokedWalker := walker.New[*Spend[SpendID, ResourceID, VoteRank]]()
-	revokeSpend := func(revokedSpend *Spend[SpendID, ResourceID, VoteRank]) error {
-		if revokedSpends.Add(revokedSpend) {
-			if supportedSpends.Has(revokedSpend) {
-				return ierrors.Errorf("applied conflicting votes (%s is supported and revoked)", revokedSpend.ID)
+	revokedWalker := walker.New[*Spender[SpenderID, ResourceID, VoteRank]]()
+	revokeSpend := func(revokedSpender *Spender[SpenderID, ResourceID, VoteRank]) error {
+		if revokedSpenders.Add(revokedSpender) {
+			if supportedSpenders.Has(revokedSpender) {
+				return ierrors.Errorf("applied conflicting votes (%s is supported and revoked)", revokedSpender.ID)
 			}
 
-			revokedWalker.PushAll(revokedSpend.Children.ToSlice()...)
+			revokedWalker.PushAll(revokedSpender.Children.ToSlice()...)
 		}
 
 		return nil
 	}
 
-	supportedWalker := walker.New[*Spend[SpendID, ResourceID, VoteRank]]()
-	supportSpend := func(supportedSpend *Spend[SpendID, ResourceID, VoteRank]) error {
-		if supportedSpends.Add(supportedSpend) {
-			if err := supportedSpend.ConflictingSpends.ForEach(revokeSpend); err != nil {
-				return ierrors.Errorf("failed to collect conflicting spends: %w", err)
+	supportedWalker := walker.New[*Spender[SpenderID, ResourceID, VoteRank]]()
+	supportSpender := func(supportedSpender *Spender[SpenderID, ResourceID, VoteRank]) error {
+		if supportedSpenders.Add(supportedSpender) {
+			if err := supportedSpender.ConflictingSpenders.ForEach(revokeSpend); err != nil {
+				return ierrors.Errorf("failed to collect conflicting spenders: %w", err)
 			}
 
-			supportedWalker.PushAll(supportedSpend.Parents.ToSlice()...)
+			supportedWalker.PushAll(supportedSpender.Parents.ToSlice()...)
 		}
 
 		return nil
 	}
 
-	for supportedWalker.PushAll(lo.Return1(c.spends(spendIDs, true)).ToSlice()...); supportedWalker.HasNext(); {
-		if err := supportSpend(supportedWalker.Next()); err != nil {
-			return nil, nil, ierrors.Errorf("failed to collect supported spends: %w", err)
+	for supportedWalker.PushAll(lo.Return1(c.spenders(spenderIDs, true)).ToSlice()...); supportedWalker.HasNext(); {
+		if err := supportSpender(supportedWalker.Next()); err != nil {
+			return nil, nil, ierrors.Errorf("failed to collect supported spenders: %w", err)
 		}
 	}
 
 	for revokedWalker.HasNext() {
-		if revokedSpend := revokedWalker.Next(); revokedSpends.Add(revokedSpend) {
-			revokedWalker.PushAll(revokedSpend.Children.ToSlice()...)
+		if revokedSpender := revokedWalker.Next(); revokedSpenders.Add(revokedSpender) {
+			revokedWalker.PushAll(revokedSpender.Children.ToSlice()...)
 		}
 	}
 
-	return supportedSpends, revokedSpends, nil
+	return supportedSpenders, revokedSpenders, nil
 }
 
-func (c *SpendDAG[SpendID, ResourceID, VoteRank]) spendSetFactory(resourceID ResourceID) func() *SpendSet[SpendID, ResourceID, VoteRank] {
-	return func() *SpendSet[SpendID, ResourceID, VoteRank] {
-		spendSet := NewSpendSet[SpendID, ResourceID, VoteRank](resourceID)
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) spendSetFactory(resourceID ResourceID) func() *SpendSet[SpenderID, ResourceID, VoteRank] {
+	return func() *SpendSet[SpenderID, ResourceID, VoteRank] {
+		spendSet := NewSpendSet[SpenderID, ResourceID, VoteRank](resourceID)
 
 		spendSet.OnAllMembersEvicted(func(prevValue bool, newValue bool) {
 			if newValue && !prevValue {

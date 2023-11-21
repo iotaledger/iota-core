@@ -399,19 +399,19 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		fmt.Printf("%s > [%s] SybilProtection.CommitteeSelected: epoch %d - %s\n", n.Name, engineName, epoch, committee.IDs())
 	})
 
-	events.SpendDAG.SpendCreated.Hook(func(spendID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] SpendDAG.SpendCreated: %s\n", n.Name, engineName, spendID)
+	events.SpendDAG.SpenderCreated.Hook(func(spenderID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] SpendDAG.SpendCreated: %s\n", n.Name, engineName, spenderID)
 	})
 
-	events.SpendDAG.SpendEvicted.Hook(func(spendID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] SpendDAG.SpendEvicted: %s\n", n.Name, engineName, spendID)
+	events.SpendDAG.SpenderEvicted.Hook(func(spenderID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] SpendDAG.SpendEvicted: %s\n", n.Name, engineName, spenderID)
 	})
-	events.SpendDAG.SpendRejected.Hook(func(spendID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] SpendDAG.SpendRejected: %s\n", n.Name, engineName, spendID)
+	events.SpendDAG.SpenderRejected.Hook(func(spenderID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] SpendDAG.SpendRejected: %s\n", n.Name, engineName, spenderID)
 	})
 
-	events.SpendDAG.SpendAccepted.Hook(func(spendID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] SpendDAG.SpendAccepted: %s\n", n.Name, engineName, spendID)
+	events.SpendDAG.SpenderAccepted.Hook(func(spenderID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] SpendDAG.SpendAccepted: %s\n", n.Name, engineName, spenderID)
 	})
 
 	instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {

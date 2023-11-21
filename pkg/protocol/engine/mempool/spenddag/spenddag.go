@@ -7,37 +7,37 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 )
 
-type SpendDAG[SpendID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] interface {
+type SpendDAG[SpenderID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] interface {
 	Shutdown()
-	Events() *Events[SpendID, ResourceID]
+	Events() *Events[SpenderID, ResourceID]
 
-	CreateSpend(id SpendID)
-	UpdateConflictingResources(id SpendID, resourceIDs ds.Set[ResourceID]) error
+	CreateSpender(id SpenderID)
+	UpdateSpentResources(id SpenderID, resourceIDs ds.Set[ResourceID]) error
 
-	ReadConsistent(callback func(spendDAG ReadLockedSpendDAG[SpendID, ResourceID, VoteRank]) error) error
-	UpdateSpendParents(spendID SpendID, addedParentIDs, removedParentIDs ds.Set[SpendID]) error
-	FutureCone(spendIDs ds.Set[SpendID]) (futureCone ds.Set[SpendID])
-	ConflictingSpends(spendID SpendID) (conflictingSpends ds.Set[SpendID], exists bool)
-	CastVotes(vote *vote.Vote[VoteRank], spendIDs ds.Set[SpendID]) error
-	AcceptanceState(spendIDs ds.Set[SpendID]) acceptance.State
-	SetAccepted(spendID SpendID)
-	UnacceptedSpends(spendIDs ds.Set[SpendID]) ds.Set[SpendID]
-	AllSpendsSupported(seat account.SeatIndex, spendIDs ds.Set[SpendID]) bool
-	EvictSpend(spendID SpendID)
+	ReadConsistent(callback func(spendDAG ReadLockedSpendDAG[SpenderID, ResourceID, VoteRank]) error) error
+	UpdateSpendParents(spenderID SpenderID, addedParentIDs, removedParentIDs ds.Set[SpenderID]) error
+	FutureCone(spenderIDs ds.Set[SpenderID]) (futureCone ds.Set[SpenderID])
+	ConflictingSpenders(spenderID SpenderID) (conflictingSpends ds.Set[SpenderID], exists bool)
+	CastVotes(vote *vote.Vote[VoteRank], spenderIDs ds.Set[SpenderID]) error
+	AcceptanceState(spenderIDs ds.Set[SpenderID]) acceptance.State
+	SetAccepted(spenderID SpenderID)
+	UnacceptedSpenders(spenderIDs ds.Set[SpenderID]) ds.Set[SpenderID]
+	AllSpendsSupported(seat account.SeatIndex, spenderIDs ds.Set[SpenderID]) bool
+	EvictSpender(spenderID SpenderID)
 
-	SpendSets(spendID SpendID) (spendSetIDs ds.Set[ResourceID], exists bool)
-	SpendParents(spendID SpendID) (spendIDs ds.Set[SpendID], exists bool)
-	SpendSetMembers(spendSetID ResourceID) (spendIDs ds.Set[SpendID], exists bool)
-	SpendWeight(spendID SpendID) int64
-	SpendChildren(spendID SpendID) (spendIDs ds.Set[SpendID], exists bool)
-	SpendVoters(spendID SpendID) (voters ds.Set[account.SeatIndex])
-	LikedInstead(spendIDs ds.Set[SpendID]) ds.Set[SpendID]
+	SpendSets(spenderID SpenderID) (spendSetIDs ds.Set[ResourceID], exists bool)
+	SpendParents(spenderID SpenderID) (spenderIDs ds.Set[SpenderID], exists bool)
+	SpendSetMembers(spendSetID ResourceID) (spenderIDs ds.Set[SpenderID], exists bool)
+	SpendWeight(spenderID SpenderID) int64
+	SpendChildren(spenderID SpenderID) (spenderIDs ds.Set[SpenderID], exists bool)
+	SpendVoters(spenderID SpenderID) (voters ds.Set[account.SeatIndex])
+	LikedInstead(spenderIDs ds.Set[SpenderID]) ds.Set[SpenderID]
 }
 
-type ReadLockedSpendDAG[SpendID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] interface {
-	LikedInstead(spendIDs ds.Set[SpendID]) ds.Set[SpendID]
-	FutureCone(spendIDs ds.Set[SpendID]) (futureCone ds.Set[SpendID])
-	ConflictingSpends(spendID SpendID) (conflictingSpends ds.Set[SpendID], exists bool)
-	AcceptanceState(spendIDs ds.Set[SpendID]) acceptance.State
-	UnacceptedSpends(spendIDs ds.Set[SpendID]) ds.Set[SpendID]
+type ReadLockedSpendDAG[SpenderID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] interface {
+	LikedInstead(spenderIDs ds.Set[SpenderID]) ds.Set[SpenderID]
+	FutureCone(spenderIDs ds.Set[SpenderID]) (futureCone ds.Set[SpenderID])
+	ConflictingSpenders(spenderID SpenderID) (conflictingSpends ds.Set[SpenderID], exists bool)
+	AcceptanceState(spenderIDs ds.Set[SpenderID]) acceptance.State
+	UnacceptedSpenders(spenderIDs ds.Set[SpenderID]) ds.Set[SpenderID]
 }

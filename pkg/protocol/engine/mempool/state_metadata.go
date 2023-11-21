@@ -8,7 +8,7 @@ import (
 type StateMetadata interface {
 	State() State
 
-	SpendIDs() reactive.Set[iotago.TransactionID]
+	SpenderIDs() reactive.Set[iotago.TransactionID]
 
 	PendingSpenderCount() int
 

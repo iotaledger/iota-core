@@ -243,16 +243,16 @@ func (t *TestFramework) RequireTransactionsEvicted(transactionAliases map[string
 	}
 }
 
-func (t *TestFramework) RequireSpendIDs(spendMapping map[string][]string) {
+func (t *TestFramework) RequireSpenderIDs(spendMapping map[string][]string) {
 	for transactionAlias, spendAliases := range spendMapping {
 		transactionMetadata, exists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
 		require.True(t.test, exists, "transaction %s does not exist", transactionAlias)
 
-		spendIDs := transactionMetadata.SpendIDs()
-		require.Equal(t.test, len(spendAliases), spendIDs.Size(), "%s has wrong number of SpendIDs", transactionAlias)
+		spenderIDs := transactionMetadata.SpenderIDs()
+		require.Equal(t.test, len(spendAliases), spenderIDs.Size(), "%s has wrong number of SpenderIDs", transactionAlias)
 
 		for _, spendAlias := range spendAliases {
-			require.True(t.test, spendIDs.Has(t.TransactionID(spendAlias)), "transaction %s should have spend %s, instead had %s", transactionAlias, spendAlias, spendIDs)
+			require.True(t.test, spenderIDs.Has(t.TransactionID(spendAlias)), "transaction %s should have spend %s, instead had %s", transactionAlias, spendAlias, spenderIDs)
 		}
 	}
 }

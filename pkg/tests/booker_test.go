@@ -139,7 +139,7 @@ func Test_WeightPropagation(t *testing.T) {
 	}
 }
 
-func Test_DoubleSpend(t *testing.T) {
+func Test_DoubleSpender(t *testing.T) {
 	ts := testsuite.NewTestSuite(t)
 	defer ts.Shutdown()
 

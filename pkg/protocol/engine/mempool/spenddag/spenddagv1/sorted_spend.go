@@ -11,76 +11,76 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 )
 
-// sortedSpend is a wrapped Spend that contains additional information for the SortedSpends.
-type sortedSpend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]] struct {
-	// sortedSet is the SortedSpends that contains this sortedSpend.
-	sortedSet *SortedSpends[SpendID, ResourceID, VoteRank]
+// sortedSpend is a wrapped Spender that contains additional information for the SortedSpenders.
+type sortedSpender[SpenderID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]] struct {
+	// sortedSet is the SortedSpenders that contains this sortedSpender.
+	sortedSet *SortedSpenders[SpenderID, ResourceID, VoteRank]
 
-	// lighterMember is the sortedSpend that is lighter than this one.
-	lighterMember *sortedSpend[SpendID, ResourceID, VoteRank]
+	// lighterMember is the sortedSpender that is lighter than this one.
+	lighterMember *sortedSpender[SpenderID, ResourceID, VoteRank]
 
-	// heavierMember is the sortedSpend that is heavierMember than this one.
-	heavierMember *sortedSpend[SpendID, ResourceID, VoteRank]
+	// heavierMember is the sortedSpender that is heavierMember than this one.
+	heavierMember *sortedSpender[SpenderID, ResourceID, VoteRank]
 
-	// currentWeight is the current weight of the Spend.
+	// currentWeight is the current weight of the Spender.
 	currentWeight weight.Value
 
-	// queuedWeight is the weight that is queued to be applied to the Spend.
+	// queuedWeight is the weight that is queued to be applied to the Spender.
 	queuedWeight *weight.Value
 
 	// weightMutex is used to protect the currentWeight and queuedWeight.
 	weightMutex syncutils.RWMutex
 
-	// currentPreferredInstead is the current PreferredInstead value of the Spend.
-	currentPreferredInstead *Spend[SpendID, ResourceID, VoteRank]
+	// currentPreferredInstead is the current PreferredInstead value of the Spender.
+	currentPreferredInstead *Spender[SpenderID, ResourceID, VoteRank]
 
-	// queuedPreferredInstead is the PreferredInstead value that is queued to be applied to the Spend.
-	queuedPreferredInstead *Spend[SpendID, ResourceID, VoteRank]
+	// queuedPreferredInstead is the PreferredInstead value that is queued to be applied to the Spender.
+	queuedPreferredInstead *Spender[SpenderID, ResourceID, VoteRank]
 
 	// preferredMutex is used to protect the currentPreferredInstead and queuedPreferredInstead.
 	preferredInsteadMutex syncutils.RWMutex
 
 	onAcceptanceStateUpdatedHook *event.Hook[func(acceptance.State, acceptance.State)]
 
-	// onWeightUpdatedHook is the hook that is triggered when the weight of the Spend is updated.
+	// onWeightUpdatedHook is the hook that is triggered when the weight of the Spender is updated.
 	onWeightUpdatedHook *event.Hook[func(weight.Value)]
 
-	// onPreferredUpdatedHook is the hook that is triggered when the PreferredInstead value of the Spend is updated.
-	onPreferredUpdatedHook *event.Hook[func(*Spend[SpendID, ResourceID, VoteRank])]
+	// onPreferredUpdatedHook is the hook that is triggered when the PreferredInstead value of the Spender is updated.
+	onPreferredUpdatedHook *event.Hook[func(*Spender[SpenderID, ResourceID, VoteRank])]
 
-	// Spend is the wrapped Spend.
-	*Spend[SpendID, ResourceID, VoteRank]
+	// Spender is the wrapped Spender.
+	*Spender[SpenderID, ResourceID, VoteRank]
 }
 
-// newSortedSpend creates a new sortedSpend.
-func newSortedSpend[SpendID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]](set *SortedSpends[SpendID, ResourceID, VoteRank], spend *Spend[SpendID, ResourceID, VoteRank]) *sortedSpend[SpendID, ResourceID, VoteRank] {
-	s := &sortedSpend[SpendID, ResourceID, VoteRank]{
+// newSortedSpender creates a new sortedSpender.
+func newSortedSpender[SpenderID, ResourceID spenddag.IDType, VoteRank spenddag.VoteRankType[VoteRank]](set *SortedSpenders[SpenderID, ResourceID, VoteRank], spender *Spender[SpenderID, ResourceID, VoteRank]) *sortedSpender[SpenderID, ResourceID, VoteRank] {
+	s := &sortedSpender[SpenderID, ResourceID, VoteRank]{
 		sortedSet:               set,
-		currentWeight:           spend.Weight.Value(),
-		currentPreferredInstead: spend.PreferredInstead(),
-		Spend:                   spend,
+		currentWeight:           spender.Weight.Value(),
+		currentPreferredInstead: spender.PreferredInstead(),
+		Spender:                 spender,
 	}
 
 	if set.owner != nil {
-		s.onAcceptanceStateUpdatedHook = spend.AcceptanceStateUpdated.Hook(s.onAcceptanceStateUpdated)
+		s.onAcceptanceStateUpdatedHook = spender.AcceptanceStateUpdated.Hook(s.onAcceptanceStateUpdated)
 	}
 
-	s.onWeightUpdatedHook = spend.Weight.OnUpdate.Hook(s.queueWeightUpdate)
-	s.onPreferredUpdatedHook = spend.PreferredInsteadUpdated.Hook(s.queuePreferredInsteadUpdate)
+	s.onWeightUpdatedHook = spender.Weight.OnUpdate.Hook(s.queueWeightUpdate)
+	s.onPreferredUpdatedHook = spender.PreferredInsteadUpdated.Hook(s.queuePreferredInsteadUpdate)
 
 	return s
 }
 
-// Weight returns the current weight of the sortedSpend.
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) Weight() weight.Value {
+// Weight returns the current weight of the sortedSpender.
+func (s *sortedSpender[SpenderID, ResourceID, VoteRank]) Weight() weight.Value {
 	s.weightMutex.RLock()
 	defer s.weightMutex.RUnlock()
 
 	return s.currentWeight
 }
 
-// Compare compares the sortedSpend to another sortedSpend.
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) Compare(other *sortedSpend[SpendID, ResourceID, VoteRank]) int {
+// Compare compares the sortedSpend to another sortedSpender.
+func (s *sortedSpender[SpenderID, ResourceID, VoteRank]) Compare(other *sortedSpender[SpenderID, ResourceID, VoteRank]) int {
 	if result := s.Weight().Compare(other.Weight()); result != weight.Equal {
 		return result
 	}
@@ -88,21 +88,21 @@ func (s *sortedSpend[SpendID, ResourceID, VoteRank]) Compare(other *sortedSpend[
 	return bytes.Compare(lo.PanicOnErr(s.ID.Bytes()), lo.PanicOnErr(other.ID.Bytes()))
 }
 
-// PreferredInstead returns the current preferred instead value of the sortedSpend.
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) PreferredInstead() *Spend[SpendID, ResourceID, VoteRank] {
+// PreferredInstead returns the current preferred instead value of the sortedSpender.
+func (s *sortedSpender[SpenderID, ResourceID, VoteRank]) PreferredInstead() *Spender[SpenderID, ResourceID, VoteRank] {
 	s.preferredInsteadMutex.RLock()
 	defer s.preferredInsteadMutex.RUnlock()
 
 	return s.currentPreferredInstead
 }
 
-// IsPreferred returns true if the sortedSpend is preferred instead of its Spends.
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) IsPreferred() bool {
-	return s.PreferredInstead() == s.Spend
+// IsPreferred returns true if the sortedSpender is preferred instead of its Spenders.
+func (s *sortedSpender[SpenderID, ResourceID, VoteRank]) IsPreferred() bool {
+	return s.PreferredInstead() == s.Spender
 }
 
-// Unhook cleans up the sortedSpend.
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) Unhook() {
+// Unhook cleans up the sortedSpender.
+func (s *sortedSpender[SpenderID, ResourceID, VoteRank]) Unhook() {
 	if s.onAcceptanceStateUpdatedHook != nil {
 		s.onAcceptanceStateUpdatedHook.Unhook()
 		s.onAcceptanceStateUpdatedHook = nil
@@ -119,14 +119,14 @@ func (s *sortedSpend[SpendID, ResourceID, VoteRank]) Unhook() {
 	}
 }
 
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) onAcceptanceStateUpdated(_ acceptance.State, newState acceptance.State) {
+func (s *sortedSpender[SpenderID, ResourceID, VoteRank]) onAcceptanceStateUpdated(_ acceptance.State, newState acceptance.State) {
 	if newState.IsAccepted() {
 		s.sortedSet.owner.setAcceptanceState(acceptance.Rejected)
 	}
 }
 
-// queueWeightUpdate queues a weight update for the sortedSpend.
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) queueWeightUpdate(newWeight weight.Value) {
+// queueWeightUpdate queues a weight update for the sortedSpender.
+func (s *sortedSpender[SpenderID, ResourceID, VoteRank]) queueWeightUpdate(newWeight weight.Value) {
 	s.weightMutex.Lock()
 	defer s.weightMutex.Unlock()
 
@@ -139,7 +139,7 @@ func (s *sortedSpend[SpendID, ResourceID, VoteRank]) queueWeightUpdate(newWeight
 }
 
 // weightUpdateApplied tries to apply a queued weight update to the sortedSpend and returns true if successful.
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) weightUpdateApplied() bool {
+func (s *sortedSpender[SpenderID, ResourceID, VoteRank]) weightUpdateApplied() bool {
 	s.weightMutex.Lock()
 	defer s.weightMutex.Unlock()
 
@@ -160,23 +160,23 @@ func (s *sortedSpend[SpendID, ResourceID, VoteRank]) weightUpdateApplied() bool 
 }
 
 // queuePreferredInsteadUpdate notifies the sortedSet that the preferred instead flag of the Spend was updated.
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) queuePreferredInsteadUpdate(spend *Spend[SpendID, ResourceID, VoteRank]) {
+func (s *sortedSpender[SpenderID, ResourceID, VoteRank]) queuePreferredInsteadUpdate(spender *Spender[SpenderID, ResourceID, VoteRank]) {
 	s.preferredInsteadMutex.Lock()
 	defer s.preferredInsteadMutex.Unlock()
 
-	if (s.queuedPreferredInstead == nil && s.currentPreferredInstead == spend) ||
-		(s.queuedPreferredInstead != nil && s.queuedPreferredInstead == spend) ||
-		s.sortedSet.owner.Spend == spend {
+	if (s.queuedPreferredInstead == nil && s.currentPreferredInstead == spender) ||
+		(s.queuedPreferredInstead != nil && s.queuedPreferredInstead == spender) ||
+		s.sortedSet.owner.Spender == spender {
 		return
 	}
 
-	s.queuedPreferredInstead = spend
+	s.queuedPreferredInstead = spender
 	s.sortedSet.notifyPendingPreferredInsteadUpdate(s)
 }
 
 // preferredInsteadUpdateApplied tries to apply a queued preferred instead update to the sortedSpend and returns
 // true if successful.
-func (s *sortedSpend[SpendID, ResourceID, VoteRank]) preferredInsteadUpdateApplied() bool {
+func (s *sortedSpender[SpenderID, ResourceID, VoteRank]) preferredInsteadUpdateApplied() bool {
 	s.preferredInsteadMutex.Lock()
 	defer s.preferredInsteadMutex.Unlock()
 

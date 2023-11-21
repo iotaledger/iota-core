@@ -27,7 +27,7 @@ type TipSelection struct {
 	// tipManager is the TipManager that is used to access the tip related metadata.
 	tipManager tipmanager.TipManager
 
-	// spendDAG is the SpendDAG that is used to track spends.
+	// spendDAG is the SpendDAG that is used to track spenders.
 	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 
 	// rootBlocks is a function that returns the current root blocks.
@@ -193,13 +193,13 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 // likedInsteadReferences returns the liked instead references that are required to be able to reference the given tip.
 func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.TransactionID], tipMetadata tipmanager.TipMetadata) (references []iotago.BlockID, updatedLikedConflicts ds.Set[iotago.TransactionID], err error) {
 	necessaryReferences := make(map[iotago.TransactionID]iotago.BlockID)
-	if err = t.spendDAG.LikedInstead(tipMetadata.Block().SpendIDs()).ForEach(func(likedSpendID iotago.TransactionID) error {
-		transactionMetadata, exists := t.transactionMetadata(likedSpendID)
+	if err = t.spendDAG.LikedInstead(tipMetadata.Block().SpenderIDs()).ForEach(func(likedSpenderID iotago.TransactionID) error {
+		transactionMetadata, exists := t.transactionMetadata(likedSpenderID)
 		if !exists {
-			return ierrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedSpendID)
+			return ierrors.Errorf("transaction required for liked instead reference (%s) not found in mem-pool", likedSpenderID)
 		}
 
-		necessaryReferences[likedSpendID] = lo.First(transactionMetadata.ValidAttachments())
+		necessaryReferences[likedSpenderID] = lo.First(transactionMetadata.ValidAttachments())
 
 		return nil
 	}); err != nil {
@@ -207,8 +207,8 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.Trans
 	}
 
 	references, updatedLikedConflicts = make([]iotago.BlockID, 0), likedConflicts.Clone()
-	for spendID, attachmentID := range necessaryReferences {
-		if updatedLikedConflicts.Add(spendID) {
+	for spenderID, attachmentID := range necessaryReferences {
+		if updatedLikedConflicts.Add(spenderID) {
 			references = append(references, attachmentID)
 		}
 	}
@@ -249,12 +249,12 @@ func (t *TipSelection) collectReferences(references model.ParentReferences, pare
 
 // isValidStrongTip checks if the given block is a valid strong tip.
 func (t *TipSelection) isValidStrongTip(block *blocks.Block) bool {
-	return !t.spendDAG.AcceptanceState(block.SpendIDs()).IsRejected()
+	return !t.spendDAG.AcceptanceState(block.SpenderIDs()).IsRejected()
 }
 
 // isValidWeakTip checks if the given block is a valid weak tip.
 func (t *TipSelection) isValidWeakTip(block *blocks.Block) bool {
-	return t.spendDAG.LikedInstead(block.PayloadSpendIDs()).Size() == 0
+	return t.spendDAG.LikedInstead(block.PayloadSpenderIDs()).Size() == 0
 }
 
 // triggerLivenessThreshold triggers the liveness threshold for all tips that have reached the given threshold.

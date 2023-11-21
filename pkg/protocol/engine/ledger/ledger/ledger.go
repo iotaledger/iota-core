@@ -156,13 +156,13 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	// collect outputs and allotments from the "uncompacted" stateDiff
 	// outputs need to be processed in the "uncompacted" version of the state diff, as we need to be able to store
 	// and retrieve intermediate outputs to show to the user
-	spends, outputs, accountDiffs, err := l.processStateDiffTransactions(stateDiff)
+	spenders, outputs, accountDiffs, err := l.processStateDiffTransactions(stateDiff)
 	if err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to process state diff transactions in slot %d: %w", slot, err)
 	}
 
 	// Now we process the collected account changes, for that we consume the "compacted" state diff to get the overall
-	// account changes at UTXO level without needing to worry about multiple spends of the same account in the same slot,
+	// account changes at UTXO level without needing to worry about multiple spenders of the same account in the same slot,
 	// we only care about the initial account output to be consumed and the final account output to be created.
 	// output side
 	createdAccounts, consumedAccounts, destroyedAccounts, err := l.processCreatedAndConsumedAccountOutputs(stateDiff, accountDiffs)
@@ -174,7 +174,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 
 	// Commit the changes
 	// Update the UTXO ledger
-	if err = l.utxoLedger.ApplyDiff(slot, outputs, spends); err != nil {
+	if err = l.utxoLedger.ApplyDiff(slot, outputs, spenders); err != nil {
 		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to apply diff to UTXO ledger for slot %d: %w", slot, err)
 	}
 
@@ -204,7 +204,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 		return true
 	})
 
-	return l.utxoLedger.StateTreeRoot(), stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), outputs, spends, nil
+	return l.utxoLedger.StateTreeRoot(), stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), outputs, spenders, nil
 }
 
 func (l *Ledger) AddAccount(output *utxoledger.Output, blockIssuanceCredits iotago.BlockIssuanceCredits) error {
@@ -769,7 +769,7 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 		return
 	}
 
-	if err := l.spendDAG.CastVotes(vote.NewVote(seat, voteRank), block.SpendIDs()); err != nil {
+	if err := l.spendDAG.CastVotes(vote.NewVote(seat, voteRank), block.SpenderIDs()); err != nil {
 		l.errorHandler(ierrors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
 }
