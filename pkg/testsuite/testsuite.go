@@ -383,7 +383,8 @@ func (t *TestSuite) RemoveNode(name string) {
 // AddGenesisWallet adds a wallet to the test suite with a block issuer in the genesis snapshot and access to the genesis seed.
 // If no block issuance credits are provided, the wallet will be assigned half of the maximum block issuance credits.
 func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
-	newWallet := t.addWallet(name, node, iotago.EmptyAccountID, t.genesisKeyManager)
+	accountID := tpkg.RandAccountID()
+	newWallet := t.addWallet(name, node, accountID, t.genesisKeyManager)
 	var bic iotago.BlockIssuanceCredits
 	if len(blockIssuanceCredits) == 0 {
 		bic = iotago.MaxBlockIssuanceCredits / 2
@@ -392,6 +393,7 @@ func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuance
 	}
 
 	accountDetails := snapshotcreator.AccountDetails{
+		AccountID:            accountID,
 		Address:              iotago.Ed25519AddressFromPubKey(newWallet.BlockIssuer.PublicKey),
 		Amount:               mock.MinIssuerAccountAmount,
 		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount),
@@ -425,6 +427,16 @@ func (t *TestSuite) DefaultWallet() *mock.Wallet {
 func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]options.Option[protocol.Protocol]) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
+
+	// Add default wallet by default when creating the first node.
+	if !t.wallets.Has("default") {
+		_, node, exists := t.nodes.Head()
+		if !exists {
+			panic("at least one node is needed to create a default wallet")
+		}
+
+		t.AddGenesisWallet("default", node)
+	}
 
 	// Create accounts for any block issuer nodes added before starting the network.
 	if t.optsAccounts != nil {
@@ -469,17 +481,21 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 
 		node.Initialize(failOnBlockFiltered, baseOpts...)
 
-		if defaultWallet := t.DefaultWallet(); defaultWallet != nil {
-			if err := node.Protocol.Engines.Main.Get().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
-				defaultWallet.AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), output)
+		return true
+	})
+
+	if _, firstNode, exists := t.nodes.Head(); exists {
+		t.wallets.ForEach(func(_ string, wallet *mock.Wallet) bool {
+			if err := firstNode.Protocol.Engines.Main.Get().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
+				wallet.AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), output)
 				return true
 			}); err != nil {
 				panic(err)
 			}
-		}
 
-		return true
-	})
+			return true
+		})
+	}
 
 	t.running = true
 }

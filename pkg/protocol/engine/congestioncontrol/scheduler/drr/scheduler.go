@@ -2,6 +2,7 @@ package drr
 
 import (
 	"math"
+	"sync"
 	"time"
 
 	"github.com/iotaledger/hive.go/core/safemath"
@@ -40,6 +41,7 @@ type Scheduler struct {
 
 	deficits *shrinkingmap.ShrinkingMap[iotago.AccountID, Deficit]
 
+	workersWg      sync.WaitGroup
 	shutdownSignal chan struct{}
 
 	blockCache *blocks.Blocks
@@ -69,6 +71,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 				if s.apiProvider.APIForSlot(commitment.Slot()).TimeProvider().SlotsBeforeNextEpoch(commitment.Slot()) == 0 {
 					s.bufferMutex.Lock()
 					defer s.bufferMutex.Unlock()
+
 					committee, exists := s.seatManager.CommitteeInSlot(commitment.Slot() + 1)
 					if !exists {
 						s.errorHandler(ierrors.Errorf("committee does not exist in committed slot %d", commitment.Slot()+1))
@@ -79,11 +82,12 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 					s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 						if !committee.HasAccount(accountID) {
 							s.shutdownValidatorQueue(validatorQueue)
-							s.validatorBuffer.Delete(accountID)
 						}
 
 						return true
 					})
+
+					s.validatorBuffer.Clear()
 				}
 			})
 			e.Ledger.HookInitialized(func() {
@@ -103,7 +107,6 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 			e.Events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 				s.AddBlock(block)
 				s.selectBlockToScheduleWithLocking()
-
 			})
 			e.Events.Ledger.AccountCreated.Hook(func(accountID iotago.AccountID) {
 				s.bufferMutex.Lock()
@@ -137,18 +140,30 @@ func New(apiProvider iotago.APIProvider, opts ...options.Option[Scheduler]) *Sch
 }
 
 func (s *Scheduler) Shutdown() {
-	s.validatorBuffer.buffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+	s.bufferMutex.Lock()
+	defer s.bufferMutex.Unlock()
+
+	s.TriggerShutdown()
+
+	// validator workers need to be shut down first, otherwise they will hang on the shutdown channel.
+	s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 		s.shutdownValidatorQueue(validatorQueue)
 
 		return true
 	})
+	s.validatorBuffer.Clear()
+
 	close(s.shutdownSignal)
+
+	s.workersWg.Wait()
+
 	s.TriggerStopped()
 }
 
 // Start starts the scheduler.
 func (s *Scheduler) Start() {
 	s.shutdownSignal = make(chan struct{}, 1)
+	s.workersWg.Add(1)
 	go s.basicBlockLoop()
 
 	s.TriggerInitialized()
@@ -249,6 +264,13 @@ func (s *Scheduler) Reset() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
+	// Validator workers need to be signaled to exit.
+	s.validatorBuffer.buffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+		s.shutdownValidatorQueue(validatorQueue)
+
+		return true
+	})
+
 	s.basicBuffer.Clear()
 	s.validatorBuffer.Clear()
 }
@@ -315,6 +337,7 @@ func (s *Scheduler) enqueueValidationBlock(block *blocks.Block) {
 }
 
 func (s *Scheduler) basicBlockLoop() {
+	defer s.workersWg.Done()
 	var blockToSchedule *blocks.Block
 loop:
 	for {
@@ -338,6 +361,7 @@ loop:
 }
 
 func (s *Scheduler) validatorLoop(validatorQueue *ValidatorQueue) {
+	defer s.workersWg.Done()
 	var blockToSchedule *blocks.Block
 loop:
 	for {
@@ -400,7 +424,6 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 		return true
 	})
 	s.selectBasicBlockWithoutLocking()
-
 }
 
 func (s *Scheduler) selectValidationBlockWithoutLocking(validatorQueue *ValidatorQueue) bool {
@@ -724,11 +747,12 @@ func (s *Scheduler) deficitFromWork(work iotago.WorkScore) Deficit {
 func (s *Scheduler) addValidator(accountID iotago.AccountID) *ValidatorQueue {
 	validatorQueue := NewValidatorQueue(accountID)
 	s.validatorBuffer.Set(accountID, validatorQueue)
+	s.workersWg.Add(1)
 	go s.validatorLoop(validatorQueue)
 
 	return validatorQueue
 }
 
 func (s *Scheduler) shutdownValidatorQueue(validatorQueue *ValidatorQueue) {
-	validatorQueue.shutdownSignal <- struct{}{}
+	close(validatorQueue.shutdownSignal)
 }

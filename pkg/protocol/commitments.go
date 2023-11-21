@@ -32,9 +32,9 @@ func newCommitments(protocol *Protocol) *Commitments {
 		protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (teardown func()) {
 			return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, newRootCommitmentModel *model.Commitment) {
 				c.Root.Compute(func(currentRootCommitment *Commitment) *Commitment {
-					newRootCommitment, err := protocol.Commitments.Get(newRootCommitmentModel.ID(), false)
+					newRootCommitment, _, err := protocol.Commitments.Publish(newRootCommitmentModel)
 					if err != nil {
-						protocol.LogError("failed to retrieve new root commitment", "id", newRootCommitment.ID(), "error", err)
+						protocol.LogError("failed to publish new root commitment", "id", newRootCommitmentModel.ID(), "error", err)
 
 						return currentRootCommitment
 					}

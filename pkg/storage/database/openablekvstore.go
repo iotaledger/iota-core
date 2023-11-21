@@ -10,25 +10,38 @@ import (
 )
 
 type openableKVStore struct {
+	dbInstance    *DBInstance
 	storeInstance kvstore.KVStore // KVStore that is used to access the DB instance
 	parentStore   *openableKVStore
 	dbPrefix      kvstore.KeyPrefix
 }
 
-func newOpenableKVStore(storeInstance kvstore.KVStore) *openableKVStore {
+func newOpenableKVStore(storeInstance kvstore.KVStore, dbInstance *DBInstance) *openableKVStore {
 	return &openableKVStore{
+		dbInstance:    dbInstance,
 		storeInstance: storeInstance,
 		parentStore:   nil,
 		dbPrefix:      kvstore.EmptyPrefix,
 	}
 }
 
-func (s *openableKVStore) instance() kvstore.KVStore {
-	if s.storeInstance != nil {
-		return s.storeInstance
+func (s *openableKVStore) topParent() *openableKVStore {
+	current := s
+	for current.parentStore != nil {
+		current = current.parentStore
 	}
 
-	return s.parentStore.instance()
+	return current
+}
+
+func (s *openableKVStore) instance() kvstore.KVStore {
+	parent := s.topParent()
+
+	if parent.dbInstance.isClosed.Load() {
+		parent.dbInstance.Open()
+	}
+
+	return parent.storeInstance
 }
 
 func (s *openableKVStore) Replace(newKVStore kvstore.KVStore) {
@@ -44,13 +57,16 @@ func (s *openableKVStore) Replace(newKVStore kvstore.KVStore) {
 func (s *openableKVStore) WithRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return s.withRealm(realm)
 }
+
 func (s *openableKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return &openableKVStore{
+		dbInstance:    nil,
 		storeInstance: nil,
 		parentStore:   s,
 		dbPrefix:      realm,
 	}, nil
 }
+
 func (s *openableKVStore) WithExtendedRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return s.withRealm(s.buildKeyPrefix(realm))
 }
@@ -98,8 +114,10 @@ func (s *openableKVStore) DeletePrefix(prefix kvstore.KeyPrefix) error {
 func (s *openableKVStore) Flush() error {
 	return s.instance().Flush()
 }
+
 func (s *openableKVStore) Close() error {
-	return s.instance().Close()
+	s.topParent().dbInstance.CloseWithoutLocking()
+	return nil
 }
 
 func (s *openableKVStore) Batched() (kvstore.BatchedMutations, error) {

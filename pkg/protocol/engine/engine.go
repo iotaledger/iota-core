@@ -531,8 +531,11 @@ func (e *Engine) ErrorHandler(componentName string) func(error) {
 func (e *Engine) initRootCommitment() {
 	updateRootCommitment := func(lastFinalizedSlot iotago.SlotIndex) {
 		e.RootCommitment.Compute(func(rootCommitment *model.Commitment) *model.Commitment {
-			var targetSlot iotago.SlotIndex
-			if maxCommittableAge := e.APIForSlot(lastFinalizedSlot).ProtocolParameters().MaxCommittableAge(); lastFinalizedSlot > maxCommittableAge {
+			protocolParams := e.APIForSlot(lastFinalizedSlot).ProtocolParameters()
+			maxCommittableAge := protocolParams.MaxCommittableAge()
+
+			targetSlot := protocolParams.GenesisSlot()
+			if lastFinalizedSlot > targetSlot+maxCommittableAge {
 				targetSlot = lastFinalizedSlot - maxCommittableAge
 			}
 

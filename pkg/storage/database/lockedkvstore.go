@@ -14,9 +14,9 @@ type lockedKVStore struct {
 	instanceMutex *syncutils.RWMutex
 }
 
-func newLockedKVStore(storeInstance kvstore.KVStore) *lockedKVStore {
+func newLockedKVStore(storeInstance kvstore.KVStore, dbInstance *DBInstance) *lockedKVStore {
 	return &lockedKVStore{
-		openableKVStore: newOpenableKVStore(storeInstance),
+		openableKVStore: newOpenableKVStore(storeInstance, dbInstance),
 		instanceMutex:   new(syncutils.RWMutex),
 	}
 }

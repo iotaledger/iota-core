@@ -36,6 +36,8 @@ func New() *Scheduler {
 }
 
 func (s *Scheduler) Shutdown() {
+	s.TriggerShutdown()
+	s.TriggerStopped()
 }
 
 func (s *Scheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...*blocks.Block) bool {

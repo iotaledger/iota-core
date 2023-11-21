@@ -146,12 +146,13 @@ func (c *Chains) publishEngineCommitments(chain *Chain) (unsubscribe func()) {
 				return engine.Ledger.HookInitialized(func() {
 					unsubscribeOnUpdate(func() (unsubscribe func()) {
 						if forkingPoint := chain.ForkingPoint.Get(); forkingPoint == nil {
-							// publish the root commitment (very first commitment ever)
-							rootCommitment, _ := publishCommitment(engine.RootCommitment.Get())
-							rootCommitment.IsRoot.Set(true)
+							// assign root commitment to main chain
+							rootCommitment := c.protocol.Commitments.Root.Get()
 							rootCommitment.setChain(chain)
 
 							chain.ForkingPoint.Set(rootCommitment)
+
+							latestPublishedSlot = rootCommitment.Slot()
 						} else {
 							latestPublishedSlot = forkingPoint.Slot() - 1
 						}
