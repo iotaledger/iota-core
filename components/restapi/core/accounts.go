@@ -17,11 +17,6 @@ import (
 )
 
 func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
-	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
-	if err != nil {
-		return nil, err
-	}
-
 	commitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, restapipkg.ParameterCommitmentID)
 	if err != nil {
 		return nil, err
@@ -36,6 +31,18 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		}
 	}
 
+	hrp := deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()
+	address, err := httpserver.ParseBech32AddressParam(c, hrp, restapipkg.ParameterBech32Address)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to parse bech32 address %s", c.Param(restapipkg.ParameterBech32Address))
+	}
+
+	accountAddress, ok := address.Clone().(*iotago.AccountAddress)
+	if !ok {
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to parse bech32 address %s", c.Param(restapipkg.ParameterBech32Address))
+	}
+
+	accountID := accountAddress.AccountID()
 	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, commitment.Slot())
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)

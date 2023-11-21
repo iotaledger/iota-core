@@ -115,7 +115,7 @@ const (
 	// GET returns the congestion state related to the specified account. (optional query parameters: "commitmentID" to specify the used commitment)
 	// MIMEApplicationJSON => json.
 	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
+	RouteCongestion = "/accounts/:" + restapipkg.ParameterBech32Address + "/congestion"
 
 	// RouteValidators is the route for getting informations about the current validators.
 	// GET returns the paginated response with the list of validators.
