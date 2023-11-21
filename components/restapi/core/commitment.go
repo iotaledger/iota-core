@@ -34,7 +34,7 @@ func getUTXOChanges(slot iotago.SlotIndex) (*apimodels.UTXOChangesResponse, erro
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs %d: %s", slot, err)
 	}
 
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(diffs.Slot)
+	commitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(diffs.Slot)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment %d: %s", diffs.Slot, err)
 	}

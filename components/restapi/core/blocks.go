@@ -50,7 +50,7 @@ func blockWithMetadataByID(c echo.Context) (*apimodels.BlockWithMetadataResponse
 		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(restapi.ParameterBlockID))
 	}
 
-	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
 	}
