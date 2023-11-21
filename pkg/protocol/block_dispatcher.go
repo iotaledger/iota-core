@@ -323,6 +323,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 	if len(blockIDs) == 0 {
 		forceCommitmentFunc()
+
 		return nil
 	}
 
