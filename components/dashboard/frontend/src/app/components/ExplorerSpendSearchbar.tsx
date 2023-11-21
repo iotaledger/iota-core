@@ -16,16 +16,16 @@ interface Props {
 @inject("nodeStore")
 @inject("explorerStore")
 @observer
-export class ExplorerConflictSearchbar extends React.Component<Props, any> {
-    conflictID: string;
+export class ExplorerSpendSearchbar extends React.Component<Props, any> {
+    spendID: string;
 
     updateSearch = (e) => {
-        this.conflictID =e.target.value;
+        this.spendID =e.target.value;
     };
 
     executeSearch = (e: KeyboardEvent) => {
         if (e.key !== 'Enter') return;
-        this.props.explorerStore.routerStore.push(`/explorer/conflict/${this.conflictID}`);
+        this.props.explorerStore.routerStore.push(`/explorer/spend/${this.spendID}`);
     };
 
     render() {
@@ -37,10 +37,10 @@ export class ExplorerConflictSearchbar extends React.Component<Props, any> {
                     <Col>
                         <InputGroup className="mb-3">
                             <FormControl
-                                placeholder="Conflict ID"
-                                aria-label="Conflict ID"
+                                placeholder="Spend ID"
+                                aria-label="Spend ID"
                                 aria-describedby="basic-addon1"
-                                value={this.conflictID} onChange={this.updateSearch}
+                                value={this.spendID} onChange={this.updateSearch}
                                 onKeyUp={this.executeSearch}
                                 disabled={searching}
                             />

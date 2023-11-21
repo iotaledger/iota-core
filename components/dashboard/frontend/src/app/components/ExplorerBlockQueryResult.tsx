@@ -13,7 +13,7 @@ import { Link } from 'react-router-dom';
 import { BasicPayload } from './BasicPayload'
 import { TransactionPayload } from './TransactionPayload'
 import { getPayloadType, PayloadType } from '../misc/Payload'
-import { resolveBase58ConflictID } from "../utils/conflict";
+import { resolveBase58SpendID } from "../utils/spend";
 import { FaucetPayload } from './FaucetPayload';
 import { TaggedDataPayload } from './TaggedDataPayload';
 
@@ -129,10 +129,10 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                             {
                                                 blk.spendIDs.map((value, index) => {
                                                     return (
-                                                        <ListGroup.Item key={"ConflictID" + index + 1}
+                                                        <ListGroup.Item key={"SpendID" + index + 1}
                                                             className="text-break">
-                                                            <Link to={`/explorer/conflict/${value}`}>
-                                                                {resolveBase58ConflictID(value)}
+                                                            <Link to={`/explorer/spend/${value}`}>
+                                                                {resolveBase58SpendID(value)}
                                                             </Link>
                                                         </ListGroup.Item>
                                                     )
@@ -146,10 +146,10 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                             {
                                                 blk.addedSpendIDs.map((value, index) => {
                                                     return (
-                                                        <ListGroup.Item key={"AddedConflictID" + index + 1}
+                                                        <ListGroup.Item key={"AddedSpendID" + index + 1}
                                                             className="text-break">
-                                                            <Link to={`/explorer/conflict/${value}`}>
-                                                                {resolveBase58ConflictID(value)}
+                                                            <Link to={`/explorer/spend/${value}`}>
+                                                                {resolveBase58SpendID(value)}
                                                             </Link>
                                                         </ListGroup.Item>
                                                     )
@@ -163,10 +163,10 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                             {
                                                 blk.subtractedSpendIDs.map((value, index) => {
                                                     return (
-                                                        <ListGroup.Item key={"SubtractedConflictID" + index + 1}
+                                                        <ListGroup.Item key={"SubtractedSpendID" + index + 1}
                                                             className="text-break">
-                                                            <Link to={`/explorer/conflict/${value}`}>
-                                                                {resolveBase58ConflictID(value)}
+                                                            <Link to={`/explorer/spend/${value}`}>
+                                                                {resolveBase58SpendID(value)}
                                                             </Link>
                                                         </ListGroup.Item>
                                                     )

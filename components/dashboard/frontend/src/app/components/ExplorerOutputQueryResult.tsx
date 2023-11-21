@@ -7,7 +7,7 @@ import ExplorerStore from "../stores/ExplorerStore";
 import Badge from "react-bootstrap/Badge";
 import {Link} from 'react-router-dom';
 import {displayManaUnit} from "../utils";
-import {resolveBase58ConflictID} from "../utils/conflict";
+import {resolveBase58SpendID} from "../utils/spend";
 import {outputToComponent} from "../utils/output";
 import {resolveConfirmationState} from "../utils/confirmation_state";
 
@@ -81,9 +81,9 @@ export class ExplorerOutputQueryResult extends React.Component<Props, any> {
                             {
                                 outputMetadata.spendIDs.map((value, index) => {
                                     return (
-                                        <ListGroup.Item key={"ConflictID" + index + 1} className="text-break">
-                                            <Link to={`/explorer/conflict/${value}`}>
-                                                {resolveBase58ConflictID(value)}
+                                        <ListGroup.Item key={"SpendID" + index + 1} className="text-break">
+                                            <Link to={`/explorer/spend/${value}`}>
+                                                {resolveBase58SpendID(value)}
                                             </Link>
                                         </ListGroup.Item>
                                     )

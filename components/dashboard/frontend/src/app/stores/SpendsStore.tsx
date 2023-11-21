@@ -7,17 +7,17 @@ import NodeStore from './NodeStore';
 import {Table} from "react-bootstrap";
 import {ConfirmationState, resolveConfirmationState} from "../utils/confirmation_state";
 
-export class ConflictSet {
-    conflictSetID: string;
+export class SpendSet {
+    spendSetID: string;
     arrivalTime: number;
     resolved: boolean;
     timeToResolve: number;
     shown: boolean;
 }
 
-export class Conflict {
-    conflictID: string;
-    conflictSetIDs: Array<string>;
+export class Spend {
+    spendID: string;
+    spendSetIDs: Array<string>;
     confirmationState: number;
     issuingTime: number;
     issuerNodeID: string;
@@ -25,10 +25,10 @@ export class Conflict {
 
 // const liveFeedSize = 10;
 
-export class ConflictsStore {
+export class SpendsStore {
     // live feed
-    @observable conflictSets: Map<String, ConflictSet>;
-    @observable conflicts: Map<String, Conflict>;
+    @observable spendSets: Map<String, SpendSet>;
+    @observable spends: Map<String, Spend>;
     
     routerStore: RouterStore;
     nodeStore: NodeStore;
@@ -36,73 +36,73 @@ export class ConflictsStore {
     constructor(routerStore: RouterStore, nodeStore: NodeStore) {
         this.routerStore = routerStore;
         this.nodeStore = nodeStore;
-        this.conflictSets = new Map;
-        this.conflicts = new Map;
-        registerHandler(WSMsgType.ConflictSet, this.updateConflictSets);
-        registerHandler(WSMsgType.Conflict, this.updateConflicts);
+        this.spendSets = new Map;
+        this.spends = new Map;
+        registerHandler(WSMsgType.SpendSet, this.updateSpendSets);
+        registerHandler(WSMsgType.Spend, this.updateSpends);
     }
 
     @action
-    updateConflictSets = (blk: ConflictSet) => {
-        this.conflictSets.set(blk.conflictSetID, blk);
+    updateSpendSets = (blk: SpendSet) => {
+        this.spendSets.set(blk.spendSetID, blk);
     };
 
     @action
-    updateConflicts = (blk: Conflict) => {
-        this.conflicts.set(blk.conflictID, blk);
+    updateSpends = (blk: Spend) => {
+        this.spends.set(blk.spendID, blk);
     };
    
     @computed
-    get conflictsLiveFeed() {
+    get spendsLiveFeed() {
         // sort branches by time and ID to prevent "jumping"
-        let conflictsArr = Array.from(this.conflictSets.values());
-        conflictsArr.sort((x: ConflictSet, y: ConflictSet): number => {
-                return y.arrivalTime - x.arrivalTime || x.conflictSetID.localeCompare(y.conflictSetID);
+        let spendsArr = Array.from(this.spendSets.values());
+        spendsArr.sort((x: SpendSet, y: SpendSet): number => {
+                return y.arrivalTime - x.arrivalTime || x.spendSetID.localeCompare(y.spendSetID);
             }
         )
 
         let feed = [];
-        for (let conflict of conflictsArr) {
+        for (let spend of spendsArr) {
             feed.push(
-                <tr key={conflict.conflictSetID} onClick={() => conflict.shown = !conflict.shown} style={{cursor:"pointer"}}>
+                <tr key={spend.spendSetID} onClick={() => spend.shown = !spend.shown} style={{cursor:"pointer"}}>
                     <td>
-                        <Link to={`/explorer/output/${conflict.conflictSetID}`}>
-                            {conflict.conflictSetID}
+                        <Link to={`/explorer/output/${spend.spendSetID}`}>
+                            {spend.spendSetID}
                         </Link>
                     </td>
                     <td>
-                        {new Date(conflict.arrivalTime * 1000).toLocaleString()}
+                        {new Date(spend.arrivalTime * 1000).toLocaleString()}
                     </td>
                     <td>
-                        {conflict.resolved ? 'Yes' : 'No'}
+                        {spend.resolved ? 'Yes' : 'No'}
                     </td>
                     <td>
-                        {conflict.timeToResolve/1000000}
+                        {spend.timeToResolve/1000000}
                     </td>
                 </tr>
             );
 
             // only render and show branches if it has been clicked
-            if (!conflict.shown) {
+            if (!spend.shown) {
                 continue
             }
 
             // sort branches by time and ID to prevent "jumping"
-            let branchesArr = Array.from(this.conflicts.values());
-            branchesArr.sort((x: Conflict, y: Conflict): number => {
-                   return x.issuingTime - y.issuingTime || x.conflictID.localeCompare(y.conflictID)
+            let branchesArr = Array.from(this.spends.values());
+            branchesArr.sort((x: Spend, y: Spend): number => {
+                   return x.issuingTime - y.issuingTime || x.spendID.localeCompare(y.spendID)
                 }
             )
 
             let branches = [];
             for (let branch of branchesArr) {
-                for(let conflictID of branch.conflictSetIDs){
-                    if (conflictID === conflict.conflictSetID) {
+                for(let spendID of branch.spendSetIDs){
+                    if (spendID === spend.spendSetID) {
                         branches.push(
-                                    <tr key={branch.conflictID} className={branch.confirmationState > ConfirmationState.Accepted ? "table-success" : ""}>
+                                    <tr key={branch.spendID} className={branch.confirmationState > ConfirmationState.Accepted ? "table-success" : ""}>
                                         <td>
-                                            <Link to={`/explorer/branch/${branch.conflictID}`}>
-                                                {branch.conflictID}
+                                            <Link to={`/explorer/branch/${branch.spendID}`}>
+                                                {branch.spendID}
                                             </Link>
                                         </td>
                                         <td>{resolveConfirmationState(branch.confirmationState)}</td>
@@ -114,7 +114,7 @@ export class ConflictsStore {
                 }
             }
             feed.push(
-                <tr key={conflict.conflictSetID+"_branches"}>
+                <tr key={spend.spendSetID+"_branches"}>
                     <td colSpan={4}>
                         <Table size="sm">
                             <thead>
@@ -139,4 +139,4 @@ export class ConflictsStore {
 
 }
 
-export default ConflictsStore;
+export default SpendsStore;

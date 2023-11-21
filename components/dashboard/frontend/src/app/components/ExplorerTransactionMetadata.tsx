@@ -4,7 +4,7 @@ import NodeStore from "../stores/NodeStore";
 import { inject, observer } from "mobx-react";
 import ExplorerStore from "../stores/ExplorerStore";
 import ListGroup from "react-bootstrap/ListGroup";
-// import {resolveBase58ConflictID} from "../utils/conflict";
+// import {resolveBase58SpendID} from "../utils/spend";
 
 interface Props {
     nodeStore?: NodeStore;
@@ -40,12 +40,12 @@ export class ExplorerTransactionMetadata extends React.Component<Props, any> {
                 <h4>Metadata</h4>
                 {txMetadata && <ListGroup>
                     <ListGroup.Item>
-                        ConflictIDs: 
+                        SpendIDs: 
                         <ListGroup>
                             { 
-                                txMetadata.conflictIDs && txMetadata.conflictIDs.map((value, index) => {
+                                txMetadata.spendIDs && txMetadata.spendIDs.map((value, index) => {
                                     return (
-                                        <ListGroup.Item key={"ConflictID" + index + 1} className="text-break">
+                                        <ListGroup.Item key={"SpendID" + index + 1} className="text-break">
                                             <a href={`/explorer/transaction/${value}`}>{value}</a>
                                         </ListGroup.Item>
                                     )

@@ -12,13 +12,13 @@ import FaucetStore from "./app/stores/FaucetStore";
 import VisualizerStore from "./app/stores/VisualizerStore";
 import ManaStore from "./app/stores/ManaStore";
 import {SlotStore} from "./app/stores/SlotStore";
-import ConflictsStore from "./app/stores/ConflictsStore";
+import SpendsStore from "./app/stores/SpendsStore";
 
 // prepare MobX stores
 const routerStore = new RouterStore();
 const nodeStore = new NodeStore();
 const explorerStore = new ExplorerStore(routerStore);
-const conflictsStore = new ConflictsStore(routerStore, nodeStore);
+const spendsStore = new SpendsStore(routerStore, nodeStore);
 const faucetStore = new FaucetStore(routerStore);
 const visualizerStore = new VisualizerStore(routerStore);
 const manaStore = new ManaStore();
@@ -27,7 +27,7 @@ const stores = {
     "routerStore": routerStore,
     "nodeStore": nodeStore,
     "explorerStore": explorerStore,
-    "conflictsStore": conflictsStore,
+    "spendsStore": spendsStore,
     "faucetStore": faucetStore,
     "visualizerStore": visualizerStore,
     "manaStore": manaStore,

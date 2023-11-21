@@ -121,35 +121,35 @@ class PendingMana {
     timestamp: number;
 }
 
-class Conflict {
+class Spend {
     id: string;
     parents: Array<string>;
     spendIDs: Array<string>;
     confirmationState: number;
 }
 
-class ConflictChildren {
-    conflictID: string;
-    childConflicts: Array<ConflictChild>
+class SpendChildren {
+    spendID: string;
+    childSpends: Array<SpendChild>
 }
 
-class ConflictChild {
-    conflictID: string;
+class SpendChild {
+    spendID: string;
     type: string;
 }
 
-class ConflictConflict {
+class SpendSpend {
     outputID: OutputID;
     spendIDs: Array<string>;
 }
 
-class ConflictConflicts {
-    conflictID: string;
-    conflicts: Array<ConflictConflict>
+class SpendSpends {
+    spendID: string;
+    spends: Array<SpendSpend>
 }
 
-class ConflictVoters {
-    conflictID: string;
+class SpendVoters {
+    spendID: string;
     voters: Array<string>
 }
 
@@ -200,10 +200,10 @@ export class ExplorerStore {
     @observable outputMetadata: OutputMetadata = null;
     @observable outputConsumers: OutputConsumers = null;
     @observable pendingMana: PendingMana = null;
-    @observable conflict: Conflict = null;
-    @observable conflictChildren: ConflictChildren = null;
-    @observable conflictConflicts: ConflictConflicts = null;
-    @observable conflictVoters: ConflictVoters = null;
+    @observable spend: Spend = null;
+    @observable spendChildren: SpendChildren = null;
+    @observable spendSpends: SpendSpends = null;
+    @observable spendVoters: SpendVoters = null;
     @observable tips: Tips = null;
     @observable slotInfo: SlotInfo = new SlotInfo;
 
@@ -347,27 +347,27 @@ export class ExplorerStore {
     }
 
     @action
-    getConflict = async (id: string) => {
-        const res = await this.fetchJson<never, Conflict>("get", `/api/conflict/${id}`)
-        this.conflict = res;
+    getSpend = async (id: string) => {
+        const res = await this.fetchJson<never, Spend>("get", `/api/spend/${id}`)
+        this.spend = res;
     }
 
     @action
-    getConflictChildren = async (id: string) => {
-        const res = await this.fetchJson<never, ConflictChildren>("get", `/api/conflict/${id}/children`)
-        this.conflictChildren = res;
+    getSpendChildren = async (id: string) => {
+        const res = await this.fetchJson<never, SpendChildren>("get", `/api/spend/${id}/children`)
+        this.spendChildren = res;
     }
 
     @action
-    getConflictConflicts = async (id: string) => {
-        const res = await this.fetchJson<never, ConflictConflicts>("get", `/api/conflict/${id}/conflicts`)
-        this.conflictConflicts = res;
+    getSpendSpends = async (id: string) => {
+        const res = await this.fetchJson<never, SpendSpends>("get", `/api/spend/${id}/spends`)
+        this.spendSpends = res;
     }
 
     @action
-    getConflictVoters = async (id: string) => {
-        const res = await this.fetchJson<never, ConflictVoters>("get", `/api/conflict/${id}/voters`)
-        this.conflictVoters = res;
+    getSpendVoters = async (id: string) => {
+        const res = await this.fetchJson<never, SpendVoters>("get", `/api/spend/${id}/voters`)
+        this.spendVoters = res;
     }
 
     @action
@@ -394,9 +394,9 @@ export class ExplorerStore {
         this.outputMetadata = null;
         this.outputConsumers = null;
         this.pendingMana = null;
-        this.conflict = null;
-        this.conflictChildren = null;
-        this.conflictConflicts = null;
+        this.spend = null;
+        this.spendChildren = null;
+        this.spendSpends = null;
         this.tips = null;
         this.slotInfo = new SlotInfo;
     };
