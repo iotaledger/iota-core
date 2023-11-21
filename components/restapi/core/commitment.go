@@ -34,6 +34,11 @@ func getUTXOChanges(slot iotago.SlotIndex) (*apimodels.UTXOChangesResponse, erro
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs %d: %s", slot, err)
 	}
 
+	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(diffs.Slot)
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment %d: %s", diffs.Slot, err)
+	}
+
 	createdOutputs := make(iotago.OutputIDs, len(diffs.Outputs))
 	consumedOutputs := make(iotago.OutputIDs, len(diffs.Spents))
 
@@ -46,7 +51,7 @@ func getUTXOChanges(slot iotago.SlotIndex) (*apimodels.UTXOChangesResponse, erro
 	}
 
 	return &apimodels.UTXOChangesResponse{
-		Slot:            slot,
+		CommitmentID:    commitment.ID(),
 		CreatedOutputs:  createdOutputs,
 		ConsumedOutputs: consumedOutputs,
 	}, nil

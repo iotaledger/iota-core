@@ -44,6 +44,12 @@ const (
 	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteBlockMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/metadata"
 
+	// RouteBlockWithMetadata is the route for getting a block, together with its metadata by its blockID.
+	// GET returns the block and metadata.
+	// MIMEApplicationJSON => json.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
+	RouteBlockWithMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/full"
+
 	// RouteBlocks is the route for sending new blocks.
 	// POST creates a single new block and returns the new block ID.
 	// The block is parsed based on the given type in the request "Content-Type" header.
@@ -181,16 +187,25 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteBlock, func(c echo.Context) error {
-		block, err := blockByID(c)
+		resp, err := blockByID(c)
 		if err != nil {
 			return err
 		}
 
-		return responseByHeader(c, block.ProtocolBlock())
+		return responseByHeader(c, resp)
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
 		resp, err := blockMetadataByID(c)
+		if err != nil {
+			return err
+		}
+
+		return responseByHeader(c, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteBlockWithMetadata, func(c echo.Context) error {
+		resp, err := blockWithMetadataByID(c)
 		if err != nil {
 			return err
 		}
@@ -276,7 +291,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteOutput, func(c echo.Context) error {
-		resp, err := getOutput(c)
+		resp, err := outputByID(c)
 		if err != nil {
 			return err
 		}
@@ -285,7 +300,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteOutputMetadata, func(c echo.Context) error {
-		resp, err := getOutputMetadata(c)
+		resp, err := outputMetadataByID(c)
 		if err != nil {
 			return err
 		}
@@ -294,7 +309,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteOutputWithMetadata, func(c echo.Context) error {
-		resp, err := getOutputWithMetadata(c)
+		resp, err := outputWithMetadataByID(c)
 		if err != nil {
 			return err
 		}

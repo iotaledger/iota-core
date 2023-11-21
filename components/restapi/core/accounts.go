@@ -117,7 +117,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	}
 
 	return &apimodels.ValidatorResponse{
-		AccountID:                      accountID,
+		AddressBech32:                  accountID.ToAddress().Bech32(deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()),
 		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 		ValidatorStake:                 accountData.ValidatorStake,
 		StakingEpochEnd:                accountData.StakeEndEpoch,
@@ -239,7 +239,7 @@ func selectedCommittee(c echo.Context) (*apimodels.CommitteeResponse, error) {
 	committee := make([]*apimodels.CommitteeMemberResponse, 0, accounts.Size())
 	accounts.ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
 		committee = append(committee, &apimodels.CommitteeMemberResponse{
-			AccountID:      accountID,
+			AddressBech32:  accountID.ToAddress().Bech32(deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()),
 			PoolStake:      seat.PoolStake,
 			ValidatorStake: seat.ValidatorStake,
 			FixedCost:      seat.FixedCost,

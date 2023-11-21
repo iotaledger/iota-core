@@ -112,8 +112,7 @@
       "tickerSymbol": "SMR",
       "unit": "SMR",
       "subunit": "glow",
-      "decimals": 6,
-      "useMetricPrefix": false
+      "decimals": 6
     }
   },
   "dashboard": {

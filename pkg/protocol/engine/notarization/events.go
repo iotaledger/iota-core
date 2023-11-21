@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -28,4 +29,6 @@ type SlotCommittedDetails struct {
 	Commitment            *model.Commitment
 	AcceptedBlocks        ads.Set[iotago.Identifier, iotago.BlockID]
 	ActiveValidatorsCount int
+	OutputsCreated        utxoledger.Outputs
+	OutputsConsumed       utxoledger.Spents
 }

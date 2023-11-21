@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-func getOutput(c echo.Context) (*apimodels.OutputResponse, error) {
+func outputByID(c echo.Context) (*apimodels.OutputResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
@@ -27,7 +27,7 @@ func getOutput(c echo.Context) (*apimodels.OutputResponse, error) {
 	}, nil
 }
 
-func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadata, error) {
+func outputMetadataByID(c echo.Context) (*apimodels.OutputMetadata, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
@@ -45,7 +45,7 @@ func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadata, error) {
 	return newOutputMetadataResponse(output)
 }
 
-func getOutputWithMetadata(c echo.Context) (*apimodels.OutputWithMetadataResponse, error) {
+func outputWithMetadataByID(c echo.Context) (*apimodels.OutputWithMetadataResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))

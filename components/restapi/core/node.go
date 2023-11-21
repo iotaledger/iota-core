@@ -49,12 +49,11 @@ func info() *apimodels.InfoResponse {
 		},
 		ProtocolParameters: protocolParameters(),
 		BaseToken: &apimodels.InfoResBaseToken{
-			Name:            deps.BaseToken.Name,
-			TickerSymbol:    deps.BaseToken.TickerSymbol,
-			Unit:            deps.BaseToken.Unit,
-			Subunit:         deps.BaseToken.Subunit,
-			Decimals:        deps.BaseToken.Decimals,
-			UseMetricPrefix: deps.BaseToken.UseMetricPrefix,
+			Name:         deps.BaseToken.Name,
+			TickerSymbol: deps.BaseToken.TickerSymbol,
+			Unit:         deps.BaseToken.Unit,
+			Subunit:      deps.BaseToken.Subunit,
+			Decimals:     deps.BaseToken.Decimals,
 		},
 		Features: features,
 	}
