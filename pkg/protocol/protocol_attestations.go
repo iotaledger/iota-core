@@ -60,35 +60,6 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 	return a
 }
 
-func (a *AttestationsProtocol) setupCommitmentVerifier(chain *Chain) (teardown func()) {
-	forkingPoint := chain.ForkingPoint.Get()
-	if forkingPoint == nil {
-		a.LogError("failed to retrieve forking point", "chain", chain.LogName())
-
-		return nil
-	}
-
-	parentOfForkingPoint := forkingPoint.Parent.Get()
-	if parentOfForkingPoint == nil {
-		a.LogError("failed to retrieve parent of forking point", "chain", chain.LogName())
-
-		return nil
-	}
-
-	a.commitmentVerifiers.GetOrCreate(forkingPoint.ID(), func() (commitmentVerifier *CommitmentVerifier) {
-		commitmentVerifier, err := NewCommitmentVerifier(forkingPoint.Chain.Get().Engine(), parentOfForkingPoint.Commitment)
-		if err != nil {
-			a.LogError("failed to create commitment verifier", "chain", chain.LogName(), "error", err)
-		}
-
-		return commitmentVerifier
-	})
-
-	return func() {
-		a.commitmentVerifiers.Delete(forkingPoint.ID())
-	}
-}
-
 func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	a.workerPool.Submit(func() {
 		commitment, _, err := a.protocol.Commitments.Publish(commitmentModel)
@@ -223,6 +194,35 @@ func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, 
 func (a *AttestationsProtocol) Shutdown() {
 	a.ticker.Shutdown()
 	a.workerPool.Shutdown().ShutdownComplete.Wait()
+}
+
+func (a *AttestationsProtocol) setupCommitmentVerifier(chain *Chain) (teardown func()) {
+	forkingPoint := chain.ForkingPoint.Get()
+	if forkingPoint == nil {
+		a.LogError("failed to retrieve forking point", "chain", chain.LogName())
+
+		return nil
+	}
+
+	parentOfForkingPoint := forkingPoint.Parent.Get()
+	if parentOfForkingPoint == nil {
+		a.LogError("failed to retrieve parent of forking point", "chain", chain.LogName())
+
+		return nil
+	}
+
+	a.commitmentVerifiers.GetOrCreate(forkingPoint.ID(), func() (commitmentVerifier *CommitmentVerifier) {
+		commitmentVerifier, err := NewCommitmentVerifier(forkingPoint.Chain.Get().Engine(), parentOfForkingPoint.Commitment)
+		if err != nil {
+			a.LogError("failed to create commitment verifier", "chain", chain.LogName(), "error", err)
+		}
+
+		return commitmentVerifier
+	})
+
+	return func() {
+		a.commitmentVerifiers.Delete(forkingPoint.ID())
+	}
 }
 
 func (a *AttestationsProtocol) sendRequest(commitmentID iotago.CommitmentID) {
