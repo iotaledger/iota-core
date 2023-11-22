@@ -2,6 +2,7 @@ package tests
 
 import (
 	"testing"
+	"time"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -334,6 +335,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 				testsuite.DefaultEpochNearingThreshold,
 			),
 		),
+		testsuite.WithWaitFor(15*time.Second),
 	)
 	defer ts.Shutdown()
 
