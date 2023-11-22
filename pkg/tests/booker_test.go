@@ -2,7 +2,6 @@ package tests
 
 import (
 	"testing"
-	"time"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -335,7 +334,6 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 				testsuite.DefaultEpochNearingThreshold,
 			),
 		),
-		testsuite.WithWaitFor(15*time.Second),
 	)
 	defer ts.Shutdown()
 
@@ -359,8 +357,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 		wallet.SetDefaultNode(node1)
 		ts.SetCurrentSlot(1)
-		ts.IssueBasicBlockWithOptions("block1.1", wallet, tx1, mock.WithSlotCommitment(genesisCommitment))
-		ts.IssueBasicBlockWithOptions("block1.2", wallet, tx2, mock.WithSlotCommitment(genesisCommitment))
+		ts.IssueBasicBlockWithOptions("block1.1", wallet, tx1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockID("Genesis")))
+		ts.IssueBasicBlockWithOptions("block1.2", wallet, tx2, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockID("Genesis")))
 		ts.SetCurrentSlot(2)
 		ts.IssueValidationBlockWithHeaderOptions("block2.tx1", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("block1.1")...))
 
