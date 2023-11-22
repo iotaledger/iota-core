@@ -263,6 +263,10 @@ func getSlotDetailsByID(c echo.Context) error {
 		return err
 	}
 
+	if commitment.ID() != commitmentID {
+		return ierrors.Errorf("commitment in the store for slot %d does not match the given commitmentID (%s != %s)", commitmentID.Slot(), commitment.ID(), commitmentID)
+	}
+
 	diffs, err := deps.Protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
 		return err

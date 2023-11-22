@@ -93,7 +93,8 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 	}
 
 	includedSlotIndex := output.SlotBooked()
-	if includedSlotIndex <= latestCommitment.Slot() {
+	genesisSlot := deps.Protocol.Engines.Main.Get().CommittedAPI().ProtocolParameters().GenesisSlot()
+	if includedSlotIndex <= latestCommitment.Slot() && includedSlotIndex >= genesisSlot {
 		includedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlotIndex, err)
@@ -117,7 +118,8 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 	}
 
 	includedSlotIndex := spent.Output().SlotBooked()
-	if includedSlotIndex <= latestCommitment.Slot() {
+	genesisSlot := deps.Protocol.Engines.Main.Get().CommittedAPI().ProtocolParameters().GenesisSlot()
+	if includedSlotIndex <= latestCommitment.Slot() && includedSlotIndex >= genesisSlot {
 		includedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlotIndex, err)
@@ -126,7 +128,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 	}
 
 	spentSlotIndex := spent.SlotSpent()
-	if spentSlotIndex <= latestCommitment.Slot() {
+	if spentSlotIndex <= latestCommitment.Slot() && spentSlotIndex >= genesisSlot {
 		spentCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(spentSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", spentSlotIndex, err)

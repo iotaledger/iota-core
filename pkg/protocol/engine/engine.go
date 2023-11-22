@@ -423,6 +423,7 @@ func (e *Engine) acceptanceHandler() {
 		e.Ledger.TrackBlock(block)
 		e.SybilProtection.TrackBlock(block)
 		e.UpgradeOrchestrator.TrackValidationBlock(block)
+		e.TipSelection.SetAcceptanceTime(block.IssuingTime())
 
 		e.Events.AcceptedBlockProcessed.Trigger(block)
 	}, event.WithWorkerPool(wp))
