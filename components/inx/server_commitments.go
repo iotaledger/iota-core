@@ -15,6 +15,10 @@ import (
 )
 
 func inxCommitment(commitment *model.Commitment) *inx.Commitment {
+	if commitment == nil {
+		return nil
+	}
+
 	return &inx.Commitment{
 		CommitmentId: inx.NewCommitmentId(commitment.ID()),
 		Commitment: &inx.RawCommitment{

@@ -30,6 +30,10 @@ func (c *CommittedSlotAPI) Commitment() (commitment *model.Commitment, err error
 		return nil, ierrors.Wrapf(err, "failed to load commitment for slot %d", c.CommitmentID)
 	}
 
+	if commitment.ID() != c.CommitmentID {
+		return nil, ierrors.Errorf("commitment in the store does not match the given commitmentID (%s != %s)", commitment.ID(), c.CommitmentID)
+	}
+
 	return commitment, nil
 }
 
