@@ -119,7 +119,7 @@ func (c *Chain) Engine() *engine.Engine {
 	return currentEngine
 }
 
-// Commitment returns the Commitment for the given slot.
+// Commitment returns the Commitment for the given slot from the perspective of this chain.
 func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c; currentChain != nil; {
 		switch forkingPoint := currentChain.ForkingPoint.Get(); {
@@ -200,7 +200,11 @@ func (c *Chain) initLogging(chains *Chains) (self *Chain) {
 func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 	teardownBehavior := lo.Batch(
 		c.Parent.WithNonEmptyValue(func(parent *Chain) (teardown func()) {
-			return parent.registerChild(c)
+			parent.Children.Add(c)
+
+			return func() {
+				parent.Children.Delete(c)
+			}
 		}),
 
 		c.SpawnedEngine.WithNonEmptyValue(func(engine *engine.Engine) (teardown func()) {
@@ -321,13 +325,5 @@ func (c *Chain) registerCommitment(newCommitment *Commitment) (unregister func()
 		c.LatestCommitment.Compute(resetToParent)
 		c.LatestAttestedCommitment.Compute(resetToParent)
 		c.LatestVerifiedCommitment.Compute(resetToParent)
-	}
-}
-
-func (c *Chain) registerChild(child *Chain) (unregisterChild func()) {
-	c.Children.Add(child)
-
-	return func() {
-		c.Children.Delete(child)
 	}
 }
