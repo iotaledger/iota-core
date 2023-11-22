@@ -9,10 +9,10 @@ type Assertions struct {
 	f *Framework
 }
 
-// Children asserts that the given spend has the given children.
+// Children asserts that the given spender has the given children.
 func (a *Assertions) Children(spendAlias string, childAliases ...string) {
-	childIDs, exists := a.f.Instance.SpendChildren(a.f.SpenderID(spendAlias))
-	require.True(a.f.test, exists, "Spend %s does not exist", spendAlias)
+	childIDs, exists := a.f.Instance.SpenderChildren(a.f.SpenderID(spendAlias))
+	require.True(a.f.test, exists, "Spender %s does not exist", spendAlias)
 
 	require.Equal(a.f.test, len(childAliases), childIDs.Size(), "Spend %s has wrong number of children", spendAlias)
 	for _, childAlias := range childAliases {
@@ -22,7 +22,7 @@ func (a *Assertions) Children(spendAlias string, childAliases ...string) {
 
 // Parents asserts that the given spend has the given parents.
 func (a *Assertions) Parents(spendAlias string, parentAliases ...string) {
-	parents, exists := a.f.Instance.SpendParents(a.f.SpenderID(spendAlias))
+	parents, exists := a.f.Instance.SpenderParents(a.f.SpenderID(spendAlias))
 	require.True(a.f.test, exists, "Spend %s does not exist", spendAlias)
 
 	require.Equal(a.f.test, len(parentAliases), parents.Size(), "Spend %s has wrong number of parents", spendAlias)
@@ -83,5 +83,5 @@ func (a *Assertions) Rejected(aliases ...string) {
 
 // ValidatorWeight asserts that the given spend has the given validator weight.
 func (a *Assertions) ValidatorWeight(spendAlias string, weight int64) {
-	require.Equal(a.f.test, weight, a.f.Instance.SpendWeight(a.f.SpenderID(spendAlias)), "ValidatorWeight is %s instead of % for spender %s", a.f.Instance.SpendWeight(a.f.SpenderID(spendAlias)), weight, spendAlias)
+	require.Equal(a.f.test, weight, a.f.Instance.SpenderWeight(a.f.SpenderID(spendAlias)), "ValidatorWeight is %s instead of % for spender %s", a.f.Instance.SpenderWeight(a.f.SpenderID(spendAlias)), weight, spendAlias)
 }

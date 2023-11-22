@@ -52,16 +52,16 @@ func NewFramework(
 	return f
 }
 
-// CreateOrUpdateSpend creates a new spender or adds it to the given SpendSets.
+// CreateOrUpdateSpender creates a new spender or adds it to the given SpendSets.
 func (f *Framework) CreateOrUpdateSpender(alias string, resourceAliases []string) error {
 	f.Instance.CreateSpender(f.SpenderID(alias))
 	return f.Instance.UpdateSpentResources(f.SpenderID(alias), f.SpendSetIDs(resourceAliases...))
 
 }
 
-// UpdateConflictParents updates the parents of the spend with the given alias.
-func (f *Framework) UpdateSpendParents(spendAlias string, addedParentIDs []string, removedParentIDs []string) error {
-	return f.Instance.UpdateSpendParents(f.SpenderID(spendAlias), f.SpenderIDs(addedParentIDs...), f.SpenderIDs(removedParentIDs...))
+// UpdateSpenderParents updates the parents of the spender with the given alias.
+func (f *Framework) UpdateSpenderParents(spendAlias string, addedParentIDs []string, removedParentIDs []string) error {
+	return f.Instance.UpdateSpenderParents(f.SpenderID(spendAlias), f.SpenderIDs(addedParentIDs...), f.SpenderIDs(removedParentIDs...))
 }
 
 // LikedInstead returns the set of spenders that are liked instead of the given spenders.
@@ -86,7 +86,7 @@ func (f *Framework) CastVotes(nodeAlias string, voteRank int, spenderAliases ...
 	return f.Instance.CastVotes(vote.NewVote[vote.MockedRank](seat, vote.MockedRank(voteRank)), f.SpenderIDs(spenderAliases...))
 }
 
-// EvictSpend evicts given spend from the SpendDAG.
+// EvictSpender evicts given spender from the SpendDAG.
 func (f *Framework) EvictSpender(spendAlias string) {
 	f.Instance.EvictSpender(f.SpenderID(spendAlias))
 }

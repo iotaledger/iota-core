@@ -48,7 +48,7 @@ func (c *SpendSet[SpenderID, ResourceID, VoteRank]) Add(addedSpender *Spender[Sp
 
 }
 
-// Remove removes a Spend from the SpendSet and returns all remaining members of the set.
+// Remove removes a Spender from the SpendSet and returns all remaining members of the set.
 func (c *SpendSet[SpenderID, ResourceID, VoteRank]) Remove(removedSpender *Spender[SpenderID, ResourceID, VoteRank]) (removed bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()

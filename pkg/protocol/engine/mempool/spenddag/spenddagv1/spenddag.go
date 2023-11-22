@@ -141,8 +141,8 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) ReadConsistent(callback func
 	return callback(c)
 }
 
-// UpdateSpendParents updates the parents of the given Spend and returns an error if the operation failed.
-func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) UpdateSpendParents(spenderID SpenderID, addedParentIDs ds.Set[SpenderID], removedParentIDs ds.Set[SpenderID]) error {
+// UpdateSpenderParents updates the parents of the given Spend and returns an error if the operation failed.
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) UpdateSpenderParents(spenderID SpenderID, addedParentIDs ds.Set[SpenderID], removedParentIDs ds.Set[SpenderID]) error {
 	newParents := ds.NewSet[SpenderID]()
 
 	updated, err := func() (bool, error) {
@@ -240,7 +240,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) AllSpendsSupported(seat acco
 	}) == nil
 }
 
-func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendVoters(spenderID SpenderID) (spendVoters ds.Set[account.SeatIndex]) {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpenderVoters(spenderID SpenderID) (spendVoters ds.Set[account.SeatIndex]) {
 	if spender, exists := c.spendersByID.Get(spenderID); exists {
 		return spender.Weight.Voters.Clone()
 	}
@@ -263,7 +263,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendSets(spenderID SpenderI
 	return spendSets, true
 }
 
-func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendParents(spenderID SpenderID) (spendParents ds.Set[SpenderID], exists bool) {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpenderParents(spenderID SpenderID) (spendParents ds.Set[SpenderID], exists bool) {
 	spender, exists := c.spendersByID.Get(spenderID)
 	if !exists {
 		return nil, false
@@ -278,7 +278,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendParents(spenderID Spend
 	return spendParents, true
 }
 
-func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendChildren(spenderID SpenderID) (spendChildren ds.Set[SpenderID], exists bool) {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpenderChildren(spenderID SpenderID) (spendChildren ds.Set[SpenderID], exists bool) {
 	spender, exists := c.spendersByID.Get(spenderID)
 	if !exists {
 		return nil, false
@@ -308,7 +308,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendSetMembers(spendSetID R
 	return spenders, true
 }
 
-func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpendWeight(spenderID SpenderID) int64 {
+func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) SpenderWeight(spenderID SpenderID) int64 {
 	if spender, exists := c.spendersByID.Get(spenderID); exists {
 		return spender.Weight.Value().ValidatorsWeight()
 	}

@@ -252,7 +252,7 @@ func (t *TestFramework) RequireSpenderIDs(spendMapping map[string][]string) {
 		require.Equal(t.test, len(spendAliases), spenderIDs.Size(), "%s has wrong number of SpenderIDs", transactionAlias)
 
 		for _, spendAlias := range spendAliases {
-			require.True(t.test, spenderIDs.Has(t.TransactionID(spendAlias)), "transaction %s should have spend %s, instead had %s", transactionAlias, spendAlias, spenderIDs)
+			require.True(t.test, spenderIDs.Has(t.TransactionID(spendAlias)), "transaction %s should have spender %s, instead had %s", transactionAlias, spendAlias, spenderIDs)
 		}
 	}
 }

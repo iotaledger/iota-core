@@ -15,7 +15,7 @@ type SpendDAG[SpenderID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] int
 	UpdateSpentResources(id SpenderID, resourceIDs ds.Set[ResourceID]) error
 
 	ReadConsistent(callback func(spendDAG ReadLockedSpendDAG[SpenderID, ResourceID, VoteRank]) error) error
-	UpdateSpendParents(spenderID SpenderID, addedParentIDs, removedParentIDs ds.Set[SpenderID]) error
+	UpdateSpenderParents(spenderID SpenderID, addedParentIDs, removedParentIDs ds.Set[SpenderID]) error
 	FutureCone(spenderIDs ds.Set[SpenderID]) (futureCone ds.Set[SpenderID])
 	ConflictingSpenders(spenderID SpenderID) (conflictingSpends ds.Set[SpenderID], exists bool)
 	CastVotes(vote *vote.Vote[VoteRank], spenderIDs ds.Set[SpenderID]) error
@@ -26,11 +26,11 @@ type SpendDAG[SpenderID, ResourceID IDType, VoteRank VoteRankType[VoteRank]] int
 	EvictSpender(spenderID SpenderID)
 
 	SpendSets(spenderID SpenderID) (spendSetIDs ds.Set[ResourceID], exists bool)
-	SpendParents(spenderID SpenderID) (spenderIDs ds.Set[SpenderID], exists bool)
+	SpenderParents(spenderID SpenderID) (spenderIDs ds.Set[SpenderID], exists bool)
 	SpendSetMembers(spendSetID ResourceID) (spenderIDs ds.Set[SpenderID], exists bool)
-	SpendWeight(spenderID SpenderID) int64
-	SpendChildren(spenderID SpenderID) (spenderIDs ds.Set[SpenderID], exists bool)
-	SpendVoters(spenderID SpenderID) (voters ds.Set[account.SeatIndex])
+	SpenderWeight(spenderID SpenderID) int64
+	SpenderChildren(spenderID SpenderID) (spenderIDs ds.Set[SpenderID], exists bool)
+	SpenderVoters(spenderID SpenderID) (voters ds.Set[account.SeatIndex])
 	LikedInstead(spenderIDs ds.Set[SpenderID]) ds.Set[SpenderID]
 }
 

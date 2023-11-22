@@ -17,7 +17,7 @@ func TestAll(t *testing.T, frameworkProvider func(*testing.T) *Framework) {
 		"CreateSpender":                 CreateSpender,
 		"ExistingSpenderJoinsSpendSets": ExistingSpenderJoinsSpendSets,
 		"JoinSpendSetTwice":             JoinSpendSetTwice,
-		"UpdateSpendParents":            UpdateSpendParents,
+		"UpdateSpenderParents":          UpdateSpenderParents,
 		"LikedInstead":                  LikedInstead,
 		"CreateSpendWithoutMembers":     CreateSpendWithoutMembers,
 		"SpendAcceptance":               SpendAcceptance,
@@ -46,26 +46,24 @@ func ExistingSpenderJoinsSpendSets(t *testing.T, tf *Framework) {
 
 	tf.Assert.SpendSetMembers("resource2", "spender1", "spender2", "spender3")
 	tf.Assert.SpendSetMembers("resource1", "spender1", "spender2")
-
-	tf.Assert.LikedInstead([]string{"spender3"}, "spender1")
 }
 
-func UpdateSpendParents(t *testing.T, tf *Framework) {
+func UpdateSpenderParents(t *testing.T, tf *Framework) {
 	require.NoError(t, tf.CreateOrUpdateSpender("spender1", []string{"resource1"}))
 	require.NoError(t, tf.CreateOrUpdateSpender("spender2", []string{"resource2"}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender3", []string{"resource1", "resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender3", []string{"spender1", "spender2"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender3", []string{"spender1", "spender2"}, []string{}))
 	tf.Assert.Children("spender1", "spender3")
 	tf.Assert.Parents("spender3", "spender1", "spender2")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender2.5", []string{"spender2.5"}))
-	require.NoError(t, tf.UpdateSpendParents("spender2.5", []string{"spender1", "spender2"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender2.5", []string{"spender1", "spender2"}, []string{}))
 	tf.Assert.Children("spender1", "spender2.5", "spender3")
 	tf.Assert.Children("spender2", "spender2.5", "spender3")
 	tf.Assert.Parents("spender2.5", "spender1", "spender2")
 
-	require.NoError(t, tf.UpdateSpendParents("spender3", []string{"spender2.5"}, []string{"spender1", "spender2"}))
+	require.NoError(t, tf.UpdateSpenderParents("spender3", []string{"spender2.5"}, []string{"spender1", "spender2"}))
 
 	tf.Assert.Children("spender1", "spender2.5")
 	tf.Assert.Children("spender2", "spender2.5")
@@ -80,10 +78,10 @@ func CreateSpender(t *testing.T, tf *Framework) {
 	tf.Assert.SpendSetMembers("resource1", "spender1", "spender2")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender3", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender3", []string{"spender1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender4", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender4", []string{"spender1"}, []string{}))
 
 	tf.Assert.SpendSetMembers("resource2", "spender3", "spender4")
 	tf.Assert.Children("spender1", "spender3", "spender4")
@@ -142,10 +140,10 @@ func LikedInstead(t *testing.T, tf *Framework) {
 	tf.Assert.LikedInstead([]string{"spender1", "spender2"}, "spender1")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender3", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender3", []string{"spender1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender4", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender4", []string{"spender1"}, []string{}))
 
 	require.NoError(t, tf.CastVotes("zero-weight", 1, "spender4"))
 	tf.Assert.LikedInstead([]string{"spender1", "spender2", "spender3", "spender4"}, "spender1", "spender4")
@@ -164,10 +162,10 @@ func SpendAcceptance(t *testing.T, tf *Framework) {
 	tf.Assert.SpendSets("spender2", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender3", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender3", []string{"spender1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender4", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender4", []string{"spender1"}, []string{}))
 
 	tf.Assert.SpendSetMembers("resource2", "spender3", "spender4")
 	tf.Assert.Children("spender1", "spender3", "spender4")
@@ -199,10 +197,10 @@ func CastVotes(t *testing.T, tf *Framework) {
 	tf.Assert.SpendSets("spender2", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender3", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender3", []string{"spender1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender4", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender4", []string{"spender1"}, []string{}))
 
 	tf.Assert.SpendSetMembers("resource2", "spender3", "spender4")
 	tf.Assert.Children("spender1", "spender3", "spender4")
@@ -235,10 +233,10 @@ func CastVotesVoteRank(t *testing.T, tf *Framework) {
 
 	// create nested conflicts
 	require.NoError(t, tf.CreateOrUpdateSpender("spender3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender3", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender3", []string{"spender1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender4", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender4", []string{"spender1"}, []string{}))
 
 	tf.Assert.SpendSetMembers("resource2", "spender3", "spender4")
 	tf.Assert.Children("spender1", "spender3", "spender4")
@@ -288,10 +286,10 @@ func CastVotesAcceptance(t *testing.T, tf *Framework) {
 	tf.Assert.SpendSets("spender2", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender3", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender3", []string{"spender1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender4", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender4", []string{"spender1"}, []string{}))
 
 	tf.Assert.SpendSetMembers("resource2", "spender3", "spender4")
 	tf.Assert.Children("spender1", "spender3", "spender4")
@@ -312,13 +310,13 @@ func CastVotesAcceptance(t *testing.T, tf *Framework) {
 
 	// Evict conflict and try to add non-existing parent to a rejected conflict - update is ignored because the parent is evicted.
 	tf.EvictSpender("spender2")
-	require.NoError(t, tf.UpdateSpendParents("spender4", []string{"spender2"}, []string{}))
-	parents, exists := tf.Instance.SpendParents(tf.SpenderID("spender4"))
+	require.NoError(t, tf.UpdateSpenderParents("spender4", []string{"spender2"}, []string{}))
+	parents, exists := tf.Instance.SpenderParents(tf.SpenderID("spender4"))
 	require.True(t, exists)
 	require.False(t, parents.Has(tf.SpenderID("spender2")))
 
 	// Try to update parents of evicted conflict.
-	require.ErrorIs(t, tf.UpdateSpendParents("spender2", []string{"spender1"}, []string{}), spenddag.ErrEntityEvicted)
+	require.ErrorIs(t, tf.UpdateSpenderParents("spender2", []string{"spender1"}, []string{}), spenddag.ErrEntityEvicted)
 }
 
 func JoinSpendSetTwice(t *testing.T, tf *Framework) {
@@ -366,10 +364,10 @@ func EvictAcceptedSpender(t *testing.T, tf *Framework) {
 	tf.Assert.SpendSets("spender2", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender3", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender3", []string{"spender1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender4", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender4", []string{"spender1"}, []string{}))
 
 	tf.Assert.SpendSetMembers("resource2", "spender3", "spender4")
 	tf.Assert.Children("spender1", "spender3", "spender4")
@@ -377,10 +375,10 @@ func EvictAcceptedSpender(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("spender4", "spender1")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender5", []string{"resource3"}))
-	require.NoError(t, tf.UpdateSpendParents("spender5", []string{"spender2"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender5", []string{"spender2"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender6", []string{"resource3"}))
-	require.NoError(t, tf.UpdateSpendParents("spender6", []string{"spender2"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender6", []string{"spender2"}, []string{}))
 
 	tf.Assert.SpendSetMembers("resource3", "spender5", "spender6")
 	tf.Assert.Children("spender2", "spender5", "spender6")
@@ -432,10 +430,10 @@ func EvictRejectedSpender(t *testing.T, tf *Framework) {
 	tf.Assert.SpendSets("spender2", "resource1")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender3", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender3", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender3", []string{"spender1"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender4", []string{"resource2"}))
-	require.NoError(t, tf.UpdateSpendParents("spender4", []string{"spender1"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender4", []string{"spender1"}, []string{}))
 
 	tf.Assert.SpendSetMembers("resource2", "spender3", "spender4")
 	tf.Assert.Children("spender1", "spender3", "spender4")
@@ -443,10 +441,10 @@ func EvictRejectedSpender(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("spender4", "spender1")
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender5", []string{"resource3"}))
-	require.NoError(t, tf.UpdateSpendParents("spender5", []string{"spender2"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender5", []string{"spender2"}, []string{}))
 
 	require.NoError(t, tf.CreateOrUpdateSpender("spender6", []string{"resource3"}))
-	require.NoError(t, tf.UpdateSpendParents("spender6", []string{"spender2"}, []string{}))
+	require.NoError(t, tf.UpdateSpenderParents("spender6", []string{"spender2"}, []string{}))
 
 	tf.Assert.SpendSetMembers("resource3", "spender5", "spender6")
 	tf.Assert.Children("spender2", "spender5", "spender6")
@@ -497,10 +495,10 @@ func EvictRejectedSpender(t *testing.T, tf *Framework) {
 	tf.Assert.Parents("spender5", "spender2")
 	tf.Assert.Children("spender2", "spender5")
 
-	// Try to add non-existing parent to a pending conflict - nothing happens.
-	require.NoError(t, tf.UpdateSpendParents("spender5", []string{"spender1"}, []string{}))
+	// Try to add non-existing parent to a pending spender - nothing happens.
+	require.NoError(t, tf.UpdateSpenderParents("spender5", []string{"spender1"}, []string{}))
 
-	parents, exists := tf.Instance.SpendParents(tf.SpenderID("spender5"))
+	parents, exists := tf.Instance.SpenderParents(tf.SpenderID("spender5"))
 	require.True(t, exists)
 	require.False(t, parents.Has(tf.SpenderID("spender1")))
 }

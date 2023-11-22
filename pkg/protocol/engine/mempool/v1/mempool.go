@@ -483,7 +483,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 		m.spendDAG.CreateSpender(transaction.ID())
 
 		unsubscribe := transaction.parentSpenderIDs.OnUpdate(func(appliedMutations ds.SetMutations[iotago.TransactionID]) {
-			if err := m.spendDAG.UpdateSpendParents(transaction.ID(), appliedMutations.AddedElements(), appliedMutations.DeletedElements()); err != nil {
+			if err := m.spendDAG.UpdateSpenderParents(transaction.ID(), appliedMutations.AddedElements(), appliedMutations.DeletedElements()); err != nil {
 				panic(err)
 			}
 		})

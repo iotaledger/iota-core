@@ -61,7 +61,7 @@ func TestMemoryRelease(t *testing.T) {
 				conflictAlias := fmt.Sprintf("spendSet-%d:%d", slot, spendIndex)
 				require.NoError(t, tf.CreateOrUpdateSpender(conflictAlias, []string{spendSetAlias}))
 				if prevSpendSetAlias != "" {
-					require.NoError(t, tf.UpdateSpendParents(conflictAlias, []string{fmt.Sprintf("%s:%d", prevSpendSetAlias, 0)}, []string{}))
+					require.NoError(t, tf.UpdateSpenderParents(conflictAlias, []string{fmt.Sprintf("%s:%d", prevSpendSetAlias, 0)}, []string{}))
 				}
 			}
 			prevSpendSetAlias = spendSetAlias
