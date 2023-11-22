@@ -134,18 +134,18 @@ func (s *Storage) Rollback(targetSlot iotago.SlotIndex) error {
 	return s.prunable.Rollback(s.pruningRange(targetSlot))
 }
 
-func (s *Storage) pruningRange(targetSlot iotago.SlotIndex) (targetEpoch iotago.EpochIndex, startPruneRange iotago.SlotIndex, endPruneRange iotago.SlotIndex) {
+func (s *Storage) pruningRange(targetSlot iotago.SlotIndex) (targetEpoch iotago.EpochIndex, startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) {
 	timeProvider := s.Settings().APIProvider().APIForSlot(targetSlot).TimeProvider()
 
 	targetEpoch = timeProvider.EpochFromSlot(targetSlot)
 
-	startPruneRange = targetSlot + 1
-	endPruneRange = s.Settings().LatestStoredSlot()
+	startSlot = targetSlot + 1
+	endSlot = s.Settings().LatestStoredSlot()
 
-	// If the targetSlot is the last slot of the previous epoch, we need to prune
-	if timeProvider.EpochFromSlot(startPruneRange) > targetEpoch {
-		endPruneRange = timeProvider.EpochEnd(targetEpoch)
+	// If startSlot is in the next epoch, there's no need to prune a range of slots as the next epoch is going to be pruned on epoch-level anyway.
+	if timeProvider.EpochFromSlot(startSlot) > targetEpoch {
+		endSlot = 0
 	}
 
-	return targetEpoch, startPruneRange, endPruneRange
+	return targetEpoch, startSlot, endSlot
 }
