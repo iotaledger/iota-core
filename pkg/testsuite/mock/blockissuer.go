@@ -516,8 +516,10 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 		return ierrors.Errorf("provided issuer account %s, but issuer provided in the block params is different %s", i.AccountID, blockParams.Issuer.ID())
 	}
 
-	if err := i.validateReferences(*blockParams.IssuingTime, blockParams.SlotCommitment.Slot, blockParams.References, node); err != nil {
-		return ierrors.Wrap(err, "block references invalid")
+	if !blockParams.SkipReferenceValidation {
+		if err := i.validateReferences(*blockParams.IssuingTime, blockParams.SlotCommitment.Slot, blockParams.References, node); err != nil {
+			return ierrors.Wrap(err, "block references invalid")
+		}
 	}
 
 	return nil

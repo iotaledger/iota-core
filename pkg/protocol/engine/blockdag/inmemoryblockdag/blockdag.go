@@ -203,8 +203,11 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 	}
 
 	// We already attached it before, but the parents are invalid, then we set the block as invalid.
-	if parentsValid, err := b.canAttachToParents(data); !parentsValid && storedBlock != nil {
-		storedBlock.SetInvalid()
+	if parentsValid, err := b.canAttachToParents(data); !parentsValid {
+		if storedBlock != nil {
+			storedBlock.SetInvalid()
+		}
+
 		return false, err
 	}
 
@@ -218,6 +221,18 @@ func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid boo
 		if b.evictionState.InRootBlockSlot(parentID) && !b.evictionState.IsRootBlock(parentID) {
 			b.retainBlockFailure(modelBlock.ID(), apimodels.BlockFailureParentIsTooOld)
 			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
+		}
+
+		parent, exists := b.blockCache.Block(parentID)
+		if !exists {
+			b.retainBlockFailure(modelBlock.ID(), apimodels.BlockFailureParentNotFound)
+			return false, ierrors.Errorf("parent %s of block %s is unknown", parentID, modelBlock.ID())
+		}
+
+		// A block's issuing time needs to be greater than its parents.
+		if !modelBlock.ProtocolBlock().Header.IssuingTime.After(parent.IssuingTime()) {
+			b.retainBlockFailure(modelBlock.ID(), apimodels.BlockFailureInvalid)
+			return false, ierrors.Errorf("block %s issued before parent %s", modelBlock.ID(), parentID)
 		}
 	}
 
