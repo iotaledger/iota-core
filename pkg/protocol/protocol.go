@@ -8,6 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -35,8 +36,6 @@ type Protocol struct {
 	Engines              *Engines
 	Options              *Options
 
-	*APIProvider
-
 	reactive.EvictionState[iotago.SlotIndex]
 	*module.ReactiveModule
 }
@@ -59,11 +58,18 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		p.Commitments = newCommitments(p)
 		p.Chains = newChains(p)
 		p.Engines = NewEngines(p)
-		p.APIProvider = NewAPIProvider(p)
 
 		p.Commitments.Root.OnUpdate(func(_ *Commitment, rootCommitment *Commitment) {
 			// TODO: DECIDE ON DATA AVAILABILITY TIMESPAN / EVICTION STRATEGY
 			//p.Evict(rootCommitment.Slot() - 1)
+		})
+
+		stopEvents := p.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (teardown func()) {
+			p.Events.Engine.LinkTo(mainEngine.Events)
+
+			return func() {
+				p.Events.Engine.LinkTo(nil)
+			}
 		})
 
 		stopClock := lo.Batch(
@@ -94,6 +100,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 			)
 
 			p.Shutdown.OnTrigger(func() {
+				stopEvents()
 				stopClock()
 				unsubscribeFromNetwork()
 
@@ -136,6 +143,40 @@ func (p *Protocol) Run(ctx context.Context) error {
 	p.Stopped.Trigger()
 
 	return ctx.Err()
+}
+
+// APIForVersion returns the API for the given version.
+func (p *Protocol) APIForVersion(version iotago.Version) (api iotago.API, err error) {
+	if mainEngineInstance := p.Engines.Main.Get(); mainEngineInstance != nil {
+		return mainEngineInstance.APIForVersion(version)
+	}
+
+	return nil, ierrors.New("no engine instance available")
+}
+
+// APIForSlot returns the API for the given slot.
+func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
+	return p.Engines.Main.Get().APIForSlot(slot)
+}
+
+// APIForEpoch returns the API for the given epoch.
+func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
+	return p.Engines.Main.Get().APIForEpoch(epoch)
+}
+
+// APIForTime returns the API for the given time.
+func (p *Protocol) APIForTime(t time.Time) iotago.API {
+	return p.Engines.Main.Get().APIForTime(t)
+}
+
+// CommittedAPI returns the API for the committed state.
+func (p *Protocol) CommittedAPI() iotago.API {
+	return p.Engines.Main.Get().CommittedAPI()
+}
+
+// LatestAPI returns the latest API.
+func (p *Protocol) LatestAPI() iotago.API {
+	return p.Engines.Main.Get().LatestAPI()
 }
 
 func maxTimeBeforeWallClock(currentValue time.Time, newValue time.Time) time.Time {

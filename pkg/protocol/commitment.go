@@ -147,9 +147,9 @@ func (c *Commitment) initBehavior(chains *Chains) (self *Commitment) {
 							return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
 						}, chain.SpawnedEngine, chain.WarpSyncMode, parent.IsVerified, c.IsVerified)),
 
-						c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, verifyAttestations bool, parentIsAttested bool, isAttested bool) bool {
-							return verifyAttestations && parentIsAttested && !isAttested
-						}, chain.RequestAttestations, parent.IsAttested, c.IsAttested)),
+						c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, verifyAttestations bool, requestBlocks bool, parentIsAttested bool, isAttested bool) bool {
+							return verifyAttestations && !requestBlocks && parentIsAttested && !isAttested
+						}, chain.RequestAttestations, chain.RequestBlocks, parent.IsAttested, c.IsAttested)),
 					)
 				}),
 			)

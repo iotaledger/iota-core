@@ -190,10 +190,10 @@ func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *sto
 }
 
 func (e *Engines) syncMainEngineFromMainChain() (unsubscribe func()) {
-	return e.protocol.Chains.Main.OnUpdateWithContext(func(_ *Chain, mainChain *Chain, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
-		unsubscribeOnUpdate(func() func() {
-			return e.Main.InheritFrom(mainChain.SpawnedEngine)
-		})
+	return e.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (teardown func()) {
+		return e.Main.DeriveValueFrom(reactive.NewDerivedVariable(func(currentMainEngine *engine.Engine, newMainEngine *engine.Engine) *engine.Engine {
+			return lo.Cond(newMainEngine == nil, currentMainEngine, newMainEngine)
+		}, mainChain.SpawnedEngine))
 	})
 }
 

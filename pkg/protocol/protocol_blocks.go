@@ -44,10 +44,8 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 		})
 
 		protocol.Chains.WithElements(func(chain *Chain) func() {
-			return chain.SpawnedEngine.OnUpdate(func(_ *engine.Engine, engine *engine.Engine) {
-				unsubscribe := engine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
-
-				engine.Shutdown.OnTrigger(unsubscribe)
+			return chain.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
+				return spawnedEngine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
 			})
 		})
 

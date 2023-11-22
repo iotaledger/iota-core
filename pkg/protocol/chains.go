@@ -9,13 +9,15 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// Chains represents the set of chains that are managed by the protocol.
 type Chains struct {
+	// Set contains all chains that are managed by the protocol.
 	reactive.Set[*Chain]
 
+	Main             reactive.Variable[*Chain]
 	HeaviestClaimed  reactive.Variable[*Chain]
 	HeaviestAttested reactive.Variable[*Chain]
 	HeaviestVerified reactive.Variable[*Chain]
-	Main             reactive.Variable[*Chain]
 
 	protocol *Protocol
 }
@@ -34,19 +36,16 @@ func newChains(protocol *Protocol) *Chains {
 	c.HeaviestClaimed.LogUpdates(c.protocol, log.LevelTrace, "HeaviestClaimed", (*Chain).LogName)
 	c.HeaviestAttested.LogUpdates(c.protocol, log.LevelTrace, "HeaviestAttested", (*Chain).LogName)
 
-	trackHeaviestChain := func(targetChainVariable reactive.Variable[*Chain], weightVariable func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
-		return weightVariable(candidate).OnUpdate(func(_ uint64, newWeight uint64) {
-			if heaviestChain := c.HeaviestVerified.Get(); heaviestChain != nil && newWeight < heaviestChain.VerifiedWeight.Get() {
-				return
+	trackHeaviestChain := func(candidateVar reactive.Variable[*Chain], weightVar func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
+		return weightVar(candidate).OnUpdate(func(_ uint64, newWeight uint64) {
+			// if the weight of the candidate is higher than the current main chain
+			if mainChain := c.Main.Get(); mainChain == nil || newWeight > mainChain.VerifiedWeight.Get() {
+				// try to set the candidate as the new heaviest chain
+				candidateVar.Compute(func(currentCandidate *Chain) *Chain {
+					// only set the candidate as the heaviest chain if it is still the heaviest chain (double locking)
+					return lo.Cond(currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newWeight > weightVar(currentCandidate).Get(), candidate, currentCandidate)
+				})
 			}
-
-			targetChainVariable.Compute(func(currentCandidate *Chain) *Chain {
-				if currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newWeight > weightVariable(currentCandidate).Get() {
-					return candidate
-				}
-
-				return currentCandidate
-			})
 		}, true)
 	}
 
@@ -67,7 +66,7 @@ func newChains(protocol *Protocol) *Chains {
 }
 
 func (c *Chains) Fork(forkingPoint *Commitment) *Chain {
-	chain := NewChain(c)
+	chain := newChain(c)
 	chain.ForkingPoint.Set(forkingPoint)
 
 	c.Add(chain)
@@ -76,11 +75,8 @@ func (c *Chains) Fork(forkingPoint *Commitment) *Chain {
 }
 
 func (c *Chains) initMainChain() {
-	c.protocol.LogTrace("initializing main chain")
-
-	mainChain := NewChain(c)
+	mainChain := newChain(c)
 	mainChain.RequestBlocks.Set(true)
-	mainChain.SpawnedEngine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
 	c.Main.Set(mainChain)
 
@@ -88,32 +84,26 @@ func (c *Chains) initMainChain() {
 }
 
 func (c *Chains) initChainSwitching() {
-	c.HeaviestClaimed.OnUpdate(func(prevHeaviestChain *Chain, heaviestChain *Chain) {
-		if prevHeaviestChain != nil {
-			prevHeaviestChain.RequestAttestations.Set(false)
-		}
+	// only switch to the heaviest chain if the latest produced commitment is enough slots away from the forking point.
+	chainSwitchingCondition := func(heavierChain *Chain, latestProducedCommitment *Commitment) bool {
+		forkingPoint := heavierChain.ForkingPoint.Get()
 
-		if !heaviestChain.RequestBlocks.Get() {
-			heaviestChain.RequestAttestations.Set(true)
-		}
+		return forkingPoint != nil && latestProducedCommitment != nil && (latestProducedCommitment.ID().Slot()-forkingPoint.ID().Slot()) > c.protocol.Options.ChainSwitchingThreshold
+	}
+
+	c.HeaviestClaimed.WithNonEmptyValue(func(heaviestClaimed *Chain) (teardown func()) {
+		return enable(heaviestClaimed.RequestAttestations)
 	})
 
-	c.HeaviestAttested.OnUpdate(func(_ *Chain, heaviestAttestedChain *Chain) {
-		heaviestAttestedChain.RequestAttestations.Set(false)
-		heaviestAttestedChain.RequestBlocks.Set(true)
+	c.HeaviestAttested.WithNonEmptyValue(func(heaviestAttested *Chain) (teardown func()) {
+		return enable(heaviestAttested.RequestBlocks)
 	})
 
-	c.HeaviestVerified.OnUpdate(func(_ *Chain, heaviestVerifiedChain *Chain) {
-		heaviestVerifiedChain.LatestProducedCommitment.OnUpdate(func(_ *Commitment, latestVerifiedCommitment *Commitment) {
-			forkingPoint := heaviestVerifiedChain.ForkingPoint.Get()
-			if forkingPoint == nil || latestVerifiedCommitment == nil {
-				return
-			}
-
-			distanceFromForkingPoint := latestVerifiedCommitment.ID().Slot() - forkingPoint.ID().Slot()
-			if distanceFromForkingPoint > c.protocol.Options.ChainSwitchingThreshold {
-				c.Main.Set(heaviestVerifiedChain)
-			}
+	c.HeaviestVerified.WithNonEmptyValue(func(heaviestVerified *Chain) (teardown func()) {
+		return heaviestVerified.LatestProducedCommitment.OnUpdateOnce(func(_ *Commitment, latestProducedCommitment *Commitment) {
+			c.Main.Set(heaviestVerified)
+		}, func(_ *Commitment, latestProducedCommitment *Commitment) bool {
+			return chainSwitchingCondition(heaviestVerified, latestProducedCommitment)
 		})
 	})
 }
@@ -172,4 +162,12 @@ func (c *Chains) publishEngineCommitments(chain *Chain) (unsubscribe func()) {
 			})
 		}
 	})
+}
+
+func enable(variable reactive.Variable[bool]) (unset func()) {
+	variable.Set(true)
+
+	return func() {
+		variable.Set(false)
+	}
 }

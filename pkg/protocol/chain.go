@@ -82,8 +82,8 @@ type Chain struct {
 	log.Logger
 }
 
-// NewChain creates a new chain instance.
-func NewChain(chains *Chains) *Chain {
+// newChain creates a new chain instance.
+func newChain(chains *Chains) *Chain {
 	return (&Chain{
 		ForkingPoint:             reactive.NewVariable[*Commitment](),
 		Parent:                   reactive.NewVariable[*Chain](),
@@ -263,12 +263,12 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 			return latestCommitment.CumulativeWeight()
 		}, c.LatestCommitment)),
 
-		c.VerifiedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestVerifiedCommitment *Commitment) uint64 {
-			if latestVerifiedCommitment == nil {
+		c.VerifiedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestProducedCommitment *Commitment) uint64 {
+			if latestProducedCommitment == nil {
 				return 0
 			}
 
-			return latestVerifiedCommitment.CumulativeWeight()
+			return latestProducedCommitment.CumulativeWeight()
 		}, c.LatestProducedCommitment)),
 
 		// the AttestedWeight is defined slightly different from the ClaimedWeight and VerifiedWeight, because it is not
@@ -278,8 +278,8 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 			return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
 		}),
 
-		c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSync bool, latestVerifiedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
-			return latestVerifiedCommitment != nil && lo.Cond(warpSync, latestVerifiedCommitment.ID().Slot() < warpSyncThreshold, latestVerifiedCommitment.ID().Slot() < outOfSyncThreshold)
+		c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSync bool, latestProducedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
+			return latestProducedCommitment != nil && lo.Cond(warpSync, latestProducedCommitment.ID().Slot() < warpSyncThreshold, latestProducedCommitment.ID().Slot() < outOfSyncThreshold)
 		}, c.LatestProducedCommitment, c.WarpSyncThreshold, c.OutOfSyncThreshold, c.WarpSyncMode.Get())),
 	)
 
