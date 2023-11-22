@@ -104,7 +104,7 @@ func (c *Chains) initChainSwitching() {
 	})
 
 	c.HeaviestVerified.OnUpdate(func(_ *Chain, heaviestVerifiedChain *Chain) {
-		heaviestVerifiedChain.LatestVerifiedCommitment.OnUpdate(func(_ *Commitment, latestVerifiedCommitment *Commitment) {
+		heaviestVerifiedChain.LatestProducedCommitment.OnUpdate(func(_ *Commitment, latestVerifiedCommitment *Commitment) {
 			forkingPoint := heaviestVerifiedChain.ForkingPoint.Get()
 			if forkingPoint == nil || latestVerifiedCommitment == nil {
 				return

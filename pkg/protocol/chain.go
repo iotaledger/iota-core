@@ -31,8 +31,9 @@ type Chain struct {
 	// LatestAttestedCommitment contains the latest commitment of this chain for which attestations were received.
 	LatestAttestedCommitment reactive.Variable[*Commitment]
 
-	// LatestVerifiedCommitment contains the latest commitment of this chain that we produced by an engine instance.
-	LatestVerifiedCommitment reactive.Variable[*Commitment]
+	// LatestProducedCommitment contains the latest commitment of this chain that we produced ourselves by booking the
+	// corresponding blocks in the SpawnedEngine.
+	LatestProducedCommitment reactive.Variable[*Commitment]
 
 	// ClaimedWeight contains the claimed weight of this chain which is derived from the cumulative weight of the
 	// LatestCommitment.
@@ -64,10 +65,11 @@ type Chain struct {
 	// requesting attestations.
 	RequestAttestations reactive.Variable[bool]
 
-	// RequestBlocks contains a flag that indicates whether this chain should verify the state by requesting blocks.
+	// RequestBlocks contains a flag that indicates whether this chain should verify the state by requesting blocks and
+	// processing them in its SpawnedEngine.
 	RequestBlocks reactive.Variable[bool]
 
-	// SpawnedEngine contains the engine that was spawned by this chain.
+	// SpawnedEngine contains the engine that is used to process blocks for this chain.
 	SpawnedEngine reactive.Variable[*engine.Engine]
 
 	// IsEvicted contains a flag that indicates whether this chain was evicted.
@@ -88,7 +90,7 @@ func NewChain(chains *Chains) *Chain {
 		Children:                 reactive.NewSet[*Chain](),
 		LatestCommitment:         reactive.NewVariable[*Commitment](),
 		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
-		LatestVerifiedCommitment: reactive.NewVariable[*Commitment](),
+		LatestProducedCommitment: reactive.NewVariable[*Commitment](),
 		ClaimedWeight:            reactive.NewVariable[uint64](),
 		AttestedWeight:           reactive.NewVariable[uint64](),
 		VerifiedWeight:           reactive.NewVariable[uint64](),
@@ -105,18 +107,38 @@ func NewChain(chains *Chains) *Chain {
 	}).initLogging(chains).initBehavior(chains)
 }
 
-// Engine returns the engine that is spawned by this chain.
-func (c *Chain) Engine() *engine.Engine {
-	currentChain, currentEngine := c, c.SpawnedEngine.Get()
-	for currentEngine == nil {
-		if currentChain = c.Parent.Get(); currentChain == nil {
-			return nil
-		}
-
-		currentEngine = currentChain.SpawnedEngine.Get()
+// DispatchBlock dispatches the given block to the chain and its children.
+func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (dispatched bool) {
+	// allow to call this method on a nil chain to avoid nil checks in the caller when dispatching to unsolid chains
+	if c == nil {
+		return false
 	}
 
-	return currentEngine
+	// first try to dispatch to our chain
+	if spawnedEngine := c.SpawnedEngine.Get(); spawnedEngine != nil {
+		// only dispatch blocks that are for slots larger than the latest commitment
+		if targetSlot := spawnedEngine.APIForTime(block.ProtocolBlock().Header.IssuingTime).TimeProvider().SlotFromTime(block.ProtocolBlock().Header.IssuingTime); targetSlot > spawnedEngine.LatestCommitment.Get().Slot() {
+			// if we are in warp sync mode, then we only accept blocks that are part of the blocks to warp sync.
+			if dispatched = !c.WarpSyncMode.Get(); !dispatched {
+				if targetCommitment, targetCommitmentExists := c.Commitment(targetSlot); targetCommitmentExists {
+					if blocksToWarpSync := targetCommitment.BlocksToWarpSync.Get(); blocksToWarpSync != nil && blocksToWarpSync.Has(block.ID()) {
+						dispatched = true
+					}
+				}
+			}
+
+			if dispatched {
+				spawnedEngine.ProcessBlockFromPeer(block, src)
+			}
+		}
+	}
+
+	// then try to dispatch to our children
+	for _, childChain := range c.Children.ToSlice() {
+		dispatched = childChain.DispatchBlock(block, src) || dispatched
+	}
+
+	return dispatched
 }
 
 // Commitment returns the Commitment for the given slot from the perspective of this chain.
@@ -135,36 +157,18 @@ func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exist
 	return nil, false
 }
 
-func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (success bool) {
-	if c == nil {
-		return false
-	}
-
-	for _, chain := range append([]*Chain{c}, c.Children.ToSlice()...) {
-		spawnedEngine := chain.SpawnedEngine.Get()
-		if spawnedEngine == nil {
-			continue
+// LatestEngine returns the latest engine instance that was spawned by the chain itself or one of its ancestors.
+func (c *Chain) LatestEngine() *engine.Engine {
+	currentChain, currentEngine := c, c.SpawnedEngine.Get()
+	for currentEngine == nil {
+		if currentChain = c.Parent.Get(); currentChain == nil {
+			return nil
 		}
 
-		if chain.WarpSyncMode.Get() {
-			issuingTime := block.ProtocolBlock().Header.IssuingTime
-
-			targetCommitment, targetCommitmentExists := chain.Commitment(spawnedEngine.APIForTime(issuingTime).TimeProvider().SlotFromTime(issuingTime))
-			if !targetCommitmentExists {
-				continue
-			}
-
-			if blocksToWarpSync := targetCommitment.BlocksToWarpSync.Get(); blocksToWarpSync == nil || !blocksToWarpSync.Has(block.ID()) {
-				continue
-			}
-		}
-
-		spawnedEngine.ProcessBlockFromPeer(block, src)
-
-		success = true
+		currentEngine = currentChain.SpawnedEngine.Get()
 	}
 
-	return success
+	return currentEngine
 }
 
 // initLogging initializes the logging of changes to the properties of this chain.
@@ -182,7 +186,7 @@ func (c *Chain) initLogging(chains *Chains) (self *Chain) {
 		c.AttestedWeight.LogUpdates(c, log.LevelTrace, "AttestedWeight"),
 		c.VerifiedWeight.LogUpdates(c, log.LevelTrace, "VerifiedWeight"),
 		c.LatestCommitment.LogUpdates(c, log.LevelTrace, "LatestCommitment", (*Commitment).LogName),
-		c.LatestVerifiedCommitment.LogUpdates(c, log.LevelDebug, "LatestVerifiedCommitment", (*Commitment).LogName),
+		c.LatestProducedCommitment.LogUpdates(c, log.LevelDebug, "LatestProducedCommitment", (*Commitment).LogName),
 		c.RequestAttestations.LogUpdates(c, log.LevelTrace, "RequestAttestations"),
 		c.RequestBlocks.LogUpdates(c, log.LevelDebug, "RequestBlocks"),
 		c.SpawnedEngine.LogUpdates(c, log.LevelTrace, "SpawnedEngine", (*engine.Engine).LogName),
@@ -265,7 +269,7 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 			}
 
 			return latestVerifiedCommitment.CumulativeWeight()
-		}, c.LatestVerifiedCommitment)),
+		}, c.LatestProducedCommitment)),
 
 		// the AttestedWeight is defined slightly different from the ClaimedWeight and VerifiedWeight, because it is not
 		// derived from a static value in the commitment but a dynamic value that is derived from the received
@@ -276,7 +280,7 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 
 		c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSync bool, latestVerifiedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
 			return latestVerifiedCommitment != nil && lo.Cond(warpSync, latestVerifiedCommitment.ID().Slot() < warpSyncThreshold, latestVerifiedCommitment.ID().Slot() < outOfSyncThreshold)
-		}, c.LatestVerifiedCommitment, c.WarpSyncThreshold, c.OutOfSyncThreshold, c.WarpSyncMode.Get())),
+		}, c.LatestProducedCommitment, c.WarpSyncThreshold, c.OutOfSyncThreshold, c.WarpSyncMode.Get())),
 	)
 
 	c.IsEvicted.OnTrigger(teardownBehavior)
@@ -284,9 +288,10 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 	return c
 }
 
+// registerCommitment registers the given commitment with this chain.
 func (c *Chain) registerCommitment(newCommitment *Commitment) (unregister func()) {
 	// if a commitment for this slot already exists, then this is a newly forked commitment, that only got associated
-	// with this chain because it temporarily inherited it through its parent before forking its own chain
+	// with this chain because it temporarily inherited it through its parent before forking (ignore it).
 	if c.commitments.Compute(newCommitment.Slot(), func(currentCommitment *Commitment, exists bool) *Commitment {
 		return lo.Cond(exists, currentCommitment, newCommitment)
 	}) != newCommitment {
@@ -306,7 +311,7 @@ func (c *Chain) registerCommitment(newCommitment *Commitment) (unregister func()
 
 	unsubscribe := lo.Batch(
 		newCommitment.IsAttested.OnTrigger(func() { c.LatestAttestedCommitment.Compute(maxCommitment) }),
-		newCommitment.IsVerified.OnTrigger(func() { c.LatestVerifiedCommitment.Compute(maxCommitment) }),
+		newCommitment.IsVerified.OnTrigger(func() { c.LatestProducedCommitment.Compute(maxCommitment) }),
 	)
 
 	return func() {
@@ -324,6 +329,6 @@ func (c *Chain) registerCommitment(newCommitment *Commitment) (unregister func()
 
 		c.LatestCommitment.Compute(resetToParent)
 		c.LatestAttestedCommitment.Compute(resetToParent)
-		c.LatestVerifiedCommitment.Compute(resetToParent)
+		c.LatestProducedCommitment.Compute(resetToParent)
 	}
 }

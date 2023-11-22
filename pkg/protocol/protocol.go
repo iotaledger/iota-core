@@ -73,7 +73,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 
 			p.Chains.WithElements(func(chain *Chain) (teardown func()) {
 				return chain.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
-					return chain.LatestVerifiedCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
+					return chain.LatestProducedCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
 						p.Clock.Set(spawnedEngine.LatestAPI().TimeProvider().SlotEndTime(latestCommitment.Slot()))
 					})
 				})

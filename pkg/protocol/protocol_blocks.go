@@ -102,7 +102,7 @@ func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 			return
 		}
 
-		b.LogTrace("processed received block", "blockID", block.ID(), "commitment", commitment.LogName())
+		b.LogTrace("received block", "blockID", block.ID(), "commitment", commitment.LogName())
 	})
 }
 

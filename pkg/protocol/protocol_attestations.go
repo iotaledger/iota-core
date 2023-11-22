@@ -212,7 +212,7 @@ func (a *AttestationsProtocol) setupCommitmentVerifier(chain *Chain) (teardown f
 	}
 
 	a.commitmentVerifiers.GetOrCreate(forkingPoint.ID(), func() (commitmentVerifier *CommitmentVerifier) {
-		commitmentVerifier, err := NewCommitmentVerifier(forkingPoint.Chain.Get().Engine(), parentOfForkingPoint.Commitment)
+		commitmentVerifier, err := NewCommitmentVerifier(forkingPoint.Chain.Get().LatestEngine(), parentOfForkingPoint.Commitment)
 		if err != nil {
 			a.LogError("failed to create commitment verifier", "chain", chain.LogName(), "error", err)
 		}
