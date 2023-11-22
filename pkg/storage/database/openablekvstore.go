@@ -38,6 +38,9 @@ func (s *openableKVStore) instance() kvstore.KVStore {
 	parent := s.topParent()
 
 	if parent.dbInstance.isClosed.Load() {
+		parent.dbInstance.Lock()
+		defer parent.dbInstance.Unlock()
+
 		parent.dbInstance.Open()
 	}
 

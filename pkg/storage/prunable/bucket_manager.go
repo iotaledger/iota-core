@@ -70,6 +70,40 @@ func (b *BucketManager) Get(epoch iotago.EpochIndex, realm kvstore.Realm) (kvsto
 	return lo.PanicOnErr(kv.WithExtendedRealm(realm)), nil
 }
 
+func (b *BucketManager) Lock() {
+	// Lock b.mutex so that a new DBInstance is not created
+	b.mutex.Lock()
+	// Lock b.openDBsCacheMutex so that DBInstance is not retrieved from cache
+	b.openDBsCacheMutex.Lock()
+
+	// Lock all KVStores so that they can't be reopened by components that store references to them (e.g., StateDiff)
+	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
+		db.Lock()
+
+		return true
+	})
+}
+
+func (b *BucketManager) Unlock() {
+	b.mutex.Unlock()
+	b.openDBsCacheMutex.Unlock()
+
+	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
+		db.Unlock()
+
+		return true
+	})
+}
+
+func (b *BucketManager) CloseWithoutLocking() {
+	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
+		db.CloseWithoutLocking()
+		b.openDBsCache.Remove(epoch)
+
+		return true
+	})
+}
+
 func (b *BucketManager) Shutdown() {
 	b.openDBsCacheMutex.Lock()
 	defer b.openDBsCacheMutex.Unlock()

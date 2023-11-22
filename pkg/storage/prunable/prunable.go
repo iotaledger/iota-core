@@ -53,12 +53,12 @@ func Clone(source *Prunable, dbConfig database.Config, apiProvider iotago.APIPro
 	source.semiPermanentDB.Lock()
 	defer source.semiPermanentDB.Unlock()
 
-	source.prunableSlotStore.mutex.Lock()
-	defer source.prunableSlotStore.mutex.Unlock()
+	source.prunableSlotStore.Lock()
+	defer source.prunableSlotStore.Unlock()
 
 	// Close forked prunable storage before copying its contents.
 	source.semiPermanentDB.CloseWithoutLocking()
-	source.prunableSlotStore.Shutdown()
+	source.prunableSlotStore.CloseWithoutLocking()
 
 	// Copy the storage on disk to new location.
 	if err := copydir.Copy(source.prunableSlotStore.dbConfig.Directory, dbConfig.Directory); err != nil {
