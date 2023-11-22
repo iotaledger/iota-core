@@ -56,6 +56,8 @@ type TestSuite struct {
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
 	mutex                               syncutils.RWMutex
 	genesisKeyManager                   *mock.KeyManager
+
+	currentSlot iotago.SlotIndex
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
@@ -135,6 +137,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			}),
 		}
 		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
+		// TODO: set this to protocolParams.GenesisSlot() when this is added.
+		t.currentSlot = 0
 	})
 }
 
@@ -331,6 +335,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 
 	node := mock.NewNode(t.Testing, t.network, partition, name, validator, t.optsLogHandler)
 	t.nodes.Set(name, node)
+	node.SetCurrentSlot(t.currentSlot)
 
 	amount := mock.MinValidatorAccountAmount
 	if len(optAmount) > 0 {
@@ -363,7 +368,7 @@ func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, o
 func (t *TestSuite) AddValidatorNode(name string, optAmount ...iotago.BaseToken) *mock.Node {
 	node := t.addNodeToPartition(name, mock.NetworkMainPartition, true, optAmount...)
 	// create a wallet for each validator node which uses the validator account as a block issuer
-	t.addWallet(name, node, node.Validator.AccountID, node.KeyManager)
+	t.AddWallet(name, node, node.Validator.AccountID, node.KeyManager)
 
 	return node
 }
@@ -384,7 +389,7 @@ func (t *TestSuite) RemoveNode(name string) {
 // If no block issuance credits are provided, the wallet will be assigned half of the maximum block issuance credits.
 func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
 	accountID := tpkg.RandAccountID()
-	newWallet := t.addWallet(name, node, accountID, t.genesisKeyManager)
+	newWallet := t.AddWallet(name, node, accountID, t.genesisKeyManager)
 	var bic iotago.BlockIssuanceCredits
 	if len(blockIssuanceCredits) == 0 {
 		bic = iotago.MaxBlockIssuanceCredits / 2
@@ -407,10 +412,11 @@ func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuance
 	return newWallet
 }
 
-func (t *TestSuite) addWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager *mock.KeyManager) *mock.Wallet {
-	newWallet := mock.NewWallet(t.Testing, name, node, keyManager)
+func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*mock.KeyManager) *mock.Wallet {
+	newWallet := mock.NewWallet(t.Testing, name, node, keyManager...)
 	newWallet.SetBlockIssuer(accountID)
 	t.wallets.Set(name, newWallet)
+	newWallet.SetCurrentSlot(t.currentSlot)
 
 	return newWallet
 }
@@ -422,6 +428,23 @@ func (t *TestSuite) DefaultWallet() *mock.Wallet {
 	}
 
 	return defaultWallet
+}
+
+// Update the global time of the test suite and all nodes and wallets.
+func (t *TestSuite) SetCurrentSlot(slot iotago.SlotIndex) {
+	t.currentSlot = slot
+	t.nodes.ForEach(func(_ string, node *mock.Node) bool {
+		node.SetCurrentSlot(slot)
+		return true
+	})
+	t.wallets.ForEach(func(_ string, wallet *mock.Wallet) bool {
+		wallet.SetCurrentSlot(slot)
+		return true
+	})
+}
+
+func (t *TestSuite) CurrentSlot() iotago.SlotIndex {
+	return t.currentSlot
 }
 
 func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]options.Option[protocol.Protocol]) {

@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/topstakers"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -90,11 +91,14 @@ func TestConfirmationFlags(t *testing.T) {
 
 	// Slots 1-3: only node A is online and issues blocks, make slot 1 committed.
 	{
-		ts.IssueValidationBlockAtSlot("A.1.0", 1, genesisCommitment, nodeA, ts.BlockID("Genesis"))
-		ts.IssueValidationBlockAtSlot("A.1.1", 1, genesisCommitment, nodeA, ts.BlockID("A.1.0"))
-		ts.IssueValidationBlockAtSlot("A.2.0", 2, genesisCommitment, nodeA, ts.BlockID("A.1.1"))
-		ts.IssueValidationBlockAtSlot("A.2.1", 2, genesisCommitment, nodeA, ts.BlockID("A.2.0"))
-		ts.IssueValidationBlockAtSlot("A.3.0", 3, genesisCommitment, nodeA, ts.BlockID("A.2.1"))
+		ts.SetCurrentSlot(1)
+		ts.IssueValidationBlockWithHeaderOptions("A.1.0", nodeA, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("Genesis")...))
+		ts.IssueValidationBlockWithHeaderOptions("A.1.1", nodeA, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("A.1.0")...))
+		ts.SetCurrentSlot(2)
+		ts.IssueValidationBlockWithHeaderOptions("A.2.0", nodeA, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("A.1.1")...))
+		ts.IssueValidationBlockWithHeaderOptions("A.2.1", nodeA, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("A.2.0")...))
+		ts.SetCurrentSlot(3)
+		ts.IssueValidationBlockWithHeaderOptions("A.3.0", nodeA, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("A.2.1")...))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.1.0", "A.1.1", "A.2.0", "A.2.1", "A.3.0"), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.1.0", "A.1.1", "A.2.0", "A.2.1"), true, ts.Nodes()...)
@@ -104,10 +108,11 @@ func TestConfirmationFlags(t *testing.T) {
 
 		// Make slot 1 committed.
 		slot1CommittableSlot := 1 + ts.API.ProtocolParameters().MinCommittableAge()
+		ts.SetCurrentSlot(slot1CommittableSlot)
 		alias1A0 := fmt.Sprintf("A.%d.0", slot1CommittableSlot)
 		alias1A1 := fmt.Sprintf("A.%d.1", slot1CommittableSlot)
-		ts.IssueValidationBlockAtSlot(alias1A0, slot1CommittableSlot, genesisCommitment, nodeA, ts.BlockID("A.3.0"))
-		ts.IssueValidationBlockAtSlot(alias1A1, slot1CommittableSlot, genesisCommitment, nodeA, ts.BlockID(alias1A0))
+		ts.IssueValidationBlockWithHeaderOptions(alias1A0, nodeA, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs("A.3.0")...))
+		ts.IssueValidationBlockWithHeaderOptions(alias1A1, nodeA, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs(alias1A0)...))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks(alias1A0), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks("A.3.0"), true, ts.Nodes()...)
@@ -118,17 +123,17 @@ func TestConfirmationFlags(t *testing.T) {
 		)
 
 		// Issue in the next slot so that slot 2 becomes committed.
-
 		slot1Commitment := lo.PanicOnErr(nodeA.Protocol.Engines.Main.Get().Storage.Commitments().Load(1)).Commitment()
 		slot2CommittableSlot := slot1CommittableSlot + 1
+		ts.SetCurrentSlot(slot2CommittableSlot)
 		alias2A0 := fmt.Sprintf("A.%d.0", slot2CommittableSlot)
 		alias2A1 := fmt.Sprintf("A.%d.1", slot2CommittableSlot)
 		alias2A2 := fmt.Sprintf("A.%d.2", slot2CommittableSlot)
 		alias2B0 := fmt.Sprintf("B.%d.0", slot2CommittableSlot)
-		ts.IssueValidationBlockAtSlot(alias2A0, slot2CommittableSlot, genesisCommitment, nodeA, ts.BlockID(alias1A1))
-		ts.IssueValidationBlockAtSlot(alias2A1, slot2CommittableSlot, slot1Commitment, nodeA, ts.BlockID(alias2A0))
-		ts.IssueValidationBlockAtSlot(alias2B0, slot2CommittableSlot, slot1Commitment, nodeB, ts.BlockID(alias2A1))
-		ts.IssueValidationBlockAtSlot(alias2A2, slot2CommittableSlot, slot1Commitment, nodeA, ts.BlockID(alias2B0))
+		ts.IssueValidationBlockWithHeaderOptions(alias2A0, nodeA, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDs(alias1A1)...))
+		ts.IssueValidationBlockWithHeaderOptions(alias2A1, nodeA, mock.WithSlotCommitment(slot1Commitment), mock.WithStrongParents(ts.BlockIDs(alias2A0)...))
+		ts.IssueValidationBlockWithHeaderOptions(alias2B0, nodeB, mock.WithSlotCommitment(slot1Commitment), mock.WithStrongParents(ts.BlockIDs(alias2A1)...))
+		ts.IssueValidationBlockWithHeaderOptions(alias2A2, nodeA, mock.WithSlotCommitment(slot1Commitment), mock.WithStrongParents(ts.BlockIDs(alias2B0)...))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks(alias2A1, alias2B0), true, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.Blocks(alias1A1, alias2A0), true, ts.Nodes()...)
@@ -146,18 +151,17 @@ func TestConfirmationFlags(t *testing.T) {
 		)
 
 		// Confirm aliasA0 by pre-confirming a block a 3rd validator in the next slot.
-
 		slot2Commitment := lo.PanicOnErr(nodeA.Protocol.Engines.Main.Get().Storage.Commitments().Load(2)).Commitment()
 		slot3CommittableSlot := slot2CommittableSlot + 1
-
+		ts.SetCurrentSlot(slot3CommittableSlot)
 		alias3C0 := fmt.Sprintf("C.%d.0", slot3CommittableSlot)
 		alias3A0 := fmt.Sprintf("A.%d.0", slot3CommittableSlot)
 		alias3B0 := fmt.Sprintf("B.%d.0", slot3CommittableSlot)
 		alias3C1 := fmt.Sprintf("C.%d.1", slot3CommittableSlot)
-		ts.IssueValidationBlockAtSlot(alias3C0, slot3CommittableSlot, slot1Commitment, nodeC, ts.BlockID(alias2A2))
-		ts.IssueValidationBlockAtSlot(alias3A0, slot3CommittableSlot, slot2Commitment, nodeA, ts.BlockID(alias3C0))
-		ts.IssueValidationBlockAtSlot(alias3B0, slot3CommittableSlot, slot2Commitment, nodeB, ts.BlockID(alias3C0))
-		ts.IssueValidationBlockAtSlot(alias3C1, slot3CommittableSlot, slot1Commitment, nodeC, ts.BlockID(alias3C0))
+		ts.IssueValidationBlockWithHeaderOptions(alias3C0, nodeC, mock.WithSlotCommitment(slot1Commitment), mock.WithStrongParents(ts.BlockIDs(alias2A2)...))
+		ts.IssueValidationBlockWithHeaderOptions(alias3A0, nodeA, mock.WithSlotCommitment(slot2Commitment), mock.WithStrongParents(ts.BlockIDs(alias3C0)...))
+		ts.IssueValidationBlockWithHeaderOptions(alias3B0, nodeB, mock.WithSlotCommitment(slot2Commitment), mock.WithStrongParents(ts.BlockIDs(alias3C0)...))
+		ts.IssueValidationBlockWithHeaderOptions(alias3C1, nodeC, mock.WithSlotCommitment(slot1Commitment), mock.WithStrongParents(ts.BlockIDs(alias3C0)...))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("A.3.0", alias1A1, alias2A0, alias2A1, alias2A2, alias2B0, alias3C0), true, ts.Nodes()...)
 		ts.AssertBlocksInCachePreConfirmed(ts.Blocks("A.3.0", alias1A1, alias2A0, alias2A1, alias2A2, alias2B0, alias3C0), true, ts.Nodes()...)
@@ -188,12 +192,13 @@ func TestConfirmationFlags(t *testing.T) {
 
 		// Confirm C.5.0 -> slot 1 should not be finalized as there's no supermajority within slot 4 or slot 5.
 		slot4CommittableSlot := slot3CommittableSlot + 1
+		ts.SetCurrentSlot(slot4CommittableSlot)
 		alias4A0 := fmt.Sprintf("A.%d.0", slot4CommittableSlot)
 		alias4B0 := fmt.Sprintf("B.%d.0", slot4CommittableSlot)
 		alias4C0 := fmt.Sprintf("C.%d.0", slot4CommittableSlot)
-		ts.IssueValidationBlockAtSlot(alias4A0, slot4CommittableSlot, slot2Commitment, nodeA, ts.BlockIDs(alias3A0, alias3B0, alias3C1)...)
-		ts.IssueValidationBlockAtSlot(alias4B0, slot4CommittableSlot, slot2Commitment, nodeB, ts.BlockIDs(alias3A0, alias3B0, alias3C1)...)
-		ts.IssueValidationBlockAtSlot(alias4C0, slot4CommittableSlot, slot2Commitment, nodeC, ts.BlockIDs(alias3A0, alias3B0, alias3C1)...)
+		ts.IssueValidationBlockWithHeaderOptions(alias4A0, nodeA, mock.WithSlotCommitment(slot2Commitment), mock.WithStrongParents(ts.BlockIDs(alias3A0, alias3B0, alias3C1)...))
+		ts.IssueValidationBlockWithHeaderOptions(alias4B0, nodeB, mock.WithSlotCommitment(slot2Commitment), mock.WithStrongParents(ts.BlockIDs(alias3A0, alias3B0, alias3C1)...))
+		ts.IssueValidationBlockWithHeaderOptions(alias4C0, nodeC, mock.WithSlotCommitment(slot2Commitment), mock.WithStrongParents(ts.BlockIDs(alias3A0, alias3B0, alias3C1)...))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks(alias3A0, alias3B0, alias3C1), true, ts.Nodes()...)
 		ts.AssertBlocksInCachePreConfirmed(ts.Blocks(alias3A0, alias3B0, alias3C1), true, ts.Nodes()...)
@@ -215,9 +220,9 @@ func TestConfirmationFlags(t *testing.T) {
 		alias4A1 := fmt.Sprintf("A.%d.1", slot4CommittableSlot)
 		alias4B1 := fmt.Sprintf("B.%d.1", slot4CommittableSlot)
 		alias4C1 := fmt.Sprintf("C.%d.1", slot4CommittableSlot)
-		ts.IssueValidationBlockAtSlot(alias4A1, slot4CommittableSlot, slot2Commitment, nodeA, ts.BlockIDs(alias4A0, alias4B0, alias4C0)...)
-		ts.IssueValidationBlockAtSlot(alias4B1, slot4CommittableSlot, slot2Commitment, nodeB, ts.BlockIDs(alias4A0, alias4B0, alias4C0)...)
-		ts.IssueValidationBlockAtSlot(alias4C1, slot4CommittableSlot, slot2Commitment, nodeC, ts.BlockIDs(alias4A0, alias4B0, alias4C0)...)
+		ts.IssueValidationBlockWithHeaderOptions(alias4A1, nodeA, mock.WithSlotCommitment(slot2Commitment), mock.WithStrongParents(ts.BlockIDs(alias4A0, alias4B0, alias4C0)...))
+		ts.IssueValidationBlockWithHeaderOptions(alias4B1, nodeB, mock.WithSlotCommitment(slot2Commitment), mock.WithStrongParents(ts.BlockIDs(alias4A0, alias4B0, alias4C0)...))
+		ts.IssueValidationBlockWithHeaderOptions(alias4C1, nodeC, mock.WithSlotCommitment(slot2Commitment), mock.WithStrongParents(ts.BlockIDs(alias4A0, alias4B0, alias4C0)...))
 
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks(alias4A0, alias4B0, alias4C0), true, ts.Nodes()...)
 		ts.AssertBlocksInCachePreConfirmed(ts.Blocks(alias4A0, alias4B0, alias4C0), true, ts.Nodes()...)

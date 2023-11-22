@@ -86,8 +86,12 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *KeyManager, accountID
 	}, opts)
 }
 
+func (i *BlockIssuer) BlockIssuerKey() iotago.BlockIssuerKey {
+	return iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(i.PublicKey))
+}
+
 func (i *BlockIssuer) BlockIssuerKeys() iotago.BlockIssuerKeys {
-	return iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(i.PublicKey)))
+	return iotago.NewBlockIssuerKeys(i.BlockIssuerKey())
 }
 
 // Shutdown shuts down the block issuer.
