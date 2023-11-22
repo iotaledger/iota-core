@@ -37,32 +37,8 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.Chains.WithElements(func(chain *Chain) (teardown func()) {
-			return chain.RequestAttestations.WithValue(func(requestAttestations bool) (teardown func()) {
-				forkingPoint := chain.ForkingPoint.Get()
-
-				if commitmentBeforeForkingPoint := forkingPoint.Parent.Get(); commitmentBeforeForkingPoint != nil {
-					if err := a.createCommitmentVerifier(forkingPoint, chain, commitmentBeforeForkingPoint); err != nil {
-						a.commitmentVerifiers.Delete(forkingPoint.ID())
-					}
-				}
-
-				return func() {
-					a.commitmentVerifiers.Delete(forkingPoint.ID())
-				}
-			})
-			return chain.RequestAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
-				forkingPoint := chain.ForkingPoint.Get()
-				if !requestAttestations {
-					a.commitmentVerifiers.Delete(forkingPoint.ID())
-
-					return
-				}
-
-				if commitmentBeforeForkingPoint := forkingPoint.Parent.Get(); commitmentBeforeForkingPoint != nil {
-					if err := a.createCommitmentVerifier(forkingPoint, chain, commitmentBeforeForkingPoint); err != nil {
-						a.commitmentVerifiers.Delete(forkingPoint.ID())
-					}
-				}
+			return chain.RequestAttestations.WithNonEmptyValue(func(requestAttestations bool) (teardown func()) {
+				return a.setupCommitmentVerifier(chain)
 			})
 		})
 
@@ -84,14 +60,33 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 	return a
 }
 
-func (a *AttestationsProtocol) createCommitmentVerifier(forkingPoint *Commitment, chain *Chain, commitmentBeforeForkingPoint *Commitment) (err error) {
+func (a *AttestationsProtocol) setupCommitmentVerifier(chain *Chain) (teardown func()) {
+	forkingPoint := chain.ForkingPoint.Get()
+	if forkingPoint == nil {
+		a.LogError("failed to retrieve forking point", "chain", chain.LogName())
+
+		return nil
+	}
+
+	parentOfForkingPoint := forkingPoint.Parent.Get()
+	if parentOfForkingPoint == nil {
+		a.LogError("failed to retrieve parent of forking point", "chain", chain.LogName())
+
+		return nil
+	}
+
 	a.commitmentVerifiers.GetOrCreate(forkingPoint.ID(), func() (commitmentVerifier *CommitmentVerifier) {
-		commitmentVerifier, err = NewCommitmentVerifier(chain.Engine(), commitmentBeforeForkingPoint.Commitment)
+		commitmentVerifier, err := NewCommitmentVerifier(forkingPoint.Chain.Get().Engine(), parentOfForkingPoint.Commitment)
+		if err != nil {
+			a.LogError("failed to create commitment verifier", "chain", chain.LogName(), "error", err)
+		}
 
 		return commitmentVerifier
 	})
 
-	return err
+	return func() {
+		a.commitmentVerifiers.Delete(forkingPoint.ID())
+	}
 }
 
 func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
@@ -118,8 +113,8 @@ func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment
 			}
 
 			commitmentVerifier, exists := a.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
-			if !exists {
-				a.LogDebug("failed to find commitment verifier", "commitment", commitment.LogName())
+			if !exists || commitmentVerifier == nil {
+				a.LogDebug("failed to retrieve commitment verifier", "commitment", commitment.LogName())
 
 				return currentWeight
 			}
