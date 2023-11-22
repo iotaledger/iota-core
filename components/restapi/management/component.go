@@ -1,6 +1,7 @@
 package management
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -11,26 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-)
-
-const (
-	// RoutePeer is the route for getting peers by their peerID.
-	// GET returns the peer
-	// DELETE deletes the peer.
-	RoutePeer = "/peers/:" + restapipkg.ParameterPeerID
-
-	// RoutePeers is the route for getting all peers of the node.
-	// GET returns a list of all peers.
-	// POST adds a new peer.
-	RoutePeers = "/peers"
-
-	// RouteDatabasePrune is the route to manually prune the database.
-	// POST prunes the database.
-	RouteDatabasePrune = "/database/prune"
-
-	// RouteSnapshotsCreate is the route to manually create a snapshot files.
-	// POST creates a full snapshot.
-	RouteSnapshotsCreate = "/snapshots/create"
+	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
 func init() {
@@ -62,9 +44,13 @@ func configure() error {
 		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
 	}
 
-	routeGroup := deps.RestRouteManager.AddRoute("management/v1")
+	formatEndpoint := func(endpoint string, parameter string) string {
+		return fmt.Sprintf(endpoint, ":"+parameter)
+	}
 
-	routeGroup.GET(RoutePeer, func(c echo.Context) error {
+	routeGroup := deps.RestRouteManager.AddRoute(nodeclient.ManagementPluginName)
+
+	routeGroup.GET(formatEndpoint(nodeclient.ManagementEndpointPeer, restapipkg.ParameterPeerID), func(c echo.Context) error {
 		resp, err := getPeer(c)
 		if err != nil {
 			return err
@@ -73,7 +59,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.DELETE(RoutePeer, func(c echo.Context) error {
+	routeGroup.DELETE(formatEndpoint(nodeclient.ManagementEndpointPeer, restapipkg.ParameterPeerID), func(c echo.Context) error {
 		if err := removePeer(c); err != nil {
 			return err
 		}
@@ -81,7 +67,7 @@ func configure() error {
 		return c.NoContent(http.StatusNoContent)
 	})
 
-	routeGroup.GET(RoutePeers, func(c echo.Context) error {
+	routeGroup.GET(nodeclient.ManagementEndpointPeers, func(c echo.Context) error {
 		resp, err := listPeers(c)
 		if err != nil {
 			return err
@@ -90,7 +76,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.POST(RoutePeers, func(c echo.Context) error {
+	routeGroup.POST(nodeclient.ManagementEndpointPeers, func(c echo.Context) error {
 		resp, err := addPeer(c, Component.Logger())
 		if err != nil {
 			return err
@@ -99,7 +85,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.POST(RouteDatabasePrune, func(c echo.Context) error {
+	routeGroup.POST(nodeclient.ManagementEndpointDatabasePrune, func(c echo.Context) error {
 		resp, err := pruneDatabase(c)
 		if err != nil {
 			return err
@@ -108,7 +94,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.POST(RouteSnapshotsCreate, func(c echo.Context) error {
+	routeGroup.POST(nodeclient.ManagementEndpointSnapshotsCreate, func(c echo.Context) error {
 		resp, err := createSnapshots(c)
 		if err != nil {
 			return err

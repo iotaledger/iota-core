@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -16,131 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-)
-
-//nolint:goconst // don't care about the number of constants
-const (
-	// RouteInfo is the route for getting the node info.
-	// GET returns the node info.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteInfo = "/info"
-
-	// RouteBlockIssuance is the route for getting all needed information for block creation.
-	// GET returns the data needed toa attach block.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteBlockIssuance = "/blocks/issuance"
-
-	// RouteBlock is the route for getting a block by its blockID.
-	// GET returns the block based on the given type in the request "Accept" header.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteBlock = "/blocks/:" + restapipkg.ParameterBlockID
-
-	// RouteBlockMetadata is the route for getting block metadata by its blockID.
-	// GET returns block metadata.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteBlockMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/metadata"
-
-	// RouteBlockWithMetadata is the route for getting a block, together with its metadata by its blockID.
-	// GET returns the block and metadata.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteBlockWithMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/full"
-
-	// RouteBlocks is the route for sending new blocks.
-	// POST creates a single new block and returns the new block ID.
-	// The block is parsed based on the given type in the request "Content-Type" header.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteBlocks = "/blocks"
-
-	// RouteOutput is the route for getting an output by its outputID (transactionHash + outputIndex). This includes the proof, that the output corresponds to the requested outputID.
-	// GET returns the output based on the given type in the request "Accept" header.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteOutput = "/outputs/:" + restapipkg.ParameterOutputID
-
-	// RouteOutputMetadata is the route for getting output metadata by its outputID (transactionHash + outputIndex) without getting the output itself again.
-	// GET returns the output metadata.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteOutputMetadata = "/outputs/:" + restapipkg.ParameterOutputID + "/metadata"
-
-	// RouteOutputWithMetadata is the route for getting output, together with its metadata by its outputID (transactionHash + outputIndex).
-	// GET returns the output metadata.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteOutputWithMetadata = "/outputs/:" + restapipkg.ParameterOutputID + "/full"
-
-	// RouteTransactionsIncludedBlock is the route for getting the block that was first confirmed for a given transaction ID.
-	// GET returns the block based on the given type in the request "Accept" header.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteTransactionsIncludedBlock = "/transactions/:" + restapipkg.ParameterTransactionID + "/included-block"
-
-	// RouteTransactionsIncludedBlockMetadata is the route for getting the block metadata that was first confirmed in the ledger for a given transaction ID.
-	// GET returns block metadata (including info about "promotion/reattachment needed").
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteTransactionsIncludedBlockMetadata = "/transactions/:" + restapipkg.ParameterTransactionID + "/included-block/metadata"
-
-	// RouteCommitmentByID is the route for getting a slot commitment by its ID.
-	// GET returns the commitment.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteCommitmentByID = "/commitments/:" + restapipkg.ParameterCommitmentID
-
-	// RouteCommitmentByIDUTXOChanges is the route for getting all UTXO changes of a commitment by its ID.
-	// GET returns the output IDs of all UTXO changes.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteCommitmentByIDUTXOChanges = "/commitments/:" + restapipkg.ParameterCommitmentID + "/utxo-changes"
-
-	// RouteCommitmentByIndex is the route for getting a commitment by its Slot.
-	// GET returns the commitment.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteCommitmentByIndex = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex
-
-	// RouteCommitmentByIndexUTXOChanges is the route for getting all UTXO changes of a commitment by its Slot.
-	// GET returns the output IDs of all UTXO changes.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
-
-	// RouteCongestion is the route for getting the current congestion state and all account related useful details as block issuance credits.
-	// GET returns the congestion state related to the specified account address. (optional query parameters: "commitmentID" to specify the used commitment)
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteCongestion = "/accounts/:" + restapipkg.ParameterBech32Address + "/congestion"
-
-	// RouteValidators is the route for getting informations about the current validators.
-	// GET returns the paginated response with the list of validators.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteValidators = "/validators"
-
-	// RouteValidatorsAccount is the route for getting details about the validator by its account address.
-	// GET returns the validator details.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterBech32Address
-
-	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
-	// Rewards are decayed up to returned epochEnd index.
-	// GET returns the rewards.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteRewards = "/rewards/:" + restapipkg.ParameterOutputID
-
-	// RouteCommittee is the route for getting the current committee.
-	// GET returns the committee.
-	// MIMEApplicationJSON => json.
-	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteCommittee = "/committee"
+	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
 func init() {
@@ -178,15 +55,19 @@ func configure() error {
 		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
 	}
 
-	routeGroup := deps.RestRouteManager.AddRoute("core/v3")
+	formatEndpoint := func(endpoint string, parameter string) string {
+		return fmt.Sprintf(endpoint, ":"+parameter)
+	}
 
-	routeGroup.GET(RouteInfo, func(c echo.Context) error {
+	routeGroup := deps.RestRouteManager.AddRoute(nodeclient.CorePluginName)
+
+	routeGroup.GET(nodeclient.CoreEndpointInfo, func(c echo.Context) error {
 		resp := info()
 
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(RouteBlock, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointBlock, restapipkg.ParameterBlockID), func(c echo.Context) error {
 		resp, err := blockByID(c)
 		if err != nil {
 			return err
@@ -195,7 +76,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointBlockMetadata, restapipkg.ParameterBlockID), func(c echo.Context) error {
 		resp, err := blockMetadataByID(c)
 		if err != nil {
 			return err
@@ -204,7 +85,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteBlockWithMetadata, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointBlockWithMetadata, restapipkg.ParameterBlockID), func(c echo.Context) error {
 		resp, err := blockWithMetadataByID(c)
 		if err != nil {
 			return err
@@ -213,7 +94,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.POST(RouteBlocks, func(c echo.Context) error {
+	routeGroup.POST(nodeclient.CoreEndpointBlocks, func(c echo.Context) error {
 		resp, err := sendBlock(c)
 		if err != nil {
 			return err
@@ -223,7 +104,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusCreated, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteBlockIssuance, func(c echo.Context) error {
+	routeGroup.GET(nodeclient.CoreEndpointBlockIssuance, func(c echo.Context) error {
 		resp, err := blockIssuance()
 		if err != nil {
 			return err
@@ -232,7 +113,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteCommitmentByID, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointCommitmentByID, restapipkg.ParameterCommitmentID), func(c echo.Context) error {
 		commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
 		if err != nil {
 			return err
@@ -246,7 +127,7 @@ func configure() error {
 		return responseByHeader(c, commitment.Commitment())
 	})
 
-	routeGroup.GET(RouteCommitmentByIDUTXOChanges, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointCommitmentByIDUTXOChanges, restapipkg.ParameterCommitmentID), func(c echo.Context) error {
 		commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
 		if err != nil {
 			return err
@@ -266,7 +147,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(RouteCommitmentByIndex, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointCommitmentByIndex, restapipkg.ParameterSlotIndex), func(c echo.Context) error {
 		index, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
@@ -280,7 +161,7 @@ func configure() error {
 		return responseByHeader(c, commitment.Commitment())
 	})
 
-	routeGroup.GET(RouteCommitmentByIndexUTXOChanges, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointCommitmentByIndexUTXOChanges, restapipkg.ParameterSlotIndex), func(c echo.Context) error {
 		slot, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
@@ -299,7 +180,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(RouteOutput, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointOutput, restapipkg.ParameterOutputID), func(c echo.Context) error {
 		resp, err := outputByID(c)
 		if err != nil {
 			return err
@@ -308,7 +189,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(RouteOutputMetadata, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointOutputMetadata, restapipkg.ParameterOutputID), func(c echo.Context) error {
 		resp, err := outputMetadataByID(c)
 		if err != nil {
 			return err
@@ -317,7 +198,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(RouteOutputWithMetadata, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointOutputWithMetadata, restapipkg.ParameterOutputID), func(c echo.Context) error {
 		resp, err := outputWithMetadataByID(c)
 		if err != nil {
 			return err
@@ -326,7 +207,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(RouteTransactionsIncludedBlock, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointTransactionsIncludedBlock, restapipkg.ParameterTransactionID), func(c echo.Context) error {
 		block, err := blockByTransactionID(c)
 		if err != nil {
 			return err
@@ -335,7 +216,7 @@ func configure() error {
 		return responseByHeader(c, block.ProtocolBlock())
 	})
 
-	routeGroup.GET(RouteTransactionsIncludedBlockMetadata, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointTransactionsIncludedBlockMetadata, restapipkg.ParameterTransactionID), func(c echo.Context) error {
 		resp, err := blockMetadataFromTransactionID(c)
 		if err != nil {
 			return err
@@ -344,7 +225,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteCongestion, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointCongestion, restapipkg.ParameterBech32Address), func(c echo.Context) error {
 		resp, err := congestionByAccountAddress(c)
 		if err != nil {
 			return err
@@ -353,7 +234,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteValidators, func(c echo.Context) error {
+	routeGroup.GET(nodeclient.CoreEndpointValidators, func(c echo.Context) error {
 		resp, err := validators(c)
 		if err != nil {
 			return err
@@ -362,7 +243,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteValidatorsAccount, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointValidatorsAccount, restapipkg.ParameterBech32Address), func(c echo.Context) error {
 		resp, err := validatorByAccountAddress(c)
 		if err != nil {
 			return err
@@ -371,7 +252,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteRewards, func(c echo.Context) error {
+	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointRewards, restapipkg.ParameterOutputID), func(c echo.Context) error {
 		resp, err := rewardsByOutputID(c)
 		if err != nil {
 			return err
@@ -380,7 +261,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(RouteCommittee, func(c echo.Context) error {
+	routeGroup.GET(nodeclient.CoreEndpointCommittee, func(c echo.Context) error {
 		resp, err := selectedCommittee(c)
 		if err != nil {
 			return err
