@@ -16,14 +16,33 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
-	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
+func congestionByAccountAddress(c echo.Context) (*apimodels.CongestionResponse, error) {
+	commitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, restapipkg.ParameterCommitmentID)
 	if err != nil {
 		return nil, err
 	}
 
 	commitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+	if commitmentID != iotago.EmptyCommitmentID {
+		// a commitment ID was provided, so we use the commitment for that ID
+		commitment, err = getCommitmentByID(commitmentID, commitment)
+		if err != nil {
+			return nil, err
+		}
+	}
 
+	hrp := deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()
+	address, err := httpserver.ParseBech32AddressParam(c, hrp, restapipkg.ParameterBech32Address)
+	if err != nil {
+		return nil, err
+	}
+
+	accountAddress, ok := address.(*iotago.AccountAddress)
+	if !ok {
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(restapipkg.ParameterBech32Address))
+	}
+
+	accountID := accountAddress.AccountID()
 	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, commitment.Slot())
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)
@@ -95,13 +114,21 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	return resp, nil
 }
 
-func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
-	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
+func validatorByAccountAddress(c echo.Context) (*apimodels.ValidatorResponse, error) {
+	hrp := deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()
+	address, err := httpserver.ParseBech32AddressParam(c, hrp, restapipkg.ParameterBech32Address)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse account ID %s", c.Param(restapipkg.ParameterAccountID))
+		return nil, err
 	}
+
+	accountAddress, ok := address.(*iotago.AccountAddress)
+	if !ok {
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(restapipkg.ParameterBech32Address))
+	}
+
 	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
+	accountID := accountAddress.AccountID()
 	accountData, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)
@@ -109,6 +136,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	if !exists {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "account %s not found for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
+
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
 	active, err := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, nextEpoch)
@@ -117,7 +145,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	}
 
 	return &apimodels.ValidatorResponse{
-		AccountID:                      accountID,
+		AddressBech32:                  accountID.ToAddress().Bech32(deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()),
 		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 		ValidatorStake:                 accountData.ValidatorStake,
 		StakingEpochEnd:                accountData.StakeEndEpoch,
@@ -239,7 +267,7 @@ func selectedCommittee(c echo.Context) (*apimodels.CommitteeResponse, error) {
 	committee := make([]*apimodels.CommitteeMemberResponse, 0, accounts.Size())
 	accounts.ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
 		committee = append(committee, &apimodels.CommitteeMemberResponse{
-			AccountID:      accountID,
+			AddressBech32:  accountID.ToAddress().Bech32(deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()),
 			PoolStake:      seat.PoolStake,
 			ValidatorStake: seat.ValidatorStake,
 			FixedCost:      seat.FixedCost,

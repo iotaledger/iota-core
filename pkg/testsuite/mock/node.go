@@ -155,6 +155,13 @@ func (n *Node) hookEvents() {
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) { n.candidateEngineActivatedCount.Add(1) })
 
 	events.MainEngineSwitched.Hook(func(e *engine.Engine) { n.mainEngineSwitchedCount.Add(1) })
+
+	n.Protocol.Events.Engine.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+		n.mutex.Lock()
+		defer n.mutex.Unlock()
+
+		n.filteredBlockEvents = append(n.filteredBlockEvents, event)
+	})
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {

@@ -4,34 +4,59 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/inx-app/pkg/httpserver"
-	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
+	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-func indexByCommitmentID(c echo.Context) (iotago.SlotIndex, error) {
-	commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
-	if err != nil {
-		return iotago.SlotIndex(0), ierrors.Wrapf(err, "failed to parse commitment ID %s", c.Param(restapipkg.ParameterCommitmentID))
+func getCommitmentBySlot(slot iotago.SlotIndex, latestCommitment ...*model.Commitment) (*model.Commitment, error) {
+	var latest *model.Commitment
+	if len(latestCommitment) > 0 {
+		latest = latestCommitment[0]
+	} else {
+		latest = deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 	}
 
-	return commitmentID.Slot(), nil
-}
-
-func getCommitmentDetails(index iotago.SlotIndex) (*iotago.Commitment, error) {
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(index)
-	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment %d: %s", index, err)
+	if slot > latest.Slot() {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "commitment is from a future slot (%d > %d)", slot, latest.Slot())
 	}
 
-	return commitment.Commitment(), nil
+	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment, slot: %d, error: %w", slot, err)
+	}
+
+	return commitment, nil
 }
 
-func getUTXOChanges(slot iotago.SlotIndex) (*apimodels.UTXOChangesResponse, error) {
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(slot)
+func getCommitmentByID(commitmentID iotago.CommitmentID, latestCommitment ...*model.Commitment) (*model.Commitment, error) {
+	var latest *model.Commitment
+	if len(latestCommitment) > 0 {
+		latest = latestCommitment[0]
+	} else {
+		latest = deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+	}
+
+	if commitmentID.Slot() > latest.Slot() {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "commitment ID (%s) is from a future slot (%d > %d)", commitmentID, commitmentID.Slot(), latest.Slot())
+	}
+
+	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentID.Slot())
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs %d: %s", slot, err)
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
+	}
+
+	if commitment.ID() != commitmentID {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "commitment in the store for slot %d does not match the given commitmentID (%s != %s)", commitmentID.Slot(), commitment.ID(), commitmentID)
+	}
+
+	return commitment, nil
+}
+
+func getUTXOChanges(commitmentID iotago.CommitmentID) (*apimodels.UTXOChangesResponse, error) {
+	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(commitmentID.Slot())
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
 	}
 
 	createdOutputs := make(iotago.OutputIDs, len(diffs.Outputs))
@@ -46,7 +71,7 @@ func getUTXOChanges(slot iotago.SlotIndex) (*apimodels.UTXOChangesResponse, erro
 	}
 
 	return &apimodels.UTXOChangesResponse{
-		Slot:            slot,
+		CommitmentID:    commitmentID,
 		CreatedOutputs:  createdOutputs,
 		ConsumedOutputs: consumedOutputs,
 	}, nil

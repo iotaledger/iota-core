@@ -46,6 +46,12 @@ func (s *Server) ListenToBlocks(_ *inx.NoParams, srv inx.INX_ListenToBlocksServe
 
 	unhook := deps.Protocol.Events.Engine.Booker.BlockBooked.Hook(func(block *blocks.Block) {
 		payload := inx.NewBlockWithBytes(block.ID(), block.ModelBlock().Data())
+
+		if ctx.Err() != nil {
+			// context is done, so we don't need to send the payload
+			return
+		}
+
 		if err := srv.Send(payload); err != nil {
 			Component.LogErrorf("send error: %v", err)
 			cancel()
@@ -74,6 +80,13 @@ func (s *Server) ListenToAcceptedBlocks(_ *inx.NoParams, srv inx.INX_ListenToAcc
 		if err != nil {
 			Component.LogErrorf("get block metadata error: %v", err)
 			cancel()
+
+			return
+		}
+
+		if ctx.Err() != nil {
+			// context is done, so we don't need to send the payload
+			return
 		}
 
 		if err := srv.Send(payload); err != nil {
@@ -104,6 +117,13 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 		if err != nil {
 			Component.LogErrorf("get block metadata error: %v", err)
 			cancel()
+
+			return
+		}
+
+		if ctx.Err() != nil {
+			// context is done, so we don't need to send the payload
+			return
 		}
 
 		if err := srv.Send(payload); err != nil {

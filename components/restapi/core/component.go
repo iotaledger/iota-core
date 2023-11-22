@@ -44,6 +44,12 @@ const (
 	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteBlockMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/metadata"
 
+	// RouteBlockWithMetadata is the route for getting a block, together with its metadata by its blockID.
+	// GET returns the block and metadata.
+	// MIMEApplicationJSON => json.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
+	RouteBlockWithMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/full"
+
 	// RouteBlocks is the route for sending new blocks.
 	// POST creates a single new block and returns the new block ID.
 	// The block is parsed based on the given type in the request "Content-Type" header.
@@ -106,10 +112,10 @@ const (
 	RouteCommitmentByIndexUTXOChanges = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/utxo-changes"
 
 	// RouteCongestion is the route for getting the current congestion state and all account related useful details as block issuance credits.
-	// GET returns the congestion state related to the specified account.
+	// GET returns the congestion state related to the specified account address. (optional query parameters: "commitmentID" to specify the used commitment)
 	// MIMEApplicationJSON => json.
 	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteCongestion = "/accounts/:" + restapipkg.ParameterAccountID + "/congestion"
+	RouteCongestion = "/accounts/:" + restapipkg.ParameterBech32Address + "/congestion"
 
 	// RouteValidators is the route for getting informations about the current validators.
 	// GET returns the paginated response with the list of validators.
@@ -117,11 +123,11 @@ const (
 	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteValidators = "/validators"
 
-	// RouteValidatorsAccount is the route for getting details about the validator by its accountID.
+	// RouteValidatorsAccount is the route for getting details about the validator by its account address.
 	// GET returns the validator details.
 	// MIMEApplicationJSON => json.
 	// MIMEApplicationVendorIOTASerializerV2 => bytes.
-	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterAccountID
+	RouteValidatorsAccount = "/validators/:" + restapipkg.ParameterBech32Address
 
 	// RouteRewards is the route for getting the rewards for staking or delegation based on staking account or delegation output.
 	// Rewards are decayed up to returned epochEnd index.
@@ -181,16 +187,25 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteBlock, func(c echo.Context) error {
-		block, err := blockByID(c)
+		resp, err := blockByID(c)
 		if err != nil {
 			return err
 		}
 
-		return responseByHeader(c, block.ProtocolBlock())
+		return responseByHeader(c, resp)
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
 		resp, err := blockMetadataByID(c)
+		if err != nil {
+			return err
+		}
+
+		return responseByHeader(c, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteBlockWithMetadata, func(c echo.Context) error {
+		resp, err := blockWithMetadataByID(c)
 		if err != nil {
 			return err
 		}
@@ -209,9 +224,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteBlockIssuance, func(c echo.Context) error {
-		index, _ := httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
-
-		resp, err := blockIssuanceBySlot(index)
+		resp, err := blockIssuance()
 		if err != nil {
 			return err
 		}
@@ -220,26 +233,32 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteCommitmentByID, func(c echo.Context) error {
-		index, err := indexByCommitmentID(c)
+		commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
 		if err != nil {
 			return err
 		}
 
-		commitment, err := getCommitmentDetails(index)
+		commitment, err := getCommitmentByID(commitmentID)
 		if err != nil {
 			return err
 		}
 
-		return responseByHeader(c, commitment)
+		return responseByHeader(c, commitment.Commitment())
 	})
 
 	routeGroup.GET(RouteCommitmentByIDUTXOChanges, func(c echo.Context) error {
-		index, err := indexByCommitmentID(c)
+		commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChanges(index)
+		// load the commitment to check if it matches the given commitmentID
+		commitment, err := getCommitmentByID(commitmentID)
+		if err != nil {
+			return err
+		}
+
+		resp, err := getUTXOChanges(commitment.ID())
 		if err != nil {
 			return err
 		}
@@ -253,21 +272,26 @@ func configure() error {
 			return err
 		}
 
-		resp, err := getCommitmentDetails(index)
+		commitment, err := getCommitmentBySlot(index)
 		if err != nil {
 			return err
 		}
 
-		return responseByHeader(c, resp)
+		return responseByHeader(c, commitment.Commitment())
 	})
 
 	routeGroup.GET(RouteCommitmentByIndexUTXOChanges, func(c echo.Context) error {
-		index, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
+		slot, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
 		if err != nil {
 			return err
 		}
 
-		resp, err := getUTXOChanges(index)
+		commitment, err := getCommitmentBySlot(slot)
+		if err != nil {
+			return err
+		}
+
+		resp, err := getUTXOChanges(commitment.ID())
 		if err != nil {
 			return err
 		}
@@ -276,7 +300,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteOutput, func(c echo.Context) error {
-		resp, err := getOutput(c)
+		resp, err := outputByID(c)
 		if err != nil {
 			return err
 		}
@@ -285,7 +309,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteOutputMetadata, func(c echo.Context) error {
-		resp, err := getOutputMetadata(c)
+		resp, err := outputMetadataByID(c)
 		if err != nil {
 			return err
 		}
@@ -294,7 +318,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteOutputWithMetadata, func(c echo.Context) error {
-		resp, err := getOutputWithMetadata(c)
+		resp, err := outputWithMetadataByID(c)
 		if err != nil {
 			return err
 		}
@@ -321,7 +345,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteCongestion, func(c echo.Context) error {
-		resp, err := congestionForAccountID(c)
+		resp, err := congestionByAccountAddress(c)
 		if err != nil {
 			return err
 		}
@@ -339,7 +363,7 @@ func configure() error {
 	}, checkNodeSynced())
 
 	routeGroup.GET(RouteValidatorsAccount, func(c echo.Context) error {
-		resp, err := validatorByAccountID(c)
+		resp, err := validatorByAccountAddress(c)
 		if err != nil {
 			return err
 		}

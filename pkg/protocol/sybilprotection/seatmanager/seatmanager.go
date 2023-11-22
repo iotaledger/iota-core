@@ -33,7 +33,9 @@ type SeatManager interface {
 	OnlineCommittee() ds.Set[account.SeatIndex]
 
 	// SeatCount returns the number of seats in the SeatManager.
-	SeatCount() int
+	SeatCountInSlot(slot iotago.SlotIndex) int
+
+	SeatCountInEpoch(epoch iotago.EpochIndex) int
 
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface

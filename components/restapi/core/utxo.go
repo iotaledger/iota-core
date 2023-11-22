@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
-func getOutput(c echo.Context) (*apimodels.OutputResponse, error) {
+func outputByID(c echo.Context) (*apimodels.OutputResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
@@ -27,7 +27,7 @@ func getOutput(c echo.Context) (*apimodels.OutputResponse, error) {
 	}, nil
 }
 
-func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadata, error) {
+func outputMetadataByID(c echo.Context) (*apimodels.OutputMetadata, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
@@ -45,7 +45,7 @@ func getOutputMetadata(c echo.Context) (*apimodels.OutputMetadata, error) {
 	return newOutputMetadataResponse(output)
 }
 
-func getOutputWithMetadata(c echo.Context) (*apimodels.OutputWithMetadataResponse, error) {
+func outputWithMetadataByID(c echo.Context) (*apimodels.OutputWithMetadataResponse, error) {
 	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
@@ -93,7 +93,8 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 	}
 
 	includedSlotIndex := output.SlotBooked()
-	if includedSlotIndex <= latestCommitment.Slot() {
+	genesisSlot := deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot()
+	if includedSlotIndex <= latestCommitment.Slot() && includedSlotIndex >= genesisSlot {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlotIndex, err)
@@ -117,7 +118,8 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 	}
 
 	includedSlotIndex := spent.Output().SlotBooked()
-	if includedSlotIndex <= latestCommitment.Slot() {
+	genesisSlot := deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot()
+	if includedSlotIndex <= latestCommitment.Slot() && includedSlotIndex >= genesisSlot {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlotIndex, err)
@@ -126,7 +128,7 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadat
 	}
 
 	spentSlotIndex := spent.SlotSpent()
-	if spentSlotIndex <= latestCommitment.Slot() {
+	if spentSlotIndex <= latestCommitment.Slot() && spentSlotIndex >= genesisSlot {
 		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", spentSlotIndex, err)

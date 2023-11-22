@@ -35,7 +35,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 				10,
 				2,
 				4,
-				2,
+				5,
 			),
 		),
 	)
@@ -137,7 +137,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				10,
 				2,
 				4,
-				2,
+				5,
 			),
 		),
 	)

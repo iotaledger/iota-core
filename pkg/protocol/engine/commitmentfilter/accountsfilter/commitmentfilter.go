@@ -5,7 +5,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -19,9 +18,6 @@ type CommitmentFilter struct {
 
 	apiProvider iotago.APIProvider
 
-	// commitmentFunc is a function that returns the commitment corresponding to the given slot index.
-	commitmentFunc func(iotago.SlotIndex) (*model.Commitment, error)
-
 	rmcRetrieveFunc func(iotago.SlotIndex) (iotago.Mana, error)
 
 	accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (*accounts.AccountData, bool, error)
@@ -33,8 +29,6 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 	return module.Provide(func(e *engine.Engine) commitmentfilter.CommitmentFilter {
 		c := New(e, opts...)
 		e.HookConstructed(func() {
-			c.commitmentFunc = e.Storage.Commitments().Load
-
 			c.accountRetrieveFunc = e.Ledger.Account
 
 			e.Ledger.HookConstructed(func() {
