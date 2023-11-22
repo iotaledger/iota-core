@@ -94,7 +94,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			return
 		}
 
-		targetEngine := commitment.Engine()
+		targetEngine := commitment.SpawnedEngine()
 		if targetEngine == nil {
 			w.LogDebug("failed to get target engine for response", "commitment", commitment.LogName())
 
@@ -263,7 +263,7 @@ func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from
 			return
 		}
 
-		engineInstance := commitment.Engine()
+		engineInstance := commitment.SpawnedEngine()
 		if engineInstance == nil {
 			w.LogTrace("warp-sync request for chain without engine", "chain", chain.LogName(), "fromPeer", from)
 

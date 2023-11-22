@@ -3,6 +3,7 @@ package protocol
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
@@ -23,8 +24,8 @@ import (
 type Protocol struct {
 	Events               *Events
 	Workers              *workerpool.Group
+	Clock                reactive.Variable[time.Time]
 	Network              *core.Protocol
-	NetworkClock         *NetworkClock
 	Commitments          *Commitments
 	Chains               *Chains
 	BlocksProtocol       *BlocksProtocol
@@ -45,12 +46,12 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 	return options.Apply(&Protocol{
 		Events:         NewEvents(),
 		Workers:        workers,
+		Clock:          reactive.NewVariable[time.Time](maxTimeBeforeWallClock),
 		Options:        NewDefaultOptions(),
 		ReactiveModule: module.NewReactiveModule(logger),
 		EvictionState:  reactive.NewEvictionState[iotago.SlotIndex](),
 	}, opts, func(p *Protocol) {
 		p.Network = core.NewProtocol(networkEndpoint, workers.CreatePool("NetworkProtocol"), p)
-		p.NetworkClock = NewNetworkClock(p)
 		p.BlocksProtocol = NewBlocksProtocol(p)
 		p.CommitmentsProtocol = NewCommitmentsProtocol(p)
 		p.AttestationsProtocol = NewAttestationsProtocol(p)
@@ -64,6 +65,20 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 			// TODO: DECIDE ON DATA AVAILABILITY TIMESPAN / EVICTION STRATEGY
 			//p.Evict(rootCommitment.Slot() - 1)
 		})
+
+		stopClock := lo.Batch(
+			p.Network.OnBlockReceived(func(block *model.Block, src peer.ID) {
+				p.Clock.Set(block.ProtocolBlock().Header.IssuingTime)
+			}),
+
+			p.Chains.WithElements(func(chain *Chain) (teardown func()) {
+				return chain.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
+					return chain.LatestVerifiedCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
+						p.Clock.Set(spawnedEngine.LatestAPI().TimeProvider().SlotEndTime(latestCommitment.Slot()))
+					})
+				})
+			}),
+		)
 
 		p.Initialized.OnTrigger(func() {
 			unsubscribeFromNetwork := lo.Batch(
@@ -79,6 +94,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 			)
 
 			p.Shutdown.OnTrigger(func() {
+				stopClock()
 				unsubscribeFromNetwork()
 
 				p.BlocksProtocol.Shutdown()
@@ -120,4 +136,12 @@ func (p *Protocol) Run(ctx context.Context) error {
 	p.Stopped.Trigger()
 
 	return ctx.Err()
+}
+
+func maxTimeBeforeWallClock(currentValue time.Time, newValue time.Time) time.Time {
+	if newValue.Before(currentValue) || newValue.After(time.Now()) {
+		return currentValue
+	}
+
+	return newValue
 }

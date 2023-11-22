@@ -44,14 +44,14 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 		})
 
 		protocol.Chains.WithElements(func(chain *Chain) func() {
-			return chain.Engine.OnUpdate(func(_ *engine.Engine, engine *engine.Engine) {
+			return chain.SpawnedEngine.OnUpdate(func(_ *engine.Engine, engine *engine.Engine) {
 				unsubscribe := engine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
 
 				engine.Shutdown.OnTrigger(unsubscribe)
 			})
 		})
 
-		protocol.Chains.Main.Get().Engine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
+		protocol.Chains.Main.Get().SpawnedEngine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
 			if engine != nil {
 				unsubscribeOnEngineChange(func() (unsubscribe func()) {
 					return lo.Batch(
@@ -92,21 +92,11 @@ func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 		}
 
 		commitment := commitmentRequest.Result()
-		if commitment == nil {
+		if commitment == nil || !commitment.Chain.Get().DispatchBlock(block, from) {
 			if !b.droppedBlocksBuffer.Add(block.ProtocolBlock().Header.SlotCommitmentID, types.NewTuple(block, from)) {
 				b.LogError("failed to add dropped block referencing unsolid commitment to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
 			} else {
 				b.LogTrace("dropped block referencing unsolid commitment added to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
-			}
-
-			return
-		}
-
-		if !commitment.Chain.Get().DispatchBlock(block, from) {
-			if !b.droppedBlocksBuffer.Add(block.ProtocolBlock().Header.SlotCommitmentID, types.NewTuple(block, from)) {
-				b.LogError("afailed to add dropped block referencing unsolid commitment to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
-			} else {
-				b.LogTrace("adropped block referencing unsolid commitment added to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
 			}
 
 			return

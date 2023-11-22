@@ -79,8 +79,8 @@ func (c *Chains) initMainChain() {
 	c.protocol.LogTrace("initializing main chain")
 
 	mainChain := NewChain(c)
-	mainChain.VerifyState.Set(true)
-	mainChain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
+	mainChain.RequestBlocks.Set(true)
+	mainChain.SpawnedEngine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) { c.protocol.Events.Engine.LinkTo(newEngine.Events) })
 
 	c.Main.Set(mainChain)
 
@@ -90,17 +90,17 @@ func (c *Chains) initMainChain() {
 func (c *Chains) initChainSwitching() {
 	c.HeaviestClaimed.OnUpdate(func(prevHeaviestChain *Chain, heaviestChain *Chain) {
 		if prevHeaviestChain != nil {
-			prevHeaviestChain.VerifyAttestations.Set(false)
+			prevHeaviestChain.RequestAttestations.Set(false)
 		}
 
-		if !heaviestChain.VerifyState.Get() {
-			heaviestChain.VerifyAttestations.Set(true)
+		if !heaviestChain.RequestBlocks.Get() {
+			heaviestChain.RequestAttestations.Set(true)
 		}
 	})
 
 	c.HeaviestAttested.OnUpdate(func(_ *Chain, heaviestAttestedChain *Chain) {
-		heaviestAttestedChain.VerifyAttestations.Set(false)
-		heaviestAttestedChain.VerifyState.Set(true)
+		heaviestAttestedChain.RequestAttestations.Set(false)
+		heaviestAttestedChain.RequestBlocks.Set(true)
 	})
 
 	c.HeaviestVerified.OnUpdate(func(_ *Chain, heaviestVerifiedChain *Chain) {

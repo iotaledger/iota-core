@@ -58,9 +58,9 @@ func NewCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
 	}).initLogging(chains).initBehavior(chains)
 }
 
-func (c *Commitment) Engine() *engine.Engine {
+func (c *Commitment) SpawnedEngine() *engine.Engine {
 	if chain := c.Chain.Get(); chain != nil {
-		return chain.Engine.Get()
+		return chain.SpawnedEngine.Get()
 	}
 
 	return nil
@@ -149,7 +149,7 @@ func (c *Commitment) initBehavior(chains *Chains) (self *Commitment) {
 
 						c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, verifyAttestations bool, parentIsAttested bool, isAttested bool) bool {
 							return verifyAttestations && parentIsAttested && !isAttested
-						}, chain.VerifyAttestations, parent.IsAttested, c.IsAttested)),
+						}, chain.RequestAttestations, parent.IsAttested, c.IsAttested)),
 					)
 				}),
 			)

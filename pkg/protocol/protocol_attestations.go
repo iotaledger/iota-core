@@ -37,18 +37,31 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.Chains.WithElements(func(chain *Chain) (teardown func()) {
-			return chain.VerifyAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
+			return chain.RequestAttestations.WithValue(func(requestAttestations bool) (teardown func()) {
 				forkingPoint := chain.ForkingPoint.Get()
 
-				if requestAttestations {
-					if commitmentBeforeForkingPoint := forkingPoint.Parent.Get(); commitmentBeforeForkingPoint != nil {
-						a.commitmentVerifiers.GetOrCreate(forkingPoint.ID(), func() *CommitmentVerifier {
-							// TODO: HANDLE ERROR GRACEFULLY
-							return lo.PanicOnErr(NewCommitmentVerifier(chain.Engine.Get(), commitmentBeforeForkingPoint.Commitment))
-						})
+				if commitmentBeforeForkingPoint := forkingPoint.Parent.Get(); commitmentBeforeForkingPoint != nil {
+					if err := a.createCommitmentVerifier(forkingPoint, chain, commitmentBeforeForkingPoint); err != nil {
+						a.commitmentVerifiers.Delete(forkingPoint.ID())
 					}
-				} else {
+				}
+
+				return func() {
 					a.commitmentVerifiers.Delete(forkingPoint.ID())
+				}
+			})
+			return chain.RequestAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
+				forkingPoint := chain.ForkingPoint.Get()
+				if !requestAttestations {
+					a.commitmentVerifiers.Delete(forkingPoint.ID())
+
+					return
+				}
+
+				if commitmentBeforeForkingPoint := forkingPoint.Parent.Get(); commitmentBeforeForkingPoint != nil {
+					if err := a.createCommitmentVerifier(forkingPoint, chain, commitmentBeforeForkingPoint); err != nil {
+						a.commitmentVerifiers.Delete(forkingPoint.ID())
+					}
 				}
 			})
 		})
@@ -69,6 +82,16 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 	})
 
 	return a
+}
+
+func (a *AttestationsProtocol) createCommitmentVerifier(forkingPoint *Commitment, chain *Chain, commitmentBeforeForkingPoint *Commitment) (err error) {
+	a.commitmentVerifiers.GetOrCreate(forkingPoint.ID(), func() (commitmentVerifier *CommitmentVerifier) {
+		commitmentVerifier, err = NewCommitmentVerifier(chain.Engine(), commitmentBeforeForkingPoint.Commitment)
+
+		return commitmentVerifier
+	})
+
+	return err
 }
 
 func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
@@ -139,20 +162,20 @@ func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, 
 			return
 		}
 
-		engineInstance := commitment.Engine()
-		if engineInstance == nil {
+		spawnedEngine := commitment.SpawnedEngine()
+		if spawnedEngine == nil {
 			a.LogTrace("request for chain without engine", "chain", chain.LogName(), "fromPeer", from)
 
 			return
 		}
 
-		if engineInstance.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
+		if spawnedEngine.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
 			a.LogTrace("requested commitment not verified", "commitment", commitment.LogName(), "fromPeer", from)
 
 			return
 		}
 
-		commitmentModel, err := engineInstance.Storage.Commitments().Load(commitmentID.Slot())
+		commitmentModel, err := spawnedEngine.Storage.Commitments().Load(commitmentID.Slot())
 		if err != nil {
 			if !ierrors.Is(err, kvstore.ErrKeyNotFound) {
 				a.LogError("failed to load requested commitment from engine", "commitment", commitment.LogName(), "fromPeer", from, "err", err)
@@ -169,14 +192,14 @@ func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, 
 			return
 		}
 
-		attestations, err := engineInstance.Attestations.Get(commitmentID.Slot())
+		attestations, err := spawnedEngine.Attestations.Get(commitmentID.Slot())
 		if err != nil {
 			a.LogError("failed to load requested attestations", "commitment", commitment.LogName(), "fromPeer", from)
 
 			return
 		}
 
-		rootsStorage, err := engineInstance.Storage.Roots(commitmentID.Slot())
+		rootsStorage, err := spawnedEngine.Storage.Roots(commitmentID.Slot())
 		if err != nil {
 			a.LogError("failed to load roots storage for requested attestations", "commitment", commitment.LogName(), "fromPeer", from)
 
