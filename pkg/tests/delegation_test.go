@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -11,7 +12,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -189,10 +189,12 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 		mock.WithAllotAllManaToAccount(ts.CurrentSlot(), ts.DefaultWallet().BlockIssuer.AccountID),
 	)
 
-	block3 := ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
+	ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
 
 	ts.Wait(node1, node2)
 
+	// TODO: Assertions do not pass for node2 - why?
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx3.Transaction}, true, node1)
-	ts.AssertTransactionFailureReason(block3.ID(), apimodels.TxFailureRewardInputInvalid, node1)
+	signedTx3ID := lo.PanicOnErr(tx3.ID())
+	ts.AssertTransactionFailure(signedTx3ID, iotago.ErrRewardInputInvalid, node1)
 }

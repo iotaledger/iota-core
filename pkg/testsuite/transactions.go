@@ -1,6 +1,8 @@
 package testsuite
 
 import (
+	"errors"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -10,7 +12,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 func (t *TestSuite) AssertTransaction(transaction *iotago.Transaction, node *mock.Node) mempool.Transaction {
@@ -161,16 +162,17 @@ func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*
 	}
 }
 
-func (t *TestSuite) AssertTransactionFailureReason(blockID iotago.BlockID, txFailureReason apimodels.TransactionFailureReason, nodes ...*mock.Node) {
+func (t *TestSuite) AssertTransactionFailure(signedTxID iotago.SignedTransactionID, txFailureReason error, nodes ...*mock.Node) {
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			blockMetadata, err := node.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
-			if err != nil {
-				return ierrors.Errorf("%s: %w", node.Name, err)
+
+			txFailure, exists := node.TransactionFailure(signedTxID)
+			if !exists {
+				return ierrors.Errorf("%s: failure for signed transaction %s does not exist", node.Name, signedTxID)
 			}
 
-			if blockMetadata.TransactionFailureReason != txFailureReason {
-				return ierrors.Errorf("%s: expected tx failure reason %d, got %d", node.Name, txFailureReason, blockMetadata.TransactionFailureReason)
+			if !errors.Is(txFailure.Error, txFailureReason) {
+				return ierrors.Errorf("%s: expected tx failure reason %s, got %s", node.Name, txFailureReason, txFailure.Error)
 			}
 
 			return nil
