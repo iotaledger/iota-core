@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -25,7 +24,7 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 		switch id {
 		case accountIDOverflow:
 			return utxoledger.CreateOutput(
-				api.SingleVersionProvider(tpkg.TestAPI),
+				iotago.SingleVersionProvider(tpkg.TestAPI),
 				iotago.OutputIDFromTransactionIDAndIndex(iotago.NewTransactionID(0, tpkg.Rand32ByteArray()), 0),
 				tpkg.RandBlockID(),
 				tpkg.RandSlot(),
@@ -38,7 +37,7 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 			), nil
 		case accountIDRecentOutput:
 			return utxoledger.CreateOutput(
-				api.SingleVersionProvider(tpkg.TestAPI),
+				iotago.SingleVersionProvider(tpkg.TestAPI),
 				iotago.OutputIDFromTransactionIDAndIndex(iotago.NewTransactionID(1, tpkg.Rand32ByteArray()), 0),
 				tpkg.RandBlockID(),
 				tpkg.RandSlot(),
@@ -51,7 +50,7 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 			), nil
 		default:
 			return utxoledger.CreateOutput(
-				api.SingleVersionProvider(tpkg.TestAPI),
+				iotago.SingleVersionProvider(tpkg.TestAPI),
 				iotago.OutputIDFromTransactionIDAndIndex(iotago.NewTransactionID(0, tpkg.Rand32ByteArray()), 0),
 				tpkg.RandBlockID(),
 				tpkg.RandSlot(),
@@ -101,7 +100,7 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 		}
 	}
 
-	manager := NewManager(api.SingleVersionProvider(tpkg.TestAPI), outputRetriever, accountRetriever)
+	manager := NewManager(iotago.SingleVersionProvider(tpkg.TestAPI), outputRetriever, accountRetriever)
 	manaDecayProvider := manager.apiProvider.LatestAPI().ManaDecayProvider()
 
 	// The value for this account will overflow because component values are too big.

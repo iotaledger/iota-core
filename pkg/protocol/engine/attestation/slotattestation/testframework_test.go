@@ -19,7 +19,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
@@ -78,7 +77,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		),
 	)
 
-	t.apiProvider = api.SingleVersionProvider(t.testAPI)
+	t.apiProvider = iotago.SingleVersionProvider(t.testAPI)
 
 	t.Instance = slotattestation.NewManager(
 		0,

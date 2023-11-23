@@ -22,7 +22,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -43,7 +42,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		T:      test,
 		blocks: shrinkingmap.New[string, *blocks.Block](),
 
-		SeatManager: mock.NewManualPOA(api.SingleVersionProvider(tpkg.TestAPI), epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)),
+		SeatManager: mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.TestAPI), epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)),
 	}
 
 	evictionState := eviction.NewState(mapdb.NewMapDB(), func(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
@@ -57,7 +56,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		return tpkg.TestAPI.ProtocolParameters().GenesisBlockID()
 	})
 
-	t.blockCache = blocks.New(evictionState, api.SingleVersionProvider(tpkg.TestAPI))
+	t.blockCache = blocks.New(evictionState, iotago.SingleVersionProvider(tpkg.TestAPI))
 	instance := thresholdblockgadget.New(t.blockCache, t.SeatManager, func(err error) {
 		fmt.Printf(">> Gadget.Error: %s\n", err)
 	})

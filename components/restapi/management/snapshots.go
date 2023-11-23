@@ -3,10 +3,10 @@ package management
 import (
 	"github.com/labstack/echo/v4"
 
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
-func createSnapshots(_ echo.Context) (*apimodels.CreateSnapshotsResponse, error) {
+func createSnapshots(_ echo.Context) (*api.CreateSnapshotsResponse, error) {
 	/*
 		if deps.SnapshotManager.IsSnapshotting() || deps.PruningManager.IsPruning() {
 			return nil, errors.WithMessage(echo.ErrServiceUnavailable, "node is already creating a snapshot or pruning is running")
