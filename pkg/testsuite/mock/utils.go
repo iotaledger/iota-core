@@ -1,16 +1,75 @@
 package mock
 
 import (
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
-const MinIssuerAccountAmount = iotago.BaseToken(372900)
-const MinValidatorAccountAmount = iotago.BaseToken(722800)
-const AccountConversionManaCost = iotago.Mana(1000000)
-const MaxBlockManaCost = iotago.Mana(1000000)
+func MinIssuerAccountAmount(protocolParameters iotago.ProtocolParameters) iotago.BaseToken {
+	// create a dummy account with a block issuer feature to calculate the storage score.
+	dummyAccountOutput := &iotago.AccountOutput{
+		Amount:         0,
+		Mana:           0,
+		AccountID:      iotago.EmptyAccountID,
+		FoundryCounter: 0,
+		UnlockConditions: iotago.AccountOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{
+				Address: &iotago.Ed25519Address{},
+			},
+		},
+		Features: iotago.AccountOutputFeatures{
+			&iotago.BlockIssuerFeature{
+				BlockIssuerKeys: iotago.BlockIssuerKeys{
+					&iotago.Ed25519PublicKeyBlockIssuerKey{},
+				},
+			},
+		},
+		ImmutableFeatures: iotago.AccountOutputImmFeatures{},
+	}
+	storageScoreStructure := iotago.NewStorageScoreStructure(protocolParameters.StorageScoreParameters())
+
+	return lo.PanicOnErr(storageScoreStructure.MinDeposit(dummyAccountOutput))
+}
+
+func MinValidatorAccountAmount(protocolParameters iotago.ProtocolParameters) iotago.BaseToken {
+	// create a dummy account with a staking and block issuer feature to calculate the storage score.
+	dummyAccountOutput := &iotago.AccountOutput{
+		Amount:         0,
+		Mana:           0,
+		AccountID:      iotago.EmptyAccountID,
+		FoundryCounter: 0,
+		UnlockConditions: iotago.AccountOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{
+				Address: &iotago.Ed25519Address{},
+			},
+		},
+		Features: iotago.AccountOutputFeatures{
+			&iotago.BlockIssuerFeature{
+				BlockIssuerKeys: iotago.BlockIssuerKeys{
+					&iotago.Ed25519PublicKeyBlockIssuerKey{},
+				},
+			},
+			&iotago.StakingFeature{},
+		},
+		ImmutableFeatures: iotago.AccountOutputImmFeatures{},
+	}
+	storageScoreStructure := iotago.NewStorageScoreStructure(protocolParameters.StorageScoreParameters())
+
+	return lo.PanicOnErr(storageScoreStructure.MinDeposit(dummyAccountOutput))
+}
+
+// TODO: add the correct formula later
+func AccountConversionManaCost(protocolParameters iotago.ProtocolParameters) iotago.Mana {
+	return iotago.Mana(1000000)
+}
+
+// TODO: add the correct formula later
+func MaxBlockManaCost(protocolParameters iotago.ProtocolParameters) iotago.Mana {
+	return iotago.Mana(1000000)
+}
 
 // TransactionBuilder options
 

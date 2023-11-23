@@ -27,6 +27,50 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
+func DefaultProtocolParameterOptions(networkName string) []options.Option[iotago.V3ProtocolParameters] {
+	return []options.Option[iotago.V3ProtocolParameters]{
+		iotago.WithNetworkOptions(
+			networkName,
+			"rms",
+		),
+		iotago.WithSupplyOptions(
+			1_000_0000,
+			100,
+			1,
+			10,
+			100,
+			100,
+			100,
+		),
+		iotago.WithRewardsOptions(8, 8, 31, 1154, 2, 1),
+		iotago.WithStakingOptions(1, 100, 1),
+
+		iotago.WithTimeProviderOptions(
+			0,
+			GenesisTimeWithOffsetBySlots(0, DefaultSlotDurationInSeconds),
+			DefaultSlotDurationInSeconds,
+			DefaultSlotsPerEpochExponent,
+		),
+		iotago.WithLivenessOptions(
+			DefaultLivenessThresholdLowerBoundInSeconds,
+			DefaultLivenessThresholdUpperBoundInSeconds,
+			DefaultMinCommittableAge,
+			DefaultMaxCommittableAge,
+			DefaultEpochNearingThreshold,
+		),
+		iotago.WithCongestionControlOptions(
+			DefaultMinReferenceManaCost,
+			DefaultRMCIncrease,
+			DefaultRMCDecrease,
+			DefaultRMCIncreaseThreshold,
+			DefaultRMCDecreaseThreshold,
+			DefaultSchedulerRate,
+			DefaultMaxBufferSize,
+			DefaultMaxValBufferSize,
+		),
+	}
+}
+
 type TestSuite struct {
 	Testing     *testing.T
 	fakeTesting *testing.T
@@ -74,49 +118,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 
-		defaultProtocolParameters := []options.Option[iotago.V3ProtocolParameters]{
-			iotago.WithNetworkOptions(
-				testingT.Name(),
-				"rms",
-			),
-			iotago.WithSupplyOptions(
-				1_000_0000,
-				100,
-				1,
-				10,
-				100,
-				100,
-				100,
-			),
-			iotago.WithRewardsOptions(8, 8, 31, 1154, 2, 1),
-			iotago.WithStakingOptions(1, 100, 1),
-
-			iotago.WithTimeProviderOptions(
-				0,
-				GenesisTimeWithOffsetBySlots(0, DefaultSlotDurationInSeconds),
-				DefaultSlotDurationInSeconds,
-				DefaultSlotsPerEpochExponent,
-			),
-			iotago.WithLivenessOptions(
-				DefaultLivenessThresholdLowerBoundInSeconds,
-				DefaultLivenessThresholdUpperBoundInSeconds,
-				DefaultMinCommittableAge,
-				DefaultMaxCommittableAge,
-				DefaultEpochNearingThreshold,
-			),
-			iotago.WithCongestionControlOptions(
-				DefaultMinReferenceManaCost,
-				DefaultRMCIncrease,
-				DefaultRMCDecrease,
-				DefaultRMCIncreaseThreshold,
-				DefaultRMCDecreaseThreshold,
-				DefaultSchedulerRate,
-				DefaultMaxBufferSize,
-				DefaultMaxValBufferSize,
-			),
-		}
-
-		t.ProtocolParameterOptions = append(defaultProtocolParameters, t.ProtocolParameterOptions...)
+		t.ProtocolParameterOptions = append(DefaultProtocolParameterOptions(testingT.Name()), t.ProtocolParameterOptions...)
 		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(t.ProtocolParameterOptions...))
 
 		genesisBlock := blocks.NewRootBlock(t.API.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(t.API).MustID(), time.Unix(t.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
@@ -332,7 +334,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	t.nodes.Set(name, node)
 	node.SetCurrentSlot(t.currentSlot)
 
-	amount := mock.MinValidatorAccountAmount
+	amount := mock.MinValidatorAccountAmount(t.API.ProtocolParameters())
 	if len(optAmount) > 0 {
 		amount = optAmount[0]
 	}
@@ -395,8 +397,8 @@ func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuance
 	accountDetails := snapshotcreator.AccountDetails{
 		AccountID:            accountID,
 		Address:              iotago.Ed25519AddressFromPubKey(newWallet.BlockIssuer.PublicKey),
-		Amount:               mock.MinIssuerAccountAmount,
-		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount),
+		Amount:               mock.MinIssuerAccountAmount(t.API.ProtocolParameters()),
+		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount(t.API.ProtocolParameters())),
 		IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newWallet.BlockIssuer.PublicKey)),
 		ExpirySlot:           iotago.MaxSlotIndex,
 		BlockIssuanceCredits: bic,

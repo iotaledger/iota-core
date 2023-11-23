@@ -19,11 +19,14 @@ import (
 func Test_TransitionAndDestroyAccount(t *testing.T) {
 	oldGenesisOutputKey := utils.RandBlockIssuerKey()
 
+	// TODO: remove this ugly workaround
+	dummyParameters := iotago.NewV3ProtocolParameters(testsuite.DefaultProtocolParameterOptions("dummy")...)
+
 	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
 		// Nil address will be replaced with the address generated from genesis seed.
 		Address: nil,
 		// Set an amount enough to cover storage deposit and more issuer keys.
-		Amount: mock.MinIssuerAccountAmount * 10,
+		Amount: mock.MinIssuerAccountAmount(dummyParameters) * 10,
 		Mana:   0,
 		// AccountID is derived from this field, so this must be set uniquely for each account.
 		IssuerKey: oldGenesisOutputKey,
@@ -79,7 +82,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
-		ValidatorStake:  mock.MinValidatorAccountAmount,
+		ValidatorStake:  mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 	}, ts.Nodes()...)
 	// default wallet block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:3")
@@ -198,7 +201,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
-		ValidatorStake:  mock.MinValidatorAccountAmount,
+		ValidatorStake:  mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 	}, ts.Nodes()...)
 	// Default wallet block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:2")
@@ -222,7 +225,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		ts.DefaultWallet(),
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
 		mock.WithStakingFeature(10000, 421, 0, 10),
-		mock.WithAccountAmount(mock.MinIssuerAccountAmount),
+		mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
 	)
 
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
@@ -373,7 +376,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
-		ValidatorStake:  mock.MinValidatorAccountAmount,
+		ValidatorStake:  mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 	}, ts.Nodes()...)
 	// default wallet block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:2")
@@ -424,7 +427,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 			iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
 			iotago.MaxSlotIndex,
 		),
-		mock.WithAccountAmount(mock.MinIssuerAccountAmount),
+		mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
 	)
 	block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 	block2 := ts.IssueBasicBlockWithOptions("block2", newUserWallet, tx2, mock.WithStrongParents(latestParents...))
@@ -695,7 +698,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
-		ValidatorStake:  mock.MinValidatorAccountAmount,
+		ValidatorStake:  mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 	}, ts.Nodes()...)
 	// default wallet block issuer account.
 	wallet1AccountOutput := ts.AccountOutput("Genesis:2")
@@ -909,7 +912,7 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
-		ValidatorStake:  mock.MinValidatorAccountAmount,
+		ValidatorStake:  mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 	}, ts.Nodes()...)
 	// default wallet block issuer account.
 	wallet1AccountOutput := ts.AccountOutput("Genesis:2")

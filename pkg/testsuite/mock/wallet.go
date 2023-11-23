@@ -26,6 +26,8 @@ type Wallet struct {
 
 	keyManager *KeyManager
 
+	apiProvider iotago.APIProvider
+
 	BlockIssuer *BlockIssuer
 
 	outputs      map[string]*utxoledger.Output
