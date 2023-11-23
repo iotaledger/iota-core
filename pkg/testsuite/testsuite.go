@@ -395,9 +395,11 @@ func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuance
 	}
 
 	accountDetails := snapshotcreator.AccountDetails{
-		AccountID:            accountID,
-		Address:              iotago.Ed25519AddressFromPubKey(newWallet.BlockIssuer.PublicKey),
-		Amount:               mock.MinIssuerAccountAmount(t.API.ProtocolParameters()),
+		AccountID: accountID,
+		Address:   iotago.Ed25519AddressFromPubKey(newWallet.BlockIssuer.PublicKey),
+		// TODO: Temporary "fix" for the tests, lets fix this in another PR, so we can at least use the docker network again
+		//Amount:               mock.MinIssuerAccountAmount(t.API.ProtocolParameters()),
+		Amount:               mock.MinValidatorAccountAmount(t.API.ProtocolParameters()) + 800,
 		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount(t.API.ProtocolParameters())),
 		IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newWallet.BlockIssuer.PublicKey)),
 		ExpirySlot:           iotago.MaxSlotIndex,
