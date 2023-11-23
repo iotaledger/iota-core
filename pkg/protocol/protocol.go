@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"cmp"
 	"context"
 	"sync"
 	"time"
@@ -25,7 +26,7 @@ import (
 type Protocol struct {
 	Events               *Events
 	Workers              *workerpool.Group
-	Clock                reactive.Variable[time.Time]
+	LatestSeenSlot       reactive.Variable[iotago.SlotIndex]
 	Network              *core.Protocol
 	Commitments          *Commitments
 	Chains               *Chains
@@ -45,7 +46,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 	return options.Apply(&Protocol{
 		Events:         NewEvents(),
 		Workers:        workers,
-		Clock:          reactive.NewVariable[time.Time](maxTimeBeforeWallClock),
+		LatestSeenSlot: reactive.NewVariable[iotago.SlotIndex](increasing[iotago.SlotIndex]),
 		Options:        NewDefaultOptions(),
 		ReactiveModule: module.NewReactiveModule(logger),
 		EvictionState:  reactive.NewEvictionState[iotago.SlotIndex](),
@@ -72,19 +73,21 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 			}
 		})
 
-		stopClock := lo.Batch(
-			p.Network.OnBlockReceived(func(block *model.Block, src peer.ID) {
-				p.Clock.Set(block.ProtocolBlock().Header.IssuingTime)
-			}),
+		unsubscribeLatestSeenSlot := p.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (teardown func()) {
+			return lo.Batch(
+				p.Network.OnBlockReceived(func(block *model.Block, src peer.ID) {
+					p.LatestSeenSlot.Set(mainEngine.LatestAPI().TimeProvider().SlotFromTime(block.ProtocolBlock().Header.IssuingTime))
+				}),
 
-			p.Chains.WithElements(func(chain *Chain) (teardown func()) {
-				return chain.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
-					return chain.LatestProducedCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
-						p.Clock.Set(spawnedEngine.LatestAPI().TimeProvider().SlotEndTime(latestCommitment.Slot()))
+				p.Chains.WithElements(func(chain *Chain) (teardown func()) {
+					return chain.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
+						return chain.LatestProducedCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
+							p.LatestSeenSlot.Set(latestCommitment.Slot())
+						})
 					})
-				})
-			}),
-		)
+				}),
+			)
+		})
 
 		p.Initialized.OnTrigger(func() {
 			unsubscribeFromNetwork := lo.Batch(
@@ -101,7 +104,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 
 			p.Shutdown.OnTrigger(func() {
 				stopEvents()
-				stopClock()
+				unsubscribeLatestSeenSlot()
 				unsubscribeFromNetwork()
 
 				p.BlocksProtocol.Shutdown()
@@ -179,10 +182,6 @@ func (p *Protocol) LatestAPI() iotago.API {
 	return p.Engines.Main.Get().LatestAPI()
 }
 
-func maxTimeBeforeWallClock(currentValue time.Time, newValue time.Time) time.Time {
-	if newValue.Before(currentValue) || newValue.After(time.Now()) {
-		return currentValue
-	}
-
-	return newValue
+func increasing[T cmp.Ordered](currentValue T, newValue T) T {
+	return max(currentValue, newValue)
 }

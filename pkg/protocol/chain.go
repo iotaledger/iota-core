@@ -213,7 +213,7 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 					}
 
 					return latestNetworkSlot - warpSyncOffset
-				}, chains.LatestSlot)),
+				}, chains.protocol.LatestSeenSlot)),
 
 				c.OutOfSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestNetworkSlot iotago.SlotIndex) iotago.SlotIndex {
 					outOfSyncOffset := 2 * engine.LatestAPI().ProtocolParameters().MaxCommittableAge()
@@ -222,7 +222,7 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 					}
 
 					return latestNetworkSlot - outOfSyncOffset
-				}, chains.LatestSlot)),
+				}, chains.protocol.LatestSeenSlot)),
 			)
 		}),
 

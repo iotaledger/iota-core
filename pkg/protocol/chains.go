@@ -1,13 +1,9 @@
 package protocol
 
 import (
-	"time"
-
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Chains represents the set of chains that are managed by the protocol.
@@ -19,8 +15,6 @@ type Chains struct {
 	HeaviestClaimed  reactive.Variable[*Chain]
 	HeaviestAttested reactive.Variable[*Chain]
 	HeaviestVerified reactive.Variable[*Chain]
-
-	LatestSlot reactive.Variable[iotago.SlotIndex]
 
 	protocol *Protocol
 
@@ -35,7 +29,6 @@ func newChains(protocol *Protocol) *Chains {
 		HeaviestClaimed:  reactive.NewVariable[*Chain](),
 		HeaviestAttested: reactive.NewVariable[*Chain](),
 		HeaviestVerified: reactive.NewVariable[*Chain](),
-		LatestSlot:       reactive.NewVariable[iotago.SlotIndex](),
 		protocol:         protocol,
 	}).initLogging(protocol).initBehavior(protocol)
 }
@@ -58,7 +51,6 @@ func (c *Chains) initLogging(protocol *Protocol) (self *Chains) {
 		c.HeaviestClaimed.LogUpdates(c, log.LevelTrace, "HeaviestClaimed", (*Chain).LogName),
 		c.HeaviestAttested.LogUpdates(c, log.LevelTrace, "HeaviestAttested", (*Chain).LogName),
 		c.HeaviestVerified.LogUpdates(c, log.LevelTrace, "HeaviestVerified", (*Chain).LogName),
-		c.LatestSlot.LogUpdates(c, log.LevelTrace, "LatestSlot"),
 
 		shutdownLogger,
 	)
@@ -69,6 +61,11 @@ func (c *Chains) initLogging(protocol *Protocol) (self *Chains) {
 }
 
 func (c *Chains) initBehavior(protocol *Protocol) (self *Chains) {
+	mainChain := newChain(c)
+	mainChain.RequestBlocks.Set(true)
+
+	c.Add(mainChain)
+
 	trackHeaviestChain := func(candidateVar reactive.Variable[*Chain], weightVar func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
 		return weightVar(candidate).OnUpdate(func(_ uint64, newWeight uint64) {
 			// if the weight of the candidate is higher than the current main chain
@@ -82,7 +79,9 @@ func (c *Chains) initBehavior(protocol *Protocol) (self *Chains) {
 		}, true)
 	}
 
-	_ = lo.Batch(
+	c.Main.Set(mainChain)
+
+	teardownBehavior := lo.Batch(
 		c.HeaviestClaimed.WithNonEmptyValue(func(heaviestClaimed *Chain) (teardown func()) {
 			return toggleTrue(heaviestClaimed.RequestAttestations)
 		}),
@@ -112,19 +111,12 @@ func (c *Chains) initBehavior(protocol *Protocol) (self *Chains) {
 			)
 		}),
 
-		protocol.Constructed.WithNonEmptyValue(func(_ bool) (teardown func()) {
-			return protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (teardown func()) {
-				return c.LatestSlot.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestNetworkTime time.Time) iotago.SlotIndex {
-					return mainEngine.LatestAPI().TimeProvider().SlotFromTime(latestNetworkTime)
-				}, protocol.Clock))
-			})
-		}),
+		func() {
+			c.Main.Set(nil)
+		},
 	)
 
-	mainChain := newChain(c)
-	mainChain.RequestBlocks.Set(true)
-	c.Main.Set(mainChain)
-	c.Add(mainChain)
+	c.protocol.Shutdown.OnTrigger(teardownBehavior)
 
 	return c
 }
