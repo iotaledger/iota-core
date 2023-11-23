@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	protocolpkg "github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func init() {
@@ -55,19 +54,15 @@ func configure() error {
 		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
 	}
 
-	formatEndpoint := func(endpoint string, parameter string) string {
-		return fmt.Sprintf(endpoint, ":"+parameter)
-	}
+	routeGroup := deps.RestRouteManager.AddRoute(api.CorePluginName)
 
-	routeGroup := deps.RestRouteManager.AddRoute(nodeclient.CorePluginName)
-
-	routeGroup.GET(nodeclient.CoreEndpointInfo, func(c echo.Context) error {
+	routeGroup.GET(api.CoreEndpointInfo, func(c echo.Context) error {
 		resp := info()
 
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointBlock, restapipkg.ParameterBlockID), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointBlock), func(c echo.Context) error {
 		resp, err := blockByID(c)
 		if err != nil {
 			return err
@@ -76,7 +71,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointBlockMetadata, restapipkg.ParameterBlockID), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointBlockMetadata), func(c echo.Context) error {
 		resp, err := blockMetadataByID(c)
 		if err != nil {
 			return err
@@ -85,7 +80,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointBlockWithMetadata, restapipkg.ParameterBlockID), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointBlockWithMetadata), func(c echo.Context) error {
 		resp, err := blockWithMetadataByID(c)
 		if err != nil {
 			return err
@@ -94,7 +89,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.POST(nodeclient.CoreEndpointBlocks, func(c echo.Context) error {
+	routeGroup.POST(api.CoreEndpointBlocks, func(c echo.Context) error {
 		resp, err := sendBlock(c)
 		if err != nil {
 			return err
@@ -104,7 +99,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusCreated, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(nodeclient.CoreEndpointBlockIssuance, func(c echo.Context) error {
+	routeGroup.GET(api.CoreEndpointBlockIssuance, func(c echo.Context) error {
 		resp, err := blockIssuance()
 		if err != nil {
 			return err
@@ -113,8 +108,8 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointCommitmentByID, restapipkg.ParameterCommitmentID), func(c echo.Context) error {
-		commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentByID), func(c echo.Context) error {
+		commitmentID, err := httpserver.ParseCommitmentIDParam(c, api.ParameterCommitmentID)
 		if err != nil {
 			return err
 		}
@@ -127,8 +122,8 @@ func configure() error {
 		return responseByHeader(c, commitment.Commitment())
 	})
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointCommitmentByIDUTXOChanges, restapipkg.ParameterCommitmentID), func(c echo.Context) error {
-		commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentByIDUTXOChanges), func(c echo.Context) error {
+		commitmentID, err := httpserver.ParseCommitmentIDParam(c, api.ParameterCommitmentID)
 		if err != nil {
 			return err
 		}
@@ -147,8 +142,8 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointCommitmentByIndex, restapipkg.ParameterSlotIndex), func(c echo.Context) error {
-		index, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentBySlot), func(c echo.Context) error {
+		index, err := httpserver.ParseSlotParam(c, api.ParameterSlot)
 		if err != nil {
 			return err
 		}
@@ -161,8 +156,8 @@ func configure() error {
 		return responseByHeader(c, commitment.Commitment())
 	})
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointCommitmentByIndexUTXOChanges, restapipkg.ParameterSlotIndex), func(c echo.Context) error {
-		slot, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentBySlotUTXOChanges), func(c echo.Context) error {
+		slot, err := httpserver.ParseSlotParam(c, api.ParameterSlot)
 		if err != nil {
 			return err
 		}
@@ -180,7 +175,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointOutput, restapipkg.ParameterOutputID), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutput), func(c echo.Context) error {
 		resp, err := outputByID(c)
 		if err != nil {
 			return err
@@ -189,7 +184,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointOutputMetadata, restapipkg.ParameterOutputID), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutputMetadata), func(c echo.Context) error {
 		resp, err := outputMetadataByID(c)
 		if err != nil {
 			return err
@@ -198,7 +193,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointOutputWithMetadata, restapipkg.ParameterOutputID), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointOutputWithMetadata), func(c echo.Context) error {
 		resp, err := outputWithMetadataByID(c)
 		if err != nil {
 			return err
@@ -207,7 +202,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointTransactionsIncludedBlock, restapipkg.ParameterTransactionID), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlock), func(c echo.Context) error {
 		block, err := blockByTransactionID(c)
 		if err != nil {
 			return err
@@ -216,7 +211,7 @@ func configure() error {
 		return responseByHeader(c, block.ProtocolBlock())
 	})
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointTransactionsIncludedBlockMetadata, restapipkg.ParameterTransactionID), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsIncludedBlockMetadata), func(c echo.Context) error {
 		resp, err := blockMetadataFromTransactionID(c)
 		if err != nil {
 			return err
@@ -225,7 +220,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointCongestion, restapipkg.ParameterBech32Address), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCongestion), func(c echo.Context) error {
 		resp, err := congestionByAccountAddress(c)
 		if err != nil {
 			return err
@@ -234,7 +229,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(nodeclient.CoreEndpointValidators, func(c echo.Context) error {
+	routeGroup.GET(api.CoreEndpointValidators, func(c echo.Context) error {
 		resp, err := validators(c)
 		if err != nil {
 			return err
@@ -243,7 +238,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointValidatorsAccount, restapipkg.ParameterBech32Address), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointValidatorsAccount), func(c echo.Context) error {
 		resp, err := validatorByAccountAddress(c)
 		if err != nil {
 			return err
@@ -252,7 +247,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(formatEndpoint(nodeclient.CoreEndpointRewards, restapipkg.ParameterOutputID), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointRewards), func(c echo.Context) error {
 		resp, err := rewardsByOutputID(c)
 		if err != nil {
 			return err
@@ -261,7 +256,7 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
-	routeGroup.GET(nodeclient.CoreEndpointCommittee, func(c echo.Context) error {
+	routeGroup.GET(api.CoreEndpointCommittee, func(c echo.Context) error {
 		resp, err := selectedCommittee(c)
 		if err != nil {
 			return err

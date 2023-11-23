@@ -58,21 +58,21 @@ require (
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
 	github.com/iotaledger/hive.go/ads v0.0.0-20231110191152-7135670285dc // indirect
-	github.com/iotaledger/hive.go/constraints v0.0.0-20231113110812-4ca2b6cc9a42 // indirect
+	github.com/iotaledger/hive.go/constraints v0.0.0-20231122112629-bdf1cc39fba7 // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231113110812-4ca2b6cc9a42 // indirect
-	github.com/iotaledger/hive.go/crypto v0.0.0-20231113110812-4ca2b6cc9a42 // indirect
+	github.com/iotaledger/hive.go/crypto v0.0.0-20231122112629-bdf1cc39fba7 // indirect
 	github.com/iotaledger/hive.go/ds v0.0.0-20231113110812-4ca2b6cc9a42 // indirect
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20231113110812-4ca2b6cc9a42 // indirect
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20231122112629-bdf1cc39fba7 // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20231110191152-7135670285dc // indirect
-	github.com/iotaledger/hive.go/lo v0.0.0-20231113110812-4ca2b6cc9a42 // indirect
+	github.com/iotaledger/hive.go/lo v0.0.0-20231122112629-bdf1cc39fba7 // indirect
 	github.com/iotaledger/hive.go/log v0.0.0-20231110191152-7135670285dc // indirect
 	github.com/iotaledger/hive.go/logger v0.0.0-20231113110812-4ca2b6cc9a42 // indirect
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231113110812-4ca2b6cc9a42 // indirect
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231122112629-bdf1cc39fba7 // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231113110812-4ca2b6cc9a42 // indirect
-	github.com/iotaledger/hive.go/stringify v0.0.0-20231113110812-4ca2b6cc9a42 // indirect
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231122193640-8819c43be9c6 // indirect
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231120082637-ccd5b8465251 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231123022049-52a0703d077f // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20231122112629-bdf1cc39fba7 // indirect
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231123103852-bb039cbab83b // indirect
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231123103318-f6ea945e2e98 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231123102955-eff367396512 // indirect
 	github.com/ipfs/boxo v0.13.1 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
@@ -178,7 +178,7 @@ require (
 	golang.org/x/time v0.4.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
 	gonum.org/v1/gonum v0.14.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20231106174013-bbf56f31fb17 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

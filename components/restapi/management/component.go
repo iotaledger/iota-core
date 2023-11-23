@@ -1,7 +1,6 @@
 package management
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -12,7 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func init() {
@@ -44,13 +43,9 @@ func configure() error {
 		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
 	}
 
-	formatEndpoint := func(endpoint string, parameter string) string {
-		return fmt.Sprintf(endpoint, ":"+parameter)
-	}
+	routeGroup := deps.RestRouteManager.AddRoute(api.ManagementPluginName)
 
-	routeGroup := deps.RestRouteManager.AddRoute(nodeclient.ManagementPluginName)
-
-	routeGroup.GET(formatEndpoint(nodeclient.ManagementEndpointPeer, restapipkg.ParameterPeerID), func(c echo.Context) error {
+	routeGroup.GET(api.EndpointWithEchoParameters(api.ManagementEndpointPeer), func(c echo.Context) error {
 		resp, err := getPeer(c)
 		if err != nil {
 			return err
@@ -59,7 +54,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.DELETE(formatEndpoint(nodeclient.ManagementEndpointPeer, restapipkg.ParameterPeerID), func(c echo.Context) error {
+	routeGroup.DELETE(api.EndpointWithEchoParameters(api.ManagementEndpointPeer), func(c echo.Context) error {
 		if err := removePeer(c); err != nil {
 			return err
 		}
@@ -67,7 +62,7 @@ func configure() error {
 		return c.NoContent(http.StatusNoContent)
 	})
 
-	routeGroup.GET(nodeclient.ManagementEndpointPeers, func(c echo.Context) error {
+	routeGroup.GET(api.ManagementEndpointPeers, func(c echo.Context) error {
 		resp, err := listPeers(c)
 		if err != nil {
 			return err
@@ -76,7 +71,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.POST(nodeclient.ManagementEndpointPeers, func(c echo.Context) error {
+	routeGroup.POST(api.ManagementEndpointPeers, func(c echo.Context) error {
 		resp, err := addPeer(c, Component.Logger())
 		if err != nil {
 			return err
@@ -85,7 +80,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.POST(nodeclient.ManagementEndpointDatabasePrune, func(c echo.Context) error {
+	routeGroup.POST(api.ManagementEndpointDatabasePrune, func(c echo.Context) error {
 		resp, err := pruneDatabase(c)
 		if err != nil {
 			return err
@@ -94,7 +89,7 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.POST(nodeclient.ManagementEndpointSnapshotsCreate, func(c echo.Context) error {
+	routeGroup.POST(api.ManagementEndpointSnapshotsCreate, func(c echo.Context) error {
 		resp, err := createSnapshots(c)
 		if err != nil {
 			return err
