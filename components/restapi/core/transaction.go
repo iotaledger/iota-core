@@ -58,3 +58,12 @@ func blockMetadataFromTransactionID(c echo.Context) (*apimodels.BlockMetadataRes
 
 	return blockMetadataByBlockID(blockID)
 }
+
+func transactionMetadataFromTransactionID(c echo.Context) (*apimodels.TransactionMetadataResponse, error) {
+	blockID, err := blockIDByTransactionID(c)
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID by transaction ID: %s", err)
+	}
+
+	return transactionMetadataByBlockID(blockID)
+}

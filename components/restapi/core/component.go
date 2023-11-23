@@ -87,6 +87,12 @@ const (
 	// MIMEApplicationVendorIOTASerializerV2 => bytes.
 	RouteTransactionsIncludedBlockMetadata = "/transactions/:" + restapipkg.ParameterTransactionID + "/included-block/metadata"
 
+	// RouteTransactionsMetadata is the route for getting the transaction metadata for a given transaction ID.
+	// GET returns transaction metadata.
+	// MIMEApplicationJSON => json.
+	// MIMEApplicationVendorIOTASerializerV2 => bytes.
+	RouteTransactionsMetadata = "/transactions/:" + restapipkg.ParameterTransactionID + "/metadata"
+
 	// RouteCommitmentByID is the route for getting a slot commitment by its ID.
 	// GET returns the commitment.
 	// MIMEApplicationJSON => json.
@@ -337,6 +343,15 @@ func configure() error {
 
 	routeGroup.GET(RouteTransactionsIncludedBlockMetadata, func(c echo.Context) error {
 		resp, err := blockMetadataFromTransactionID(c)
+		if err != nil {
+			return err
+		}
+
+		return responseByHeader(c, resp)
+	}, checkNodeSynced())
+
+	routeGroup.GET(RouteTransactionsMetadata, func(c echo.Context) error {
+		resp, err := transactionMetadataFromTransactionID(c)
 		if err != nil {
 			return err
 		}

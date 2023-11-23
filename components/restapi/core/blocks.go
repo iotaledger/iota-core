@@ -34,6 +34,20 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataRes
 	return blockMetadata.BlockMetadataResponse(), nil
 }
 
+func transactionMetadataByBlockID(blockID iotago.BlockID) (*apimodels.TransactionMetadataResponse, error) {
+	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
+	}
+
+	txMetadata, err := blockMetadata.TransactionMetadataResponse()
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "transaction not found: %s", err)
+	}
+
+	return txMetadata, nil
+}
+
 func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
 	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
 	if err != nil {
