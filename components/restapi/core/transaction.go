@@ -59,10 +59,22 @@ func blockMetadataFromTransactionID(c echo.Context) (*api.BlockMetadataResponse,
 }
 
 func transactionMetadataFromTransactionID(c echo.Context) (*api.TransactionMetadataResponse, error) {
-	blockID, err := blockIDByTransactionID(c)
+	txID, err := httpserver.ParseTransactionIDParam(c, api.ParameterTransactionID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID by transaction ID: %s", err)
+		return nil, ierrors.Wrapf(err, "failed to parse transaction ID %s", c.Param(api.ParameterTransactionID))
 	}
 
-	return transactionMetadataByBlockID(blockID)
+	blockID, err := blockIDFromTransactionID(txID)
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID by transaction ID: %v", err)
+	}
+
+	metadata, err := transactionMetadataByBlockID(blockID)
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to get transaction metadata: %v", err)
+	}
+
+	metadata.TransactionID = txID
+
+	return metadata, nil
 }

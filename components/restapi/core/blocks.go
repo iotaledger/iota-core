@@ -39,12 +39,7 @@ func transactionMetadataByBlockID(blockID iotago.BlockID) (*api.TransactionMetad
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
 	}
 
-	txMetadata, err := blockMetadata.TransactionMetadataResponse()
-	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "transaction not found: %s", err)
-	}
-
-	return txMetadata, nil
+	return blockMetadata.TransactionMetadataResponse()
 }
 
 func blockMetadataByID(c echo.Context) (*api.BlockMetadataResponse, error) {
