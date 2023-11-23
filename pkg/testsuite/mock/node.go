@@ -157,11 +157,11 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 }
 
 func (n *Node) hookEvents() {
-	n.Protocol.Chains.HeaviestAttested.OnUpdate(func(prevHeaviestAttestedChain *protocol.Chain, heaviestAttestedChain *protocol.Chain) {
-		if prevHeaviestAttestedChain != nil {
+	n.Protocol.Chains.HeaviestAttestedCandidate.OnUpdate(func(prevHeaviestAttestedCandidate *protocol.Chain, heaviestAttestedCandidate *protocol.Chain) {
+		if prevHeaviestAttestedCandidate != nil {
 			n.forkDetectedCount.Add(1)
 
-			heaviestAttestedChain.SpawnedEngine.OnUpdate(func(prevEngine *engine.Engine, newEngine *engine.Engine) {
+			heaviestAttestedCandidate.SpawnedEngine.OnUpdate(func(prevEngine *engine.Engine, newEngine *engine.Engine) {
 				n.candidateEngineActivatedCount.Add(1)
 			})
 		}

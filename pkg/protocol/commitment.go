@@ -114,7 +114,7 @@ func (c *Commitment) initBehavior(chains *Chains) (self *Commitment) {
 
 					if c != mainChild {
 						if chain == nil {
-							chain = chains.Fork(c)
+							chain = chains.forkChain(c)
 						}
 
 						return chain

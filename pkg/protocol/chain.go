@@ -78,8 +78,8 @@ type Chain struct {
 }
 
 // newChain creates a new chain instance.
-func newChain(chains *Chains) *Chain {
-	return (&Chain{
+func newChain(logger log.Logger, shutdownLogger func(), latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex]) *Chain {
+	c := &Chain{
 		ForkingPoint:             reactive.NewVariable[*Commitment](),
 		Parent:                   reactive.NewVariable[*Chain](),
 		Children:                 reactive.NewSet[*Chain](),
@@ -98,7 +98,16 @@ func newChain(chains *Chains) *Chain {
 		IsEvicted:                reactive.NewEvent(),
 
 		commitments: shrinkingmap.New[iotago.SlotIndex, *Commitment](),
-	}).initLogging(chains).initBehavior(chains)
+	}
+
+	shutdown := lo.Batch(
+		c.initLogger(logger, shutdownLogger),
+		c.initDerivedProperties(latestSeenSlot),
+	)
+
+	c.IsEvicted.OnTrigger(shutdown)
+
+	return c
 }
 
 // DispatchBlock dispatches the given block to the chain and its children.
@@ -165,12 +174,11 @@ func (c *Chain) LatestEngine() *engine.Engine {
 	return currentEngine
 }
 
-// initLogging initializes the logging of changes to the properties of this chain.
-func (c *Chain) initLogging(chains *Chains) (self *Chain) {
-	var shutdownLogger func()
-	c.Logger, shutdownLogger = chains.NewEntityLogger("")
+// initLogger initializes the Logger of this chain.
+func (c *Chain) initLogger(logger log.Logger, shutdownLogger func()) (teardown func()) {
+	c.Logger = logger
 
-	teardownLogging := lo.Batch(
+	return lo.Batch(
 		c.WarpSyncMode.LogUpdates(c, log.LevelTrace, "WarpSyncMode"),
 		c.WarpSyncThreshold.LogUpdates(c, log.LevelTrace, "WarpSyncThreshold"),
 		c.OutOfSyncThreshold.LogUpdates(c, log.LevelTrace, "OutOfSyncThreshold"),
@@ -187,94 +195,126 @@ func (c *Chain) initLogging(chains *Chains) (self *Chain) {
 
 		shutdownLogger,
 	)
-
-	c.IsEvicted.OnTrigger(teardownLogging)
-
-	return c
 }
 
-// initBehavior initializes the behavior of this chain by setting up the relations between its properties.
-func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
-	teardownBehavior := lo.Batch(
-		c.Parent.WithNonEmptyValue(func(parent *Chain) (teardown func()) {
-			parent.Children.Add(c)
-
-			return func() {
-				parent.Children.Delete(c)
-			}
-		}),
-
-		c.SpawnedEngine.WithNonEmptyValue(func(engine *engine.Engine) (teardown func()) {
-			return lo.Batch(
-				c.WarpSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestNetworkSlot iotago.SlotIndex) iotago.SlotIndex {
-					warpSyncOffset := engine.LatestAPI().ProtocolParameters().MaxCommittableAge()
-					if warpSyncOffset >= latestNetworkSlot {
-						return 0
-					}
-
-					return latestNetworkSlot - warpSyncOffset
-				}, chains.protocol.LatestSeenSlot)),
-
-				c.OutOfSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestNetworkSlot iotago.SlotIndex) iotago.SlotIndex {
-					outOfSyncOffset := 2 * engine.LatestAPI().ProtocolParameters().MaxCommittableAge()
-					if outOfSyncOffset >= latestNetworkSlot {
-						return 0
-					}
-
-					return latestNetworkSlot - outOfSyncOffset
-				}, chains.protocol.LatestSeenSlot)),
-			)
-		}),
+// initDerivedProperties initializes the behavior of this chain by setting up the relations between its properties.
+func (c *Chain) initDerivedProperties(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex]) (teardown func()) {
+	return lo.Batch(
+		c.deriveClaimedWeight(),
+		c.deriveVerifiedWeight(),
+		c.deriveLatestAttestedWeight(),
+		c.deriveWarpSyncMode(),
 
 		c.ForkingPoint.WithValue(func(forkingPoint *Commitment) (teardown func()) {
-			if forkingPoint == nil {
-				c.Parent.Set(nil)
-
-				return func() {}
-			}
-
-			return forkingPoint.Parent.WithValue(func(parentCommitment *Commitment) (teardown func()) {
-				if parentCommitment == nil {
-					c.Parent.Set(nil)
-
-					return func() {}
-				}
-
-				return c.Parent.InheritFrom(parentCommitment.Chain)
-			})
+			return c.deriveParent(forkingPoint)
 		}),
 
-		c.ClaimedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestCommitment *Commitment) uint64 {
-			if latestCommitment == nil {
-				return 0
-			}
-
-			return latestCommitment.CumulativeWeight()
-		}, c.LatestCommitment)),
-
-		c.VerifiedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestProducedCommitment *Commitment) uint64 {
-			if latestProducedCommitment == nil {
-				return 0
-			}
-
-			return latestProducedCommitment.CumulativeWeight()
-		}, c.LatestProducedCommitment)),
-
-		// the AttestedWeight is defined slightly different from the ClaimedWeight and VerifiedWeight, because it is not
-		// derived from a static value in the commitment but a dynamic value that is derived from the received
-		// attestations (which may change over time).
-		c.LatestAttestedCommitment.WithNonEmptyValue(func(latestAttestedCommitment *Commitment) (teardown func()) {
-			return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
+		c.Parent.WithNonEmptyValue(func(parent *Chain) (teardown func()) {
+			return parent.deriveChildren(c)
 		}),
 
-		c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSync bool, latestProducedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
-			return latestProducedCommitment != nil && lo.Cond(warpSync, latestProducedCommitment.ID().Slot() < warpSyncThreshold, latestProducedCommitment.ID().Slot() < outOfSyncThreshold)
-		}, c.LatestProducedCommitment, c.WarpSyncThreshold, c.OutOfSyncThreshold, c.WarpSyncMode.Get())),
+		c.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
+			return lo.Batch(
+				c.deriveWarpSyncThreshold(latestSeenSlot, spawnedEngine),
+				c.deriveOutOfSyncThreshold(latestSeenSlot, spawnedEngine),
+			)
+		}),
 	)
+}
 
-	c.IsEvicted.OnTrigger(teardownBehavior)
+// deriveWarpSyncMode defines how a chain determines whether it is in warp sync mode or not.
+func (c *Chain) deriveWarpSyncMode() func() {
+	return c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSyncMode bool, latestProducedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
+		// if we have no latest produced commitment, then the engine is not yet initialized and warp sync is disabled
+		if latestProducedCommitment == nil {
+			return false
+		}
 
-	return c
+		// if warp sync mode is enabled, keep it enabled until we are no longer below the warp sync threshold
+		if warpSyncMode {
+			return latestProducedCommitment.ID().Slot() < warpSyncThreshold
+		}
+
+		// if warp sync mode is disabled, enable it only if we fall below the out of sync threshold
+		return latestProducedCommitment.ID().Slot() < outOfSyncThreshold
+	}, c.LatestProducedCommitment, c.WarpSyncThreshold, c.OutOfSyncThreshold, c.WarpSyncMode.Get()))
+}
+
+// the AttestedWeight is defined slightly different from the ClaimedWeight and VerifiedWeight, because it is not
+// derived from a static value in the commitment but a dynamic value that is derived from the received
+// attestations (which may change over time).
+func (c *Chain) deriveLatestAttestedWeight() func() {
+	return c.LatestAttestedCommitment.WithNonEmptyValue(func(latestAttestedCommitment *Commitment) (teardown func()) {
+		return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
+	})
+}
+
+func (c *Chain) deriveVerifiedWeight() func() {
+	return c.VerifiedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestProducedCommitment *Commitment) uint64 {
+		if latestProducedCommitment == nil {
+			return 0
+		}
+
+		return latestProducedCommitment.CumulativeWeight()
+	}, c.LatestProducedCommitment))
+}
+
+func (c *Chain) deriveClaimedWeight() (teardown func()) {
+	return c.ClaimedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestCommitment *Commitment) uint64 {
+		if latestCommitment == nil {
+			return 0
+		}
+
+		return latestCommitment.CumulativeWeight()
+	}, c.LatestCommitment))
+}
+
+func (c *Chain) deriveChildren(child *Chain) func() {
+	c.Children.Add(child)
+
+	return func() {
+		c.Children.Delete(child)
+	}
+}
+
+func (c *Chain) deriveParent(forkingPoint *Commitment) func() {
+	if forkingPoint == nil {
+		c.Parent.Set(nil)
+
+		return nil
+	}
+
+	return forkingPoint.Parent.WithValue(func(parentCommitment *Commitment) (teardown func()) {
+		if parentCommitment == nil {
+			c.Parent.Set(nil)
+
+			return nil
+		}
+
+		return c.Parent.InheritFrom(parentCommitment.Chain)
+	})
+}
+
+func (c *Chain) deriveOutOfSyncThreshold(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex], spawnedEngine *engine.Engine) func() {
+	return c.OutOfSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
+		outOfSyncOffset := 2 * spawnedEngine.LatestAPI().ProtocolParameters().MaxCommittableAge()
+		if outOfSyncOffset >= latestSeenSlot {
+			return 0
+		}
+
+		return latestSeenSlot - outOfSyncOffset
+	}, latestSeenSlot))
+}
+
+func (c *Chain) deriveWarpSyncThreshold(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex], spawnedEngine *engine.Engine) func() {
+	return c.WarpSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
+		warpSyncOffset := spawnedEngine.LatestAPI().ProtocolParameters().MaxCommittableAge()
+		if warpSyncOffset >= latestSeenSlot {
+			return 0
+		}
+
+		return latestSeenSlot - warpSyncOffset
+	}, latestSeenSlot))
 }
 
 // registerCommitment registers the given commitment with this chain.
@@ -320,4 +360,18 @@ func (c *Chain) registerCommitment(newCommitment *Commitment) (unregister func()
 		c.LatestAttestedCommitment.Compute(resetToParent)
 		c.LatestProducedCommitment.Compute(resetToParent)
 	}
+}
+
+// claimedWeightVariable is a getter for the ClaimedWeight variable of this chain, which is internally used to be able
+// to "address" the variable across multiple chains in a generic way.
+func (c *Chain) claimedWeightVariable() reactive.Variable[uint64] {
+	return c.ClaimedWeight
+}
+
+func (c *Chain) verifiedWeightVariable() reactive.Variable[uint64] {
+	return c.VerifiedWeight
+}
+
+func (c *Chain) attestedWeightVariable() reactive.Variable[uint64] {
+	return c.AttestedWeight
 }
