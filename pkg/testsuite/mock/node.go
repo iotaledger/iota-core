@@ -71,6 +71,7 @@ type Node struct {
 
 	mutex               syncutils.RWMutex
 	attachedBlocks      []*blocks.Block
+	currentSlot         iotago.SlotIndex
 	filteredBlockEvents []*commitmentfilter.BlockFilteredEvent
 }
 
@@ -108,6 +109,10 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 		attachedBlocks: make([]*blocks.Block, 0),
 	}
+}
+
+func (n *Node) SetCurrentSlot(slot iotago.SlotIndex) {
+	n.currentSlot = slot
 }
 
 func (n *Node) IsValidator() bool {

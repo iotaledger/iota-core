@@ -21,7 +21,7 @@ var Base = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("default", "rms"),
-			iotago.WithSupplyOptions(4_600_000_000_000_000, 100, 1, 10, 100, 100, 100),
+			iotago.WithSupplyOptions(4_600_000_000_000_000, 250, 1, 1000, 100000, 500000, 100000),
 			iotago.WithTimeProviderOptions(0, 1696841745, 10, 13),
 			iotago.WithLivenessOptions(30, 30, 7, 14, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
@@ -132,7 +132,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("docker", "rms"),
-			iotago.WithSupplyOptions(4_600_000_000_000_000, 1, 1, 10, 100, 100, 100),
+			iotago.WithSupplyOptions(4_600_000_000_000_000, 250, 1, 1000, 100000, 500000, 100000),
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 13),
 			iotago.WithLivenessOptions(30, 30, 7, 14, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
@@ -241,7 +241,7 @@ var Feature = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("feature", "rms"),
-			iotago.WithSupplyOptions(4_600_000_000_000_000, 100, 1, 10, 100, 100, 100),
+			iotago.WithSupplyOptions(4_600_000_000_000_000, 250, 1, 1000, 100000, 500000, 100000),
 			iotago.WithTimeProviderOptions(666666, time.Now().Unix()-100_000, 10, 13), // Let's fix genesis at 10_000 slots back.
 			iotago.WithLivenessOptions(30, 30, 10, 20, 30),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
