@@ -19,7 +19,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -44,7 +43,7 @@ func NewTestSuite(test *testing.T) *TestSuite {
 
 	t := &TestSuite{
 		T:               test,
-		apiProvider:     api.SingleVersionProvider(testAPI),
+		apiProvider:     iotago.SingleVersionProvider(testAPI),
 		accounts:        make(map[string]iotago.AccountID),
 		blockIssuerKeys: make(map[string]iotago.BlockIssuerKey),
 		outputs:         make(map[string]iotago.OutputID),
