@@ -61,12 +61,16 @@ func MinValidatorAccountAmount(protocolParameters iotago.ProtocolParameters) iot
 	return lo.PanicOnErr(storageScoreStructure.MinDeposit(dummyAccountOutput))
 }
 
-// TODO: add the correct formula later
+// TODO: add the correct formula later.
+//
+//nolint:revive
 func AccountConversionManaCost(protocolParameters iotago.ProtocolParameters) iotago.Mana {
 	return iotago.Mana(1000000)
 }
 
-// TODO: add the correct formula later
+// TODO: add the correct formula later.
+//
+//nolint:revive
 func MaxBlockManaCost(protocolParameters iotago.ProtocolParameters) iotago.Mana {
 	return iotago.Mana(1000000)
 }

@@ -21,7 +21,7 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 	input := w.Output(inputName)
 
 	accountOutput := options.Apply(builder.NewAccountOutputBuilder(recipientWallet.Address(), input.BaseTokenAmount()).
-		Mana(MaxBlockManaCost(w.apiProvider.CommittedAPI().ProtocolParameters())),
+		Mana(MaxBlockManaCost(w.Node.Protocol.CommittedAPI().ProtocolParameters())),
 		opts).MustBuild()
 
 	outputStates := iotago.Outputs[iotago.Output]{accountOutput}
@@ -197,8 +197,8 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 	input := w.Output(inputName)
 
 	implicitAccountOutput := &iotago.BasicOutput{
-		Amount: MinIssuerAccountAmount(w.apiProvider.CommittedAPI().ProtocolParameters()),
-		Mana:   AccountConversionManaCost(w.apiProvider.CommittedAPI().ProtocolParameters()),
+		Amount: MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
+		Mana:   AccountConversionManaCost(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
 		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: recipientWallet.ImplicitAccountCreationAddress()},
 		},
@@ -206,8 +206,8 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 	}
 
 	remainderBasicOutput := &iotago.BasicOutput{
-		Amount: input.BaseTokenAmount() - MinIssuerAccountAmount(w.apiProvider.CommittedAPI().ProtocolParameters()),
-		Mana:   input.StoredMana() - AccountConversionManaCost(w.apiProvider.CommittedAPI().ProtocolParameters()),
+		Amount: input.BaseTokenAmount() - MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
+		Mana:   input.StoredMana() - AccountConversionManaCost(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
 		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: input.Output().UnlockConditionSet().Address().Address},
 		},
@@ -242,7 +242,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 		panic(fmt.Sprintf("output with alias %s is not an implicit account", inputName))
 	}
 
-	accountOutput := options.Apply(builder.NewAccountOutputBuilder(w.Address(), MinIssuerAccountAmount(w.apiProvider.CommittedAPI().ProtocolParameters())).
+	accountOutput := options.Apply(builder.NewAccountOutputBuilder(w.Address(), MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters())).
 		AccountID(iotago.AccountIDFromOutputID(input.OutputID())),
 		opts).MustBuild()
 
