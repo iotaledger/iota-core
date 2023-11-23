@@ -488,28 +488,48 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", inputName))
 	}
 
+	delegationEnd := inputDelegation.EndEpoch
+	// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
+	// "last epoch" for the rewards calculation.
+	if inputDelegation.DelegationID.Empty() {
+		apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
+		futureBoundedSlotIndex := w.currentSlot + apiForSlot.ProtocolParameters().MinCommittableAge()
+		delegationEnd = apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex) - iotago.EpochIndex(1)
+	}
+
 	rewardMana, _, _, err := w.Node.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
 		inputDelegation.ValidatorAddress.AccountID(),
 		inputDelegation.DelegatedAmount,
 		inputDelegation.StartEpoch,
-		inputDelegation.EndEpoch,
+		delegationEnd,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to calculate reward for output %s: %s", inputName, err))
 	}
+
+	// Create Basic Output where the reward will be put.
+	outputStates := iotago.Outputs[iotago.Output]{&iotago.BasicOutput{
+		Amount: input.BaseTokenAmount(),
+		Mana:   rewardMana,
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: w.Address()},
+		},
+		Features: iotago.BasicOutputFeatures{},
+	}}
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 
 		WithInputs(utxoledger.Outputs{input}),
 		WithRewardInput(
-			&iotago.RewardInput{Index: 1},
+			&iotago.RewardInput{Index: 0},
 			rewardMana,
 		),
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID),
+		WithOutputs(outputStates),
 	)
 
 	return signedTransaction
