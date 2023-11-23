@@ -40,7 +40,7 @@ func Test_TopStakersRotation(t *testing.T) {
 	ts.AddValidatorNode("node4", 1_000_003)
 	ts.AddValidatorNode("node5", 1_000_002)
 	ts.AddValidatorNode("node6", 1_000_001)
-	ts.AddGenesisWallet("default", node1)
+	ts.AddDefaultWallet(node1)
 
 	ts.AddNode("node7")
 

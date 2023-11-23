@@ -409,6 +409,23 @@ func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuance
 	return newWallet
 }
 
+const (
+	DefaultWallet = "defaultWallet"
+)
+
+func (t *TestSuite) AddDefaultWallet(node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
+	return t.AddGenesisWallet(DefaultWallet, node, blockIssuanceCredits...)
+}
+
+func (t *TestSuite) DefaultWallet() *mock.Wallet {
+	defaultWallet, exists := t.wallets.Get(DefaultWallet)
+	if !exists {
+		return nil
+	}
+
+	return defaultWallet
+}
+
 func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*mock.KeyManager) *mock.Wallet {
 	newWallet := mock.NewWallet(t.Testing, name, node, keyManager...)
 	newWallet.SetBlockIssuer(accountID)
@@ -416,15 +433,6 @@ func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.Acc
 	newWallet.SetCurrentSlot(t.currentSlot)
 
 	return newWallet
-}
-
-func (t *TestSuite) DefaultWallet() *mock.Wallet {
-	defaultWallet, exists := t.wallets.Get("default")
-	if !exists {
-		return nil
-	}
-
-	return defaultWallet
 }
 
 // Update the global time of the test suite and all nodes and wallets.
@@ -449,13 +457,13 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 	defer t.mutex.Unlock()
 
 	// Add default wallet by default when creating the first node.
-	if !t.wallets.Has("default") {
+	if !t.wallets.Has(DefaultWallet) {
 		_, node, exists := t.nodes.Head()
 		if !exists {
 			panic("at least one node is needed to create a default wallet")
 		}
 
-		t.AddGenesisWallet("default", node)
+		t.AddDefaultWallet(node)
 	}
 
 	// Create accounts for any block issuer nodes added before starting the network.
