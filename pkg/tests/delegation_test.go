@@ -3,12 +3,16 @@ package tests
 import (
 	"testing"
 
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/builder"
+	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -30,7 +34,6 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 			),
 		),
 	)
-	defer ts.Shutdown()
 
 	// Add a validator node to the network. This will add a validator account to the snapshot.
 	node1 := ts.AddValidatorNode("node1")
@@ -121,6 +124,7 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 // can be destroyed.
 func Test_Delegation_DestroyOutputWithoutRewards(t *testing.T) {
 	ts, node1, node2, latestParents := setupDelegationTestsuite(t)
+	defer ts.Shutdown()
 
 	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
 	accountAddress := tpkg.RandAccountAddress()
@@ -143,4 +147,66 @@ func Test_Delegation_DestroyOutputWithoutRewards(t *testing.T) {
 
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx3.Transaction}, true, node1, node2)
 	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx3.Transaction}, true, node1, node2)
+}
+
+func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
+	ts, node1, node2, latestParents := setupDelegationTestsuite(t)
+	defer ts.Shutdown()
+
+	// CREATE NFT FROM BASIC UTXO
+	block2Slot := ts.CurrentSlot()
+	input := ts.DefaultWallet().Output("TX1:1")
+	nftOutput := builder.NewNFTOutputBuilder(ts.DefaultWallet().Address(), input.BaseTokenAmount()).MustBuild()
+	tx2 := ts.DefaultWallet().CreateSignedTransactionWithOptions(
+		"TX2",
+		mock.WithInputs(utxoledger.Outputs{input}),
+		mock.WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
+		mock.WithAllotAllManaToAccount(ts.CurrentSlot(), ts.DefaultWallet().BlockIssuer.AccountID),
+	)
+
+	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
+
+	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
+
+	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
+	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
+
+	ts.DefaultWallet().ShowOutputs()
+
+	// ATTEMPT TO POINT REWARD INPUT TO AN NFT OUTPUT
+	inputNFT := ts.DefaultWallet().Output("TX2:0")
+	prevNFT := inputNFT.Output().Clone().(*iotago.NFTOutput)
+	nftOutput = builder.NewNFTOutputBuilderFromPrevious(prevNFT).NFTID(iotago.NFTIDFromOutputID(inputNFT.OutputID())).MustBuild()
+
+	tx3 := ts.DefaultWallet().CreateSignedTransactionWithOptions(
+		"TX3",
+		mock.WithInputs(utxoledger.Outputs{inputNFT}),
+		mock.WithRewardInput(
+			&iotago.RewardInput{Index: 0},
+			0,
+		),
+		mock.WithCommitmentInput(&iotago.CommitmentInput{
+			CommitmentID: ts.DefaultWallet().Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+		}),
+		mock.WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
+		mock.WithAllotAllManaToAccount(ts.CurrentSlot(), ts.DefaultWallet().BlockIssuer.AccountID),
+	)
+
+	block3 := ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
+
+	ts.Wait(node1, node2)
+
+	ts.AssertTransactionsExist([]*iotago.Transaction{tx3.Transaction}, true, node1)
+	ts.Eventually(func() error {
+		blockMetadata, err := node1.Protocol.MainEngineInstance().Retainer.BlockMetadata(block3.ID())
+		if err != nil {
+			return ierrors.Errorf("%s: %w", node1.Name, err)
+		}
+
+		if blockMetadata.TransactionFailureReason != apimodels.TxFailureRewardInputInvalid {
+			return ierrors.Errorf("%s: expected reward input invalid, got tx failure reason %d", node1.Name, blockMetadata.TransactionFailureReason)
+		}
+
+		return nil
+	})
 }

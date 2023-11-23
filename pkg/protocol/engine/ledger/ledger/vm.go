@@ -124,6 +124,8 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 			}
 
 			rewardInputSet[delegationID] = reward
+		default:
+			return nil, ierrors.Wrapf(iotago.ErrRewardInputInvalid, "reward input may only point to a delegation or account output")
 		}
 	}
 
