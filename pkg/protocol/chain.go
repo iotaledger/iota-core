@@ -1,8 +1,6 @@
 package protocol
 
 import (
-	"time"
-
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
@@ -46,9 +44,6 @@ type Chain struct {
 	// VerifiedWeight contains the verified weight of this chain which is derived from the cumulative weight of the
 	// latest verified commitment.
 	VerifiedWeight reactive.Variable[uint64]
-
-	// LatestNetworkSlot contains the latest network slot.
-	LatestNetworkSlot reactive.Variable[iotago.SlotIndex]
 
 	// WarpSyncMode contains a flag that indicates whether this chain is in warp sync mode.
 	WarpSyncMode reactive.Variable[bool]
@@ -95,7 +90,6 @@ func newChain(chains *Chains) *Chain {
 		AttestedWeight:           reactive.NewVariable[uint64](),
 		VerifiedWeight:           reactive.NewVariable[uint64](),
 		WarpSyncMode:             reactive.NewVariable[bool]().Init(true),
-		LatestNetworkSlot:        reactive.NewVariable[iotago.SlotIndex](),
 		WarpSyncThreshold:        reactive.NewVariable[iotago.SlotIndex](),
 		OutOfSyncThreshold:       reactive.NewVariable[iotago.SlotIndex](),
 		RequestAttestations:      reactive.NewVariable[bool](),
@@ -174,11 +168,10 @@ func (c *Chain) LatestEngine() *engine.Engine {
 // initLogging initializes the logging of changes to the properties of this chain.
 func (c *Chain) initLogging(chains *Chains) (self *Chain) {
 	var shutdownLogger func()
-	c.Logger, shutdownLogger = chains.protocol.NewEntityLogger("Chain")
+	c.Logger, shutdownLogger = chains.NewEntityLogger("")
 
 	teardownLogging := lo.Batch(
 		c.WarpSyncMode.LogUpdates(c, log.LevelTrace, "WarpSyncMode"),
-		c.LatestNetworkSlot.LogUpdates(c, log.LevelTrace, "LatestNetworkSlot"),
 		c.WarpSyncThreshold.LogUpdates(c, log.LevelTrace, "WarpSyncThreshold"),
 		c.OutOfSyncThreshold.LogUpdates(c, log.LevelTrace, "OutOfSyncThreshold"),
 		c.ForkingPoint.LogUpdates(c, log.LevelTrace, "ForkingPoint", (*Commitment).LogName),
@@ -213,10 +206,6 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 
 		c.SpawnedEngine.WithNonEmptyValue(func(engine *engine.Engine) (teardown func()) {
 			return lo.Batch(
-				c.LatestNetworkSlot.DeriveValueFrom(reactive.NewDerivedVariable(func(latestNetworkSlot iotago.SlotIndex, latestNetworkTime time.Time) iotago.SlotIndex {
-					return engine.LatestAPI().TimeProvider().SlotFromTime(latestNetworkTime)
-				}, chains.protocol.Clock)),
-
 				c.WarpSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestNetworkSlot iotago.SlotIndex) iotago.SlotIndex {
 					warpSyncOffset := engine.LatestAPI().ProtocolParameters().MaxCommittableAge()
 					if warpSyncOffset >= latestNetworkSlot {
@@ -224,7 +213,7 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 					}
 
 					return latestNetworkSlot - warpSyncOffset
-				}, c.LatestNetworkSlot)),
+				}, chains.LatestSlot)),
 
 				c.OutOfSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestNetworkSlot iotago.SlotIndex) iotago.SlotIndex {
 					outOfSyncOffset := 2 * engine.LatestAPI().ProtocolParameters().MaxCommittableAge()
@@ -233,7 +222,7 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 					}
 
 					return latestNetworkSlot - outOfSyncOffset
-				}, c.LatestNetworkSlot)),
+				}, chains.LatestSlot)),
 			)
 		}),
 

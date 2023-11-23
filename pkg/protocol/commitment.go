@@ -68,7 +68,7 @@ func (c *Commitment) SpawnedEngine() *engine.Engine {
 
 func (c *Commitment) initLogging(chains *Chains) (self *Commitment) {
 	var shutdownLogger func()
-	c.Logger, shutdownLogger = chains.protocol.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))
+	c.Logger, shutdownLogger = chains.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))
 
 	teardownLogging := lo.Batch(
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
