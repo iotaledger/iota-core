@@ -45,6 +45,8 @@ func newCommitments(protocol *Protocol) *Commitments {
 				})
 			})
 		})
+
+		protocol.Chains.WithElements(c.publishEngineCommitments)
 	})
 
 	return c
@@ -143,4 +145,46 @@ func (c *Commitments) setupCommitment(commitment *Commitment, slotEvictedEvent r
 			c.Delete(commitment)
 		})
 	}
+}
+
+func (c *Commitments) publishCommitment(chain *Chain, commitment *model.Commitment) (publishedCommitment *Commitment, published bool) {
+	publishedCommitment, published, err := c.Publish(commitment)
+	if err != nil {
+		panic(err) // this can never happen, but we panic to get a stack trace if it ever does
+	}
+
+	publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
+	publishedCommitment.IsAttested.Set(true)
+	publishedCommitment.IsVerified.Set(true)
+
+	if publishedCommitment.IsSolid.Get() {
+		publishedCommitment.setChain(chain)
+	}
+
+	return publishedCommitment, published
+}
+
+func (c *Commitments) publishEngineCommitments(chain *Chain) (unsubscribe func()) {
+	return chain.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
+		return spawnedEngine.Initialized.WithNonEmptyValue(func(_ bool) (teardown func()) {
+			forkingPoint, forkingPointUpdated := chain.ForkingPoint.DefaultTo(c.protocol.Commitments.Root.Get())
+			latestPublishedSlot := forkingPoint.Slot() - 1
+
+			if forkingPointUpdated {
+				forkingPoint.setChain(chain)
+
+				latestPublishedSlot++
+			}
+
+			return spawnedEngine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {
+				for ; latestPublishedSlot < latestCommitment.Slot(); latestPublishedSlot++ {
+					if commitmentToPublish, err := spawnedEngine.Storage.Commitments().Load(latestPublishedSlot + 1); err != nil {
+						spawnedEngine.LogError("failed to load commitment to publish from engine", "slot", latestPublishedSlot+1, "err", err)
+					} else {
+						c.publishCommitment(chain, commitmentToPublish)
+					}
+				}
+			})
+		})
+	})
 }

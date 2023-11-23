@@ -4,9 +4,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
-	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Chains represents the set of chains that are managed by the protocol.
@@ -51,8 +48,6 @@ func newChains(protocol *Protocol) *Chains {
 
 	c.WithElements(func(chain *Chain) (teardown func()) {
 		return lo.Batch(
-			c.publishEngineCommitments(chain),
-
 			trackHeaviestChain(c.HeaviestVerified, func(chain *Chain) reactive.Variable[uint64] { return chain.VerifiedWeight }, chain),
 			trackHeaviestChain(c.HeaviestAttested, func(chain *Chain) reactive.Variable[uint64] { return chain.AttestedWeight }, chain),
 			trackHeaviestChain(c.HeaviestClaimed, func(chain *Chain) reactive.Variable[uint64] { return chain.ClaimedWeight }, chain),
@@ -84,13 +79,6 @@ func (c *Chains) initMainChain() {
 }
 
 func (c *Chains) initChainSwitching() {
-	// only switch to the heaviest chain if the latest produced commitment is enough slots away from the forking point.
-	chainSwitchingCondition := func(heavierChain *Chain, latestProducedCommitment *Commitment) bool {
-		forkingPoint := heavierChain.ForkingPoint.Get()
-
-		return forkingPoint != nil && latestProducedCommitment != nil && (latestProducedCommitment.ID().Slot()-forkingPoint.ID().Slot()) > c.protocol.Options.ChainSwitchingThreshold
-	}
-
 	c.HeaviestClaimed.WithNonEmptyValue(func(heaviestClaimed *Chain) (teardown func()) {
 		return enable(heaviestClaimed.RequestAttestations)
 	})
@@ -99,68 +87,17 @@ func (c *Chains) initChainSwitching() {
 		return enable(heaviestAttested.RequestBlocks)
 	})
 
-	c.HeaviestVerified.WithNonEmptyValue(func(heaviestVerified *Chain) (teardown func()) {
-		return heaviestVerified.LatestProducedCommitment.OnUpdateOnce(func(_ *Commitment, latestProducedCommitment *Commitment) {
-			c.Main.Set(heaviestVerified)
-		}, func(_ *Commitment, latestProducedCommitment *Commitment) bool {
-			return chainSwitchingCondition(heaviestVerified, latestProducedCommitment)
-		})
-	})
-}
+	c.HeaviestVerified.WithNonEmptyValue(func(heavierChain *Chain) (teardown func()) {
+		// only switch to the heaviest chain if the latest produced commitment is enough slots away from the forking point.
+		chainSwitchingCondition := func(_ *Commitment, latestProducedCommitment *Commitment) bool {
+			forkingPoint := heavierChain.ForkingPoint.Get()
 
-func (c *Chains) publishEngineCommitments(chain *Chain) (unsubscribe func()) {
-	return chain.SpawnedEngine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnUpdate func(subscriptionFactory func() (unsubscribe func()))) {
-		if engine != nil {
-			var latestPublishedSlot iotago.SlotIndex
-
-			publishCommitment := func(commitment *model.Commitment) (publishedCommitment *Commitment, published bool) {
-				publishedCommitment, published, err := c.protocol.Commitments.Publish(commitment)
-				if err != nil {
-					panic(err) // this can never happen, but we panic to get a stack trace if it ever does
-				}
-
-				publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
-				publishedCommitment.IsAttested.Set(true)
-				publishedCommitment.IsVerified.Set(true)
-
-				latestPublishedSlot = commitment.Slot()
-
-				if publishedCommitment.IsSolid.Get() {
-					publishedCommitment.setChain(chain)
-				}
-
-				return publishedCommitment, published
-			}
-
-			unsubscribeOnUpdate(func() (unsubscribe func()) {
-				return engine.Ledger.HookInitialized(func() {
-					unsubscribeOnUpdate(func() (unsubscribe func()) {
-						if forkingPoint := chain.ForkingPoint.Get(); forkingPoint == nil {
-							// assign root commitment to main chain
-							rootCommitment := c.protocol.Commitments.Root.Get()
-							rootCommitment.setChain(chain)
-
-							chain.ForkingPoint.Set(rootCommitment)
-
-							latestPublishedSlot = rootCommitment.Slot()
-						} else {
-							latestPublishedSlot = forkingPoint.Slot() - 1
-						}
-
-						return engine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {
-							for latestPublishedSlot < latestCommitment.Slot() {
-								commitmentToPublish, err := engine.Storage.Commitments().Load(latestPublishedSlot + 1)
-								if err != nil {
-									panic(err) // this should never happen, but we panic to get a stack trace if it does
-								}
-
-								publishCommitment(commitmentToPublish)
-							}
-						})
-					})
-				})
-			})
+			return forkingPoint != nil && latestProducedCommitment != nil && (latestProducedCommitment.ID().Slot()-forkingPoint.ID().Slot()) > c.protocol.Options.ChainSwitchingThreshold
 		}
+
+		return heavierChain.LatestProducedCommitment.OnUpdateOnce(func(_ *Commitment, latestProducedCommitment *Commitment) {
+			c.Main.Set(heavierChain)
+		}, chainSwitchingCondition)
 	})
 }
 

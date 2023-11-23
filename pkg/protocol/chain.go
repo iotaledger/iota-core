@@ -204,6 +204,10 @@ func (c *Chain) initLogging(chains *Chains) (self *Chain) {
 func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 	teardownBehavior := lo.Batch(
 		c.Parent.WithNonEmptyValue(func(parent *Chain) (teardown func()) {
+			if parent == c {
+				c.LogError("WHAT IS GOING ON?!?")
+			}
+
 			parent.Children.Add(c)
 
 			return func() {
@@ -245,7 +249,7 @@ func (c *Chain) initBehavior(chains *Chains) (self *Chain) {
 			}
 
 			return forkingPoint.Parent.WithValue(func(parentCommitment *Commitment) (teardown func()) {
-				if parentCommitment == nil {
+				if parentCommitment == nil || parentCommitment.IsRoot.Get() {
 					c.Parent.Set(nil)
 
 					return func() {}
