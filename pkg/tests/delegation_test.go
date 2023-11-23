@@ -3,7 +3,6 @@ package tests
 import (
 	"testing"
 
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -171,8 +170,6 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
 	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
 
-	ts.DefaultWallet().ShowOutputs()
-
 	// ATTEMPT TO POINT REWARD INPUT TO AN NFT OUTPUT
 	inputNFT := ts.DefaultWallet().Output("TX2:0")
 	prevNFT := inputNFT.Output().Clone().(*iotago.NFTOutput)
@@ -197,16 +194,5 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 	ts.Wait(node1, node2)
 
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx3.Transaction}, true, node1)
-	ts.Eventually(func() error {
-		blockMetadata, err := node1.Protocol.MainEngineInstance().Retainer.BlockMetadata(block3.ID())
-		if err != nil {
-			return ierrors.Errorf("%s: %w", node1.Name, err)
-		}
-
-		if blockMetadata.TransactionFailureReason != apimodels.TxFailureRewardInputInvalid {
-			return ierrors.Errorf("%s: expected reward input invalid, got tx failure reason %d", node1.Name, blockMetadata.TransactionFailureReason)
-		}
-
-		return nil
-	})
+	ts.AssertTransactionFailureReason(block3.ID(), apimodels.TxFailureRewardInputInvalid, node1)
 }
