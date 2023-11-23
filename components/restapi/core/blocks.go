@@ -85,7 +85,7 @@ func blockIssuance() (*apimodels.IssuanceBlockHeaderResponse, error) {
 func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 	iotaBlock, err := httpserver.ParseRequestByHeader(c, deps.Protocol.CommittedAPI(), iotago.BlockFromBytes(deps.Protocol))
 	if err != nil {
-		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to parse request: %w", err)
+		return nil, err
 	}
 
 	blockID, err := deps.BlockHandler.AttachBlock(c.Request().Context(), iotaBlock)
