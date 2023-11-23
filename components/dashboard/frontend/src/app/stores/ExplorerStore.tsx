@@ -35,8 +35,6 @@ export class Block {
     shallowLikeChildren: Array<string>;
     solid: boolean;
     spendIDs: Array<string>;
-    addedSpendIDs: Array<string>;
-    subtractedSpendIDs: Array<string>;
     scheduled: boolean;
     booked: boolean;
     orphaned: boolean;
@@ -121,38 +119,6 @@ class PendingMana {
     timestamp: number;
 }
 
-class Spend {
-    id: string;
-    parents: Array<string>;
-    spendIDs: Array<string>;
-    confirmationState: number;
-}
-
-class SpendChildren {
-    spendID: string;
-    childSpends: Array<SpendChild>
-}
-
-class SpendChild {
-    spendID: string;
-    type: string;
-}
-
-class SpendSpend {
-    outputID: OutputID;
-    spendIDs: Array<string>;
-}
-
-class SpendSpends {
-    spendID: string;
-    spends: Array<SpendSpend>
-}
-
-class SpendVoters {
-    spendID: string;
-    voters: Array<string>
-}
-
 class SlotInfo {
     id: string;
     index: number;
@@ -200,10 +166,6 @@ export class ExplorerStore {
     @observable outputMetadata: OutputMetadata = null;
     @observable outputConsumers: OutputConsumers = null;
     @observable pendingMana: PendingMana = null;
-    @observable spend: Spend = null;
-    @observable spendChildren: SpendChildren = null;
-    @observable spendSpends: SpendSpends = null;
-    @observable spendVoters: SpendVoters = null;
     @observable tips: Tips = null;
     @observable slotInfo: SlotInfo = new SlotInfo;
 
@@ -347,30 +309,6 @@ export class ExplorerStore {
     }
 
     @action
-    getSpend = async (id: string) => {
-        const res = await this.fetchJson<never, Spend>("get", `/api/spend/${id}`)
-        this.spend = res;
-    }
-
-    @action
-    getSpendChildren = async (id: string) => {
-        const res = await this.fetchJson<never, SpendChildren>("get", `/api/spend/${id}/children`)
-        this.spendChildren = res;
-    }
-
-    @action
-    getSpendSpends = async (id: string) => {
-        const res = await this.fetchJson<never, SpendSpends>("get", `/api/spend/${id}/spends`)
-        this.spendSpends = res;
-    }
-
-    @action
-    getSpendVoters = async (id: string) => {
-        const res = await this.fetchJson<never, SpendVoters>("get", `/api/spend/${id}/voters`)
-        this.spendVoters = res;
-    }
-
-    @action
     getSlotInfo = async (id: string) => {
         const res = await this.fetchJson<never, SlotInfo>("get", `/api/slot/commitment/${id}`)
         this.slotInfo = res;
@@ -394,9 +332,6 @@ export class ExplorerStore {
         this.outputMetadata = null;
         this.outputConsumers = null;
         this.pendingMana = null;
-        this.spend = null;
-        this.spendChildren = null;
-        this.spendSpends = null;
         this.tips = null;
         this.slotInfo = new SlotInfo;
     };
@@ -412,8 +347,6 @@ export class ExplorerStore {
     updateBlock = (blk: Block) => {
         this.blk = blk;
         this.blk.spendIDs = this.blk.spendIDs ? this.blk.spendIDs : []
-        this.blk.addedSpendIDs = this.blk.addedSpendIDs ? this.blk.addedSpendIDs : []
-        this.blk.subtractedSpendIDs = this.blk.subtractedSpendIDs ? this.blk.subtractedSpendIDs : []
         this.blk.strongChildren = this.blk.strongChildren ? this.blk.strongChildren : []
         this.blk.weakChildren = this.blk.weakChildren ? this.blk.weakChildren : []
         this.blk.shallowLikeChildren = this.blk.shallowLikeChildren ? this.blk.shallowLikeChildren : []

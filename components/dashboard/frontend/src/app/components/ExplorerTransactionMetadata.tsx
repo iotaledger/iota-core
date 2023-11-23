@@ -4,7 +4,6 @@ import NodeStore from "../stores/NodeStore";
 import { inject, observer } from "mobx-react";
 import ExplorerStore from "../stores/ExplorerStore";
 import ListGroup from "react-bootstrap/ListGroup";
-// import {resolveBase58SpendID} from "../utils/spend";
 
 interface Props {
     nodeStore?: NodeStore;

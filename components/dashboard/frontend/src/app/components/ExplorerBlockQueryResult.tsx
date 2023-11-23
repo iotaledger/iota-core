@@ -13,7 +13,6 @@ import { Link } from 'react-router-dom';
 import { BasicPayload } from './BasicPayload'
 import { TransactionPayload } from './TransactionPayload'
 import { getPayloadType, PayloadType } from '../misc/Payload'
-import { resolveBase58SpendID } from "../utils/spend";
 import { FaucetPayload } from './FaucetPayload';
 import { TaggedDataPayload } from './TaggedDataPayload';
 
@@ -124,50 +123,14 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                         Sequence Number: {blk.sequenceNumber}
                                     </ListGroup.Item>
                                     <ListGroup.Item>
-                                        spendIDs:
+                                        SpendIDs:
                                         <ListGroup>
                                             {
                                                 blk.spendIDs.map((value, index) => {
                                                     return (
                                                         <ListGroup.Item key={"SpendID" + index + 1}
                                                             className="text-break">
-                                                            <Link to={`/explorer/spend/${value}`}>
-                                                                {resolveBase58SpendID(value)}
-                                                            </Link>
-                                                        </ListGroup.Item>
-                                                    )
-                                                })
-                                            }
-                                        </ListGroup>
-                                    </ListGroup.Item>
-                                    <ListGroup.Item>
-                                        AddedspendIDs:
-                                        <ListGroup>
-                                            {
-                                                blk.addedSpendIDs.map((value, index) => {
-                                                    return (
-                                                        <ListGroup.Item key={"AddedSpendID" + index + 1}
-                                                            className="text-break">
-                                                            <Link to={`/explorer/spend/${value}`}>
-                                                                {resolveBase58SpendID(value)}
-                                                            </Link>
-                                                        </ListGroup.Item>
-                                                    )
-                                                })
-                                            }
-                                        </ListGroup>
-                                    </ListGroup.Item>
-                                    <ListGroup.Item>
-                                        SubtractedspendIDs:
-                                        <ListGroup>
-                                            {
-                                                blk.subtractedSpendIDs.map((value, index) => {
-                                                    return (
-                                                        <ListGroup.Item key={"SubtractedSpendID" + index + 1}
-                                                            className="text-break">
-                                                            <Link to={`/explorer/spend/${value}`}>
-                                                                {resolveBase58SpendID(value)}
-                                                            </Link>
+                                                                {value}
                                                         </ListGroup.Item>
                                                     )
                                                 })

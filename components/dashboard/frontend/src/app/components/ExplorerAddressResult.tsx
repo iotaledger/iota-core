@@ -8,11 +8,9 @@ import {ExplorerStore, ExplorerOutput, OutputMetadata} from "../stores/ExplorerS
 import Spinner from "react-bootstrap/Spinner";
 import ListGroup from "react-bootstrap/ListGroup";
 import Alert from "react-bootstrap/Alert";
-import {Link} from 'react-router-dom';
 import {displayManaUnit} from "../utils";
 import {OutputType, outputToComponent, outputTypeToName} from "../utils/output";
 import {Button, ListGroupItem} from "react-bootstrap";
-import {resolveBase58SpendID as resolveBase58SpendID} from "../utils/spend";
 
 interface Props {
     nodeStore?: NodeStore;
@@ -222,15 +220,13 @@ class OutputMeta extends React.Component<omProps, any> {
         let pendingMana = this.props.pendingMana;
         return (
             <ListGroup>
-                spendIDs: 
+                SpendIDs: 
                 <ListGroup>
                     {
                         metadata.spendIDs.map((value, index) => {
                             return (
                                 <ListGroup.Item key={"SpendID" + index + 1} className="text-break">
-                                    <Link to={`/explorer/spend/${value}`}>
-                                        {resolveBase58SpendID(value)}
-                                    </Link>
+                                    {value}
                                 </ListGroup.Item>
                             )
                         })

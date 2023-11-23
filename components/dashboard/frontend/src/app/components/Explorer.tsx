@@ -8,7 +8,6 @@ import {ExplorerSearchbar} from "./ExplorerSearchbar";
 import {ExplorerLiveFeed} from "./ExplorerLiveFeed";
 import {ExplorerTransactionSearchbar} from "./ExplorerTransactionSearchbar";
 import {ExplorerOutputSearchbar} from "./ExplorerOutputSearchbar";
-import {ExplorerSpendSearchbar} from "./ExplorerSpendSearchbar";
 
 interface Props {
     nodeStore?: NodeStore;
@@ -39,9 +38,6 @@ export class Explorer extends React.Component<Props, any> {
                 <Row>
                     <Col>
                         <ExplorerOutputSearchbar/>
-                    </Col>
-                    <Col>
-                        <ExplorerSpendSearchbar/>
                     </Col>
                 </Row>
                 <ExplorerLiveFeed/>

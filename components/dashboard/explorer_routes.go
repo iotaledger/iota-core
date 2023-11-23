@@ -47,10 +47,6 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 	routeGroup.GET("/output/:"+restapipkg.ParameterOutputID, getOutput)
 	// routeGroup.GET("/output/:outputID/metadata", ledgerstateAPI.GetOutputMetadata)
 	// routeGroup.GET("/output/:outputID/consumers", ledgerstateAPI.GetOutputConsumers)
-	// routeGroup.GET("/conflict/:spendID", ledgerstateAPI.GetConflict)
-	// routeGroup.GET("/conflict/:spendID/children", ledgerstateAPI.GetConflictChildren)
-	// routeGroup.GET("/conflict/:spendID/conflicts", ledgerstateAPI.GetConflictConflicts)
-	// routeGroup.GET("/conflict/:spendID/voters", ledgerstateAPI.GetConflictVoters)
 	routeGroup.GET("/slot/commitment/:"+restapipkg.ParameterCommitmentID, getSlotDetailsByID)
 
 	routeGroup.GET("/search/:search", func(c echo.Context) error {

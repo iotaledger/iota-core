@@ -5,9 +5,7 @@ import NodeStore from "../stores/NodeStore";
 import { inject, observer } from "mobx-react";
 import ExplorerStore from "../stores/ExplorerStore";
 import Badge from "react-bootstrap/Badge";
-import {Link} from 'react-router-dom';
 import {displayManaUnit} from "../utils";
-import {resolveBase58SpendID} from "../utils/spend";
 import {outputToComponent} from "../utils/output";
 import {resolveConfirmationState} from "../utils/confirmation_state";
 
@@ -76,15 +74,13 @@ export class ExplorerOutputQueryResult extends React.Component<Props, any> {
                 {outputMetadata && <div className={"mb-2"}>
                     <ListGroup>
                         <ListGroup.Item>Transaction ID: <a href={`/explorer/transaction/${outputMetadata.outputID.transactionID}`}>{outputMetadata.outputID.transactionID}</a> </ListGroup.Item>
-                        spendIDs: 
+                        SpendIDs: 
                         <ListGroup>
                             {
                                 outputMetadata.spendIDs.map((value, index) => {
                                     return (
                                         <ListGroup.Item key={"SpendID" + index + 1} className="text-break">
-                                            <Link to={`/explorer/spend/${value}`}>
-                                                {resolveBase58SpendID(value)}
-                                            </Link>
+                                                {value}
                                         </ListGroup.Item>
                                     )
                                 })

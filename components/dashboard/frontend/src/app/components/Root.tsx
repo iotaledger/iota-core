@@ -18,7 +18,6 @@ import {Visualizer} from "./Visualizer";
 import {Tips} from "./Tips";
 import {ExplorerTransactionQueryResult} from "./ExplorerTransactionQueryResult";
 import {ExplorerOutputQueryResult} from "./ExplorerOutputQueryResult";
-import {ExplorerSpendQueryResult} from "./ExplorerSpendQueryResult";
 import { SlotLiveFeed } from './SlotLiveFeed';
 import { ExplorerSlotQueryResult } from './ExplorerSlotQueryResult';
 
@@ -92,7 +91,6 @@ export class Root extends React.Component<Props, any> {
                     <Route exact path="/explorer/address/:id" component={ExplorerAddressQueryResult}/>
                     <Route exact path="/explorer/transaction/:id" component={ExplorerTransactionQueryResult}/>
                     <Route exact path="/explorer/output/:id" component={ExplorerOutputQueryResult}/>
-                    <Route exact path="/explorer/spend/:id" component={ExplorerSpendQueryResult}/>
                     <Route exact path="/explorer/slot/commitment/:commitment" component={ExplorerSlotQueryResult}/>
                     <Route exact path="/explorer/404/:search" component={Explorer404}/>
                     <Route exact path="/slots" component={SlotLiveFeed}/>
