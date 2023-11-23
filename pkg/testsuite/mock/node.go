@@ -190,7 +190,7 @@ func (n *Node) hookEvents() {
 				n.mutex.Lock()
 				defer n.mutex.Unlock()
 
-				n.invalidTransactionEvents[signedTransactionMetadata.ID()] = InvalidSignedTransactionEvent{
+				n.invalidTransactionEvents[signedTxID] = InvalidSignedTransactionEvent{
 					Metadata: signedTransactionMetadata,
 					Error:    err,
 				}
