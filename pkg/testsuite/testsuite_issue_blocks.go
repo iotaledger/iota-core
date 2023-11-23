@@ -238,9 +238,11 @@ func (t *TestSuite) IssueBlockRowsInSlot(prefix string, slot iotago.SlotIndex, r
 	return blocksIssued, lastBlockRowIssued
 }
 
-func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, rowsPerSlot int, initialParentsPrefix string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, rowsPerSlot int, initialParentsPrefix string, nodes []*mock.Node, waitForSlotsCommitted bool, useCommitmentAtMinCommittableAge bool) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
 	var blocksIssued, lastBlockRowIssued []*blocks.Block
 	parentsPrefix := initialParentsPrefix
+
+	issuingOptions := make(map[string][]options.Option[mock.BlockHeaderParams])
 
 	for i, slot := range slots {
 		if i > 0 {
@@ -253,7 +255,20 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 
 		if waitForSlotsCommitted {
 			if slot > t.API.ProtocolParameters().MinCommittableAge() {
-				t.AssertCommitmentSlotIndexExists(slot-(t.API.ProtocolParameters().MinCommittableAge()), nodes...)
+				commitmentSlot := slot - t.API.ProtocolParameters().MinCommittableAge()
+				t.AssertCommitmentSlotIndexExists(commitmentSlot, nodes...)
+
+				if useCommitmentAtMinCommittableAge {
+					// Make sure that all nodes create blocks throughout the slot that commit to the same commitment at slot-minCommittableAge-1.
+					for _, node := range nodes {
+						commitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentSlot)
+						require.NoError(t.Testing, err)
+
+						issuingOptions[node.Name] = []options.Option[mock.BlockHeaderParams]{
+							mock.WithSlotCommitment(commitment.Commitment()),
+						}
+					}
+				}
 			} else {
 				t.AssertBlocksExist(blocksInSlot, true, nodes...)
 			}
@@ -263,8 +278,8 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 	return blocksIssued, lastBlockRowIssued
 }
 
-func (t *TestSuite) IssueBlocksAtEpoch(prefix string, epoch iotago.EpochIndex, rowsPerSlot int, initialParentsPrefix string, nodes []*mock.Node, waitForSlotsCommitted bool, issuingOptions map[string][]options.Option[mock.BlockHeaderParams]) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
-	return t.IssueBlocksAtSlots(prefix, t.SlotsForEpoch(epoch), rowsPerSlot, initialParentsPrefix, nodes, waitForSlotsCommitted, issuingOptions)
+func (t *TestSuite) IssueBlocksAtEpoch(prefix string, epoch iotago.EpochIndex, rowsPerSlot int, initialParentsPrefix string, nodes []*mock.Node, waitForSlotsCommitted bool, useCommitmentAtMinCommittableAge bool) (allBlocksIssued []*blocks.Block, lastBlockRow []*blocks.Block) {
+	return t.IssueBlocksAtSlots(prefix, t.SlotsForEpoch(epoch), rowsPerSlot, initialParentsPrefix, nodes, waitForSlotsCommitted, false)
 }
 
 func (t *TestSuite) SlotsForEpoch(epoch iotago.EpochIndex) []iotago.SlotIndex {

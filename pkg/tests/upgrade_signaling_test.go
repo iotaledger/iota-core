@@ -234,16 +234,16 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, nil)
 
 	// Epoch 5: revoke vote of nodeA in last slot of epoch.
-	ts.IssueBlocksAtSlots("", ts.SlotsForEpoch(4)[:ts.API.TimeProvider().EpochDurationSlots()-1], 4, "31.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtSlots("", ts.SlotsForEpoch(4)[:ts.API.TimeProvider().EpochDurationSlots()-1], 4, "31.3", ts.Nodes(), true, false)
 
 	ts.Node("nodeA").SetProtocolParametersHash(iotago.Identifier{})
 
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{39}, 4, "38.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{39}, 4, "38.3", ts.Nodes(), true, false)
 
 	ts.Node("nodeA").SetProtocolParametersHash(hash1)
 
 	// Epoch 6: issue half before restarting and half after restarting.
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{40, 41, 42, 43}, 4, "39.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{40, 41, 42, 43}, 4, "39.3", ts.Nodes(), true, false)
 
 	{
 		var expectedRootBlocks []*blocks.Block
@@ -293,11 +293,11 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}
 
 	// Can only continue to issue on nodeA, nodeB, nodeC, nodeD, nodeF. nodeE and nodeG were just restarted and don't have the latest unaccepted state.
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{44}, 4, "43.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{44}, 4, "43.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, false)
 
 	// TODO: would be great to dynamically add accounts for later nodes.
 	// Can't issue on nodeG as its account is not known.
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, false)
 
 	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
 	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
@@ -411,8 +411,8 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	// Check that issuing still produces the same commitments on the nodes that upgraded. The nodes that did not upgrade
 	// should not be able to issue and process blocks with the new version.
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{64, 65}, 4, "63.3", ts.Nodes("nodeB", "nodeC"), false, nil)
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{66, 67, 68, 69, 70, 71}, 4, "65.3", ts.Nodes("nodeB", "nodeC"), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{64, 65}, 4, "63.3", ts.Nodes("nodeB", "nodeC"), false, false)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{66, 67, 68, 69, 70, 71}, 4, "65.3", ts.Nodes("nodeB", "nodeC"), true, false)
 
 	// Nodes that did not set up the new protocol parameters are not able to process blocks with the new version.
 	ts.AssertNodeState(ts.Nodes("nodeA", "nodeD", "nodeF", "nodeG"),

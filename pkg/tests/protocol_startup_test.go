@@ -241,7 +241,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	// Epoch 1: skip slot 10 and issue 6 rows per slot
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{8, 9, 11, 12, 13}, 6, "7.3", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{8, 9, 11, 12, 13}, 6, "7.3", ts.Nodes(), true, false)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13"), true, ts.Nodes()...)
 
@@ -374,7 +374,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		}
 
 		// Only issue on nodes that have the latest state in memory.
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{14, 15}, 6, "13.5", ts.Nodes("nodeA", "nodeB"), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{14, 15}, 6, "13.5", ts.Nodes("nodeA", "nodeB"), true, false)
 
 		for _, slot := range []iotago.SlotIndex{12, 13} {
 			aliases := lo.Map([]string{"nodeA", "nodeB"}, func(s string) string {

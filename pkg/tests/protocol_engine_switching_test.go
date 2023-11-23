@@ -165,7 +165,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	// Issue up to slot 13 in P0 (main partition with all nodes) and verify that the nodes have the expected states.
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, 4, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(10),
@@ -220,7 +220,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	// Issue blocks in partition 1.
 	{
-		ts.IssueBlocksAtSlots("P1:", []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20}, 4, "P0:13.3", nodesP1[:len(nodesP1)-1], true, nil)
+		ts.IssueBlocksAtSlots("P1:", []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20}, 4, "P0:13.3", nodesP1[:len(nodesP1)-1], true, false)
 
 		ts.AssertNodeState(nodesP1,
 			testsuite.WithLatestFinalizedSlot(17),
@@ -274,7 +274,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	// Issue blocks in partition 2.
 	{
-		ts.IssueBlocksAtSlots("P2:", []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20}, 4, "P0:13.3", nodesP2[:len(nodesP2)-1], true, nil)
+		ts.IssueBlocksAtSlots("P2:", []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20}, 4, "P0:13.3", nodesP2[:len(nodesP2)-1], true, false)
 
 		ts.AssertNodeState(nodesP2,
 			testsuite.WithLatestFinalizedSlot(10),
