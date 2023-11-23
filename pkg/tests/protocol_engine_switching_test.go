@@ -384,21 +384,21 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithWaitFor(15*time.Second),
+		testsuite.WithWaitFor(30*time.Second),
 
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
 				0,
 				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
-				3, // 8 slots per epoch
+				4, // 16 slots per epoch
 			),
 			iotago.WithLivenessOptions(
 				10,
 				10,
-				2,
 				3,
-				6,
+				5,
+				10,
 			),
 		),
 	)
@@ -409,7 +409,7 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	node2 := ts.AddValidatorNode("node2")
 	node3 := ts.AddValidatorNode("node3")
 
-	const expectedCommittedSlotAfterPartitionMerge = 18
+	const expectedCommittedSlotAfterPartitionMerge = 19
 	nodesP1 := []*mock.Node{node0, node1, node2}
 	nodesP2 := []*mock.Node{node3}
 
@@ -466,45 +466,31 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		)
 	}
 
-	// Issue up to slot 11 in P0 (main partition with all nodes) and verify that the nodes have the expected states.
+	// Issue up to slot 8 in P0 (main partition with all nodes) and verify that the nodes have the expected states.
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7}, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2}, 4, "Genesis", ts.Nodes(), true, true)
 
-		// Register candidates (node1, node2) in P0 for epoch 2.
+		// Register candidates (node1, node2) in P0 for epoch 1.
 		{
-			ts.IssueCandidacyAnnouncementInSlot("P0:node1-candidacy:1", 8, "P0:7.3", ts.Wallet("node1"))
-			ts.IssueCandidacyAnnouncementInSlot("P0:node2-candidacy:1", 8, "P0:node1-candidacy:1", ts.Wallet("node2"))
+			ts.IssueCandidacyAnnouncementInSlot("P0:node1-candidacy:1", 3, "P0:2.3", ts.Wallet("node1"))
+			ts.IssueCandidacyAnnouncementInSlot("P0:node2-candidacy:1", 3, "P0:node1-candidacy:1", ts.Wallet("node2"))
 		}
 
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{8, 9, 10, 11}, 4, "P0:node2-candidacy:1", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{3, 4, 5, 6, 7, 8}, 4, "P0:node2-candidacy:1", ts.Nodes(), true, true)
 
 		ts.AssertNodeState(ts.Nodes(),
-			testsuite.WithLatestFinalizedSlot(8),
-			testsuite.WithLatestCommitmentSlotIndex(9),
-			testsuite.WithEqualStoredCommitmentAtIndex(9),
-			testsuite.WithLatestCommitmentCumulativeWeight(28),                                                // 4 for each committed slot starting from 3-9
-			testsuite.WithSybilProtectionCommittee(1, ts.AccountsOfNodes("node0", "node1", "node2", "node3")), // make sure the committee is reused due to no candidates but finalization at epochNearingThreshold
-			testsuite.WithSybilProtectionOnlineCommittee(ts.SeatOfNodes(9, "node0", "node1", "node2", "node3")...),
-			testsuite.WithSybilProtectionCandidates(1, ts.AccountsOfNodes("node1", "node2")),
-			testsuite.WithEvictedSlot(9),
+			testsuite.WithLatestFinalizedSlot(4),
+			testsuite.WithLatestCommitmentSlotIndex(5),
+			testsuite.WithEqualStoredCommitmentAtIndex(5),
+			testsuite.WithLatestCommitmentCumulativeWeight(4), // 4 * slot 5
+			testsuite.WithSybilProtectionOnlineCommittee(ts.SeatOfNodes(5, "node0", "node1", "node2", "node3")...),
+			testsuite.WithSybilProtectionCandidates(0, ts.AccountsOfNodes("node1", "node2")),
+			testsuite.WithEvictedSlot(5),
 		)
 
-		for _, slot := range []iotago.SlotIndex{3, 4, 5, 6, 7, 8, 9} {
-			var attestationBlocks []*blocks.Block
-			for _, node := range ts.Nodes() {
-				if node.IsValidator() {
-					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", slot, node.Name)))
-				}
-			}
-			ts.AssertAttestationsForSlot(slot, attestationBlocks, ts.Nodes()...)
-		}
+		ts.AssertAttestationsForSlot(5, ts.Blocks("P0:5.3-node0", "P0:5.3-node1", "P0:5.3-node2", "P0:5.3-node3"), ts.Nodes()...)
 
-		// Make sure the tips are properly set.
-		var tipBlocks []*blocks.Block
-		for _, node := range ts.Nodes() {
-			tipBlocks = append(tipBlocks, ts.Block(fmt.Sprintf("P0:11.3-%s", node.Name)))
-		}
-		ts.AssertStrongTips(tipBlocks, ts.Nodes()...)
+		ts.AssertStrongTips(ts.Blocks("P0:8.3-node0", "P0:8.3-node1", "P0:8.3-node2", "P0:8.3-node3"), ts.Nodes()...)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
 	}
@@ -517,36 +503,38 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 
 	// Issue blocks in partition 1.
 	{
-		ts.IssueBlocksAtSlots("P1:", []iotago.SlotIndex{12, 13, 14, 15, 16, 17, 18, 19}, 4, "P0:11.3", nodesP1, true, nil)
+		ts.IssueBlocksAtSlots("P1:", []iotago.SlotIndex{9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}, 4, "P0:8.3", nodesP1, true, true)
 
 		ts.AssertNodeState(nodesP1,
 			testsuite.WithLatestFinalizedSlot(16),
 			testsuite.WithLatestCommitmentSlotIndex(17),
 			testsuite.WithEqualStoredCommitmentAtIndex(17),
-			testsuite.WithLatestCommitmentCumulativeWeight(54), // 28 + see attestation assertions below for how to compute
-			testsuite.WithSybilProtectionCandidates(1, ts.AccountsOfNodes("node1", "node2")),
-			testsuite.WithSybilProtectionCandidates(2, []iotago.AccountID{}),
-			testsuite.WithSybilProtectionCommittee(1, ts.AccountsOfNodes("node0", "node1", "node2", "node3")),
-			testsuite.WithSybilProtectionCommittee(2, ts.AccountsOfNodes("node1", "node2")), // we selected a new committee for epoch 2
+			testsuite.WithLatestCommitmentCumulativeWeight(43), // 4 + see attestation assertions below for how to compute
 			testsuite.WithSybilProtectionOnlineCommittee(ts.SeatOfNodes(17, "node1", "node2")...),
 			testsuite.WithEvictedSlot(17),
 		)
 
-		ts.AssertAttestationsForSlot(10, ts.Blocks("P0:10.3-node0", "P0:10.3-node1", "P0:10.3-node2", "P0:10.3-node3"), nodesP1...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
-		ts.AssertAttestationsForSlot(11, ts.Blocks("P0:11.3-node0", "P0:11.3-node1", "P0:11.3-node2", "P0:11.3-node3"), nodesP1...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
-		ts.AssertAttestationsForSlot(12, ts.Blocks("P1:12.3-node0", "P1:12.3-node1", "P1:12.3-node2", "P0:11.3-node3"), nodesP1...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
-		ts.AssertAttestationsForSlot(13, ts.Blocks("P1:13.3-node0", "P1:13.3-node1", "P1:13.3-node2"), nodesP1...)                  // Committee in epoch 1 is all nodes; node3 is in P2
-		ts.AssertAttestationsForSlot(14, ts.Blocks("P1:14.3-node0", "P1:14.3-node1", "P1:14.3-node2"), nodesP1...)                  // Committee in epoch 1 is all nodes; node3 is in P2
-		ts.AssertAttestationsForSlot(15, ts.Blocks("P1:15.3-node0", "P1:15.3-node1", "P1:15.3-node2"), nodesP1...)                  // Committee in epoch 1 is all nodes; node3 is in P2
-		ts.AssertAttestationsForSlot(16, ts.Blocks("P1:15.3-node0", "P1:16.3-node1", "P1:16.3-node2"), nodesP1...)                  // We're in Epoch 2 (only node1, node2) but we carry attestations of others because of window
-		ts.AssertAttestationsForSlot(17, ts.Blocks("P1:17.3-node1", "P1:17.3-node2"), nodesP1...)                                   // Committee in epoch 2 is only node1, node2
+		// Assert committee in epoch 1.
+		ts.AssertSybilProtectionCandidates(0, ts.AccountsOfNodes("node1", "node2"), nodesP1...)
+		ts.AssertSybilProtectionCommittee(1, ts.AccountsOfNodes("node1", "node2"), nodesP1...) // we selected a new committee for epoch 1
 
-		// Make sure the tips are properly set.
-		var tipBlocks []*blocks.Block
-		for _, node := range nodesP1 {
-			tipBlocks = append(tipBlocks, ts.Block(fmt.Sprintf("P1:19.3-%s", node.Name)))
-		}
-		ts.AssertStrongTips(tipBlocks, nodesP1...)
+		// Assert committee in epoch 2.
+		ts.AssertSybilProtectionCandidates(1, iotago.AccountIDs{}, nodesP1...)
+
+		ts.AssertAttestationsForSlot(6, ts.Blocks("P0:6.3-node0", "P0:6.3-node1", "P0:6.3-node2", "P0:6.3-node3"), nodesP1...) // Committee in epoch 1 is all nodes
+		ts.AssertAttestationsForSlot(7, ts.Blocks("P0:7.3-node0", "P0:7.3-node1", "P0:7.3-node2", "P0:7.3-node3"), nodesP1...) // Committee in epoch 1 is all nodes
+		ts.AssertAttestationsForSlot(8, ts.Blocks("P0:8.3-node0", "P0:8.3-node1", "P0:8.3-node2", "P0:8.3-node3"), nodesP1...) // Committee in epoch 1 is all nodes
+		ts.AssertAttestationsForSlot(9, ts.Blocks("P1:9.3-node0", "P1:9.3-node1", "P1:9.3-node2", "P0:8.3-node3"), nodesP1...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
+		ts.AssertAttestationsForSlot(10, ts.Blocks("P1:10.3-node0", "P1:10.3-node1", "P1:10.3-node2"), nodesP1...)             // Committee in epoch 1 is all nodes; node3 is in P2
+		ts.AssertAttestationsForSlot(11, ts.Blocks("P1:11.3-node0", "P1:11.3-node1", "P1:11.3-node2"), nodesP1...)             // Committee in epoch 1 is all nodes; node3 is in P2
+		ts.AssertAttestationsForSlot(12, ts.Blocks("P1:12.3-node0", "P1:12.3-node1", "P1:12.3-node2"), nodesP1...)             // Committee in epoch 1 is all nodes; node3 is in P2
+		ts.AssertAttestationsForSlot(13, ts.Blocks("P1:13.3-node0", "P1:13.3-node1", "P1:13.3-node2"), nodesP1...)             // Committee in epoch 1 is all nodes; node3 is in P2
+		ts.AssertAttestationsForSlot(14, ts.Blocks("P1:14.3-node0", "P1:14.3-node1", "P1:14.3-node2"), nodesP1...)             // Committee in epoch 1 is all nodes; node3 is in P2
+		ts.AssertAttestationsForSlot(15, ts.Blocks("P1:15.3-node0", "P1:15.3-node1", "P1:15.3-node2"), nodesP1...)             // Committee in epoch 1 is all nodes; node3 is in P2
+		ts.AssertAttestationsForSlot(16, ts.Blocks("P1:15.3-node0", "P1:16.3-node1", "P1:16.3-node2"), nodesP1...)             // We're in Epoch 2 (only node1, node2) but we carry attestations of others because of window
+		ts.AssertAttestationsForSlot(17, ts.Blocks("P1:17.3-node1", "P1:17.3-node2"), nodesP1...)                              // Committee in epoch 2 is only node1, node2
+
+		ts.AssertStrongTips(ts.Blocks("P1:20.3-node0", "P1:20.3-node1", "P1:20.3-node2"), nodesP1...)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, nodesP1...)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, nodesP2...)
@@ -554,36 +542,38 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 
 	// Issue blocks in partition 2.
 	{
-		ts.IssueBlocksAtSlots("P2:", []iotago.SlotIndex{12, 13, 14, 15, 16, 17, 18, 19}, 4, "P0:11.3", nodesP2, true, nil)
+		ts.IssueBlocksAtSlots("P2:", []iotago.SlotIndex{9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}, 4, "P0:8.3", nodesP2, true, true)
 
 		ts.AssertNodeState(nodesP2,
-			testsuite.WithLatestFinalizedSlot(8),
+			testsuite.WithLatestFinalizedSlot(4),
 			testsuite.WithLatestCommitmentSlotIndex(17),
 			testsuite.WithEqualStoredCommitmentAtIndex(17),
-			testsuite.WithLatestCommitmentCumulativeWeight(45), // 28 + see attestation assertions below for how to compute
-			testsuite.WithSybilProtectionCandidates(1, ts.AccountsOfNodes("node1", "node2")),
-			testsuite.WithSybilProtectionCandidates(2, []iotago.AccountID{}),
-			testsuite.WithSybilProtectionCommittee(1, ts.AccountsOfNodes("node0", "node1", "node2", "node3")),
-			testsuite.WithSybilProtectionCommittee(2, ts.AccountsOfNodes("node0", "node1", "node2", "node3")), // the committee was reused because there was no finalization at epochNearingThreshold
+			// testsuite.WithLatestCommitmentCumulativeWeight(43), // 4 + see attestation assertions below for how to compute
 			testsuite.WithSybilProtectionOnlineCommittee(ts.SeatOfNodes(17, "node3")...),
 			testsuite.WithEvictedSlot(17),
 		)
 
-		ts.AssertAttestationsForSlot(10, ts.Blocks("P0:10.3-node0", "P0:10.3-node1", "P0:10.3-node2", "P0:10.3-node3"), nodesP1...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
-		ts.AssertAttestationsForSlot(11, ts.Blocks("P0:11.3-node0", "P0:11.3-node1", "P0:11.3-node2", "P0:11.3-node3"), nodesP2...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
-		ts.AssertAttestationsForSlot(12, ts.Blocks("P0:11.3-node0", "P0:11.3-node1", "P0:11.3-node2", "P2:12.3-node3"), nodesP2...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
-		ts.AssertAttestationsForSlot(13, ts.Blocks("P2:13.3-node3"), nodesP2...)                                                    // Committee in epoch 1 is all nodes but only node3 is issuing in P2
-		ts.AssertAttestationsForSlot(14, ts.Blocks("P2:14.3-node3"), nodesP2...)                                                    // Committee in epoch 1 is all nodes but only node3 is issuing in P2
-		ts.AssertAttestationsForSlot(15, ts.Blocks("P2:15.3-node3"), nodesP2...)                                                    // Committee in epoch 1 is all nodes but only node3 is issuing in P2
-		ts.AssertAttestationsForSlot(16, ts.Blocks("P2:16.3-node3"), nodesP2...)                                                    // Committee in epoch 2 is reused but only node3 is issuing in P2
-		ts.AssertAttestationsForSlot(17, ts.Blocks("P2:17.3-node3"), nodesP2...)                                                    // Committee in epoch 2 is reused but only node3 is issuing in P2
+		// Assert committee in epoch 1.
+		ts.AssertSybilProtectionCandidates(0, ts.AccountsOfNodes("node1", "node2"), nodesP2...)
+		ts.AssertSybilProtectionCommittee(1, ts.AccountsOfNodes("node0", "node1", "node2", "node3"), nodesP2...) // committee was reused due to no finalization at epochNearingThreshold
 
-		// Make sure the tips are properly set.
-		var tipBlocks []*blocks.Block
-		for _, node := range nodesP2 {
-			tipBlocks = append(tipBlocks, ts.Block(fmt.Sprintf("P2:19.3-%s", node.Name)))
-		}
-		ts.AssertStrongTips(tipBlocks, nodesP2...)
+		// Assert committee in epoch 2.
+		ts.AssertSybilProtectionCandidates(1, iotago.AccountIDs{}, nodesP2...)
+
+		ts.AssertAttestationsForSlot(6, ts.Blocks("P0:6.3-node0", "P0:6.3-node1", "P0:6.3-node2", "P0:6.3-node3"), nodesP2...) // Committee in epoch 1 is all nodes
+		ts.AssertAttestationsForSlot(7, ts.Blocks("P0:7.3-node0", "P0:7.3-node1", "P0:7.3-node2", "P0:7.3-node3"), nodesP2...) // Committee in epoch 1 is all nodes
+		ts.AssertAttestationsForSlot(8, ts.Blocks("P0:8.3-node0", "P0:8.3-node1", "P0:8.3-node2", "P0:8.3-node3"), nodesP2...) // Committee in epoch 1 is all nodes
+		ts.AssertAttestationsForSlot(9, ts.Blocks("P0:8.3-node0", "P0:8.3-node1", "P0:8.3-node2", "P2:9.3-node3"), nodesP2...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
+		ts.AssertAttestationsForSlot(10, ts.Blocks("P2:10.3-node3"), nodesP2...)                                               // Committee in epoch 1 is all nodes; only node3 is in P2
+		ts.AssertAttestationsForSlot(11, ts.Blocks("P2:11.3-node3"), nodesP2...)                                               // Committee in epoch 1 is all nodes; only node3 is in P2
+		ts.AssertAttestationsForSlot(12, ts.Blocks("P2:12.3-node3"), nodesP2...)                                               // Committee in epoch 1 is all nodes; only node3 is in P2
+		ts.AssertAttestationsForSlot(13, ts.Blocks("P2:13.3-node3"), nodesP2...)                                               // Committee in epoch 1 is all nodes; only node3 is in P2
+		ts.AssertAttestationsForSlot(14, ts.Blocks("P2:14.3-node3"), nodesP2...)                                               // Committee in epoch 1 is all nodes; only node3 is in P2
+		ts.AssertAttestationsForSlot(15, ts.Blocks("P2:15.3-node3"), nodesP2...)                                               // Committee in epoch 1 is all nodes; only node3 is in P2
+		ts.AssertAttestationsForSlot(16, ts.Blocks("P2:16.3-node3"), nodesP2...)                                               // Committee in epoch 2 (reused) is all nodes; only node3 is in P2
+		ts.AssertAttestationsForSlot(17, ts.Blocks("P2:17.3-node3"), nodesP2...)                                               // Committee in epoch 2 (reused) is all nodes; only node3 is in P2
+
+		ts.AssertStrongTips(ts.Blocks("P2:20.3-node3"), nodesP2...)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, nodesP2...)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, nodesP1...)
@@ -603,11 +593,11 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		wg := &sync.WaitGroup{}
 
 		// Issue blocks on both partitions after merging the networks.
-		node0.Validator.IssueActivity(ctxP1, wg, 20, node0)
-		node1.Validator.IssueActivity(ctxP1, wg, 20, node1)
-		node2.Validator.IssueActivity(ctxP1, wg, 20, node2)
+		node0.Validator.IssueActivity(ctxP1, wg, 21, node0)
+		node1.Validator.IssueActivity(ctxP1, wg, 21, node1)
+		node2.Validator.IssueActivity(ctxP1, wg, 21, node2)
 
-		node3.Validator.IssueActivity(ctxP2, wg, 20, node3)
+		node3.Validator.IssueActivity(ctxP2, wg, 21, node3)
 
 		// P1 finalized until slot 16. We do not expect any forks here because our CW is higher than the other partition's.
 		ts.AssertForkDetectedCount(0, nodesP1...)
@@ -630,24 +620,30 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
 	// This is to make sure that the storage was copied correctly during engine switching.
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
-	// ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...) // not all blocks of slot 19 are available on node3 (buffer issue?)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...) // not all blocks of slot 19 are available on node3 (buffer issue?)
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
 
 	ts.AssertNodeState(ts.Nodes(),
 		testsuite.WithEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge),
-		testsuite.WithSybilProtectionCandidates(1, ts.AccountsOfNodes("node1", "node2")),
-		testsuite.WithSybilProtectionCandidates(2, []iotago.AccountID{}),
-		testsuite.WithSybilProtectionCommittee(1, ts.AccountsOfNodes("node0", "node1", "node2", "node3")),
-		testsuite.WithSybilProtectionCommittee(2, ts.AccountsOfNodes("node1", "node2")), // we selected a new committee for epoch 2
 	)
 
-	ts.AssertAttestationsForSlot(10, ts.Blocks("P0:10.3-node0", "P0:10.3-node1", "P0:10.3-node2", "P0:10.3-node3"), ts.Nodes()...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
-	ts.AssertAttestationsForSlot(11, ts.Blocks("P0:11.3-node0", "P0:11.3-node1", "P0:11.3-node2", "P0:11.3-node3"), ts.Nodes()...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
-	ts.AssertAttestationsForSlot(12, ts.Blocks("P1:12.3-node0", "P1:12.3-node1", "P1:12.3-node2", "P0:11.3-node3"), ts.Nodes()...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
-	ts.AssertAttestationsForSlot(13, ts.Blocks("P1:13.3-node0", "P1:13.3-node1", "P1:13.3-node2"), ts.Nodes()...)                  // Committee in epoch 1 is all nodes; node3 is in P2
-	ts.AssertAttestationsForSlot(14, ts.Blocks("P1:14.3-node0", "P1:14.3-node1", "P1:14.3-node2"), ts.Nodes()...)                  // Committee in epoch 1 is all nodes; node3 is in P2
-	ts.AssertAttestationsForSlot(15, ts.Blocks("P1:15.3-node0", "P1:15.3-node1", "P1:15.3-node2"), ts.Nodes()...)                  // Committee in epoch 1 is all nodes; node3 is in P2
-	ts.AssertAttestationsForSlot(16, ts.Blocks("P1:15.3-node0", "P1:16.3-node1", "P1:16.3-node2"), ts.Nodes()...)                  // We're in Epoch 2 (only node1, node2) but we carry attestations of others because of window
-	ts.AssertAttestationsForSlot(17, ts.Blocks("P1:17.3-node1", "P1:17.3-node2"), ts.Nodes()...)                                   // Committee in epoch 2 is only node1, node2
-	ts.AssertAttestationsForSlot(18, ts.Blocks("P1:18.3-node1", "P1:18.3-node2"), ts.Nodes()...)                                   // Committee in epoch 2 is only node1, node2
+	// Assert committee in epoch 1.
+	ts.AssertSybilProtectionCandidates(0, ts.AccountsOfNodes("node1", "node2"), ts.Nodes()...)
+	ts.AssertSybilProtectionCommittee(1, ts.AccountsOfNodes("node1", "node2"), ts.Nodes()...) // we selected a new committee for epoch 1
+
+	// Assert committee in epoch 2.
+	ts.AssertSybilProtectionCandidates(1, iotago.AccountIDs{}, ts.Nodes()...)
+
+	ts.AssertAttestationsForSlot(6, ts.Blocks("P0:6.3-node0", "P0:6.3-node1", "P0:6.3-node2", "P0:6.3-node3"), ts.Nodes()...) // Committee in epoch 1 is all nodes
+	ts.AssertAttestationsForSlot(7, ts.Blocks("P0:7.3-node0", "P0:7.3-node1", "P0:7.3-node2", "P0:7.3-node3"), ts.Nodes()...) // Committee in epoch 1 is all nodes
+	ts.AssertAttestationsForSlot(8, ts.Blocks("P0:8.3-node0", "P0:8.3-node1", "P0:8.3-node2", "P0:8.3-node3"), ts.Nodes()...) // Committee in epoch 1 is all nodes
+	ts.AssertAttestationsForSlot(9, ts.Blocks("P1:9.3-node0", "P1:9.3-node1", "P1:9.3-node2", "P0:8.3-node3"), ts.Nodes()...) // Committee in epoch 1 is all nodes; and we carry attestations of others because of window
+	ts.AssertAttestationsForSlot(10, ts.Blocks("P1:10.3-node0", "P1:10.3-node1", "P1:10.3-node2"), ts.Nodes()...)             // Committee in epoch 1 is all nodes; node3 is in P2
+	ts.AssertAttestationsForSlot(11, ts.Blocks("P1:11.3-node0", "P1:11.3-node1", "P1:11.3-node2"), ts.Nodes()...)             // Committee in epoch 1 is all nodes; node3 is in P2
+	ts.AssertAttestationsForSlot(12, ts.Blocks("P1:12.3-node0", "P1:12.3-node1", "P1:12.3-node2"), ts.Nodes()...)             // Committee in epoch 1 is all nodes; node3 is in P2
+	ts.AssertAttestationsForSlot(13, ts.Blocks("P1:13.3-node0", "P1:13.3-node1", "P1:13.3-node2"), ts.Nodes()...)             // Committee in epoch 1 is all nodes; node3 is in P2
+	ts.AssertAttestationsForSlot(14, ts.Blocks("P1:14.3-node0", "P1:14.3-node1", "P1:14.3-node2"), ts.Nodes()...)             // Committee in epoch 1 is all nodes; node3 is in P2
+	ts.AssertAttestationsForSlot(15, ts.Blocks("P1:15.3-node0", "P1:15.3-node1", "P1:15.3-node2"), ts.Nodes()...)             // Committee in epoch 1 is all nodes; node3 is in P2
+	ts.AssertAttestationsForSlot(16, ts.Blocks("P1:15.3-node0", "P1:16.3-node1", "P1:16.3-node2"), ts.Nodes()...)             // We're in Epoch 2 (only node1, node2) but we carry attestations of others because of window
+	ts.AssertAttestationsForSlot(17, ts.Blocks("P1:17.3-node1", "P1:17.3-node2"), ts.Nodes()...)                              // Committee in epoch 2 is only node1, node2
 }

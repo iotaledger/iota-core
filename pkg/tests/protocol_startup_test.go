@@ -83,7 +83,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 
 	// Epoch 0: issue 4 rows per slot.
 	{
-		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.Nodes()...)
 
@@ -195,7 +195,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	// Epoch 0: issue 4 rows per slot.
 	{
-		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.Nodes()...)
 
@@ -394,11 +394,11 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	// Epoch 2-4
 	{
 		// Issue on all nodes except nodeD as its account is not yet known.
-		ts.IssueBlocksAtEpoch("", 2, 4, "15.5", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 2, 4, "15.5", ts.Nodes(), true, false)
 
 		// Issue on all nodes.
-		ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, nil)
-		ts.IssueBlocksAtEpoch("", 4, 4, "31.3", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, false)
+		ts.IssueBlocksAtEpoch("", 4, 4, "31.3", ts.Nodes(), true, false)
 
 		var expectedActiveRootBlocks []*blocks.Block
 		for _, slot := range []iotago.SlotIndex{35, 36, 37} {

@@ -174,7 +174,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.Node("nodeA").SetProtocolParametersHash(hash2)
 	ts.Node("nodeD").SetHighestSupportedVersion(3)
 	ts.Node("nodeD").SetProtocolParametersHash(hash2)
-	ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, false)
 
 	// check account data before all nodes set the current version
 	ts.AssertAccountData(&accounts.AccountData{
@@ -209,7 +209,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.Node("nodeD").SetHighestSupportedVersion(5)
 	ts.Node("nodeD").SetProtocolParametersHash(hash2)
 
-	ts.IssueBlocksAtEpoch("", 1, 4, "7.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtEpoch("", 1, 4, "7.3", ts.Nodes(), true, false)
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeA").Validator.AccountID,
@@ -230,8 +230,8 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	require.Contains(t, pastAccounts, ts.Node("nodeA").Validator.AccountID)
 	require.Equal(t, model.VersionAndHash{Version: 4, Hash: hash2}, pastAccounts[ts.Node("nodeA").Validator.AccountID].LatestSupportedProtocolVersionAndHash)
 
-	ts.IssueBlocksAtEpoch("", 2, 4, "15.3", ts.Nodes(), true, nil)
-	ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtEpoch("", 2, 4, "15.3", ts.Nodes(), true, false)
+	ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, false)
 
 	// Epoch 5: revoke vote of nodeA in last slot of epoch.
 	ts.IssueBlocksAtSlots("", ts.SlotsForEpoch(4)[:ts.API.TimeProvider().EpochDurationSlots()-1], 4, "31.3", ts.Nodes(), true, false)
@@ -299,8 +299,8 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	// Can't issue on nodeG as its account is not known.
 	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, false)
 
-	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
-	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
+	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, false)
+	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, false)
 
 	// Restart node (and add protocol parameters) and add another node from snapshot (also with protocol parameters already set).
 	{
