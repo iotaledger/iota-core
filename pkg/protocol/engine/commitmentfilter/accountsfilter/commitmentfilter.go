@@ -87,7 +87,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 		if !block.IssuingTime().After(parentIssuingTime) {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Join(iotago.ErrBlockIssuingTimeNonMonotonic, ierrors.Errorf("block %s issuing time not greater than parent's %s issuing time", block.ID(), parentID)),
+				Reason: ierrors.Join(iotago.ErrBlockIssuingTimeNonMonotonic, ierrors.Errorf("block %s issuing time %s not greater than parent's %s issuing time %s", block.ID(), block.IssuingTime(), parentID, parentIssuingTime)),
 			})
 
 			return

@@ -68,6 +68,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		wallets:                             orderedmap.New[string, *mock.Wallet](),
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
 		automaticTransactionIssuingCounters: *shrinkingmap.New[string, int](),
+		currentSlot:                         1, // genesis slot is 0, the first slot is 1
 
 		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
 		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
