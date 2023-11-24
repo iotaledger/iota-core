@@ -1,7 +1,6 @@
 package retainer
 
 import (
-	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -29,9 +28,9 @@ func (b *BlockMetadata) BlockMetadataResponse() *api.BlockMetadataResponse {
 	return response
 }
 
-func (b *BlockMetadata) TransactionMetadataResponse() (*api.TransactionMetadataResponse, error) {
+func (b *BlockMetadata) TransactionMetadataResponse() *api.TransactionMetadataResponse {
 	if b.TransactionState == api.TransactionStateNoTransaction {
-		return nil, ierrors.Errorf("Transaction not found")
+		return nil
 	}
 
 	response := &api.TransactionMetadataResponse{
@@ -39,5 +38,5 @@ func (b *BlockMetadata) TransactionMetadataResponse() (*api.TransactionMetadataR
 		TransactionFailureReason: b.TransactionFailureReason,
 	}
 
-	return response, nil
+	return response
 }

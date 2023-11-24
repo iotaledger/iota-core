@@ -66,12 +66,12 @@ func transactionMetadataFromTransactionID(c echo.Context) (*api.TransactionMetad
 
 	blockID, err := blockIDFromTransactionID(txID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID by transaction ID: %v", err)
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to get block ID from transaction ID: %v", err)
 	}
 
 	metadata, err := transactionMetadataByBlockID(blockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to get transaction metadata: %v", err)
+		return nil, err
 	}
 
 	metadata.TransactionID = txID
