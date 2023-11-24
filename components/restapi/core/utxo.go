@@ -6,14 +6,13 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
-	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
-func outputByID(c echo.Context) (*apimodels.OutputResponse, error) {
-	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
+func outputByID(c echo.Context) (*api.OutputResponse, error) {
+	outputID, err := httpserver.ParseOutputIDParam(c, api.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
 	}
 
 	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
@@ -21,16 +20,16 @@ func outputByID(c echo.Context) (*apimodels.OutputResponse, error) {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
 	}
 
-	return &apimodels.OutputResponse{
+	return &api.OutputResponse{
 		Output:        output.Output(),
 		OutputIDProof: output.OutputIDProof(),
 	}, nil
 }
 
-func outputMetadataByID(c echo.Context) (*apimodels.OutputMetadata, error) {
-	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
+func outputMetadataByID(c echo.Context) (*api.OutputMetadata, error) {
+	outputID, err := httpserver.ParseOutputIDParam(c, api.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
 	}
 
 	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
@@ -45,10 +44,10 @@ func outputMetadataByID(c echo.Context) (*apimodels.OutputMetadata, error) {
 	return newOutputMetadataResponse(output)
 }
 
-func outputWithMetadataByID(c echo.Context) (*apimodels.OutputWithMetadataResponse, error) {
-	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
+func outputWithMetadataByID(c echo.Context) (*api.OutputWithMetadataResponse, error) {
+	outputID, err := httpserver.ParseOutputIDParam(c, api.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
 	}
 
 	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
@@ -62,7 +61,7 @@ func outputWithMetadataByID(c echo.Context) (*apimodels.OutputWithMetadataRespon
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load spent output metadata: %s", err)
 		}
 
-		return &apimodels.OutputWithMetadataResponse{
+		return &api.OutputWithMetadataResponse{
 			Output:        spent.Output().Output(),
 			OutputIDProof: spent.Output().OutputIDProof(),
 			Metadata:      metadata,
@@ -74,17 +73,17 @@ func outputWithMetadataByID(c echo.Context) (*apimodels.OutputWithMetadataRespon
 		return nil, err
 	}
 
-	return &apimodels.OutputWithMetadataResponse{
+	return &api.OutputWithMetadataResponse{
 		Output:        output.Output(),
 		OutputIDProof: output.OutputIDProof(),
 		Metadata:      metadata,
 	}, nil
 }
 
-func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMetadata, error) {
+func newOutputMetadataResponse(output *utxoledger.Output) (*api.OutputMetadata, error) {
 	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
-	resp := &apimodels.OutputMetadata{
+	resp := &api.OutputMetadata{
 		BlockID:            output.BlockID(),
 		TransactionID:      output.OutputID().TransactionID(),
 		OutputIndex:        output.OutputID().Index(),
@@ -105,10 +104,10 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*apimodels.OutputMeta
 	return resp, nil
 }
 
-func newSpentMetadataResponse(spent *utxoledger.Spent) (*apimodels.OutputMetadata, error) {
+func newSpentMetadataResponse(spent *utxoledger.Spent) (*api.OutputMetadata, error) {
 	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
-	resp := &apimodels.OutputMetadata{
+	resp := &api.OutputMetadata{
 		BlockID:            spent.BlockID(),
 		TransactionID:      spent.OutputID().TransactionID(),
 		OutputIndex:        spent.OutputID().Index(),

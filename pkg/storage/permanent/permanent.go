@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 const (
@@ -34,7 +33,7 @@ type Permanent struct {
 	accounts           kvstore.KVStore
 	latestNonEmptySlot kvstore.KVStore
 
-	optsEpochBasedProvider []options.Option[api.EpochBasedProvider]
+	optsEpochBasedProvider []options.Option[iotago.EpochBasedProvider]
 }
 
 // New returns a new permanent storage instance.

@@ -17,13 +17,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	iotago_tpkg "github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Output, spent *utxoledger.Spent) {
 	outputID := output.OutputID()
-	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	require.NoError(t, manager.AddGenesisUnspentOutput(output))
 
@@ -83,7 +82,7 @@ func CreateOutputAndAssertSerialization(t *testing.T, blockID iotago.BlockID, in
 	require.NoError(t, err)
 
 	iotagoAPI := iotago_tpkg.TestAPI
-	output := utxoledger.CreateOutput(api.SingleVersionProvider(iotagoAPI), outputID, blockID, indexBooked, iotaOutput, outputProof)
+	output := utxoledger.CreateOutput(iotago.SingleVersionProvider(iotagoAPI), outputID, blockID, indexBooked, iotaOutput, outputProof)
 	outputBytes, err := iotagoAPI.Encode(output.Output())
 	require.NoError(t, err)
 	proofBytes, err := outputProof.Bytes()
