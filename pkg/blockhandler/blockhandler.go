@@ -88,7 +88,7 @@ func (i *BlockHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mode
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook
 
-	defer lo.Batch(evtUnhook, prefilteredUnhook)
+	defer lo.Batch(evtUnhook, prefilteredUnhook)()
 
 	if err := i.submitBlock(block); err != nil {
 		return ierrors.Wrapf(err, "failed to issue block %s", blockID)
