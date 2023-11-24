@@ -39,7 +39,7 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	node2 := ts.AddNode("node2")
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddGenesisWallet("default", node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddDefaultWallet(node1, iotago.MaxBlockIssuanceCredits/2)
 
 	ts.Run(true)
 
@@ -53,7 +53,7 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 		ExpirySlot:      iotago.MaxSlotIndex,
 		BlockIssuerKeys: node1.Validator.BlockIssuerKeys(),
 		StakeEndEpoch:   iotago.MaxEpochIndex,
-		ValidatorStake:  mock.MinValidatorAccountAmount,
+		ValidatorStake:  mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 	}, ts.Nodes()...)
 	// Default wallet block issuer account.
 	blockIssuerAccountOutput := ts.AccountOutput("Genesis:2")
@@ -76,8 +76,8 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 		"Genesis:0",
 		ts.DefaultWallet(),
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
-		mock.WithStakingFeature(10000, 421, 0, 10),
-		mock.WithAccountAmount(mock.MinIssuerAccountAmount),
+		mock.WithStakingFeature(mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()), 421, 0, 10),
+		mock.WithAccountAmount(mock.MinValidatorAccountAmount(ts.API.ProtocolParameters())),
 	)
 
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
@@ -98,7 +98,7 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 		PreviousOutputID:       iotago.EmptyOutputID,
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
-		ValidatorStakeChange:   10000,
+		ValidatorStakeChange:   int64(mock.MinValidatorAccountAmount(ts.API.ProtocolParameters())),
 		StakeEndEpochChange:    10,
 		FixedCostChange:        421,
 		DelegationStakeChange:  0,
@@ -113,7 +113,7 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: 0,
-		ValidatorStake:  10000,
+		ValidatorStake:  mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 	}, ts.Nodes()...)
 
 	return ts, node1, node2, latestParents
