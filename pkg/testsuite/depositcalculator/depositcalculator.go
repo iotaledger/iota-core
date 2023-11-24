@@ -288,9 +288,13 @@ func MinDeposit(protocolParams iotago.ProtocolParameters, outputType iotago.Outp
 
 	case iotago.OutputFoundry:
 		dummyOutput = &iotago.FoundryOutput{
-			Amount:            0,
-			SerialNumber:      0,
-			TokenScheme:       &iotago.SimpleTokenScheme{},
+			Amount:       0,
+			SerialNumber: 0,
+			TokenScheme: &iotago.SimpleTokenScheme{
+				MintedTokens:  big.NewInt(0),
+				MeltedTokens:  big.NewInt(0),
+				MaximumSupply: big.NewInt(0),
+			},
 			UnlockConditions:  getUnlockConditions[iotago.FoundryOutputUnlockCondition](outputType, depositCalculationOptions),
 			Features:          getFeatures[iotago.FoundryOutputFeature](depositCalculationOptions),
 			ImmutableFeatures: getImmutableFeatures[iotago.FoundryOutputImmFeature](depositCalculationOptions),
