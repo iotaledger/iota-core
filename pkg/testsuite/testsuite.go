@@ -382,6 +382,11 @@ func (t *TestSuite) RemoveNode(name string) {
 	t.nodes.Delete(name)
 }
 
+// AddGenesisAccount adds an account the test suite in the genesis snapshot.
+func (t *TestSuite) AddGenesisAccount(accountDetails snapshotcreator.AccountDetails) {
+	t.optsAccounts = append(t.optsAccounts, accountDetails)
+}
+
 // AddGenesisWallet adds a wallet to the test suite with a block issuer in the genesis snapshot and access to the genesis seed.
 // If no block issuance credits are provided, the wallet will be assigned half of the maximum block issuance credits.
 func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {

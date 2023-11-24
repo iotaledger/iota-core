@@ -19,22 +19,7 @@ import (
 func Test_TransitionAndDestroyAccount(t *testing.T) {
 	oldGenesisOutputKey := utils.RandBlockIssuerKey()
 
-	// TODO: remove this ugly workaround
-	dummyParameters := iotago.NewV3ProtocolParameters(testsuite.DefaultProtocolParameterOptions("dummy")...)
-
-	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
-		// Nil address will be replaced with the address generated from genesis seed.
-		Address: nil,
-		// Set an amount enough to cover storage deposit and more issuer keys.
-		Amount: mock.MinIssuerAccountAmount(dummyParameters) * 10,
-		Mana:   0,
-		// AccountID is derived from this field, so this must be set uniquely for each account.
-		IssuerKey: oldGenesisOutputKey,
-		// Expiry Slot is the slot index at which the account expires.
-		ExpirySlot: iotago.MaxSlotIndex,
-		// BlockIssuanceCredits on this account is custom because it never needs to issue.
-		BlockIssuanceCredits: iotago.BlockIssuanceCredits(123),
-	}),
+	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
 				0,
@@ -52,6 +37,20 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 		),
 	)
 	defer ts.Shutdown()
+
+	ts.AddGenesisAccount(snapshotcreator.AccountDetails{
+		// Nil address will be replaced with the address generated from genesis seed.
+		Address: nil,
+		// Set an amount enough to cover storage deposit and more issuer keys.
+		Amount: mock.MinIssuerAccountAmount(ts.API.ProtocolParameters()) * 10,
+		Mana:   0,
+		// AccountID is derived from this field, so this must be set uniquely for each account.
+		IssuerKey: oldGenesisOutputKey,
+		// Expiry Slot is the slot index at which the account expires.
+		ExpirySlot: iotago.MaxSlotIndex,
+		// BlockIssuanceCredits on this account is custom because it never needs to issue.
+		BlockIssuanceCredits: iotago.BlockIssuanceCredits(123),
+	})
 
 	// Add a validator node to the network. This will add a validator account to the snapshot.
 	node1 := ts.AddValidatorNode("node1")
