@@ -113,7 +113,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		Endpoint:  net.JoinWithEndpointID(peerID, partition),
 		Workers:   workerpool.NewGroup(name),
 
-		attachedBlocks: make([]*blocks.Block, 0),
+		attachedBlocks:           make([]*blocks.Block, 0),
 		invalidTransactionEvents: make(map[iotago.SignedTransactionID]InvalidSignedTransactionEvent),
 	}
 }

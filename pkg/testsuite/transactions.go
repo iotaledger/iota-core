@@ -1,8 +1,6 @@
 package testsuite
 
 import (
-	"errors"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -171,7 +169,7 @@ func (t *TestSuite) AssertTransactionFailure(signedTxID iotago.SignedTransaction
 				return ierrors.Errorf("%s: failure for signed transaction %s does not exist", node.Name, signedTxID)
 			}
 
-			if !errors.Is(txFailure.Error, txFailureReason) {
+			if !ierrors.Is(txFailure.Error, txFailureReason) {
 				return ierrors.Errorf("%s: expected tx failure reason %s, got %s", node.Name, txFailureReason, txFailure.Error)
 			}
 

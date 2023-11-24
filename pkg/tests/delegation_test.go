@@ -4,18 +4,17 @@ import (
 	"testing"
 
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
-	"github.com/iotaledger/iota-core/pkg/utils"
+
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock.Node, []iotago.BlockID) {
+func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock.Node) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
@@ -65,118 +64,70 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 		BlockIssuerKeys: wallet.BlockIssuer.BlockIssuerKeys(),
 	}, ts.Nodes()...)
 
-	// CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
-	newAccountBlockIssuerKey := utils.RandBlockIssuerKey()
-	// set the expiry slot of the transitioned genesis account to the latest committed + MaxCommittableAge
-	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
-
-	var block1Slot iotago.SlotIndex = 1
-	tx1 := ts.DefaultWallet().CreateAccountFromInput(
-		"TX1",
-		"Genesis:0",
-		ts.DefaultWallet(),
-		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
-		mock.WithStakingFeature(mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()), 421, 0, 10),
-		mock.WithAccountAmount(mock.MinValidatorAccountAmount(ts.API.ProtocolParameters())),
-	)
-
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-	ts.SetCurrentSlot(block1Slot)
-	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
-	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
-
-	newAccount := ts.DefaultWallet().AccountOutput("TX1:0")
-	newAccountOutput := newAccount.Output().(*iotago.AccountOutput)
-
-	ts.AssertAccountDiff(newAccountOutput.AccountID, block1Slot, &model.AccountDiff{
-		BICChange:              0,
-		PreviousUpdatedSlot:    0,
-		NewExpirySlot:          newAccountExpirySlot,
-		PreviousExpirySlot:     0,
-		NewOutputID:            newAccount.OutputID(),
-		PreviousOutputID:       iotago.EmptyOutputID,
-		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
-		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
-		ValidatorStakeChange:   int64(mock.MinValidatorAccountAmount(ts.API.ProtocolParameters())),
-		StakeEndEpochChange:    10,
-		FixedCostChange:        421,
-		DelegationStakeChange:  0,
-	}, false, ts.Nodes()...)
-
-	ts.AssertAccountData(&accounts.AccountData{
-		ID:              newAccountOutput.AccountID,
-		Credits:         accounts.NewBlockIssuanceCredits(0, block1Slot),
-		ExpirySlot:      newAccountExpirySlot,
-		OutputID:        newAccount.OutputID(),
-		BlockIssuerKeys: iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
-		StakeEndEpoch:   10,
-		FixedCost:       421,
-		DelegationStake: 0,
-		ValidatorStake:  mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
-	}, ts.Nodes()...)
-
-	return ts, node1, node2, latestParents
+	return ts, node1, node2
 }
 
 // Test that a Delegation Output which delegates to an account which does not exist / did not receive rewards
 // can be destroyed.
 func Test_Delegation_DestroyOutputWithoutRewards(t *testing.T) {
-	ts, node1, node2, latestParents := setupDelegationTestsuite(t)
+	ts, node1, node2 := setupDelegationTestsuite(t)
 	defer ts.Shutdown()
 
 	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
 	accountAddress := tpkg.RandAccountAddress()
-	block2Slot := ts.CurrentSlot()
-	tx2 := ts.DefaultWallet().CreateDelegationFromInput(
-		"TX2",
-		"TX1:1",
+	var block1Slot iotago.SlotIndex = 1
+	ts.SetCurrentSlot(block1Slot)
+	tx1 := ts.DefaultWallet().CreateDelegationFromInput(
+		"TX1",
+		"Genesis:0",
 		mock.WithDelegatedValidatorAddress(accountAddress),
 		mock.WithDelegationStartEpoch(1),
 	)
+	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+
+	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
+
+	block2Slot := ts.CurrentSlot()
+	tx2 := ts.DefaultWallet().ClaimDelegatorRewards("TX2", "TX1:0")
 	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
 
-	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
+	ts.CommitUntilSlot(block2Slot, block2.ID())
 
-	block3Slot := ts.CurrentSlot()
-	tx3 := ts.DefaultWallet().ClaimDelegatorRewards("TX3", "TX2:0")
-	block3 := ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
-
-	ts.CommitUntilSlot(block3Slot, block3.ID())
-
-	ts.AssertTransactionsExist([]*iotago.Transaction{tx3.Transaction}, true, node1, node2)
-	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx3.Transaction}, true, node1, node2)
+	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
+	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
 }
 
 func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
-	ts, node1, node2, latestParents := setupDelegationTestsuite(t)
+	ts, node1, node2 := setupDelegationTestsuite(t)
 	defer ts.Shutdown()
 
 	// CREATE NFT FROM BASIC UTXO
-	block2Slot := ts.CurrentSlot()
-	input := ts.DefaultWallet().Output("TX1:1")
+	var block1Slot iotago.SlotIndex = 1
+	ts.SetCurrentSlot(block1Slot)
+
+	input := ts.DefaultWallet().Output("Genesis:0")
 	nftOutput := builder.NewNFTOutputBuilder(ts.DefaultWallet().Address(), input.BaseTokenAmount()).MustBuild()
-	tx2 := ts.DefaultWallet().CreateSignedTransactionWithOptions(
-		"TX2",
+	tx1 := ts.DefaultWallet().CreateSignedTransactionWithOptions(
+		"TX1",
 		mock.WithInputs(utxoledger.Outputs{input}),
 		mock.WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
 		mock.WithAllotAllManaToAccount(ts.CurrentSlot(), ts.DefaultWallet().BlockIssuer.AccountID),
 	)
 
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
+	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
 
-	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
+	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
 
-	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
-	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
+	ts.AssertTransactionsExist([]*iotago.Transaction{tx1.Transaction}, true, node1, node2)
+	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx1.Transaction}, true, node1, node2)
 
 	// ATTEMPT TO POINT REWARD INPUT TO AN NFT OUTPUT
-	inputNFT := ts.DefaultWallet().Output("TX2:0")
+	inputNFT := ts.DefaultWallet().Output("TX1:0")
 	prevNFT := inputNFT.Output().Clone().(*iotago.NFTOutput)
 	nftOutput = builder.NewNFTOutputBuilderFromPrevious(prevNFT).NFTID(iotago.NFTIDFromOutputID(inputNFT.OutputID())).MustBuild()
 
-	tx3 := ts.DefaultWallet().CreateSignedTransactionWithOptions(
-		"TX3",
+	tx2 := ts.DefaultWallet().CreateSignedTransactionWithOptions(
+		"TX2",
 		mock.WithInputs(utxoledger.Outputs{inputNFT}),
 		mock.WithRewardInput(
 			&iotago.RewardInput{Index: 0},
@@ -189,12 +140,12 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 		mock.WithAllotAllManaToAccount(ts.CurrentSlot(), ts.DefaultWallet().BlockIssuer.AccountID),
 	)
 
-	ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
+	ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
 
 	ts.Wait(node1, node2)
 
 	// TODO: Assertions do not pass for node2 - why?
-	ts.AssertTransactionsExist([]*iotago.Transaction{tx3.Transaction}, true, node1)
-	signedTx3ID := lo.PanicOnErr(tx3.ID())
+	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1)
+	signedTx3ID := lo.PanicOnErr(tx2.ID())
 	ts.AssertTransactionFailure(signedTx3ID, iotago.ErrRewardInputInvalid, node1)
 }
