@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
+	"github.com/iotaledger/iota-core/pkg/testsuite/depositcalculator"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/utils"
@@ -220,7 +221,14 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// set the expiry slot of the transitioned genesis account to the latest committed + MaxCommittableAge
 	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
 
-	validatorAccountAmount := mock.MinValidatorAccountAmount(ts.API.ProtocolParameters())
+	stakedAmount := iotago.BaseToken(10000)
+
+	validatorAccountAmount, err := depositcalculator.MinDeposit(ts.API.ProtocolParameters(), iotago.OutputAccount,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+		depositcalculator.WithBlockIssuerKeys(1),
+		depositcalculator.WithStakedAmount(stakedAmount),
+	)
+	require.NoError(t, err)
 
 	var block1Slot iotago.SlotIndex = 1
 	tx1 := ts.DefaultWallet().CreateAccountFromInput(
@@ -228,7 +236,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		"Genesis:0",
 		ts.DefaultWallet(),
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
-		mock.WithStakingFeature(validatorAccountAmount, 421, 0, 10), // match amount and staked amount to simplify the tests
+		mock.WithStakingFeature(stakedAmount, 421, 0, 10), // match amount and staked amount to simplify the tests
 		mock.WithAccountAmount(validatorAccountAmount),
 	)
 
@@ -250,7 +258,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		PreviousOutputID:       iotago.EmptyOutputID,
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
-		ValidatorStakeChange:   int64(validatorAccountAmount),
+		ValidatorStakeChange:   int64(stakedAmount),
 		StakeEndEpochChange:    10,
 		FixedCostChange:        421,
 		DelegationStakeChange:  0,
@@ -265,7 +273,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: 0,
-		ValidatorStake:  validatorAccountAmount,
+		ValidatorStake:  stakedAmount,
 	}, ts.Nodes()...)
 
 	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
@@ -304,7 +312,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(delegatedAmount),
-		ValidatorStake:  validatorAccountAmount,
+		ValidatorStake:  stakedAmount,
 	}, ts.Nodes()...)
 
 	// transition a delegation output to a delayed claiming state
@@ -337,7 +345,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(0),
-		ValidatorStake:  validatorAccountAmount,
+		ValidatorStake:  stakedAmount,
 	}, ts.Nodes()...)
 }
 
@@ -695,8 +703,13 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 	wallet2BIC := iotago.MaxBlockIssuanceCredits / 2
 
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	// TODO: calculate the correct amount
-	wallet1 := ts.AddGenesisWallet("wallet 1", node1, testsuite.WithWalletAmount(5000000), testsuite.WithWalletBlockIssuanceCredits(wallet1BIC))
+	minDeposit, err := depositcalculator.MinDeposit(ts.API.ProtocolParameters(), iotago.OutputAccount,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+		depositcalculator.WithBlockIssuerKeys(2),
+	)
+	require.NoError(t, err)
+
+	wallet1 := ts.AddGenesisWallet("wallet 1", node1, testsuite.WithWalletAmount(minDeposit), testsuite.WithWalletBlockIssuanceCredits(wallet1BIC))
 	wallet2 := ts.AddGenesisWallet("wallet 2", node1, testsuite.WithWalletBlockIssuanceCredits(wallet2BIC))
 
 	ts.Run(true)
