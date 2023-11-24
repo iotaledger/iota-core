@@ -19,18 +19,18 @@ type Options struct {
 	GovernorAddress             iotago.Address
 
 	// Features
-	SenderAddress       iotago.Address
-	IssuerAddress       iotago.Address
-	MetadataLength      int
-	StateMetadataLength int
-	TagLength           int
-	HasNativeToken      bool
-	BlockIssuerKeys     int
-	StakedAmount        iotago.BaseToken
+	SenderAddress               iotago.Address
+	IssuerAddress               iotago.Address
+	MetadataSerializedSize      int
+	StateMetadataSerializedSize int
+	TagLength                   int
+	HasNativeToken              bool
+	BlockIssuerKeys             int
+	StakedAmount                iotago.BaseToken
 
 	// Immutable Features
-	ImmutableIssuerAddress  iotago.Address
-	ImmutableMetadataLength int
+	ImmutableIssuerAddress          iotago.Address
+	ImmutableMetadataSerializedSize int
 }
 
 // WithAddress sets the address for the address unlock condition.
@@ -89,19 +89,19 @@ func WithIssuerAddress(address iotago.Address) options.Option[Options] {
 	}
 }
 
-// WithMetadataLength adds a metadata feature and adds an entry with an empty key and a dummy value
+// WithMetadataSerializedSize adds a metadata feature and adds an entry with an empty key and a dummy value
 // of the given length minus the length of the map length prefix, key length prefix and value length prefix.
-func WithMetadataLength(length int) options.Option[Options] {
+func WithMetadataSerializedSize(size int) options.Option[Options] {
 	return func(opts *Options) {
-		opts.MetadataLength = length
+		opts.MetadataSerializedSize = size
 	}
 }
 
-// WithStateMetadataLength adds a state metadata feature and adds an entry with an empty key and a dummy value
+// WithStateMetadataSerializedSize adds a state metadata feature and adds an entry with an empty key and a dummy value
 // of the given length minus the length of the map length prefix, key length prefix and value length prefix.
-func WithStateMetadataLength(length int) options.Option[Options] {
+func WithStateMetadataSerializedSize(size int) options.Option[Options] {
 	return func(opts *Options) {
-		opts.StateMetadataLength = length
+		opts.StateMetadataSerializedSize = size
 	}
 }
 
@@ -140,11 +140,11 @@ func WithImmutableIssuerAddress(address iotago.Address) options.Option[Options] 
 	}
 }
 
-// WithImmutableMetadataLength adds an immutable metadata feature and adds an entry with an empty key and a dummy value
+// WithImmutableMetadataSerializedSize adds an immutable metadata feature and adds an entry with an empty key and a dummy value
 // of the given length minus the length of the map length prefix, key length prefix and value length prefix.
-func WithImmutableMetadataLength(length int) options.Option[Options] {
+func WithImmutableMetadataSerializedSize(size int) options.Option[Options] {
 	return func(opts *Options) {
-		opts.ImmutableMetadataLength = length
+		opts.ImmutableMetadataSerializedSize = size
 	}
 }
 
@@ -190,20 +190,20 @@ func getFeatures[T iotago.Feature](opts *Options) iotago.Features[T] {
 		features = append(features, &iotago.IssuerFeature{Address: opts.IssuerAddress})
 	}
 
-	if opts.MetadataLength > 0 {
+	if opts.MetadataSerializedSize > 0 {
 		features = append(features, &iotago.MetadataFeature{
 			Entries: iotago.MetadataFeatureEntries{
 				// configured length - map length prefix - key length prefix - value length prefix
-				"": make([]byte, opts.MetadataLength-int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsUint16)),
+				"": make([]byte, opts.MetadataSerializedSize-int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsUint16)),
 			},
 		})
 	}
 
-	if opts.StateMetadataLength > 0 {
+	if opts.StateMetadataSerializedSize > 0 {
 		features = append(features, &iotago.StateMetadataFeature{
 			Entries: iotago.StateMetadataFeatureEntries{
 				// configured length - map length prefix - key length prefix - value length prefix
-				"": make([]byte, opts.StateMetadataLength-int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsUint16)),
+				"": make([]byte, opts.StateMetadataSerializedSize-int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsUint16)),
 			},
 		})
 	}
@@ -239,11 +239,11 @@ func getImmutableFeatures[T iotago.Feature](opts *Options) iotago.Features[T] {
 		features = append(features, &iotago.IssuerFeature{Address: opts.ImmutableIssuerAddress})
 	}
 
-	if opts.ImmutableMetadataLength > 0 {
+	if opts.ImmutableMetadataSerializedSize > 0 {
 		features = append(features, &iotago.MetadataFeature{
 			Entries: iotago.MetadataFeatureEntries{
 				// configured length - map length prefix - key length prefix - value length prefix
-				"": make([]byte, opts.ImmutableMetadataLength-int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsUint16)),
+				"": make([]byte, opts.ImmutableMetadataSerializedSize-int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsByte)+int(serix.LengthPrefixTypeAsUint16)),
 			},
 		})
 	}
