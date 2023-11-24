@@ -236,7 +236,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		"Genesis:0",
 		ts.DefaultWallet(),
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
-		mock.WithStakingFeature(stakedAmount, 421, 0, 10), // match amount and staked amount to simplify the tests
+		mock.WithStakingFeature(stakedAmount, 421, 0, 10),
 		mock.WithAccountAmount(validatorAccountAmount),
 	)
 
