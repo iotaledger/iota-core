@@ -5,7 +5,6 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -23,7 +22,6 @@ type CommitmentFilter struct {
 
 	accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (*accounts.AccountData, bool, error)
 
-	modelBlockRetrieveFunc func(iotago.BlockID) (*model.Block, bool)
 	blockCacheRetrieveFunc func(iotago.BlockID) (*blocks.Block, bool)
 
 	module.Module
@@ -34,7 +32,6 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 		c := New(e, opts...)
 		e.HookConstructed(func() {
 			c.accountRetrieveFunc = e.Ledger.Account
-			c.modelBlockRetrieveFunc = e.Block
 			c.blockCacheRetrieveFunc = e.BlockCache.Block
 
 			e.Ledger.HookConstructed(func() {
