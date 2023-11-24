@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
+	"github.com/iotaledger/iota-core/pkg/testsuite/depositcalculator"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	"github.com/iotaledger/iota-core/pkg/utils"
@@ -19,22 +20,7 @@ import (
 func Test_TransitionAndDestroyAccount(t *testing.T) {
 	oldGenesisOutputKey := utils.RandBlockIssuerKey()
 
-	// TODO: remove this ugly workaround
-	dummyParameters := iotago.NewV3ProtocolParameters(testsuite.DefaultProtocolParameterOptions("dummy")...)
-
-	ts := testsuite.NewTestSuite(t, testsuite.WithAccounts(snapshotcreator.AccountDetails{
-		// Nil address will be replaced with the address generated from genesis seed.
-		Address: nil,
-		// Set an amount enough to cover storage deposit and more issuer keys.
-		Amount: mock.MinIssuerAccountAmount(dummyParameters) * 10,
-		Mana:   0,
-		// AccountID is derived from this field, so this must be set uniquely for each account.
-		IssuerKey: oldGenesisOutputKey,
-		// Expiry Slot is the slot index at which the account expires.
-		ExpirySlot: iotago.MaxSlotIndex,
-		// BlockIssuanceCredits on this account is custom because it never needs to issue.
-		BlockIssuanceCredits: iotago.BlockIssuanceCredits(123),
-	}),
+	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
 				0,
@@ -53,12 +39,26 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
+	ts.AddGenesisAccount(snapshotcreator.AccountDetails{
+		// Nil address will be replaced with the address generated from genesis seed.
+		Address: nil,
+		// Set an amount enough to cover storage deposit and more issuer keys.
+		Amount: mock.MinIssuerAccountAmount(ts.API.ProtocolParameters()) * 10,
+		Mana:   0,
+		// AccountID is derived from this field, so this must be set uniquely for each account.
+		IssuerKey: oldGenesisOutputKey,
+		// Expiry Slot is the slot index at which the account expires.
+		ExpirySlot: iotago.MaxSlotIndex,
+		// BlockIssuanceCredits on this account is custom because it never needs to issue.
+		BlockIssuanceCredits: iotago.BlockIssuanceCredits(123),
+	})
+
 	// Add a validator node to the network. This will add a validator account to the snapshot.
 	node1 := ts.AddValidatorNode("node1")
 	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddDefaultWallet(node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddDefaultWallet(node1)
 
 	ts.Run(true)
 
@@ -189,7 +189,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddDefaultWallet(node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddDefaultWallet(node1)
 
 	ts.Run(true)
 
@@ -221,16 +221,23 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// set the expiry slot of the transitioned genesis account to the latest committed + MaxCommittableAge
 	newAccountExpirySlot := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
 
+	stakedAmount := iotago.BaseToken(10000)
+
+	validatorAccountAmount, err := depositcalculator.MinDeposit(ts.API.ProtocolParameters(), iotago.OutputAccount,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+		depositcalculator.WithBlockIssuerKeys(1),
+		depositcalculator.WithStakedAmount(stakedAmount),
+	)
+	require.NoError(t, err)
+
 	var block1Slot iotago.SlotIndex = 1
 	tx1 := ts.DefaultWallet().CreateAccountFromInput(
 		"TX1",
 		"Genesis:0",
 		ts.DefaultWallet(),
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
-		mock.WithStakingFeature(10000, 421, 0, 10),
-		// TODO: Temporary "fix" for the tests, lets fix this in another PR, so we can at least use the docker network again
-		//mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
-		mock.WithAccountAmount(mock.MinValidatorAccountAmount(ts.API.ProtocolParameters())),
+		mock.WithStakingFeature(stakedAmount, 421, 0, 10),
+		mock.WithAccountAmount(validatorAccountAmount),
 	)
 
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
@@ -251,7 +258,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		PreviousOutputID:       iotago.EmptyOutputID,
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
-		ValidatorStakeChange:   10000,
+		ValidatorStakeChange:   int64(stakedAmount),
 		StakeEndEpochChange:    10,
 		FixedCostChange:        421,
 		DelegationStakeChange:  0,
@@ -266,7 +273,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: 0,
-		ValidatorStake:  10000,
+		ValidatorStake:  stakedAmount,
 	}, ts.Nodes()...)
 
 	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
@@ -305,7 +312,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(delegatedAmount),
-		ValidatorStake:  10000,
+		ValidatorStake:  stakedAmount,
 	}, ts.Nodes()...)
 
 	// transition a delegation output to a delayed claiming state
@@ -338,7 +345,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(0),
-		ValidatorStake:  10000,
+		ValidatorStake:  stakedAmount,
 	}, ts.Nodes()...)
 }
 
@@ -367,7 +374,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddDefaultWallet(node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddDefaultWallet(node1)
 
 	ts.Run(true)
 
@@ -497,8 +504,8 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	wallet1BIC := iotago.BlockIssuanceCredits(100000)
 	wallet2BIC := iotago.BlockIssuanceCredits(0)
 
-	wallet1 := ts.AddGenesisWallet("wallet 1", node2, wallet1BIC)
-	wallet2 := ts.AddGenesisWallet("wallet 2", node2, wallet2BIC)
+	wallet1 := ts.AddGenesisWallet("wallet 1", node2, testsuite.WithWalletBlockIssuanceCredits(wallet1BIC))
+	wallet2 := ts.AddGenesisWallet("wallet 2", node2, testsuite.WithWalletBlockIssuanceCredits(wallet2BIC))
 
 	ts.Run(false)
 
@@ -694,9 +701,16 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 
 	wallet1BIC := iotago.BlockIssuanceCredits(-1)
 	wallet2BIC := iotago.MaxBlockIssuanceCredits / 2
+
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet1 := ts.AddGenesisWallet("wallet 1", node1, wallet1BIC)
-	wallet2 := ts.AddGenesisWallet("wallet 2", node1, wallet2BIC)
+	minDeposit, err := depositcalculator.MinDeposit(ts.API.ProtocolParameters(), iotago.OutputAccount,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+		depositcalculator.WithBlockIssuerKeys(2),
+	)
+	require.NoError(t, err)
+
+	wallet1 := ts.AddGenesisWallet("wallet 1", node1, testsuite.WithWalletAmount(minDeposit), testsuite.WithWalletBlockIssuanceCredits(wallet1BIC))
+	wallet2 := ts.AddGenesisWallet("wallet 2", node1, testsuite.WithWalletBlockIssuanceCredits(wallet2BIC))
 
 	ts.Run(true)
 
@@ -742,7 +756,6 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 	newExpirySlot := block1Slot + ts.API.ProtocolParameters().MaxCommittableAge()
 	{
 		// Prepare a transaction that will try to spend an AccountOutput of a locked account.
-		// BUG: How can we add a block issuer feature here with only minimum funds?
 		tx1 := wallet1.TransitionAccount(
 			"TX1",
 			"Genesis:2",
@@ -916,8 +929,8 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 	wallet1BIC := iotago.BlockIssuanceCredits(-1)
 	wallet2BIC := iotago.MaxBlockIssuanceCredits / 2
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet1 := ts.AddGenesisWallet("wallet 1", node1, wallet1BIC)
-	wallet2 := ts.AddGenesisWallet("wallet 2", node1, wallet2BIC)
+	wallet1 := ts.AddGenesisWallet("wallet 1", node1, testsuite.WithWalletBlockIssuanceCredits(wallet1BIC))
+	wallet2 := ts.AddGenesisWallet("wallet 2", node1, testsuite.WithWalletBlockIssuanceCredits(wallet2BIC))
 
 	ts.Run(true)
 

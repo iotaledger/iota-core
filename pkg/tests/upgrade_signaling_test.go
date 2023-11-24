@@ -119,7 +119,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.AddValidatorNode("nodeD")
 	ts.AddNode("nodeE")
 	ts.AddNode("nodeF")
-	wallet := ts.AddDefaultWallet(nodeA, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddDefaultWallet(nodeA)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
 		"nodeA": nodeOptionsWithoutV5,
