@@ -49,7 +49,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			Amount:               mock.MinValidatorAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
-			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 			StakingEpochEnd:      iotago.MaxEpochIndex,
 			FixedCost:            1,
 			StakedAmount:         mock.MinValidatorAccountAmount,
@@ -69,7 +69,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			Amount:               mock.MinValidatorAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
-			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 			StakingEpochEnd:      iotago.MaxEpochIndex,
 			FixedCost:            1,
 			StakedAmount:         mock.MinValidatorAccountAmount,
@@ -89,7 +89,28 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			Amount:               mock.MinValidatorAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
-			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
+			StakingEpochEnd:      iotago.MaxEpochIndex,
+			FixedCost:            1,
+			StakedAmount:         mock.MinValidatorAccountAmount,
+			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount),
+		},
+		snapshotcreator.AccountDetails{
+			/*
+				node-04-validator
+
+				Ed25519 Public Key:   c9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe
+				Private Key: 5cceed8ca18146639330177ab4f61ab1a71e2d3fea3d4389f9e2e43f34ec8b33c9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe
+				Account Address:      rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw
+				Ed25519 Address:      rms1qr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvts0unx0s
+				Restricted Address:   rms1xqyvnn4vxlffx92627pcr2338mn5ahar43e7aycdq32kf2h8wu0gllspqgz9eyua, Capabilities: mana
+			*/
+			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xc9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe"))),
+			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xc9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe"))),
+			Amount:               mock.MinValidatorAccountAmount,
+			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0xc9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe")))),
+			ExpirySlot:           iotago.MaxSlotIndex,
+			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 			StakingEpochEnd:      iotago.MaxEpochIndex,
 			FixedCost:            1,
 			StakedAmount:         mock.MinValidatorAccountAmount,
@@ -110,7 +131,7 @@ var Docker = []options.Option[snapshotcreator.Options]{
 			Amount:               mock.MinIssuerAccountAmount,
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270")))),
 			ExpirySlot:           iotago.MaxSlotIndex,
-			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 			Mana:                 iotago.Mana(mock.MinIssuerAccountAmount),
 		},
 	),
@@ -132,12 +153,13 @@ var Docker = []options.Option[snapshotcreator.Options]{
 	snapshotcreator.WithProtocolParameters(
 		iotago.NewV3ProtocolParameters(
 			iotago.WithNetworkOptions("docker", "rms"),
-			iotago.WithSupplyOptions(4_600_000_000_000_000, 250, 1, 1000, 100000, 500000, 100000),
-			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 13),
-			iotago.WithLivenessOptions(30, 30, 7, 14, 30),
+			iotago.WithSupplyOptions(4_600_000_000_000_000, 1, 1, 10, 100, 100, 100),
+			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
+			iotago.WithLivenessOptions(30, 30, 2, 4, 8),
 			// increase/decrease threshold = fraction * slotDurationInSeconds * schedulerRate
 			iotago.WithCongestionControlOptions(500, 500, 500, 800000, 500000, 100000, 1000, 100),
 			iotago.WithWorkScoreOptions(25, 1, 100, 50, 10, 10, 50, 1, 10, 250),
+			iotago.WithTargetCommitteeSize(4),
 		),
 	),
 }

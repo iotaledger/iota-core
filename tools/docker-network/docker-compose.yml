@@ -84,6 +84,31 @@ services:
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
 
+  node-4-validator:
+    image: docker-network-node-1-validator:latest
+    stop_grace_period: 1m
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    networks:
+      - iota-core
+    ports:
+      - "8040:14265/tcp" # REST-API
+      - "8041:8081/tcp" # Dashboard
+      - "6041:6061/tcp" # pprof
+      - "9049:9029/tcp" # INX
+    volumes:
+      - ./docker-network.snapshot:/app/data/snapshot.bin
+      - ./config.json:/app/config.json:ro
+    command: >
+      ${COMMON_CONFIG}
+      ${MANUALPEERING_CONFIG}
+      --p2p.identityPrivateKey=f205f6c4525069f71f9c7e987d72421a16c7900056b494a2b85fdf7942cf906aefbdc580f5d1ce4ae3f86ccfe109c6cd76df9b0e710a437b2aa964358c7b9449
+      --inx.enabled=true
+      --inx.bindAddress=0.0.0.0:9029
+
   node-4:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
@@ -247,6 +272,7 @@ services:
       --inx.address=node-1-validator:9029
       --faucet.bindAddress=inx-faucet:8091
       --faucet.rateLimit.enabled=false
+      --logger.level=warn
 
   inx-validator-1:
     image: iotaledger/inx-validator:1.0-alpha
@@ -260,7 +286,7 @@ services:
     environment:
       - "VALIDATOR_PRV_KEY=443a988ea61797651217de1f4662d4d6da11fd78e67f94511453bf6576045a05293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b"
     command: >
-      --logger.level=debug
+      --logger.level=warn
       --inx.address=node-1-validator:9029
       --validator.ignoreBootstrapped=true
       --validator.accountAddress=rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6
@@ -277,7 +303,7 @@ services:
     environment:
       - "VALIDATOR_PRV_KEY=3a5d39f8b60367a17fd54dac2a32c172c8e1fd6cf74ce65f1e13edba565f281705c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064"
     command: >
-      --logger.level=debug
+      --logger.level=warn
       --inx.address=node-2-validator:9029
       --validator.accountAddress=rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl
 
@@ -293,9 +319,26 @@ services:
     environment:
       - "VALIDATOR_PRV_KEY=db39d2fde6301d313b108dc9db1ee724d0f405f6fde966bd776365bc5f4a5fb31e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648"
     command: >
-      --logger.level=debug
+      --logger.level=warn
       --inx.address=node-3-validator:9029
       --validator.accountAddress=rms1pp4wuuz0y42caz48vv876qfpmffswsvg40zz8v79sy8cp0jfxm4kunflcgt
+
+  inx-validator-4:
+    image: iotaledger/inx-validator:1.0-alpha
+    stop_grace_period: 1m
+    restart: unless-stopped
+    depends_on:
+      node-3-validator:
+        condition: service_started
+    networks:
+      - iota-core
+    environment:
+      - "VALIDATOR_PRV_KEY=5cceed8ca18146639330177ab4f61ab1a71e2d3fea3d4389f9e2e43f34ec8b33c9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe"
+    command: >
+      --logger.level=debug
+      --inx.address=node-4-validator:9029
+      --validator.accountAddress=rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw
+      --logger.level=warn
 
 # Create our own network
 networks:
