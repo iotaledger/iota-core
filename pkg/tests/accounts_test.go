@@ -220,16 +220,16 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// set the expiry slot of the transitioned genesis account to the latest committed + MaxCommittableAge
 	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
 
+	validatorAccountAmount := mock.MinValidatorAccountAmount(ts.API.ProtocolParameters())
+
 	var block1Slot iotago.SlotIndex = 1
 	tx1 := ts.DefaultWallet().CreateAccountFromInput(
 		"TX1",
 		"Genesis:0",
 		ts.DefaultWallet(),
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
-		mock.WithStakingFeature(10000, 421, 0, 10),
-		// TODO: Temporary "fix" for the tests, lets fix this in another PR, so we can at least use the docker network again
-		//mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
-		mock.WithAccountAmount(mock.MinValidatorAccountAmount(ts.API.ProtocolParameters())),
+		mock.WithStakingFeature(validatorAccountAmount, 421, 0, 10), // match amount and staked amount to simplify the tests
+		mock.WithAccountAmount(validatorAccountAmount),
 	)
 
 	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
@@ -250,7 +250,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		PreviousOutputID:       iotago.EmptyOutputID,
 		BlockIssuerKeysAdded:   iotago.NewBlockIssuerKeys(newAccountBlockIssuerKey),
 		BlockIssuerKeysRemoved: iotago.NewBlockIssuerKeys(),
-		ValidatorStakeChange:   10000,
+		ValidatorStakeChange:   int64(validatorAccountAmount),
 		StakeEndEpochChange:    10,
 		FixedCostChange:        421,
 		DelegationStakeChange:  0,
@@ -265,7 +265,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: 0,
-		ValidatorStake:  10000,
+		ValidatorStake:  validatorAccountAmount,
 	}, ts.Nodes()...)
 
 	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
@@ -304,7 +304,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(delegatedAmount),
-		ValidatorStake:  10000,
+		ValidatorStake:  validatorAccountAmount,
 	}, ts.Nodes()...)
 
 	// transition a delegation output to a delayed claiming state
@@ -337,7 +337,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		StakeEndEpoch:   10,
 		FixedCost:       421,
 		DelegationStake: iotago.BaseToken(0),
-		ValidatorStake:  10000,
+		ValidatorStake:  validatorAccountAmount,
 	}, ts.Nodes()...)
 }
 
