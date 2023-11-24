@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 const (
@@ -15,8 +15,8 @@ const (
 )
 
 type BlockRetainerData struct {
-	State         apimodels.BlockState
-	FailureReason apimodels.BlockFailureReason
+	State         api.BlockState
+	FailureReason api.BlockFailureReason
 }
 
 func (b *BlockRetainerData) Bytes() ([]byte, error) {
@@ -38,10 +38,10 @@ func BlockRetainerDataFromBytes(bytes []byte) (*BlockRetainerData, int, error) {
 	var err error
 	b := new(BlockRetainerData)
 
-	if b.State, err = stream.Read[apimodels.BlockState](byteReader); err != nil {
+	if b.State, err = stream.Read[api.BlockState](byteReader); err != nil {
 		return nil, 0, ierrors.Wrap(err, "failed to read block state")
 	}
-	if b.FailureReason, err = stream.Read[apimodels.BlockFailureReason](byteReader); err != nil {
+	if b.FailureReason, err = stream.Read[api.BlockFailureReason](byteReader); err != nil {
 		return nil, 0, ierrors.Wrap(err, "failed to read block failure reason")
 	}
 
@@ -49,8 +49,8 @@ func BlockRetainerDataFromBytes(bytes []byte) (*BlockRetainerData, int, error) {
 }
 
 type TransactionRetainerData struct {
-	State         apimodels.TransactionState
-	FailureReason apimodels.TransactionFailureReason
+	State         api.TransactionState
+	FailureReason api.TransactionFailureReason
 }
 
 func (t *TransactionRetainerData) Bytes() ([]byte, error) {
@@ -72,10 +72,10 @@ func TransactionRetainerDataFromBytes(bytes []byte) (*TransactionRetainerData, i
 	var err error
 	t := new(TransactionRetainerData)
 
-	if t.State, err = stream.Read[apimodels.TransactionState](byteReader); err != nil {
+	if t.State, err = stream.Read[api.TransactionState](byteReader); err != nil {
 		return nil, 0, ierrors.Wrap(err, "failed to read transaction state")
 	}
-	if t.FailureReason, err = stream.Read[apimodels.TransactionFailureReason](byteReader); err != nil {
+	if t.FailureReason, err = stream.Read[api.TransactionFailureReason](byteReader); err != nil {
 		return nil, 0, ierrors.Wrap(err, "failed to read transaction failure reason")
 	}
 
@@ -109,8 +109,8 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 
 func (r *Retainer) StoreBlockAttached(blockID iotago.BlockID) error {
 	return r.blockStore.Set(blockID, &BlockRetainerData{
-		State:         apimodels.BlockStatePending,
-		FailureReason: apimodels.BlockFailureNone,
+		State:         api.BlockStatePending,
+		FailureReason: api.BlockFailureNone,
 	})
 }
 
@@ -134,33 +134,33 @@ func (r *Retainer) GetTransaction(blockID iotago.BlockID) (*TransactionRetainerD
 
 func (r *Retainer) StoreBlockAccepted(blockID iotago.BlockID) error {
 	return r.blockStore.Set(blockID, &BlockRetainerData{
-		State:         apimodels.BlockStateAccepted,
-		FailureReason: apimodels.BlockFailureNone,
+		State:         api.BlockStateAccepted,
+		FailureReason: api.BlockFailureNone,
 	})
 }
 
 func (r *Retainer) StoreBlockConfirmed(blockID iotago.BlockID) error {
 	return r.blockStore.Set(blockID, &BlockRetainerData{
-		State:         apimodels.BlockStateConfirmed,
-		FailureReason: apimodels.BlockFailureNone,
+		State:         api.BlockStateConfirmed,
+		FailureReason: api.BlockFailureNone,
 	})
 }
 
 func (r *Retainer) StoreTransactionPending(blockID iotago.BlockID) error {
 	return r.transactionStore.Set(blockID, &TransactionRetainerData{
-		State:         apimodels.TransactionStatePending,
-		FailureReason: apimodels.TxFailureNone,
+		State:         api.TransactionStatePending,
+		FailureReason: api.TxFailureNone,
 	})
 }
 
-func (r *Retainer) StoreTransactionNoFailureStatus(blockID iotago.BlockID, status apimodels.TransactionState) error {
-	if status == apimodels.TransactionStateFailed {
+func (r *Retainer) StoreTransactionNoFailureStatus(blockID iotago.BlockID, status api.TransactionState) error {
+	if status == api.TransactionStateFailed {
 		return ierrors.Errorf("failed to retain transaction status, status cannot be failed, blockID: %s", blockID.String())
 	}
 
 	return r.transactionStore.Set(blockID, &TransactionRetainerData{
 		State:         status,
-		FailureReason: apimodels.TxFailureNone,
+		FailureReason: api.TxFailureNone,
 	})
 }
 
@@ -168,16 +168,16 @@ func (r *Retainer) DeleteTransactionData(prevID iotago.BlockID) error {
 	return r.transactionStore.Delete(prevID)
 }
 
-func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType apimodels.BlockFailureReason) error {
+func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType api.BlockFailureReason) error {
 	return r.blockStore.Set(blockID, &BlockRetainerData{
-		State:         apimodels.BlockStateFailed,
+		State:         api.BlockStateFailed,
 		FailureReason: failureType,
 	})
 }
 
-func (r *Retainer) StoreTransactionFailure(blockID iotago.BlockID, failureType apimodels.TransactionFailureReason) error {
+func (r *Retainer) StoreTransactionFailure(blockID iotago.BlockID, failureType api.TransactionFailureReason) error {
 	return r.transactionStore.Set(blockID, &TransactionRetainerData{
-		State:         apimodels.TransactionStateFailed,
+		State:         api.TransactionStateFailed,
 		FailureReason: failureType,
 	})
 }
