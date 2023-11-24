@@ -155,7 +155,7 @@ var (
 		),
 	}
 
-	// Feature is a preset for the feature network, genesis time ~20th of July 2023.
+	// Feature is a preset for the feature network.
 	Feature = []options.Option[snapshotcreator.Options]{
 		snapshotcreator.WithFilePath("docker-network.snapshot"),
 		snapshotcreator.WithProtocolParameters(protocolParamsFeature),
