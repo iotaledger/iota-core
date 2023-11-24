@@ -1,3 +1,4 @@
+//nolint:forcetypeassert
 package depositcalculator
 
 import (
