@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -115,7 +114,7 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
-		api.SingleVersionProvider(testAPI),
+		iotago.SingleVersionProvider(testAPI),
 		WithMaxAllowedWallClockDrift(allowedDrift),
 	)
 
@@ -135,8 +134,8 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 }
 
 func TestFilter_ProtocolVersion(t *testing.T) {
-	apiProvider := api.NewEpochBasedProvider(
-		api.WithAPIForMissingVersionCallback(
+	apiProvider := iotago.NewEpochBasedProvider(
+		iotago.WithAPIForMissingVersionCallback(
 			func(params iotago.ProtocolParameters) (iotago.API, error) {
 				return iotago.V3API(iotago.NewV3ProtocolParameters(iotago.WithVersion(params.Version()))), nil
 			},
@@ -204,7 +203,7 @@ func TestFilter_ValidationBlocks(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
-		api.SingleVersionProvider(testAPI),
+		iotago.SingleVersionProvider(testAPI),
 	)
 
 	validatorAccountID := tpkg.RandAccountID()

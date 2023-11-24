@@ -56,7 +56,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	node6 := ts.AddValidatorNode("node6")
 	node7 := ts.AddValidatorNode("node7")
 	node8 := ts.AddNode("node8")
-	ts.AddGenesisWallet("default", node0, iotago.MaxBlockIssuanceCredits/2)
+	ts.AddDefaultWallet(node0, iotago.MaxBlockIssuanceCredits/2)
 
 	const expectedCommittedSlotAfterPartitionMerge = 18
 	nodesP1 := []*mock.Node{node0, node1, node2, node3, node4, node5}

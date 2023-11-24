@@ -10,12 +10,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	iotago_tpkg "github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	outputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),
@@ -89,7 +88,7 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 }
 
 func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), api.SingleVersionProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.TestAPI))
 
 	previousOutputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),

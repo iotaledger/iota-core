@@ -6,15 +6,15 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
-func pruneDatabase(c echo.Context) (*apimodels.PruneDatabaseResponse, error) {
+func pruneDatabase(c echo.Context) (*api.PruneDatabaseResponse, error) {
 	if deps.Protocol.Engines.Main.Get().Storage.IsPruning() {
 		return nil, ierrors.Wrapf(echo.ErrServiceUnavailable, "node is already pruning")
 	}
 
-	request := &apimodels.PruneDatabaseRequest{}
+	request := &api.PruneDatabaseRequest{}
 	if err := c.Bind(request); err != nil {
 		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "invalid request, error: %s", err)
 	}
@@ -60,7 +60,7 @@ func pruneDatabase(c echo.Context) (*apimodels.PruneDatabaseResponse, error) {
 		targetEpoch++
 	}
 
-	return &apimodels.PruneDatabaseResponse{
+	return &api.PruneDatabaseResponse{
 		Epoch: targetEpoch,
 	}, nil
 }

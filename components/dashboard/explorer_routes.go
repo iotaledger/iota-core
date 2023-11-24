@@ -11,11 +11,10 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/hexutil"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 // SearchResult defines the struct of the SearchResult.
@@ -27,8 +26,8 @@ type SearchResult struct {
 }
 
 func setupExplorerRoutes(routeGroup *echo.Group) {
-	routeGroup.GET("/block/:"+restapipkg.ParameterBlockID, func(c echo.Context) (err error) {
-		blockID, err := httpserver.ParseBlockIDParam(c, restapipkg.ParameterBlockID)
+	routeGroup.GET("/block/:"+api.ParameterBlockID, func(c echo.Context) (err error) {
+		blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)
 		if err != nil {
 			return ierrors.Errorf("parse block ID error: %w", err)
 		}
@@ -41,17 +40,17 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 		return c.JSON(http.StatusOK, t)
 	})
 
-	routeGroup.GET("/transaction/:"+restapipkg.ParameterTransactionID, getTransaction)
+	routeGroup.GET("/transaction/:"+api.ParameterTransactionID, getTransaction)
 	routeGroup.GET("/transaction/:transactionID/metadata", getTransactionMetadata)
 	// routeGroup.GET("/transaction/:transactionID/attachments", ledgerstateAPI.GetTransactionAttachments)
-	routeGroup.GET("/output/:"+restapipkg.ParameterOutputID, getOutput)
+	routeGroup.GET("/output/:"+api.ParameterOutputID, getOutput)
 	// routeGroup.GET("/output/:outputID/metadata", ledgerstateAPI.GetOutputMetadata)
 	// routeGroup.GET("/output/:outputID/consumers", ledgerstateAPI.GetOutputConsumers)
 	// routeGroup.GET("/conflict/:conflictID", ledgerstateAPI.GetConflict)
 	// routeGroup.GET("/conflict/:conflictID/children", ledgerstateAPI.GetConflictChildren)
 	// routeGroup.GET("/conflict/:conflictID/conflicts", ledgerstateAPI.GetConflictConflicts)
 	// routeGroup.GET("/conflict/:conflictID/voters", ledgerstateAPI.GetConflictVoters)
-	routeGroup.GET("/slot/commitment/:"+restapipkg.ParameterCommitmentID, getSlotDetailsByID)
+	routeGroup.GET("/slot/commitment/:"+api.ParameterCommitmentID, getSlotDetailsByID)
 
 	routeGroup.GET("/search/:search", func(c echo.Context) error {
 		search := c.Param("search")
@@ -177,13 +176,13 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 		})
 	} else {
 		switch metadata.BlockState {
-		case apimodels.BlockStateConfirmed, apimodels.BlockStateFinalized:
+		case api.BlockStateConfirmed, api.BlockStateFinalized:
 			t.Solid = true
 			t.Booked = true
 			t.Acceptance = true
 			t.Scheduled = true
 			t.Confirmation = true
-		case apimodels.BlockStateFailed, apimodels.BlockStateRejected:
+		case api.BlockStateFailed, api.BlockStateRejected:
 			t.ObjectivelyInvalid = true
 		}
 	}
@@ -192,7 +191,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 }
 
 func getTransaction(c echo.Context) error {
-	txID, err := httpserver.ParseTransactionIDParam(c, restapipkg.ParameterTransactionID)
+	txID, err := httpserver.ParseTransactionIDParam(c, api.ParameterTransactionID)
 	if err != nil {
 		return err
 	}
@@ -220,7 +219,7 @@ func getTransaction(c echo.Context) error {
 }
 
 func getTransactionMetadata(c echo.Context) error {
-	txID, err := httpserver.ParseTransactionIDParam(c, restapipkg.ParameterTransactionID)
+	txID, err := httpserver.ParseTransactionIDParam(c, api.ParameterTransactionID)
 	if err != nil {
 		return err
 	}
@@ -239,7 +238,7 @@ func getTransactionMetadata(c echo.Context) error {
 }
 
 func getOutput(c echo.Context) error {
-	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
+	outputID, err := httpserver.ParseOutputIDParam(c, api.ParameterOutputID)
 	if err != nil {
 		return err
 	}
@@ -253,7 +252,7 @@ func getOutput(c echo.Context) error {
 }
 
 func getSlotDetailsByID(c echo.Context) error {
-	commitmentID, err := httpserver.ParseCommitmentIDParam(c, restapipkg.ParameterCommitmentID)
+	commitmentID, err := httpserver.ParseCommitmentIDParam(c, api.ParameterCommitmentID)
 	if err != nil {
 		return err
 	}

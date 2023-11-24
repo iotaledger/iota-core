@@ -10,7 +10,7 @@ require (
 	github.com/iotaledger/hive.go/lo v0.0.0-20231123125248-3ca2c0a88408
 	github.com/iotaledger/hive.go/runtime v0.0.0-20231123125248-3ca2c0a88408
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231122091223-371a164a92e5
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231124100551-bb617f46bb49
 	github.com/mr-tron/base58 v1.2.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.15.0
@@ -26,7 +26,7 @@ require (
 	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/hive.go/ads v0.0.0-20231123022750-daace4282098 // indirect
+	github.com/iotaledger/hive.go/ads v0.0.0-20231123125248-3ca2c0a88408 // indirect
 	github.com/iotaledger/hive.go/constraints v0.0.0-20231123125248-3ca2c0a88408 // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231123125248-3ca2c0a88408 // indirect
 	github.com/iotaledger/hive.go/ds v0.0.0-20231123125248-3ca2c0a88408 // indirect

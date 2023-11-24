@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -121,7 +120,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
-		api.SingleVersionProvider(testAPI),
+		iotago.SingleVersionProvider(testAPI),
 	)
 
 	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
@@ -183,7 +182,7 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
-		api.SingleVersionProvider(testAPI),
+		iotago.SingleVersionProvider(testAPI),
 	)
 
 	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
@@ -231,7 +230,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
-		api.SingleVersionProvider(testAPI),
+		iotago.SingleVersionProvider(testAPI),
 	)
 
 	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {

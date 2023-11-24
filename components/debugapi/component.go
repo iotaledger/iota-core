@@ -22,18 +22,19 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 const (
 	RouteValidators    = "/validators"
-	RouteBlockMetadata = "/blocks/:" + restapipkg.ParameterBlockID + "/metadata"
+	RouteBlockMetadata = "/blocks/:" + api.ParameterBlockID + "/metadata"
 
 	RouteChainManagerAllChainsDot      = "/all-chains"
 	RouteChainManagerAllChainsRendered = "/all-chains/rendered"
 
-	RouteCommitmentByIndexBlockIDs = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/blocks"
+	RouteCommitmentBySlotBlockIDs = "/commitments/by-slot/:" + api.ParameterSlot + "/blocks"
 
-	RouteCommitmentByIndexTransactionIDs = "/commitments/by-index/:" + restapipkg.ParameterSlotIndex + "/transactions"
+	RouteCommitmentBySlotTransactionIDs = "/commitments/by-slot/:" + api.ParameterSlot + "/transactions"
 )
 
 const (
@@ -148,7 +149,7 @@ func configure() error {
 	})
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
-		blockID, err := httpserver.ParseBlockIDParam(c, restapipkg.ParameterBlockID)
+		blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)
 		if err != nil {
 			return err
 		}
@@ -206,8 +207,8 @@ func configure() error {
 		return c.Blob(http.StatusOK, "image/png", renderedBytes)
 	})
 
-	routeGroup.GET(RouteCommitmentByIndexBlockIDs, func(c echo.Context) error {
-		slot, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
+	routeGroup.GET(RouteCommitmentBySlotBlockIDs, func(c echo.Context) error {
+		slot, err := httpserver.ParseSlotParam(c, api.ParameterSlot)
 		if err != nil {
 			return err
 		}
@@ -220,8 +221,8 @@ func configure() error {
 		return httpserver.JSONResponse(c, http.StatusOK, resp)
 	})
 
-	routeGroup.GET(RouteCommitmentByIndexTransactionIDs, func(c echo.Context) error {
-		slot, err := httpserver.ParseSlotParam(c, restapipkg.ParameterSlotIndex)
+	routeGroup.GET(RouteCommitmentBySlotTransactionIDs, func(c echo.Context) error {
+		slot, err := httpserver.ParseSlotParam(c, api.ParameterSlot)
 		if err != nil {
 			return err
 		}

@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func getCommitmentBySlot(slot iotago.SlotIndex, latestCommitment ...*model.Commitment) (*model.Commitment, error) {
@@ -53,7 +53,7 @@ func getCommitmentByID(commitmentID iotago.CommitmentID, latestCommitment ...*mo
 	return commitment, nil
 }
 
-func getUTXOChanges(commitmentID iotago.CommitmentID) (*apimodels.UTXOChangesResponse, error) {
+func getUTXOChanges(commitmentID iotago.CommitmentID) (*api.UTXOChangesResponse, error) {
 	diffs, err := deps.Protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
@@ -70,7 +70,7 @@ func getUTXOChanges(commitmentID iotago.CommitmentID) (*apimodels.UTXOChangesRes
 		consumedOutputs[i] = output.OutputID()
 	}
 
-	return &apimodels.UTXOChangesResponse{
+	return &api.UTXOChangesResponse{
 		CommitmentID:    commitmentID,
 		CreatedOutputs:  createdOutputs,
 		ConsumedOutputs: consumedOutputs,

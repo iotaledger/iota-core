@@ -6,15 +6,14 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
-	"github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func blockByID(c echo.Context) (*iotago.Block, error) {
-	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+	blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(restapi.ParameterBlockID))
+		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
 	}
 
 	block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
@@ -25,7 +24,7 @@ func blockByID(c echo.Context) (*iotago.Block, error) {
 	return block.ProtocolBlock(), nil
 }
 
-func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
+func blockMetadataByBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
 	blockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
@@ -34,19 +33,19 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataRes
 	return blockMetadata.BlockMetadataResponse(), nil
 }
 
-func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
-	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+func blockMetadataByID(c echo.Context) (*api.BlockMetadataResponse, error) {
+	blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(restapi.ParameterBlockID))
+		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
 	}
 
 	return blockMetadataByBlockID(blockID)
 }
 
-func blockWithMetadataByID(c echo.Context) (*apimodels.BlockWithMetadataResponse, error) {
-	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+func blockWithMetadataByID(c echo.Context) (*api.BlockWithMetadataResponse, error) {
+	blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(restapi.ParameterBlockID))
+		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
 	}
 
 	block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
@@ -59,19 +58,19 @@ func blockWithMetadataByID(c echo.Context) (*apimodels.BlockWithMetadataResponse
 		return nil, err
 	}
 
-	return &apimodels.BlockWithMetadataResponse{
+	return &api.BlockWithMetadataResponse{
 		Block:    block.ProtocolBlock(),
 		Metadata: blockMetadata,
 	}, nil
 }
 
-func blockIssuance() (*apimodels.IssuanceBlockHeaderResponse, error) {
+func blockIssuance() (*api.IssuanceBlockHeaderResponse, error) {
 	references := deps.Protocol.Engines.Main.Get().TipSelection.SelectTips(iotago.BasicBlockMaxParents)
 	if len(references[iotago.StrongParentType]) == 0 {
 		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "no strong parents available")
 	}
 
-	resp := &apimodels.IssuanceBlockHeaderResponse{
+	resp := &api.IssuanceBlockHeaderResponse{
 		StrongParents:       references[iotago.StrongParentType],
 		WeakParents:         references[iotago.WeakParentType],
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType],
@@ -82,10 +81,10 @@ func blockIssuance() (*apimodels.IssuanceBlockHeaderResponse, error) {
 	return resp, nil
 }
 
-func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
+func sendBlock(c echo.Context) (*api.BlockCreatedResponse, error) {
 	iotaBlock, err := httpserver.ParseRequestByHeader(c, deps.Protocol.CommittedAPI(), iotago.BlockFromBytes(deps.Protocol))
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse iotablock")
+		return nil, err
 	}
 
 	blockID, err := deps.BlockHandler.AttachBlock(c.Request().Context(), iotaBlock)
@@ -102,7 +101,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 		}
 	}
 
-	return &apimodels.BlockCreatedResponse{
+	return &api.BlockCreatedResponse{
 		BlockID: blockID,
 	}, nil
 }
