@@ -1,8 +1,6 @@
 package accountsfilter
 
 import (
-	"time"
-
 	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -25,7 +23,8 @@ type CommitmentFilter struct {
 
 	accountRetrieveFunc func(accountID iotago.AccountID, targetIndex iotago.SlotIndex) (*accounts.AccountData, bool, error)
 
-	blockRetrieveFunc func(iotago.BlockID) (*model.Block, bool)
+	modelBlockRetrieveFunc func(iotago.BlockID) (*model.Block, bool)
+	blockCacheRetrieveFunc func(iotago.BlockID) (*blocks.Block, bool)
 
 	module.Module
 }
@@ -35,7 +34,8 @@ func NewProvider(opts ...options.Option[CommitmentFilter]) module.Provider[*engi
 		c := New(e, opts...)
 		e.HookConstructed(func() {
 			c.accountRetrieveFunc = e.Ledger.Account
-			c.blockRetrieveFunc = e.Block
+			c.modelBlockRetrieveFunc = e.Block
+			c.blockCacheRetrieveFunc = e.BlockCache.Block
 
 			e.Ledger.HookConstructed(func() {
 				c.rmcRetrieveFunc = e.Ledger.RMCManager().RMC
@@ -66,28 +66,20 @@ func (c *CommitmentFilter) ProcessPreFilteredBlock(block *blocks.Block) {
 func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	// Block issuing time monotonicity: a block's issuing time needs to be greater than its parents issuing time.
 	for _, parentID := range block.Parents() {
-		var parentIssuingTime time.Time
-
-		if parentID == block.ProtocolBlock().API.ProtocolParameters().GenesisBlockID() {
-			parentIssuingTime = block.ProtocolBlock().API.TimeProvider().GenesisTime()
-		} else {
-			parent, exists := c.blockRetrieveFunc(parentID)
-			if !exists {
-				c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
-					Block:  block,
-					Reason: ierrors.Join(iotago.ErrBlockParentNotFound, ierrors.Errorf("parent %s of block %s is unknown", parentID, block.ID())),
-				})
-
-				return
-			}
-
-			parentIssuingTime = parent.ProtocolBlock().Header.IssuingTime
-		}
-
-		if !block.IssuingTime().After(parentIssuingTime) {
+		parent, exists := c.blockCacheRetrieveFunc(parentID)
+		if !exists {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Join(iotago.ErrBlockIssuingTimeNonMonotonic, ierrors.Errorf("block %s issuing time %s not greater than parent's %s issuing time %s", block.ID(), block.IssuingTime(), parentID, parentIssuingTime)),
+				Reason: ierrors.Join(iotago.ErrBlockParentNotFound, ierrors.Errorf("parent %s of block %s is unknown", parentID, block.ID())),
+			})
+
+			return
+		}
+
+		if !block.IssuingTime().After(parent.IssuingTime()) {
+			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
+				Block:  block,
+				Reason: ierrors.Join(iotago.ErrBlockIssuingTimeNonMonotonic, ierrors.Errorf("block %s issuing time %s not greater than parent's %s issuing time %s", block.ID(), block.IssuingTime(), parentID, parent.IssuingTime())),
 			})
 
 			return
