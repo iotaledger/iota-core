@@ -68,7 +68,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 	for _, parentID := range block.Parents() {
 		var parentIssuingTime time.Time
 
-		if parentID == iotago.EmptyBlockID {
+		if parentID == block.ProtocolBlock().API.ProtocolParameters().GenesisBlockID() {
 			parentIssuingTime = block.ProtocolBlock().API.TimeProvider().GenesisTime()
 		} else {
 			parent, exists := c.blockRetrieveFunc(parentID)
