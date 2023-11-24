@@ -13,6 +13,8 @@ import (
 )
 
 type Commitment struct {
+	*model.Commitment
+
 	Parent                          reactive.Variable[*Commitment]
 	Children                        reactive.Set[*Commitment]
 	MainChild                       reactive.Variable[*Commitment]
@@ -31,12 +33,11 @@ type Commitment struct {
 	ReplayDroppedBlocks             reactive.Variable[bool]
 	IsEvicted                       reactive.Event
 
-	*model.Commitment
 	log.Logger
 }
 
 func NewCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
-	return (&Commitment{
+	c := &Commitment{
 		Commitment:                      commitment,
 		Parent:                          reactive.NewVariable[*Commitment](),
 		Children:                        reactive.NewSet[*Commitment](),
@@ -55,7 +56,16 @@ func NewCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
 		ReplayDroppedBlocks:             reactive.NewVariable[bool](),
 		IsEvicted:                       reactive.NewEvent(),
-	}).initLogging(chains).initBehavior(chains)
+	}
+
+	shutdown := lo.Batch(
+		c.initLogger(chains.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))),
+		c.initDerivedProperties(chains),
+	)
+
+	c.IsEvicted.OnTrigger(shutdown)
+
+	return c
 }
 
 func (c *Commitment) SpawnedEngine() *engine.Engine {
@@ -66,13 +76,11 @@ func (c *Commitment) SpawnedEngine() *engine.Engine {
 	return nil
 }
 
-func (c *Commitment) initLogging(chains *Chains) (self *Commitment) {
-	var shutdownLogger func()
-	c.Logger, shutdownLogger = chains.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))
+func (c *Commitment) initLogger(logger log.Logger, shutdownLogger func()) (teardown func()) {
+	c.Logger = logger
 
-	teardownLogging := lo.Batch(
+	return lo.Batch(
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
-		// c.ChildChains.LogUpdates(c, log.LevelTrace, "ChildChains", (*Commitment).LogName),
 		c.MainChild.LogUpdates(c, log.LevelTrace, "MainChild", (*Commitment).LogName),
 		c.Chain.LogUpdates(c, log.LevelTrace, "Chain", (*Chain).LogName),
 		c.RequestAttestations.LogUpdates(c, log.LevelTrace, "RequestAttestations"),
@@ -89,84 +97,53 @@ func (c *Commitment) initLogging(chains *Chains) (self *Commitment) {
 
 		shutdownLogger,
 	)
-
-	c.IsEvicted.OnTrigger(teardownLogging)
-
-	return c
 }
 
-func (c *Commitment) initBehavior(chains *Chains) (self *Commitment) {
-	teardownBehavior := lo.Batch(
-		c.IsSolid.InheritFrom(c.IsRoot),
-		c.IsAttested.InheritFrom(c.IsRoot),
-		c.IsVerified.InheritFrom(c.IsRoot),
+func (c *Commitment) initDerivedProperties(chains *Chains) (teardown func()) {
+	return lo.Batch(
+		c.deriveRootProperties(),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
+			// the weight can be fixed as soon as the parent is known (as it only relies on static information from the
+			// parent commitment)
 			c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
 
 			return lo.Batch(
-				parent.registerChild(c),
+				parent.deriveChildren(c),
 
-				c.Chain.DeriveValueFrom(reactive.NewDerivedVariable3(func(chain *Chain, isRoot bool, mainChild *Commitment, parentChain *Chain) *Chain {
-					if isRoot {
-						return chain
-					}
-
-					if c != mainChild {
-						if chain == nil {
-							chain = chains.newChain()
-							chain.ForkingPoint.Set(c)
-						}
-
-						return chain
-					}
-
-					if chain != nil && chain != parentChain {
-						chain.IsEvicted.Trigger()
-					}
-
-					return parentChain
-				}, c.IsRoot, parent.MainChild, parent.Chain, c.Chain.Get())),
-
-				c.CumulativeAttestedWeight.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ uint64, parentCumulativeAttestedWeight uint64, attestedWeight uint64) uint64 {
-					return parentCumulativeAttestedWeight + attestedWeight
-				}, parent.CumulativeAttestedWeight, c.AttestedWeight)),
-
-				c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, parentAboveLatestVerifiedCommitment bool, parentIsVerified bool, isVerified bool) bool {
-					return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
-				}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified)),
-
-				c.IsSolid.InheritFrom(parent.IsSolid),
+				c.deriveIsSolid(parent),
+				c.deriveChain(chains, parent),
+				c.deriveCumulativeAttestedWeight(parent),
+				c.deriveIsAboveLatestVerifiedCommitment(parent),
 
 				c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
 					return lo.Batch(
-						c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, spawnedEngine *engine.Engine, warpSyncing bool, isAboveLatestVerifiedCommitment bool) bool {
-							return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
-						}, chain.SpawnedEngine, chain.WarpSyncMode, c.IsAboveLatestVerifiedCommitment)),
-
-						c.RequestBlocksToWarpSync.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
-							return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
-						}, chain.SpawnedEngine, chain.WarpSyncMode, parent.IsVerified, c.IsVerified)),
-
-						c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, verifyAttestations bool, requestBlocks bool, parentIsAttested bool, isAttested bool) bool {
-							return verifyAttestations && !requestBlocks && parentIsAttested && !isAttested
-						}, chain.RequestAttestations, chain.RequestBlocks, parent.IsAttested, c.IsAttested)),
+						c.deriveRequestBlocksToWarpSync(chain, parent),
+						c.deriveRequestAttestations(chain, parent),
 					)
 				}),
 			)
 		}),
 
 		c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
-			return chain.addCommitment(c)
+			return lo.Batch(
+				chain.addCommitment(c),
+
+				c.deriveReplayDroppedBlocks(chain),
+			)
 		}),
 	)
-
-	c.IsEvicted.OnTrigger(teardownBehavior)
-
-	return c
 }
 
-func (c *Commitment) registerChild(child *Commitment) (unregisterChild func()) {
+func (c *Commitment) deriveRootProperties() (teardown func()) {
+	return lo.Batch(
+		c.IsSolid.InheritFrom(c.IsRoot),
+		c.IsAttested.InheritFrom(c.IsRoot),
+		c.IsVerified.InheritFrom(c.IsRoot),
+	)
+}
+
+func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) {
 	c.MainChild.Compute(func(mainChild *Commitment) *Commitment {
 		if !c.Children.Add(child) || mainChild != nil {
 			return mainChild
@@ -184,6 +161,66 @@ func (c *Commitment) registerChild(child *Commitment) (unregisterChild func()) {
 			return lo.Return1(c.Children.Any())
 		})
 	}
+}
+
+func (c *Commitment) deriveIsSolid(parent *Commitment) func() {
+	return c.IsSolid.InheritFrom(parent.IsSolid)
+}
+
+func (c *Commitment) deriveChain(chains *Chains, parent *Commitment) func() {
+	return c.Chain.DeriveValueFrom(reactive.NewDerivedVariable3(func(currentChain *Chain, isRoot bool, mainChild *Commitment, parentChain *Chain) *Chain {
+		// do not adjust the chain of the root commitment (it is initially set from the outside)
+		if isRoot {
+			return currentChain
+		}
+
+		// if we are not the main child of our parent, we create and return a new chain
+		if c != mainChild {
+			if currentChain == nil {
+				currentChain = chains.newChain()
+				currentChain.ForkingPoint.Set(c)
+			}
+
+			return currentChain
+		}
+
+		// if we are the main child of our parent, and we
+		if currentChain != nil && currentChain != parentChain {
+			currentChain.IsEvicted.Trigger()
+		}
+
+		return parentChain
+	}, c.IsRoot, parent.MainChild, parent.Chain, c.Chain.Get()))
+}
+
+func (c *Commitment) deriveCumulativeAttestedWeight(parent *Commitment) func() {
+	return c.CumulativeAttestedWeight.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ uint64, parentCumulativeAttestedWeight uint64, attestedWeight uint64) uint64 {
+		return parentCumulativeAttestedWeight + attestedWeight
+	}, parent.CumulativeAttestedWeight, c.AttestedWeight))
+}
+
+func (c *Commitment) deriveIsAboveLatestVerifiedCommitment(parent *Commitment) func() {
+	return c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, parentAboveLatestVerifiedCommitment bool, parentIsVerified bool, isVerified bool) bool {
+		return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
+	}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified))
+}
+
+func (c *Commitment) deriveRequestBlocksToWarpSync(chain *Chain, parent *Commitment) func() {
+	return c.RequestBlocksToWarpSync.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
+		return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
+	}, chain.SpawnedEngine, chain.WarpSyncMode, parent.IsVerified, c.IsVerified))
+}
+
+func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment) func() {
+	return c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, verifyAttestations bool, requestBlocks bool, parentIsAttested bool, isAttested bool) bool {
+		return verifyAttestations && !requestBlocks && parentIsAttested && !isAttested
+	}, chain.RequestAttestations, chain.RequestBlocks, parent.IsAttested, c.IsAttested))
+}
+
+func (c *Commitment) deriveReplayDroppedBlocks(chain *Chain) func() {
+	return c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, spawnedEngine *engine.Engine, warpSyncing bool, isAboveLatestVerifiedCommitment bool) bool {
+		return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
+	}, chain.SpawnedEngine, chain.WarpSyncMode, c.IsAboveLatestVerifiedCommitment))
 }
 
 func (c *Commitment) setChain(targetChain *Chain) {
