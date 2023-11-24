@@ -27,6 +27,50 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
+func DefaultProtocolParameterOptions(networkName string) []options.Option[iotago.V3ProtocolParameters] {
+	return []options.Option[iotago.V3ProtocolParameters]{
+		iotago.WithNetworkOptions(
+			networkName,
+			"rms",
+		),
+		iotago.WithSupplyOptions(
+			1_000_0000,
+			100,
+			1,
+			10,
+			100,
+			100,
+			100,
+		),
+		iotago.WithRewardsOptions(8, 8, 31, 1154, 2, 1),
+		iotago.WithStakingOptions(1, 100, 1),
+
+		iotago.WithTimeProviderOptions(
+			0,
+			GenesisTimeWithOffsetBySlots(0, DefaultSlotDurationInSeconds),
+			DefaultSlotDurationInSeconds,
+			DefaultSlotsPerEpochExponent,
+		),
+		iotago.WithLivenessOptions(
+			DefaultLivenessThresholdLowerBoundInSeconds,
+			DefaultLivenessThresholdUpperBoundInSeconds,
+			DefaultMinCommittableAge,
+			DefaultMaxCommittableAge,
+			DefaultEpochNearingThreshold,
+		),
+		iotago.WithCongestionControlOptions(
+			DefaultMinReferenceManaCost,
+			DefaultRMCIncrease,
+			DefaultRMCDecrease,
+			DefaultRMCIncreaseThreshold,
+			DefaultRMCDecreaseThreshold,
+			DefaultSchedulerRate,
+			DefaultMaxBufferSize,
+			DefaultMaxValBufferSize,
+		),
+	}
+}
+
 type TestSuite struct {
 	Testing     *testing.T
 	fakeTesting *testing.T
@@ -74,49 +118,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 
-		defaultProtocolParameters := []options.Option[iotago.V3ProtocolParameters]{
-			iotago.WithNetworkOptions(
-				testingT.Name(),
-				"rms",
-			),
-			iotago.WithSupplyOptions(
-				1_000_0000,
-				100,
-				1,
-				10,
-				100,
-				100,
-				100,
-			),
-			iotago.WithRewardsOptions(8, 8, 31, 1154, 2, 1),
-			iotago.WithStakingOptions(1, 100, 1),
-
-			iotago.WithTimeProviderOptions(
-				0,
-				GenesisTimeWithOffsetBySlots(0, DefaultSlotDurationInSeconds),
-				DefaultSlotDurationInSeconds,
-				DefaultSlotsPerEpochExponent,
-			),
-			iotago.WithLivenessOptions(
-				DefaultLivenessThresholdLowerBoundInSeconds,
-				DefaultLivenessThresholdUpperBoundInSeconds,
-				DefaultMinCommittableAge,
-				DefaultMaxCommittableAge,
-				DefaultEpochNearingThreshold,
-			),
-			iotago.WithCongestionControlOptions(
-				DefaultMinReferenceManaCost,
-				DefaultRMCIncrease,
-				DefaultRMCDecrease,
-				DefaultRMCIncreaseThreshold,
-				DefaultRMCDecreaseThreshold,
-				DefaultSchedulerRate,
-				DefaultMaxBufferSize,
-				DefaultMaxValBufferSize,
-			),
-		}
-
-		t.ProtocolParameterOptions = append(defaultProtocolParameters, t.ProtocolParameterOptions...)
+		t.ProtocolParameterOptions = append(DefaultProtocolParameterOptions(testingT.Name()), t.ProtocolParameterOptions...)
 		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(t.ProtocolParameterOptions...))
 
 		genesisBlock := blocks.NewRootBlock(t.API.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(t.API).MustID(), time.Unix(t.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
@@ -333,7 +335,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	t.nodes.Set(name, node)
 	node.SetCurrentSlot(t.currentSlot)
 
-	amount := mock.MinValidatorAccountAmount
+	amount := mock.MinValidatorAccountAmount(t.API.ProtocolParameters())
 	if len(optAmount) > 0 {
 		amount = optAmount[0]
 	}
@@ -394,10 +396,12 @@ func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuance
 	}
 
 	accountDetails := snapshotcreator.AccountDetails{
-		AccountID:            accountID,
-		Address:              iotago.Ed25519AddressFromPubKey(newWallet.BlockIssuer.PublicKey),
-		Amount:               mock.MinIssuerAccountAmount,
-		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount),
+		AccountID: accountID,
+		Address:   iotago.Ed25519AddressFromPubKey(newWallet.BlockIssuer.PublicKey),
+		// TODO: Temporary "fix" for the tests, lets fix this in another PR, so we can at least use the docker network again
+		//Amount:               mock.MinIssuerAccountAmount(t.API.ProtocolParameters()),
+		Amount:               mock.MinValidatorAccountAmount(t.API.ProtocolParameters()) + 800,
+		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount(t.API.ProtocolParameters())),
 		IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newWallet.BlockIssuer.PublicKey)),
 		ExpirySlot:           iotago.MaxSlotIndex,
 		BlockIssuanceCredits: bic,
@@ -408,6 +412,23 @@ func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuance
 	return newWallet
 }
 
+const (
+	DefaultWallet = "defaultWallet"
+)
+
+func (t *TestSuite) AddDefaultWallet(node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
+	return t.AddGenesisWallet(DefaultWallet, node, blockIssuanceCredits...)
+}
+
+func (t *TestSuite) DefaultWallet() *mock.Wallet {
+	defaultWallet, exists := t.wallets.Get(DefaultWallet)
+	if !exists {
+		return nil
+	}
+
+	return defaultWallet
+}
+
 func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*mock.KeyManager) *mock.Wallet {
 	newWallet := mock.NewWallet(t.Testing, name, node, keyManager...)
 	newWallet.SetBlockIssuer(accountID)
@@ -415,15 +436,6 @@ func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.Acc
 	newWallet.SetCurrentSlot(t.currentSlot)
 
 	return newWallet
-}
-
-func (t *TestSuite) DefaultWallet() *mock.Wallet {
-	defaultWallet, exists := t.wallets.Get("default")
-	if !exists {
-		return nil
-	}
-
-	return defaultWallet
 }
 
 // Update the global time of the test suite and all nodes and wallets.
@@ -448,13 +460,13 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 	defer t.mutex.Unlock()
 
 	// Add default wallet by default when creating the first node.
-	if !t.wallets.Has("default") {
+	if !t.wallets.Has(DefaultWallet) {
 		_, node, exists := t.nodes.Head()
 		if !exists {
 			panic("at least one node is needed to create a default wallet")
 		}
 
-		t.AddGenesisWallet("default", node)
+		t.AddDefaultWallet(node)
 	}
 
 	// Create accounts for any block issuer nodes added before starting the network.
