@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 func Test_BlockTimeMonotonicity(t *testing.T) {
@@ -24,7 +23,7 @@ func Test_BlockTimeMonotonicity(t *testing.T) {
 	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
-	ts.Run(true)
+	ts.Run(false)
 
 	time0 := ts.API.TimeProvider().GenesisTime().Add(3 * time.Second)
 	ts.IssueValidationBlockWithOptions("block0", node0, mock.WithValidationBlockHeaderOptions(
@@ -55,6 +54,5 @@ func Test_BlockTimeMonotonicity(t *testing.T) {
 
 	}
 
-	ts.AssertBlocksExist(ts.Blocks("block1", "block2"), false, ts.Nodes()...)
-	ts.AssertBlocksInRetainerFailureReason(ts.Blocks("block1", "block2"), apimodels.BlockFailureInvalid, ts.Nodes()...)
+	ts.AssertBlockFiltered(ts.Blocks("block1", "block2"), iotago.ErrBlockIssuingTimeNonMonotonic, node0)
 }

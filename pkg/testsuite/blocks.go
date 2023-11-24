@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
 )
 
 func (t *TestSuite) AssertBlock(block *blocks.Block, node *mock.Node) *model.Block {
@@ -67,6 +66,8 @@ func (t *TestSuite) AssertBlockFiltered(blocks []*blocks.Block, reason error, no
 					if ierrors.Is(filteredBlockEvent.Reason, reason) {
 						return nil
 					}
+
+					return ierrors.Errorf("AssertBlockFiltered: %s: block %s was filtered with reason %s but expected %s", node.Name, block.ID(), filteredBlockEvent.Reason, reason)
 				}
 			}
 
@@ -156,31 +157,6 @@ func (t *TestSuite) AssertBlocksInCacheConflicts(blockConflicts map[*blocks.Bloc
 
 				if !actualConflictIDs.HasAll(expectedConflictIDs) {
 					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedConflictIDs, actualConflictIDs)
-				}
-
-				return nil
-			})
-		}
-	}
-}
-
-func (t *TestSuite) AssertBlocksInRetainerFailureReason(blocks []*blocks.Block, expectedState apimodels.BlockFailureReason, nodes ...*mock.Node) {
-	mustNodes(nodes)
-
-	for _, node := range nodes {
-		for _, block := range blocks {
-			if block.ID() == iotago.EmptyBlockID {
-				continue
-			}
-
-			t.Eventually(func() error {
-				blockFromRetainer, err := node.Protocol.MainEngineInstance().Retainer.BlockMetadata(block.ID())
-				if err != nil {
-					return ierrors.Wrapf(err, "AssertBlocksInRetainerFailureReason: %s: error when retrieving block %s", node.Name, block.ID())
-				}
-
-				if expectedState != blockFromRetainer.BlockFailureReason {
-					return ierrors.Errorf("AssertBlocksInRetainerFailureReason: %s: expected %v, got %v", node.Name, expectedState, blockFromRetainer.BlockFailureReason)
 				}
 
 				return nil
