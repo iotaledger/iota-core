@@ -57,7 +57,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddDefaultWallet(node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddDefaultWallet(node1)
 
 	ts.Run(true)
 
@@ -188,7 +188,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddDefaultWallet(node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddDefaultWallet(node1)
 
 	ts.Run(true)
 
@@ -366,7 +366,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	_ = ts.AddNode("node2")
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddDefaultWallet(node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddDefaultWallet(node1)
 
 	ts.Run(true)
 
@@ -496,8 +496,8 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	wallet1BIC := iotago.BlockIssuanceCredits(100000)
 	wallet2BIC := iotago.BlockIssuanceCredits(0)
 
-	wallet1 := ts.AddGenesisWallet("wallet 1", node2, wallet1BIC)
-	wallet2 := ts.AddGenesisWallet("wallet 2", node2, wallet2BIC)
+	wallet1 := ts.AddGenesisWallet("wallet 1", node2, testsuite.WithWalletBlockIssuanceCredits(wallet1BIC))
+	wallet2 := ts.AddGenesisWallet("wallet 2", node2, testsuite.WithWalletBlockIssuanceCredits(wallet2BIC))
 
 	ts.Run(false)
 
@@ -693,9 +693,11 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 
 	wallet1BIC := iotago.BlockIssuanceCredits(-1)
 	wallet2BIC := iotago.MaxBlockIssuanceCredits / 2
+
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet1 := ts.AddGenesisWallet("wallet 1", node1, wallet1BIC)
-	wallet2 := ts.AddGenesisWallet("wallet 2", node1, wallet2BIC)
+	// TODO: calculate the correct amount
+	wallet1 := ts.AddGenesisWallet("wallet 1", node1, testsuite.WithWalletAmount(5000000), testsuite.WithWalletBlockIssuanceCredits(wallet1BIC))
+	wallet2 := ts.AddGenesisWallet("wallet 2", node1, testsuite.WithWalletBlockIssuanceCredits(wallet2BIC))
 
 	ts.Run(true)
 
@@ -741,7 +743,6 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 	newExpirySlot := block1Slot + ts.API.ProtocolParameters().MaxCommittableAge()
 	{
 		// Prepare a transaction that will try to spend an AccountOutput of a locked account.
-		// BUG: How can we add a block issuer feature here with only minimum funds?
 		tx1 := wallet1.TransitionAccount(
 			"TX1",
 			"Genesis:2",
@@ -915,8 +916,8 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 	wallet1BIC := iotago.BlockIssuanceCredits(-1)
 	wallet2BIC := iotago.MaxBlockIssuanceCredits / 2
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet1 := ts.AddGenesisWallet("wallet 1", node1, wallet1BIC)
-	wallet2 := ts.AddGenesisWallet("wallet 2", node1, wallet2BIC)
+	wallet1 := ts.AddGenesisWallet("wallet 1", node1, testsuite.WithWalletBlockIssuanceCredits(wallet1BIC))
+	wallet2 := ts.AddGenesisWallet("wallet 2", node1, testsuite.WithWalletBlockIssuanceCredits(wallet2BIC))
 
 	ts.Run(true)
 

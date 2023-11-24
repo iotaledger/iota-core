@@ -34,12 +34,12 @@ func Test_TopStakersRotation(t *testing.T) {
 	)
 	defer ts.Shutdown()
 
-	node1 := ts.AddValidatorNode("node1", 1_000_006)
-	ts.AddValidatorNode("node2", 1_000_005)
-	ts.AddValidatorNode("node3", 1_000_004)
-	ts.AddValidatorNode("node4", 1_000_003)
-	ts.AddValidatorNode("node5", 1_000_002)
-	ts.AddValidatorNode("node6", 1_000_001)
+	node1 := ts.AddValidatorNode("node1", testsuite.WithWalletAmount(1_000_006))
+	ts.AddValidatorNode("node2", testsuite.WithWalletAmount(1_000_005))
+	ts.AddValidatorNode("node3", testsuite.WithWalletAmount(1_000_004))
+	ts.AddValidatorNode("node4", testsuite.WithWalletAmount(1_000_003))
+	ts.AddValidatorNode("node5", testsuite.WithWalletAmount(1_000_002))
+	ts.AddValidatorNode("node6", testsuite.WithWalletAmount(1_000_001))
 	ts.AddDefaultWallet(node1)
 
 	ts.AddNode("node7")
