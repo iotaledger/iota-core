@@ -72,7 +72,7 @@ func (c *Commitment) initLogging(chains *Chains) (self *Commitment) {
 
 	teardownLogging := lo.Batch(
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
-		// c.Children.LogUpdates(c, log.LevelTrace, "Children", (*Commitment).LogName),
+		// c.ChildChains.LogUpdates(c, log.LevelTrace, "ChildChains", (*Commitment).LogName),
 		c.MainChild.LogUpdates(c, log.LevelTrace, "MainChild", (*Commitment).LogName),
 		c.Chain.LogUpdates(c, log.LevelTrace, "Chain", (*Chain).LogName),
 		c.RequestAttestations.LogUpdates(c, log.LevelTrace, "RequestAttestations"),
@@ -114,7 +114,8 @@ func (c *Commitment) initBehavior(chains *Chains) (self *Commitment) {
 
 					if c != mainChild {
 						if chain == nil {
-							chain = chains.forkChain(c)
+							chain = chains.newChain()
+							chain.ForkingPoint.Set(c)
 						}
 
 						return chain
@@ -156,7 +157,7 @@ func (c *Commitment) initBehavior(chains *Chains) (self *Commitment) {
 		}),
 
 		c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
-			return chain.registerCommitment(c)
+			return chain.addCommitment(c)
 		}),
 	)
 

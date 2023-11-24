@@ -1,57 +1,68 @@
 package protocol
 
 import (
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/iota-core/pkg/model"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// Chains is a subcomponent of the protocol that manages the chains and the corresponding chain switching logic, and it
-// exposes these chains as a reactive set together with endpoints for the main chain and the heaviest candidates.
+// Chains is a subcomponent of the protocol that exposes the chains that are managed by the protocol and that implements
+// the chain switching logic.
 type Chains struct {
-	// Set contains all chains that are managed by the protocol.
+	// Set contains all non-evicted chains that are managed by the protocol.
 	reactive.Set[*Chain]
 
-	// Main is a reactive variable that contains the main chain.
+	// Main contains the main chain.
 	Main reactive.Variable[*Chain]
 
-	// HeaviestClaimedCandidate is a reactive variable that contains the candidate chain with the heaviest claimed
-	// weight.
-	HeaviestClaimedCandidate  reactive.Variable[*Chain]
+	// HeaviestClaimedCandidate contains the candidate chain with the heaviest claimed weight.
+	HeaviestClaimedCandidate reactive.Variable[*Chain]
+
+	// HeaviestAttestedCandidate contains the candidate chain with the heaviest attested weight.
 	HeaviestAttestedCandidate reactive.Variable[*Chain]
+
+	// HeaviestVerifiedCandidate contains the candidate chain with the heaviest verified weight.
 	HeaviestVerifiedCandidate reactive.Variable[*Chain]
 
-	protocol *Protocol
+	// LatestSeenSlot contains the latest slot that was seen by any of the chains.
+	LatestSeenSlot reactive.Variable[iotago.SlotIndex]
 
-	// Logger embeds a logger that can be used to log messages emitted by this chain.
+	// Logger contains a reference to the logger that is used by this component.
 	log.Logger
 }
 
+// newChains creates a new chains instance for the given protocol.
 func newChains(protocol *Protocol) *Chains {
-	return (&Chains{
+	c := &Chains{
 		Set:                       reactive.NewSet[*Chain](),
 		Main:                      reactive.NewVariable[*Chain](),
 		HeaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
 		HeaviestAttestedCandidate: reactive.NewVariable[*Chain](),
 		HeaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
-		protocol:                  protocol,
-	}).init(protocol)
-}
+		LatestSeenSlot:            reactive.NewVariable[iotago.SlotIndex](increasing[iotago.SlotIndex]),
+	}
 
-func (c *Chains) init(protocol *Protocol) (self *Chains) {
 	shutdown := lo.Batch(
-		c.initLogging(protocol.NewChildLogger("Chains")),
-		c.initMainChain(),
+		c.initLogger(protocol.NewChildLogger("Chains")),
 		c.initChainSwitching(protocol.Options.ChainSwitchingThreshold),
+
+		protocol.Constructed.WithNonEmptyValue(func(_ bool) (teardown func()) {
+			return c.deriveLatestSeenSlot(protocol)
+		}),
 	)
 
-	c.protocol.Shutdown.OnTrigger(shutdown)
+	protocol.Shutdown.OnTrigger(shutdown)
 
 	return c
 }
 
-func (c *Chains) initLogging(logger log.Logger, shutdownLogger func()) (teardown func()) {
+// initLogger initializes the logger for this component.
+func (c *Chains) initLogger(logger log.Logger, shutdownLogger func()) (teardown func()) {
 	c.Logger = logger
 
 	return lo.Batch(
@@ -64,27 +75,14 @@ func (c *Chains) initLogging(logger log.Logger, shutdownLogger func()) (teardown
 	)
 }
 
-func (c *Chains) initMainChain() (teardown func()) {
-	chainLogger, shutdownChainLogger := c.NewEntityLogger("")
-
-	mainChain := newChain(chainLogger, shutdownChainLogger, c.protocol.LatestSeenSlot)
+// initChainSwitching initializes the chain switching logic.
+func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (teardown func()) {
+	mainChain := c.newChain()
 	mainChain.RequestBlocks.Set(true)
 
-	c.Add(mainChain)
+	c.Main.Set(mainChain)
 
-	return c.Main.ToggleValue(mainChain)
-}
-
-func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (teardown func()) {
 	return lo.Batch(
-		c.WithElements(func(candidateChain *Chain) (teardown func()) {
-			return lo.Batch(
-				c.trackHeaviestCandidate(c.HeaviestClaimedCandidate, (*Chain).claimedWeightVariable, candidateChain),
-				c.trackHeaviestCandidate(c.HeaviestVerifiedCandidate, (*Chain).verifiedWeightVariable, candidateChain),
-				c.trackHeaviestCandidate(c.HeaviestAttestedCandidate, (*Chain).attestedWeightVariable, candidateChain),
-			)
-		}),
-
 		c.HeaviestClaimedCandidate.WithNonEmptyValue(func(heaviestClaimedCandidate *Chain) (teardown func()) {
 			return heaviestClaimedCandidate.RequestAttestations.ToggleValue(true)
 		}),
@@ -105,29 +103,57 @@ func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (t
 				c.Main.Set(heaviestVerifiedCandidate)
 			}, chainSwitchingCondition)
 		}),
+
+		c.WithElements(func(candidateChain *Chain) (teardown func()) {
+			return lo.Batch(
+				c.initHeaviestCandidateTracking(c.HeaviestClaimedCandidate, (*Chain).claimedWeight, candidateChain),
+				c.initHeaviestCandidateTracking(c.HeaviestVerifiedCandidate, (*Chain).verifiedWeight, candidateChain),
+				c.initHeaviestCandidateTracking(c.HeaviestAttestedCandidate, (*Chain).attestedWeight, candidateChain),
+			)
+		}),
 	)
 }
 
-func (c *Chains) trackHeaviestCandidate(candidateVar reactive.Variable[*Chain], weightVar func(*Chain) reactive.Variable[uint64], candidate *Chain) (unsubscribe func()) {
-	return weightVar(candidate).OnUpdate(func(_ uint64, newWeight uint64) {
-		// if the weight of the candidate is higher than the current main chain
-		if mainChain := c.Main.Get(); mainChain == nil || newWeight > mainChain.VerifiedWeight.Get() {
-			// try to set the candidate as the new heaviest chain
-			candidateVar.Compute(func(currentCandidate *Chain) *Chain {
-				// only set the candidate as the heaviest chain if it is still the heaviest chain (double-checked locking)
-				return lo.Cond(currentCandidate == nil || currentCandidate.IsEvicted.WasTriggered() || newWeight > weightVar(currentCandidate).Get(), candidate, currentCandidate)
-			})
+// initHeaviestCandidateTracking initializes the tracking of the heaviest candidates according to the given parameters.
+func (c *Chains) initHeaviestCandidateTracking(candidateVar reactive.Variable[*Chain], weightVar func(*Chain) reactive.Variable[uint64], newCandidate *Chain) (unsubscribe func()) {
+	return weightVar(newCandidate).OnUpdate(func(_ uint64, newWeight uint64) {
+		// abort if the candidate is not heavier than the main chain.
+		if mainChain := c.Main.Get(); mainChain != nil && newWeight <= mainChain.VerifiedWeight.Get() {
+			return
 		}
+
+		// atomically replace the existing candidate if the new one is heavier.
+		candidateVar.Compute(func(currentCandidate *Chain) *Chain {
+			if currentCandidate != nil && !currentCandidate.IsEvicted.WasTriggered() && newWeight <= weightVar(currentCandidate).Get() {
+				return currentCandidate
+			}
+
+			return newCandidate
+		})
 	}, true)
 }
 
-func (c *Chains) forkChain(forkingPoint *Commitment) *Chain {
-	chainLogger, shutdownChainLogger := c.NewEntityLogger("")
+// deriveLatestSeenSlot derives the latest seen slot from the protocol.
+func (c *Chains) deriveLatestSeenSlot(protocol *Protocol) func() {
+	return protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (teardown func()) {
+		return lo.Batch(
+			mainEngine.Initialized.OnTrigger(func() {
+				c.LatestSeenSlot.Set(mainEngine.LatestCommitment.Get().Slot())
+			}),
 
-	chain := newChain(chainLogger, shutdownChainLogger, c.protocol.LatestSeenSlot)
-	chain.ForkingPoint.Set(forkingPoint)
+			protocol.Network.OnBlockReceived(func(block *model.Block, src peer.ID) {
+				c.LatestSeenSlot.Set(mainEngine.LatestAPI().TimeProvider().SlotFromTime(block.ProtocolBlock().Header.IssuingTime))
+			}),
+		)
+	})
+}
 
-	c.Add(chain)
+// newChain creates a new chain instance and adds it to the set of chains.
+func (c *Chains) newChain() *Chain {
+	chain := newChain(c)
+	if c.Add(chain) {
+		chain.IsEvicted.OnTrigger(func() { c.Delete(chain) })
+	}
 
 	return chain
 }

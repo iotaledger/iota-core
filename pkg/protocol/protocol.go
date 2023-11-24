@@ -26,7 +26,6 @@ import (
 type Protocol struct {
 	Events               *Events
 	Workers              *workerpool.Group
-	LatestSeenSlot       reactive.Variable[iotago.SlotIndex]
 	Network              *core.Protocol
 	Commitments          *Commitments
 	Chains               *Chains
@@ -46,7 +45,6 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 	return options.Apply(&Protocol{
 		Events:         NewEvents(),
 		Workers:        workers,
-		LatestSeenSlot: reactive.NewVariable[iotago.SlotIndex](increasing[iotago.SlotIndex]),
 		Options:        NewDefaultOptions(),
 		ReactiveModule: module.NewReactiveModule(logger),
 		EvictionState:  reactive.NewEvictionState[iotago.SlotIndex](),
@@ -73,22 +71,6 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 			}
 		})
 
-		unsubscribeLatestSeenSlot := p.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (teardown func()) {
-			return lo.Batch(
-				p.Network.OnBlockReceived(func(block *model.Block, src peer.ID) {
-					p.LatestSeenSlot.Set(mainEngine.LatestAPI().TimeProvider().SlotFromTime(block.ProtocolBlock().Header.IssuingTime))
-				}),
-
-				p.Chains.WithElements(func(chain *Chain) (teardown func()) {
-					return chain.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
-						return chain.LatestProducedCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
-							p.LatestSeenSlot.Set(latestCommitment.Slot())
-						})
-					})
-				}),
-			)
-		})
-
 		p.Initialized.OnTrigger(func() {
 			unsubscribeFromNetwork := lo.Batch(
 				p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
@@ -104,7 +86,6 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 
 			p.Shutdown.OnTrigger(func() {
 				stopEvents()
-				unsubscribeLatestSeenSlot()
 				unsubscribeFromNetwork()
 
 				p.BlocksProtocol.Shutdown()
