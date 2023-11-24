@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 )
 
 type DBInstance struct {
@@ -16,7 +17,7 @@ type DBInstance struct {
 	isShutdown    atomic.Bool
 }
 
-func NewDBInstance(dbConfig Config) *DBInstance {
+func NewDBInstance(dbConfig Config, openedCallback func(d *DBInstance)) *DBInstance {
 	db, err := StoreWithDefaultSettings(dbConfig.Directory, true, dbConfig.Engine)
 	if err != nil {
 		panic(err)
@@ -26,7 +27,28 @@ func NewDBInstance(dbConfig Config) *DBInstance {
 		dbConfig: dbConfig,
 	}
 
-	lockableKVStore := newLockedKVStore(db, dbInstance)
+	// Create a storeInstanceMutex that will be used to lock access to Open() method.
+	// This allows us to avoid contention upon write-locking access to the KVStore upon all operations.
+	storeInstanceMutex := new(syncutils.Mutex)
+
+	// lockedKVStore and the underlying openableKVStore don't handle opening and closing the underlying store by themselves,
+	// but delegate that to the entity that constructed it. It needs to be done like that, because opening and closing the underlying store also
+	// modifies the state of the DBInstance. Other methods (e.g. Flush) that don't modify the state of DBInstance can be handled directly.
+	lockableKVStore := newLockedKVStore(db, func() {
+		if dbInstance.isClosed.Load() {
+			storeInstanceMutex.Lock()
+			defer storeInstanceMutex.Unlock()
+
+			if dbInstance.isClosed.Load() {
+				dbInstance.Open()
+				if openedCallback != nil {
+					openedCallback(dbInstance)
+				}
+			}
+		}
+	}, func() {
+		dbInstance.CloseWithoutLocking()
+	})
 
 	dbInstance.store = lockableKVStore
 
@@ -42,6 +64,10 @@ func NewDBInstance(dbConfig Config) *DBInstance {
 
 	dbInstance.healthTracker = storeHealthTracker
 
+	if openedCallback != nil {
+		openedCallback(dbInstance)
+	}
+
 	return dbInstance
 }
 
@@ -52,8 +78,8 @@ func (d *DBInstance) Shutdown() {
 }
 
 func (d *DBInstance) Flush() {
-	d.store.Lock()
-	defer d.store.Unlock()
+	d.store.LockAccess()
+	defer d.store.UnlockAccess()
 
 	if !d.isClosed.Load() {
 		_ = d.store.instance().Flush()
@@ -61,8 +87,8 @@ func (d *DBInstance) Flush() {
 }
 
 func (d *DBInstance) Close() {
-	d.store.Lock()
-	defer d.store.Unlock()
+	d.store.LockAccess()
+	defer d.store.UnlockAccess()
 
 	d.CloseWithoutLocking()
 }
@@ -73,7 +99,11 @@ func (d *DBInstance) CloseWithoutLocking() {
 			panic(err)
 		}
 
-		if err := FlushAndClose(d.store); err != nil {
+		if err := d.store.topParent().storeInstance.Flush(); err != nil {
+			panic(err)
+		}
+
+		if err := d.store.topParent().storeInstance.Close(); err != nil {
 			panic(err)
 		}
 
@@ -101,12 +131,12 @@ func (d *DBInstance) Open() {
 	}
 }
 
-func (d *DBInstance) Lock() {
-	d.store.Lock()
+func (d *DBInstance) LockAccess() {
+	d.store.LockAccess()
 }
 
-func (d *DBInstance) Unlock() {
-	d.store.Unlock()
+func (d *DBInstance) UnlockAccess() {
+	d.store.UnlockAccess()
 }
 
 func (d *DBInstance) KVStore() kvstore.KVStore {
