@@ -222,18 +222,6 @@ func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid boo
 			b.retainBlockFailure(modelBlock.ID(), api.BlockFailureParentIsTooOld)
 			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
 		}
-
-		parent, exists := b.blockCache.Block(parentID)
-		if !exists {
-			b.retainBlockFailure(modelBlock.ID(), apimodels.BlockFailureParentNotFound)
-			return false, ierrors.Errorf("parent %s of block %s is unknown", parentID, modelBlock.ID())
-		}
-
-		// A block's issuing time needs to be greater than its parents.
-		if !modelBlock.ProtocolBlock().Header.IssuingTime.After(parent.IssuingTime()) {
-			b.retainBlockFailure(modelBlock.ID(), apimodels.BlockFailureInvalid)
-			return false, ierrors.Errorf("block %s issued before parent %s", modelBlock.ID(), parentID)
-		}
 	}
 
 	return true, nil
