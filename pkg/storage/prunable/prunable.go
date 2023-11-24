@@ -32,7 +32,8 @@ type Prunable struct {
 func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[BucketManager]) *Prunable {
 	dir := utils.NewDirectory(dbConfig.Directory, true)
 	semiPermanentDBConfig := dbConfig.WithDirectory(dir.PathWithCreate("semipermanent"))
-	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig)
+	// openedCallback is nil because we don't need to do anything when reopening the store.
+	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig, nil)
 
 	return &Prunable{
 		apiProvider:       apiProvider,
@@ -50,13 +51,13 @@ func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler 
 
 func Clone(source *Prunable, dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[BucketManager]) (*Prunable, error) {
 	// Lock semi-permanent DB and prunable slot store so that nobody can try to use or open them while cloning.
-	source.semiPermanentDB.Lock()
-	defer source.semiPermanentDB.Unlock()
+	source.semiPermanentDB.LockAccess()
+	defer source.semiPermanentDB.UnlockAccess()
 
 	source.prunableSlotStore.Lock()
 	defer source.prunableSlotStore.Unlock()
 
-	// Close forked prunable storage before copying its contents.
+	// Close forked prunable storage before copying its contents. All necessary locks are already acquired.
 	source.semiPermanentDB.CloseWithoutLocking()
 	source.prunableSlotStore.CloseWithoutLocking()
 
@@ -64,8 +65,6 @@ func Clone(source *Prunable, dbConfig database.Config, apiProvider iotago.APIPro
 	if err := copydir.Copy(source.prunableSlotStore.dbConfig.Directory, dbConfig.Directory); err != nil {
 		return nil, ierrors.Wrap(err, "failed to copy prunable storage directory to new storage path")
 	}
-
-	source.semiPermanentDB.Open()
 
 	return New(dbConfig, apiProvider, errorHandler, opts...), nil
 }

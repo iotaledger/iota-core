@@ -43,7 +43,8 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 		errorHandler: errorHandler,
 		dbConfig:     dbConfig,
 	}, opts, func(p *Permanent) {
-		p.store = database.NewDBInstance(p.dbConfig)
+		// openedCallback is nil because we don't need to do anything upon reopening
+		p.store = database.NewDBInstance(p.dbConfig, nil)
 		p.settings = NewSettings(lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{settingsPrefix})), p.optsEpochBasedProvider...)
 		p.commitments = NewCommitments(lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{commitmentsPrefix})), p.settings.APIProvider())
 		p.utxoLedger = utxoledger.New(lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{ledgerPrefix})), p.settings.APIProvider())
@@ -53,16 +54,14 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 }
 
 func Clone(source *Permanent, dbConfig database.Config, errorHandler func(error), opts ...options.Option[Permanent]) (*Permanent, error) {
-	source.store.Lock()
-	defer source.store.Unlock()
+	source.store.LockAccess()
+	defer source.store.UnlockAccess()
 
 	source.store.CloseWithoutLocking()
 
 	if err := copydir.Copy(source.dbConfig.Directory, dbConfig.Directory); err != nil {
 		return nil, ierrors.Wrap(err, "failed to copy permanent storage directory to new storage path")
 	}
-
-	source.store.Open()
 
 	return New(dbConfig, errorHandler, opts...), nil
 }
