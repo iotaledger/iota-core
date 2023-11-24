@@ -26,7 +26,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func Test_Upgrade_Signaling(t *testing.T) {
@@ -75,7 +74,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			storage.WithPruningDelay(20),
 			storage.WithPermanentOptions(
 				permanent.WithEpochBasedProviderOptions(
-					api.WithAPIForMissingVersionCallback(func(protocolParameters iotago.ProtocolParameters) (iotago.API, error) {
+					iotago.WithAPIForMissingVersionCallback(func(protocolParameters iotago.ProtocolParameters) (iotago.API, error) {
 						switch protocolParameters.Version() {
 						case 3:
 							return ts.API, nil
@@ -106,7 +105,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			storage.WithPruningDelay(20),
 			storage.WithPermanentOptions(
 				permanent.WithEpochBasedProviderOptions(
-					api.WithAPIForMissingVersionCallback(func(protocolParameters iotago.ProtocolParameters) (iotago.API, error) {
+					iotago.WithAPIForMissingVersionCallback(func(protocolParameters iotago.ProtocolParameters) (iotago.API, error) {
 						switch protocolParameters.Version() {
 						case 3:
 							return ts.API, nil

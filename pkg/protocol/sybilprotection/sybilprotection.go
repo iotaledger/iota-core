@@ -8,13 +8,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type SybilProtection interface {
 	TrackBlock(block *blocks.Block)
 	EligibleValidators(epoch iotago.EpochIndex) (accounts.AccountsData, error)
-	OrderedRegisteredCandidateValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error)
+	OrderedRegisteredCandidateValidatorsList(epoch iotago.EpochIndex) ([]*api.ValidatorResponse, error)
 	IsCandidateActive(validatorID iotago.AccountID, epoch iotago.EpochIndex) (bool, error)
 	// ValidatorReward returns the amount of mana that a validator has earned in a given epoch range.
 	// The actual used epoch range is returned, only until usedEnd the decay was applied.

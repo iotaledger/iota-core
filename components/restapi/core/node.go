@@ -1,11 +1,9 @@
 package core
 
-import (
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
-)
+import "github.com/iotaledger/iota.go/v4/api"
 
-func protocolParameters() []*apimodels.InfoResProtocolParameters {
-	protoParams := make([]*apimodels.InfoResProtocolParameters, 0)
+func protocolParameters() []*api.InfoResProtocolParameters {
+	protoParams := make([]*api.InfoResProtocolParameters, 0)
 	provider := deps.Protocol.MainEngineInstance().Storage.Settings().APIProvider()
 	for _, version := range provider.ProtocolEpochVersions() {
 		protocolParams := provider.ProtocolParameters(version.Version)
@@ -13,7 +11,7 @@ func protocolParameters() []*apimodels.InfoResProtocolParameters {
 			continue
 		}
 
-		protoParams = append(protoParams, &apimodels.InfoResProtocolParameters{
+		protoParams = append(protoParams, &api.InfoResProtocolParameters{
 			StartEpoch: version.StartEpoch,
 			Parameters: protocolParams,
 		})
@@ -22,15 +20,15 @@ func protocolParameters() []*apimodels.InfoResProtocolParameters {
 	return protoParams
 }
 
-func info() *apimodels.InfoResponse {
+func info() *api.InfoResponse {
 	clSnapshot := deps.Protocol.MainEngineInstance().Clock.Snapshot()
 	syncStatus := deps.Protocol.MainEngineInstance().SyncManager.SyncStatus()
 	metrics := deps.MetricsTracker.NodeMetrics()
 
-	return &apimodels.InfoResponse{
+	return &api.InfoResponse{
 		Name:    deps.AppInfo.Name,
 		Version: deps.AppInfo.Version,
-		Status: &apimodels.InfoResNodeStatus{
+		Status: &api.InfoResNodeStatus{
 			IsHealthy:                   syncStatus.NodeSynced,
 			AcceptedTangleTime:          clSnapshot.AcceptedTime,
 			RelativeAcceptedTangleTime:  clSnapshot.RelativeAcceptedTime,
@@ -42,13 +40,13 @@ func info() *apimodels.InfoResponse {
 			LatestConfirmedBlockSlot:    syncStatus.LastConfirmedBlockSlot,
 			PruningEpoch:                syncStatus.LastPrunedEpoch,
 		},
-		Metrics: &apimodels.InfoResNodeMetrics{
+		Metrics: &api.InfoResNodeMetrics{
 			BlocksPerSecond:          metrics.BlocksPerSecond,
 			ConfirmedBlocksPerSecond: metrics.ConfirmedBlocksPerSecond,
 			ConfirmationRate:         metrics.ConfirmedRate,
 		},
 		ProtocolParameters: protocolParameters(),
-		BaseToken: &apimodels.InfoResBaseToken{
+		BaseToken: &api.InfoResBaseToken{
 			Name:         deps.BaseToken.Name,
 			TickerSymbol: deps.BaseToken.TickerSymbol,
 			Unit:         deps.BaseToken.Unit,

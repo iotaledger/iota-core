@@ -15,7 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Booker struct {
@@ -27,7 +27,7 @@ type Booker struct {
 
 	ledger ledger.Ledger
 
-	retainBlockFailure func(id iotago.BlockID, reason apimodels.BlockFailureReason)
+	retainBlockFailure func(id iotago.BlockID, reason api.BlockFailureReason)
 
 	errorHandler func(error)
 	apiProvider  iotago.APIProvider
@@ -92,7 +92,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	}
 
 	if signedTransactionMetadata == nil {
-		b.retainBlockFailure(block.ID(), apimodels.BlockFailurePayloadInvalid)
+		b.retainBlockFailure(block.ID(), api.BlockFailurePayloadInvalid)
 
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
@@ -153,7 +153,7 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 	})
 }
 
-func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockID, apimodels.BlockFailureReason)) {
+func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockID, api.BlockFailureReason)) {
 	b.retainBlockFailure = retainBlockFailure
 }
 
@@ -192,7 +192,7 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 	for _, parent := range block.ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
-			b.retainBlockFailure(block.ID(), apimodels.BlockFailureParentNotFound)
+			b.retainBlockFailure(block.ID(), api.BlockFailureParentNotFound)
 			return nil, ierrors.Errorf("parent %s does not exist", parent.ID)
 		}
 
