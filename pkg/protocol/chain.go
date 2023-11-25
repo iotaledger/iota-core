@@ -110,6 +110,27 @@ func newChain(chains *Chains) *Chain {
 	return c
 }
 
+func (c *Chain) withInitializedEngine(callback func(spawnedEngine *engine.Engine) (teardown func())) (teardown func()) {
+	return c.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
+		return spawnedEngine.Initialized.WithNonEmptyValue(func(_ bool) (teardown func()) {
+			return callback(spawnedEngine)
+		})
+	})
+}
+
+// LastCommonSlot returns the slot of the last commitment that is common to this chain and its parent chain.
+func (c *Chain) LastCommonSlot() iotago.SlotIndex {
+	if forkingPoint := c.ForkingPoint.Get(); forkingPoint != nil {
+		if isRoot := forkingPoint.IsRoot.Get(); isRoot {
+			return forkingPoint.Slot()
+		}
+
+		return forkingPoint.Slot() - 1
+	}
+
+	panic("chain has no forking point")
+}
+
 // DispatchBlock dispatches the given block to the chain and its children (it is allowed to call this method on a nil
 // receiver, in which case it will be a no-op with a return value of false).
 func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (dispatched bool) {
@@ -170,7 +191,7 @@ func (c *Chain) initLogger(logger log.Logger, shutdownLogger func()) (teardown f
 		c.LatestProducedCommitment.LogUpdates(c, log.LevelDebug, "LatestProducedCommitment", (*Commitment).LogName),
 		c.RequestAttestations.LogUpdates(c, log.LevelTrace, "RequestAttestations"),
 		c.RequestBlocks.LogUpdates(c, log.LevelDebug, "RequestBlocks"),
-		c.SpawnedEngine.LogUpdates(c, log.LevelTrace, "SpawnedEngine", (*engine.Engine).LogName),
+		c.SpawnedEngine.LogUpdates(c, log.LevelTrace, "TargetEngine", (*engine.Engine).LogName),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 
 		shutdownLogger,

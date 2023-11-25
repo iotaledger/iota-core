@@ -5,6 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -18,6 +19,8 @@ type Commitments struct {
 
 	protocol    *Protocol
 	commitments *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
+
+	log.Logger
 }
 
 func newCommitments(protocol *Protocol) *Commitments {
@@ -28,25 +31,18 @@ func newCommitments(protocol *Protocol) *Commitments {
 		commitments: shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 	}
 
-	protocol.Constructed.OnTrigger(func() {
-		protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (teardown func()) {
-			return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, newRootCommitmentModel *model.Commitment) {
-				c.Root.Compute(func(currentRootCommitment *Commitment) *Commitment {
-					newRootCommitment, _, err := protocol.Commitments.Publish(newRootCommitmentModel)
-					if err != nil {
-						protocol.LogError("failed to publish new root commitment", "id", newRootCommitmentModel.ID(), "error", err)
-
-						return currentRootCommitment
-					}
-
-					newRootCommitment.IsRoot.Set(true)
-
-					return newRootCommitment
+	protocol.Constructed.WithNonEmptyValue(func(_ bool) (teardown func()) {
+		return lo.Batch(
+			protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (teardown func()) {
+				return mainChain.withInitializedEngine(func(mainEngine *engine.Engine) (teardown func()) {
+					return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, newRootCommitment *model.Commitment) {
+						c.publishRootCommitment(mainChain, newRootCommitment)
+					})
 				})
-			})
-		})
+			}),
 
-		protocol.Chains.WithElements(c.publishEngineCommitments)
+			protocol.Chains.WithElements(c.publishEngineCommitments),
+		)
 	})
 
 	return c
@@ -58,7 +54,7 @@ func (c *Commitments) Publish(commitment *model.Commitment) (commitmentMetadata 
 		return nil, false, ierrors.Wrapf(request.Err(), "failed to request commitment %s", commitment.ID())
 	}
 
-	publishedCommitmentMetadata := NewCommitment(commitment, c.protocol.Chains)
+	publishedCommitmentMetadata := newCommitment(commitment, c.protocol.Chains)
 	request.Resolve(publishedCommitmentMetadata).OnSuccess(func(resolvedMetadata *Commitment) {
 		commitmentMetadata = resolvedMetadata
 	})
@@ -147,8 +143,40 @@ func (c *Commitments) setupCommitment(commitment *Commitment, slotEvictedEvent r
 	}
 }
 
-func (c *Commitments) publishCommitment(chain *Chain, commitment *model.Commitment) (publishedCommitment *Commitment, published bool) {
-	publishedCommitment, published, err := c.Publish(commitment)
+func (c *Commitments) publishRootCommitment(mainChain *Chain, newRootCommitment *model.Commitment) {
+	c.Root.Compute(func(currentRootCommitment *Commitment) *Commitment {
+		publishedRootCommitment, _, err := c.Publish(newRootCommitment)
+		if err != nil {
+			c.LogError("failed to publish new root commitment", "id", newRootCommitment.ID(), "error", err)
+
+			return currentRootCommitment
+		}
+
+		publishedRootCommitment.IsRoot.Set(true)
+		publishedRootCommitment.forceChain(mainChain)
+
+		mainChain.ForkingPoint.DefaultTo(publishedRootCommitment)
+
+		return publishedRootCommitment
+	})
+}
+
+func (c *Commitments) publishEngineCommitments(chain *Chain) (unsubscribe func()) {
+	return chain.withInitializedEngine(func(spawnedEngine *engine.Engine) (teardown func()) {
+		return spawnedEngine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {
+			for latestPublishedSlot := chain.LastCommonSlot(); latestPublishedSlot < latestCommitment.Slot(); latestPublishedSlot++ {
+				if commitmentToPublish, err := spawnedEngine.Storage.Commitments().Load(latestPublishedSlot + 1); err != nil {
+					spawnedEngine.LogError("failed to load commitment to publish from engine", "slot", latestPublishedSlot+1, "err", err)
+				} else {
+					c.publishEngineCommitment(chain, commitmentToPublish)
+				}
+			}
+		})
+	})
+}
+
+func (c *Commitments) publishEngineCommitment(chain *Chain, commitment *model.Commitment) {
+	publishedCommitment, _, err := c.Publish(commitment)
 	if err != nil {
 		panic(err) // this can never happen, but we panic to get a stack trace if it ever does
 	}
@@ -157,34 +185,5 @@ func (c *Commitments) publishCommitment(chain *Chain, commitment *model.Commitme
 	publishedCommitment.IsAttested.Set(true)
 	publishedCommitment.IsVerified.Set(true)
 
-	if publishedCommitment.IsSolid.Get() {
-		publishedCommitment.setChain(chain)
-	}
-
-	return publishedCommitment, published
-}
-
-func (c *Commitments) publishEngineCommitments(chain *Chain) (unsubscribe func()) {
-	return chain.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
-		return spawnedEngine.Initialized.WithNonEmptyValue(func(_ bool) (teardown func()) {
-			forkingPoint, forkingPointUpdated := chain.ForkingPoint.DefaultTo(c.protocol.Commitments.Root.Get())
-			latestPublishedSlot := forkingPoint.Slot() - 1
-
-			if forkingPointUpdated {
-				forkingPoint.setChain(chain)
-
-				latestPublishedSlot++
-			}
-
-			return spawnedEngine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {
-				for ; latestPublishedSlot < latestCommitment.Slot(); latestPublishedSlot++ {
-					if commitmentToPublish, err := spawnedEngine.Storage.Commitments().Load(latestPublishedSlot + 1); err != nil {
-						spawnedEngine.LogError("failed to load commitment to publish from engine", "slot", latestPublishedSlot+1, "err", err)
-					} else {
-						c.publishCommitment(chain, commitmentToPublish)
-					}
-				}
-			})
-		})
-	})
+	publishedCommitment.forceChain(chain)
 }

@@ -12,31 +12,74 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// Commitment represents a commitment to a specific ledger state at a specific point in time that is part of a chain of
+// commitments produced by the nodes in the network.
 type Commitment struct {
+	// Commitment contains the underlying model.Commitment that is represented by this Commitment.
 	*model.Commitment
 
-	Parent                          reactive.Variable[*Commitment]
-	Children                        reactive.Set[*Commitment]
-	MainChild                       reactive.Variable[*Commitment]
-	Chain                           reactive.Variable[*Chain]
-	RequestAttestations             reactive.Variable[bool]
-	RequestBlocksToWarpSync         reactive.Variable[bool]
-	BlocksToWarpSync                reactive.Variable[ds.Set[iotago.BlockID]]
-	Weight                          reactive.Variable[uint64]
-	AttestedWeight                  reactive.Variable[uint64]
-	CumulativeAttestedWeight        reactive.Variable[uint64]
-	IsRoot                          reactive.Event
-	IsSolid                         reactive.Event
-	IsAttested                      reactive.Event
-	IsVerified                      reactive.Event
-	IsAboveLatestVerifiedCommitment reactive.Variable[bool]
-	ReplayDroppedBlocks             reactive.Variable[bool]
-	IsEvicted                       reactive.Event
+	// Parent contains the Commitment that is referenced as a parent in this Commitment.
+	Parent reactive.Variable[*Commitment]
 
+	// Children contains the Commitments that reference this Commitment as a parent.
+	Children reactive.Set[*Commitment]
+
+	// MainChild contains the Commitment that is the main child of this Commitment (continues the chain).
+	MainChild reactive.Variable[*Commitment]
+
+	// Chain contains the Chain that this Commitment is part of.
+	Chain reactive.Variable[*Chain]
+
+	// RequestAttestations contains a flag indicating if the node should request attestations for this Commitment.
+	RequestAttestations reactive.Variable[bool]
+
+	// WarpSyncBlocks contains a flag indicating if the node should request the blocks of this Commitment using warp
+	// sync.
+	WarpSyncBlocks reactive.Variable[bool]
+
+	// BlocksToWarpSync contains the set of blocks that should be requested using warp sync.
+	BlocksToWarpSync reactive.Variable[ds.Set[iotago.BlockID]]
+
+	// Weight contains the weight of this Commitment (the difference between the cumulative weight of this Commitment
+	// and its parent).
+	Weight reactive.Variable[uint64]
+
+	// AttestedWeight contains the weight of the Commitment that was attested by other nodes.
+	AttestedWeight reactive.Variable[uint64]
+
+	// CumulativeAttestedWeight contains the cumulative weight of all attested Commitments up to this point.
+	CumulativeAttestedWeight reactive.Variable[uint64]
+
+	// IsRoot contains a flag indicating if this Commitment is the root of the Chain.
+	IsRoot reactive.Event
+
+	// IsSolid contains a flag indicating if this Commitment is solid (all referenced blocks in its past are known).
+	IsSolid reactive.Event
+
+	// IsAttested contains a flag indicating if we have received attestations for this Commitment.
+	IsAttested reactive.Event
+
+	// IsVerified contains a flag indicating if this Commitment is verified (we produced this Commitment ourselves by
+	// booking all the contained blocks and transactions).
+	IsVerified reactive.Event
+
+	// IsAboveLatestVerifiedCommitment contains a flag indicating if this Commitment is above the latest verified
+	// Commitment.
+	IsAboveLatestVerifiedCommitment reactive.Variable[bool]
+
+	// ReplayDroppedBlocks contains a flag indicating if we should replay the blocks that were dropped while the
+	//Commitment was pending.
+	ReplayDroppedBlocks reactive.Variable[bool]
+
+	// IsEvicted contains a flag indicating if this Commitment was evicted from the Protocol.
+	IsEvicted reactive.Event
+
+	// Logger embeds a logger that can be used to log messages emitted by this Commitment.
 	log.Logger
 }
 
-func NewCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
+// NewCommitment creates a new Commitment from the given model.Commitment.
+func newCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
 	c := &Commitment{
 		Commitment:                      commitment,
 		Parent:                          reactive.NewVariable[*Commitment](),
@@ -44,7 +87,7 @@ func NewCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
 		MainChild:                       reactive.NewVariable[*Commitment](),
 		Chain:                           reactive.NewVariable[*Chain](),
 		RequestAttestations:             reactive.NewVariable[bool](),
-		RequestBlocksToWarpSync:         reactive.NewVariable[bool](),
+		WarpSyncBlocks:                  reactive.NewVariable[bool](),
 		BlocksToWarpSync:                reactive.NewVariable[ds.Set[iotago.BlockID]](),
 		Weight:                          reactive.NewVariable[uint64](),
 		AttestedWeight:                  reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
@@ -68,7 +111,8 @@ func NewCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
 	return c
 }
 
-func (c *Commitment) SpawnedEngine() *engine.Engine {
+// TargetEngine returns the engine that is responsible for booking the blocks of this Commitment.
+func (c *Commitment) TargetEngine() *engine.Engine {
 	if chain := c.Chain.Get(); chain != nil {
 		return chain.SpawnedEngine.Get()
 	}
@@ -76,6 +120,7 @@ func (c *Commitment) SpawnedEngine() *engine.Engine {
 	return nil
 }
 
+// initLogger initializes the Logger of this Commitment.
 func (c *Commitment) initLogger(logger log.Logger, shutdownLogger func()) (teardown func()) {
 	c.Logger = logger
 
@@ -84,7 +129,7 @@ func (c *Commitment) initLogger(logger log.Logger, shutdownLogger func()) (teard
 		c.MainChild.LogUpdates(c, log.LevelTrace, "MainChild", (*Commitment).LogName),
 		c.Chain.LogUpdates(c, log.LevelTrace, "Chain", (*Chain).LogName),
 		c.RequestAttestations.LogUpdates(c, log.LevelTrace, "RequestAttestations"),
-		c.RequestBlocksToWarpSync.LogUpdates(c, log.LevelTrace, "RequestBlocksToWarpSync"),
+		c.WarpSyncBlocks.LogUpdates(c, log.LevelTrace, "WarpSyncBlocks"),
 		c.Weight.LogUpdates(c, log.LevelTrace, "Weight"),
 		c.AttestedWeight.LogUpdates(c, log.LevelTrace, "AttestedWeight"),
 		c.CumulativeAttestedWeight.LogUpdates(c, log.LevelTrace, "CumulativeAttestedWeight"),
@@ -99,6 +144,7 @@ func (c *Commitment) initLogger(logger log.Logger, shutdownLogger func()) (teard
 	)
 }
 
+// initDerivedProperties initializes the behavior of this Commitment by setting up the relations between its properties.
 func (c *Commitment) initDerivedProperties(chains *Chains) (teardown func()) {
 	return lo.Batch(
 		c.deriveRootProperties(),
@@ -118,8 +164,8 @@ func (c *Commitment) initDerivedProperties(chains *Chains) (teardown func()) {
 
 				c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
 					return lo.Batch(
-						c.deriveRequestBlocksToWarpSync(chain, parent),
 						c.deriveRequestAttestations(chain, parent),
+						c.deriveWarpSyncBlocks(chain, parent),
 					)
 				}),
 			)
@@ -135,6 +181,7 @@ func (c *Commitment) initDerivedProperties(chains *Chains) (teardown func()) {
 	)
 }
 
+// deriveRootProperties derives the properties that are supposed to be set for the root Commitment.
 func (c *Commitment) deriveRootProperties() (teardown func()) {
 	return lo.Batch(
 		c.IsSolid.InheritFrom(c.IsRoot),
@@ -143,6 +190,7 @@ func (c *Commitment) deriveRootProperties() (teardown func()) {
 	)
 }
 
+// deriveChildren derives the children of this Commitment by adding the given child to the Children set.
 func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) {
 	c.MainChild.Compute(func(mainChild *Commitment) *Commitment {
 		if !c.Children.Add(child) || mainChild != nil {
@@ -163,13 +211,16 @@ func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) 
 	}
 }
 
+// deriveIsSolid derives the IsSolid flag of this Commitment which is set to true if the parent is known and solid.
 func (c *Commitment) deriveIsSolid(parent *Commitment) func() {
 	return c.IsSolid.InheritFrom(parent.IsSolid)
 }
 
+// deriveChain derives the Chain of this Commitment which is either inherited from the parent if we are the main child
+// or a newly created chain.
 func (c *Commitment) deriveChain(chains *Chains, parent *Commitment) func() {
 	return c.Chain.DeriveValueFrom(reactive.NewDerivedVariable3(func(currentChain *Chain, isRoot bool, mainChild *Commitment, parentChain *Chain) *Chain {
-		// do not adjust the chain of the root commitment (it is initially set from the outside)
+		// do not adjust the chain of the root commitment (it is set from the outside)
 		if isRoot {
 			return currentChain
 		}
@@ -193,37 +244,47 @@ func (c *Commitment) deriveChain(chains *Chains, parent *Commitment) func() {
 	}, c.IsRoot, parent.MainChild, parent.Chain, c.Chain.Get()))
 }
 
+// deriveCumulativeAttestedWeight derives the CumulativeAttestedWeight of this Commitment which is the sum of the
+// parent's CumulativeAttestedWeight and the AttestedWeight of this Commitment.
 func (c *Commitment) deriveCumulativeAttestedWeight(parent *Commitment) func() {
 	return c.CumulativeAttestedWeight.DeriveValueFrom(reactive.NewDerivedVariable2(func(_ uint64, parentCumulativeAttestedWeight uint64, attestedWeight uint64) uint64 {
 		return parentCumulativeAttestedWeight + attestedWeight
 	}, parent.CumulativeAttestedWeight, c.AttestedWeight))
 }
 
+// deriveIsAboveLatestVerifiedCommitment derives the IsAboveLatestVerifiedCommitment flag of this Commitment which is
+// true if the parent is already above the latest verified Commitment or if the parent is verified and we are not.
 func (c *Commitment) deriveIsAboveLatestVerifiedCommitment(parent *Commitment) func() {
 	return c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, parentAboveLatestVerifiedCommitment bool, parentIsVerified bool, isVerified bool) bool {
 		return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
 	}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified))
 }
 
-func (c *Commitment) deriveRequestBlocksToWarpSync(chain *Chain, parent *Commitment) func() {
-	return c.RequestBlocksToWarpSync.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
-		return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
-	}, chain.SpawnedEngine, chain.WarpSyncMode, parent.IsVerified, c.IsVerified))
-}
-
+// deriveRequestAttestations derives the RequestAttestations flag of this Commitment which is true if our Chain is
+// requesting attestations, and we are the directly above the latest attested Commitment.
 func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment) func() {
 	return c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, verifyAttestations bool, requestBlocks bool, parentIsAttested bool, isAttested bool) bool {
 		return verifyAttestations && !requestBlocks && parentIsAttested && !isAttested
 	}, chain.RequestAttestations, chain.RequestBlocks, parent.IsAttested, c.IsAttested))
 }
 
+// deriveWarpSyncBlocks derives the WarpSyncBlocks flag of this Commitment which is true if our Chain is requesting
+// warp sync, and we are the directly above the latest verified Commitment.
+func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func() {
+	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
+		return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
+	}, chain.SpawnedEngine, chain.WarpSyncMode, parent.IsVerified, c.IsVerified))
+}
+
+// deriveReplayDroppedBlocks derives the ReplayDroppedBlocks flag of this Commitment which is true if our Chain has an
+// engine, is no longer requesting warp sync, and we are above the latest verified Commitment.
 func (c *Commitment) deriveReplayDroppedBlocks(chain *Chain) func() {
 	return c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, spawnedEngine *engine.Engine, warpSyncing bool, isAboveLatestVerifiedCommitment bool) bool {
 		return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
 	}, chain.SpawnedEngine, chain.WarpSyncMode, c.IsAboveLatestVerifiedCommitment))
 }
 
-func (c *Commitment) setChain(targetChain *Chain) {
+func (c *Commitment) forceChain(targetChain *Chain) {
 	if currentChain := c.Chain.Get(); currentChain != targetChain {
 		if currentChain == nil { // the root commitment doesn't inherit a chain from its parents
 			c.Chain.Set(targetChain)

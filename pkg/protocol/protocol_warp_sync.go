@@ -37,7 +37,7 @@ func NewWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		c.protocol.Commitments.WithElements(func(commitment *Commitment) (teardown func()) {
-			return commitment.RequestBlocksToWarpSync.OnUpdate(func(_ bool, warpSyncBlocks bool) {
+			return commitment.WarpSyncBlocks.OnUpdate(func(_ bool, warpSyncBlocks bool) {
 				if warpSyncBlocks {
 					c.ticker.StartTicker(commitment.ID())
 				} else {
@@ -94,7 +94,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			return
 		}
 
-		targetEngine := commitment.SpawnedEngine()
+		targetEngine := commitment.TargetEngine()
 		if targetEngine == nil {
 			w.LogDebug("failed to get target engine for response", "commitment", commitment.LogName())
 
@@ -102,7 +102,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 		}
 
 		commitment.BlocksToWarpSync.Compute(func(blocksToWarpSync ds.Set[iotago.BlockID]) ds.Set[iotago.BlockID] {
-			if blocksToWarpSync != nil || !commitment.RequestBlocksToWarpSync.Get() {
+			if blocksToWarpSync != nil || !commitment.WarpSyncBlocks.Get() {
 				w.LogTrace("response for already synced commitment", "commitment", commitment.LogName(), "fromPeer", from)
 
 				return blocksToWarpSync
@@ -263,14 +263,14 @@ func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from
 			return
 		}
 
-		engineInstance := commitment.SpawnedEngine()
-		if engineInstance == nil {
+		targetEngine := commitment.TargetEngine()
+		if targetEngine == nil {
 			w.LogTrace("warp-sync request for chain without engine", "chain", chain.LogName(), "fromPeer", from)
 
 			return
 		}
 
-		committedSlot, err := engineInstance.CommittedSlot(commitmentID)
+		committedSlot, err := targetEngine.CommittedSlot(commitmentID)
 		if err != nil {
 			w.LogTrace("warp-sync request for uncommitted slot", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from)
 

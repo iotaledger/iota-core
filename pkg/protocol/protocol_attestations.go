@@ -128,20 +128,20 @@ func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, 
 			return
 		}
 
-		spawnedEngine := commitment.SpawnedEngine()
-		if spawnedEngine == nil {
+		targetEngine := commitment.TargetEngine()
+		if targetEngine == nil {
 			a.LogTrace("request for chain without engine", "chain", chain.LogName(), "fromPeer", from)
 
 			return
 		}
 
-		if spawnedEngine.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
+		if targetEngine.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
 			a.LogTrace("requested commitment not verified", "commitment", commitment.LogName(), "fromPeer", from)
 
 			return
 		}
 
-		commitmentModel, err := spawnedEngine.Storage.Commitments().Load(commitmentID.Slot())
+		commitmentModel, err := targetEngine.Storage.Commitments().Load(commitmentID.Slot())
 		if err != nil {
 			if !ierrors.Is(err, kvstore.ErrKeyNotFound) {
 				a.LogError("failed to load requested commitment from engine", "commitment", commitment.LogName(), "fromPeer", from, "err", err)
@@ -158,14 +158,14 @@ func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, 
 			return
 		}
 
-		attestations, err := spawnedEngine.Attestations.Get(commitmentID.Slot())
+		attestations, err := targetEngine.Attestations.Get(commitmentID.Slot())
 		if err != nil {
 			a.LogError("failed to load requested attestations", "commitment", commitment.LogName(), "fromPeer", from)
 
 			return
 		}
 
-		rootsStorage, err := spawnedEngine.Storage.Roots(commitmentID.Slot())
+		rootsStorage, err := targetEngine.Storage.Roots(commitmentID.Slot())
 		if err != nil {
 			a.LogError("failed to load roots storage for requested attestations", "commitment", commitment.LogName(), "fromPeer", from)
 
@@ -200,6 +200,12 @@ func (a *AttestationsProtocol) setupCommitmentVerifier(chain *Chain) (teardown f
 	forkingPoint := chain.ForkingPoint.Get()
 	if forkingPoint == nil {
 		a.LogError("failed to retrieve forking point", "chain", chain.LogName())
+
+		return nil
+	}
+
+	if forkingPoint.IsRoot.Get() {
+		a.LogTrace("skipping commitment verifier setup for main chain", "chain", chain.LogName())
 
 		return nil
 	}
