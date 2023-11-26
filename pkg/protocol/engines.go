@@ -193,7 +193,7 @@ func (e *Engines) syncMainEngineFromMainChain() (unsubscribe func()) {
 	return e.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (teardown func()) {
 		return e.Main.DeriveValueFrom(reactive.NewDerivedVariable(func(currentMainEngine *engine.Engine, newMainEngine *engine.Engine) *engine.Engine {
 			return lo.Cond(newMainEngine == nil, currentMainEngine, newMainEngine)
-		}, mainChain.SpawnedEngine))
+		}, mainChain.Engine))
 	})
 }
 
@@ -212,7 +212,7 @@ func (e *Engines) injectEngineInstances() (unsubscribe func()) {
 		return chain.RequestBlocks.OnUpdate(func(_ bool, instantiate bool) {
 			e.worker.Submit(func() {
 				if !instantiate {
-					chain.SpawnedEngine.Set(nil)
+					chain.Engine.Set(nil)
 
 					return
 				}
@@ -228,7 +228,7 @@ func (e *Engines) injectEngineInstances() (unsubscribe func()) {
 				} else {
 					e.protocol.Network.OnShutdown(func() { newEngine.Shutdown.Trigger() })
 
-					chain.SpawnedEngine.Set(newEngine)
+					chain.Engine.Set(newEngine)
 				}
 			})
 		})

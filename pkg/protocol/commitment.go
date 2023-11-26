@@ -79,7 +79,7 @@ type Commitment struct {
 }
 
 // NewCommitment creates a new Commitment from the given model.Commitment.
-func newCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
+func newCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment {
 	c := &Commitment{
 		Commitment:                      commitment,
 		Parent:                          reactive.NewVariable[*Commitment](),
@@ -102,8 +102,8 @@ func newCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
 	}
 
 	shutdown := lo.Batch(
-		c.initLogger(chains.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))),
-		c.initDerivedProperties(chains),
+		c.initLogger(protocol.Commitments.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))),
+		c.initDerivedProperties(protocol.Chains),
 	)
 
 	c.IsEvicted.OnTrigger(shutdown)
@@ -114,7 +114,7 @@ func newCommitment(commitment *model.Commitment, chains *Chains) *Commitment {
 // TargetEngine returns the engine that is responsible for booking the blocks of this Commitment.
 func (c *Commitment) TargetEngine() *engine.Engine {
 	if chain := c.Chain.Get(); chain != nil {
-		return chain.SpawnedEngine.Get()
+		return chain.Engine.Get()
 	}
 
 	return nil
@@ -148,6 +148,7 @@ func (c *Commitment) initLogger(logger log.Logger, shutdownLogger func()) (teard
 func (c *Commitment) initDerivedProperties(chains *Chains) (teardown func()) {
 	return lo.Batch(
 		c.deriveRootProperties(),
+		c.deriveIsAttested(),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			// the weight can be fixed as soon as the parent is known (as it only relies on static information from the
@@ -157,6 +158,7 @@ func (c *Commitment) initDerivedProperties(chains *Chains) (teardown func()) {
 			return lo.Batch(
 				parent.deriveChildren(c),
 
+				c.deriveIsAttested(),
 				c.deriveIsSolid(parent),
 				c.deriveChain(chains, parent),
 				c.deriveCumulativeAttestedWeight(parent),
@@ -188,6 +190,11 @@ func (c *Commitment) deriveRootProperties() (teardown func()) {
 		c.IsAttested.InheritFrom(c.IsRoot),
 		c.IsVerified.InheritFrom(c.IsRoot),
 	)
+}
+
+// deriveIsAttested derives the IsAttested flag by forcing it to true once the Commitment is marked as verified.
+func (c *Commitment) deriveIsAttested() (teardown func()) {
+	return c.IsAttested.InheritFrom(c.IsVerified)
 }
 
 // deriveChildren derives the children of this Commitment by adding the given child to the Children set.
@@ -271,24 +278,24 @@ func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment)
 // deriveWarpSyncBlocks derives the WarpSyncBlocks flag of this Commitment which is true if our Chain is requesting
 // warp sync, and we are the directly above the latest verified Commitment.
 func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func() {
-	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, spawnedEngine *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
-		return spawnedEngine != nil && warpSync && parentIsVerified && !isVerified
-	}, chain.SpawnedEngine, chain.WarpSyncMode, parent.IsVerified, c.IsVerified))
+	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
+		return engineInstance != nil && warpSync && parentIsVerified && !isVerified
+	}, chain.Engine, chain.WarpSyncMode, parent.IsVerified, c.IsVerified))
 }
 
 // deriveReplayDroppedBlocks derives the ReplayDroppedBlocks flag of this Commitment which is true if our Chain has an
 // engine, is no longer requesting warp sync, and we are above the latest verified Commitment.
 func (c *Commitment) deriveReplayDroppedBlocks(chain *Chain) func() {
-	return c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, spawnedEngine *engine.Engine, warpSyncing bool, isAboveLatestVerifiedCommitment bool) bool {
-		return spawnedEngine != nil && !warpSyncing && isAboveLatestVerifiedCommitment
-	}, chain.SpawnedEngine, chain.WarpSyncMode, c.IsAboveLatestVerifiedCommitment))
+	return c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, engineInstance *engine.Engine, warpSyncing bool, isAboveLatestVerifiedCommitment bool) bool {
+		return engineInstance != nil && !warpSyncing && isAboveLatestVerifiedCommitment
+	}, chain.Engine, chain.WarpSyncMode, c.IsAboveLatestVerifiedCommitment))
 }
 
+// forceChain forces the Chain of this Commitment to the given Chain by promoting it to the main child of its parent if
+// the parent is on the target Chain.
 func (c *Commitment) forceChain(targetChain *Chain) {
 	if currentChain := c.Chain.Get(); currentChain != targetChain {
-		if currentChain == nil { // the root commitment doesn't inherit a chain from its parents
-			c.Chain.Set(targetChain)
-		} else if parent := c.Parent.Get(); parent.Chain.Get() == targetChain {
+		if parent := c.Parent.Get(); parent.Chain.Get() == targetChain {
 			parent.MainChild.Set(c)
 		}
 	}

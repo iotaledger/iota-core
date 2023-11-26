@@ -30,7 +30,7 @@ type Chain struct {
 	LatestAttestedCommitment reactive.Variable[*Commitment]
 
 	// LatestProducedCommitment contains the latest commitment of this chain that we produced ourselves by booking the
-	// corresponding blocks in the SpawnedEngine.
+	// corresponding blocks in the Engine.
 	LatestProducedCommitment reactive.Variable[*Commitment]
 
 	// ClaimedWeight contains the claimed weight of this chain which is derived from the cumulative weight of the
@@ -61,11 +61,11 @@ type Chain struct {
 	RequestAttestations reactive.Variable[bool]
 
 	// RequestBlocks contains a flag that indicates whether this chain should verify the state by requesting blocks and
-	// processing them in its SpawnedEngine.
+	// processing them in its Engine.
 	RequestBlocks reactive.Variable[bool]
 
-	// SpawnedEngine contains the engine that is used to process blocks for this chain.
-	SpawnedEngine reactive.Variable[*engine.Engine]
+	// Engine contains the engine instance that is used to process blocks for this chain.
+	Engine reactive.Variable[*engine.Engine]
 
 	// IsEvicted contains a flag that indicates whether this chain was evicted.
 	IsEvicted reactive.Event
@@ -94,7 +94,7 @@ func newChain(chains *Chains) *Chain {
 		OutOfSyncThreshold:       reactive.NewVariable[iotago.SlotIndex](),
 		RequestAttestations:      reactive.NewVariable[bool](),
 		RequestBlocks:            reactive.NewVariable[bool](),
-		SpawnedEngine:            reactive.NewVariable[*engine.Engine](),
+		Engine:                   reactive.NewVariable[*engine.Engine](),
 		IsEvicted:                reactive.NewEvent(),
 
 		commitments: shrinkingmap.New[iotago.SlotIndex, *Commitment](),
@@ -110,10 +110,11 @@ func newChain(chains *Chains) *Chain {
 	return c
 }
 
-func (c *Chain) withInitializedEngine(callback func(spawnedEngine *engine.Engine) (teardown func())) (teardown func()) {
-	return c.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
-		return spawnedEngine.Initialized.WithNonEmptyValue(func(_ bool) (teardown func()) {
-			return callback(spawnedEngine)
+// WithInitializedEngine calls the given callback once the Engine of this chain is initialized.
+func (c *Chain) WithInitializedEngine(callback func(engineInstance *engine.Engine) (teardown func())) (teardown func()) {
+	return c.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (teardown func()) {
+		return engineInstance.Initialized.WithNonEmptyValue(func(_ bool) (teardown func()) {
+			return callback(engineInstance)
 		})
 	})
 }
@@ -165,8 +166,8 @@ func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exist
 
 // LatestEngine returns the latest engine instance that was spawned by the chain itself or one of its ancestors.
 func (c *Chain) LatestEngine() *engine.Engine {
-	currentChain, currentEngine := c, c.SpawnedEngine.Get()
-	for ; currentEngine == nil; currentEngine = currentChain.SpawnedEngine.Get() {
+	currentChain, currentEngine := c, c.Engine.Get()
+	for ; currentEngine == nil; currentEngine = currentChain.Engine.Get() {
 		if currentChain = c.ParentChain.Get(); currentChain == nil {
 			return nil
 		}
@@ -191,7 +192,7 @@ func (c *Chain) initLogger(logger log.Logger, shutdownLogger func()) (teardown f
 		c.LatestProducedCommitment.LogUpdates(c, log.LevelDebug, "LatestProducedCommitment", (*Commitment).LogName),
 		c.RequestAttestations.LogUpdates(c, log.LevelTrace, "RequestAttestations"),
 		c.RequestBlocks.LogUpdates(c, log.LevelDebug, "RequestBlocks"),
-		c.SpawnedEngine.LogUpdates(c, log.LevelTrace, "TargetEngine", (*engine.Engine).LogName),
+		c.Engine.LogUpdates(c, log.LevelTrace, "Engine", (*engine.Engine).LogName),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 
 		shutdownLogger,
@@ -214,10 +215,10 @@ func (c *Chain) initDerivedProperties(latestSeenSlot reactive.ReadableVariable[i
 			return parentChain.deriveChildChains(c)
 		}),
 
-		c.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
+		c.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (teardown func()) {
 			return lo.Batch(
-				c.deriveWarpSyncThreshold(latestSeenSlot, spawnedEngine),
-				c.deriveOutOfSyncThreshold(latestSeenSlot, spawnedEngine),
+				c.deriveWarpSyncThreshold(latestSeenSlot, engineInstance),
+				c.deriveOutOfSyncThreshold(latestSeenSlot, engineInstance),
 			)
 		}),
 	)
@@ -305,9 +306,9 @@ func (c *Chain) deriveParentChain(forkingPoint *Commitment) (teardown func()) {
 
 // deriveOutOfSyncThreshold defines how a chain determines its "out of sync" threshold (the latest seen slot minus 2
 // times the max committable age or 0 if this would cause an overflow to the negative numbers).
-func (c *Chain) deriveOutOfSyncThreshold(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex], spawnedEngine *engine.Engine) func() {
+func (c *Chain) deriveOutOfSyncThreshold(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex], engineInstance *engine.Engine) func() {
 	return c.OutOfSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
-		if outOfSyncOffset := 2 * spawnedEngine.LatestAPI().ProtocolParameters().MaxCommittableAge(); outOfSyncOffset < latestSeenSlot {
+		if outOfSyncOffset := 2 * engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge(); outOfSyncOffset < latestSeenSlot {
 			return latestSeenSlot - outOfSyncOffset
 		}
 
@@ -317,9 +318,9 @@ func (c *Chain) deriveOutOfSyncThreshold(latestSeenSlot reactive.ReadableVariabl
 
 // deriveWarpSyncThreshold defines how a chain determines its warp sync threshold (the latest seen slot minus the max
 // committable age or 0 if this would cause an overflow to the negative numbers).
-func (c *Chain) deriveWarpSyncThreshold(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex], spawnedEngine *engine.Engine) func() {
+func (c *Chain) deriveWarpSyncThreshold(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex], engineInstance *engine.Engine) func() {
 	return c.WarpSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
-		if warpSyncOffset := spawnedEngine.LatestAPI().ProtocolParameters().MaxCommittableAge(); warpSyncOffset < latestSeenSlot {
+		if warpSyncOffset := engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge(); warpSyncOffset < latestSeenSlot {
 			return latestSeenSlot - warpSyncOffset
 		}
 
@@ -342,15 +343,15 @@ func (c *Chain) addCommitment(newCommitment *Commitment) (teardown func()) {
 // dispatchBlockToSpawnedEngine dispatches the given block to the spawned engine of this chain (if it exists).
 func (c *Chain) dispatchBlockToSpawnedEngine(block *model.Block, src peer.ID) (dispatched bool) {
 	// abort if we do not have a spawned engine
-	spawnedEngine := c.SpawnedEngine.Get()
-	if spawnedEngine == nil {
+	engineInstance := c.Engine.Get()
+	if engineInstance == nil {
 		return false
 	}
 
 	// abort if the target slot is below the latest commitment
 	issuingTime := block.ProtocolBlock().Header.IssuingTime
-	targetSlot := spawnedEngine.APIForTime(issuingTime).TimeProvider().SlotFromTime(issuingTime)
-	if targetSlot <= spawnedEngine.LatestCommitment.Get().Slot() {
+	targetSlot := engineInstance.APIForTime(issuingTime).TimeProvider().SlotFromTime(issuingTime)
+	if targetSlot <= engineInstance.LatestCommitment.Get().Slot() {
 		return false
 	}
 
@@ -370,7 +371,7 @@ func (c *Chain) dispatchBlockToSpawnedEngine(block *model.Block, src peer.ID) (d
 	}
 
 	// dispatch the block to the spawned engine if all previous checks passed
-	spawnedEngine.ProcessBlockFromPeer(block, src)
+	engineInstance.ProcessBlockFromPeer(block, src)
 
 	return true
 }

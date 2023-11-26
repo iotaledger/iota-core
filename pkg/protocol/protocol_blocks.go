@@ -44,12 +44,12 @@ func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 		})
 
 		protocol.Chains.WithElements(func(chain *Chain) func() {
-			return chain.SpawnedEngine.WithNonEmptyValue(func(spawnedEngine *engine.Engine) (teardown func()) {
-				return spawnedEngine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
+			return chain.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (teardown func()) {
+				return engineInstance.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
 			})
 		})
 
-		protocol.Chains.Main.Get().SpawnedEngine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
+		protocol.Chains.Main.Get().Engine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
 			if engine != nil {
 				unsubscribeOnEngineChange(func() (unsubscribe func()) {
 					return lo.Batch(
@@ -82,7 +82,7 @@ func (b *BlocksProtocol) SendResponse(block *model.Block) {
 
 func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 	b.workerPool.Submit(func() {
-		commitmentRequest := b.protocol.Commitments.requestCommitment(block.ProtocolBlock().Header.SlotCommitmentID, true)
+		commitmentRequest := b.protocol.Commitments.createCachedRequest(block.ProtocolBlock().Header.SlotCommitmentID, true)
 		if commitmentRequest.WasRejected() {
 			b.LogError("dropped block referencing unsolidifiable commitment", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID(), "err", commitmentRequest.Err())
 

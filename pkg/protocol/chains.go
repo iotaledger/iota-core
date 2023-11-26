@@ -32,6 +32,9 @@ type Chains struct {
 	// LatestSeenSlot contains the latest slot that was seen by any of the chains.
 	LatestSeenSlot reactive.Variable[iotago.SlotIndex]
 
+	// protocol contains a reference to the Protocol instance that this component belongs to.
+	protocol *Protocol
+
 	// Logger contains a reference to the logger that is used by this component.
 	log.Logger
 }
@@ -45,6 +48,7 @@ func newChains(protocol *Protocol) *Chains {
 		HeaviestAttestedCandidate: reactive.NewVariable[*Chain](),
 		HeaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
 		LatestSeenSlot:            reactive.NewVariable[iotago.SlotIndex](increasing[iotago.SlotIndex]),
+		protocol:                  protocol,
 	}
 
 	shutdown := lo.Batch(
@@ -59,6 +63,16 @@ func newChains(protocol *Protocol) *Chains {
 	protocol.Shutdown.OnTrigger(shutdown)
 
 	return c
+}
+
+// WithInitializedEngines is a reactive selector that executes the given callback for each managed chain that
+// initialized its engine.
+func (c *Chains) WithInitializedEngines(callback func(chain *Chain, engine *engine.Engine) (teardown func())) (teardown func()) {
+	return c.WithElements(func(chain *Chain) (teardown func()) {
+		return chain.WithInitializedEngine(func(engine *engine.Engine) (teardown func()) {
+			return callback(chain, engine)
+		})
+	})
 }
 
 // initLogger initializes the logger for this component.

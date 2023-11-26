@@ -161,7 +161,7 @@ func (n *Node) hookEvents() {
 		if prevHeaviestAttestedCandidate != nil {
 			n.forkDetectedCount.Add(1)
 
-			heaviestAttestedCandidate.SpawnedEngine.OnUpdate(func(prevEngine *engine.Engine, newEngine *engine.Engine) {
+			heaviestAttestedCandidate.Engine.OnUpdate(func(prevEngine *engine.Engine, newEngine *engine.Engine) {
 				n.candidateEngineActivatedCount.Add(1)
 			})
 		}
@@ -183,7 +183,7 @@ func (n *Node) hookEvents() {
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	n.Protocol.Chains.WithElements(func(chain *protocol.Chain) (teardown func()) {
-		return chain.SpawnedEngine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) {
+		return chain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) {
 			if newEngine != nil {
 				n.attachEngineLogs(failOnBlockFiltered, newEngine)
 			}

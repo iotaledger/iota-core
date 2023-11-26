@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -31,6 +32,14 @@ func NewCommitmentsProtocol(protocol *Protocol) *CommitmentsProtocol {
 	c.ticker.Events.Tick.Hook(c.SendRequest)
 
 	return c
+}
+
+func (c *CommitmentsProtocol) StartTicker(request *promise.Promise[*Commitment], commitmentID iotago.CommitmentID) {
+	c.ticker.StartTicker(commitmentID)
+
+	request.OnComplete(func() {
+		c.ticker.StopTicker(commitmentID)
+	})
 }
 
 func (c *CommitmentsProtocol) SendRequest(commitmentID iotago.CommitmentID) {
