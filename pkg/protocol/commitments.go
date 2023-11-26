@@ -24,8 +24,9 @@ type Commitments struct {
 	// protocol contains a reference to the Protocol instance that this component belongs to.
 	protocol *Protocol
 
-	// cachedRequests contains all cached requests for commitments that are currently relevant.
-	cachedRequests *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
+	// commitmentPromises contains Promise instances for all non-evicted commitments that were accessed by the Protocol.
+	// It acts as a cache and a way to address commitments generically even if they are still unsolid.
+	commitmentPromises *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
 
 	// Logger contains a reference to the logger that is used by this component.
 	log.Logger
@@ -34,10 +35,10 @@ type Commitments struct {
 // newCommitments creates a new commitments instance for the given protocol.
 func newCommitments(protocol *Protocol) *Commitments {
 	c := &Commitments{
-		Set:            reactive.NewSet[*Commitment](),
-		Root:           reactive.NewVariable[*Commitment](),
-		protocol:       protocol,
-		cachedRequests: shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
+		Set:                reactive.NewSet[*Commitment](),
+		Root:               reactive.NewVariable[*Commitment](),
+		protocol:           protocol,
+		commitmentPromises: shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 	}
 
 	shutdown := lo.Batch(
@@ -50,27 +51,10 @@ func newCommitments(protocol *Protocol) *Commitments {
 	return c
 }
 
-// Publish publishes the given commitment model to the collection and returns the corresponding Commitment singleton
-// that holds the metadata.
-func (c *Commitments) Publish(commitment *model.Commitment) (commitmentMetadata *Commitment, published bool, err error) {
-	// create cached request
-	cachedRequest := c.createCachedRequest(commitment.ID(), false)
-	if cachedRequest.WasRejected() {
-		return nil, false, ierrors.Wrapf(cachedRequest.Err(), "failed to request commitment %s", commitment.ID())
-	}
-
-	publishedCommitmentMetadata := newCommitment(commitment, c.protocol)
-	cachedRequest.Resolve(publishedCommitmentMetadata).OnSuccess(func(resolvedMetadata *Commitment) {
-		commitmentMetadata = resolvedMetadata
-	})
-
-	return commitmentMetadata, commitmentMetadata == publishedCommitmentMetadata, nil
-}
-
-func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestMissing ...bool) (commitment *Commitment, err error) {
-	commitmentRequest, exists := c.cachedRequests.Get(commitmentID)
-	if !exists && lo.First(requestMissing) {
-		if commitmentRequest = c.createCachedRequest(commitmentID, true); commitmentRequest.WasRejected() {
+func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...bool) (commitment *Commitment, err error) {
+	commitmentRequest, exists := c.commitmentPromises.Get(commitmentID)
+	if !exists && lo.First(requestIfMissing) {
+		if commitmentRequest = c.Promise(commitmentID, true); commitmentRequest.WasRejected() {
 			return nil, ierrors.Wrapf(commitmentRequest.Err(), "failed to request commitment %s", commitmentID)
 		}
 	}
@@ -84,6 +68,67 @@ func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestMissing ...bo
 	}
 
 	return commitmentRequest.Result(), nil
+}
+
+func (c *Commitments) Promise(commitmentID iotago.CommitmentID, requestIfMissing ...bool) (commitmentPromise *promise.Promise[*Commitment]) {
+	// handle evicted slots
+	slotEvicted := c.protocol.EvictionEvent(commitmentID.Index())
+	if slotEvicted.WasTriggered() && c.protocol.LastEvictedSlot().Get() != 0 {
+		return promise.New[*Commitment]().Reject(ErrorSlotEvicted)
+	}
+
+	// create a new promise or return the existing one
+	commitmentPromise, promiseCreated := c.commitmentPromises.GetOrCreate(commitmentID, lo.NoVariadic(promise.New[*Commitment]))
+	if !promiseCreated {
+		return commitmentPromise
+	}
+
+	// start ticker if requested
+	if lo.First(requestIfMissing) {
+		c.LogDebug("requesting commitment", "commitmentID", commitmentID)
+		c.protocol.CommitmentsProtocol.StartTicker(commitmentPromise, commitmentID)
+	} else {
+		c.LogDebug("NOT requesting commitment", "commitmentID", commitmentID)
+	}
+
+	// handle successful resolutions
+	commitmentPromise.OnSuccess(func(commitment *Commitment) {
+		c.initCommitment(commitment, slotEvicted)
+	})
+
+	// handle failed resolutions
+	commitmentPromise.OnError(func(err error) {
+		c.LogDebug("request failed", "commitmentID", commitmentID, "error", err)
+	})
+
+	// tear down the promise once the slot is evicted
+	slotEvicted.OnTrigger(func() {
+		c.commitmentPromises.Delete(commitmentID)
+
+		commitmentPromise.Reject(ErrorSlotEvicted)
+	})
+
+	return commitmentPromise
+}
+
+// Resolve publishes the given commitment model to the collection and returns the corresponding Commitment singleton
+// that holds the metadata.
+func (c *Commitments) Resolve(commitmentModel *model.Commitment) (publishedCommitment *Commitment, published bool, err error) {
+	// retrieve promise and abort if it was already rejected
+	commitmentPromise := c.Promise(commitmentModel.ID())
+	if commitmentPromise.WasRejected() {
+		return nil, false, ierrors.Wrapf(commitmentPromise.Err(), "failed to request commitment %s", commitmentModel.ID())
+	}
+
+	// otherwise try to resolve it and determine if we were the goroutine that resolved it
+	publishedCommitment = newCommitment(c, commitmentModel)
+	commitmentPromise.Resolve(publishedCommitment).OnSuccess(func(resolvedCommitment *Commitment) {
+		if published = resolvedCommitment == publishedCommitment; !published {
+			publishedCommitment = resolvedCommitment
+		}
+	})
+
+	return publishedCommitment, published, nil
 }
 
 func (c *Commitments) initLogger(logger log.Logger, shutdownLogger func()) (teardown func()) {
@@ -114,7 +159,7 @@ func (c *Commitments) initEngineCommitmentSynchronization(protocol *Protocol) fu
 
 func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine.Engine) func() {
 	return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, newRootCommitmentModel *model.Commitment) {
-		newRootCommitment, published, err := c.Publish(newRootCommitmentModel)
+		newRootCommitment, published, err := c.Resolve(newRootCommitmentModel)
 		if err != nil {
 			c.LogError("failed to publish new root commitment", "id", newRootCommitmentModel.ID(), "error", err)
 
@@ -143,7 +188,7 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 				return
 			}
 
-			publishedCommitment, _, err := c.Publish(modelToPublish)
+			publishedCommitment, _, err := c.Resolve(modelToPublish)
 			if err != nil {
 				c.LogError("failed to publish commitment from engine", "engine", engine.LogName(), "commitment", modelToPublish, "err", err)
 
@@ -157,55 +202,21 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 	})
 }
 
-func (c *Commitments) createCachedRequest(commitmentID iotago.CommitmentID, requestFromPeers bool) (commitmentRequest *promise.Promise[*Commitment]) {
-	// handle evicted slots
-	slotEvicted := c.protocol.EvictionEvent(commitmentID.Index())
-	if slotEvicted.WasTriggered() && c.protocol.LastEvictedSlot().Get() != 0 {
-		return promise.New[*Commitment]().Reject(ErrorSlotEvicted)
-	}
+func (c *Commitments) initCommitment(commitment *Commitment, slotEvicted reactive.Event) {
+	commitment.LogDebug("created", "id", commitment.ID())
 
-	// attempt to create a request and abort if it already exists
-	commitmentRequest, requestCreated := c.cachedRequests.GetOrCreate(commitmentID, lo.NoVariadic(promise.New[*Commitment]))
-	if !requestCreated {
-		return commitmentRequest
-	}
-
-	// start ticker if necessary
-	if requestFromPeers {
-		c.protocol.CommitmentsProtocol.StartTicker(commitmentRequest, commitmentID)
-	}
-
-	// handle successful requests
-	commitmentRequest.OnSuccess(func(commitment *Commitment) {
-		commitment.LogDebug("created", "id", commitment.ID())
-
-		// solidify the parent of the commitment
-		c.createCachedRequest(commitment.PreviousCommitmentID(), true).OnSuccess(func(parent *Commitment) {
-			commitment.Parent.Set(parent)
-		})
-
-		// add commitment to the set
-		c.Add(commitment)
-
-		// tear down the commitment once the slot is evicted
-		slotEvicted.OnTrigger(func() {
-			c.Delete(commitment)
-
-			commitment.IsEvicted.Trigger()
-		})
+	// solidify the parent of the commitment
+	c.Promise(commitment.PreviousCommitmentID(), true).OnSuccess(func(parent *Commitment) {
+		commitment.Parent.Set(parent)
 	})
 
-	// handle failed requests
-	commitmentRequest.OnError(func(err error) {
-		c.LogDebug("request failed", "commitmentID", commitmentID, "error", err)
-	})
+	// add commitment to the set
+	c.Add(commitment)
 
-	// tear down the request once the slot is evicted
+	// tear down the commitment once the slot is evicted
 	slotEvicted.OnTrigger(func() {
-		c.cachedRequests.Delete(commitmentID)
+		c.Delete(commitment)
 
-		commitmentRequest.Reject(ErrorSlotEvicted)
+		commitment.IsEvicted.Trigger()
 	})
-
-	return commitmentRequest
 }

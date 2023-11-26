@@ -34,10 +34,10 @@ func NewCommitmentsProtocol(protocol *Protocol) *CommitmentsProtocol {
 	return c
 }
 
-func (c *CommitmentsProtocol) StartTicker(request *promise.Promise[*Commitment], commitmentID iotago.CommitmentID) {
+func (c *CommitmentsProtocol) StartTicker(commitmentPromise *promise.Promise[*Commitment], commitmentID iotago.CommitmentID) {
 	c.ticker.StartTicker(commitmentID)
 
-	request.OnComplete(func() {
+	commitmentPromise.OnComplete(func() {
 		c.ticker.StopTicker(commitmentID)
 	})
 }
@@ -60,7 +60,7 @@ func (c *CommitmentsProtocol) SendResponse(commitment *Commitment, to peer.ID) {
 
 func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment, from peer.ID) {
 	c.workerPool.Submit(func() {
-		if commitment, published, err := c.protocol.Commitments.Publish(commitmentModel); err != nil {
+		if commitment, published, err := c.protocol.Commitments.Resolve(commitmentModel); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
 		} else if published {
 			c.LogTrace("received response", "commitment", commitment.LogName(), "fromPeer", from)

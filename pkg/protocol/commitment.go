@@ -53,9 +53,6 @@ type Commitment struct {
 	// IsRoot contains a flag indicating if this Commitment is the root of the Chain.
 	IsRoot reactive.Event
 
-	// IsSolid contains a flag indicating if this Commitment is solid (all referenced blocks in its past are known).
-	IsSolid reactive.Event
-
 	// IsAttested contains a flag indicating if we have received attestations for this Commitment.
 	IsAttested reactive.Event
 
@@ -74,14 +71,17 @@ type Commitment struct {
 	// IsEvicted contains a flag indicating if this Commitment was evicted from the Protocol.
 	IsEvicted reactive.Event
 
+	// commitments contains a reference to the Commitments instance that this Commitment belongs to.
+	commitments *Commitments
+
 	// Logger embeds a logger that can be used to log messages emitted by this Commitment.
 	log.Logger
 }
 
 // NewCommitment creates a new Commitment from the given model.Commitment.
-func newCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment {
+func newCommitment(commitments *Commitments, model *model.Commitment) *Commitment {
 	c := &Commitment{
-		Commitment:                      commitment,
+		Commitment:                      model,
 		Parent:                          reactive.NewVariable[*Commitment](),
 		Children:                        reactive.NewSet[*Commitment](),
 		MainChild:                       reactive.NewVariable[*Commitment](),
@@ -93,17 +93,17 @@ func newCommitment(commitment *model.Commitment, protocol *Protocol) *Commitment
 		AttestedWeight:                  reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
 		IsRoot:                          reactive.NewEvent(),
-		IsSolid:                         reactive.NewEvent(),
 		IsAttested:                      reactive.NewEvent(),
 		IsVerified:                      reactive.NewEvent(),
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
 		ReplayDroppedBlocks:             reactive.NewVariable[bool](),
 		IsEvicted:                       reactive.NewEvent(),
+		commitments:                     commitments,
 	}
 
 	shutdown := lo.Batch(
-		c.initLogger(protocol.Commitments.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))),
-		c.initDerivedProperties(protocol.Chains),
+		c.initLogger(),
+		c.initDerivedProperties(),
 	)
 
 	c.IsEvicted.OnTrigger(shutdown)
@@ -121,8 +121,8 @@ func (c *Commitment) TargetEngine() *engine.Engine {
 }
 
 // initLogger initializes the Logger of this Commitment.
-func (c *Commitment) initLogger(logger log.Logger, shutdownLogger func()) (teardown func()) {
-	c.Logger = logger
+func (c *Commitment) initLogger() (teardown func()) {
+	c.Logger, teardown = c.commitments.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))
 
 	return lo.Batch(
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
@@ -134,33 +134,33 @@ func (c *Commitment) initLogger(logger log.Logger, shutdownLogger func()) (teard
 		c.AttestedWeight.LogUpdates(c, log.LevelTrace, "AttestedWeight"),
 		c.CumulativeAttestedWeight.LogUpdates(c, log.LevelTrace, "CumulativeAttestedWeight"),
 		c.IsRoot.LogUpdates(c, log.LevelTrace, "IsRoot"),
-		c.IsSolid.LogUpdates(c, log.LevelTrace, "IsSolid"),
 		c.IsAttested.LogUpdates(c, log.LevelTrace, "IsAttested"),
 		c.IsVerified.LogUpdates(c, log.LevelTrace, "IsVerified"),
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 
-		shutdownLogger,
+		teardown,
 	)
 }
 
 // initDerivedProperties initializes the behavior of this Commitment by setting up the relations between its properties.
-func (c *Commitment) initDerivedProperties(chains *Chains) (teardown func()) {
+func (c *Commitment) initDerivedProperties() (teardown func()) {
 	return lo.Batch(
-		c.deriveRootProperties(),
-		c.deriveIsAttested(),
+		// mark commitments that are marked as root as verified
+		c.IsVerified.InheritFrom(c.IsRoot),
+
+		// mark commitments that are marked as verified as attested
+		c.IsAttested.InheritFrom(c.IsVerified),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
-			// the weight can be fixed as soon as the parent is known (as it only relies on static information from the
-			// parent commitment)
+			// the weight can be fixed as a one time operation (as it only relies on static information from the parent
+			// commitment)
 			c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
 
 			return lo.Batch(
 				parent.deriveChildren(c),
 
-				c.deriveIsAttested(),
-				c.deriveIsSolid(parent),
-				c.deriveChain(chains, parent),
+				c.deriveChain(parent),
 				c.deriveCumulativeAttestedWeight(parent),
 				c.deriveIsAboveLatestVerifiedCommitment(parent),
 
@@ -181,20 +181,6 @@ func (c *Commitment) initDerivedProperties(chains *Chains) (teardown func()) {
 			)
 		}),
 	)
-}
-
-// deriveRootProperties derives the properties that are supposed to be set for the root Commitment.
-func (c *Commitment) deriveRootProperties() (teardown func()) {
-	return lo.Batch(
-		c.IsSolid.InheritFrom(c.IsRoot),
-		c.IsAttested.InheritFrom(c.IsRoot),
-		c.IsVerified.InheritFrom(c.IsRoot),
-	)
-}
-
-// deriveIsAttested derives the IsAttested flag by forcing it to true once the Commitment is marked as verified.
-func (c *Commitment) deriveIsAttested() (teardown func()) {
-	return c.IsAttested.InheritFrom(c.IsVerified)
 }
 
 // deriveChildren derives the children of this Commitment by adding the given child to the Children set.
@@ -218,31 +204,28 @@ func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) 
 	}
 }
 
-// deriveIsSolid derives the IsSolid flag of this Commitment which is set to true if the parent is known and solid.
-func (c *Commitment) deriveIsSolid(parent *Commitment) func() {
-	return c.IsSolid.InheritFrom(parent.IsSolid)
-}
-
 // deriveChain derives the Chain of this Commitment which is either inherited from the parent if we are the main child
 // or a newly created chain.
-func (c *Commitment) deriveChain(chains *Chains, parent *Commitment) func() {
+func (c *Commitment) deriveChain(parent *Commitment) func() {
 	return c.Chain.DeriveValueFrom(reactive.NewDerivedVariable3(func(currentChain *Chain, isRoot bool, mainChild *Commitment, parentChain *Chain) *Chain {
 		// do not adjust the chain of the root commitment (it is set from the outside)
 		if isRoot {
 			return currentChain
 		}
 
-		// if we are not the main child of our parent, we create and return a new chain
+		// if we are not the main child of our parent, we spawn a new chain
 		if c != mainChild {
 			if currentChain == nil {
-				currentChain = chains.newChain()
+				currentChain = c.commitments.protocol.Chains.newChain()
 				currentChain.ForkingPoint.Set(c)
 			}
 
 			return currentChain
 		}
 
-		// if we are the main child of our parent, and we
+		// if we are the main child of our parent, and our chain is not the parent chain (that we are supposed to
+		// inherit), then we evict our current chain (we will spawn a new one if we ever change back to not being the
+		// main child)
 		if currentChain != nil && currentChain != parentChain {
 			currentChain.IsEvicted.Trigger()
 		}

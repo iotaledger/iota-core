@@ -4,6 +4,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/types"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -82,14 +83,15 @@ func (b *BlocksProtocol) SendResponse(block *model.Block) {
 
 func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 	b.workerPool.Submit(func() {
-		commitmentRequest := b.protocol.Commitments.createCachedRequest(block.ProtocolBlock().Header.SlotCommitmentID, true)
-		if commitmentRequest.WasRejected() {
-			b.LogError("dropped block referencing unsolidifiable commitment", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID(), "err", commitmentRequest.Err())
+		// abort if the commitment belongs to an evicted slot
+		commitment, err := b.protocol.Commitments.Get(block.ProtocolBlock().Header.SlotCommitmentID, true)
+		if err != nil && ierrors.Is(ErrorSlotEvicted, err) {
+			b.LogError("dropped block referencing unsolidifiable commitment", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID(), "err", err)
 
 			return
 		}
 
-		commitment := commitmentRequest.Result()
+		// add the block to the dropped blocks buffer if we could not dispatch it to the chain
 		if commitment == nil || !commitment.Chain.Get().DispatchBlock(block, from) {
 			if !b.droppedBlocksBuffer.Add(block.ProtocolBlock().Header.SlotCommitmentID, types.NewTuple(block, from)) {
 				b.LogError("failed to add dropped block referencing unsolid commitment to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())

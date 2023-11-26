@@ -70,6 +70,9 @@ type Chain struct {
 	// IsEvicted contains a flag that indicates whether this chain was evicted.
 	IsEvicted reactive.Event
 
+	// chains contains a reference to the Chains instance that this chain belongs to.
+	chains *Chains
+
 	// commitments contains the commitments that make up this chain.
 	commitments *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *Commitment]
 
@@ -97,12 +100,13 @@ func newChain(chains *Chains) *Chain {
 		Engine:                   reactive.NewVariable[*engine.Engine](),
 		IsEvicted:                reactive.NewEvent(),
 
+		chains:      chains,
 		commitments: shrinkingmap.New[iotago.SlotIndex, *Commitment](),
 	}
 
 	shutdown := lo.Batch(
-		c.initLogger(chains.NewEntityLogger("")),
-		c.initDerivedProperties(chains.LatestSeenSlot),
+		c.initLogger(),
+		c.initDerivedProperties(),
 	)
 
 	c.IsEvicted.OnTrigger(shutdown)
@@ -177,8 +181,8 @@ func (c *Chain) LatestEngine() *engine.Engine {
 }
 
 // initLogger initializes the Logger of this chain.
-func (c *Chain) initLogger(logger log.Logger, shutdownLogger func()) (teardown func()) {
-	c.Logger = logger
+func (c *Chain) initLogger() (teardown func()) {
+	c.Logger, teardown = c.chains.NewEntityLogger("")
 
 	return lo.Batch(
 		c.WarpSyncMode.LogUpdates(c, log.LevelTrace, "WarpSyncMode"),
@@ -195,12 +199,12 @@ func (c *Chain) initLogger(logger log.Logger, shutdownLogger func()) (teardown f
 		c.Engine.LogUpdates(c, log.LevelTrace, "Engine", (*engine.Engine).LogName),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 
-		shutdownLogger,
+		teardown,
 	)
 }
 
 // initDerivedProperties initializes the behavior of this chain by setting up the relations between its properties.
-func (c *Chain) initDerivedProperties(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex]) (teardown func()) {
+func (c *Chain) initDerivedProperties() (teardown func()) {
 	return lo.Batch(
 		c.deriveClaimedWeight(),
 		c.deriveVerifiedWeight(),
@@ -217,8 +221,8 @@ func (c *Chain) initDerivedProperties(latestSeenSlot reactive.ReadableVariable[i
 
 		c.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (teardown func()) {
 			return lo.Batch(
-				c.deriveWarpSyncThreshold(latestSeenSlot, engineInstance),
-				c.deriveOutOfSyncThreshold(latestSeenSlot, engineInstance),
+				c.deriveWarpSyncThreshold(c.chains.LatestSeenSlot, engineInstance),
+				c.deriveOutOfSyncThreshold(c.chains.LatestSeenSlot, engineInstance),
 			)
 		}),
 	)

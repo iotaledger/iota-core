@@ -62,7 +62,7 @@ func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 
 func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	a.workerPool.Submit(func() {
-		commitment, _, err := a.protocol.Commitments.Publish(commitmentModel)
+		commitment, _, err := a.protocol.Commitments.Resolve(commitmentModel)
 		if err != nil {
 			a.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitmentModel.ID(), "peer", from, "error", err)
 

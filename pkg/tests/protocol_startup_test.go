@@ -351,8 +351,6 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 			slot7Commitment := lo.PanicOnErr(nodeA.Protocol.Engines.Main.Get().Storage.Commitments().Load(7))
 
-			fmt.Println("expecting commitment", slot7Commitment.ID())
-
 			ts.AssertNodeState(ts.Nodes("nodeC-restarted", "nodeD"),
 				testsuite.WithSnapshotImported(true),
 				testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
