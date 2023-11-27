@@ -26,7 +26,7 @@ func NewCommitmentsProtocol(protocol *Protocol) *CommitmentsProtocol {
 		Logger:     lo.Return1(protocol.Logger.NewChildLogger("Commitments")),
 		protocol:   protocol,
 		workerPool: protocol.Workers.CreatePool("Commitments"),
-		ticker:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
+		ticker:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.CommitmentRequesterOptions...),
 	}
 
 	c.ticker.Events.Tick.Hook(c.SendRequest)

@@ -5,6 +5,9 @@ import (
 )
 
 var (
+	// ErrorCommitmentNotFound is returned for requests for commitments that are not available yet.
 	ErrorCommitmentNotFound = ierrors.New("commitment not found")
-	ErrorSlotEvicted        = ierrors.New("slot evicted")
+
+	// ErrorSlotEvicted is returned for requests for commitments that belong to evicted slots.
+	ErrorSlotEvicted = ierrors.New("slot evicted")
 )

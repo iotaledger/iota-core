@@ -193,23 +193,23 @@ func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, requestIfM
 	}
 
 	// create a new promise or return the existing one
-	commitmentPromise, promiseCreated := c.cachedRequests.GetOrCreate(commitmentID, lo.NoVariadic(promise.New[*Commitment]))
+	cachedRequest, promiseCreated := c.cachedRequests.GetOrCreate(commitmentID, lo.NoVariadic(promise.New[*Commitment]))
 	if !promiseCreated {
-		return commitmentPromise
+		return cachedRequest
 	}
 
 	// start ticker if requested
 	if lo.First(requestIfMissing) {
-		c.protocol.CommitmentsProtocol.StartTicker(commitmentPromise, commitmentID)
+		c.protocol.CommitmentsProtocol.StartTicker(cachedRequest, commitmentID)
 	}
 
 	// handle successful resolutions
-	commitmentPromise.OnSuccess(func(commitment *Commitment) {
+	cachedRequest.OnSuccess(func(commitment *Commitment) {
 		c.initCommitment(commitment, slotEvicted)
 	})
 
 	// handle failed resolutions
-	commitmentPromise.OnError(func(err error) {
+	cachedRequest.OnError(func(err error) {
 		c.LogDebug("request failed", "commitmentID", commitmentID, "error", err)
 	})
 
@@ -217,10 +217,10 @@ func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, requestIfM
 	slotEvicted.OnTrigger(func() {
 		c.cachedRequests.Delete(commitmentID)
 
-		commitmentPromise.Reject(ErrorSlotEvicted)
+		cachedRequest.Reject(ErrorSlotEvicted)
 	})
 
-	return commitmentPromise
+	return cachedRequest
 }
 
 // initCommitment initializes the given commitment.
