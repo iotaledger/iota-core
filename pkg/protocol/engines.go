@@ -209,9 +209,9 @@ func (e *Engines) syncMainEngineInfoFile() (unsubscribe func()) {
 
 func (e *Engines) injectEngineInstances() (unsubscribe func()) {
 	return e.protocol.Chains.WithElements(func(chain *Chain) (teardown func()) {
-		return chain.RequestBlocks.OnUpdate(func(_ bool, instantiate bool) {
+		return chain.StartEngine.OnUpdate(func(_ bool, startEngine bool) {
 			e.worker.Submit(func() {
-				if !instantiate {
+				if !startEngine {
 					chain.Engine.Set(nil)
 
 					return

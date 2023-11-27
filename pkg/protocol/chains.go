@@ -92,7 +92,7 @@ func (c *Chains) initLogger(logger log.Logger, shutdownLogger func()) (teardown 
 // initChainSwitching initializes the chain switching logic.
 func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (teardown func()) {
 	mainChain := c.newChain()
-	mainChain.RequestBlocks.Set(true)
+	mainChain.StartEngine.Set(true)
 
 	c.Main.Set(mainChain)
 
@@ -102,7 +102,7 @@ func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (t
 		}),
 
 		c.HeaviestAttestedCandidate.WithNonEmptyValue(func(heaviestAttestedCandidate *Chain) (teardown func()) {
-			return heaviestAttestedCandidate.RequestBlocks.ToggleValue(true)
+			return heaviestAttestedCandidate.StartEngine.ToggleValue(true)
 		}),
 
 		c.HeaviestVerifiedCandidate.WithNonEmptyValue(func(heaviestVerifiedCandidate *Chain) (teardown func()) {

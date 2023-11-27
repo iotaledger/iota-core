@@ -60,7 +60,7 @@ func (c *CommitmentsProtocol) SendResponse(commitment *Commitment, to peer.ID) {
 
 func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment, from peer.ID) {
 	c.workerPool.Submit(func() {
-		if commitment, published, err := c.protocol.Commitments.Resolve(commitmentModel); err != nil {
+		if commitment, published, err := c.protocol.Commitments.publishCommitmentModel(commitmentModel); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
 		} else if published {
 			c.LogTrace("received response", "commitment", commitment.LogName(), "fromPeer", from)

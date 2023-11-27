@@ -60,9 +60,9 @@ type Chain struct {
 	// requesting attestations.
 	RequestAttestations reactive.Variable[bool]
 
-	// RequestBlocks contains a flag that indicates whether this chain should verify the state by requesting blocks and
-	// processing them in its Engine.
-	RequestBlocks reactive.Variable[bool]
+	// StartEngine contains a flag that indicates whether this chain should verify the state by processing blocks in an
+	// engine.
+	StartEngine reactive.Variable[bool]
 
 	// Engine contains the engine instance that is used to process blocks for this chain.
 	Engine reactive.Variable[*engine.Engine]
@@ -96,7 +96,7 @@ func newChain(chains *Chains) *Chain {
 		WarpSyncThreshold:        reactive.NewVariable[iotago.SlotIndex](),
 		OutOfSyncThreshold:       reactive.NewVariable[iotago.SlotIndex](),
 		RequestAttestations:      reactive.NewVariable[bool](),
-		RequestBlocks:            reactive.NewVariable[bool](),
+		StartEngine:              reactive.NewVariable[bool](),
 		Engine:                   reactive.NewVariable[*engine.Engine](),
 		IsEvicted:                reactive.NewEvent(),
 
@@ -195,7 +195,7 @@ func (c *Chain) initLogger() (teardown func()) {
 		c.LatestCommitment.LogUpdates(c, log.LevelTrace, "LatestCommitment", (*Commitment).LogName),
 		c.LatestProducedCommitment.LogUpdates(c, log.LevelDebug, "LatestProducedCommitment", (*Commitment).LogName),
 		c.RequestAttestations.LogUpdates(c, log.LevelTrace, "RequestAttestations"),
-		c.RequestBlocks.LogUpdates(c, log.LevelDebug, "RequestBlocks"),
+		c.StartEngine.LogUpdates(c, log.LevelDebug, "StartEngine"),
 		c.Engine.LogUpdates(c, log.LevelTrace, "Engine", (*engine.Engine).LogName),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 

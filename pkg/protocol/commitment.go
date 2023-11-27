@@ -251,11 +251,11 @@ func (c *Commitment) deriveIsAboveLatestVerifiedCommitment(parent *Commitment) f
 }
 
 // deriveRequestAttestations derives the RequestAttestations flag of this Commitment which is true if our Chain is
-// requesting attestations, and we are the directly above the latest attested Commitment.
+// requesting attestations (while not having an engine), and we are the directly above the latest attested Commitment.
 func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment) func() {
-	return c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, verifyAttestations bool, requestBlocks bool, parentIsAttested bool, isAttested bool) bool {
-		return verifyAttestations && !requestBlocks && parentIsAttested && !isAttested
-	}, chain.RequestAttestations, chain.RequestBlocks, parent.IsAttested, c.IsAttested))
+	return c.RequestAttestations.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, startEngine bool, verifyAttestations bool, parentIsAttested bool, isAttested bool) bool {
+		return !startEngine && verifyAttestations && parentIsAttested && !isAttested
+	}, chain.StartEngine, chain.RequestAttestations, parent.IsAttested, c.IsAttested))
 }
 
 // deriveWarpSyncBlocks derives the WarpSyncBlocks flag of this Commitment which is true if our Chain is requesting
