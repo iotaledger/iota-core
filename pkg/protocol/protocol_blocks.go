@@ -15,14 +15,23 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// BlocksProtocol is a subcomponent of the protocol that is responsible for handling block requests and responses.
 type BlocksProtocol struct {
-	protocol            *Protocol
-	workerPool          *workerpool.WorkerPool
+	// protocol contains a reference to the Protocol instance that this component belongs to.
+	protocol *Protocol
+
+	// workerPool contains the worker pool that is used to process block requests and responses asynchronously.
+	workerPool *workerpool.WorkerPool
+
+	// droppedBlocksBuffer contains a buffer for dropped blocks that reference unsolid commitments that can be replayed
+	// at a later point in time (to make tests more reliable as we have no continuous activity).
 	droppedBlocksBuffer *buffer.UnsolidCommitmentBuffer[*types.Tuple[*model.Block, peer.ID]]
 
+	// Logger embeds a logger that can be used to log messages emitted by this chain.
 	log.Logger
 }
 
+// newBlocksProtocol creates a new blocks protocol instance for the given protocol.
 func newBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 	b := &BlocksProtocol{
 		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Blocks")),
@@ -65,6 +74,7 @@ func newBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 	return b
 }
 
+// SendRequest sends a request for the given block to all peers.
 func (b *BlocksProtocol) SendRequest(blockID iotago.BlockID) {
 	b.workerPool.Submit(func() {
 		b.protocol.Network.RequestBlock(blockID)
@@ -73,6 +83,7 @@ func (b *BlocksProtocol) SendRequest(blockID iotago.BlockID) {
 	})
 }
 
+// SendResponse sends the given block to all peers.
 func (b *BlocksProtocol) SendResponse(block *model.Block) {
 	b.workerPool.Submit(func() {
 		b.protocol.Network.SendBlock(block)
@@ -81,6 +92,7 @@ func (b *BlocksProtocol) SendResponse(block *model.Block) {
 	})
 }
 
+// ProcessResponse processes the given block response.
 func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 	b.workerPool.Submit(func() {
 		// abort if the commitment belongs to an evicted slot
@@ -106,6 +118,7 @@ func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 	})
 }
 
+// ProcessRequest processes the given block request.
 func (b *BlocksProtocol) ProcessRequest(blockID iotago.BlockID, from peer.ID) {
 	b.workerPool.Submit(func() {
 		block, exists := b.protocol.Engines.Main.Get().Block(blockID)
@@ -143,6 +156,7 @@ func (b *BlocksProtocol) ProcessRequest(blockID iotago.BlockID, from peer.ID) {
 	})
 }
 
+// Shutdown shuts down the blocks protocol and waits for all pending requests to be finished.
 func (b *BlocksProtocol) Shutdown() {
 	b.workerPool.Shutdown().ShutdownComplete.Wait()
 }

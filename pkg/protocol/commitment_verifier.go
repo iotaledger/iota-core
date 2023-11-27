@@ -13,12 +13,17 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
+// CommitmentVerifier is a helper to verify the attestations of a commitment.
 type CommitmentVerifier struct {
-	engine                  *engine.Engine
+	// engine contains a reference to the engine instance that is used to verify the attestations.
+	engine *engine.Engine
+
+	// validatorAccountsAtFork contains the accounts of the validators at the forking point.
 	validatorAccountsAtFork map[iotago.AccountID]*accounts.AccountData
 }
 
-func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) (*CommitmentVerifier, error) {
+// newCommitmentVerifier creates a new CommitmentVerifier instance.
+func newCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) (*CommitmentVerifier, error) {
 	committeeAtForkingPoint, exists := mainEngine.SybilProtection.SeatManager().CommitteeInSlot(lastCommonCommitmentBeforeFork.Slot())
 	if !exists {
 		return nil, ierrors.Errorf("committee in slot %d does not exist", lastCommonCommitmentBeforeFork.Slot())
@@ -36,6 +41,7 @@ func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBefore
 	}, nil
 }
 
+// verifyCommitment verifies the given commitment and returns the blockIDs and cumulative weight of the attestations.
 func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
 	tree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes, iotago.AccountID.Bytes, iotago.AccountIDFromBytes, (*iotago.Attestation).Bytes, iotago.AttestationFromBytes(c.engine))
 
@@ -61,6 +67,7 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestatio
 	return blockIDs, seatCount, nil
 }
 
+// verifyAttestations verifies the given attestations and returns the blockIDs and cumulative weight of the attestations.
 func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestation) (iotago.BlockIDs, uint64, error) {
 	visitedIdentities := ds.NewSet[iotago.AccountID]()
 	var blockIDs iotago.BlockIDs

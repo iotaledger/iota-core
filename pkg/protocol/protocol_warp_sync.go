@@ -17,14 +17,22 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
+// WarpSyncProtocol is a subcomponent of the protocol that is responsible for handling warp sync requests and responses.
 type WarpSyncProtocol struct {
-	protocol   *Protocol
-	workerPool *workerpool.WorkerPool
-	ticker     *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+	// protocol contains a reference to the Protocol instance that this component belongs to.
+	protocol *Protocol
 
+	// workerPool contains the worker pool that is used to process warp sync requests and responses asynchronously.
+	workerPool *workerpool.WorkerPool
+
+	// ticker contains the ticker that is used to send warp sync requests.
+	ticker *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+
+	// Logger embeds a logger that can be used to log messages emitted by this chain.
 	log.Logger
 }
 
+// newWarpSyncProtocol creates a new warp sync protocol instance for the given protocol.
 func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 	c := &WarpSyncProtocol{
 		Logger:     lo.Return1(protocol.Logger.NewChildLogger("WarpSync")),
@@ -50,6 +58,7 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 	return c
 }
 
+// SendRequest sends a warp sync request for the given commitment ID to all peers.
 func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 	w.workerPool.Submit(func() {
 		if commitment, err := w.protocol.Commitments.Get(commitmentID, false); err == nil {
@@ -60,6 +69,7 @@ func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 	})
 }
 
+// SendResponse sends a warp sync response for the given commitment ID to the given peer.
 func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, roots *iotago.Roots, transactionIDs iotago.TransactionIDs, to peer.ID) {
 	w.workerPool.Submit(func() {
 		w.protocol.Network.SendWarpSyncResponse(commitment.ID(), blockIDsBySlotCommitment, roots.TangleProof(), transactionIDs, roots.MutationProof(), to)
@@ -68,6 +78,7 @@ func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDsBySlotCo
 	})
 }
 
+// ProcessResponse processes the given warp sync response.
 func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	w.workerPool.Submit(func() {
 		commitment, err := w.protocol.Commitments.Get(commitmentID)
@@ -243,6 +254,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 	})
 }
 
+// ProcessRequest processes the given warp sync request.
 func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	w.workerPool.Submit(func() {
 		commitment, err := w.protocol.Commitments.Get(commitmentID)
@@ -302,6 +314,7 @@ func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from
 	})
 }
 
+// Shutdown shuts down the warp sync protocol.
 func (w *WarpSyncProtocol) Shutdown() {
 	w.ticker.Shutdown()
 	w.workerPool.Shutdown().ShutdownComplete.Wait()

@@ -21,16 +21,25 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// Engines is a subcomponent of the protocol that exposes the engines that are managed by the protocol.
 type Engines struct {
+	// Main contains the main engine.
 	Main reactive.Variable[*engine.Engine]
 
-	protocol  *Protocol
-	worker    *workerpool.WorkerPool
+	// protocol contains a reference to the Protocol instance that this component belongs to.
+	protocol *Protocol
+
+	// worker contains the worker pool that is used to process changes to the engine instances asynchronously.
+	worker *workerpool.WorkerPool
+
+	// directory contains the directory that is used to store the engine instances on disk.
 	directory *utils.Directory
 
+	// ReactiveModule embeds a reactive module that provides default API for logging and lifecycle management.
 	*module.ReactiveModule
 }
 
+// newEngines creates a new Engines instance.
 func newEngines(protocol *Protocol) *Engines {
 	e := &Engines{
 		Main:           reactive.NewVariable[*engine.Engine](),
@@ -41,15 +50,14 @@ func newEngines(protocol *Protocol) *Engines {
 	}
 
 	protocol.Constructed.OnTrigger(func() {
-		unsubscribe := lo.Batch(
+		shutdown := lo.Batch(
 			e.syncMainEngineFromMainChain(),
 			e.syncMainEngineInfoFile(),
 			e.injectEngineInstances(),
 		)
 
 		e.Shutdown.OnTrigger(func() {
-			unsubscribe()
-
+			shutdown()
 			e.worker.Shutdown().ShutdownComplete.Wait()
 
 			e.Stopped.Trigger()
@@ -63,6 +71,7 @@ func newEngines(protocol *Protocol) *Engines {
 	return e
 }
 
+// LoadMainEngine loads the main engine from disk or creates a new one if no engine exists.
 func (e *Engines) LoadMainEngine(snapshotPath string) (*engine.Engine, error) {
 	info := &engineInfo{}
 	if err := ioutils.ReadJSONFromFile(e.infoFilePath(), info); err != nil && !ierrors.Is(err, os.ErrNotExist) {
@@ -93,6 +102,7 @@ func (e *Engines) LoadMainEngine(snapshotPath string) (*engine.Engine, error) {
 	return e.Main.Get(), nil
 }
 
+// ForkAtSlot creates a new engine instance that forks from the main engine at the given slot.
 func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 	newEngineAlias := lo.PanicOnErr(uuid.NewUUID()).String()
 	errorHandler := func(err error) {
@@ -152,6 +162,7 @@ func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 	return candidateEngine, nil
 }
 
+// CleanupCandidates removes all engine instances that are not the main engine.
 func (e *Engines) CleanupCandidates() error {
 	activeDir := filepath.Base(e.Main.Get().Storage.Directory())
 
@@ -171,10 +182,12 @@ func (e *Engines) CleanupCandidates() error {
 	return nil
 }
 
+// infoFilePath returns the path to the engine info file.
 func (e *Engines) infoFilePath() string {
 	return e.directory.Path(engineInfoFile)
 }
 
+// loadEngineInstanceFromSnapshot loads an engine instance from a snapshot.
 func (e *Engines) loadEngineInstanceFromSnapshot(engineAlias string, snapshotPath string) *engine.Engine {
 	errorHandler := func(err error) {
 		e.protocol.LogError("engine error", "err", err, "name", engineAlias[0:8])
@@ -185,11 +198,13 @@ func (e *Engines) loadEngineInstanceFromSnapshot(engineAlias string, snapshotPat
 	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...))
 }
 
+// loadEngineInstanceWithStorage loads an engine instance with the given storage.
 func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *storage.Storage) *engine.Engine {
 	return engine.New(e.protocol.Logger, e.protocol.Workers.CreateGroup(engineAlias), storage, e.protocol.Options.FilterProvider, e.protocol.Options.CommitmentFilterProvider, e.protocol.Options.BlockDAGProvider, e.protocol.Options.BookerProvider, e.protocol.Options.ClockProvider, e.protocol.Options.BlockGadgetProvider, e.protocol.Options.SlotGadgetProvider, e.protocol.Options.SybilProtectionProvider, e.protocol.Options.NotarizationProvider, e.protocol.Options.AttestationProvider, e.protocol.Options.LedgerProvider, e.protocol.Options.SchedulerProvider, e.protocol.Options.TipManagerProvider, e.protocol.Options.TipSelectionProvider, e.protocol.Options.RetainerProvider, e.protocol.Options.UpgradeOrchestratorProvider, e.protocol.Options.SyncManagerProvider, e.protocol.Options.EngineOptions...)
 }
 
-func (e *Engines) syncMainEngineFromMainChain() (unsubscribe func()) {
+// syncMainEngineFromMainChain syncs the main engine from the main chain.
+func (e *Engines) syncMainEngineFromMainChain() (shutdown func()) {
 	return e.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (teardown func()) {
 		return e.Main.DeriveValueFrom(reactive.NewDerivedVariable(func(currentMainEngine *engine.Engine, newMainEngine *engine.Engine) *engine.Engine {
 			return lo.Cond(newMainEngine == nil, currentMainEngine, newMainEngine)
@@ -197,7 +212,8 @@ func (e *Engines) syncMainEngineFromMainChain() (unsubscribe func()) {
 	})
 }
 
-func (e *Engines) syncMainEngineInfoFile() (unsubscribe func()) {
+// syncMainEngineInfoFile syncs the engine info file with the main engine.
+func (e *Engines) syncMainEngineInfoFile() (shutdown func()) {
 	return e.Main.OnUpdate(func(_ *engine.Engine, mainEngine *engine.Engine) {
 		if mainEngine != nil {
 			if err := ioutils.WriteJSONToFile(e.infoFilePath(), &engineInfo{Name: filepath.Base(mainEngine.Storage.Directory())}, 0o644); err != nil {
@@ -207,7 +223,8 @@ func (e *Engines) syncMainEngineInfoFile() (unsubscribe func()) {
 	})
 }
 
-func (e *Engines) injectEngineInstances() (unsubscribe func()) {
+// injectEngineInstances injects engine instances into the chains (when requested).
+func (e *Engines) injectEngineInstances() (shutdown func()) {
 	return e.protocol.Chains.WithElements(func(chain *Chain) (teardown func()) {
 		return chain.StartEngine.OnUpdate(func(_ bool, startEngine bool) {
 			e.worker.Submit(func() {
@@ -235,8 +252,11 @@ func (e *Engines) injectEngineInstances() (unsubscribe func()) {
 	})
 }
 
+// engineInfoFile is the name of the engine info file.
 const engineInfoFile = "info"
 
+// engineInfo is the structure of the engine info file.
 type engineInfo struct {
+	// Name contains the name of the engine.
 	Name string `json:"name"`
 }
