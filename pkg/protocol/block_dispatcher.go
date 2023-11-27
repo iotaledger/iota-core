@@ -78,18 +78,25 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
 
 	matchingEngineFound := false
 	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
-		if engine != nil && !engine.WasShutdown() && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
-			if b.inSyncWindow(engine, block) {
-				engine.ProcessBlockFromPeer(block, src)
-			} else {
-				// Stick too new blocks into the unsolid commitment buffer so that they can be dispatched once the
-				// engine instance is in sync (mostly needed for tests).
-				if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
-					return ierrors.Errorf("failed to add block %s to unsolid commitment buffer", block.ID())
-				}
-			}
+		e := engine
+		if engine != nil && !engine.WasShutdown() {
+			// Lock access to the engine while it's being reset, so that no new blocks enter the dataflow.
+			e.RLock()
+			defer e.RUnlock()
 
-			matchingEngineFound = true
+			if engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID()) {
+				if b.inSyncWindow(engine, block) {
+					engine.ProcessBlockFromPeer(block, src)
+				} else {
+					// Stick too new blocks into the unsolid commitment buffer so that they can be dispatched once the
+					// engine instance is in sync (mostly needed for tests).
+					if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
+						return ierrors.Errorf("failed to add block %s to unsolid commitment buffer", block.ID())
+					}
+				}
+
+				matchingEngineFound = true
+			}
 		}
 	}
 
