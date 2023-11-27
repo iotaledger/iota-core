@@ -186,8 +186,10 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				}
 			}
 
+			commitment.IsCommittable.OnTrigger(forceCommitmentFunc)
+
 			if totalBlocks == 0 {
-				commitment.IsCommittable.OnTrigger(forceCommitmentFunc)
+				commitment.IsFullyBooked.Set(true)
 
 				return blocksToWarpSync
 			}
@@ -213,12 +215,9 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 						targetEngine.BlockGadget.SetAccepted(block)
 
 						block.Notarized().OnUpdate(func(_ bool, _ bool) {
-							// Wait for all blocks to be notarized before forcing the commitment of the slot.
-							if notarizedBlocks.Add(1) != totalBlocks {
-								return
+							if notarizedBlocks.Add(1) == totalBlocks {
+								commitment.IsFullyBooked.Set(true)
 							}
-
-							commitment.IsCommittable.OnTrigger(forceCommitmentFunc)
 						})
 					}
 				}

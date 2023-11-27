@@ -56,14 +56,15 @@ type Commitment struct {
 	// IsAttested contains a flag indicating if we have received attestations for this Commitment.
 	IsAttested reactive.Event
 
+	// IsFullyBooked contains a flag indicating if we have received all blocks for this Commitment.
 	IsFullyBooked reactive.Event
 
 	// IsCommittable contains a flag indicating if this Commitment is committable (we have received all blocks and all attestations).
 	IsCommittable reactive.Event
 
-	// IsVerified contains a flag indicating if this Commitment is verified (we produced this Commitment ourselves by
-	// booking all the contained blocks and transactions).
-	IsVerified reactive.Event
+	// IsCommitted contains a flag indicating if we Commitment produced this Commitment ourselves by replaying all the
+	// blocks of the Commitment.
+	IsCommitted reactive.Event
 
 	// IsAboveLatestVerifiedCommitment contains a flag indicating if this Commitment is above the latest verified
 	// Commitment.
@@ -101,7 +102,7 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		IsAttested:                      reactive.NewEvent(),
 		IsFullyBooked:                   reactive.NewEvent(),
 		IsCommittable:                   reactive.NewEvent(),
-		IsVerified:                      reactive.NewEvent(),
+		IsCommitted:                     reactive.NewEvent(),
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
 		ReplayDroppedBlocks:             reactive.NewVariable[bool](),
 		IsEvicted:                       reactive.NewEvent(),
@@ -142,7 +143,7 @@ func (c *Commitment) initLogger() (shutdown func()) {
 		c.CumulativeAttestedWeight.LogUpdates(c, log.LevelTrace, "CumulativeAttestedWeight"),
 		c.IsRoot.LogUpdates(c, log.LevelTrace, "IsRoot"),
 		c.IsAttested.LogUpdates(c, log.LevelTrace, "IsAttested"),
-		c.IsVerified.LogUpdates(c, log.LevelTrace, "IsVerified"),
+		c.IsCommitted.LogUpdates(c, log.LevelTrace, "IsCommitted"),
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 
@@ -154,12 +155,12 @@ func (c *Commitment) initLogger() (shutdown func()) {
 func (c *Commitment) initDerivedProperties() (shutdown func()) {
 	return lo.Batch(
 		// mark commitments that are marked as root as verified
-		c.IsVerified.InheritFrom(c.IsRoot),
+		c.IsCommitted.InheritFrom(c.IsRoot),
 
 		// mark commitments that are marked as verified as attested, fully booked and committable
-		c.IsAttested.InheritFrom(c.IsVerified),
-		c.IsFullyBooked.InheritFrom(c.IsVerified),
-		c.IsCommittable.InheritFrom(c.IsVerified),
+		c.IsAttested.InheritFrom(c.IsCommitted),
+		c.IsFullyBooked.InheritFrom(c.IsCommitted),
+		c.IsCommittable.InheritFrom(c.IsCommitted),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			// the weight can be fixed as a one time operation (as it only relies on static information from the parent
@@ -256,7 +257,7 @@ func (c *Commitment) deriveCumulativeAttestedWeight(parent *Commitment) func() {
 func (c *Commitment) deriveIsAboveLatestVerifiedCommitment(parent *Commitment) func() {
 	return c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, parentAboveLatestVerifiedCommitment bool, parentIsVerified bool, isVerified bool) bool {
 		return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
-	}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified))
+	}, parent.IsAboveLatestVerifiedCommitment, parent.IsCommitted, c.IsCommitted))
 }
 
 // deriveRequestAttestations derives the RequestAttestations flag of this Commitment which is true if our Chain is

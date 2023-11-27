@@ -155,7 +155,7 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 			// mark it as produced by ourselves and force it to be on the right chain (in case our chain produced a
 			// different commitment than the one we erroneously expected it to be - we always trust our engine most).
 			publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
-			publishedCommitment.IsVerified.Set(true)
+			publishedCommitment.IsCommitted.Set(true)
 			publishedCommitment.forceChain(chain)
 		}
 	})
