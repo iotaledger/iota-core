@@ -23,7 +23,7 @@ type BlocksProtocol struct {
 	log.Logger
 }
 
-func NewBlocksProtocol(protocol *Protocol) *BlocksProtocol {
+func newBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 	b := &BlocksProtocol{
 		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Blocks")),
 		protocol:            protocol,

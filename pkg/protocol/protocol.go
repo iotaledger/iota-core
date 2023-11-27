@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"cmp"
 	"context"
 	"sync"
 	"time"
@@ -22,25 +21,50 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// Protocol implements the meta-protocol that is responsible for syncing with the heaviest chain.
+// Protocol is an implementation of the IOTA core protocol.
 type Protocol struct {
-	Events               *Events
-	Workers              *workerpool.Group
-	Network              *core.Protocol
-	Commitments          *Commitments
-	Chains               *Chains
-	BlocksProtocol       *BlocksProtocol
-	CommitmentsProtocol  *CommitmentsProtocol
-	AttestationsProtocol *AttestationsProtocol
-	WarpSyncProtocol     *WarpSyncProtocol
-	Engines              *Engines
-	Options              *Options
+	// Events contains a centralized access point for all events that are triggered by the main engine of the protocol.
+	Events *Events
 
+	// Workers contains the worker pools that are used by the protocol.
+	Workers *workerpool.Group
+
+	// Network contains the network endpoint of the protocol.
+	Network *core.Protocol
+
+	// Commitments contains the commitments that are managed by the protocol.
+	Commitments *Commitments
+
+	// Chains contains the chains that are managed by the protocol.
+	Chains *Chains
+
+	// BlocksProtocol contains the subcomponent that is responsible for handling block requests and responses.
+	BlocksProtocol *BlocksProtocol
+
+	// CommitmentsProtocol contains the subcomponent that is responsible for handling commitment requests and responses.
+	CommitmentsProtocol *CommitmentsProtocol
+
+	// AttestationsProtocol contains the subcomponent that is responsible for handling attestation requests and
+	// responses.
+	AttestationsProtocol *AttestationsProtocol
+
+	// WarpSyncProtocol contains the subcomponent that is responsible for handling warp sync requests and responses.
+	WarpSyncProtocol *WarpSyncProtocol
+
+	// Engines contains the engines that are managed by the protocol.
+	Engines *Engines
+
+	// Options contains the options that were used to create the protocol.
+	Options *Options
+
+	// EvictionState contains the eviction state of the protocol.
 	reactive.EvictionState[iotago.SlotIndex]
+
+	// ReactiveModule embeds the reactive module logic of the protocol.
 	*module.ReactiveModule
 }
 
-// New creates a new protocol instance.
+// New creates a new protocol instance from the given parameters.
 func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
 	return options.Apply(&Protocol{
 		Events:         NewEvents(),
@@ -49,63 +73,23 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 		ReactiveModule: module.NewReactiveModule(logger),
 		EvictionState:  reactive.NewEvictionState[iotago.SlotIndex](),
 	}, opts, func(p *Protocol) {
-		p.Network = core.NewProtocol(networkEndpoint, workers.CreatePool("NetworkProtocol"), p)
-		p.BlocksProtocol = NewBlocksProtocol(p)
-		p.CommitmentsProtocol = NewCommitmentsProtocol(p)
-		p.AttestationsProtocol = NewAttestationsProtocol(p)
-		p.WarpSyncProtocol = NewWarpSyncProtocol(p)
-		p.Commitments = newCommitments(p)
-		p.Chains = newChains(p)
-		p.Engines = NewEngines(p)
-
-		p.Commitments.Root.OnUpdate(func(_ *Commitment, rootCommitment *Commitment) {
-			// TODO: DECIDE ON DATA AVAILABILITY TIMESPAN / EVICTION STRATEGY
-			//p.Evict(rootCommitment.Slot() - 1)
-		})
-
-		stopEvents := p.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (teardown func()) {
-			p.Events.Engine.LinkTo(mainEngine.Events)
-
-			return func() {
-				p.Events.Engine.LinkTo(nil)
-			}
-		})
+		shutdownSubComponents := p.initSubcomponents(networkEndpoint)
 
 		p.Initialized.OnTrigger(func() {
-			unsubscribeFromNetwork := lo.Batch(
-				p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
-				p.Network.OnBlockReceived(p.BlocksProtocol.ProcessResponse),
-				p.Network.OnBlockRequestReceived(p.BlocksProtocol.ProcessRequest),
-				p.Network.OnCommitmentReceived(p.CommitmentsProtocol.ProcessResponse),
-				p.Network.OnCommitmentRequestReceived(p.CommitmentsProtocol.ProcessRequest),
-				p.Network.OnAttestationsReceived(p.AttestationsProtocol.ProcessResponse),
-				p.Network.OnAttestationsRequestReceived(p.AttestationsProtocol.ProcessRequest),
-				p.Network.OnWarpSyncResponseReceived(p.WarpSyncProtocol.ProcessResponse),
-				p.Network.OnWarpSyncRequestReceived(p.WarpSyncProtocol.ProcessRequest),
+			shutdown := lo.Batch(
+				p.initEviction(),
+				p.initGlobalEventsRedirection(),
+				p.initNetwork(),
+
+				shutdownSubComponents,
 			)
 
-			p.Shutdown.OnTrigger(func() {
-				stopEvents()
-				unsubscribeFromNetwork()
-
-				p.BlocksProtocol.Shutdown()
-				p.CommitmentsProtocol.Shutdown()
-				p.AttestationsProtocol.Shutdown()
-				p.WarpSyncProtocol.Shutdown()
-				p.Network.Shutdown()
-				p.Engines.Shutdown.Trigger()
-			})
+			p.Shutdown.OnTrigger(shutdown)
 		})
 
 		p.Constructed.Trigger()
 
-		// wait for the main engine to be initialized
-		var waitInitialized sync.WaitGroup
-		waitInitialized.Add(1)
-		p.Engines.Main.OnUpdateOnce(func(_ *engine.Engine, engine *engine.Engine) {
-			engine.Initialized.OnTrigger(waitInitialized.Done)
-		})
-		waitInitialized.Wait()
+		p.waitMainEngineInitialized()
 	})
 }
 
@@ -123,7 +107,6 @@ func (p *Protocol) Run(ctx context.Context) error {
 	<-ctx.Done()
 
 	p.Shutdown.Trigger()
-	p.Workers.Shutdown()
 	p.Stopped.Trigger()
 
 	return ctx.Err()
@@ -163,6 +146,71 @@ func (p *Protocol) LatestAPI() iotago.API {
 	return p.Engines.Main.Get().LatestAPI()
 }
 
-func increasing[T cmp.Ordered](currentValue T, newValue T) T {
-	return max(currentValue, newValue)
+// initSubcomponents initializes the subcomponents of the protocol and returns a function that shuts them down.
+func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown func()) {
+	p.Network = core.NewProtocol(networkEndpoint, p.Workers.CreatePool("NetworkProtocol"), p)
+	p.BlocksProtocol = newBlocksProtocol(p)
+	p.CommitmentsProtocol = newCommitmentsProtocol(p)
+	p.AttestationsProtocol = newAttestationsProtocol(p)
+	p.WarpSyncProtocol = newWarpSyncProtocol(p)
+	p.Commitments = newCommitments(p)
+	p.Chains = newChains(p)
+	p.Engines = newEngines(p)
+
+	return func() {
+		p.BlocksProtocol.Shutdown()
+		p.CommitmentsProtocol.Shutdown()
+		p.AttestationsProtocol.Shutdown()
+		p.WarpSyncProtocol.Shutdown()
+		p.Network.Shutdown()
+		p.Workers.Shutdown()
+		p.Engines.Shutdown.Trigger()
+	}
+}
+
+// initEviction initializes the eviction of old data when the engine advances and returns a function that shuts it down.
+func (p *Protocol) initEviction() (shutdown func()) {
+	return p.Commitments.Root.OnUpdate(func(_ *Commitment, rootCommitment *Commitment) {
+		// TODO: DECIDE ON DATA AVAILABILITY TIMESPAN / EVICTION STRATEGY
+		// p.Evict(rootCommitment.Slot() - 1)
+	})
+}
+
+// initGlobalEventsRedirection initializes the global events redirection of the protocol and returns a function that
+// shuts it down.
+func (p *Protocol) initGlobalEventsRedirection() (shutdown func()) {
+	return p.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (shutdown func()) {
+		p.Events.Engine.LinkTo(mainEngine.Events)
+
+		return func() {
+			p.Events.Engine.LinkTo(nil)
+		}
+	})
+}
+
+// initNetwork initializes the network of the protocol and returns a function that shuts it down.
+func (p *Protocol) initNetwork() (shutdown func()) {
+	return lo.Batch(
+		p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
+		p.Network.OnBlockReceived(p.BlocksProtocol.ProcessResponse),
+		p.Network.OnBlockRequestReceived(p.BlocksProtocol.ProcessRequest),
+		p.Network.OnCommitmentReceived(p.CommitmentsProtocol.ProcessResponse),
+		p.Network.OnCommitmentRequestReceived(p.CommitmentsProtocol.ProcessRequest),
+		p.Network.OnAttestationsReceived(p.AttestationsProtocol.ProcessResponse),
+		p.Network.OnAttestationsRequestReceived(p.AttestationsProtocol.ProcessRequest),
+		p.Network.OnWarpSyncResponseReceived(p.WarpSyncProtocol.ProcessResponse),
+		p.Network.OnWarpSyncRequestReceived(p.WarpSyncProtocol.ProcessRequest),
+	)
+}
+
+// waitMainEngineInitialized waits until the main engine is initialized.
+func (p *Protocol) waitMainEngineInitialized() {
+	var waitInitialized sync.WaitGroup
+
+	waitInitialized.Add(1)
+	p.Engines.Main.OnUpdateOnce(func(_ *engine.Engine, engine *engine.Engine) {
+		engine.Initialized.OnTrigger(waitInitialized.Done)
+	})
+
+	waitInitialized.Wait()
 }

@@ -21,7 +21,7 @@ type CommitmentsProtocol struct {
 	log.Logger
 }
 
-func NewCommitmentsProtocol(protocol *Protocol) *CommitmentsProtocol {
+func newCommitmentsProtocol(protocol *Protocol) *CommitmentsProtocol {
 	c := &CommitmentsProtocol{
 		Logger:     lo.Return1(protocol.Logger.NewChildLogger("Commitments")),
 		protocol:   protocol,

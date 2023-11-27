@@ -25,7 +25,7 @@ type WarpSyncProtocol struct {
 	log.Logger
 }
 
-func NewWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
+func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 	c := &WarpSyncProtocol{
 		Logger:     lo.Return1(protocol.Logger.NewChildLogger("WarpSync")),
 		protocol:   protocol,

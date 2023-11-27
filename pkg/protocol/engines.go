@@ -31,7 +31,7 @@ type Engines struct {
 	*module.ReactiveModule
 }
 
-func NewEngines(protocol *Protocol) *Engines {
+func newEngines(protocol *Protocol) *Engines {
 	e := &Engines{
 		Main:           reactive.NewVariable[*engine.Engine](),
 		ReactiveModule: protocol.NewReactiveSubModule("Engines"),

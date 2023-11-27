@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"cmp"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
@@ -170,4 +172,9 @@ func (c *Chains) newChain() *Chain {
 	}
 
 	return chain
+}
+
+// increasing is a generic function that returns the maximum of the two given values.
+func increasing[T cmp.Ordered](currentValue T, newValue T) T {
+	return max(currentValue, newValue)
 }

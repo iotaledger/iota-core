@@ -24,7 +24,7 @@ type AttestationsProtocol struct {
 	log.Logger
 }
 
-func NewAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
+func newAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 	a := &AttestationsProtocol{
 		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Attestations")),
 		protocol:            protocol,
