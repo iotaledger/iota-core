@@ -56,6 +56,11 @@ type Commitment struct {
 	// IsAttested contains a flag indicating if we have received attestations for this Commitment.
 	IsAttested reactive.Event
 
+	// IsCommittable contains a flag indicating if this Commitment is committable (we have received all blocks and all attestations).
+	IsCommittable reactive.Event
+
+	IsFullyBooked reactive.Event
+
 	// IsVerified contains a flag indicating if this Commitment is verified (we produced this Commitment ourselves by
 	// booking all the contained blocks and transactions).
 	IsVerified reactive.Event
@@ -94,6 +99,7 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
 		IsRoot:                          reactive.NewEvent(),
 		IsAttested:                      reactive.NewEvent(),
+		IsCommittable:                   reactive.NewEvent(),
 		IsVerified:                      reactive.NewEvent(),
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
 		ReplayDroppedBlocks:             reactive.NewVariable[bool](),
@@ -151,6 +157,9 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 
 		// mark commitments that are marked as verified as attested
 		c.IsAttested.InheritFrom(c.IsVerified),
+
+		// mark commitments that are marked as verified as fully booked
+		c.IsFullyBooked.InheritFrom(c.IsVerified),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			// the weight can be fixed as a one time operation (as it only relies on static information from the parent
@@ -261,9 +270,9 @@ func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment)
 // deriveWarpSyncBlocks derives the WarpSyncBlocks flag of this Commitment which is true if our Chain is requesting
 // warp sync, and we are the directly above the latest verified Commitment.
 func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func() {
-	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
-		return engineInstance != nil && warpSync && parentIsVerified && !isVerified
-	}, chain.Engine, chain.WarpSyncMode, parent.IsVerified, c.IsVerified))
+	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSync bool, parentIsFullyBooked bool, isFullyBooked bool) bool {
+		return engineInstance != nil && warpSync && parentIsFullyBooked && !isFullyBooked
+	}, chain.Engine, chain.WarpSyncMode, parent.IsFullyBooked, c.IsFullyBooked))
 }
 
 // deriveReplayDroppedBlocks derives the ReplayDroppedBlocks flag of this Commitment which is true if our Chain has an

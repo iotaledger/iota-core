@@ -187,7 +187,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			}
 
 			if totalBlocks == 0 {
-				forceCommitmentFunc()
+				commitment.IsCommittable.OnTrigger(forceCommitmentFunc)
 
 				return blocksToWarpSync
 			}
@@ -218,7 +218,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 								return
 							}
 
-							forceCommitmentFunc()
+							commitment.IsCommittable.OnTrigger(forceCommitmentFunc)
 						})
 					}
 				}
