@@ -143,6 +143,8 @@ func (c *Commitment) initLogger() (shutdown func()) {
 		c.CumulativeAttestedWeight.LogUpdates(c, log.LevelTrace, "CumulativeAttestedWeight"),
 		c.IsRoot.LogUpdates(c, log.LevelTrace, "IsRoot"),
 		c.IsAttested.LogUpdates(c, log.LevelTrace, "IsAttested"),
+		c.IsFullyBooked.LogUpdates(c, log.LevelTrace, "IsFullyBooked"),
+		c.IsCommittable.LogUpdates(c, log.LevelTrace, "IsCommittable"),
 		c.IsCommitted.LogUpdates(c, log.LevelTrace, "IsCommitted"),
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
@@ -255,8 +257,8 @@ func (c *Commitment) deriveCumulativeAttestedWeight(parent *Commitment) func() {
 // deriveIsAboveLatestVerifiedCommitment derives the IsAboveLatestVerifiedCommitment flag of this Commitment which is
 // true if the parent is already above the latest verified Commitment or if the parent is verified and we are not.
 func (c *Commitment) deriveIsAboveLatestVerifiedCommitment(parent *Commitment) func() {
-	return c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, parentAboveLatestVerifiedCommitment bool, parentIsVerified bool, isVerified bool) bool {
-		return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
+	return c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, parentAboveLatestVerifiedCommitment bool, parentIsCommitted bool, isCommitted bool) bool {
+		return parentAboveLatestVerifiedCommitment || (parentIsCommitted && !isCommitted)
 	}, parent.IsAboveLatestVerifiedCommitment, parent.IsCommitted, c.IsCommitted))
 }
 

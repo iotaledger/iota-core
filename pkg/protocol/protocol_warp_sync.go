@@ -160,7 +160,8 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			if targetEngine.Workers.WaitChildren(); targetEngine.Storage.Settings().LatestCommitment().ID().Slot() > commitmentID.Slot() {
 				return blocksToWarpSync
 			}
-			targetEngine.Reset()
+			// TODO: reset the engine only once at the very beginning of the warp-sync process
+			// targetEngine.Reset()
 
 			// Once all blocks are booked we
 			//   1. Mark all transactions as accepted
@@ -186,7 +187,16 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				}
 			}
 
-			commitment.IsCommittable.OnTrigger(forceCommitmentFunc)
+			commitment.IsFullyBooked.OnUpdateOnce(func(_ bool, _ bool) {
+				minimumCommittableAge := w.protocol.APIForSlot(commitmentID.Slot()).ProtocolParameters().MinCommittableAge()
+				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - minimumCommittableAge + 1); exists {
+					committableCommitment.IsCommittable.Trigger()
+				}
+			})
+
+			commitment.IsCommittable.OnUpdateOnce(func(_ bool, _ bool) {
+				forceCommitmentFunc()
+			})
 
 			if totalBlocks == 0 {
 				commitment.IsFullyBooked.Set(true)
