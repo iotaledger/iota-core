@@ -31,11 +31,12 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 				5,
 			),
 		),
+		testsuite.WithWaitFor(15*time.Second),
 	)
 	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
-	ts.AddGenesisWallet("default", node0)
+	ts.AddDefaultWallet(node0)
 	ts.AddValidatorNode("node1")
 	ts.AddNode("node2")
 
@@ -47,9 +48,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	// Revive chain on node0.
 	{
-		block0 := ts.IssueValidationBlock("block0", node0,
-			mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(50)),
-		)
+		ts.SetCurrentSlot(50)
+		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0)
 		require.EqualValues(t, 48, ts.Block("block0").SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
@@ -121,7 +121,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
-	ts.AddGenesisWallet("default", node0)
+	ts.AddDefaultWallet(node0)
 	ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
 
@@ -158,9 +158,8 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 
 	// Revive chain on node0-restarted.
 	{
-		block0 := ts.IssueValidationBlock("block0", node0restarted,
-			mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(20)),
-		)
+		ts.SetCurrentSlot(20)
+		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted)
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
@@ -216,7 +215,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
-	ts.AddGenesisWallet("default", node0)
+	ts.AddDefaultWallet(node0)
 	ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
 
@@ -249,9 +248,8 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 
 	// Revive chain on node0-restarted.
 	{
-		block0 := ts.IssueValidationBlock("block0", node0restarted,
-			mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(20)),
-		)
+		ts.SetCurrentSlot(20)
+		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted)
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)

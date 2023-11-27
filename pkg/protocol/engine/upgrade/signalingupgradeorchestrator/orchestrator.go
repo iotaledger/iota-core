@@ -282,7 +282,7 @@ func (o *Orchestrator) tryUpgrade(currentEpoch iotago.EpochIndex, lastSlotInEpoc
 
 	// The version should be upgraded. We're adding the version to the settings.
 	// Effectively, this is a soft fork as it is contained in the hash of protocol parameters and versions.
-	if err := o.setProtocolParametersEpochMappingFunc(versionAndHashTobeUpgraded.Version, versionAndHashTobeUpgraded.Hash, currentEpoch+iotago.EpochIndex(o.apiProvider.APIForEpoch(currentEpoch).ProtocolParameters().VersionSignaling().ActivationOffset)); err != nil {
+	if err := o.setProtocolParametersEpochMappingFunc(versionAndHashTobeUpgraded.Version, versionAndHashTobeUpgraded.Hash, currentEpoch+iotago.EpochIndex(o.apiProvider.APIForEpoch(currentEpoch).ProtocolParameters().VersionSignalingParameters().ActivationOffset)); err != nil {
 		o.errorHandler(ierrors.Wrap(err, "failed to set protocol parameters epoch mapping"))
 		return
 	}
@@ -325,7 +325,7 @@ func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex)
 	versionMostSignaled, signaledCount := o.maxVersionByCount(epochVersions)
 
 	// Check whether the signaling window threshold is reached.
-	if signaledCount < int(apiForEpoch.ProtocolParameters().VersionSignaling().WindowTargetRatio) {
+	if signaledCount < int(apiForEpoch.ProtocolParameters().VersionSignalingParameters().WindowTargetRatio) {
 		return model.VersionAndHash{}, false
 	}
 
@@ -333,7 +333,7 @@ func (o *Orchestrator) signalingThresholdReached(currentEpoch iotago.EpochIndex)
 }
 
 func (o *Orchestrator) signalingWindowStart(epoch iotago.EpochIndex, api iotago.API) iotago.EpochIndex {
-	windowSize := iotago.EpochIndex(api.ProtocolParameters().VersionSignaling().WindowSize)
+	windowSize := iotago.EpochIndex(api.ProtocolParameters().VersionSignalingParameters().WindowSize)
 
 	if epoch < windowSize {
 		return 0

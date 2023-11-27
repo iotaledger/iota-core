@@ -17,6 +17,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
+	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -114,7 +115,9 @@ func Test_BookInCommittedSlot(t *testing.T) {
 			})
 			ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes()...)
 		}
-		ts.IssueValidationBlockAtSlot("5*", 5, lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(3)).Commitment(), ts.Node("nodeA"), ts.BlockIDsWithPrefix("4.3-")...)
+		ts.SetCurrentSlot(5)
+		commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(3)).Commitment()
+		ts.IssueValidationBlockWithHeaderOptions("5*", ts.Node("nodeA"), mock.WithSlotCommitment(commitment), mock.WithStrongParents(ts.BlockIDsWithPrefix("4.3-")...))
 
 		ts.AssertBlocksExist(ts.Blocks("5*"), false, ts.Nodes("nodeA")...)
 	}
@@ -143,7 +146,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	nodeA := ts.AddValidatorNode("nodeA")
 	nodeB := ts.AddValidatorNode("nodeB")
 	ts.AddNode("nodeC")
-	ts.AddGenesisWallet("default", nodeA, iotago.MaxBlockIssuanceCredits/2)
+	ts.AddDefaultWallet(nodeA)
 
 	nodeOptions := []options.Option[protocol.Protocol]{
 		protocol.WithStorageOptions(
