@@ -220,6 +220,15 @@ func configure() error {
 		return responseByHeader(c, resp)
 	}, checkNodeSynced())
 
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointTransactionsMetadata), func(c echo.Context) error {
+		resp, err := transactionMetadataFromTransactionID(c)
+		if err != nil {
+			return err
+		}
+
+		return responseByHeader(c, resp)
+	}, checkNodeSynced())
+
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCongestion), func(c echo.Context) error {
 		resp, err := congestionByAccountAddress(c)
 		if err != nil {
