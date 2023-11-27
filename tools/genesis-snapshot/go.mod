@@ -29,7 +29,7 @@ require (
 	github.com/iotaledger/hive.go/ads v0.0.0-20231110191152-7135670285dc // indirect
 	github.com/iotaledger/hive.go/constraints v0.0.0-20231122112629-bdf1cc39fba7 // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231113110812-4ca2b6cc9a42 // indirect
-	github.com/iotaledger/hive.go/ds v0.0.0-20231113110812-4ca2b6cc9a42 // indirect
+	github.com/iotaledger/hive.go/ds v0.0.0-20231124134854-9ec596cfd9ff // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20231110191152-7135670285dc // indirect
 	github.com/iotaledger/hive.go/log v0.0.0-20231110191152-7135670285dc // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231113110812-4ca2b6cc9a42 // indirect
