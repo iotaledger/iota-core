@@ -70,29 +70,29 @@ func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...
 }
 
 // initLogger initializes the logger for this component.
-func (c *Commitments) initLogger() (teardown func()) {
-	c.Logger, teardown = c.protocol.NewChildLogger("Commitments")
+func (c *Commitments) initLogger() (shutdown func()) {
+	c.Logger, shutdown = c.protocol.NewChildLogger("Commitments")
 
 	return lo.Batch(
 		c.Root.LogUpdates(c, log.LevelTrace, "Root", (*Commitment).LogName),
 
-		teardown,
+		shutdown,
 	)
 }
 
 // initEngineCommitmentSynchronization initializes the synchronization of commitments that are published by the engines.
 func (c *Commitments) initEngineCommitmentSynchronization() func() {
-	return c.protocol.Constructed.WithNonEmptyValue(func(_ bool) (teardown func()) {
+	return c.protocol.Constructed.WithNonEmptyValue(func(_ bool) (shutdown func()) {
 		return lo.Batch(
 			// advance the root commitment of the main chain
-			c.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (teardown func()) {
-				return mainChain.WithInitializedEngine(func(mainEngine *engine.Engine) (teardown func()) {
+			c.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (shutdown func()) {
+				return mainChain.WithInitializedEngine(func(mainEngine *engine.Engine) (shutdown func()) {
 					return c.publishRootCommitment(mainChain, mainEngine)
 				})
 			}),
 
 			// publish the commitments that are produced by the engines
-			c.protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (teardown func()) {
+			c.protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
 				return c.publishEngineCommitments(chain, engine)
 			}),
 		)
@@ -114,7 +114,7 @@ func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine
 			newRootCommitment.Chain.Set(mainChain)
 		}
 
-		// TODO: SET HERE AND FIX BUG
+		// TODO: USE SET HERE (debug eviction issues)
 		mainChain.ForkingPoint.DefaultTo(newRootCommitment)
 
 		c.Root.Set(newRootCommitment)
@@ -122,7 +122,7 @@ func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine
 }
 
 // publishEngineCommitments publishes the commitments of the given engine to its chain.
-func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engine) (teardown func()) {
+func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engine) (shutdown func()) {
 	latestPublishedSlot := chain.LastCommonSlot()
 
 	return engine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {

@@ -41,7 +41,7 @@ func newBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 	}
 
 	protocol.Constructed.OnTrigger(func() {
-		protocol.Commitments.WithElements(func(commitment *Commitment) (teardown func()) {
+		protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
 			return commitment.ReplayDroppedBlocks.OnUpdate(func(_ bool, replayBlocks bool) {
 				if replayBlocks {
 					for _, droppedBlock := range b.droppedBlocksBuffer.GetValues(commitment.ID()) {
@@ -54,7 +54,7 @@ func newBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 		})
 
 		protocol.Chains.WithElements(func(chain *Chain) func() {
-			return chain.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (teardown func()) {
+			return chain.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (shutdown func()) {
 				return engineInstance.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
 			})
 		})

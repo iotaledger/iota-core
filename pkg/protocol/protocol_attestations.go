@@ -47,13 +47,13 @@ func newAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 	a.ticker.Events.Tick.Hook(a.sendRequest)
 
 	protocol.Constructed.OnTrigger(func() {
-		protocol.Chains.WithElements(func(chain *Chain) (teardown func()) {
-			return chain.RequestAttestations.WithNonEmptyValue(func(requestAttestations bool) (teardown func()) {
+		protocol.Chains.WithElements(func(chain *Chain) (shutdown func()) {
+			return chain.RequestAttestations.WithNonEmptyValue(func(requestAttestations bool) (shutdown func()) {
 				return a.setupCommitmentVerifier(chain)
 			})
 		})
 
-		protocol.Commitments.WithElements(func(commitment *Commitment) (teardown func()) {
+		protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
 			return commitment.RequestAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
 				if requestAttestations {
 					if commitment.CumulativeWeight() == 0 {
@@ -211,7 +211,7 @@ func (a *AttestationsProtocol) Shutdown() {
 }
 
 // setupCommitmentVerifier sets up the commitment verifier for the given chain.
-func (a *AttestationsProtocol) setupCommitmentVerifier(chain *Chain) (teardown func()) {
+func (a *AttestationsProtocol) setupCommitmentVerifier(chain *Chain) (shutdown func()) {
 	forkingPoint := chain.ForkingPoint.Get()
 	if forkingPoint == nil {
 		a.LogError("failed to retrieve forking point", "chain", chain.LogName())

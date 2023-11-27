@@ -44,7 +44,7 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 	c.ticker.Events.Tick.Hook(c.SendRequest)
 
 	protocol.Constructed.OnTrigger(func() {
-		c.protocol.Commitments.WithElements(func(commitment *Commitment) (teardown func()) {
+		c.protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
 			return commitment.WarpSyncBlocks.OnUpdate(func(_ bool, warpSyncBlocks bool) {
 				if warpSyncBlocks {
 					c.ticker.StartTicker(commitment.ID())

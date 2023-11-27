@@ -121,8 +121,8 @@ func (c *Commitment) TargetEngine() *engine.Engine {
 }
 
 // initLogger initializes the Logger of this Commitment.
-func (c *Commitment) initLogger() (teardown func()) {
-	c.Logger, teardown = c.commitments.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))
+func (c *Commitment) initLogger() (shutdown func()) {
+	c.Logger, shutdown = c.commitments.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))
 
 	return lo.Batch(
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
@@ -139,12 +139,12 @@ func (c *Commitment) initLogger() (teardown func()) {
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 
-		teardown,
+		shutdown,
 	)
 }
 
 // initDerivedProperties initializes the behavior of this Commitment by setting up the relations between its properties.
-func (c *Commitment) initDerivedProperties() (teardown func()) {
+func (c *Commitment) initDerivedProperties() (shutdown func()) {
 	return lo.Batch(
 		// mark commitments that are marked as root as verified
 		c.IsVerified.InheritFrom(c.IsRoot),

@@ -114,10 +114,11 @@ func newChain(chains *Chains) *Chain {
 	return c
 }
 
-// WithInitializedEngine calls the given callback once the Engine of this chain is initialized.
-func (c *Chain) WithInitializedEngine(callback func(engineInstance *engine.Engine) (teardown func())) (teardown func()) {
-	return c.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (teardown func()) {
-		return engineInstance.Initialized.WithNonEmptyValue(func(_ bool) (teardown func()) {
+// WithInitializedEngine is a reactive selector that executes the given callback once an Engine for this chain was
+// initialized.
+func (c *Chain) WithInitializedEngine(callback func(engineInstance *engine.Engine) (shutdown func())) (shutdown func()) {
+	return c.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (shutdown func()) {
+		return engineInstance.Initialized.WithNonEmptyValue(func(_ bool) (shutdown func()) {
 			return callback(engineInstance)
 		})
 	})
@@ -181,8 +182,8 @@ func (c *Chain) LatestEngine() *engine.Engine {
 }
 
 // initLogger initializes the Logger of this chain.
-func (c *Chain) initLogger() (teardown func()) {
-	c.Logger, teardown = c.chains.NewEntityLogger("")
+func (c *Chain) initLogger() (shutdown func()) {
+	c.Logger, shutdown = c.chains.NewEntityLogger("")
 
 	return lo.Batch(
 		c.WarpSyncMode.LogUpdates(c, log.LevelTrace, "WarpSyncMode"),
@@ -199,27 +200,27 @@ func (c *Chain) initLogger() (teardown func()) {
 		c.Engine.LogUpdates(c, log.LevelTrace, "Engine", (*engine.Engine).LogName),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 
-		teardown,
+		shutdown,
 	)
 }
 
 // initDerivedProperties initializes the behavior of this chain by setting up the relations between its properties.
-func (c *Chain) initDerivedProperties() (teardown func()) {
+func (c *Chain) initDerivedProperties() (shutdown func()) {
 	return lo.Batch(
 		c.deriveClaimedWeight(),
 		c.deriveVerifiedWeight(),
 		c.deriveLatestAttestedWeight(),
 		c.deriveWarpSyncMode(),
 
-		c.ForkingPoint.WithValue(func(forkingPoint *Commitment) (teardown func()) {
+		c.ForkingPoint.WithValue(func(forkingPoint *Commitment) (shutdown func()) {
 			return c.deriveParentChain(forkingPoint)
 		}),
 
-		c.ParentChain.WithNonEmptyValue(func(parentChain *Chain) (teardown func()) {
+		c.ParentChain.WithNonEmptyValue(func(parentChain *Chain) (shutdown func()) {
 			return parentChain.deriveChildChains(c)
 		}),
 
-		c.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (teardown func()) {
+		c.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (shutdown func()) {
 			return lo.Batch(
 				c.deriveWarpSyncThreshold(c.chains.LatestSeenSlot, engineInstance),
 				c.deriveOutOfSyncThreshold(c.chains.LatestSeenSlot, engineInstance),
@@ -248,7 +249,7 @@ func (c *Chain) deriveWarpSyncMode() func() {
 
 // deriveClaimedWeight defines how a chain determines its claimed weight (by setting the cumulative weight of the
 // latest commitment).
-func (c *Chain) deriveClaimedWeight() (teardown func()) {
+func (c *Chain) deriveClaimedWeight() (shutdown func()) {
 	return c.ClaimedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestCommitment *Commitment) uint64 {
 		if latestCommitment == nil {
 			return 0
@@ -262,7 +263,7 @@ func (c *Chain) deriveClaimedWeight() (teardown func()) {
 // weight of the latest attested commitment). It uses inheritance instead of simply setting the value as the cumulative
 // attested weight can change over time depending on the attestations that are received.
 func (c *Chain) deriveLatestAttestedWeight() func() {
-	return c.LatestAttestedCommitment.WithNonEmptyValue(func(latestAttestedCommitment *Commitment) (teardown func()) {
+	return c.LatestAttestedCommitment.WithNonEmptyValue(func(latestAttestedCommitment *Commitment) (shutdown func()) {
 		return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
 	})
 }
@@ -290,9 +291,9 @@ func (c *Chain) deriveChildChains(child *Chain) func() {
 
 // deriveParentChain defines how a chain determines its parent chain from its forking point (it inherits the Chain from
 // the parent commitment of the forking point or nil if either of them is still unknown).
-func (c *Chain) deriveParentChain(forkingPoint *Commitment) (teardown func()) {
+func (c *Chain) deriveParentChain(forkingPoint *Commitment) (shutdown func()) {
 	if forkingPoint != nil {
-		return forkingPoint.Parent.WithValue(func(parentCommitment *Commitment) (teardown func()) {
+		return forkingPoint.Parent.WithValue(func(parentCommitment *Commitment) (shutdown func()) {
 			if parentCommitment != nil {
 				return c.ParentChain.InheritFrom(parentCommitment.Chain)
 			}
@@ -333,7 +334,7 @@ func (c *Chain) deriveWarpSyncThreshold(latestSeenSlot reactive.ReadableVariable
 }
 
 // addCommitment adds the given commitment to this chain.
-func (c *Chain) addCommitment(newCommitment *Commitment) (teardown func()) {
+func (c *Chain) addCommitment(newCommitment *Commitment) (shutdown func()) {
 	c.commitments.Set(newCommitment.Slot(), newCommitment)
 
 	c.LatestCommitment.Set(newCommitment)

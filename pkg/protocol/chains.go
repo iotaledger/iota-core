@@ -57,7 +57,7 @@ func newChains(protocol *Protocol) *Chains {
 		c.initLogger(protocol.NewChildLogger("Chains")),
 		c.initChainSwitching(protocol.Options.ChainSwitchingThreshold),
 
-		protocol.Constructed.WithNonEmptyValue(func(_ bool) (teardown func()) {
+		protocol.Constructed.WithNonEmptyValue(func(_ bool) (shutdown func()) {
 			return c.deriveLatestSeenSlot(protocol)
 		}),
 	)
@@ -69,16 +69,16 @@ func newChains(protocol *Protocol) *Chains {
 
 // WithInitializedEngines is a reactive selector that executes the given callback for each managed chain that
 // initialized its engine.
-func (c *Chains) WithInitializedEngines(callback func(chain *Chain, engine *engine.Engine) (teardown func())) (teardown func()) {
-	return c.WithElements(func(chain *Chain) (teardown func()) {
-		return chain.WithInitializedEngine(func(engine *engine.Engine) (teardown func()) {
+func (c *Chains) WithInitializedEngines(callback func(chain *Chain, engine *engine.Engine) (shutdown func())) (shutdown func()) {
+	return c.WithElements(func(chain *Chain) (shutdown func()) {
+		return chain.WithInitializedEngine(func(engine *engine.Engine) (shutdown func()) {
 			return callback(chain, engine)
 		})
 	})
 }
 
 // initLogger initializes the logger for this component.
-func (c *Chains) initLogger(logger log.Logger, shutdownLogger func()) (teardown func()) {
+func (c *Chains) initLogger(logger log.Logger, shutdownLogger func()) (shutdown func()) {
 	c.Logger = logger
 
 	return lo.Batch(
@@ -92,22 +92,22 @@ func (c *Chains) initLogger(logger log.Logger, shutdownLogger func()) (teardown 
 }
 
 // initChainSwitching initializes the chain switching logic.
-func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (teardown func()) {
+func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (shutdown func()) {
 	mainChain := c.newChain()
 	mainChain.StartEngine.Set(true)
 
 	c.Main.Set(mainChain)
 
 	return lo.Batch(
-		c.HeaviestClaimedCandidate.WithNonEmptyValue(func(heaviestClaimedCandidate *Chain) (teardown func()) {
+		c.HeaviestClaimedCandidate.WithNonEmptyValue(func(heaviestClaimedCandidate *Chain) (shutdown func()) {
 			return heaviestClaimedCandidate.RequestAttestations.ToggleValue(true)
 		}),
 
-		c.HeaviestAttestedCandidate.WithNonEmptyValue(func(heaviestAttestedCandidate *Chain) (teardown func()) {
+		c.HeaviestAttestedCandidate.WithNonEmptyValue(func(heaviestAttestedCandidate *Chain) (shutdown func()) {
 			return heaviestAttestedCandidate.StartEngine.ToggleValue(true)
 		}),
 
-		c.HeaviestVerifiedCandidate.WithNonEmptyValue(func(heaviestVerifiedCandidate *Chain) (teardown func()) {
+		c.HeaviestVerifiedCandidate.WithNonEmptyValue(func(heaviestVerifiedCandidate *Chain) (shutdown func()) {
 			// only switch to the heaviest chain if the latest produced commitment is enough slots away from the forking point.
 			chainSwitchingCondition := func(_ *Commitment, latestProducedCommitment *Commitment) bool {
 				forkingPoint := heaviestVerifiedCandidate.ForkingPoint.Get()
@@ -120,7 +120,7 @@ func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (t
 			}, chainSwitchingCondition)
 		}),
 
-		c.WithElements(func(candidateChain *Chain) (teardown func()) {
+		c.WithElements(func(candidateChain *Chain) (shutdown func()) {
 			return lo.Batch(
 				c.initHeaviestCandidateTracking(c.HeaviestClaimedCandidate, (*Chain).claimedWeight, candidateChain),
 				c.initHeaviestCandidateTracking(c.HeaviestVerifiedCandidate, (*Chain).verifiedWeight, candidateChain),
@@ -151,7 +151,7 @@ func (c *Chains) initHeaviestCandidateTracking(candidateVar reactive.Variable[*C
 
 // deriveLatestSeenSlot derives the latest seen slot from the protocol.
 func (c *Chains) deriveLatestSeenSlot(protocol *Protocol) func() {
-	return protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (teardown func()) {
+	return protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (shutdown func()) {
 		return lo.Batch(
 			mainEngine.Initialized.OnTrigger(func() {
 				c.LatestSeenSlot.Set(mainEngine.LatestCommitment.Get().Slot())

@@ -205,7 +205,7 @@ func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *sto
 
 // syncMainEngineFromMainChain syncs the main engine from the main chain.
 func (e *Engines) syncMainEngineFromMainChain() (shutdown func()) {
-	return e.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (teardown func()) {
+	return e.protocol.Chains.Main.WithNonEmptyValue(func(mainChain *Chain) (shutdown func()) {
 		return e.Main.DeriveValueFrom(reactive.NewDerivedVariable(func(currentMainEngine *engine.Engine, newMainEngine *engine.Engine) *engine.Engine {
 			return lo.Cond(newMainEngine == nil, currentMainEngine, newMainEngine)
 		}, mainChain.Engine))
@@ -225,7 +225,7 @@ func (e *Engines) syncMainEngineInfoFile() (shutdown func()) {
 
 // injectEngineInstances injects engine instances into the chains (when requested).
 func (e *Engines) injectEngineInstances() (shutdown func()) {
-	return e.protocol.Chains.WithElements(func(chain *Chain) (teardown func()) {
+	return e.protocol.Chains.WithElements(func(chain *Chain) (shutdown func()) {
 		return chain.StartEngine.OnUpdate(func(_ bool, startEngine bool) {
 			e.worker.Submit(func() {
 				if !startEngine {
