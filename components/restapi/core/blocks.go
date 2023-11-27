@@ -64,7 +64,7 @@ func blockWithMetadataByID(c echo.Context) (*api.BlockWithMetadataResponse, erro
 
 	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
 	if !exists {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "no transaction found for block ID %s", blockID.ToHex())
 	}
 
 	blockMetadata, err := blockMetadataByBlockID(blockID)
