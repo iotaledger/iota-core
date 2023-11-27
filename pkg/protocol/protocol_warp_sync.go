@@ -190,12 +190,12 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			commitment.IsFullyBooked.OnUpdateOnce(func(_ bool, _ bool) {
 				minimumCommittableAge := w.protocol.APIForSlot(commitmentID.Slot()).ProtocolParameters().MinCommittableAge()
 				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - minimumCommittableAge + 1); exists {
-					committableCommitment.IsCommittable.Trigger()
+					committableCommitment.IsCommittable.Set(true)
 				}
 			})
 
 			commitment.IsCommittable.OnUpdateOnce(func(_ bool, _ bool) {
-				forceCommitmentFunc()
+				w.workerPool.Submit(forceCommitmentFunc)
 			})
 
 			if totalBlocks == 0 {
