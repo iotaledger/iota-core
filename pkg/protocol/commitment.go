@@ -56,10 +56,10 @@ type Commitment struct {
 	// IsAttested contains a flag indicating if we have received attestations for this Commitment.
 	IsAttested reactive.Event
 
+	IsFullyBooked reactive.Event
+
 	// IsCommittable contains a flag indicating if this Commitment is committable (we have received all blocks and all attestations).
 	IsCommittable reactive.Event
-
-	IsFullyBooked reactive.Event
 
 	// IsVerified contains a flag indicating if this Commitment is verified (we produced this Commitment ourselves by
 	// booking all the contained blocks and transactions).
@@ -99,6 +99,7 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
 		IsRoot:                          reactive.NewEvent(),
 		IsAttested:                      reactive.NewEvent(),
+		IsFullyBooked:                   reactive.NewEvent(),
 		IsCommittable:                   reactive.NewEvent(),
 		IsVerified:                      reactive.NewEvent(),
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
@@ -155,11 +156,10 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 		// mark commitments that are marked as root as verified
 		c.IsVerified.InheritFrom(c.IsRoot),
 
-		// mark commitments that are marked as verified as attested
+		// mark commitments that are marked as verified as attested, fully booked and committable
 		c.IsAttested.InheritFrom(c.IsVerified),
-
-		// mark commitments that are marked as verified as fully booked
 		c.IsFullyBooked.InheritFrom(c.IsVerified),
+		c.IsCommittable.InheritFrom(c.IsVerified),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			// the weight can be fixed as a one time operation (as it only relies on static information from the parent
