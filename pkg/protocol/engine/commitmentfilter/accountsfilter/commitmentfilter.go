@@ -67,7 +67,7 @@ func (c *CommitmentFilter) evaluateBlock(block *blocks.Block) {
 		if !exists {
 			c.events.BlockFiltered.Trigger(&commitmentfilter.BlockFilteredEvent{
 				Block:  block,
-				Reason: ierrors.Join(iotago.ErrBlockParentNotFound, ierrors.Errorf("parent %s of block %s is unknown", parentID, block.ID())),
+				Reason: ierrors.Join(iotago.ErrBlockParentNotFound, ierrors.Errorf("parent %s of block %s is not known", parentID, block.ID())),
 			})
 
 			return
