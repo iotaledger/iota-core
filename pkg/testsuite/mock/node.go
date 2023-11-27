@@ -111,7 +111,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		Workers:   workerpool.NewGroup(name),
 
 		logHandler:          logHandler,
-		enableEngineLogging: false,
+		enableEngineLogging: true,
 
 		attachedBlocks: make([]*blocks.Block, 0),
 	}
