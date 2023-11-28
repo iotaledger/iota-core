@@ -78,6 +78,7 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
 
 	matchingEngineFound := false
 	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
+		// Bind value of the pointer to a local variable, because the pointer in the loop will be reused and modified in the next iteration. That could be problematic with use of `defer`.
 		e := engine
 		if engine != nil && !engine.WasShutdown() {
 			// The engine is locked while it's being reset, so that no new blocks enter the dataflow, here we make sure that this process is exclusive
