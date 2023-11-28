@@ -134,7 +134,7 @@ func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (s
 func (c *Chains) initHeaviestCandidateTracking(candidateVar reactive.Variable[*Chain], weightVar func(*Chain) reactive.Variable[uint64], newCandidate *Chain) (unsubscribe func()) {
 	return weightVar(newCandidate).OnUpdate(func(_ uint64, newWeight uint64) {
 		// abort if the candidate is not heavier than the main chain.
-		if mainChain := c.Main.Get(); mainChain != nil && newWeight <= mainChain.VerifiedWeight.Get() {
+		if mainChain := c.Main.Get(); newCandidate == mainChain || newWeight <= mainChain.VerifiedWeight.Get() {
 			return
 		}
 

@@ -111,7 +111,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		Workers:   workerpool.NewGroup(name),
 
 		logHandler:          logHandler,
-		enableEngineLogging: true,
+		enableEngineLogging: false,
 
 		attachedBlocks: make([]*blocks.Block, 0),
 	}
@@ -157,8 +157,8 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 }
 
 func (n *Node) hookEvents() {
-	n.Protocol.Chains.HeaviestAttestedCandidate.OnUpdate(func(prevHeaviestAttestedCandidate *protocol.Chain, heaviestAttestedCandidate *protocol.Chain) {
-		if prevHeaviestAttestedCandidate != nil {
+	n.Protocol.Chains.HeaviestAttestedCandidate.OnUpdate(func(_ *protocol.Chain, heaviestAttestedCandidate *protocol.Chain) {
+		if heaviestAttestedCandidate != nil {
 			n.forkDetectedCount.Add(1)
 
 			heaviestAttestedCandidate.Engine.OnUpdate(func(prevEngine *engine.Engine, newEngine *engine.Engine) {
