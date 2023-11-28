@@ -4,61 +4,24 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/testsuite/depositcalculator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 func MinIssuerAccountAmount(protocolParameters iotago.ProtocolParameters) iotago.BaseToken {
-	// create a dummy account with a block issuer feature to calculate the storage score.
-	dummyAccountOutput := &iotago.AccountOutput{
-		Amount:         0,
-		Mana:           0,
-		AccountID:      iotago.EmptyAccountID,
-		FoundryCounter: 0,
-		UnlockConditions: iotago.AccountOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{
-				Address: &iotago.Ed25519Address{},
-			},
-		},
-		Features: iotago.AccountOutputFeatures{
-			&iotago.BlockIssuerFeature{
-				BlockIssuerKeys: iotago.BlockIssuerKeys{
-					&iotago.Ed25519PublicKeyBlockIssuerKey{},
-				},
-			},
-		},
-		ImmutableFeatures: iotago.AccountOutputImmFeatures{},
-	}
-	storageScoreStructure := iotago.NewStorageScoreStructure(protocolParameters.StorageScoreParameters())
-
-	return lo.PanicOnErr(storageScoreStructure.MinDeposit(dummyAccountOutput))
+	return lo.PanicOnErr(depositcalculator.MinDeposit(protocolParameters, iotago.OutputAccount,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+		depositcalculator.WithBlockIssuerKeys(1),
+	))
 }
 
 func MinValidatorAccountAmount(protocolParameters iotago.ProtocolParameters) iotago.BaseToken {
-	// create a dummy account with a staking and block issuer feature to calculate the storage score.
-	dummyAccountOutput := &iotago.AccountOutput{
-		Amount:         0,
-		Mana:           0,
-		AccountID:      iotago.EmptyAccountID,
-		FoundryCounter: 0,
-		UnlockConditions: iotago.AccountOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{
-				Address: &iotago.Ed25519Address{},
-			},
-		},
-		Features: iotago.AccountOutputFeatures{
-			&iotago.BlockIssuerFeature{
-				BlockIssuerKeys: iotago.BlockIssuerKeys{
-					&iotago.Ed25519PublicKeyBlockIssuerKey{},
-				},
-			},
-			&iotago.StakingFeature{},
-		},
-		ImmutableFeatures: iotago.AccountOutputImmFeatures{},
-	}
-	storageScoreStructure := iotago.NewStorageScoreStructure(protocolParameters.StorageScoreParameters())
-
-	return lo.PanicOnErr(storageScoreStructure.MinDeposit(dummyAccountOutput))
+	return lo.PanicOnErr(depositcalculator.MinDeposit(protocolParameters, iotago.OutputAccount,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+		depositcalculator.WithBlockIssuerKeys(1),
+		depositcalculator.WithStakedAmount(1),
+	))
 }
 
 // TODO: add the correct formula later.
