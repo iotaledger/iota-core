@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -44,7 +45,14 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 	c.ticker.Events.Tick.Hook(c.SendRequest)
 
 	protocol.Constructed.OnTrigger(func() {
-		c.protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
+		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
+			return chain.WarpSyncMode.OnUpdate(func(_ bool, warpsyncMode bool) {
+				if warpsyncMode {
+					engine.Reset()
+				}
+			})
+		})
+		protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
 			return commitment.WarpSyncBlocks.OnUpdate(func(_ bool, warpSyncBlocks bool) {
 				if warpSyncBlocks {
 					c.ticker.StartTicker(commitment.ID())
@@ -160,8 +168,6 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			if targetEngine.Workers.WaitChildren(); targetEngine.Storage.Settings().LatestCommitment().ID().Slot() > commitmentID.Slot() {
 				return blocksToWarpSync
 			}
-			// TODO: reset the engine only once at the very beginning of the warp-sync process
-			// targetEngine.Reset()
 
 			// Once all blocks are booked we
 			//   1. Mark all transactions as accepted
