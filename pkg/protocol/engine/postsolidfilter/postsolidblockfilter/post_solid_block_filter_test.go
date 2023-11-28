@@ -1,4 +1,4 @@
-package accountsfilter
+package postsolidblockfilter
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/postsolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -19,7 +19,7 @@ import (
 
 type TestFramework struct {
 	Test             *testing.T
-	CommitmentFilter *CommitmentFilter
+	CommitmentFilter *PostSolidBlockFilter
 
 	commitments map[iotago.SlotIndex]*model.Commitment
 	accountData map[iotago.AccountID]*accounts.AccountData
@@ -28,7 +28,7 @@ type TestFramework struct {
 	apiProvider iotago.APIProvider
 }
 
-func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter ...options.Option[CommitmentFilter]) *TestFramework {
+func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter ...options.Option[PostSolidBlockFilter]) *TestFramework {
 	tf := &TestFramework{
 		Test:        t,
 		apiProvider: apiProvider,
@@ -56,7 +56,7 @@ func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter .
 		t.Logf("BlockAllowed: %s", block.ID())
 	})
 
-	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		t.Logf("BlockFiltered: %s - %s", event.Block.ID(), event.Reason)
 	})
 
@@ -127,7 +127,7 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 		require.NotEqual(t, "noAccount", block.ID().Alias())
 	})
 
-	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		require.NotEqual(t, "withAccount", event.Block.ID().Alias())
 		require.NotEqual(t, "withImplicitAccount", event.Block.ID().Alias())
 	})
@@ -189,7 +189,7 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 		require.NotEqual(t, "insuffientBurnedMana", block.ID().Alias())
 	})
 
-	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		require.NotEqual(t, "sufficientBurnedMana", event.Block.ID().Alias())
 	})
 
@@ -237,7 +237,7 @@ func TestCommitmentFilter_Expiry(t *testing.T) {
 		require.NotEqual(t, "expired", block.ID().Alias())
 	})
 
-	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
+	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		require.Equal(t, "expired", event.Block.ID().Alias())
 	})
 

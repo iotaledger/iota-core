@@ -23,7 +23,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -31,6 +30,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
@@ -48,7 +48,7 @@ type Engine struct {
 	Events              *Events
 	Storage             *storage.Storage
 	Filter              filter.Filter
-	CommitmentFilter    commitmentfilter.CommitmentFilter
+	CommitmentFilter    postsolidfilter.PostSolidFilter
 	EvictionState       *eviction.State
 	BlockRequester      *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
 	BlockDAG            blockdag.BlockDAG
@@ -90,7 +90,7 @@ func New(
 	errorHandler func(error),
 	storageInstance *storage.Storage,
 	filterProvider module.Provider[*Engine, filter.Filter],
-	commitmentFilterProvider module.Provider[*Engine, commitmentfilter.CommitmentFilter],
+	commitmentFilterProvider module.Provider[*Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
 	clockProvider module.Provider[*Engine, clock.Clock],

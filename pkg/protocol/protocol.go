@@ -23,8 +23,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter/accountsfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/drr"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
@@ -37,6 +35,8 @@ import (
 	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/postsolidfilter/postsolidblockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager/trivialsyncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
@@ -78,7 +78,7 @@ type Protocol struct {
 	optsStorageOptions      []options.Option[storage.Storage]
 
 	optsFilterProvider              module.Provider[*engine.Engine, filter.Filter]
-	optsCommitmentFilterProvider    module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
+	optsCommitmentFilterProvider    module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
 	optsBlockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	optsTipManagerProvider          module.Provider[*engine.Engine, tipmanager.TipManager]
 	optsTipSelectionProvider        module.Provider[*engine.Engine, tipselection.TipSelection]
@@ -107,7 +107,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		Workers:                         workers,
 		networkDispatcher:               dispatcher,
 		optsFilterProvider:              blockfilter.NewProvider(),
-		optsCommitmentFilterProvider:    accountsfilter.NewProvider(),
+		optsCommitmentFilterProvider:    postsolidblockfilter.NewProvider(),
 		optsBlockDAGProvider:            inmemoryblockdag.NewProvider(),
 		optsTipManagerProvider:          tipmanagerv1.NewProvider(),
 		optsTipSelectionProvider:        tipselectionv1.NewProvider(),

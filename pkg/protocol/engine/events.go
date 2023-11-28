@@ -7,7 +7,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -17,6 +16,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
@@ -31,7 +31,7 @@ type Events struct {
 
 	EvictionState    *eviction.Events
 	Filter           *filter.Events
-	CommitmentFilter *commitmentfilter.Events
+	CommitmentFilter *postsolidfilter.Events
 	BlockRequester   *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
 	TipManager       *tipmanager.Events
 	BlockDAG         *blockdag.Events
@@ -58,7 +58,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		StoragePruned:          event.New1[iotago.EpochIndex](),
 		EvictionState:          eviction.NewEvents(),
 		Filter:                 filter.NewEvents(),
-		CommitmentFilter:       commitmentfilter.NewEvents(),
+		CommitmentFilter:       postsolidfilter.NewEvents(),
 		BlockRequester:         eventticker.NewEvents[iotago.SlotIndex, iotago.BlockID](),
 		TipManager:             tipmanager.NewEvents(),
 		BlockDAG:               blockdag.NewEvents(),

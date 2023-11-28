@@ -1,11 +1,11 @@
-package commitmentfilter
+package postsolidfilter
 
 import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 
-type CommitmentFilter interface {
+type PostSolidFilter interface {
 	// ProcessPreFilteredBlock processes block from the given source.
 	ProcessPreFilteredBlock(block *blocks.Block)
 

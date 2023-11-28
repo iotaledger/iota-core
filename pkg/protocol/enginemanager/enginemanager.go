@@ -20,7 +20,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
@@ -28,6 +27,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
@@ -56,7 +56,7 @@ type EngineManager struct {
 	storageOptions              []options.Option[storage.Storage]
 	engineOptions               []options.Option[engine.Engine]
 	filterProvider              module.Provider[*engine.Engine, filter.Filter]
-	commitmentFilterProvider    module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
+	commitmentFilterProvider    module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
 	blockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	bookerProvider              module.Provider[*engine.Engine, booker.Booker]
 	clockProvider               module.Provider[*engine.Engine, clock.Clock]
@@ -82,7 +82,7 @@ func New(
 	storageOptions []options.Option[storage.Storage],
 	engineOptions []options.Option[engine.Engine],
 	filterProvider module.Provider[*engine.Engine, filter.Filter],
-	commitmentFilterProvider module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter],
+	commitmentFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],
 	clockProvider module.Provider[*engine.Engine, clock.Clock],
