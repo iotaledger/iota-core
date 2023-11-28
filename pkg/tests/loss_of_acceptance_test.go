@@ -61,8 +61,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{51, 52}, 2, "block0", ts.Nodes("node0"), true, nil)
 
-		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(50, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
 		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes()...)
 	}
 
@@ -70,8 +70,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{53, 54, 55, 56, 57}, 3, "52.1", ts.Nodes(), true, nil)
 
-		ts.AssertEqualStoredCommitmentAtIndex(55, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(55, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(55, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("57.0"), true, ts.Nodes()...)
 	}
 
@@ -89,8 +89,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{58, 59}, 3, "57.2", ts.Nodes("node0", "node1", "node2"), true, nil)
 
-		ts.AssertEqualStoredCommitmentAtIndex(57, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(57, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(57, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("59.0"), true, ts.Nodes()...)
 	}
 
