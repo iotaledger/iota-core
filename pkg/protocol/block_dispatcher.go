@@ -77,27 +77,28 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
 	}
 
 	matchingEngineFound := false
-	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
-		// Bind value of the pointer to a local variable, because the pointer in the loop will be reused and modified in the next iteration. That could be problematic with use of `defer`.
-		e := engine
-		if engine != nil && !engine.WasShutdown() {
+	for _, e := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
+		if e != nil {
 			// The engine is locked while it's being reset, so that no new blocks enter the dataflow, here we make sure that this process is exclusive
 			e.RLock()
-			defer e.RUnlock()
 
-			if engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID()) {
-				if b.inSyncWindow(engine, block) {
-					engine.ProcessBlockFromPeer(block, src)
+			if !e.WasShutdown() && e.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || e.BlockRequester.HasTicker(block.ID()) {
+				if b.inSyncWindow(e, block) {
+					e.ProcessBlockFromPeer(block, src)
 				} else {
 					// Stick too new blocks into the unsolid commitment buffer so that they can be dispatched once the
 					// engine instance is in sync (mostly needed for tests).
 					if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
+						e.RUnlock()
+
 						return ierrors.Errorf("failed to add block %s to unsolid commitment buffer", block.ID())
 					}
 				}
 
 				matchingEngineFound = true
 			}
+
+			e.RUnlock()
 		}
 	}
 
