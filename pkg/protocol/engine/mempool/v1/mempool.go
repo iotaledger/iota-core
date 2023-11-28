@@ -483,6 +483,8 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 			stateDiff, err := m.stateDiff(slot)
 			if err != nil {
 				m.errorHandler(ierrors.Wrapf(err, "failed to get state diff for slot %d", slot))
+
+				return
 			}
 
 			if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
