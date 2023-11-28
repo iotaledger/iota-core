@@ -453,6 +453,14 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
 	})
 
+	instance.Ledger.MemPool().OnSignedTransactionAttached(
+		func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
+			signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
+				fmt.Printf("%s > [%s] MemPool.SignedTransactionSignaturesInvalid(%s): %s\n", n.Name, engineName, err, signedTransactionMetadata.ID())
+			})
+		},
+	)
+
 	instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
 		fmt.Printf("%s > [%s] Ledger.TransactionAttached: %s\n", n.Name, engineName, transactionMetadata.ID())
 
