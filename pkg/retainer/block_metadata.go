@@ -15,23 +15,23 @@ type BlockMetadata struct {
 	TransactionFailureReason api.TransactionFailureReason
 }
 
-func (b *BlockMetadata) BlockMetadataResponse() *api.BlockMetadataResponse {
+func (m *BlockMetadata) BlockMetadataResponse() *api.BlockMetadataResponse {
 	return &api.BlockMetadataResponse{
-		BlockID:             b.BlockID,
-		BlockState:          b.BlockState.String(),
-		BlockFailureReason:  b.BlockFailureReason,
-		TransactionMetadata: b.TransactionMetadataResponse(),
+		BlockID:             m.BlockID,
+		BlockState:          m.BlockState.String(),
+		BlockFailureReason:  m.BlockFailureReason,
+		TransactionMetadata: m.TransactionMetadataResponse(),
 	}
 }
 
-func (b *BlockMetadata) TransactionMetadataResponse() *api.TransactionMetadataResponse {
-	if b.TransactionState == api.TransactionStateNoTransaction {
+func (m *BlockMetadata) TransactionMetadataResponse() *api.TransactionMetadataResponse {
+	if m.TransactionState == api.TransactionStateNoTransaction {
 		return nil
 	}
 
 	return &api.TransactionMetadataResponse{
-		TransactionID:            b.TransactionID,
-		TransactionState:         b.TransactionState.String(),
-		TransactionFailureReason: b.TransactionFailureReason,
+		TransactionID:            m.TransactionID,
+		TransactionState:         m.TransactionState.String(),
+		TransactionFailureReason: m.TransactionFailureReason,
 	}
 }

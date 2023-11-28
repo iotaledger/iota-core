@@ -84,14 +84,14 @@ func outputWithMetadataByID(c echo.Context) (*api.OutputWithMetadataResponse, er
 func newOutputMetadataResponse(output *utxoledger.Output) (*api.OutputMetadata, error) {
 	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
-	includedSlotIndex := output.SlotBooked()
+	includedSlot := output.SlotBooked()
 	includedCommitmentID := iotago.EmptyCommitmentID
 
-	if includedSlotIndex <= latestCommitment.Slot() &&
-		includedSlotIndex >= deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
+	if includedSlot <= latestCommitment.Slot() &&
+		includedSlot >= deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot() {
+		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlotIndex, err)
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlot, err)
 		}
 		includedCommitmentID = includedCommitment.ID()
 	}
@@ -100,7 +100,7 @@ func newOutputMetadataResponse(output *utxoledger.Output) (*api.OutputMetadata, 
 		OutputID: output.OutputID(),
 		BlockID:  output.BlockID(),
 		Included: &api.OutputInclusionMetadata{
-			Slot:          includedSlotIndex,
+			Slot:          includedSlot,
 			TransactionID: output.OutputID().TransactionID(),
 			CommitmentID:  includedCommitmentID,
 		},
@@ -114,20 +114,20 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*api.OutputMetadata, err
 		return nil, err
 	}
 
-	spentSlotIndex := spent.SlotSpent()
+	spentSlot := spent.SlotSpent()
 	spentCommitmentID := iotago.EmptyCommitmentID
 
-	if spentSlotIndex <= newOutputMetadataResponse.LatestCommitmentID.Slot() &&
-		spentSlotIndex >= deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot() {
-		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
+	if spentSlot <= newOutputMetadataResponse.LatestCommitmentID.Slot() &&
+		spentSlot >= deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot() {
+		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", spentSlotIndex, err)
+			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", spentSlot, err)
 		}
 		spentCommitmentID = spentCommitment.ID()
 	}
 
 	newOutputMetadataResponse.Spent = &api.OutputConsumptionMetadata{
-		Slot:          spentSlotIndex,
+		Slot:          spentSlot,
 		TransactionID: spent.TransactionIDSpent(),
 		CommitmentID:  spentCommitmentID,
 	}
