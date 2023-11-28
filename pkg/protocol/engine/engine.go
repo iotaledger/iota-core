@@ -75,6 +75,8 @@ type Engine struct {
 	chainID iotago.CommitmentID
 	mutex   syncutils.RWMutex
 
+	accessMutex syncutils.RWMutex
+
 	optsSnapshotPath     string
 	optsEntryPointsDepth int
 	optsSnapshotDepth    int
@@ -206,12 +208,13 @@ func New(
 				if err := e.UpgradeOrchestrator.RestoreFromDisk(e.Storage.Settings().LatestCommitment().Slot()); err != nil {
 					panic(ierrors.Wrap(err, "failed to restore upgrade orchestrator from disk"))
 				}
+
+				e.Reset()
 			}
 		},
 		func(e *Engine) {
 			fmt.Println("Engine Settings", e.Storage.Settings().String())
 		},
-		(*Engine).Reset,
 		(*Engine).TriggerInitialized,
 	)
 }
@@ -223,26 +226,34 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (e *Engine) Reset() {
+	e.accessMutex.Lock()
+	defer e.accessMutex.Unlock()
+
+	// Reset should be performed in the same order as Shutdown.
 	e.BlockRequester.Clear()
-	e.Storage.Reset()
-	e.EvictionState.Reset()
-	e.Filter.Reset()
-	e.CommitmentFilter.Reset()
-	e.BlockCache.Reset()
-	e.BlockDAG.Reset()
+	e.Scheduler.Reset()
+	e.TipSelection.Reset()
+	e.TipManager.Reset()
+	e.Attestations.Reset()
+	e.SyncManager.Reset()
+	e.Notarization.Reset()
+	e.SlotGadget.Reset()
+	e.BlockGadget.Reset()
+	e.UpgradeOrchestrator.Reset()
+	e.SybilProtection.Reset()
 	e.Booker.Reset()
 	e.Ledger.Reset()
-	e.BlockGadget.Reset()
-	e.SlotGadget.Reset()
-	e.Notarization.Reset()
-	e.Attestations.Reset()
-	e.SybilProtection.Reset()
-	e.Scheduler.Reset()
-	e.TipManager.Reset()
-	e.TipSelection.Reset()
+	e.CommitmentFilter.Reset()
+	e.BlockDAG.Reset()
+	e.Filter.Reset()
 	e.Retainer.Reset()
-	e.SyncManager.Reset()
-	e.UpgradeOrchestrator.Reset()
+	e.EvictionState.Reset()
+	e.BlockCache.Reset()
+
+	// Waits for all pending tasks to be processed.
+	e.Workers.WaitChildren()
+
+	e.Storage.Reset()
 
 	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
 	latestCommittedTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
@@ -253,22 +264,24 @@ func (e *Engine) Shutdown() {
 	if !e.WasShutdown() {
 		e.TriggerShutdown()
 
+		// Shutdown should be performed in the reverse dataflow order.
 		e.BlockRequester.Shutdown()
+		e.Scheduler.Shutdown()
+		e.TipSelection.Shutdown()
+		e.TipManager.Shutdown()
 		e.Attestations.Shutdown()
 		e.SyncManager.Shutdown()
 		e.Notarization.Shutdown()
+		e.Clock.Shutdown()
+		e.SlotGadget.Shutdown()
+		e.BlockGadget.Shutdown()
+		e.UpgradeOrchestrator.Shutdown()
+		e.SybilProtection.Shutdown()
 		e.Booker.Shutdown()
 		e.Ledger.Shutdown()
-		e.BlockDAG.Shutdown()
-		e.BlockGadget.Shutdown()
-		e.SlotGadget.Shutdown()
-		e.Clock.Shutdown()
-		e.SybilProtection.Shutdown()
-		e.UpgradeOrchestrator.Shutdown()
-		e.TipManager.Shutdown()
-		e.Filter.Shutdown()
 		e.CommitmentFilter.Shutdown()
-		e.Scheduler.Shutdown()
+		e.BlockDAG.Shutdown()
+		e.Filter.Shutdown()
 		e.Retainer.Shutdown()
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()
@@ -541,6 +554,14 @@ func (e *Engine) ErrorHandler(componentName string) func(error) {
 	return func(err error) {
 		e.errorHandler(ierrors.Wrap(err, componentName))
 	}
+}
+
+func (e *Engine) RLock() {
+	e.accessMutex.RLock()
+}
+
+func (e *Engine) RUnlock() {
+	e.accessMutex.RUnlock()
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
