@@ -365,7 +365,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
 			StakedAmount:         walletOptions.Amount,
-			StakingEpochEnd:      iotago.MaxEpochIndex,
+			StakingEndEpoch:      iotago.MaxEpochIndex,
 			FixedCost:            iotago.Mana(0),
 			AccountID:            node.Validator.AccountID,
 		}

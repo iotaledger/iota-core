@@ -70,7 +70,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	committeeAccountsData := make(accounts.AccountsData, 0)
 	for _, snapshotAccountDetails := range opt.Accounts {
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
-		if snapshotAccountDetails.StakedAmount > 0 && snapshotAccountDetails.StakingEpochEnd > 0 {
+		if snapshotAccountDetails.StakedAmount > 0 && snapshotAccountDetails.StakingEndEpoch > 0 {
 			blockIssuerKeyEd25519, ok := snapshotAccountDetails.IssuerKey.(*iotago.Ed25519PublicKeyBlockIssuerKey)
 			if !ok {
 				panic("block issuer key must be of type ed25519")
@@ -88,7 +88,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 				ValidatorStake:                        snapshotAccountDetails.StakedAmount,
 				DelegationStake:                       0,
 				FixedCost:                             snapshotAccountDetails.FixedCost,
-				StakeEndEpoch:                         snapshotAccountDetails.StakingEpochEnd,
+				StakeEndEpoch:                         snapshotAccountDetails.StakingEndEpoch,
 				LatestSupportedProtocolVersionAndHash: model.VersionAndHash{},
 			})
 		}
@@ -207,7 +207,7 @@ func createGenesisAccounts(api iotago.API, accounts []AccountDetails) (iotago.Tx
 	var outputs iotago.TxEssenceOutputs
 	// Account outputs start from Genesis TX index 1
 	for idx, genesisAccount := range accounts {
-		output := createAccount(genesisAccount.AccountID, genesisAccount.Address, genesisAccount.Amount, genesisAccount.Mana, genesisAccount.IssuerKey, genesisAccount.ExpirySlot, genesisAccount.StakedAmount, genesisAccount.StakingEpochEnd, genesisAccount.FixedCost)
+		output := createAccount(genesisAccount.AccountID, genesisAccount.Address, genesisAccount.Amount, genesisAccount.Mana, genesisAccount.IssuerKey, genesisAccount.ExpirySlot, genesisAccount.StakedAmount, genesisAccount.StakingEndEpoch, genesisAccount.FixedCost)
 
 		if _, err := api.StorageScoreStructure().CoversMinDeposit(output, genesisAccount.Amount); err != nil {
 			return nil, ierrors.Wrapf(err, "min rent not covered by account output with index %d", idx+1)
