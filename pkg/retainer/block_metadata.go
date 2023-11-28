@@ -27,3 +27,16 @@ func (b *BlockMetadata) BlockMetadataResponse() *api.BlockMetadataResponse {
 
 	return response
 }
+
+func (b *BlockMetadata) TransactionMetadataResponse() *api.TransactionMetadataResponse {
+	if b.TransactionState == api.TransactionStateNoTransaction {
+		return nil
+	}
+
+	response := &api.TransactionMetadataResponse{
+		TransactionState:         b.TransactionState.String(),
+		TransactionFailureReason: b.TransactionFailureReason,
+	}
+
+	return response
+}
