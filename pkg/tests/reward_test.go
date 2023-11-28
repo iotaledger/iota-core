@@ -40,7 +40,7 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	node2 := ts.AddNode("node2")
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
-	wallet := ts.AddDefaultWallet(node1, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddDefaultWallet(node1)
 
 	ts.Run(true)
 
