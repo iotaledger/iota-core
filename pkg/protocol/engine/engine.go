@@ -229,6 +229,9 @@ func (e *Engine) Reset() {
 	e.accessMutex.Lock()
 	defer e.accessMutex.Unlock()
 
+	// Waits for all pending tasks to be processed.
+	e.Workers.WaitChildren()
+
 	// Reset should be performed in the same order as Shutdown.
 	e.BlockRequester.Clear()
 	e.Scheduler.Reset()
@@ -249,9 +252,6 @@ func (e *Engine) Reset() {
 	e.Retainer.Reset()
 	e.EvictionState.Reset()
 	e.BlockCache.Reset()
-
-	// Waits for all pending tasks to be processed.
-	e.Workers.WaitChildren()
 
 	e.Storage.Reset()
 
