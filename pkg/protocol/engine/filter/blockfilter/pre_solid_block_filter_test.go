@@ -20,12 +20,12 @@ import (
 
 type TestFramework struct {
 	Test   *testing.T
-	Filter *Filter
+	Filter *PreSolidBlockFilter
 
 	apiProvider iotago.APIProvider
 }
 
-func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter ...options.Option[Filter]) *TestFramework {
+func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter ...options.Option[PreSolidBlockFilter]) *TestFramework {
 	tf := &TestFramework{
 		Test:        t,
 		apiProvider: apiProvider,

@@ -55,7 +55,7 @@ type EngineManager struct {
 
 	storageOptions              []options.Option[storage.Storage]
 	engineOptions               []options.Option[engine.Engine]
-	filterProvider              module.Provider[*engine.Engine, filter.Filter]
+	filterProvider              module.Provider[*engine.Engine, filter.PreSolidFilter]
 	postSolidFilterProvider     module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
 	blockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	bookerProvider              module.Provider[*engine.Engine, booker.Booker]
@@ -81,7 +81,7 @@ func New(
 	dbVersion byte,
 	storageOptions []options.Option[storage.Storage],
 	engineOptions []options.Option[engine.Engine],
-	filterProvider module.Provider[*engine.Engine, filter.Filter],
+	filterProvider module.Provider[*engine.Engine, filter.PreSolidFilter],
 	postSolidFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],

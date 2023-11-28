@@ -21,8 +21,8 @@ var (
 	ErrInvalidBlockVersion          = ierrors.New("block has invalid protocol version")
 )
 
-// Filter filters blocks.
-type Filter struct {
+// PreSolidBlockFilter filters blocks.
+type PreSolidBlockFilter struct {
 	events *filter.Events
 
 	apiProvider iotago.APIProvider
@@ -34,8 +34,8 @@ type Filter struct {
 	module.Module
 }
 
-func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
-	return module.Provide(func(e *engine.Engine) filter.Filter {
+func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*engine.Engine, filter.PreSolidFilter] {
+	return module.Provide(func(e *engine.Engine) filter.PreSolidFilter {
 		f := New(e, opts...)
 		f.TriggerConstructed()
 
@@ -51,21 +51,21 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 	})
 }
 
-var _ filter.Filter = new(Filter)
+var _ filter.PreSolidFilter = new(PreSolidBlockFilter)
 
-// New creates a new Filter.
-func New(apiProvider iotago.APIProvider, opts ...options.Option[Filter]) *Filter {
-	return options.Apply(&Filter{
+// New creates a new PreSolidBlockFilter.
+func New(apiProvider iotago.APIProvider, opts ...options.Option[PreSolidBlockFilter]) *PreSolidBlockFilter {
+	return options.Apply(&PreSolidBlockFilter{
 		events:      filter.NewEvents(),
 		apiProvider: apiProvider,
 	}, opts,
-		(*Filter).TriggerConstructed,
-		(*Filter).TriggerInitialized,
+		(*PreSolidBlockFilter).TriggerConstructed,
+		(*PreSolidBlockFilter).TriggerInitialized,
 	)
 }
 
 // ProcessReceivedBlock processes block from the given source.
-func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
+func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 	// Verify the block's version corresponds to the protocol version for the slot.
 	apiForSlot := f.apiProvider.APIForSlot(block.ID().Slot())
 	if apiForSlot.Version() != block.ProtocolBlock().Header.ProtocolVersion {
@@ -118,15 +118,15 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
-func (f *Filter) Reset() { /* nothing to reset but comply with interface */ }
+func (f *PreSolidBlockFilter) Reset() { /* nothing to reset but comply with interface */ }
 
-func (f *Filter) Shutdown() {
+func (f *PreSolidBlockFilter) Shutdown() {
 	f.TriggerStopped()
 }
 
 // WithMaxAllowedWallClockDrift specifies how far in the future are blocks allowed to be ahead of our own wall clock (defaults to 0 seconds).
-func WithMaxAllowedWallClockDrift(d time.Duration) options.Option[Filter] {
-	return func(filter *Filter) {
+func WithMaxAllowedWallClockDrift(d time.Duration) options.Option[PreSolidBlockFilter] {
+	return func(filter *PreSolidBlockFilter) {
 		filter.optsMaxAllowedWallClockDrift = d
 	}
 }

@@ -77,7 +77,7 @@ type Protocol struct {
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
 	optsStorageOptions      []options.Option[storage.Storage]
 
-	optsFilterProvider              module.Provider[*engine.Engine, filter.Filter]
+	optsFilterProvider              module.Provider[*engine.Engine, filter.PreSolidFilter]
 	optsPostSolidFilterProvider     module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
 	optsBlockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	optsTipManagerProvider          module.Provider[*engine.Engine, tipmanager.TipManager]

@@ -47,7 +47,7 @@ import (
 type Engine struct {
 	Events              *Events
 	Storage             *storage.Storage
-	Filter              filter.Filter
+	Filter              filter.PreSolidFilter
 	PostSolidFilter     postsolidfilter.PostSolidFilter
 	EvictionState       *eviction.State
 	BlockRequester      *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
@@ -89,7 +89,7 @@ func New(
 	workers *workerpool.Group,
 	errorHandler func(error),
 	storageInstance *storage.Storage,
-	filterProvider module.Provider[*Engine, filter.Filter],
+	filterProvider module.Provider[*Engine, filter.PreSolidFilter],
 	postSolidFilterProvider module.Provider[*Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
