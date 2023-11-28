@@ -6,8 +6,8 @@ import (
 )
 
 type PostSolidFilter interface {
-	// ProcessPreFilteredBlock processes block from the given source.
-	ProcessPreFilteredBlock(block *blocks.Block)
+	// ProcessSolidBlock processes block from the given source.
+	ProcessSolidBlock(block *blocks.Block)
 
 	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset()

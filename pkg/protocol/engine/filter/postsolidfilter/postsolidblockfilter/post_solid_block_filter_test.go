@@ -36,7 +36,7 @@ func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter .
 		accountData: make(map[iotago.AccountID]*accounts.AccountData),
 		rmcData:     make(map[iotago.SlotIndex]iotago.Mana),
 	}
-	tf.PostSolidFilter = New(apiProvider, optsFilter...)
+	tf.PostSolidFilter = New(optsFilter...)
 
 	tf.PostSolidFilter.accountRetrieveFunc = func(accountID iotago.AccountID, targetSlot iotago.SlotIndex) (*accounts.AccountData, bool, error) {
 		if accountData, ok := tf.accountData[accountID]; ok {
@@ -82,7 +82,7 @@ func (t *TestFramework) processBlock(alias string, block *iotago.Block) {
 	require.NoError(t.Test, err)
 
 	modelBlock.ID().RegisterAlias(alias)
-	t.PostSolidFilter.ProcessPreFilteredBlock(blocks.NewBlock(modelBlock))
+	t.PostSolidFilter.ProcessSolidBlock(blocks.NewBlock(modelBlock))
 }
 
 func (t *TestFramework) IssueSignedBlockAtSlot(alias string, slot iotago.SlotIndex, commitmentID iotago.CommitmentID, keyPair ed25519.KeyPair) {
