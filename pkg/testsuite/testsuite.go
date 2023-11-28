@@ -27,6 +27,67 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
+func DefaultProtocolParameterOptions(networkName string) []options.Option[iotago.V3ProtocolParameters] {
+	return []options.Option[iotago.V3ProtocolParameters]{
+		iotago.WithNetworkOptions(
+			networkName,
+			"rms",
+		),
+		iotago.WithSupplyOptions(
+			1_000_0000,
+			100,
+			1,
+			10,
+			100,
+			100,
+			100,
+		),
+		iotago.WithRewardsOptions(8, 8, 31, 1154, 2, 1),
+		iotago.WithStakingOptions(1, 100, 1),
+
+		iotago.WithTimeProviderOptions(
+			0,
+			GenesisTimeWithOffsetBySlots(0, DefaultSlotDurationInSeconds),
+			DefaultSlotDurationInSeconds,
+			DefaultSlotsPerEpochExponent,
+		),
+		iotago.WithLivenessOptions(
+			DefaultLivenessThresholdLowerBoundInSeconds,
+			DefaultLivenessThresholdUpperBoundInSeconds,
+			DefaultMinCommittableAge,
+			DefaultMaxCommittableAge,
+			DefaultEpochNearingThreshold,
+		),
+		iotago.WithCongestionControlOptions(
+			DefaultMinReferenceManaCost,
+			DefaultRMCIncrease,
+			DefaultRMCDecrease,
+			DefaultRMCIncreaseThreshold,
+			DefaultRMCDecreaseThreshold,
+			DefaultSchedulerRate,
+			DefaultMaxBufferSize,
+			DefaultMaxValBufferSize,
+		),
+	}
+}
+
+type WalletOptions struct {
+	Amount               iotago.BaseToken
+	BlockIssuanceCredits iotago.BlockIssuanceCredits
+}
+
+func WithWalletAmount(amount iotago.BaseToken) options.Option[WalletOptions] {
+	return func(opts *WalletOptions) {
+		opts.Amount = amount
+	}
+}
+
+func WithWalletBlockIssuanceCredits(blockIssuanceCredits iotago.BlockIssuanceCredits) options.Option[WalletOptions] {
+	return func(opts *WalletOptions) {
+		opts.BlockIssuanceCredits = blockIssuanceCredits
+	}
+}
+
 type TestSuite struct {
 	Testing     *testing.T
 	fakeTesting *testing.T
@@ -74,49 +135,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 
-		defaultProtocolParameters := []options.Option[iotago.V3ProtocolParameters]{
-			iotago.WithNetworkOptions(
-				testingT.Name(),
-				"rms",
-			),
-			iotago.WithSupplyOptions(
-				1_000_0000,
-				100,
-				1,
-				10,
-				100,
-				100,
-				100,
-			),
-			iotago.WithRewardsOptions(8, 8, 31, 1154, 2, 1),
-			iotago.WithStakingOptions(1, 100, 1),
-
-			iotago.WithTimeProviderOptions(
-				0,
-				GenesisTimeWithOffsetBySlots(0, DefaultSlotDurationInSeconds),
-				DefaultSlotDurationInSeconds,
-				DefaultSlotsPerEpochExponent,
-			),
-			iotago.WithLivenessOptions(
-				DefaultLivenessThresholdLowerBoundInSeconds,
-				DefaultLivenessThresholdUpperBoundInSeconds,
-				DefaultMinCommittableAge,
-				DefaultMaxCommittableAge,
-				DefaultEpochNearingThreshold,
-			),
-			iotago.WithCongestionControlOptions(
-				DefaultMinReferenceManaCost,
-				DefaultRMCIncrease,
-				DefaultRMCDecrease,
-				DefaultRMCIncreaseThreshold,
-				DefaultRMCDecreaseThreshold,
-				DefaultSchedulerRate,
-				DefaultMaxBufferSize,
-				DefaultMaxValBufferSize,
-			),
-		}
-
-		t.ProtocolParameterOptions = append(defaultProtocolParameters, t.ProtocolParameterOptions...)
+		t.ProtocolParameterOptions = append(DefaultProtocolParameterOptions(testingT.Name()), t.ProtocolParameterOptions...)
 		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(t.ProtocolParameterOptions...))
 
 		genesisBlock := blocks.NewRootBlock(t.API.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(t.API).MustID(), time.Unix(t.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
@@ -320,7 +339,7 @@ func (t *TestSuite) Shutdown() {
 	// })
 }
 
-func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, optAmount ...iotago.BaseToken) *mock.Node {
+func (t *TestSuite) addNodeToPartition(name string, partition string, validator bool, walletOpts ...options.Option[WalletOptions]) *mock.Node {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -332,19 +351,19 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	t.nodes.Set(name, node)
 	node.SetCurrentSlot(t.currentSlot)
 
-	amount := mock.MinValidatorAccountAmount
-	if len(optAmount) > 0 {
-		amount = optAmount[0]
-	}
-	if amount > 0 && validator {
+	walletOptions := options.Apply(&WalletOptions{
+		Amount: mock.MinValidatorAccountAmount(t.API.ProtocolParameters()),
+	}, walletOpts)
+
+	if walletOptions.Amount > 0 && validator {
 		accountDetails := snapshotcreator.AccountDetails{
 			Address:              iotago.Ed25519AddressFromPubKey(node.Validator.PublicKey),
-			Amount:               amount,
-			Mana:                 iotago.Mana(amount),
+			Amount:               walletOptions.Amount,
+			Mana:                 iotago.Mana(walletOptions.Amount),
 			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.Validator.PublicKey)),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
-			StakedAmount:         amount,
+			StakedAmount:         walletOptions.Amount,
 			StakingEpochEnd:      iotago.MaxEpochIndex,
 			FixedCost:            iotago.Mana(0),
 			AccountID:            node.Validator.AccountID,
@@ -356,55 +375,76 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 	return node
 }
 
-func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, optAmount ...iotago.BaseToken) *mock.Node {
-	return t.addNodeToPartition(name, partition, true, optAmount...)
+func (t *TestSuite) AddValidatorNodeToPartition(name string, partition string, walletOpts ...options.Option[WalletOptions]) *mock.Node {
+	return t.addNodeToPartition(name, partition, true, walletOpts...)
 }
 
-func (t *TestSuite) AddValidatorNode(name string, optAmount ...iotago.BaseToken) *mock.Node {
-	node := t.addNodeToPartition(name, mock.NetworkMainPartition, true, optAmount...)
+func (t *TestSuite) AddValidatorNode(name string, walletOpts ...options.Option[WalletOptions]) *mock.Node {
+	node := t.addNodeToPartition(name, mock.NetworkMainPartition, true, walletOpts...)
 	// create a wallet for each validator node which uses the validator account as a block issuer
 	t.AddWallet(name, node, node.Validator.AccountID, node.KeyManager)
 
 	return node
 }
 
-func (t *TestSuite) AddNodeToPartition(name string, partition string, optAmount ...iotago.BaseToken) *mock.Node {
-	return t.addNodeToPartition(name, partition, false, optAmount...)
+func (t *TestSuite) AddNodeToPartition(name string, partition string, walletOpts ...options.Option[WalletOptions]) *mock.Node {
+	return t.addNodeToPartition(name, partition, false, walletOpts...)
 }
 
-func (t *TestSuite) AddNode(name string, optAmount ...iotago.BaseToken) *mock.Node {
-	return t.addNodeToPartition(name, mock.NetworkMainPartition, false, optAmount...)
+func (t *TestSuite) AddNode(name string, walletOpts ...options.Option[WalletOptions]) *mock.Node {
+	return t.addNodeToPartition(name, mock.NetworkMainPartition, false, walletOpts...)
 }
 
 func (t *TestSuite) RemoveNode(name string) {
 	t.nodes.Delete(name)
 }
 
+// AddGenesisAccount adds an account the test suite in the genesis snapshot.
+func (t *TestSuite) AddGenesisAccount(accountDetails snapshotcreator.AccountDetails) {
+	t.optsAccounts = append(t.optsAccounts, accountDetails)
+}
+
 // AddGenesisWallet adds a wallet to the test suite with a block issuer in the genesis snapshot and access to the genesis seed.
 // If no block issuance credits are provided, the wallet will be assigned half of the maximum block issuance credits.
-func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, blockIssuanceCredits ...iotago.BlockIssuanceCredits) *mock.Wallet {
+func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, walletOpts ...options.Option[WalletOptions]) *mock.Wallet {
 	accountID := tpkg.RandAccountID()
 	newWallet := t.AddWallet(name, node, accountID, t.genesisKeyManager)
-	var bic iotago.BlockIssuanceCredits
-	if len(blockIssuanceCredits) == 0 {
-		bic = iotago.MaxBlockIssuanceCredits / 2
-	} else {
-		bic = blockIssuanceCredits[0]
-	}
+
+	walletOptions := options.Apply(&WalletOptions{
+		Amount:               mock.MinIssuerAccountAmount(t.API.ProtocolParameters()),
+		BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
+	}, walletOpts)
 
 	accountDetails := snapshotcreator.AccountDetails{
 		AccountID:            accountID,
 		Address:              iotago.Ed25519AddressFromPubKey(newWallet.BlockIssuer.PublicKey),
-		Amount:               mock.MinIssuerAccountAmount,
-		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount),
+		Amount:               walletOptions.Amount,
+		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount(t.API.ProtocolParameters())),
 		IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newWallet.BlockIssuer.PublicKey)),
 		ExpirySlot:           iotago.MaxSlotIndex,
-		BlockIssuanceCredits: bic,
+		BlockIssuanceCredits: walletOptions.BlockIssuanceCredits,
 	}
 
 	t.optsAccounts = append(t.optsAccounts, accountDetails)
 
 	return newWallet
+}
+
+const (
+	DefaultWallet = "defaultWallet"
+)
+
+func (t *TestSuite) AddDefaultWallet(node *mock.Node, walletOpts ...options.Option[WalletOptions]) *mock.Wallet {
+	return t.AddGenesisWallet(DefaultWallet, node, walletOpts...)
+}
+
+func (t *TestSuite) DefaultWallet() *mock.Wallet {
+	defaultWallet, exists := t.wallets.Get(DefaultWallet)
+	if !exists {
+		return nil
+	}
+
+	return defaultWallet
 }
 
 func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*mock.KeyManager) *mock.Wallet {
@@ -414,15 +454,6 @@ func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.Acc
 	newWallet.SetCurrentSlot(t.currentSlot)
 
 	return newWallet
-}
-
-func (t *TestSuite) DefaultWallet() *mock.Wallet {
-	defaultWallet, exists := t.wallets.Get("default")
-	if !exists {
-		return nil
-	}
-
-	return defaultWallet
 }
 
 // Update the global time of the test suite and all nodes and wallets.
@@ -447,13 +478,13 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 	defer t.mutex.Unlock()
 
 	// Add default wallet by default when creating the first node.
-	if !t.wallets.Has("default") {
+	if !t.wallets.Has(DefaultWallet) {
 		_, node, exists := t.nodes.Head()
 		if !exists {
 			panic("at least one node is needed to create a default wallet")
 		}
 
-		t.AddGenesisWallet("default", node)
+		t.AddDefaultWallet(node)
 	}
 
 	// Create accounts for any block issuer nodes added before starting the network.

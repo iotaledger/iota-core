@@ -1,16 +1,42 @@
 package mock
 
 import (
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/testsuite/depositcalculator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
-const MinIssuerAccountAmount = iotago.BaseToken(372900)
-const MinValidatorAccountAmount = iotago.BaseToken(722800)
-const AccountConversionManaCost = iotago.Mana(1000000)
-const MaxBlockManaCost = iotago.Mana(1000000)
+func MinIssuerAccountAmount(protocolParameters iotago.ProtocolParameters) iotago.BaseToken {
+	return lo.PanicOnErr(depositcalculator.MinDeposit(protocolParameters, iotago.OutputAccount,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+		depositcalculator.WithBlockIssuerKeys(1),
+	))
+}
+
+func MinValidatorAccountAmount(protocolParameters iotago.ProtocolParameters) iotago.BaseToken {
+	return lo.PanicOnErr(depositcalculator.MinDeposit(protocolParameters, iotago.OutputAccount,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+		depositcalculator.WithBlockIssuerKeys(1),
+		depositcalculator.WithStakedAmount(1),
+	))
+}
+
+// TODO: add the correct formula later.
+//
+//nolint:revive
+func AccountConversionManaCost(protocolParameters iotago.ProtocolParameters) iotago.Mana {
+	return iotago.Mana(1000000)
+}
+
+// TODO: add the correct formula later.
+//
+//nolint:revive
+func MaxBlockManaCost(protocolParameters iotago.ProtocolParameters) iotago.Mana {
+	return iotago.Mana(1000000)
+}
 
 // TransactionBuilder options
 

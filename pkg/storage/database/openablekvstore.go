@@ -10,18 +10,20 @@ import (
 )
 
 type openableKVStore struct {
-	dbInstance    *DBInstance
-	storeInstance kvstore.KVStore // KVStore that is used to access the DB instance
-	parentStore   *openableKVStore
-	dbPrefix      kvstore.KeyPrefix
+	openIfNecessary func() // openIfNecessary callback should synchronize itself and make sure that storeInstance is ready to use after.
+	closeStore      func()
+	storeInstance   kvstore.KVStore // storeInstance is a KVStore that is holding the reference to the underlying database.
+	parentStore     *openableKVStore
+	dbPrefix        kvstore.KeyPrefix
 }
 
-func newOpenableKVStore(storeInstance kvstore.KVStore, dbInstance *DBInstance) *openableKVStore {
+func newOpenableKVStore(storeInstance kvstore.KVStore, openStoreIfNecessary func(), closeStore func()) *openableKVStore {
 	return &openableKVStore{
-		dbInstance:    dbInstance,
-		storeInstance: storeInstance,
-		parentStore:   nil,
-		dbPrefix:      kvstore.EmptyPrefix,
+		openIfNecessary: openStoreIfNecessary,
+		closeStore:      closeStore,
+		storeInstance:   storeInstance,
+		parentStore:     nil,
+		dbPrefix:        kvstore.EmptyPrefix,
 	}
 }
 
@@ -36,10 +38,8 @@ func (s *openableKVStore) topParent() *openableKVStore {
 
 func (s *openableKVStore) instance() kvstore.KVStore {
 	parent := s.topParent()
-
-	if parent.dbInstance.isClosed.Load() {
-		parent.dbInstance.Open()
-	}
+	// openIfNecessary callback should synchronize itself and make sure that storeInstance is ready to use after.
+	parent.openIfNecessary()
 
 	return parent.storeInstance
 }
@@ -60,7 +60,6 @@ func (s *openableKVStore) WithRealm(realm kvstore.Realm) (kvstore.KVStore, error
 
 func (s *openableKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return &openableKVStore{
-		dbInstance:    nil,
 		storeInstance: nil,
 		parentStore:   s,
 		dbPrefix:      realm,
@@ -116,7 +115,8 @@ func (s *openableKVStore) Flush() error {
 }
 
 func (s *openableKVStore) Close() error {
-	s.topParent().dbInstance.CloseWithoutLocking()
+	s.topParent().closeStore()
+
 	return nil
 }
 

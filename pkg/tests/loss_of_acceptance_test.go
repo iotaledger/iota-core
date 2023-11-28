@@ -36,7 +36,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
-	ts.AddGenesisWallet("default", node0)
+	ts.AddDefaultWallet(node0)
 	ts.AddValidatorNode("node1")
 	ts.AddNode("node2")
 
@@ -61,8 +61,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{51, 52}, 2, "block0", ts.Nodes("node0"), true, nil)
 
-		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(50, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
 		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes()...)
 	}
 
@@ -70,9 +70,9 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{53, 54, 55, 56, 57}, 3, "52.1", ts.Nodes(), true, nil)
 
-		ts.AssertEqualStoredCommitmentAtIndex(55, ts.Nodes()...)
-		ts.AssertLatestCommitmentSlotIndex(55, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("57.0"), true, ts.Nodes()...)
+		ts.AssertLatestCommitmentSlotIndex(55, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(55, ts.Nodes()...)
 	}
 
 	// Start node3 from genesis snapshot.
@@ -89,9 +89,9 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{58, 59}, 3, "57.2", ts.Nodes("node0", "node1", "node2"), true, nil)
 
-		ts.AssertEqualStoredCommitmentAtIndex(57, ts.Nodes()...)
-		ts.AssertLatestCommitmentSlotIndex(57, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("59.0"), true, ts.Nodes()...)
+		ts.AssertLatestCommitmentSlotIndex(57, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(57, ts.Nodes()...)
 	}
 
 	// Check that commitments from 1-49 are empty.
@@ -121,7 +121,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
-	ts.AddGenesisWallet("default", node0)
+	ts.AddDefaultWallet(node0)
 	ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
 
@@ -131,9 +131,9 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, nil)
 
+		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(8, ts.Nodes()...)
-		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 	}
 
 	// Create snapshot and restart node0 from it.
@@ -183,9 +183,9 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, nil)
 
+		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(23, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(23, ts.Nodes()...)
-		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 	}
 
 	// Check that commitments from 8-19 are empty -> all previously accepted blocks in 9,10 have been orphaned.
@@ -215,7 +215,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
-	ts.AddGenesisWallet("default", node0)
+	ts.AddDefaultWallet(node0)
 	ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
 
@@ -225,9 +225,9 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, nil)
 
+		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(8, ts.Nodes()...)
-		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 	}
 
 	for _, node := range ts.Nodes("node0", "node1") {
@@ -273,9 +273,9 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, nil)
 
+		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(23, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(23, ts.Nodes()...)
-		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 	}
 
 	// Check that commitments from 8-19 are empty -> all previously accepted blocks in 9,10 have been orphaned.
