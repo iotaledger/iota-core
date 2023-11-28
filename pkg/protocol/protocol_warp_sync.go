@@ -174,12 +174,17 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				}
 
 				// 2. Mark all blocks as accepted
-				for _, blockIDs := range blockIDsBySlotCommitment {
+				for slotCommitmentID, blockIDs := range blockIDsBySlotCommitment {
 					for _, blockID := range blockIDs {
 						block, exists := targetEngine.BlockCache.Block(blockID)
 						if !exists { // this should never happen as we just booked these blocks in this slot.
 							continue
 						}
+
+						// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
+						// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
+						// block cache and thus if not root blocks no block in the next slot can become solid.
+						targetEngine.EvictionState.AddRootBlock(block.ID(), slotCommitmentID)
 
 						targetEngine.BlockGadget.SetAccepted(block)
 					}
@@ -222,7 +227,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			var bookedBlocks atomic.Uint32
 			blocksToWarpSync = ds.NewSet[iotago.BlockID]()
-			for slotCommitmentID, blockIDs := range blockIDsBySlotCommitment {
+			for _, blockIDs := range blockIDsBySlotCommitment {
 				for _, blockID := range blockIDs {
 					blocksToWarpSync.Add(blockID)
 
@@ -235,11 +240,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 						continue
 					}
 
-					// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
-					// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
-					// block cache and thus if not root blocks no block in the next slot can become solid.
-					targetEngine.EvictionState.AddRootBlock(block.ID(), slotCommitmentID)
-
+					// TODO: this will need to be changed to WeightPropagated before marking a block as actually booked.
 					block.Booked().OnUpdate(func(_ bool, _ bool) {
 						if bookedBlocks.Add(1) != totalBlocks {
 							return
