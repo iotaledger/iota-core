@@ -55,7 +55,9 @@ func NewProvider(opts ...options.Option[Clock]) module.Provider[*engine.Engine, 
 				asyncOpt := event.WithWorkerPool(c.workerPool)
 				c.HookStopped(lo.Batch(
 					e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-						c.acceptedTime.Advance(block.IssuingTime())
+						block.Notarized().OnTrigger(func() {
+							c.acceptedTime.Advance(block.IssuingTime())
+						})
 					}, asyncOpt).Unhook,
 
 					e.Events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {

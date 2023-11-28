@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
@@ -46,12 +47,14 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
-			return chain.WarpSyncMode.OnUpdate(func(_ bool, warpsyncMode bool) {
-				if warpsyncMode {
+			return chain.WarpSyncMode.OnUpdate(func(_ bool, warpSyncMode bool) {
+				if warpSyncMode {
+					engine.Workers.WaitChildren()
 					engine.Reset()
 				}
 			})
 		})
+
 		protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
 			return commitment.WarpSyncBlocks.OnUpdate(func(_ bool, warpSyncBlocks bool) {
 				if warpSyncBlocks {
@@ -165,7 +168,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			}
 
 			// make sure the engine is clean and requires a warp-sync before we start processing the blocks
-			if targetEngine.Workers.WaitChildren(); targetEngine.Storage.Settings().LatestCommitment().ID().Slot() > commitmentID.Slot() {
+			if targetEngine.Storage.Settings().LatestCommitment().ID().Slot() > commitmentID.Slot() {
 				return blocksToWarpSync
 			}
 
@@ -174,42 +177,64 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			//   2. Mark all blocks as accepted
 			//   3. Force commitment of the slot
 			forceCommitmentFunc := func() {
+				if !chain.WarpSyncMode.Get() {
+					return
+				}
+
+				// 0. Prepare data flow
+				var (
+					notarizedBlocksCount uint64
+					allBlocksNotarized   = reactive.NewEvent()
+				)
+
 				// 1. Mark all transactions as accepted
 				for _, transactionID := range transactionIDs {
 					targetEngine.Ledger.ConflictDAG().SetAccepted(transactionID)
 				}
 
-				// 2. Mark all blocks as accepted
-				for slotCommitmentID, blockIDs := range blockIDsBySlotCommitment {
-					for _, blockID := range blockIDs {
-						block, exists := targetEngine.BlockCache.Block(blockID)
-						if !exists { // this should never happen as we just booked these blocks in this slot.
-							continue
+				// 2. Mark all blocks as accepted and wait for them to be notarized
+				if totalBlocks == 0 {
+					allBlocksNotarized.Trigger()
+				} else {
+					for slotCommitmentID, blockIDs := range blockIDsBySlotCommitment {
+						for _, blockID := range blockIDs {
+							block, exists := targetEngine.BlockCache.Block(blockID)
+							if !exists { // this should never happen as we just booked these blocks in this slot.
+								continue
+							}
+
+							// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
+							// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
+							// block cache and thus if not root blocks no block in the next slot can become solid.
+							targetEngine.EvictionState.AddRootBlock(block.ID(), slotCommitmentID)
+
+							targetEngine.BlockGadget.SetAccepted(block)
+
+							block.Notarized().OnTrigger(func() {
+								if atomic.AddUint64(&notarizedBlocksCount, 1) == uint64(totalBlocks) {
+									allBlocksNotarized.Trigger()
+								}
+							})
 						}
-
-						// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
-						// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
-						// block cache and thus if not root blocks no block in the next slot can become solid.
-						targetEngine.EvictionState.AddRootBlock(block.ID(), slotCommitmentID)
-
-						targetEngine.BlockGadget.SetAccepted(block)
 					}
 				}
 
-				// 3. Force commitment of the slot
-				producedCommitment, err := targetEngine.Notarization.ForceCommit(commitmentID.Slot())
-				if err != nil {
-					w.protocol.LogError("failed to force commitment", "commitmentID", commitmentID, "err", err)
+				allBlocksNotarized.OnTrigger(func() {
+					// 3. Force commitment of the slot
+					producedCommitment, err := targetEngine.Notarization.ForceCommit(commitmentID.Slot())
+					if err != nil {
+						w.protocol.LogError("failed to force commitment", "commitmentID", commitmentID, "err", err)
 
-					return
-				}
+						return
+					}
 
-				// 4. Verify that the produced commitment is the same as the initially requested one
-				if producedCommitment.ID() != commitmentID {
-					w.protocol.LogError("commitment does not match", "expectedCommitmentID", commitmentID, "producedCommitmentID", producedCommitment.ID())
+					// 4. Verify that the produced commitment is the same as the initially requested one
+					if producedCommitment.ID() != commitmentID {
+						w.protocol.LogError("commitment does not match", "expectedCommitmentID", commitmentID, "producedCommitmentID", producedCommitment.ID())
 
-					return
-				}
+						return
+					}
+				})
 			}
 
 			commitment.IsFullyBooked.OnUpdateOnce(func(_ bool, _ bool) {
@@ -236,8 +261,6 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			for _, blockIDs := range blockIDsBySlotCommitment {
 				for _, blockID := range blockIDs {
 					blocksToWarpSync.Add(blockID)
-
-					w.LogError("requesting block", "blockID", blockID)
 
 					block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
 					if block == nil {

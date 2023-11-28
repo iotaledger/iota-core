@@ -92,7 +92,7 @@ func newChain(chains *Chains) *Chain {
 		ClaimedWeight:            reactive.NewVariable[uint64](),
 		AttestedWeight:           reactive.NewVariable[uint64](),
 		VerifiedWeight:           reactive.NewVariable[uint64](),
-		WarpSyncMode:             reactive.NewVariable[bool]().Init(true),
+		WarpSyncMode:             reactive.NewVariable[bool](),
 		WarpSyncThreshold:        reactive.NewVariable[iotago.SlotIndex](),
 		OutOfSyncThreshold:       reactive.NewVariable[iotago.SlotIndex](),
 		RequestAttestations:      reactive.NewVariable[bool](),
