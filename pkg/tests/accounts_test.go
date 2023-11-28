@@ -228,9 +228,8 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		ts.DefaultWallet(),
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
 		mock.WithStakingFeature(10000, 421, 0, 10),
-		// TODO: Temporary "fix" for the tests, lets fix this in another PR, so we can at least use the docker network again
-		//mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
 		mock.WithAccountAmount(mock.MinValidatorAccountAmount(ts.API.ProtocolParameters())),
+		mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Node.Protocol.CommittedAPI().ProtocolParameters())),
 	)
 
 	ts.SetCurrentSlot(block1Slot)
