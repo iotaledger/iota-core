@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
