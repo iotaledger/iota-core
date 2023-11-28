@@ -22,9 +22,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter/presolidblockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
@@ -165,9 +165,9 @@ func provide(c *dig.Container) error {
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(),
 			),
-			protocol.WithFilterProvider(
-				blockfilter.NewProvider(
-					blockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
+			protocol.WithPreSolidFilterProvider(
+				presolidblockfilter.NewProvider(
+					presolidblockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
 				),
 			),
 			protocol.WithUpgradeOrchestratorProvider(
@@ -190,20 +190,20 @@ func configure() error {
 		Component.LogDebugf("AcceptedBlockProcessed, blockID: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	deps.Protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		Component.LogDebugf("BlockPreFiltered, blockID: %s, reason: %s", event.Block.ID(), event.Reason.Error())
 	})
 
-	deps.Protocol.Events.Engine.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
+	deps.Protocol.Events.Engine.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
 		Component.LogDebugf("BlockPreAllowed, blockID: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
-		Component.LogDebugf("CommitmentFilter.BlockAllowed, blockID: %s", block.ID())
+	deps.Protocol.Events.Engine.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
+		Component.LogDebugf("PostSolidFilter.BlockAllowed, blockID: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
-		Component.LogWarnf("CommitmentFilter.BlockFiltered, blockID: %s, reason: %s", event.Block.ID(), event.Reason.Error())
+	deps.Protocol.Events.Engine.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+		Component.LogWarnf("PostSolidFilter.BlockFiltered, blockID: %s, reason: %s", event.Block.ID(), event.Reason.Error())
 	})
 
 	deps.Protocol.Events.Engine.TipManager.BlockAdded.Hook(func(tip tipmanager.TipMetadata) {

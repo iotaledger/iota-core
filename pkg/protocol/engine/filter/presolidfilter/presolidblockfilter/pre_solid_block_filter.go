@@ -1,4 +1,4 @@
-package blockfilter
+package presolidblockfilter
 
 import (
 	"time"
@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -21,9 +21,9 @@ var (
 	ErrInvalidBlockVersion          = ierrors.New("block has invalid protocol version")
 )
 
-// Filter filters blocks.
-type Filter struct {
-	events *filter.Events
+// PreSolidBlockFilter filters blocks.
+type PreSolidBlockFilter struct {
+	events *presolidfilter.Events
 
 	apiProvider iotago.APIProvider
 
@@ -34,13 +34,13 @@ type Filter struct {
 	module.Module
 }
 
-func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine, filter.Filter] {
-	return module.Provide(func(e *engine.Engine) filter.Filter {
+func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*engine.Engine, presolidfilter.PreSolidFilter] {
+	return module.Provide(func(e *engine.Engine) presolidfilter.PreSolidFilter {
 		f := New(e, opts...)
 		f.TriggerConstructed()
 
 		e.Constructed.OnTrigger(func() {
-			e.Events.Filter.LinkTo(f.events)
+			e.Events.PreSolidFilter.LinkTo(f.events)
 			e.SybilProtection.HookInitialized(func() {
 				f.committeeFunc = e.SybilProtection.SeatManager().CommitteeInSlot
 			})
@@ -51,25 +51,25 @@ func NewProvider(opts ...options.Option[Filter]) module.Provider[*engine.Engine,
 	})
 }
 
-var _ filter.Filter = new(Filter)
+var _ presolidfilter.PreSolidFilter = new(PreSolidBlockFilter)
 
-// New creates a new Filter.
-func New(apiProvider iotago.APIProvider, opts ...options.Option[Filter]) *Filter {
-	return options.Apply(&Filter{
-		events:      filter.NewEvents(),
+// New creates a new PreSolidBlockFilter.
+func New(apiProvider iotago.APIProvider, opts ...options.Option[PreSolidBlockFilter]) *PreSolidBlockFilter {
+	return options.Apply(&PreSolidBlockFilter{
+		events:      presolidfilter.NewEvents(),
 		apiProvider: apiProvider,
 	}, opts,
-		(*Filter).TriggerConstructed,
-		(*Filter).TriggerInitialized,
+		(*PreSolidBlockFilter).TriggerConstructed,
+		(*PreSolidBlockFilter).TriggerInitialized,
 	)
 }
 
 // ProcessReceivedBlock processes block from the given source.
-func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
+func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 	// Verify the block's version corresponds to the protocol version for the slot.
 	apiForSlot := f.apiProvider.APIForSlot(block.ID().Slot())
 	if apiForSlot.Version() != block.ProtocolBlock().Header.ProtocolVersion {
-		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+		f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 			Block:  block,
 			Reason: ierrors.Wrapf(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().Header.ProtocolVersion, apiForSlot.Version(), apiForSlot.TimeProvider().EpochFromSlot(block.ID().Slot())),
 			Source: source,
@@ -81,7 +81,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 	// Verify the timestamp is not too far in the future.
 	timeDelta := time.Since(block.ProtocolBlock().Header.IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
-		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+		f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 			Block:  block,
 			Reason: ierrors.Wrapf(ErrBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
 			Source: source,
@@ -94,7 +94,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 		blockSlot := block.ProtocolBlock().API.TimeProvider().SlotFromTime(block.ProtocolBlock().Header.IssuingTime)
 		committee, exists := f.committeeFunc(blockSlot)
 		if !exists {
-			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+			f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 				Block:  block,
 				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "no committee for slot %d", blockSlot),
 				Source: source,
@@ -104,7 +104,7 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 		}
 
 		if !committee.HasAccount(block.ProtocolBlock().Header.IssuerID) {
-			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+			f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 				Block:  block,
 				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().Header.IssuerID, blockSlot),
 				Source: source,
@@ -118,15 +118,15 @@ func (f *Filter) ProcessReceivedBlock(block *model.Block, source peer.ID) {
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
-func (f *Filter) Reset() { /* nothing to reset but comply with interface */ }
+func (f *PreSolidBlockFilter) Reset() { /* nothing to reset but comply with interface */ }
 
-func (f *Filter) Shutdown() {
+func (f *PreSolidBlockFilter) Shutdown() {
 	f.TriggerStopped()
 }
 
 // WithMaxAllowedWallClockDrift specifies how far in the future are blocks allowed to be ahead of our own wall clock (defaults to 0 seconds).
-func WithMaxAllowedWallClockDrift(d time.Duration) options.Option[Filter] {
-	return func(filter *Filter) {
+func WithMaxAllowedWallClockDrift(d time.Duration) options.Option[PreSolidBlockFilter] {
+	return func(filter *PreSolidBlockFilter) {
 		filter.optsMaxAllowedWallClockDrift = d
 	}
 }

@@ -403,7 +403,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 
 	// CREATE IMPLICIT ACCOUNT FROM GENESIS BASIC UTXO, SENT TO A NEW USER WALLET.
 	// this wallet is not registered in the ledger yet.
-	newUserWallet := mock.NewWallet(ts.Testing, "newUser", node1)
+	newUserWallet := ts.AddWallet("newUser", node1, iotago.EmptyAccountID)
 	// a default wallet, already registered in the ledger, will issue the transaction and block.
 	tx1 := ts.DefaultWallet().CreateImplicitAccountFromInput(
 		"TX1",
@@ -570,7 +570,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	block2Slot := ts.CurrentSlot()
 
 	// Try to issue more blocks from each of the issuers - one succeeds in issuing a block,
-	// the other has the block rejected in the CommitmentFilter as his account has negative BIC value.
+	// the other has the block rejected in the PostSolidFilter as his account has negative BIC value.
 	{
 		block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
@@ -1020,7 +1020,7 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 
 	block2Slot := ts.CurrentSlot()
 
-	//TRY TO SPEND THE BASIC OUTPUT FROM AN ACCOUNT ADDRESS
+	// TRY TO SPEND THE BASIC OUTPUT FROM AN ACCOUNT ADDRESS
 	{
 		block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 

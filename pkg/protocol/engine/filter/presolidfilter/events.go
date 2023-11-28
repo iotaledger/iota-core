@@ -1,4 +1,4 @@
-package filter
+package presolidfilter
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"

@@ -48,7 +48,7 @@ func NewManualPOA(e iotago.APIProvider, committeeStore *epochstore.Store[*accoun
 func NewManualPOAProvider() module.Provider[*engine.Engine, seatmanager.SeatManager] {
 	return module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
 		poa := NewManualPOA(e, e.Storage.Committee())
-		e.Events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
+		e.Events.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 			poa.events.BlockProcessed.Trigger(block)
 		})
 

@@ -103,7 +103,7 @@ type AccountDetails struct {
 	ExpirySlot           iotago.SlotIndex
 	BlockIssuanceCredits iotago.BlockIssuanceCredits
 
-	StakingEpochEnd iotago.EpochIndex
+	StakingEndEpoch iotago.EpochIndex
 	FixedCost       iotago.Mana
 	StakedAmount    iotago.BaseToken
 }

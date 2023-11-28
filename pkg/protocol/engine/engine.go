@@ -25,12 +25,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
@@ -49,8 +49,8 @@ import (
 type Engine struct {
 	Events              *Events
 	Storage             *storage.Storage
-	Filter              filter.Filter
-	CommitmentFilter    commitmentfilter.CommitmentFilter
+	PreSolidFilter      presolidfilter.PreSolidFilter
+	PostSolidFilter     postsolidfilter.PostSolidFilter
 	EvictionState       *eviction.State
 	BlockRequester      *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
 	BlockDAG            blockdag.BlockDAG
@@ -91,8 +91,8 @@ func New(
 	logger log.Logger,
 	workers *workerpool.Group,
 	storageInstance *storage.Storage,
-	filterProvider module.Provider[*Engine, filter.Filter],
-	commitmentFilterProvider module.Provider[*Engine, commitmentfilter.CommitmentFilter],
+	preSolidFilterProvider module.Provider[*Engine, presolidfilter.PreSolidFilter],
+	postSolidFilterProvider module.Provider[*Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
 	clockProvider module.Provider[*Engine, clock.Clock],
@@ -154,8 +154,8 @@ func New(
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 			e.SybilProtection = sybilProtectionProvider(e)
 			e.BlockDAG = blockDAGProvider(e)
-			e.Filter = filterProvider(e)
-			e.CommitmentFilter = commitmentFilterProvider(e)
+			e.PreSolidFilter = preSolidFilterProvider(e)
+			e.PostSolidFilter = postSolidFilterProvider(e)
 			e.Booker = bookerProvider(e)
 			e.Clock = clockProvider(e)
 			e.BlockGadget = blockGadgetProvider(e)
@@ -231,7 +231,7 @@ func New(
 }
 
 func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
-	e.Filter.ProcessReceivedBlock(block, source)
+	e.PreSolidFilter.ProcessReceivedBlock(block, source)
 	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
@@ -253,9 +253,9 @@ func (e *Engine) Reset() {
 	e.SybilProtection.Reset()
 	e.Booker.Reset()
 	e.Ledger.Reset()
-	e.CommitmentFilter.Reset()
+	e.PostSolidFilter.Reset()
 	e.BlockDAG.Reset()
-	e.Filter.Reset()
+	e.PreSolidFilter.Reset()
 	e.Retainer.Reset()
 	e.EvictionState.Reset()
 	e.BlockCache.Reset()
@@ -607,9 +607,9 @@ func (e *Engine) initReactiveModule(logger log.Logger) (reactiveModule *module.R
 		e.SybilProtection.Shutdown()
 		e.Booker.Shutdown()
 		e.Ledger.Shutdown()
-		e.CommitmentFilter.Shutdown()
+		e.PostSolidFilter.Shutdown()
 		e.BlockDAG.Shutdown()
-		e.Filter.Shutdown()
+		e.PreSolidFilter.Shutdown()
 		e.Retainer.Shutdown()
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()

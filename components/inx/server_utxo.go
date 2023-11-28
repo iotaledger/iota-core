@@ -17,19 +17,26 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
+func NewLedgerOutput(o *utxoledger.Output, slotIncluded ...iotago.SlotIndex) (*inx.LedgerOutput, error) {
 	latestCommitment := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
+
+	includedSlot := o.SlotBooked()
+	if len(slotIncluded) > 0 {
+		includedSlot = slotIncluded[0]
+	}
 
 	l := &inx.LedgerOutput{
 		OutputId:   inx.NewOutputId(o.OutputID()),
 		BlockId:    inx.NewBlockId(o.BlockID()),
-		SlotBooked: uint32(o.SlotBooked()),
+		SlotBooked: uint32(includedSlot),
 		Output: &inx.RawOutput{
 			Data: o.Bytes(),
 		},
+		OutputIdProof: &inx.RawOutputIDProof{
+			Data: o.ProofBytes(),
+		},
 	}
 
-	includedSlot := o.SlotBooked()
 	if includedSlot > 0 &&
 		includedSlot <= latestCommitment.Slot() &&
 		includedSlot >= deps.Protocol.CommittedAPI().ProtocolParameters().GenesisSlot() {
@@ -391,7 +398,8 @@ func (s *Server) ListenToAcceptedTransactions(_ *inx.NoParams, srv inx.INX_Liste
 				return nil
 			}
 
-			inxOutput, err := NewLedgerOutput(output)
+			// we need to pass the slot of the accepted transaction here, because the "SlotBooked" in the output is 0.
+			inxOutput, err := NewLedgerOutput(output, slot)
 			if err != nil {
 				return err
 			}

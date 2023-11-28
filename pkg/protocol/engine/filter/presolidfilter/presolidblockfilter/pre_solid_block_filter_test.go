@@ -1,4 +1,4 @@
-package blockfilter
+package presolidblockfilter
 
 import (
 	"testing"
@@ -12,7 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -20,12 +20,12 @@ import (
 
 type TestFramework struct {
 	Test   *testing.T
-	Filter *Filter
+	Filter *PreSolidBlockFilter
 
 	apiProvider iotago.APIProvider
 }
 
-func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter ...options.Option[Filter]) *TestFramework {
+func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter ...options.Option[PreSolidBlockFilter]) *TestFramework {
 	tf := &TestFramework{
 		Test:        t,
 		apiProvider: apiProvider,
@@ -36,7 +36,7 @@ func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter .
 		t.Logf("BlockPreAllowed: %s", block.ID())
 	})
 
-	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	tf.Filter.events.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		t.Logf("BlockPreFiltered: %s - %s", event.Block.ID(), event.Reason)
 	})
 
@@ -122,7 +122,7 @@ func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 		require.NotEqual(t, "tooFarAheadFuture", block.ID().Alias())
 	})
 
-	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	tf.Filter.events.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		require.Equal(t, "tooFarAheadFuture", event.Block.ID().Alias())
 		require.True(t, ierrors.Is(event.Reason, ErrBlockTimeTooFarAheadInFuture))
 	})
@@ -160,7 +160,7 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 		require.False(t, invalid.Has(block.ID().Alias()))
 	})
 
-	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	tf.Filter.events.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		block := event.Block
 		require.False(t, valid.Has(block.ID().Alias()))
 		require.True(t, invalid.Has(block.ID().Alias()))
@@ -216,7 +216,7 @@ func TestFilter_ValidationBlocks(t *testing.T) {
 		require.NotEqual(t, "nonValidator", block.ID().Alias())
 	})
 
-	tf.Filter.events.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	tf.Filter.events.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		require.NotEqual(t, "validator", event.Block.ID().Alias())
 		require.Equal(t, "nonValidator", event.Block.ID().Alias())
 		require.True(t, ierrors.Is(event.Reason, ErrValidatorNotInCommittee))
