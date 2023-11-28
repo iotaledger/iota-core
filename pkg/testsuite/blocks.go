@@ -71,7 +71,7 @@ func (t *TestSuite) AssertBlockFiltered(blocks []*blocks.Block, reason error, no
 				}
 			}
 
-			return ierrors.Errorf("AssertBlockFiltered: %s: block %s was not filtered by the CommitmentFilter", node.Name, block.ID())
+			return ierrors.Errorf("AssertBlockFiltered: %s: block %s was not filtered by the PostSolidFilter", node.Name, block.ID())
 		})
 	}
 }

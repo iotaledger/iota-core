@@ -56,7 +56,7 @@ type EngineManager struct {
 	storageOptions              []options.Option[storage.Storage]
 	engineOptions               []options.Option[engine.Engine]
 	filterProvider              module.Provider[*engine.Engine, filter.Filter]
-	commitmentFilterProvider    module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
+	postSolidFilterProvider     module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
 	blockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	bookerProvider              module.Provider[*engine.Engine, booker.Booker]
 	clockProvider               module.Provider[*engine.Engine, clock.Clock]
@@ -82,7 +82,7 @@ func New(
 	storageOptions []options.Option[storage.Storage],
 	engineOptions []options.Option[engine.Engine],
 	filterProvider module.Provider[*engine.Engine, filter.Filter],
-	commitmentFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter],
+	postSolidFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],
 	clockProvider module.Provider[*engine.Engine, clock.Clock],
@@ -108,7 +108,7 @@ func New(
 		storageOptions:              storageOptions,
 		engineOptions:               engineOptions,
 		filterProvider:              filterProvider,
-		commitmentFilterProvider:    commitmentFilterProvider,
+		postSolidFilterProvider:     postSolidFilterProvider,
 		blockDAGProvider:            blockDAGProvider,
 		bookerProvider:              bookerProvider,
 		clockProvider:               clockProvider,
@@ -223,7 +223,7 @@ func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storag
 		errorHandler,
 		storage,
 		e.filterProvider,
-		e.commitmentFilterProvider,
+		e.postSolidFilterProvider,
 		e.blockDAGProvider,
 		e.bookerProvider,
 		e.clockProvider,

@@ -18,8 +18,8 @@ import (
 )
 
 type TestFramework struct {
-	Test             *testing.T
-	CommitmentFilter *PostSolidBlockFilter
+	Test            *testing.T
+	PostSolidFilter *PostSolidBlockFilter
 
 	commitments map[iotago.SlotIndex]*model.Commitment
 	accountData map[iotago.AccountID]*accounts.AccountData
@@ -36,27 +36,27 @@ func NewTestFramework(t *testing.T, apiProvider iotago.APIProvider, optsFilter .
 		accountData: make(map[iotago.AccountID]*accounts.AccountData),
 		rmcData:     make(map[iotago.SlotIndex]iotago.Mana),
 	}
-	tf.CommitmentFilter = New(apiProvider, optsFilter...)
+	tf.PostSolidFilter = New(apiProvider, optsFilter...)
 
-	tf.CommitmentFilter.accountRetrieveFunc = func(accountID iotago.AccountID, targetSlot iotago.SlotIndex) (*accounts.AccountData, bool, error) {
+	tf.PostSolidFilter.accountRetrieveFunc = func(accountID iotago.AccountID, targetSlot iotago.SlotIndex) (*accounts.AccountData, bool, error) {
 		if accountData, ok := tf.accountData[accountID]; ok {
 			return accountData, true, nil
 		}
 		return nil, false, ierrors.Errorf("no account data available for account id %s", accountID)
 	}
 
-	tf.CommitmentFilter.rmcRetrieveFunc = func(slot iotago.SlotIndex) (iotago.Mana, error) {
+	tf.PostSolidFilter.rmcRetrieveFunc = func(slot iotago.SlotIndex) (iotago.Mana, error) {
 		if rmc, ok := tf.rmcData[slot]; ok {
 			return rmc, nil
 		}
 		return iotago.Mana(0), ierrors.Errorf("no rmc available for slot index %d", slot)
 	}
 
-	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
+	tf.PostSolidFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
 		t.Logf("BlockAllowed: %s", block.ID())
 	})
 
-	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+	tf.PostSolidFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		t.Logf("BlockFiltered: %s - %s", event.Block.ID(), event.Reason)
 	})
 
@@ -82,7 +82,7 @@ func (t *TestFramework) processBlock(alias string, block *iotago.Block) {
 	require.NoError(t.Test, err)
 
 	modelBlock.ID().RegisterAlias(alias)
-	t.CommitmentFilter.ProcessPreFilteredBlock(blocks.NewBlock(modelBlock))
+	t.PostSolidFilter.ProcessPreFilteredBlock(blocks.NewBlock(modelBlock))
 }
 
 func (t *TestFramework) IssueSignedBlockAtSlot(alias string, slot iotago.SlotIndex, commitmentID iotago.CommitmentID, keyPair ed25519.KeyPair) {
@@ -116,18 +116,18 @@ func (t *TestFramework) IssueSignedBlockAtSlotWithBurnedMana(alias string, slot 
 	t.processBlock(alias, block)
 }
 
-func TestCommitmentFilter_NoAccount(t *testing.T) {
+func TestPostSolidFilter_NoAccount(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
 		iotago.SingleVersionProvider(testAPI),
 	)
 
-	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
+	tf.PostSolidFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
 		require.NotEqual(t, "noAccount", block.ID().Alias())
 	})
 
-	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+	tf.PostSolidFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		require.NotEqual(t, "withAccount", event.Block.ID().Alias())
 		require.NotEqual(t, "withImplicitAccount", event.Block.ID().Alias())
 	})
@@ -178,18 +178,18 @@ func TestCommitmentFilter_NoAccount(t *testing.T) {
 	tf.IssueSignedBlockAtSlot("withImplicitAccount", currentSlot, commitmentID, keyPairImplicitAccount)
 }
 
-func TestCommitmentFilter_BurnedMana(t *testing.T) {
+func TestPostSolidFilter_BurnedMana(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
 		iotago.SingleVersionProvider(testAPI),
 	)
 
-	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
+	tf.PostSolidFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
 		require.NotEqual(t, "insuffientBurnedMana", block.ID().Alias())
 	})
 
-	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+	tf.PostSolidFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		require.NotEqual(t, "sufficientBurnedMana", event.Block.ID().Alias())
 	})
 
@@ -226,18 +226,18 @@ func TestCommitmentFilter_BurnedMana(t *testing.T) {
 	tf.IssueSignedBlockAtSlotWithBurnedMana("insuffientBurnedMana", currentSlot, commitmentID, keyPair, iotago.Mana(9))
 }
 
-func TestCommitmentFilter_Expiry(t *testing.T) {
+func TestPostSolidFilter_Expiry(t *testing.T) {
 	testAPI := tpkg.TestAPI
 
 	tf := NewTestFramework(t,
 		iotago.SingleVersionProvider(testAPI),
 	)
 
-	tf.CommitmentFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
+	tf.PostSolidFilter.events.BlockAllowed.Hook(func(block *blocks.Block) {
 		require.NotEqual(t, "expired", block.ID().Alias())
 	})
 
-	tf.CommitmentFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+	tf.PostSolidFilter.events.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		require.Equal(t, "expired", event.Block.ID().Alias())
 	})
 

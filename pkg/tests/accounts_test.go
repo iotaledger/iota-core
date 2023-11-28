@@ -570,7 +570,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	block2Slot := ts.CurrentSlot()
 
 	// Try to issue more blocks from each of the issuers - one succeeds in issuing a block,
-	// the other has the block rejected in the CommitmentFilter as his account has negative BIC value.
+	// the other has the block rejected in the PostSolidFilter as his account has negative BIC value.
 	{
 		block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
 

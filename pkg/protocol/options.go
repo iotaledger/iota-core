@@ -49,9 +49,9 @@ func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, filte
 	}
 }
 
-func WithCommitmentFilterProvider(optsCommitmentFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]) options.Option[Protocol] {
+func WithPostSolidFilterProvider(optsPostSolidFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.optsCommitmentFilterProvider = optsCommitmentFilterProvider
+		p.optsPostSolidFilterProvider = optsPostSolidFilterProvider
 	}
 }
 

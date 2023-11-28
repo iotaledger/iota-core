@@ -204,11 +204,11 @@ func configure() error {
 		Component.LogDebugf("BlockPreAllowed, blockID: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
+	deps.Protocol.Events.Engine.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 		Component.LogDebugf("PostSolidFilter.BlockAllowed, blockID: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.CommitmentFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+	deps.Protocol.Events.Engine.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		Component.LogWarnf("PostSolidFilter.BlockFiltered, blockID: %s, reason: %s", event.Block.ID(), event.Reason.Error())
 	})
 

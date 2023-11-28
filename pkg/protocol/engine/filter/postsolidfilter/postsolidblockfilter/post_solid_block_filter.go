@@ -39,7 +39,7 @@ func NewProvider(opts ...options.Option[PostSolidBlockFilter]) module.Provider[*
 			})
 
 			e.Events.BlockDAG.BlockSolid.Hook(c.ProcessPreFilteredBlock)
-			e.Events.CommitmentFilter.LinkTo(c.events)
+			e.Events.PostSolidFilter.LinkTo(c.events)
 
 			c.TriggerInitialized()
 		})

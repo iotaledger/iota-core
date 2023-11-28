@@ -48,7 +48,7 @@ type Engine struct {
 	Events              *Events
 	Storage             *storage.Storage
 	Filter              filter.Filter
-	CommitmentFilter    postsolidfilter.PostSolidFilter
+	PostSolidFilter     postsolidfilter.PostSolidFilter
 	EvictionState       *eviction.State
 	BlockRequester      *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
 	BlockDAG            blockdag.BlockDAG
@@ -90,7 +90,7 @@ func New(
 	errorHandler func(error),
 	storageInstance *storage.Storage,
 	filterProvider module.Provider[*Engine, filter.Filter],
-	commitmentFilterProvider module.Provider[*Engine, postsolidfilter.PostSolidFilter],
+	postSolidFilterProvider module.Provider[*Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
 	clockProvider module.Provider[*Engine, clock.Clock],
@@ -144,7 +144,7 @@ func New(
 			e.SybilProtection = sybilProtectionProvider(e)
 			e.BlockDAG = blockDAGProvider(e)
 			e.Filter = filterProvider(e)
-			e.CommitmentFilter = commitmentFilterProvider(e)
+			e.PostSolidFilter = postSolidFilterProvider(e)
 			e.Booker = bookerProvider(e)
 			e.Clock = clockProvider(e)
 			e.BlockGadget = blockGadgetProvider(e)
@@ -243,7 +243,7 @@ func (e *Engine) Reset() {
 	e.SybilProtection.Reset()
 	e.Booker.Reset()
 	e.Ledger.Reset()
-	e.CommitmentFilter.Reset()
+	e.PostSolidFilter.Reset()
 	e.BlockDAG.Reset()
 	e.Filter.Reset()
 	e.Retainer.Reset()
@@ -279,7 +279,7 @@ func (e *Engine) Shutdown() {
 		e.SybilProtection.Shutdown()
 		e.Booker.Shutdown()
 		e.Ledger.Shutdown()
-		e.CommitmentFilter.Shutdown()
+		e.PostSolidFilter.Shutdown()
 		e.BlockDAG.Shutdown()
 		e.Filter.Shutdown()
 		e.Retainer.Shutdown()

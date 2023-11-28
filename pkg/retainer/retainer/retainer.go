@@ -67,7 +67,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			}
 		}, asyncOpt)
 
-		e.Events.CommitmentFilter.BlockFiltered.Hook(func(e *postsolidfilter.BlockFilteredEvent) {
+		e.Events.PostSolidFilter.BlockFiltered.Hook(func(e *postsolidfilter.BlockFilteredEvent) {
 			r.RetainBlockFailure(e.Block.ID(), determineBlockFailureReason(e.Reason))
 		}, asyncOpt)
 

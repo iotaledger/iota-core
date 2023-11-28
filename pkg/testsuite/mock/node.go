@@ -156,7 +156,7 @@ func (n *Node) hookEvents() {
 
 	events.MainEngineSwitched.Hook(func(e *engine.Engine) { n.mainEngineSwitchedCount.Add(1) })
 
-	n.Protocol.Events.Engine.CommitmentFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+	n.Protocol.Events.Engine.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		n.mutex.Lock()
 		defer n.mutex.Unlock()
 
@@ -318,11 +318,11 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		}
 	})
 
-	events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
+	events.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 		fmt.Printf("%s > [%s] PostSolidFilter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.CommitmentFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+	events.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
 		fmt.Printf("%s > [%s] PostSolidFilter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
 		if failOnBlockFiltered {
 			n.Testing.Fatal("no blocks should be filtered")
