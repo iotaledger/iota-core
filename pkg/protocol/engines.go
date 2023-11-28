@@ -58,7 +58,6 @@ func newEngines(protocol *Protocol) *Engines {
 
 		e.Shutdown.OnTrigger(func() {
 			shutdown()
-			e.worker.Shutdown().ShutdownComplete.Wait()
 
 			e.Stopped.Trigger()
 		})

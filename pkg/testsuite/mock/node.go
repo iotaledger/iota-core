@@ -157,8 +157,8 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 }
 
 func (n *Node) hookEvents() {
-	n.Protocol.Chains.HeaviestAttestedCandidate.OnUpdate(func(prevHeaviestAttestedCandidate *protocol.Chain, heaviestAttestedCandidate *protocol.Chain) {
-		if prevHeaviestAttestedCandidate != nil {
+	n.Protocol.Chains.HeaviestAttestedCandidate.OnUpdate(func(_ *protocol.Chain, heaviestAttestedCandidate *protocol.Chain) {
+		if heaviestAttestedCandidate != nil {
 			n.forkDetectedCount.Add(1)
 
 			heaviestAttestedCandidate.Engine.OnUpdate(func(prevEngine *engine.Engine, newEngine *engine.Engine) {
