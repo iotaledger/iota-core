@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
@@ -67,7 +67,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			}
 		}, asyncOpt)
 
-		e.Events.CommitmentFilter.BlockFiltered.Hook(func(e *commitmentfilter.BlockFilteredEvent) {
+		e.Events.PostSolidFilter.BlockFiltered.Hook(func(e *postsolidfilter.BlockFilteredEvent) {
 			r.RetainBlockFailure(e.Block.ID(), determineBlockFailureReason(e.Reason))
 		}, asyncOpt)
 

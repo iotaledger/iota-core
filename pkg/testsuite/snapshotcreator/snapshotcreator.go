@@ -16,11 +16,11 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter/accountsfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/passthrough"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter/postsolidblockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter/presolidblockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager/trivialsyncmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
@@ -97,8 +97,8 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	engineInstance := engine.New(workers.CreateGroup("Engine"),
 		errorHandler,
 		s,
-		blockfilter.NewProvider(),
-		accountsfilter.NewProvider(),
+		presolidblockfilter.NewProvider(),
+		postsolidblockfilter.NewProvider(),
 		inmemoryblockdag.NewProvider(),
 		inmemorybooker.NewProvider(),
 		blocktime.NewProvider(),

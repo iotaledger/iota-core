@@ -11,10 +11,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
@@ -43,15 +43,15 @@ func WithChainSwitchingThreshold(threshold int) options.Option[Protocol] {
 	}
 }
 
-func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, filter.Filter]) options.Option[Protocol] {
+func WithPreSolidFilterProvider(optsPreSolidFilterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.optsFilterProvider = optsFilterProvider
+		p.optsPreSolidFilterProvider = optsPreSolidFilterProvider
 	}
 }
 
-func WithCommitmentFilterProvider(optsCommitmentFilterProvider module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]) options.Option[Protocol] {
+func WithPostSolidFilterProvider(optsPostSolidFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.optsCommitmentFilterProvider = optsCommitmentFilterProvider
+		p.optsPostSolidFilterProvider = optsPostSolidFilterProvider
 	}
 }
 

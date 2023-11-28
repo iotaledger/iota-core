@@ -151,8 +151,9 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			}),
 		}
 		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
-		// TODO: set this to protocolParams.GenesisSlot() when this is added.
-		t.currentSlot = 0
+
+		// The first valid slot is always +1 of the genesis slot.
+		t.currentSlot = t.API.TimeProvider().GenesisSlot() + 1
 	})
 }
 
