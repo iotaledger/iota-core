@@ -27,6 +27,9 @@ func NewLedgerOutput(o *utxoledger.Output) (*inx.LedgerOutput, error) {
 		Output: &inx.RawOutput{
 			Data: o.Bytes(),
 		},
+		OutputIdProof: &inx.RawOutputIDProof{
+			Data: o.ProofBytes(),
+		},
 	}
 
 	includedSlot := o.SlotBooked()
