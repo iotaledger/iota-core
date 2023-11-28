@@ -20,8 +20,7 @@ import (
 func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string, recipientWallet *Wallet, opts ...options.Option[builder.AccountOutputBuilder]) *iotago.SignedTransaction {
 	input := w.Output(inputName)
 
-	accountOutput := options.Apply(builder.NewAccountOutputBuilder(recipientWallet.Address(), input.BaseTokenAmount()).
-		Mana(MaxBlockManaCost(w.Node.Protocol.CommittedAPI().ProtocolParameters())),
+	accountOutput := options.Apply(builder.NewAccountOutputBuilder(recipientWallet.Address(), input.BaseTokenAmount()),
 		opts).MustBuild()
 
 	outputStates := iotago.Outputs[iotago.Output]{accountOutput}
@@ -424,21 +423,31 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 		panic(fmt.Sprintf("failed to calculate reward for output %s: %s", inputName, err))
 	}
 
+	accountOutput := builder.NewAccountOutputBuilderFromPrevious(inputAccount).
+		RemoveFeature(iotago.FeatureStaking).
+		Mana(input.StoredMana() + rewardMana).
+		MustBuild()
+
 	signedTransaction := w.CreateSignedTransactionWithOptions(
 		transactionName,
 		WithAccountInput(input),
 		WithRewardInput(
-			&iotago.RewardInput{Index: 1},
+			&iotago.RewardInput{Index: 0},
 			rewardMana,
 		),
+		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
+			AccountID: accountOutput.AccountID,
+		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithAllotAllManaToAccount(w.currentSlot, inputAccount.AccountID),
+		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
 	)
 
 	return signedTransaction
 }
+
 func (w *Wallet) AllotManaFromInputs(transactionName string, allotments iotago.Allotments, inputNames ...string) *iotago.SignedTransaction {
 	inputStates := make([]*utxoledger.Output, 0, len(inputNames))
 	outputStates := make(iotago.Outputs[iotago.Output], 0, len(inputNames))
