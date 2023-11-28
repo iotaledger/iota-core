@@ -545,15 +545,20 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 		switch spentOutput.OutputType() {
 		case iotago.OutputAccount:
 			consumedAccount, _ := spentOutput.Output().(*iotago.AccountOutput)
+			accountID := consumedAccount.AccountID
+			if accountID == iotago.EmptyAccountID {
+				accountID = iotago.AccountIDFromOutputID(spentOutput.OutputID())
+			}
+
 			// if we transition / destroy an account output that doesn't have a block issuer feature or staking, we don't need to track the changes.
 			if consumedAccount.FeatureSet().BlockIssuer() == nil && consumedAccount.FeatureSet().Staking() == nil {
 				return true
 			}
-			consumedAccounts[consumedAccount.AccountID] = spentOutput
+			consumedAccounts[accountID] = spentOutput
 
 			// if we have consumed accounts that are not created in the same slot, we need to track them as destroyed
-			if _, exists := createdAccounts[consumedAccount.AccountID]; !exists {
-				destroyedAccounts.Add(consumedAccount.AccountID)
+			if _, exists := createdAccounts[accountID]; !exists {
+				destroyedAccounts.Add(accountID)
 			}
 
 		case iotago.OutputDelegation:
