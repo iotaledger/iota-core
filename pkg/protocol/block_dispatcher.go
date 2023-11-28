@@ -80,7 +80,7 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
 	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
 		e := engine
 		if engine != nil && !engine.WasShutdown() {
-			// Lock access to the engine while it's being reset, so that no new blocks enter the dataflow.
+			// The engine is locked while it's being reset, so that no new blocks enter the dataflow, here we make sure that this process is exclusive
 			e.RLock()
 			defer e.RUnlock()
 
