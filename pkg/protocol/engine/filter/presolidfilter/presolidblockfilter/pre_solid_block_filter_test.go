@@ -1,4 +1,4 @@
-package blockfilter
+package presolidblockfilter
 
 import (
 	"testing"

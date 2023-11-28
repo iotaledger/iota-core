@@ -13,8 +13,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
@@ -43,7 +43,7 @@ func WithChainSwitchingThreshold(threshold int) options.Option[Protocol] {
 	}
 }
 
-func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, filter.PreSolidFilter]) options.Option[Protocol] {
+func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.optsFilterProvider = optsFilterProvider
 	}

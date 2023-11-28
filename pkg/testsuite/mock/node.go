@@ -22,8 +22,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -311,7 +311,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		fmt.Printf("%s > [%s] PreSolidFilter.BlockPreAllowed: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	events.Filter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		fmt.Printf("%s > [%s] PreSolidFilter.BlockPreFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
 		if failOnBlockFiltered {
 			n.Testing.Fatal("no blocks should be prefiltered")

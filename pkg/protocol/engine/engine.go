@@ -27,8 +27,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
@@ -47,7 +47,7 @@ import (
 type Engine struct {
 	Events              *Events
 	Storage             *storage.Storage
-	Filter              filter.PreSolidFilter
+	Filter              presolidfilter.PreSolidFilter
 	PostSolidFilter     postsolidfilter.PostSolidFilter
 	EvictionState       *eviction.State
 	BlockRequester      *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
@@ -89,7 +89,7 @@ func New(
 	workers *workerpool.Group,
 	errorHandler func(error),
 	storageInstance *storage.Storage,
-	filterProvider module.Provider[*Engine, filter.PreSolidFilter],
+	filterProvider module.Provider[*Engine, presolidfilter.PreSolidFilter],
 	postSolidFilterProvider module.Provider[*Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],

@@ -1,4 +1,4 @@
-package blockfilter
+package presolidblockfilter
 
 import (
 	"time"
@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -23,7 +23,7 @@ var (
 
 // PreSolidBlockFilter filters blocks.
 type PreSolidBlockFilter struct {
-	events *filter.Events
+	events *presolidfilter.Events
 
 	apiProvider iotago.APIProvider
 
@@ -34,8 +34,8 @@ type PreSolidBlockFilter struct {
 	module.Module
 }
 
-func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*engine.Engine, filter.PreSolidFilter] {
-	return module.Provide(func(e *engine.Engine) filter.PreSolidFilter {
+func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*engine.Engine, presolidfilter.PreSolidFilter] {
+	return module.Provide(func(e *engine.Engine) presolidfilter.PreSolidFilter {
 		f := New(e, opts...)
 		f.TriggerConstructed()
 
@@ -51,12 +51,12 @@ func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*e
 	})
 }
 
-var _ filter.PreSolidFilter = new(PreSolidBlockFilter)
+var _ presolidfilter.PreSolidFilter = new(PreSolidBlockFilter)
 
 // New creates a new PreSolidBlockFilter.
 func New(apiProvider iotago.APIProvider, opts ...options.Option[PreSolidBlockFilter]) *PreSolidBlockFilter {
 	return options.Apply(&PreSolidBlockFilter{
-		events:      filter.NewEvents(),
+		events:      presolidfilter.NewEvents(),
 		apiProvider: apiProvider,
 	}, opts,
 		(*PreSolidBlockFilter).TriggerConstructed,
@@ -69,7 +69,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 	// Verify the block's version corresponds to the protocol version for the slot.
 	apiForSlot := f.apiProvider.APIForSlot(block.ID().Slot())
 	if apiForSlot.Version() != block.ProtocolBlock().Header.ProtocolVersion {
-		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+		f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 			Block:  block,
 			Reason: ierrors.Wrapf(ErrInvalidBlockVersion, "invalid protocol version %d (expected %d) for epoch %d", block.ProtocolBlock().Header.ProtocolVersion, apiForSlot.Version(), apiForSlot.TimeProvider().EpochFromSlot(block.ID().Slot())),
 			Source: source,
@@ -81,7 +81,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 	// Verify the timestamp is not too far in the future.
 	timeDelta := time.Since(block.ProtocolBlock().Header.IssuingTime)
 	if timeDelta < -f.optsMaxAllowedWallClockDrift {
-		f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+		f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 			Block:  block,
 			Reason: ierrors.Wrapf(ErrBlockTimeTooFarAheadInFuture, "issuing time ahead %s vs %s allowed", -timeDelta, f.optsMaxAllowedWallClockDrift),
 			Source: source,
@@ -94,7 +94,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 		blockSlot := block.ProtocolBlock().API.TimeProvider().SlotFromTime(block.ProtocolBlock().Header.IssuingTime)
 		committee, exists := f.committeeFunc(blockSlot)
 		if !exists {
-			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+			f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 				Block:  block,
 				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "no committee for slot %d", blockSlot),
 				Source: source,
@@ -104,7 +104,7 @@ func (f *PreSolidBlockFilter) ProcessReceivedBlock(block *model.Block, source pe
 		}
 
 		if !committee.HasAccount(block.ProtocolBlock().Header.IssuerID) {
-			f.events.BlockPreFiltered.Trigger(&filter.BlockPreFilteredEvent{
+			f.events.BlockPreFiltered.Trigger(&presolidfilter.BlockPreFilteredEvent{
 				Block:  block,
 				Reason: ierrors.Wrapf(ErrValidatorNotInCommittee, "validation block issuer %s is not part of the committee for slot %d", block.ProtocolBlock().Header.IssuerID, blockSlot),
 				Source: source,

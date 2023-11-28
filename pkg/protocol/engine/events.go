@@ -11,8 +11,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -30,7 +30,7 @@ type Events struct {
 	StoragePruned          *event.Event1[iotago.EpochIndex]
 
 	EvictionState   *eviction.Events
-	Filter          *filter.Events
+	Filter          *presolidfilter.Events
 	PostSolidFilter *postsolidfilter.Events
 	BlockRequester  *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
 	TipManager      *tipmanager.Events
@@ -57,7 +57,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		AcceptedBlockProcessed: event.New1[*blocks.Block](),
 		StoragePruned:          event.New1[iotago.EpochIndex](),
 		EvictionState:          eviction.NewEvents(),
-		Filter:                 filter.NewEvents(),
+		Filter:                 presolidfilter.NewEvents(),
 		PostSolidFilter:        postsolidfilter.NewEvents(),
 		BlockRequester:         eventticker.NewEvents[iotago.SlotIndex, iotago.BlockID](),
 		TipManager:             tipmanager.NewEvents(),

@@ -21,9 +21,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter/presolidblockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
@@ -164,8 +164,8 @@ func provide(c *dig.Container) error {
 				slotattestation.NewProvider(),
 			),
 			protocol.WithFilterProvider(
-				blockfilter.NewProvider(
-					blockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
+				presolidblockfilter.NewProvider(
+					presolidblockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
 				),
 			),
 			protocol.WithUpgradeOrchestratorProvider(
@@ -196,7 +196,7 @@ func configure() error {
 		Component.LogDebugf("AcceptedBlockProcessed, blockID: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	deps.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		Component.LogDebugf("BlockPreFiltered, blockID: %s, reason: %s", event.Block.ID(), event.Reason.Error())
 	})
 

@@ -22,7 +22,7 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/serix"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
@@ -343,7 +343,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
 
-	defer node.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	defer node.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if block.ID() != event.Block.ID() {
 			return
 		}

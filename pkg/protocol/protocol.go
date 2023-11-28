@@ -29,10 +29,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter/postsolidblockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter/presolidblockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -77,7 +77,7 @@ type Protocol struct {
 	optsChainManagerOptions []options.Option[chainmanager.Manager]
 	optsStorageOptions      []options.Option[storage.Storage]
 
-	optsFilterProvider              module.Provider[*engine.Engine, filter.PreSolidFilter]
+	optsFilterProvider              module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]
 	optsPostSolidFilterProvider     module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
 	optsBlockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	optsTipManagerProvider          module.Provider[*engine.Engine, tipmanager.TipManager]
@@ -106,7 +106,7 @@ func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options
 		Events:                          NewEvents(),
 		Workers:                         workers,
 		networkDispatcher:               dispatcher,
-		optsFilterProvider:              blockfilter.NewProvider(),
+		optsFilterProvider:              presolidblockfilter.NewProvider(),
 		optsPostSolidFilterProvider:     postsolidblockfilter.NewProvider(),
 		optsBlockDAGProvider:            inmemoryblockdag.NewProvider(),
 		optsTipManagerProvider:          tipmanagerv1.NewProvider(),

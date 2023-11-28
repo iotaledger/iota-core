@@ -24,8 +24,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
@@ -55,7 +55,7 @@ type EngineManager struct {
 
 	storageOptions              []options.Option[storage.Storage]
 	engineOptions               []options.Option[engine.Engine]
-	filterProvider              module.Provider[*engine.Engine, filter.PreSolidFilter]
+	filterProvider              module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]
 	postSolidFilterProvider     module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
 	blockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	bookerProvider              module.Provider[*engine.Engine, booker.Booker]
@@ -81,7 +81,7 @@ func New(
 	dbVersion byte,
 	storageOptions []options.Option[storage.Storage],
 	engineOptions []options.Option[engine.Engine],
-	filterProvider module.Provider[*engine.Engine, filter.PreSolidFilter],
+	filterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter],
 	postSolidFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],
