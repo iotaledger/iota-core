@@ -47,7 +47,7 @@ import (
 type Engine struct {
 	Events              *Events
 	Storage             *storage.Storage
-	Filter              presolidfilter.PreSolidFilter
+	PreSolidFilter      presolidfilter.PreSolidFilter
 	PostSolidFilter     postsolidfilter.PostSolidFilter
 	EvictionState       *eviction.State
 	BlockRequester      *eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]
@@ -89,7 +89,7 @@ func New(
 	workers *workerpool.Group,
 	errorHandler func(error),
 	storageInstance *storage.Storage,
-	filterProvider module.Provider[*Engine, presolidfilter.PreSolidFilter],
+	preSolidFilterProvider module.Provider[*Engine, presolidfilter.PreSolidFilter],
 	postSolidFilterProvider module.Provider[*Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*Engine, booker.Booker],
@@ -143,7 +143,7 @@ func New(
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 			e.SybilProtection = sybilProtectionProvider(e)
 			e.BlockDAG = blockDAGProvider(e)
-			e.Filter = filterProvider(e)
+			e.PreSolidFilter = preSolidFilterProvider(e)
 			e.PostSolidFilter = postSolidFilterProvider(e)
 			e.Booker = bookerProvider(e)
 			e.Clock = clockProvider(e)
@@ -220,7 +220,7 @@ func New(
 }
 
 func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
-	e.Filter.ProcessReceivedBlock(block, source)
+	e.PreSolidFilter.ProcessReceivedBlock(block, source)
 	e.Events.BlockProcessed.Trigger(block.ID())
 }
 
@@ -245,7 +245,7 @@ func (e *Engine) Reset() {
 	e.Ledger.Reset()
 	e.PostSolidFilter.Reset()
 	e.BlockDAG.Reset()
-	e.Filter.Reset()
+	e.PreSolidFilter.Reset()
 	e.Retainer.Reset()
 	e.EvictionState.Reset()
 	e.BlockCache.Reset()
@@ -281,7 +281,7 @@ func (e *Engine) Shutdown() {
 		e.Ledger.Shutdown()
 		e.PostSolidFilter.Shutdown()
 		e.BlockDAG.Shutdown()
-		e.Filter.Shutdown()
+		e.PreSolidFilter.Shutdown()
 		e.Retainer.Shutdown()
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()

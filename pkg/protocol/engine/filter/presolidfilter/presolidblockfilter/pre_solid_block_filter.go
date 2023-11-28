@@ -40,7 +40,7 @@ func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*e
 		f.TriggerConstructed()
 
 		e.HookConstructed(func() {
-			e.Events.Filter.LinkTo(f.events)
+			e.Events.PreSolidFilter.LinkTo(f.events)
 			e.SybilProtection.HookInitialized(func() {
 				f.committeeFunc = e.SybilProtection.SeatManager().CommitteeInSlot
 			})

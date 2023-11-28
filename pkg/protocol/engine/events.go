@@ -30,7 +30,7 @@ type Events struct {
 	StoragePruned          *event.Event1[iotago.EpochIndex]
 
 	EvictionState   *eviction.Events
-	Filter          *presolidfilter.Events
+	PreSolidFilter  *presolidfilter.Events
 	PostSolidFilter *postsolidfilter.Events
 	BlockRequester  *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
 	TipManager      *tipmanager.Events
@@ -57,7 +57,7 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		AcceptedBlockProcessed: event.New1[*blocks.Block](),
 		StoragePruned:          event.New1[iotago.EpochIndex](),
 		EvictionState:          eviction.NewEvents(),
-		Filter:                 presolidfilter.NewEvents(),
+		PreSolidFilter:         presolidfilter.NewEvents(),
 		PostSolidFilter:        postsolidfilter.NewEvents(),
 		BlockRequester:         eventticker.NewEvents[iotago.SlotIndex, iotago.BlockID](),
 		TipManager:             tipmanager.NewEvents(),

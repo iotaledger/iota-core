@@ -343,7 +343,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
 
-	defer node.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
+	defer node.Protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if block.ID() != event.Block.ID() {
 			return
 		}

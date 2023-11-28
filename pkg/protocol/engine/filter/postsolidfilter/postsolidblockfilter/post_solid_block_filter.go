@@ -170,7 +170,7 @@ func (c *PostSolidBlockFilter) evaluateBlock(block *blocks.Block) {
 			// Implicit Accounts can only have Block Issuer Keys of type Ed25519PublicKeyHashBlockIssuerKey.
 			bikPubKeyHash, isBikPubKeyHash := blockIssuerKey.(*iotago.Ed25519PublicKeyHashBlockIssuerKey)
 
-			// Filter the block if it's not a Block Issuer Key from an Implicit Account or if the Pub Key Hashes do not match.
+			// PreSolidFilter the block if it's not a Block Issuer Key from an Implicit Account or if the Pub Key Hashes do not match.
 			if !isBikPubKeyHash || bikPubKeyHash.PublicKeyHash != iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(signature.PublicKey[:]).PublicKeyHash {
 				c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
 					Block:  block,

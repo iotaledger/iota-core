@@ -163,7 +163,7 @@ func provide(c *dig.Container) error {
 			protocol.WithAttestationProvider(
 				slotattestation.NewProvider(),
 			),
-			protocol.WithFilterProvider(
+			protocol.WithPreSolidFilterProvider(
 				presolidblockfilter.NewProvider(
 					presolidblockfilter.WithMaxAllowedWallClockDrift(ParamsProtocol.Filter.MaxAllowedClockDrift),
 				),
@@ -196,11 +196,11 @@ func configure() error {
 		Component.LogDebugf("AcceptedBlockProcessed, blockID: %s", block.ID())
 	})
 
-	deps.Protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
+	deps.Protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		Component.LogDebugf("BlockPreFiltered, blockID: %s, reason: %s", event.Block.ID(), event.Reason.Error())
 	})
 
-	deps.Protocol.Events.Engine.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
+	deps.Protocol.Events.Engine.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
 		Component.LogDebugf("BlockPreAllowed, blockID: %s", block.ID())
 	})
 

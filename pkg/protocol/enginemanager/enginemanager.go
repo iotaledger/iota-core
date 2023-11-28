@@ -55,7 +55,7 @@ type EngineManager struct {
 
 	storageOptions              []options.Option[storage.Storage]
 	engineOptions               []options.Option[engine.Engine]
-	filterProvider              module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]
+	preSolidFilterProvider      module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]
 	postSolidFilterProvider     module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
 	blockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	bookerProvider              module.Provider[*engine.Engine, booker.Booker]
@@ -81,7 +81,7 @@ func New(
 	dbVersion byte,
 	storageOptions []options.Option[storage.Storage],
 	engineOptions []options.Option[engine.Engine],
-	filterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter],
+	preSolidFilterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter],
 	postSolidFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],
@@ -107,7 +107,7 @@ func New(
 		engineCreated:               event.New1[*engine.Engine](),
 		storageOptions:              storageOptions,
 		engineOptions:               engineOptions,
-		filterProvider:              filterProvider,
+		preSolidFilterProvider:      preSolidFilterProvider,
 		postSolidFilterProvider:     postSolidFilterProvider,
 		blockDAGProvider:            blockDAGProvider,
 		bookerProvider:              bookerProvider,
@@ -222,7 +222,7 @@ func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storag
 	newEngine := engine.New(e.workers.CreateGroup(engineAlias),
 		errorHandler,
 		storage,
-		e.filterProvider,
+		e.preSolidFilterProvider,
 		e.postSolidFilterProvider,
 		e.blockDAGProvider,
 		e.bookerProvider,

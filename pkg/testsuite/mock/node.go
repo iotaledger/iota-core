@@ -307,11 +307,11 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
-	events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
+	events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
 		fmt.Printf("%s > [%s] PreSolidFilter.BlockPreAllowed: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.Filter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
+	events.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		fmt.Printf("%s > [%s] PreSolidFilter.BlockPreFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
 		if failOnBlockFiltered {
 			n.Testing.Fatal("no blocks should be prefiltered")

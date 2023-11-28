@@ -43,9 +43,9 @@ func WithChainSwitchingThreshold(threshold int) options.Option[Protocol] {
 	}
 }
 
-func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]) options.Option[Protocol] {
+func WithPreSolidFilterProvider(optsPreSolidFilterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.optsFilterProvider = optsFilterProvider
+		p.optsPreSolidFilterProvider = optsPreSolidFilterProvider
 	}
 }
 

@@ -68,7 +68,7 @@ func (i *BlockHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mode
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook()
 
-	defer i.protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
+	defer i.protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if block.ID() != event.Block.ID() {
 			return
 		}
