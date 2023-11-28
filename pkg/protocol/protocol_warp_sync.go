@@ -167,10 +167,24 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			//   1. Mark all transactions as accepted
 			//   2. Mark all blocks as accepted
 			//   3. Force commitment of the slot
-			var bookedBlocks atomic.Uint32
-			var notarizedBlocks atomic.Uint32
-
 			forceCommitmentFunc := func() {
+				// 1. Mark all transactions as accepted
+				for _, transactionID := range transactionIDs {
+					targetEngine.Ledger.ConflictDAG().SetAccepted(transactionID)
+				}
+
+				// 2. Mark all blocks as accepted
+				for _, blockIDs := range blockIDsBySlotCommitment {
+					for _, blockID := range blockIDs {
+						block, exists := targetEngine.BlockCache.Block(blockID)
+						if !exists { // this should never happen as we just booked these blocks in this slot.
+							continue
+						}
+
+						targetEngine.BlockGadget.SetAccepted(block)
+					}
+				}
+
 				// 3. Force commitment of the slot
 				producedCommitment, err := targetEngine.Notarization.ForceCommit(commitmentID.Slot())
 				if err != nil {
@@ -188,6 +202,8 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			}
 
 			commitment.IsFullyBooked.OnUpdateOnce(func(_ bool, _ bool) {
+				// Let's assume that MCA is 5: when we want to book 15, we expect to have the commitment of 10 to load
+				// accounts from it, hence why we make committable the slot at - MCA + 1 with respect of the current slot.
 				minimumCommittableAge := w.protocol.APIForSlot(commitmentID.Slot()).ProtocolParameters().MinCommittableAge()
 				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - minimumCommittableAge + 1); exists {
 					committableCommitment.IsCommittable.Set(true)
@@ -204,35 +220,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				return blocksToWarpSync
 			}
 
-			blockBookedFunc := func(_ bool, _ bool) {
-				if bookedBlocks.Add(1) != totalBlocks {
-					return
-				}
-
-				// 1. Mark all transactions as accepted
-				for _, transactionID := range transactionIDs {
-					targetEngine.Ledger.ConflictDAG().SetAccepted(transactionID)
-				}
-
-				// 2. Mark all blocks as accepted
-				for _, blockIDs := range blockIDsBySlotCommitment {
-					for _, blockID := range blockIDs {
-						block, exists := targetEngine.BlockCache.Block(blockID)
-						if !exists { // this should never happen as we just booked these blocks in this slot.
-							continue
-						}
-
-						targetEngine.BlockGadget.SetAccepted(block)
-
-						block.Notarized().OnUpdate(func(_ bool, _ bool) {
-							if notarizedBlocks.Add(1) == totalBlocks {
-								commitment.IsFullyBooked.Set(true)
-							}
-						})
-					}
-				}
-			}
-
+			var bookedBlocks atomic.Uint32
 			blocksToWarpSync = ds.NewSet[iotago.BlockID]()
 			for slotCommitmentID, blockIDs := range blockIDsBySlotCommitment {
 				for _, blockID := range blockIDs {
@@ -252,7 +240,13 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 					// block cache and thus if not root blocks no block in the next slot can become solid.
 					targetEngine.EvictionState.AddRootBlock(block.ID(), slotCommitmentID)
 
-					block.Booked().OnUpdate(blockBookedFunc)
+					block.Booked().OnUpdate(func(_ bool, _ bool) {
+						if bookedBlocks.Add(1) != totalBlocks {
+							return
+						}
+
+						commitment.IsFullyBooked.Set(true)
+					})
 				}
 			}
 
