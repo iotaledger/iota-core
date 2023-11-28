@@ -6,26 +6,22 @@ import (
 )
 
 type BlockMetadata struct {
-	BlockID                  iotago.BlockID
-	BlockState               api.BlockState
-	BlockFailureReason       api.BlockFailureReason
+	BlockID            iotago.BlockID
+	BlockState         api.BlockState
+	BlockFailureReason api.BlockFailureReason
+
+	TransactionID            iotago.TransactionID
 	TransactionState         api.TransactionState
 	TransactionFailureReason api.TransactionFailureReason
 }
 
 func (b *BlockMetadata) BlockMetadataResponse() *api.BlockMetadataResponse {
-	response := &api.BlockMetadataResponse{
-		BlockID:                  b.BlockID,
-		BlockState:               b.BlockState.String(),
-		BlockFailureReason:       b.BlockFailureReason,
-		TransactionFailureReason: b.TransactionFailureReason,
+	return &api.BlockMetadataResponse{
+		BlockID:             b.BlockID,
+		BlockState:          b.BlockState.String(),
+		BlockFailureReason:  b.BlockFailureReason,
+		TransactionMetadata: b.TransactionMetadataResponse(),
 	}
-
-	if b.TransactionState != api.TransactionStateNoTransaction {
-		response.TransactionState = b.TransactionState.String()
-	}
-
-	return response
 }
 
 func (b *BlockMetadata) TransactionMetadataResponse() *api.TransactionMetadataResponse {
@@ -33,10 +29,9 @@ func (b *BlockMetadata) TransactionMetadataResponse() *api.TransactionMetadataRe
 		return nil
 	}
 
-	response := &api.TransactionMetadataResponse{
+	return &api.TransactionMetadataResponse{
+		TransactionID:            b.TransactionID,
 		TransactionState:         b.TransactionState.String(),
 		TransactionFailureReason: b.TransactionFailureReason,
 	}
-
-	return response
 }

@@ -354,7 +354,7 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 		active := activeCandidates.Has(candidate)
 		validatorResp = append(validatorResp, &api.ValidatorResponse{
 			AddressBech32:                  accountData.ID.ToAddress().Bech32(o.apiProvider.CommittedAPI().ProtocolParameters().Bech32HRP()),
-			StakingEpochEnd:                accountData.StakeEndEpoch,
+			StakingEndEpoch:                accountData.StakeEndEpoch,
 			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 			ValidatorStake:                 accountData.ValidatorStake,
 			FixedCost:                      accountData.FixedCost,

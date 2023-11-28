@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
@@ -83,57 +84,53 @@ func outputWithMetadataByID(c echo.Context) (*api.OutputWithMetadataResponse, er
 func newOutputMetadataResponse(output *utxoledger.Output) (*api.OutputMetadata, error) {
 	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
 
-	resp := &api.OutputMetadata{
-		BlockID:            output.BlockID(),
-		TransactionID:      output.OutputID().TransactionID(),
-		OutputIndex:        output.OutputID().Index(),
-		IsSpent:            false,
-		LatestCommitmentID: latestCommitment.ID(),
-	}
-
 	includedSlotIndex := output.SlotBooked()
-	genesisSlot := deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot()
-	if includedSlotIndex <= latestCommitment.Slot() && includedSlotIndex >= genesisSlot {
+	includedCommitmentID := iotago.EmptyCommitmentID
+
+	if includedSlotIndex <= latestCommitment.Slot() &&
+		includedSlotIndex >= deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot() {
 		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlotIndex, err)
 		}
-		resp.IncludedCommitmentID = includedCommitment.ID()
+		includedCommitmentID = includedCommitment.ID()
 	}
 
-	return resp, nil
+	return &api.OutputMetadata{
+		OutputID: output.OutputID(),
+		BlockID:  output.BlockID(),
+		Included: &api.OutputInclusionMetadata{
+			Slot:          includedSlotIndex,
+			TransactionID: output.OutputID().TransactionID(),
+			CommitmentID:  includedCommitmentID,
+		},
+		LatestCommitmentID: latestCommitment.ID(),
+	}, nil
 }
 
 func newSpentMetadataResponse(spent *utxoledger.Spent) (*api.OutputMetadata, error) {
-	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
-
-	resp := &api.OutputMetadata{
-		BlockID:            spent.BlockID(),
-		TransactionID:      spent.OutputID().TransactionID(),
-		OutputIndex:        spent.OutputID().Index(),
-		IsSpent:            true,
-		TransactionIDSpent: spent.TransactionIDSpent(),
-		LatestCommitmentID: latestCommitment.ID(),
-	}
-
-	includedSlotIndex := spent.Output().SlotBooked()
-	genesisSlot := deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot()
-	if includedSlotIndex <= latestCommitment.Slot() && includedSlotIndex >= genesisSlot {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlotIndex)
-		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlotIndex, err)
-		}
-		resp.IncludedCommitmentID = includedCommitment.ID()
+	newOutputMetadataResponse, err := newOutputMetadataResponse(spent.Output())
+	if err != nil {
+		return nil, err
 	}
 
 	spentSlotIndex := spent.SlotSpent()
-	if spentSlotIndex <= latestCommitment.Slot() && spentSlotIndex >= genesisSlot {
+	spentCommitmentID := iotago.EmptyCommitmentID
+
+	if spentSlotIndex <= newOutputMetadataResponse.LatestCommitmentID.Slot() &&
+		spentSlotIndex >= deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot() {
 		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlotIndex)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", spentSlotIndex, err)
 		}
-		resp.CommitmentIDSpent = spentCommitment.ID()
+		spentCommitmentID = spentCommitment.ID()
 	}
 
-	return resp, nil
+	newOutputMetadataResponse.Spent = &api.OutputConsumptionMetadata{
+		Slot:          spentSlotIndex,
+		TransactionID: spent.TransactionIDSpent(),
+		CommitmentID:  spentCommitmentID,
+	}
+
+	return newOutputMetadataResponse, nil
 }
