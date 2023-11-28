@@ -150,9 +150,8 @@ func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[strin
 			PoolRewards: iotago.Mana(poolRewards),
 			FixedCost:   action.FixedCost,
 		}
-		fmt.Println(poolRewards, poolRewardsFloat)
-		require.InEpsilon(t.T, poolRewards, poolRewardsFloat, 0.01)
 
+		require.InEpsilon(t.T, poolRewards, poolRewardsFloat, 0.01)
 	}
 }
 
@@ -272,15 +271,15 @@ func (t *TestSuite) calculatePoolRewardFloat(epoch iotago.EpochIndex, totalValid
 	poolStakeFloat := float64(poolStake)
 	validatorStakeFloat := float64(validatorStake)
 	performanceFactorFloat := float64(performanceFactor) / float64(params.ValidationBlocksPerSlot())
-	//theta := float64(params.RewardsParameters().ManaShareCoefficient)
-	//S := float64(params.TokenSupply())
-	//gamma := float64(params.ManaParameters().GenerationRate) * math.Pow(2.0, -float64(params.ManaParameters().GenerationRateExponent))
+	// theta := float64(params.RewardsParameters().ManaShareCoefficient)
+	// S := float64(params.TokenSupply())
+	// gamma := float64(params.ManaParameters().GenerationRate) * math.Pow(2.0, -float64(params.ManaParameters().GenerationRateExponent))
 	d := math.Pow(2.0, float64(params.SlotsPerEpochExponent()))
 	betaDelta := d * float64(params.SlotDurationInSeconds()) / 3.0 / (365 * 24 * 60 * 60)
 
 	targetRewardFloat := float64(t.api.ComputedFinalReward())
 
-	//targetRewardFloat := theta * S * gamma * d
+	// targetRewardFloat := theta * S * gamma * d
 	if epoch <= params.RewardsParameters().BootstrappingDuration {
 		targetRewardFloat = float64(t.api.ComputedInitialReward()) * math.Exp(-betaDelta*float64(epoch))
 		//	targetRewardFloat = targetRewardFloat * betaDelta * math.Exp(1) / (1 - math.Exp(-betaDelta)) * math.Exp(-betaDelta*float64(epoch))
