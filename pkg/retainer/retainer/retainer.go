@@ -8,7 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
@@ -67,7 +67,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			}
 		}, asyncOpt)
 
-		e.Events.CommitmentFilter.BlockFiltered.Hook(func(e *commitmentfilter.BlockFilteredEvent) {
+		e.Events.PostSolidFilter.BlockFiltered.Hook(func(e *postsolidfilter.BlockFilteredEvent) {
 			r.RetainBlockFailure(e.Block.ID(), determineBlockFailureReason(e.Reason))
 		}, asyncOpt)
 
@@ -161,12 +161,13 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 		blockStatus = api.BlockStatePending
 	}
 
-	txStatus, txFailureReason := r.transactionStatus(blockID)
+	txID, txStatus, txFailureReason := r.transactionStatus(blockID)
 
 	return &retainer.BlockMetadata{
 		BlockID:                  blockID,
 		BlockState:               blockStatus,
 		BlockFailureReason:       blockFailureReason,
+		TransactionID:            txID,
 		TransactionState:         txStatus,
 		TransactionFailureReason: txFailureReason,
 	}, nil
@@ -239,16 +240,16 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (api.BlockState, api.Bloc
 	return blockData.State, blockData.FailureReason
 }
 
-func (r *Retainer) transactionStatus(blockID iotago.BlockID) (api.TransactionState, api.TransactionFailureReason) {
+func (r *Retainer) transactionStatus(blockID iotago.BlockID) (iotago.TransactionID, api.TransactionState, api.TransactionFailureReason) {
 	store, err := r.store(blockID.Slot())
 	if err != nil {
 		r.errorHandler(ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot()))
-		return api.TransactionStateNoTransaction, api.TxFailureNone
+		return iotago.EmptyTransactionID, api.TransactionStateNoTransaction, api.TxFailureNone
 	}
 
 	txData, exists := store.GetTransaction(blockID)
 	if !exists {
-		return api.TransactionStateNoTransaction, api.TxFailureNone
+		return iotago.EmptyTransactionID, api.TransactionStateNoTransaction, api.TxFailureNone
 	}
 
 	// for confirmed and finalized we need to check for the block status
@@ -257,13 +258,13 @@ func (r *Retainer) transactionStatus(blockID iotago.BlockID) (api.TransactionSta
 
 		switch blockState {
 		case api.BlockStateConfirmed:
-			return api.TransactionStateConfirmed, api.TxFailureNone
+			return txData.TransactionID, api.TransactionStateConfirmed, api.TxFailureNone
 		case api.BlockStateFinalized:
-			return api.TransactionStateFinalized, api.TxFailureNone
+			return txData.TransactionID, api.TransactionStateFinalized, api.TxFailureNone
 		}
 	}
 
-	return txData.State, txData.FailureReason
+	return txData.TransactionID, txData.State, txData.FailureReason
 }
 
 func (r *Retainer) onBlockAttached(blockID iotago.BlockID) error {

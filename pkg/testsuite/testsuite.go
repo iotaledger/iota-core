@@ -151,8 +151,9 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 			}),
 		}
 		t.optsSnapshotOptions = append(defaultSnapshotOptions, t.optsSnapshotOptions...)
-		// TODO: set this to protocolParams.GenesisSlot() when this is added.
-		t.currentSlot = 0
+
+		// The first valid slot is always +1 of the genesis slot.
+		t.currentSlot = t.API.TimeProvider().GenesisSlot() + 1
 	})
 }
 
@@ -364,7 +365,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
 			StakedAmount:         walletOptions.Amount,
-			StakingEpochEnd:      iotago.MaxEpochIndex,
+			StakingEndEpoch:      iotago.MaxEpochIndex,
 			FixedCost:            iotago.Mana(0),
 			AccountID:            node.Validator.AccountID,
 		}

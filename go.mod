@@ -10,22 +10,22 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20231110191152-7135670285dc
-	github.com/iotaledger/hive.go/app v0.0.0-20231113110812-4ca2b6cc9a42
-	github.com/iotaledger/hive.go/constraints v0.0.0-20231122112629-bdf1cc39fba7
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231113110812-4ca2b6cc9a42
-	github.com/iotaledger/hive.go/crypto v0.0.0-20231122112629-bdf1cc39fba7
-	github.com/iotaledger/hive.go/ds v0.0.0-20231124134854-9ec596cfd9ff
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20231122112629-bdf1cc39fba7
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20231110191152-7135670285dc
-	github.com/iotaledger/hive.go/lo v0.0.0-20231122112629-bdf1cc39fba7
-	github.com/iotaledger/hive.go/logger v0.0.0-20231113110812-4ca2b6cc9a42
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231122112629-bdf1cc39fba7
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231113110812-4ca2b6cc9a42
-	github.com/iotaledger/hive.go/stringify v0.0.0-20231122112629-bdf1cc39fba7
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231123103852-bb039cbab83b
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231123103318-f6ea945e2e98
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231124103306-ad44904e2b86
+	github.com/iotaledger/hive.go/ads v0.0.0-20231127134220-90b88e35bdb2
+	github.com/iotaledger/hive.go/app v0.0.0-20231127134220-90b88e35bdb2
+	github.com/iotaledger/hive.go/constraints v0.0.0-20231128121006-331a9e522dfe
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231127134220-90b88e35bdb2
+	github.com/iotaledger/hive.go/crypto v0.0.0-20231128121006-331a9e522dfe
+	github.com/iotaledger/hive.go/ds v0.0.0-20231127134220-90b88e35bdb2
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20231128121006-331a9e522dfe
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20231127134220-90b88e35bdb2
+	github.com/iotaledger/hive.go/lo v0.0.0-20231128121006-331a9e522dfe
+	github.com/iotaledger/hive.go/logger v0.0.0-20231127134220-90b88e35bdb2
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231128121006-331a9e522dfe
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231127134220-90b88e35bdb2
+	github.com/iotaledger/hive.go/stringify v0.0.0-20231128121006-331a9e522dfe
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231128163614-c82e1fa40733
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231128162307-cc6b309e93ef
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231128162016-23f1b4e12cec
 	github.com/labstack/echo/v4 v4.11.3
 	github.com/labstack/gommon v0.4.1
 	github.com/libp2p/go-libp2p v0.32.0
@@ -41,7 +41,7 @@ require (
 	github.com/zyedidia/generic v1.2.1
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.1
-	golang.org/x/crypto v0.15.0
+	golang.org/x/crypto v0.16.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
@@ -85,11 +85,11 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
-	github.com/holiman/uint256 v1.2.3 // indirect
+	github.com/holiman/uint256 v1.2.4 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/hive.go/log v0.0.0-20231110191152-7135670285dc // indirect
+	github.com/iotaledger/hive.go/log v0.0.0-20231127134220-90b88e35bdb2 // indirect
 	github.com/ipfs/boxo v0.13.1 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
@@ -171,14 +171,14 @@ require (
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/image v0.13.0 // indirect
 	golang.org/x/mod v0.13.0 // indirect
-	golang.org/x/net v0.18.0 // indirect
+	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.4.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
 	gonum.org/v1/gonum v0.14.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20231127180814-3a041ad873d4 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect

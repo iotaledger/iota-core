@@ -1,4 +1,4 @@
-package commitmentfilter
+package postsolidfilter
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"

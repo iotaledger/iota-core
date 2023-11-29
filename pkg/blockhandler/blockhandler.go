@@ -11,7 +11,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -78,7 +78,7 @@ func (i *BlockHandler) SubmitBlockAndAwaitEvent(ctx context.Context, block *mode
 		}
 	}, event.WithWorkerPool(i.workerPool)).Unhook
 
-	prefilteredUnhook := i.protocol.Events.Engine.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
+	prefilteredUnhook := i.protocol.Events.Engine.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
 		if blockID != event.Block.ID() {
 			return
 		}
