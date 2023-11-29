@@ -6,37 +6,32 @@ import (
 )
 
 type BlockMetadata struct {
-	BlockID                  iotago.BlockID
-	BlockState               api.BlockState
-	BlockFailureReason       api.BlockFailureReason
+	BlockID            iotago.BlockID
+	BlockState         api.BlockState
+	BlockFailureReason api.BlockFailureReason
+
+	TransactionID            iotago.TransactionID
 	TransactionState         api.TransactionState
 	TransactionFailureReason api.TransactionFailureReason
 }
 
-func (b *BlockMetadata) BlockMetadataResponse() *api.BlockMetadataResponse {
-	response := &api.BlockMetadataResponse{
-		BlockID:                  b.BlockID,
-		BlockState:               b.BlockState.String(),
-		BlockFailureReason:       b.BlockFailureReason,
-		TransactionFailureReason: b.TransactionFailureReason,
+func (m *BlockMetadata) BlockMetadataResponse() *api.BlockMetadataResponse {
+	return &api.BlockMetadataResponse{
+		BlockID:             m.BlockID,
+		BlockState:          m.BlockState.String(),
+		BlockFailureReason:  m.BlockFailureReason,
+		TransactionMetadata: m.TransactionMetadataResponse(),
 	}
-
-	if b.TransactionState != api.TransactionStateNoTransaction {
-		response.TransactionState = b.TransactionState.String()
-	}
-
-	return response
 }
 
-func (b *BlockMetadata) TransactionMetadataResponse() *api.TransactionMetadataResponse {
-	if b.TransactionState == api.TransactionStateNoTransaction {
+func (m *BlockMetadata) TransactionMetadataResponse() *api.TransactionMetadataResponse {
+	if m.TransactionState == api.TransactionStateNoTransaction {
 		return nil
 	}
 
-	response := &api.TransactionMetadataResponse{
-		TransactionState:         b.TransactionState.String(),
-		TransactionFailureReason: b.TransactionFailureReason,
+	return &api.TransactionMetadataResponse{
+		TransactionID:            m.TransactionID,
+		TransactionState:         m.TransactionState.String(),
+		TransactionFailureReason: m.TransactionFailureReason,
 	}
-
-	return response
 }

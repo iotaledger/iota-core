@@ -89,7 +89,7 @@ func blockIssuance() (*api.IssuanceBlockHeaderResponse, error) {
 		WeakParents:         references[iotago.WeakParentType],
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType],
 		LatestFinalizedSlot: deps.Protocol.MainEngineInstance().SyncManager.LatestFinalizedSlot(),
-		Commitment:          deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Commitment(),
+		LatestCommitment:    deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Commitment(),
 	}
 
 	return resp, nil

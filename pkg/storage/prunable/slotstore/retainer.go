@@ -49,6 +49,7 @@ func BlockRetainerDataFromBytes(bytes []byte) (*BlockRetainerData, int, error) {
 }
 
 type TransactionRetainerData struct {
+	TransactionID iotago.TransactionID
 	State         api.TransactionState
 	FailureReason api.TransactionFailureReason
 }
@@ -56,6 +57,9 @@ type TransactionRetainerData struct {
 func (t *TransactionRetainerData) Bytes() ([]byte, error) {
 	byteBuffer := stream.NewByteBuffer(2)
 
+	if err := stream.Write(byteBuffer, t.TransactionID); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write transaction ID")
+	}
 	if err := stream.Write(byteBuffer, t.State); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write transaction state")
 	}
@@ -72,6 +76,9 @@ func TransactionRetainerDataFromBytes(bytes []byte) (*TransactionRetainerData, i
 	var err error
 	t := new(TransactionRetainerData)
 
+	if t.TransactionID, err = stream.Read[iotago.TransactionID](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read transaction ID")
+	}
 	if t.State, err = stream.Read[api.TransactionState](byteReader); err != nil {
 		return nil, 0, ierrors.Wrap(err, "failed to read transaction state")
 	}
