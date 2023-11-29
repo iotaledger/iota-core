@@ -34,9 +34,7 @@ export class Block {
     weakChildren: Array<string>;
     shallowLikeChildren: Array<string>;
     solid: boolean;
-    conflictIDs: Array<string>;
-    addedConflictIDs: Array<string>;
-    subtractedConflictIDs: Array<string>;
+    spendIDs: Array<string>;
     scheduled: boolean;
     booked: boolean;
     orphaned: boolean;
@@ -88,7 +86,7 @@ class OutputID {
 
 export class OutputMetadata {
     outputID: OutputID;
-    conflictIDs: Array<string>;
+    spendIDs: Array<string>;
     consumerCount: number;
     confirmedConsumer: string // tx id of confirmed consumer
     confirmationState: number
@@ -107,7 +105,7 @@ class OutputConsumers {
 
 class TransactionMetadata {
     transactionID: string;
-    conflictIDs: string[];
+    spendIDs: string[];
     booked: boolean;
     bookedTime: number;
     confirmationState: string;
@@ -119,38 +117,6 @@ class PendingMana {
     outputID: string;
     error: string;
     timestamp: number;
-}
-
-class Conflict {
-    id: string;
-    parents: Array<string>;
-    conflictIDs: Array<string>;
-    confirmationState: number;
-}
-
-class ConflictChildren {
-    conflictID: string;
-    childConflicts: Array<ConflictChild>
-}
-
-class ConflictChild {
-    conflictID: string;
-    type: string;
-}
-
-class ConflictConflict {
-    outputID: OutputID;
-    conflictIDs: Array<string>;
-}
-
-class ConflictConflicts {
-    conflictID: string;
-    conflicts: Array<ConflictConflict>
-}
-
-class ConflictVoters {
-    conflictID: string;
-    voters: Array<string>
 }
 
 class SlotInfo {
@@ -200,10 +166,6 @@ export class ExplorerStore {
     @observable outputMetadata: OutputMetadata = null;
     @observable outputConsumers: OutputConsumers = null;
     @observable pendingMana: PendingMana = null;
-    @observable conflict: Conflict = null;
-    @observable conflictChildren: ConflictChildren = null;
-    @observable conflictConflicts: ConflictConflicts = null;
-    @observable conflictVoters: ConflictVoters = null;
     @observable tips: Tips = null;
     @observable slotInfo: SlotInfo = new SlotInfo;
 
@@ -347,30 +309,6 @@ export class ExplorerStore {
     }
 
     @action
-    getConflict = async (id: string) => {
-        const res = await this.fetchJson<never, Conflict>("get", `/api/conflict/${id}`)
-        this.conflict = res;
-    }
-
-    @action
-    getConflictChildren = async (id: string) => {
-        const res = await this.fetchJson<never, ConflictChildren>("get", `/api/conflict/${id}/children`)
-        this.conflictChildren = res;
-    }
-
-    @action
-    getConflictConflicts = async (id: string) => {
-        const res = await this.fetchJson<never, ConflictConflicts>("get", `/api/conflict/${id}/conflicts`)
-        this.conflictConflicts = res;
-    }
-
-    @action
-    getConflictVoters = async (id: string) => {
-        const res = await this.fetchJson<never, ConflictVoters>("get", `/api/conflict/${id}/voters`)
-        this.conflictVoters = res;
-    }
-
-    @action
     getSlotInfo = async (id: string) => {
         const res = await this.fetchJson<never, SlotInfo>("get", `/api/slot/commitment/${id}`)
         this.slotInfo = res;
@@ -394,9 +332,6 @@ export class ExplorerStore {
         this.outputMetadata = null;
         this.outputConsumers = null;
         this.pendingMana = null;
-        this.conflict = null;
-        this.conflictChildren = null;
-        this.conflictConflicts = null;
         this.tips = null;
         this.slotInfo = new SlotInfo;
     };
@@ -411,9 +346,7 @@ export class ExplorerStore {
     @action
     updateBlock = (blk: Block) => {
         this.blk = blk;
-        this.blk.conflictIDs = this.blk.conflictIDs ? this.blk.conflictIDs : []
-        this.blk.addedConflictIDs = this.blk.addedConflictIDs ? this.blk.addedConflictIDs : []
-        this.blk.subtractedConflictIDs = this.blk.subtractedConflictIDs ? this.blk.subtractedConflictIDs : []
+        this.blk.spendIDs = this.blk.spendIDs ? this.blk.spendIDs : []
         this.blk.strongChildren = this.blk.strongChildren ? this.blk.strongChildren : []
         this.blk.weakChildren = this.blk.weakChildren ? this.blk.weakChildren : []
         this.blk.shallowLikeChildren = this.blk.shallowLikeChildren ? this.blk.shallowLikeChildren : []
