@@ -127,7 +127,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	node2 := ts.AddNode("node2")
 
 	ts.Run(true, nil)
-	node2.Protocol.SetLogLevel(log.LevelTrace)
+	node2.Protocol.SetLogLevel(log.LevelDebug)
 
 	// Issue up to slot 10, committing slot 8.
 	{

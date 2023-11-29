@@ -191,11 +191,11 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	})
 }
 
-func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engine.Engine, engineName string) {
+func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engine.Engine) {
 	events := instance.Events
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] BlockDAG.BlockAttached: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("BlockDAG.BlockAttached", "block", block.ID())
 
 		n.mutex.Lock()
 		defer n.mutex.Unlock()
@@ -203,78 +203,80 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 	})
 
 	events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] BlockDAG.BlockSolid: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("BlockDAG.BlockSolid", "block", block.ID())
 	})
 
 	events.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
-		fmt.Printf("%s > [%s] BlockDAG.BlockInvalid: %s - %s\n", n.Name, engineName, block.ID(), err)
+		instance.LogTrace("BlockDAG.BlockInvalid", "block", block.ID(), "err", err)
 	})
 
 	events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] BlockDAG.BlockMissing: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("BlockDAG.BlockMissing", "block", block.ID())
 	})
 
 	events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] BlockDAG.MissingBlockAttached: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("BlockDAG.MissingBlockAttached", "block", block.ID())
 	})
 
 	events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] SybilProtection.BlockProcessed: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("SeatManager.BlockProcessed", "block", block.ID())
 	})
 
 	events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Booker.BlockBooked: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("Booker.BlockBooked", "block", block.ID())
 	})
 
 	events.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
-		fmt.Printf("%s > [%s] Booker.BlockInvalid: %s - %s\n", n.Name, engineName, block.ID(), err.Error())
+		instance.LogTrace("Booker.BlockInvalid", "block", block.ID(), "err", err)
 	})
 
 	events.Booker.TransactionInvalid.Hook(func(metadata mempool.TransactionMetadata, err error) {
-		fmt.Printf("%s > [%s] Booker.TransactionInvalid: %s - %s\n", n.Name, engineName, metadata.ID(), err.Error())
+		instance.LogTrace("Booker.TransactionInvalid", "tx", metadata.ID(), "err", err)
 	})
 
 	events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Scheduler.BlockScheduled: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("Scheduler.BlockScheduled", "block", block.ID())
 	})
 
 	events.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Scheduler.BlockEnqueued: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("Scheduler.BlockEnqueued", "block", block.ID())
 	})
 
 	events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Scheduler.BlockSkipped: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("Scheduler.BlockSkipped", "block", block.ID())
 	})
 
 	events.Scheduler.BlockDropped.Hook(func(block *blocks.Block, err error) {
-		fmt.Printf("%s > [%s] Scheduler.BlockDropped: %s - %s\n", n.Name, engineName, block.ID(), err.Error())
+		instance.LogTrace("Scheduler.BlockDropped", "block", block.ID(), "err", err)
 	})
 
 	events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.AcceptedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
+		instance.LogTrace("Clock.AcceptedTimeUpdated", "time", newTime, "slot", instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
 	events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
-		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
+		instance.LogTrace("Clock.ConfirmedTimeUpdated", "time", newTime, "slot", instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
 	events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
-		fmt.Printf("%s > [%s] PreSolidFilter.BlockPreAllowed: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("PreSolidFilter.BlockPreAllowed", "block", block.ID())
 	})
 
 	events.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
-		fmt.Printf("%s > [%s] PreSolidFilter.BlockPreFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+		instance.LogTrace("PreSolidFilter.BlockPreFiltered", "block", event.Block.ID(), "err", event.Reason)
+
 		if failOnBlockFiltered {
 			n.Testing.Fatal("no blocks should be prefiltered")
 		}
 	})
 
 	events.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] PostSolidFilter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
+		instance.LogTrace("PostSolidFilter.BlockAllowed", "block", block.ID())
 	})
 
 	events.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
-		fmt.Printf("%s > [%s] PostSolidFilter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+		instance.LogTrace("PostSolidFilter.BlockFiltered", "block", event.Block.ID(), "err", event.Reason)
+
 		if failOnBlockFiltered {
 			n.Testing.Fatal("no blocks should be filtered")
 		}
@@ -285,11 +287,11 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 	})
 
 	events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
-		fmt.Printf("%s > [%s] BlockRequester.Tick: %s\n", n.Name, engineName, blockID)
+		instance.LogTrace("BlockRequester.Tick", "block", blockID)
 	})
 
 	events.BlockProcessed.Hook(func(blockID iotago.BlockID) {
-		fmt.Printf("%s > [%s] Engine.BlockProcessed: %s\n", n.Name, engineName, blockID)
+		instance.LogTrace("BlockProcessed", "block", blockID)
 	})
 
 	events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
@@ -316,109 +318,108 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 			require.NoError(n.Testing, err)
 		}
 
-		fmt.Printf("%s > [%s] NotarizationManager.SlotCommitted: %s %s Accepted Blocks: %s\n %s\n Attestations: %s\n", n.Name, engineName, details.Commitment.ID(), details.Commitment, acceptedBlocks, roots, attestationBlockIDs)
+		instance.LogTrace("NotarizationManager.SlotCommitted", "commitment", details.Commitment.ID(), "acceptedBlocks", acceptedBlocks, "roots", roots, "attestations", attestationBlockIDs)
 	})
 
 	events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-		fmt.Printf("%s > [%s] NotarizationManager.LatestCommitmentUpdated: %s\n", n.Name, engineName, commitment.ID())
+		instance.LogTrace("NotarizationManager.LatestCommitmentUpdated", "commitment", commitment.ID())
 	})
 
 	events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreAccepted: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().Header.SlotCommitmentID)
+		instance.LogTrace("BlockGadget.BlockPreAccepted", "block", block.ID(), "slotCommitmentID", block.ProtocolBlock().Header.SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockAccepted: %s @ slot %s committing to %s\n", n.Name, engineName, block.ID(), block.ID().Slot(), block.ProtocolBlock().Header.SlotCommitmentID)
+		instance.LogTrace("BlockGadget.BlockAccepted", "block", block.ID(), "slotCommitmentID", block.ProtocolBlock().Header.SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockPreConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().Header.SlotCommitmentID)
+		instance.LogTrace("BlockGadget.BlockPreConfirmed", "block", block.ID(), "slotCommitmentID", block.ProtocolBlock().Header.SlotCommitmentID)
 	})
 
 	events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] Consensus.BlockGadget.BlockConfirmed: %s %s\n", n.Name, engineName, block.ID(), block.ProtocolBlock().Header.SlotCommitmentID)
+		instance.LogTrace("BlockGadget.BlockConfirmed", "block", block.ID(), "slotCommitmentID", block.ProtocolBlock().Header.SlotCommitmentID)
 	})
 
 	events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
-		fmt.Printf("%s > [%s] Consensus.SlotGadget.SlotFinalized: %s\n", n.Name, engineName, slot)
+		instance.LogTrace("SlotGadget.SlotFinalized", "slot", slot)
 	})
 
 	events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
-		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatAdded: %d - %s\n", n.Name, engineName, seat, accountID)
+		instance.LogTrace("SybilProtection.OnlineCommitteeSeatAdded", "seat", seat, "accountID", accountID)
 	})
 
 	events.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
-		fmt.Printf("%s > [%s] SybilProtection.OnlineCommitteeSeatRemoved: %d\n", n.Name, engineName, seat)
+		instance.LogTrace("SybilProtection.OnlineCommitteeSeatRemoved", "seat", seat)
 	})
 
 	events.SybilProtection.CommitteeSelected.Hook(func(committee *account.Accounts, epoch iotago.EpochIndex) {
-		fmt.Printf("%s > [%s] SybilProtection.CommitteeSelected: epoch %d - %s\n", n.Name, engineName, epoch, committee.IDs())
+		instance.LogTrace("SybilProtection.CommitteeSelected", "epoch", epoch, "committee", committee.IDs())
 	})
 
 	events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictCreated: %s\n", n.Name, engineName, conflictID)
+		instance.LogTrace("ConflictDAG.ConflictCreated", "conflictID", conflictID)
 	})
 
 	events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictEvicted: %s\n", n.Name, engineName, conflictID)
+		instance.LogTrace("ConflictDAG.ConflictEvicted", "conflictID", conflictID)
 	})
+
 	events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictRejected: %s\n", n.Name, engineName, conflictID)
+		instance.LogTrace("ConflictDAG.ConflictRejected", "conflictID", conflictID)
 	})
 
 	events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
+		instance.LogTrace("ConflictDAG.ConflictAccepted", "conflictID", conflictID)
 	})
 
 	instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
-		fmt.Printf("%s > [%s] Ledger.TransactionAttached: %s\n", n.Name, engineName, transactionMetadata.ID())
+		instance.LogTrace("Ledger.TransactionAttached", "tx", transactionMetadata.ID())
 
 		transactionMetadata.OnSolid(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionSolid: %s\n", n.Name, engineName, transactionMetadata.ID())
+			instance.LogTrace("MemPool.TransactionSolid", "tx", transactionMetadata.ID())
 		})
 
 		transactionMetadata.OnExecuted(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionExecuted: %s\n", n.Name, engineName, transactionMetadata.ID())
+			instance.LogTrace("MemPool.TransactionExecuted", "tx", transactionMetadata.ID())
 		})
 
 		transactionMetadata.OnBooked(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionBooked: %s\n", n.Name, engineName, transactionMetadata.ID())
+			instance.LogTrace("MemPool.TransactionBooked", "tx", transactionMetadata.ID())
 		})
 
 		transactionMetadata.OnConflicting(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionConflicting: %s\n", n.Name, engineName, transactionMetadata.ID())
+			instance.LogTrace("MemPool.TransactionConflicting", "tx", transactionMetadata.ID())
 		})
 
 		transactionMetadata.OnAccepted(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionAccepted: %s\n", n.Name, engineName, transactionMetadata.ID())
+			instance.LogTrace("MemPool.TransactionAccepted", "tx", transactionMetadata.ID())
 		})
 
 		transactionMetadata.OnRejected(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionRejected: %s\n", n.Name, engineName, transactionMetadata.ID())
+			instance.LogTrace("MemPool.TransactionRejected", "tx", transactionMetadata.ID())
 		})
 
 		transactionMetadata.OnInvalid(func(err error) {
-			fmt.Printf("%s > [%s] MemPool.TransactionInvalid(%s): %s\n", n.Name, engineName, err, transactionMetadata.ID())
+			instance.LogTrace("MemPool.TransactionInvalid", "tx", transactionMetadata.ID(), "err", err)
 		})
 
 		transactionMetadata.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
-			fmt.Printf("%s > [%s] MemPool.TransactionOrphanedSlotUpdated in slot %d: %s\n", n.Name, engineName, slot, transactionMetadata.ID())
+			instance.LogTrace("MemPool.TransactionOrphanedSlotUpdated", "tx", transactionMetadata.ID(), "slot", slot)
 		})
 
 		transactionMetadata.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
-			fmt.Printf("%s > [%s] MemPool.TransactionCommittedSlotUpdated in slot %d: %s\n", n.Name, engineName, slot, transactionMetadata.ID())
+			instance.LogTrace("MemPool.TransactionCommittedSlotUpdated", "tx", transactionMetadata.ID(), "slot", slot)
 		})
 
 		transactionMetadata.OnPending(func() {
-			fmt.Printf("%s > [%s] MemPool.TransactionPending: %s\n", n.Name, engineName, transactionMetadata.ID())
+			instance.LogTrace("MemPool.TransactionPending", "tx", transactionMetadata.ID())
 		})
 	})
 }
 
 func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
-	engineName := fmt.Sprintf("%s - %s", lo.Cond(n.Protocol.Engines.Main.Get() != instance, "Candidate", "Main"), instance.Name()[:8])
-
-	n.attachEngineLogsWithName(failOnBlockFiltered, instance, engineName)
+	n.attachEngineLogsWithName(failOnBlockFiltered, instance)
 }
 
 func (n *Node) Wait() {
