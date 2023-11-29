@@ -59,7 +59,7 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to
 					// recover if no node was part of the online committee anymore.
-					e.Events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
+					e.Events.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 						// Only track identities that are part of the committee.
 						committee, exists := s.CommitteeInSlot(block.ID().Slot())
 						if !exists {

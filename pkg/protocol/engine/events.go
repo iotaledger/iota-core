@@ -7,12 +7,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
@@ -29,23 +29,23 @@ type Events struct {
 	AcceptedBlockProcessed *event.Event1[*blocks.Block]
 	StoragePruned          *event.Event1[iotago.EpochIndex]
 
-	EvictionState    *eviction.Events
-	Filter           *filter.Events
-	CommitmentFilter *commitmentfilter.Events
-	BlockRequester   *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
-	TipManager       *tipmanager.Events
-	BlockDAG         *blockdag.Events
-	Booker           *booker.Events
-	Clock            *clock.Events
-	BlockGadget      *blockgadget.Events
-	SlotGadget       *slotgadget.Events
-	SybilProtection  *sybilprotection.Events
-	Ledger           *ledger.Events
-	Notarization     *notarization.Events
-	ConflictDAG      *conflictdag.Events[iotago.TransactionID, mempool.StateID]
-	Scheduler        *scheduler.Events
-	SeatManager      *seatmanager.Events
-	SyncManager      *syncmanager.Events
+	EvictionState   *eviction.Events
+	PreSolidFilter  *presolidfilter.Events
+	PostSolidFilter *postsolidfilter.Events
+	BlockRequester  *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
+	TipManager      *tipmanager.Events
+	BlockDAG        *blockdag.Events
+	Booker          *booker.Events
+	Clock           *clock.Events
+	BlockGadget     *blockgadget.Events
+	SlotGadget      *slotgadget.Events
+	SybilProtection *sybilprotection.Events
+	Ledger          *ledger.Events
+	Notarization    *notarization.Events
+	ConflictDAG     *conflictdag.Events[iotago.TransactionID, mempool.StateID]
+	Scheduler       *scheduler.Events
+	SeatManager     *seatmanager.Events
+	SyncManager     *syncmanager.Events
 
 	event.Group[Events, *Events]
 }
@@ -57,8 +57,8 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		AcceptedBlockProcessed: event.New1[*blocks.Block](),
 		StoragePruned:          event.New1[iotago.EpochIndex](),
 		EvictionState:          eviction.NewEvents(),
-		Filter:                 filter.NewEvents(),
-		CommitmentFilter:       commitmentfilter.NewEvents(),
+		PreSolidFilter:         presolidfilter.NewEvents(),
+		PostSolidFilter:        postsolidfilter.NewEvents(),
 		BlockRequester:         eventticker.NewEvents[iotago.SlotIndex, iotago.BlockID](),
 		TipManager:             tipmanager.NewEvents(),
 		BlockDAG:               blockdag.NewEvents(),

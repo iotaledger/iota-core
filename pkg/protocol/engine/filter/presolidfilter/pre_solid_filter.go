@@ -1,4 +1,4 @@
-package filter
+package presolidfilter
 
 import (
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -7,7 +7,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 )
 
-type Filter interface {
+type PreSolidFilter interface {
 	// ProcessReceivedBlock processes block from the given source.
 	ProcessReceivedBlock(block *model.Block, source peer.ID)
 

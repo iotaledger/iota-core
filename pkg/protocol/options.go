@@ -13,16 +13,16 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter/accountsfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/drr"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/blockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter/postsolidblockfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter/presolidblockfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
@@ -63,11 +63,11 @@ type Options struct {
 
 	CommitmentRequesterOptions []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]
 
-	// FilterProvider contains the provider for the Filter engine modules.
-	FilterProvider module.Provider[*engine.Engine, filter.Filter]
+	// PreSolidFilterProvider contains the provider for the PreSolidFilter engine modules.
+	PreSolidFilterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]
 
-	// CommitmentFilterProvider contains the provider for the CommitmentFilter engine modules.
-	CommitmentFilterProvider module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
+	// PostSolidFilterProvider contains the provider for the PostSolidFilter engine modules.
+	PostSolidFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
 
 	// BlockDAGProvider contains the provider for the BlockDAG engine modules.
 	BlockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG]
@@ -121,8 +121,8 @@ func NewDefaultOptions() *Options {
 		BaseDirectory:           "",
 		ChainSwitchingThreshold: 3,
 
-		FilterProvider:              blockfilter.NewProvider(),
-		CommitmentFilterProvider:    accountsfilter.NewProvider(),
+		PreSolidFilterProvider:      presolidblockfilter.NewProvider(),
+		PostSolidFilterProvider:     postsolidblockfilter.NewProvider(),
 		BlockDAGProvider:            inmemoryblockdag.NewProvider(),
 		TipManagerProvider:          tipmanagerv1.NewProvider(),
 		TipSelectionProvider:        tipselectionv1.NewProvider(),
@@ -162,17 +162,17 @@ func WithChainSwitchingThreshold(threshold iotago.SlotIndex) options.Option[Prot
 	}
 }
 
-// WithFilterProvider is an option for the Protocol that allows to set the FilterProvider.
-func WithFilterProvider(optsFilterProvider module.Provider[*engine.Engine, filter.Filter]) options.Option[Protocol] {
+// WithPreSolidFilterProvider is an option for the Protocol that allows to set the PreSolidFilterProvider.
+func WithPreSolidFilterProvider(optsFilterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.FilterProvider = optsFilterProvider
+		p.Options.PreSolidFilterProvider = optsFilterProvider
 	}
 }
 
-// WithCommitmentFilterProvider is an option for the Protocol that allows to set the CommitmentFilterProvider.
-func WithCommitmentFilterProvider(optsCommitmentFilterProvider module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]) options.Option[Protocol] {
+// WithPostSolidFilter is an option for the Protocol that allows to set the PostSolidFilterProvider.
+func WithPostSolidFilter(optsCommitmentFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]) options.Option[Protocol] {
 	return func(p *Protocol) {
-		p.Options.CommitmentFilterProvider = optsCommitmentFilterProvider
+		p.Options.PostSolidFilterProvider = optsCommitmentFilterProvider
 	}
 }
 

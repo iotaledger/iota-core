@@ -46,7 +46,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 		e.Constructed.OnTrigger(func() {
 			wp := b.workers.CreatePool("BlockDAG.Attach", workerpool.WithWorkerCount(2))
 
-			e.Events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
+			e.Events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
 					b.errorHandler(ierrors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.ProtocolBlock().Header.IssuerID))
 				}
@@ -203,8 +203,11 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 	}
 
 	// We already attached it before, but the parents are invalid, then we set the block as invalid.
-	if parentsValid, err := b.canAttachToParents(data); !parentsValid && storedBlock != nil {
-		storedBlock.SetInvalid()
+	if parentsValid, err := b.canAttachToParents(data); !parentsValid {
+		if storedBlock != nil {
+			storedBlock.SetInvalid()
+		}
+
 		return false, err
 	}
 

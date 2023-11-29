@@ -148,7 +148,7 @@ func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {
 		AddressBech32:                  accountID.ToAddress().Bech32(deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()),
 		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 		ValidatorStake:                 accountData.ValidatorStake,
-		StakingEpochEnd:                accountData.StakeEndEpoch,
+		StakingEndEpoch:                accountData.StakeEndEpoch,
 		FixedCost:                      accountData.FixedCost,
 		Active:                         active,
 		LatestSupportedProtocolVersion: accountData.LatestSupportedProtocolVersionAndHash.Version,
@@ -232,8 +232,8 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 	}
 
 	return &api.ManaRewardsResponse{
-		EpochStart: actualStart,
-		EpochEnd:   actualEnd,
+		StartEpoch: actualStart,
+		EndEpoch:   actualEnd,
 		Rewards:    reward,
 	}, nil
 }
