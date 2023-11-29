@@ -556,6 +556,39 @@ func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, rec
 	return signedTransaction
 }
 
+func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, recipientWallet *Wallet, opts ...options.Option[builder.NFTOutputBuilder]) *iotago.SignedTransaction {
+	input := w.Output(inputName)
+
+	nftOutput := builder.NewNFTOutputBuilder(w.Address(), input.BaseTokenAmount()).MustBuild()
+	return w.CreateSignedTransactionWithOptions(
+		transactionName,
+		WithInputs(utxoledger.Outputs{input}),
+		WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
+		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID),
+	)
+}
+
+func (w *Wallet) TransitionNFTWithTransactionOpts(transactionName string, inputName string, opts ...options.Option[builder.TransactionBuilder]) *iotago.SignedTransaction {
+	input, exists := w.outputs[inputName]
+	if !exists {
+		panic(fmt.Sprintf("NFT with alias %s does not exist", inputName))
+	}
+
+	nftOutput, ok := input.Output().Clone().(*iotago.NFTOutput)
+	if !ok {
+		panic(fmt.Sprintf("output with alias %s is not *iotago.NFTOutput", inputName))
+	}
+
+	builder.NewNFTOutputBuilderFromPrevious(nftOutput).NFTID(iotago.NFTIDFromOutputID(input.OutputID())).MustBuild()
+
+	return w.CreateSignedTransactionWithOptions(
+		"TX2",
+		append(opts, WithInputs(utxoledger.Outputs{input}),
+			WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
+			WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID))...,
+	)
+}
+
 func (w *Wallet) CreateSignedTransactionWithOptions(transactionName string, opts ...options.Option[builder.TransactionBuilder]) *iotago.SignedTransaction {
 	currentAPI := w.Node.Protocol.CommittedAPI()
 

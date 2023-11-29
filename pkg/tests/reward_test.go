@@ -6,13 +6,11 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/utils"
 
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -187,15 +185,7 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 	var block1Slot iotago.SlotIndex = 1
 	ts.SetCurrentSlot(block1Slot)
 
-	input := ts.DefaultWallet().Output("Genesis:0")
-	nftOutput := builder.NewNFTOutputBuilder(ts.DefaultWallet().Address(), input.BaseTokenAmount()).MustBuild()
-	tx1 := ts.DefaultWallet().CreateSignedTransactionWithOptions(
-		"TX1",
-		mock.WithInputs(utxoledger.Outputs{input}),
-		mock.WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
-		mock.WithAllotAllManaToAccount(ts.CurrentSlot(), ts.DefaultWallet().BlockIssuer.AccountID),
-	)
-
+	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", "Genesis:0", ts.DefaultWallet())
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
 
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
@@ -204,23 +194,14 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx1.Transaction}, true, node1, node2)
 
 	// ATTEMPT TO POINT REWARD INPUT TO AN NFT OUTPUT
-	inputNFT := ts.DefaultWallet().Output("TX1:0")
-	prevNFT := inputNFT.Output().Clone().(*iotago.NFTOutput)
-	nftOutput = builder.NewNFTOutputBuilderFromPrevious(prevNFT).NFTID(iotago.NFTIDFromOutputID(inputNFT.OutputID())).MustBuild()
-
-	tx2 := ts.DefaultWallet().CreateSignedTransactionWithOptions(
-		"TX2",
-		mock.WithInputs(utxoledger.Outputs{inputNFT}),
+	tx2 := ts.DefaultWallet().TransitionNFTWithTransactionOpts("TX2", "TX1:0",
 		mock.WithRewardInput(
 			&iotago.RewardInput{Index: 0},
 			0,
 		),
 		mock.WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: ts.DefaultWallet().Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
-		}),
-		mock.WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
-		mock.WithAllotAllManaToAccount(ts.CurrentSlot(), ts.DefaultWallet().BlockIssuer.AccountID),
-	)
+		}))
 
 	ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
 
@@ -228,6 +209,6 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 
 	// TODO: Assertions do not pass for node2 - why?
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1)
-	signedTx3ID := lo.PanicOnErr(tx2.ID())
-	ts.AssertTransactionFailure(signedTx3ID, iotago.ErrRewardInputInvalid, node1)
+	signedTx2ID := lo.PanicOnErr(tx2.ID())
+	ts.AssertTransactionFailure(signedTx2ID, iotago.ErrRewardInputInvalid, node1)
 }
