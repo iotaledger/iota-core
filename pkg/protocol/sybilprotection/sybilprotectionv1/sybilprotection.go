@@ -153,8 +153,8 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot iotag
 
 	// Determine the committee root.
 	{
-		// If the committed slot is `maxCommittableSlot`
-		// away from the end of the epoch, then register a committee for the next epoch if it hasn't been selected yet.
+		// If the committed slot is `maxCommittableAge` away from the end of the epoch, then register (reuse)
+		// a committee for the next epoch if it hasn't been selected yet.
 		if slot+maxCommittableAge == currentEpochEndSlot {
 			if _, committeeExists := o.seatManager.CommitteeInEpoch(nextEpoch); !committeeExists {
 				// If the committee for the epoch wasn't set before due to finalization of a slot,
