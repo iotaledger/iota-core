@@ -54,7 +54,6 @@ func SmallerCommittee(client *nodeclient.Client) error {
 	if err != nil {
 		return ierrors.Wrap(err, "dockerStop failed")
 	}
-	fmt.Println("Stop validator 2......done")
 
 	err = AwaitCommitteeSelection(client, currentEpoch+2, 3)
 	if err != nil {
@@ -66,7 +65,6 @@ func SmallerCommittee(client *nodeclient.Client) error {
 	if err != nil {
 		return ierrors.Wrap(err, "dockerRestart failed")
 	}
-	fmt.Println("Restart validator 2......done")
 
 	err = AwaitCommitteeSelection(client, currentEpoch+3, 4)
 	if err != nil {
@@ -85,7 +83,6 @@ func ReuseDueToNoFinalization(client *nodeclient.Client) error {
 	if err != nil {
 		return ierrors.Wrap(err, "dockerStop failed")
 	}
-	fmt.Println("Stop validator 2 and 3......done")
 
 	status, err := GetNodeStatus(client)
 	if err != nil {
@@ -118,7 +115,6 @@ func ReuseDueToNoFinalization(client *nodeclient.Client) error {
 	if err != nil {
 		return ierrors.Wrap(err, "dockerRestart failed")
 	}
-	fmt.Println("Restart validator 2......done")
 
 	err = AwaitCommitteeSelection(client, currentEpoch+3, 3)
 	if err != nil {
@@ -234,6 +230,8 @@ func DockerNetworkStop() {
 }
 
 func DockerContainerStop(containerIndex ...string) error {
+	fmt.Println("Stop validator", containerIndex, "......")
+
 	args := []string{"stop"}
 	for _, i := range containerIndex {
 		args = append(args, ValidatorDockerName[i])
@@ -243,6 +241,8 @@ func DockerContainerStop(containerIndex ...string) error {
 }
 
 func DockerContainerRestart(containerIndex ...string) error {
+	fmt.Println("Restart validator", containerIndex, "......")
+
 	args := []string{"restart"}
 	for _, i := range containerIndex {
 		args = append(args, ValidatorDockerName[i])
