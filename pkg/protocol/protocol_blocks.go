@@ -112,9 +112,11 @@ func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 			}
 
 			return
+		} else if block.ProtocolBlock().Header.SlotCommitmentID.Slot() >= 19 {
+			b.LogError("received block", "blockID", block.ID(), "commitment", commitment.LogName())
+		} else {
+			b.LogTrace("received block", "blockID", block.ID(), "commitment", commitment.LogName())
 		}
-
-		b.LogTrace("received block", "blockID", block.ID(), "commitment", commitment.LogName())
 	})
 }
 
