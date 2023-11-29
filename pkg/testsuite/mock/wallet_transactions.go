@@ -423,9 +423,12 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 		panic(fmt.Sprintf("failed to calculate reward for output %s: %s", inputName, err))
 	}
 
+	apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
+	potentialMana := w.PotentialMana(apiForSlot, input, w.currentSlot)
+
 	accountOutput := builder.NewAccountOutputBuilderFromPrevious(inputAccount).
 		RemoveFeature(iotago.FeatureStaking).
-		Mana(input.StoredMana() + rewardMana).
+		Mana(potentialMana + input.StoredMana() + rewardMana).
 		MustBuild()
 
 	signedTransaction := w.createSignedTransactionWithOptions(
@@ -441,7 +444,6 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
-		WithAllotAllManaToAccount(w.currentSlot, inputAccount.AccountID),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
 	)
 
@@ -497,11 +499,11 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", inputName))
 	}
 
+	apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
 	delegationEnd := inputDelegation.EndEpoch
 	// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
 	// "last epoch" for the rewards calculation.
 	if inputDelegation.DelegationID.Empty() {
-		apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
 		futureBoundedSlotIndex := w.currentSlot + apiForSlot.ProtocolParameters().MinCommittableAge()
 		delegationEnd = apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex) - iotago.EpochIndex(1)
 	}
@@ -516,10 +518,12 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 		panic(fmt.Sprintf("failed to calculate reward for output %s: %s", inputName, err))
 	}
 
+	potentialMana := w.PotentialMana(apiForSlot, input, w.currentSlot)
+
 	// Create Basic Output where the reward will be put.
 	outputStates := iotago.Outputs[iotago.Output]{&iotago.BasicOutput{
 		Amount: input.BaseTokenAmount(),
-		Mana:   rewardMana,
+		Mana:   rewardMana + potentialMana,
 		UnlockConditions: iotago.BasicOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{Address: w.Address()},
 		},
@@ -528,7 +532,6 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
-
 		WithInputs(utxoledger.Outputs{input}),
 		WithRewardInput(
 			&iotago.RewardInput{Index: 0},
@@ -537,11 +540,22 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
-		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID),
 		WithOutputs(outputStates),
 	)
 
 	return signedTransaction
+}
+
+// Computes the Potential Mana that the output generates until target slot.
+func (w *Wallet) PotentialMana(api iotago.API, input *utxoledger.Output, targetSlot iotago.SlotIndex) iotago.Mana {
+	minDeposit := lo.PanicOnErr(api.StorageScoreStructure().MinDeposit(input.Output()))
+
+	if minDeposit > input.BaseTokenAmount() {
+		return 0
+	}
+
+	excessBaseTokens := input.BaseTokenAmount() - minDeposit
+	return lo.PanicOnErr(api.ManaDecayProvider().ManaGenerationWithDecay(excessBaseTokens, input.OutputID().CreationSlot(), targetSlot))
 }
 
 func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, recipientWallet *Wallet) *iotago.SignedTransaction {
