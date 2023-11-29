@@ -185,7 +185,7 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 	var block1Slot iotago.SlotIndex = 1
 	ts.SetCurrentSlot(block1Slot)
 
-	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", "Genesis:0", ts.DefaultWallet())
+	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", "Genesis:0")
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
 
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())

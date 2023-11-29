@@ -425,10 +425,11 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 
 	apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
 	potentialMana := w.PotentialMana(apiForSlot, input, w.currentSlot)
+	storedMana := lo.PanicOnErr(apiForSlot.ManaDecayProvider().ManaWithDecay(input.StoredMana(), input.SlotCreated(), w.currentSlot))
 
 	accountOutput := builder.NewAccountOutputBuilderFromPrevious(inputAccount).
 		RemoveFeature(iotago.FeatureStaking).
-		Mana(potentialMana + input.StoredMana() + rewardMana).
+		Mana(potentialMana + storedMana + rewardMana).
 		MustBuild()
 
 	signedTransaction := w.createSignedTransactionWithOptions(
@@ -555,7 +556,8 @@ func (w *Wallet) PotentialMana(api iotago.API, input *utxoledger.Output, targetS
 	}
 
 	excessBaseTokens := input.BaseTokenAmount() - minDeposit
-	return lo.PanicOnErr(api.ManaDecayProvider().ManaGenerationWithDecay(excessBaseTokens, input.OutputID().CreationSlot(), targetSlot))
+
+	return lo.PanicOnErr(api.ManaDecayProvider().ManaGenerationWithDecay(excessBaseTokens, input.SlotCreated(), targetSlot))
 }
 
 func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, recipientWallet *Wallet) *iotago.SignedTransaction {
@@ -570,10 +572,13 @@ func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, rec
 	return signedTransaction
 }
 
-func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, recipientWallet *Wallet, opts ...options.Option[builder.NFTOutputBuilder]) *iotago.SignedTransaction {
+func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, opts ...options.Option[builder.NFTOutputBuilder]) *iotago.SignedTransaction {
 	input := w.Output(inputName)
 
-	nftOutput := builder.NewNFTOutputBuilder(w.Address(), input.BaseTokenAmount()).MustBuild()
+	nftOutputBuilder := builder.NewNFTOutputBuilder(w.Address(), input.BaseTokenAmount())
+	options.Apply(nftOutputBuilder, opts)
+	nftOutput := nftOutputBuilder.MustBuild()
+
 	return w.createSignedTransactionWithOptions(
 		transactionName,
 		WithInputs(utxoledger.Outputs{input}),
@@ -596,7 +601,7 @@ func (w *Wallet) TransitionNFTWithTransactionOpts(transactionName string, inputN
 	builder.NewNFTOutputBuilderFromPrevious(nftOutput).NFTID(iotago.NFTIDFromOutputID(input.OutputID())).MustBuild()
 
 	return w.createSignedTransactionWithOptions(
-		"TX2",
+		transactionName,
 		append(opts, WithInputs(utxoledger.Outputs{input}),
 			WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
 			WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID))...,
