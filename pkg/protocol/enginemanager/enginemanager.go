@@ -20,12 +20,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
@@ -55,8 +55,8 @@ type EngineManager struct {
 
 	storageOptions              []options.Option[storage.Storage]
 	engineOptions               []options.Option[engine.Engine]
-	filterProvider              module.Provider[*engine.Engine, filter.Filter]
-	commitmentFilterProvider    module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter]
+	preSolidFilterProvider      module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]
+	postSolidFilterProvider     module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
 	blockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
 	bookerProvider              module.Provider[*engine.Engine, booker.Booker]
 	clockProvider               module.Provider[*engine.Engine, clock.Clock]
@@ -81,8 +81,8 @@ func New(
 	dbVersion byte,
 	storageOptions []options.Option[storage.Storage],
 	engineOptions []options.Option[engine.Engine],
-	filterProvider module.Provider[*engine.Engine, filter.Filter],
-	commitmentFilterProvider module.Provider[*engine.Engine, commitmentfilter.CommitmentFilter],
+	preSolidFilterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter],
+	postSolidFilterProvider module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter],
 	blockDAGProvider module.Provider[*engine.Engine, blockdag.BlockDAG],
 	bookerProvider module.Provider[*engine.Engine, booker.Booker],
 	clockProvider module.Provider[*engine.Engine, clock.Clock],
@@ -107,8 +107,8 @@ func New(
 		engineCreated:               event.New1[*engine.Engine](),
 		storageOptions:              storageOptions,
 		engineOptions:               engineOptions,
-		filterProvider:              filterProvider,
-		commitmentFilterProvider:    commitmentFilterProvider,
+		preSolidFilterProvider:      preSolidFilterProvider,
+		postSolidFilterProvider:     postSolidFilterProvider,
 		blockDAGProvider:            blockDAGProvider,
 		bookerProvider:              bookerProvider,
 		clockProvider:               clockProvider,
@@ -222,8 +222,8 @@ func (e *EngineManager) loadEngineInstanceWithStorage(engineAlias string, storag
 	newEngine := engine.New(e.workers.CreateGroup(engineAlias),
 		errorHandler,
 		storage,
-		e.filterProvider,
-		e.commitmentFilterProvider,
+		e.preSolidFilterProvider,
+		e.postSolidFilterProvider,
 		e.blockDAGProvider,
 		e.bookerProvider,
 		e.clockProvider,
