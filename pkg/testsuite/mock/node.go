@@ -77,7 +77,7 @@ type Node struct {
 	mutex                    syncutils.RWMutex
 	attachedBlocks           []*blocks.Block
 	currentSlot              iotago.SlotIndex
-	filteredBlockEvents []*postsolidfilter.BlockFilteredEvent
+	filteredBlockEvents      []*postsolidfilter.BlockFilteredEvent
 	invalidTransactionEvents map[iotago.SignedTransactionID]InvalidSignedTransactionEvent
 }
 
