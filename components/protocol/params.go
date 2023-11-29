@@ -37,8 +37,6 @@ type BaseToken struct {
 	Subunit string `default:"glow" usage:"the base token subunit"`
 	// the base token amount of decimals
 	Decimals uint32 `default:"6" usage:"the base token amount of decimals"`
-	// the base token uses the metric prefix
-	UseMetricPrefix bool `default:"false" usage:"the base token uses the metric prefix"`
 }
 
 // ParametersDatabase contains the definition of configuration parameters used by the storage layer.

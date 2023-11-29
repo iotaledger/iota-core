@@ -91,7 +91,7 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 // OutputMetadata represents the JSON model of the mempool.OutputMetadata.
 // type OutputMetadata struct {
 // 	OutputID              *OutputID          `json:"outputID"`
-// 	ConflictIDs           []string           `json:"conflictIDs"`
+// 	SpendIDs           []string           `json:"spendIDs"`
 // 	FirstConsumer         string             `json:"firstCount"`
 // 	ConfirmedConsumer     string             `json:"confirmedConsumer,omitempty"`
 // 	ConfirmationState     confirmation.State `json:"confirmationState"`
@@ -102,7 +102,7 @@ func NewOutputID(outputID iotago.OutputID) *OutputID {
 // func NewOutputMetadata(outputMetadata *mempool.OutputMetadata, confirmedConsumerID utxo.TransactionID) *OutputMetadata {
 // 	return &OutputMetadata{
 // 		OutputID: NewOutputID(outputMetadata.ID()),
-// 		ConflictIDs: lo.Map(lo.Map(outputMetadata.ConflictIDs().Slice(), func(t utxo.TransactionID) []byte {
+// 		SpendIDs: lo.Map(lo.Map(outputMetadata.SpendIDs().Slice(), func(t utxo.TransactionID) []byte {
 // 			return lo.PanicOnErr(t.Bytes())
 // 		}), base58.Encode),
 // 		FirstConsumer:         outputMetadata.FirstConsumer().Base58(),
@@ -234,7 +234,7 @@ func NewUnlockBlock(unlockBlock iotago.Unlock) *UnlockBlock {
 // TransactionMetadata represents the JSON model of the mempool.TransactionMetadata.
 type TransactionMetadata struct {
 	TransactionID         string   `json:"transactionID"`
-	ConflictIDs           []string `json:"conflictIDs"`
+	SpendIDs              []string `json:"spendIDs"`
 	Booked                bool     `json:"booked"`
 	BookedTime            int64    `json:"bookedTime"`
 	ConfirmationState     string   `json:"confirmationState"`
@@ -254,7 +254,7 @@ func NewTransactionMetadata(transactionMetadata mempool.TransactionMetadata, con
 
 	return &TransactionMetadata{
 		TransactionID: transactionMetadata.ID().ToHex(),
-		ConflictIDs: func() []string {
+		SpendIDs: func() []string {
 			var strIDs []string
 			for _, txID := range conflicts.ToSlice() {
 				strIDs = append(strIDs, txID.ToHex())

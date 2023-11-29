@@ -3,81 +3,81 @@ package retainer
 import (
 	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
-var blocksErrorsFailureReasonMap = map[error]apimodels.BlockFailureReason{
-	iotago.ErrIssuerAccountNotFound:     apimodels.BlockFailureIssuerAccountNotFound,
-	iotago.ErrBurnedInsufficientMana:    apimodels.BlockFailureBurnedInsufficientMana,
-	iotago.ErrBlockVersionInvalid:       apimodels.BlockFailureVersionInvalid,
-	iotago.ErrRMCNotFound:               apimodels.BlockFailureAccountInvalid,
-	iotago.ErrFailedToCalculateManaCost: apimodels.BlockFailureManaCostCalculationFailed,
-	iotago.ErrNegativeBIC:               apimodels.BlockFailureAccountInvalid,
-	iotago.ErrAccountExpired:            apimodels.BlockFailureAccountInvalid,
-	iotago.ErrInvalidSignature:          apimodels.BlockFailureSignatureInvalid,
+var blocksErrorsFailureReasonMap = map[error]api.BlockFailureReason{
+	iotago.ErrIssuerAccountNotFound:     api.BlockFailureIssuerAccountNotFound,
+	iotago.ErrBurnedInsufficientMana:    api.BlockFailureBurnedInsufficientMana,
+	iotago.ErrBlockVersionInvalid:       api.BlockFailureVersionInvalid,
+	iotago.ErrRMCNotFound:               api.BlockFailureAccountInvalid,
+	iotago.ErrFailedToCalculateManaCost: api.BlockFailureManaCostCalculationFailed,
+	iotago.ErrNegativeBIC:               api.BlockFailureAccountInvalid,
+	iotago.ErrAccountExpired:            api.BlockFailureAccountInvalid,
+	iotago.ErrInvalidSignature:          api.BlockFailureSignatureInvalid,
 }
 
-func determineBlockFailureReason(err error) apimodels.BlockFailureReason {
+func determineBlockFailureReason(err error) api.BlockFailureReason {
 	for errKey, failureReason := range blocksErrorsFailureReasonMap {
 		if ierrors.Is(err, errKey) {
 			return failureReason
 		}
 	}
 	// use most general failure reason
-	return apimodels.BlockFailureInvalid
+	return api.BlockFailureInvalid
 }
 
-var txErrorsFailureReasonMap = map[error]apimodels.TransactionFailureReason{
+var txErrorsFailureReasonMap = map[error]api.TransactionFailureReason{
 	// unknown type / type casting errors
-	iotago.ErrTxTypeInvalid:               apimodels.TxFailureTxTypeInvalid,
-	iotago.ErrUnknownInputType:            apimodels.TxFailureUTXOInputInvalid,
-	iotago.ErrUTXOInputInvalid:            apimodels.TxFailureUTXOInputInvalid,
-	iotago.ErrUnknownOutputType:           apimodels.TxFailureUTXOInputInvalid,
-	iotago.ErrBICInputInvalid:             apimodels.TxFailureBICInputInvalid,
-	iotago.ErrRewardInputInvalid:          apimodels.TxFailureRewardInputInvalid,
-	iotago.ErrCommitmentInputMissing:      apimodels.TxFailureCommitmentInputInvalid,
-	iotago.ErrCommitmentInputInvalid:      apimodels.TxFailureCommitmentInputInvalid,
-	iotago.ErrUnlockBlockSignatureInvalid: apimodels.TxFailureUnlockBlockSignatureInvalid,
+	iotago.ErrTxTypeInvalid:               api.TxFailureTxTypeInvalid,
+	iotago.ErrUnknownInputType:            api.TxFailureUTXOInputInvalid,
+	iotago.ErrUTXOInputInvalid:            api.TxFailureUTXOInputInvalid,
+	iotago.ErrUnknownOutputType:           api.TxFailureUTXOInputInvalid,
+	iotago.ErrBICInputInvalid:             api.TxFailureBICInputInvalid,
+	iotago.ErrRewardInputInvalid:          api.TxFailureRewardInputInvalid,
+	iotago.ErrCommitmentInputMissing:      api.TxFailureCommitmentInputInvalid,
+	iotago.ErrCommitmentInputInvalid:      api.TxFailureCommitmentInputInvalid,
+	iotago.ErrUnlockBlockSignatureInvalid: api.TxFailureUnlockBlockSignatureInvalid,
 
 	// context inputs errors
-	iotago.ErrNoStakingFeature:              apimodels.TxFailureNoStakingFeature,
-	iotago.ErrFailedToClaimStakingReward:    apimodels.TxFailureFailedToClaimStakingReward,
-	iotago.ErrFailedToClaimDelegationReward: apimodels.TxFailureFailedToClaimDelegationReward,
+	iotago.ErrNoStakingFeature:              api.TxFailureNoStakingFeature,
+	iotago.ErrFailedToClaimStakingReward:    api.TxFailureFailedToClaimStakingReward,
+	iotago.ErrFailedToClaimDelegationReward: api.TxFailureFailedToClaimDelegationReward,
 
 	// UTXO errors
-	iotago.ErrTxConflicting:     apimodels.TxFailureConflicting,
-	iotago.ErrInputAlreadySpent: apimodels.TxFailureUTXOInputAlreadySpent,
+	iotago.ErrTxConflicting:     api.TxFailureConflicting,
+	iotago.ErrInputAlreadySpent: api.TxFailureUTXOInputAlreadySpent,
 
 	// native token errors
-	iotago.ErrNativeTokenSetInvalid:    apimodels.TxFailureGivenNativeTokensInvalid,
-	iotago.ErrNativeTokenSumUnbalanced: apimodels.TxFailureGivenNativeTokensInvalid,
+	iotago.ErrNativeTokenSetInvalid:    api.TxFailureGivenNativeTokensInvalid,
+	iotago.ErrNativeTokenSumUnbalanced: api.TxFailureGivenNativeTokensInvalid,
 
 	// vm errors
-	iotago.ErrInputOutputSumMismatch:       apimodels.TxFailureSumOfInputAndOutputValuesDoesNotMatch,
-	iotago.ErrTimelockNotExpired:           apimodels.TxFailureConfiguredTimelockNotYetExpired,
-	iotago.ErrReturnAmountNotFulFilled:     apimodels.TxFailureReturnAmountNotFulfilled,
-	iotago.ErrInvalidInputUnlock:           apimodels.TxFailureInputUnlockInvalid,
-	iotago.ErrSenderFeatureNotUnlocked:     apimodels.TxFailureSenderNotUnlocked,
-	iotago.ErrChainTransitionInvalid:       apimodels.TxFailureChainStateTransitionInvalid,
-	iotago.ErrInputOutputManaMismatch:      apimodels.TxFailureManaAmountInvalid,
-	iotago.ErrManaAmountInvalid:            apimodels.TxFailureManaAmountInvalid,
-	iotago.ErrInputCreationAfterTxCreation: apimodels.TxFailureInputCreationAfterTxCreation,
+	iotago.ErrInputOutputSumMismatch:       api.TxFailureSumOfInputAndOutputValuesDoesNotMatch,
+	iotago.ErrTimelockNotExpired:           api.TxFailureConfiguredTimelockNotYetExpired,
+	iotago.ErrReturnAmountNotFulFilled:     api.TxFailureReturnAmountNotFulfilled,
+	iotago.ErrInvalidInputUnlock:           api.TxFailureInputUnlockInvalid,
+	iotago.ErrSenderFeatureNotUnlocked:     api.TxFailureSenderNotUnlocked,
+	iotago.ErrChainTransitionInvalid:       api.TxFailureChainStateTransitionInvalid,
+	iotago.ErrInputOutputManaMismatch:      api.TxFailureManaAmountInvalid,
+	iotago.ErrManaAmountInvalid:            api.TxFailureManaAmountInvalid,
+	iotago.ErrInputCreationAfterTxCreation: api.TxFailureInputCreationAfterTxCreation,
 
 	// tx capabilities errors
-	iotago.ErrTxCapabilitiesNativeTokenBurningNotAllowed: apimodels.TxFailureCapabilitiesNativeTokenBurningNotAllowed,
-	iotago.ErrTxCapabilitiesManaBurningNotAllowed:        apimodels.TxFailureCapabilitiesManaBurningNotAllowed,
-	iotago.ErrTxCapabilitiesAccountDestructionNotAllowed: apimodels.TxFailureCapabilitiesAccountDestructionNotAllowed,
-	iotago.ErrTxCapabilitiesAnchorDestructionNotAllowed:  apimodels.TxFailureCapabilitiesAnchorDestructionNotAllowed,
-	iotago.ErrTxCapabilitiesFoundryDestructionNotAllowed: apimodels.TxFailureCapabilitiesFoundryDestructionNotAllowed,
-	iotago.ErrTxCapabilitiesNFTDestructionNotAllowed:     apimodels.TxFailureCapabilitiesNFTDestructionNotAllowed,
+	iotago.ErrTxCapabilitiesNativeTokenBurningNotAllowed: api.TxFailureCapabilitiesNativeTokenBurningNotAllowed,
+	iotago.ErrTxCapabilitiesManaBurningNotAllowed:        api.TxFailureCapabilitiesManaBurningNotAllowed,
+	iotago.ErrTxCapabilitiesAccountDestructionNotAllowed: api.TxFailureCapabilitiesAccountDestructionNotAllowed,
+	iotago.ErrTxCapabilitiesAnchorDestructionNotAllowed:  api.TxFailureCapabilitiesAnchorDestructionNotAllowed,
+	iotago.ErrTxCapabilitiesFoundryDestructionNotAllowed: api.TxFailureCapabilitiesFoundryDestructionNotAllowed,
+	iotago.ErrTxCapabilitiesNFTDestructionNotAllowed:     api.TxFailureCapabilitiesNFTDestructionNotAllowed,
 }
 
-func determineTxFailureReason(err error) apimodels.TransactionFailureReason {
+func determineTxFailureReason(err error) api.TransactionFailureReason {
 	for errKey, failureReason := range txErrorsFailureReasonMap {
 		if ierrors.Is(err, errKey) {
 			return failureReason
 		}
 	}
 	// use most general failure reason
-	return apimodels.TxFailureSemanticValidationFailed
+	return api.TxFailureSemanticValidationFailed
 }

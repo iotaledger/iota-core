@@ -1,15 +1,42 @@
 package mock
 
 import (
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/testsuite/depositcalculator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 )
 
-const MinIssuerAccountAmount = iotago.BaseToken(372900)
-const MinValidatorAccountAmount = iotago.BaseToken(722800)
-const AccountConversionManaCost = iotago.Mana(1000000)
+func MinIssuerAccountAmount(protocolParameters iotago.ProtocolParameters) iotago.BaseToken {
+	return lo.PanicOnErr(depositcalculator.MinDeposit(protocolParameters, iotago.OutputAccount,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+		depositcalculator.WithBlockIssuerKeys(1),
+	))
+}
+
+func MinValidatorAccountAmount(protocolParameters iotago.ProtocolParameters) iotago.BaseToken {
+	return lo.PanicOnErr(depositcalculator.MinDeposit(protocolParameters, iotago.OutputAccount,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+		depositcalculator.WithBlockIssuerKeys(1),
+		depositcalculator.WithStakedAmount(1),
+	))
+}
+
+// TODO: add the correct formula later.
+//
+//nolint:revive
+func AccountConversionManaCost(protocolParameters iotago.ProtocolParameters) iotago.Mana {
+	return iotago.Mana(1000000)
+}
+
+// TODO: add the correct formula later.
+//
+//nolint:revive
+func MaxBlockManaCost(protocolParameters iotago.ProtocolParameters) iotago.Mana {
+	return iotago.Mana(1000000)
+}
 
 // TransactionBuilder options
 
@@ -67,17 +94,27 @@ func WithAllotments(allotments iotago.Allotments) options.Option[builder.Transac
 	}
 }
 
-func WithSlotCreated(creationSlot iotago.SlotIndex) options.Option[builder.TransactionBuilder] {
+func WithCreationSlot(creationSlot iotago.SlotIndex) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		txBuilder.SetCreationSlot(creationSlot)
 	}
 }
 
-func WithContextInputs(contextInputs iotago.TxEssenceContextInputs) options.Option[builder.TransactionBuilder] {
+func WithCommitmentInput(input *iotago.CommitmentInput) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
-		for _, input := range contextInputs {
-			txBuilder.AddContextInput(input)
-		}
+		txBuilder.AddCommitmentInput(input)
+	}
+}
+
+func WithBlockIssuanceCreditInput(input *iotago.BlockIssuanceCreditInput) options.Option[builder.TransactionBuilder] {
+	return func(txBuilder *builder.TransactionBuilder) {
+		txBuilder.AddBlockIssuanceCreditInput(input)
+	}
+}
+
+func WithRewardInput(input *iotago.RewardInput, mana iotago.Mana) options.Option[builder.TransactionBuilder] {
+	return func(txBuilder *builder.TransactionBuilder) {
+		txBuilder.AddRewardInput(input, mana)
 	}
 }
 
@@ -92,6 +129,12 @@ func WithOutputs(outputs iotago.Outputs[iotago.Output]) options.Option[builder.T
 func WithTaggedDataPayload(payload *iotago.TaggedData) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		txBuilder.AddTaggedDataPayload(payload)
+	}
+}
+
+func WithAllotAllManaToAccount(slot iotago.SlotIndex, accountID iotago.AccountID) options.Option[builder.TransactionBuilder] {
+	return func(txBuilder *builder.TransactionBuilder) {
+		txBuilder.AllotAllMana(slot, accountID)
 	}
 }
 
@@ -159,9 +202,21 @@ func WithBlockIssuerExpirySlot(expirySlot iotago.SlotIndex) options.Option[build
 	}
 }
 
+func WithoutBlockIssuerFeature() options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.RemoveFeature(iotago.FeatureBlockIssuer)
+	}
+}
+
 func WithStakingFeature(amount iotago.BaseToken, fixedCost iotago.Mana, startEpoch iotago.EpochIndex, optEndEpoch ...iotago.EpochIndex) options.Option[builder.AccountOutputBuilder] {
 	return func(accountBuilder *builder.AccountOutputBuilder) {
 		accountBuilder.Staking(amount, fixedCost, startEpoch, optEndEpoch...)
+	}
+}
+
+func WithoutStakingFeature() options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.RemoveFeature(iotago.FeatureStaking)
 	}
 }
 

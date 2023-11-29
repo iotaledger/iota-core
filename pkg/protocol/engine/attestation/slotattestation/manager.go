@@ -335,8 +335,10 @@ func (m *Manager) Reset() {
 }
 
 func (m *Manager) computeAttestationCommitmentOffset(slot iotago.SlotIndex) (cutoffSlot iotago.SlotIndex, isValid bool) {
-	if slot < m.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge() {
-		return 0, false
+	protocolParams := m.apiProvider.APIForSlot(slot).ProtocolParameters()
+
+	if slot < protocolParams.GenesisSlot()+protocolParams.MaxCommittableAge() {
+		return protocolParams.GenesisSlot(), false
 	}
 
 	return slot - m.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge(), true

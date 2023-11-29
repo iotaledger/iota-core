@@ -16,7 +16,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -88,7 +87,7 @@ func (t *TestSuite) InitPerformanceTracker() {
 		},
 		performanceFactorFunc,
 		t.latestCommittedEpoch,
-		api.SingleVersionProvider(t.api),
+		iotago.SingleVersionProvider(t.api),
 		func(err error) {},
 	)
 }

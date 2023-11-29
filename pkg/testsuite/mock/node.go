@@ -22,8 +22,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/commitmentfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -71,7 +71,8 @@ type Node struct {
 
 	mutex               syncutils.RWMutex
 	attachedBlocks      []*blocks.Block
-	filteredBlockEvents []*commitmentfilter.BlockFilteredEvent
+	currentSlot         iotago.SlotIndex
+	filteredBlockEvents []*postsolidfilter.BlockFilteredEvent
 }
 
 func NewNode(t *testing.T, net *Network, partition string, name string, validator bool) *Node {
@@ -108,6 +109,10 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 		attachedBlocks: make([]*blocks.Block, 0),
 	}
+}
+
+func (n *Node) SetCurrentSlot(slot iotago.SlotIndex) {
+	n.currentSlot = slot
 }
 
 func (n *Node) IsValidator() bool {
@@ -150,6 +155,13 @@ func (n *Node) hookEvents() {
 	events.CandidateEngineActivated.Hook(func(e *engine.Engine) { n.candidateEngineActivatedCount.Add(1) })
 
 	events.MainEngineSwitched.Hook(func(e *engine.Engine) { n.mainEngineSwitchedCount.Add(1) })
+
+	n.Protocol.Events.Engine.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+		n.mutex.Lock()
+		defer n.mutex.Unlock()
+
+		n.filteredBlockEvents = append(n.filteredBlockEvents, event)
+	})
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
@@ -295,23 +307,23 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		fmt.Printf("%s > [%s] Clock.ConfirmedTimeUpdated: %s [Slot %d]\n", n.Name, engineName, newTime, instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
 	})
 
-	events.Filter.BlockPreAllowed.Hook(func(block *model.Block) {
-		fmt.Printf("%s > [%s] Filter.BlockPreAllowed: %s\n", n.Name, engineName, block.ID())
+	events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
+		fmt.Printf("%s > [%s] PreSolidFilter.BlockPreAllowed: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.Filter.BlockPreFiltered.Hook(func(event *filter.BlockPreFilteredEvent) {
-		fmt.Printf("%s > [%s] Filter.BlockPreFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+	events.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
+		fmt.Printf("%s > [%s] PreSolidFilter.BlockPreFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
 		if failOnBlockFiltered {
 			n.Testing.Fatal("no blocks should be prefiltered")
 		}
 	})
 
-	events.CommitmentFilter.BlockAllowed.Hook(func(block *blocks.Block) {
-		fmt.Printf("%s > [%s] CommitmentFilter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
+	events.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
+		fmt.Printf("%s > [%s] PostSolidFilter.BlockAllowed: %s\n", n.Name, engineName, block.ID())
 	})
 
-	events.CommitmentFilter.BlockFiltered.Hook(func(event *commitmentfilter.BlockFilteredEvent) {
-		fmt.Printf("%s > [%s] CommitmentFilter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
+	events.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+		fmt.Printf("%s > [%s] PostSolidFilter.BlockFiltered: %s - %s\n", n.Name, engineName, event.Block.ID(), event.Reason.Error())
 		if failOnBlockFiltered {
 			n.Testing.Fatal("no blocks should be filtered")
 		}
@@ -392,19 +404,19 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		fmt.Printf("%s > [%s] SybilProtection.CommitteeSelected: epoch %d - %s\n", n.Name, engineName, epoch, committee.IDs())
 	})
 
-	events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictCreated: %s\n", n.Name, engineName, conflictID)
+	events.SpendDAG.SpenderCreated.Hook(func(spenderID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] SpendDAG.SpendCreated: %s\n", n.Name, engineName, spenderID)
 	})
 
-	events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictEvicted: %s\n", n.Name, engineName, conflictID)
+	events.SpendDAG.SpenderEvicted.Hook(func(spenderID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] SpendDAG.SpendEvicted: %s\n", n.Name, engineName, spenderID)
 	})
-	events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictRejected: %s\n", n.Name, engineName, conflictID)
+	events.SpendDAG.SpenderRejected.Hook(func(spenderID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] SpendDAG.SpendRejected: %s\n", n.Name, engineName, spenderID)
 	})
 
-	events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
-		fmt.Printf("%s > [%s] ConflictDAG.ConflictAccepted: %s\n", n.Name, engineName, conflictID)
+	events.SpendDAG.SpenderAccepted.Hook(func(spenderID iotago.TransactionID) {
+		fmt.Printf("%s > [%s] SpendDAG.SpendAccepted: %s\n", n.Name, engineName, spenderID)
 	})
 
 	instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
@@ -512,7 +524,7 @@ func (n *Node) CandidateEngineActivatedCount() int {
 	return int(n.candidateEngineActivatedCount.Load())
 }
 
-func (n *Node) FilteredBlocks() []*commitmentfilter.BlockFilteredEvent {
+func (n *Node) FilteredBlocks() []*postsolidfilter.BlockFilteredEvent {
 	n.mutex.RLock()
 	defer n.mutex.RUnlock()
 

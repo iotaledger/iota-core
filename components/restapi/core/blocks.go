@@ -6,16 +6,14 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/blockhandler"
-	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
-func blockByID(c echo.Context) (*model.Block, error) {
-	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+func blockByID(c echo.Context) (*iotago.Block, error) {
+	blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(restapi.ParameterBlockID))
+		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
 	}
 
 	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
@@ -23,10 +21,10 @@ func blockByID(c echo.Context) (*model.Block, error) {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
 	}
 
-	return block, nil
+	return block.ProtocolBlock(), nil
 }
 
-func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataResponse, error) {
+func blockMetadataByBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
 	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
@@ -35,49 +33,72 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*apimodels.BlockMetadataRes
 	return blockMetadata.BlockMetadataResponse(), nil
 }
 
-func blockMetadataByID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
-	blockID, err := httpserver.ParseBlockIDParam(c, restapi.ParameterBlockID)
+func transactionMetadataByBlockID(blockID iotago.BlockID) (*api.TransactionMetadataResponse, error) {
+	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(restapi.ParameterBlockID))
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
+	}
+
+	metadata := blockMetadata.TransactionMetadataResponse()
+	if metadata == nil {
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "transaction not found")
+	}
+
+	return metadata, nil
+}
+
+func blockMetadataByID(c echo.Context) (*api.BlockMetadataResponse, error) {
+	blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
 	}
 
 	return blockMetadataByBlockID(blockID)
 }
 
-func blockIssuanceBySlot(slotIndex iotago.SlotIndex) (*apimodels.IssuanceBlockHeaderResponse, error) {
+func blockWithMetadataByID(c echo.Context) (*api.BlockWithMetadataResponse, error) {
+	blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
+	}
+
+	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	if !exists {
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "no transaction found for block ID %s", blockID.ToHex())
+	}
+
+	blockMetadata, err := blockMetadataByBlockID(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.BlockWithMetadataResponse{
+		Block:    block.ProtocolBlock(),
+		Metadata: blockMetadata,
+	}, nil
+}
+
+func blockIssuance() (*api.IssuanceBlockHeaderResponse, error) {
 	references := deps.Protocol.MainEngineInstance().TipSelection.SelectTips(iotago.BasicBlockMaxParents)
-
-	var slotCommitment *model.Commitment
-	var err error
-	// by default we use latest commitment
-	if slotIndex == 0 {
-		slotCommitment = deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
-	} else {
-		slotCommitment, err = deps.Protocol.MainEngineInstance().Storage.Commitments().Load(slotIndex)
-		if err != nil {
-			return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to load commitment for requested slot %d: %s", slotIndex, err)
-		}
-	}
-
 	if len(references[iotago.StrongParentType]) == 0 {
-		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "get references failed")
+		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "no strong parents available")
 	}
 
-	resp := &apimodels.IssuanceBlockHeaderResponse{
+	resp := &api.IssuanceBlockHeaderResponse{
 		StrongParents:       references[iotago.StrongParentType],
 		WeakParents:         references[iotago.WeakParentType],
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType],
 		LatestFinalizedSlot: deps.Protocol.MainEngineInstance().SyncManager.LatestFinalizedSlot(),
-		Commitment:          slotCommitment.Commitment(),
+		LatestCommitment:    deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Commitment(),
 	}
 
 	return resp, nil
 }
 
-func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
+func sendBlock(c echo.Context) (*api.BlockCreatedResponse, error) {
 	iotaBlock, err := httpserver.ParseRequestByHeader(c, deps.Protocol.CommittedAPI(), iotago.BlockFromBytes(deps.Protocol))
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse iotablock")
+		return nil, err
 	}
 
 	blockID, err := deps.BlockHandler.AttachBlock(c.Request().Context(), iotaBlock)
@@ -94,7 +115,7 @@ func sendBlock(c echo.Context) (*apimodels.BlockCreatedResponse, error) {
 		}
 	}
 
-	return &apimodels.BlockCreatedResponse{
+	return &api.BlockCreatedResponse{
 		BlockID: blockID,
 	}, nil
 }

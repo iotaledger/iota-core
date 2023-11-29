@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"testing"
 
+	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -29,6 +30,7 @@ type Wallet struct {
 
 	outputs      map[string]*utxoledger.Output
 	transactions map[string]*iotago.Transaction
+	currentSlot  iotago.SlotIndex
 }
 
 func NewWallet(t *testing.T, name string, node *Node, keyManager ...*KeyManager) *Wallet {
@@ -47,6 +49,7 @@ func NewWallet(t *testing.T, name string, node *Node, keyManager ...*KeyManager)
 		outputs:      make(map[string]*utxoledger.Output),
 		transactions: make(map[string]*iotago.Transaction),
 		keyManager:   km,
+		BlockIssuer:  NewBlockIssuer(t, name, km, iotago.EmptyAccountID, false),
 	}
 }
 
@@ -54,8 +57,21 @@ func (w *Wallet) SetBlockIssuer(accountID iotago.AccountID) {
 	w.BlockIssuer = NewBlockIssuer(w.Testing, w.Name, w.keyManager, accountID, false)
 }
 
+func (w *Wallet) BlockIssuerKey() iotago.BlockIssuerKey {
+	if w.BlockIssuer != nil {
+		return w.BlockIssuerKey()
+	}
+	_, pub := w.keyManager.KeyPair()
+
+	return iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(pub))
+}
+
 func (w *Wallet) SetDefaultNode(node *Node) {
 	w.Node = node
+}
+
+func (w *Wallet) SetCurrentSlot(slot iotago.SlotIndex) {
+	w.currentSlot = slot
 }
 
 func (w *Wallet) AddOutput(outputName string, output *utxoledger.Output) {

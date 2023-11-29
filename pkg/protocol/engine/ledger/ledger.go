@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/rmc"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -30,14 +30,14 @@ type Ledger interface {
 	ForEachUnspentOutput(func(output *utxoledger.Output) bool) error
 	AddGenesisUnspentOutput(unspentOutput *utxoledger.Output) error
 
-	ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, BlockVoteRank]
+	SpendDAG() spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, BlockVoteRank]
 	MemPool() mempool.MemPool[BlockVoteRank]
 	SlotDiffs(slot iotago.SlotIndex) (*utxoledger.SlotDiff, error)
 
 	ManaManager() *mana.Manager
 	RMCManager() *rmc.Manager
 
-	CommitSlot(slot iotago.SlotIndex) (stateRoot, mutationRoot, accountRoot iotago.Identifier, err error)
+	CommitSlot(slot iotago.SlotIndex) (stateRoot, mutationRoot, accountRoot iotago.Identifier, created utxoledger.Outputs, consumed utxoledger.Spents, err error)
 
 	Import(reader io.ReadSeeker) error
 	Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) error

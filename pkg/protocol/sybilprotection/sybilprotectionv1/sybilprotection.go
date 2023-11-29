@@ -21,7 +21,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/topstakers"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1/performance"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type SybilProtection struct {
@@ -331,7 +331,7 @@ func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.
 }
 
 // OrderedRegisteredCandidateValidatorsList returns the currently known list of registered validator candidates for the given epoch.
-func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.EpochIndex) ([]*apimodels.ValidatorResponse, error) {
+func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.EpochIndex) ([]*api.ValidatorResponse, error) {
 	candidates, err := o.performanceTracker.ValidatorCandidates(epoch)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to retrieve candidates")
@@ -342,7 +342,7 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 		return nil, ierrors.Wrapf(err, "failed to retrieve eligible candidates")
 	}
 
-	validatorResp := make([]*apimodels.ValidatorResponse, 0, candidates.Size())
+	validatorResp := make([]*api.ValidatorResponse, 0, candidates.Size())
 	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
 		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
 		if err != nil {
@@ -356,9 +356,9 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 			return nil
 		}
 		active := activeCandidates.Has(candidate)
-		validatorResp = append(validatorResp, &apimodels.ValidatorResponse{
-			AccountID:                      accountData.ID,
-			StakingEpochEnd:                accountData.StakeEndEpoch,
+		validatorResp = append(validatorResp, &api.ValidatorResponse{
+			AddressBech32:                  accountData.ID.ToAddress().Bech32(o.apiProvider.CommittedAPI().ProtocolParameters().Bech32HRP()),
+			StakingEndEpoch:                accountData.StakeEndEpoch,
 			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 			ValidatorStake:                 accountData.ValidatorStake,
 			FixedCost:                      accountData.FixedCost,

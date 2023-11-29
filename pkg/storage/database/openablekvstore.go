@@ -10,25 +10,38 @@ import (
 )
 
 type openableKVStore struct {
-	storeInstance kvstore.KVStore // KVStore that is used to access the DB instance
-	parentStore   *openableKVStore
-	dbPrefix      kvstore.KeyPrefix
+	openIfNecessary func() // openIfNecessary callback should synchronize itself and make sure that storeInstance is ready to use after.
+	closeStore      func()
+	storeInstance   kvstore.KVStore // storeInstance is a KVStore that is holding the reference to the underlying database.
+	parentStore     *openableKVStore
+	dbPrefix        kvstore.KeyPrefix
 }
 
-func newOpenableKVStore(storeInstance kvstore.KVStore) *openableKVStore {
+func newOpenableKVStore(storeInstance kvstore.KVStore, openStoreIfNecessary func(), closeStore func()) *openableKVStore {
 	return &openableKVStore{
-		storeInstance: storeInstance,
-		parentStore:   nil,
-		dbPrefix:      kvstore.EmptyPrefix,
+		openIfNecessary: openStoreIfNecessary,
+		closeStore:      closeStore,
+		storeInstance:   storeInstance,
+		parentStore:     nil,
+		dbPrefix:        kvstore.EmptyPrefix,
 	}
+}
+
+func (s *openableKVStore) topParent() *openableKVStore {
+	current := s
+	for current.parentStore != nil {
+		current = current.parentStore
+	}
+
+	return current
 }
 
 func (s *openableKVStore) instance() kvstore.KVStore {
-	if s.storeInstance != nil {
-		return s.storeInstance
-	}
+	parent := s.topParent()
+	// openIfNecessary callback should synchronize itself and make sure that storeInstance is ready to use after.
+	parent.openIfNecessary()
 
-	return s.parentStore.instance()
+	return parent.storeInstance
 }
 
 func (s *openableKVStore) Replace(newKVStore kvstore.KVStore) {
@@ -44,6 +57,7 @@ func (s *openableKVStore) Replace(newKVStore kvstore.KVStore) {
 func (s *openableKVStore) WithRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return s.withRealm(realm)
 }
+
 func (s *openableKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return &openableKVStore{
 		storeInstance: nil,
@@ -51,6 +65,7 @@ func (s *openableKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error
 		dbPrefix:      realm,
 	}, nil
 }
+
 func (s *openableKVStore) WithExtendedRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
 	return s.withRealm(s.buildKeyPrefix(realm))
 }
@@ -98,8 +113,11 @@ func (s *openableKVStore) DeletePrefix(prefix kvstore.KeyPrefix) error {
 func (s *openableKVStore) Flush() error {
 	return s.instance().Flush()
 }
+
 func (s *openableKVStore) Close() error {
-	return s.instance().Close()
+	s.topParent().closeStore()
+
+	return nil
 }
 
 func (s *openableKVStore) Batched() (kvstore.BatchedMutations, error) {

@@ -14,13 +14,13 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 type TestFramework struct {
-	Instance    mempool.MemPool[vote.MockedRank]
-	ConflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank]
+	Instance mempool.MemPool[vote.MockedRank]
+	SpendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank]
 
 	referencesByAlias        map[string]mempool.StateReference
 	stateIDByAlias           map[string]mempool.StateID
@@ -35,10 +35,10 @@ type TestFramework struct {
 	mutex syncutils.RWMutex
 }
 
-func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank], conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
+func NewTestFramework(test *testing.T, instance mempool.MemPool[vote.MockedRank], spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, vote.MockedRank], ledgerState *ledgertests.MockStateResolver, workers *workerpool.Group) *TestFramework {
 	t := &TestFramework{
 		Instance:                 instance,
-		ConflictDAG:              conflictDAG,
+		SpendDAG:                 spendDAG,
 		referencesByAlias:        make(map[string]mempool.StateReference),
 		stateIDByAlias:           make(map[string]mempool.StateID),
 		signedTransactionByAlias: make(map[string]mempool.SignedTransaction),
@@ -243,16 +243,16 @@ func (t *TestFramework) RequireTransactionsEvicted(transactionAliases map[string
 	}
 }
 
-func (t *TestFramework) RequireConflictIDs(conflictMapping map[string][]string) {
-	for transactionAlias, conflictAliases := range conflictMapping {
+func (t *TestFramework) RequireSpenderIDs(spendMapping map[string][]string) {
+	for transactionAlias, spendAliases := range spendMapping {
 		transactionMetadata, exists := t.Instance.TransactionMetadata(t.TransactionID(transactionAlias))
 		require.True(t.test, exists, "transaction %s does not exist", transactionAlias)
 
-		conflictIDs := transactionMetadata.ConflictIDs()
-		require.Equal(t.test, len(conflictAliases), conflictIDs.Size(), "%s has wrong number of ConflictIDs", transactionAlias)
+		spenderIDs := transactionMetadata.SpenderIDs()
+		require.Equal(t.test, len(spendAliases), spenderIDs.Size(), "%s has wrong number of SpenderIDs", transactionAlias)
 
-		for _, conflictAlias := range conflictAliases {
-			require.True(t.test, conflictIDs.Has(t.TransactionID(conflictAlias)), "transaction %s should have conflict %s, instead had %s", transactionAlias, conflictAlias, conflictIDs)
+		for _, spendAlias := range spendAliases {
+			require.True(t.test, spenderIDs.Has(t.TransactionID(spendAlias)), "transaction %s should have spender %s, instead had %s", transactionAlias, spendAlias, spenderIDs)
 		}
 	}
 }

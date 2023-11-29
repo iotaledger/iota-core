@@ -15,6 +15,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/storage"
@@ -34,13 +35,14 @@ type Manager struct {
 	ledger              ledger.Ledger
 	sybilProtection     sybilprotection.SybilProtection
 	upgradeOrchestrator upgrade.Orchestrator
+	tipSelection        tipselection.TipSelection
 
 	storage *storage.Storage
 
 	acceptedTimeFunc func() time.Time
 	apiProvider      iotago.APIProvider
 
-	commitmentMutex syncutils.Mutex
+	commitmentMutex syncutils.RWMutex
 
 	module.Module
 }
@@ -57,6 +59,7 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 
 			m.ledger = e.Ledger
 			m.sybilProtection = e.SybilProtection
+			m.tipSelection = e.TipSelection
 			m.attestation = e.Attestations
 			m.upgradeOrchestrator = e.UpgradeOrchestrator
 
@@ -111,6 +114,15 @@ func (m *Manager) ForceCommit(slot iotago.SlotIndex) (*model.Commitment, error) 
 		return nil, ierrors.New("notarization manager was stopped")
 	}
 
+	// When force committing set acceptance time in TipSelection to the end of the epoch
+	// that is LivenessThresholdUpperBound in the future from the committed slot,
+	// so that all the unaccepted blocks in force committed slot are orphaned.
+	// The value must be at least LivenessThresholdUpperBound in the future.
+	// This is to avoid the situation in which future cone of those blocks becomes accepted after force-committing the slot.
+	// This would cause issues with consistency as it's impossible to add blocks to a committed slot.
+	artificialAcceptanceTime := m.apiProvider.APIForSlot(slot).TimeProvider().SlotEndTime(slot).Add(m.apiProvider.APIForSlot(slot).ProtocolParameters().LivenessThresholdUpperBound())
+	m.tipSelection.SetAcceptanceTime(artificialAcceptanceTime)
+
 	commitment, err := m.createCommitment(slot)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to create commitment for slot %d", slot)
@@ -144,6 +156,9 @@ func (m *Manager) IsBootstrapped() bool {
 }
 
 func (m *Manager) notarizeAcceptedBlock(block *blocks.Block) (err error) {
+	m.commitmentMutex.RLock()
+	defer m.commitmentMutex.RUnlock()
+
 	if err = m.slotMutations.AddAcceptedBlock(block); err != nil {
 		return ierrors.Wrap(err, "failed to add accepted block to slot mutations")
 	}
@@ -192,7 +207,7 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 		return nil, ierrors.Wrap(err, "failed to commit attestations")
 	}
 
-	stateRoot, mutationRoot, accountRoot, err := m.ledger.CommitSlot(slot)
+	stateRoot, mutationRoot, accountRoot, created, consumed, err := m.ledger.CommitSlot(slot)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to commit ledger")
 	}
@@ -255,6 +270,8 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 		Commitment:            newModelCommitment,
 		AcceptedBlocks:        acceptedBlocks,
 		ActiveValidatorsCount: 0,
+		OutputsCreated:        created,
+		OutputsConsumed:       consumed,
 	})
 
 	if err = m.storage.Settings().SetLatestCommitment(newModelCommitment); err != nil {

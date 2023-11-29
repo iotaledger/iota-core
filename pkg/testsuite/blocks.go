@@ -66,10 +66,12 @@ func (t *TestSuite) AssertBlockFiltered(blocks []*blocks.Block, reason error, no
 					if ierrors.Is(filteredBlockEvent.Reason, reason) {
 						return nil
 					}
+
+					return ierrors.Errorf("AssertBlockFiltered: %s: block %s was filtered with reason %s but expected %s", node.Name, block.ID(), filteredBlockEvent.Reason, reason)
 				}
 			}
 
-			return ierrors.Errorf("AssertBlockFiltered: %s: block %s was not filtered by the CommitmentFilter", node.Name, block.ID())
+			return ierrors.Errorf("AssertBlockFiltered: %s: block %s was not filtered by the PostSolidFilter", node.Name, block.ID())
 		})
 	}
 }
@@ -146,15 +148,15 @@ func (t *TestSuite) AssertBlocksInCacheConflicts(blockConflicts map[*blocks.Bloc
 					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s is root block", node.Name, blockFromCache.ID())
 				}
 
-				expectedConflictIDs := ds.NewSet(lo.Map(conflictAliases, t.DefaultWallet().TransactionID)...)
-				actualConflictIDs := blockFromCache.ConflictIDs()
+				expectedSpenderIDs := ds.NewSet(lo.Map(conflictAliases, t.DefaultWallet().TransactionID)...)
+				actualSpenderIDs := blockFromCache.SpenderIDs()
 
-				if expectedConflictIDs.Size() != actualConflictIDs.Size() {
-					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s conflict count incorrect: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedConflictIDs, actualConflictIDs)
+				if expectedSpenderIDs.Size() != actualSpenderIDs.Size() {
+					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s conflict count incorrect: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedSpenderIDs, actualSpenderIDs)
 				}
 
-				if !actualConflictIDs.HasAll(expectedConflictIDs) {
-					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedConflictIDs, actualConflictIDs)
+				if !actualSpenderIDs.HasAll(expectedSpenderIDs) {
+					return ierrors.Errorf("AssertBlocksInCacheConflicts: %s: block %s: expected conflicts %v, got %v", node.Name, blockFromCache.ID(), expectedSpenderIDs, actualSpenderIDs)
 				}
 
 				return nil
