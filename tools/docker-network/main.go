@@ -210,7 +210,7 @@ func AwaitCommitteeSelection(client *nodeclient.Client, expectedEpoch iotago.Epo
 
 func DockerNetworkRun() *nodeclient.Client {
 	go func() {
-		exec.Command("./run_dev.sh", "2>&1", "&").Run()
+		exec.Command("./run_dev_test.sh", "2>&1", "&").Run()
 	}()
 
 	// first wait until the node is available
