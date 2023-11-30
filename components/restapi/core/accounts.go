@@ -13,17 +13,36 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
-func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, error) {
-	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
+func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error) {
+	commitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, api.ParameterCommitmentID)
 	if err != nil {
 		return nil, err
 	}
 
 	commitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+	if commitmentID != iotago.EmptyCommitmentID {
+		// a commitment ID was provided, so we use the commitment for that ID
+		commitment, err = getCommitmentByID(commitmentID, commitment)
+		if err != nil {
+			return nil, err
+		}
+	}
 
+	hrp := deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()
+	address, err := httpserver.ParseBech32AddressParam(c, hrp, api.ParameterBech32Address)
+	if err != nil {
+		return nil, err
+	}
+
+	accountAddress, ok := address.(*iotago.AccountAddress)
+	if !ok {
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(api.ParameterBech32Address))
+	}
+
+	accountID := accountAddress.AccountID()
 	acc, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, commitment.Slot())
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)
@@ -32,7 +51,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "account not found: %s", accountID.ToHex())
 	}
 
-	return &apimodels.CongestionResponse{
+	return &api.CongestionResponse{
 		Slot:                 commitment.Slot(),
 		Ready:                deps.Protocol.MainEngineInstance().Scheduler.IsBlockIssuerReady(accountID),
 		ReferenceManaCost:    commitment.ReferenceManaCost(),
@@ -40,7 +59,7 @@ func congestionForAccountID(c echo.Context) (*apimodels.CongestionResponse, erro
 	}, nil
 }
 
-func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
+func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	var err error
 	pageSize := restapi.ParamsRestAPI.MaxPageSize
 	if len(c.QueryParam(restapipkg.QueryParameterPageSize)) > 0 {
@@ -81,7 +100,7 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	}
 
 	page := registeredValidators[cursorIndex:lo.Min(cursorIndex+pageSize, uint32(len(registeredValidators)))]
-	resp := &apimodels.ValidatorsResponse{
+	resp := &api.ValidatorsResponse{
 		Validators: page,
 		PageSize:   pageSize,
 	}
@@ -95,13 +114,21 @@ func validators(c echo.Context) (*apimodels.ValidatorsResponse, error) {
 	return resp, nil
 }
 
-func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) {
-	accountID, err := httpserver.ParseAccountIDParam(c, restapipkg.ParameterAccountID)
+func validatorByAccountAddress(c echo.Context) (*api.ValidatorResponse, error) {
+	hrp := deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()
+	address, err := httpserver.ParseBech32AddressParam(c, hrp, api.ParameterBech32Address)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse account ID %s", c.Param(restapipkg.ParameterAccountID))
+		return nil, err
 	}
+
+	accountAddress, ok := address.(*iotago.AccountAddress)
+	if !ok {
+		return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "address %s is not an account address", c.Param(api.ParameterBech32Address))
+	}
+
 	latestCommittedSlot := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot()
 
+	accountID := accountAddress.AccountID()
 	accountData, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get account %s from the Ledger: %s", accountID.ToHex(), err)
@@ -109,6 +136,7 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	if !exists {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "account %s not found for latest committedSlot %d", accountID.ToHex(), latestCommittedSlot)
 	}
+
 	nextEpoch := deps.Protocol.APIForSlot(latestCommittedSlot).TimeProvider().EpochFromSlot(latestCommittedSlot) + 1
 
 	active, err := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, nextEpoch)
@@ -116,11 +144,11 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 		return nil, ierrors.Wrapf(err, "failed to check if account %s is an active candidate", accountID.ToHex())
 	}
 
-	return &apimodels.ValidatorResponse{
-		AccountID:                      accountID,
+	return &api.ValidatorResponse{
+		AddressBech32:                  accountID.ToAddress().Bech32(deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()),
 		PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 		ValidatorStake:                 accountData.ValidatorStake,
-		StakingEpochEnd:                accountData.StakeEndEpoch,
+		StakingEndEpoch:                accountData.StakeEndEpoch,
 		FixedCost:                      accountData.FixedCost,
 		Active:                         active,
 		LatestSupportedProtocolVersion: accountData.LatestSupportedProtocolVersionAndHash.Version,
@@ -128,18 +156,18 @@ func validatorByAccountID(c echo.Context) (*apimodels.ValidatorResponse, error) 
 	}, nil
 }
 
-func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
-	outputID, err := httpserver.ParseOutputIDParam(c, restapipkg.ParameterOutputID)
+func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
+	outputID, err := httpserver.ParseOutputIDParam(c, api.ParameterOutputID)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(restapipkg.ParameterOutputID))
+		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
 	}
 
 	var slotIndex iotago.SlotIndex
-	if len(c.QueryParam(restapipkg.ParameterSlotIndex)) > 0 {
+	if len(c.QueryParam(api.ParameterSlot)) > 0 {
 		var err error
-		slotIndex, err = httpserver.ParseSlotQueryParam(c, restapipkg.ParameterSlotIndex)
+		slotIndex, err = httpserver.ParseSlotQueryParam(c, api.ParameterSlot)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse slot index %s", c.Param(restapipkg.ParameterSlotIndex))
+			return nil, ierrors.Wrapf(err, "failed to parse slot index %s", c.Param(api.ParameterSlot))
 		}
 		genesisSlot := deps.Protocol.LatestAPI().ProtocolParameters().GenesisSlot()
 		if slotIndex < genesisSlot {
@@ -203,19 +231,19 @@ func rewardsByOutputID(c echo.Context) (*apimodels.ManaRewardsResponse, error) {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to calculate reward for output %s: %s", outputID.ToHex(), err)
 	}
 
-	return &apimodels.ManaRewardsResponse{
-		EpochStart: actualStart,
-		EpochEnd:   actualEnd,
+	return &api.ManaRewardsResponse{
+		StartEpoch: actualStart,
+		EndEpoch:   actualEnd,
 		Rewards:    reward,
 	}, nil
 }
 
-func selectedCommittee(c echo.Context) (*apimodels.CommitteeResponse, error) {
+func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {
 	timeProvider := deps.Protocol.CommittedAPI().TimeProvider()
 
 	var slot iotago.SlotIndex
 
-	epoch, err := httpserver.ParseEpochQueryParam(c, restapipkg.ParameterEpochIndex)
+	epoch, err := httpserver.ParseEpochQueryParam(c, api.ParameterEpoch)
 	if err != nil {
 		// by default we return current epoch
 		slot = timeProvider.SlotFromTime(time.Now())
@@ -226,7 +254,7 @@ func selectedCommittee(c echo.Context) (*apimodels.CommitteeResponse, error) {
 
 	seatedAccounts, exists := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)
 	if !exists {
-		return &apimodels.CommitteeResponse{
+		return &api.CommitteeResponse{
 			Epoch: epoch,
 		}, nil
 	}
@@ -236,10 +264,10 @@ func selectedCommittee(c echo.Context) (*apimodels.CommitteeResponse, error) {
 		return nil, ierrors.Wrapf(err, "failed to get accounts from committee for slot %d", slot)
 	}
 
-	committee := make([]*apimodels.CommitteeMemberResponse, 0, accounts.Size())
+	committee := make([]*api.CommitteeMemberResponse, 0, accounts.Size())
 	accounts.ForEach(func(accountID iotago.AccountID, seat *account.Pool) bool {
-		committee = append(committee, &apimodels.CommitteeMemberResponse{
-			AccountID:      accountID,
+		committee = append(committee, &api.CommitteeMemberResponse{
+			AddressBech32:  accountID.ToAddress().Bech32(deps.Protocol.CommittedAPI().ProtocolParameters().Bech32HRP()),
 			PoolStake:      seat.PoolStake,
 			ValidatorStake: seat.ValidatorStake,
 			FixedCost:      seat.FixedCost,
@@ -248,7 +276,7 @@ func selectedCommittee(c echo.Context) (*apimodels.CommitteeResponse, error) {
 		return true
 	})
 
-	return &apimodels.CommitteeResponse{
+	return &api.CommitteeResponse{
 		Epoch:               epoch,
 		Committee:           committee,
 		TotalStake:          accounts.TotalStake(),

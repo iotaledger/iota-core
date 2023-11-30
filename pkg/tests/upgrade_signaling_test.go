@@ -26,7 +26,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func Test_Upgrade_Signaling(t *testing.T) {
@@ -75,7 +74,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			storage.WithPruningDelay(20),
 			storage.WithPermanentOptions(
 				permanent.WithEpochBasedProviderOptions(
-					api.WithAPIForMissingVersionCallback(func(protocolParameters iotago.ProtocolParameters) (iotago.API, error) {
+					iotago.WithAPIForMissingVersionCallback(func(protocolParameters iotago.ProtocolParameters) (iotago.API, error) {
 						switch protocolParameters.Version() {
 						case 3:
 							return ts.API, nil
@@ -106,7 +105,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			storage.WithPruningDelay(20),
 			storage.WithPermanentOptions(
 				permanent.WithEpochBasedProviderOptions(
-					api.WithAPIForMissingVersionCallback(func(protocolParameters iotago.ProtocolParameters) (iotago.API, error) {
+					iotago.WithAPIForMissingVersionCallback(func(protocolParameters iotago.ProtocolParameters) (iotago.API, error) {
 						switch protocolParameters.Version() {
 						case 3:
 							return ts.API, nil
@@ -127,7 +126,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.AddValidatorNode("nodeD")
 	ts.AddNode("nodeE")
 	ts.AddNode("nodeF")
-	wallet := ts.AddGenesisWallet("default", nodeA, iotago.MaxBlockIssuanceCredits/2)
+	wallet := ts.AddDefaultWallet(nodeA)
 
 	ts.Run(true, map[string][]options.Option[protocol.Protocol]{
 		"nodeA": nodeOptionsWithoutV5,
@@ -149,7 +148,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		ExpirySlot:                            iotago.MaxSlotIndex,
 		OutputID:                              ts.AccountOutput("Genesis:1").OutputID(),
 		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").Validator.PublicKey))),
-		ValidatorStake:                        mock.MinValidatorAccountAmount,
+		ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         iotago.MaxEpochIndex,
@@ -174,7 +173,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.Node("nodeA").SetProtocolParametersHash(hash2)
 	ts.Node("nodeD").SetHighestSupportedVersion(3)
 	ts.Node("nodeD").SetProtocolParametersHash(hash2)
-	ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, false)
 
 	// check account data before all nodes set the current version
 	ts.AssertAccountData(&accounts.AccountData{
@@ -183,7 +182,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		ExpirySlot:                            iotago.MaxSlotIndex,
 		OutputID:                              ts.AccountOutput("Genesis:1").OutputID(),
 		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").Validator.PublicKey))),
-		ValidatorStake:                        mock.MinValidatorAccountAmount,
+		ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         iotago.MaxEpochIndex,
@@ -196,7 +195,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		ExpirySlot:                            iotago.MaxSlotIndex,
 		OutputID:                              ts.AccountOutput("Genesis:4").OutputID(),
 		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeD").Validator.PublicKey))),
-		ValidatorStake:                        mock.MinValidatorAccountAmount,
+		ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         iotago.MaxEpochIndex,
@@ -209,7 +208,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	ts.Node("nodeD").SetHighestSupportedVersion(5)
 	ts.Node("nodeD").SetProtocolParametersHash(hash2)
 
-	ts.IssueBlocksAtEpoch("", 1, 4, "7.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtEpoch("", 1, 4, "7.3", ts.Nodes(), true, false)
 
 	ts.AssertAccountData(&accounts.AccountData{
 		ID:                                    ts.Node("nodeA").Validator.AccountID,
@@ -217,7 +216,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		ExpirySlot:                            iotago.MaxSlotIndex,
 		OutputID:                              ts.AccountOutput("Genesis:1").OutputID(),
 		BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").Validator.PublicKey))),
-		ValidatorStake:                        mock.MinValidatorAccountAmount,
+		ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 		DelegationStake:                       0,
 		FixedCost:                             0,
 		StakeEndEpoch:                         iotago.MaxEpochIndex,
@@ -230,20 +229,20 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	require.Contains(t, pastAccounts, ts.Node("nodeA").Validator.AccountID)
 	require.Equal(t, model.VersionAndHash{Version: 4, Hash: hash2}, pastAccounts[ts.Node("nodeA").Validator.AccountID].LatestSupportedProtocolVersionAndHash)
 
-	ts.IssueBlocksAtEpoch("", 2, 4, "15.3", ts.Nodes(), true, nil)
-	ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtEpoch("", 2, 4, "15.3", ts.Nodes(), true, false)
+	ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, false)
 
 	// Epoch 5: revoke vote of nodeA in last slot of epoch.
-	ts.IssueBlocksAtSlots("", ts.SlotsForEpoch(4)[:ts.API.TimeProvider().EpochDurationSlots()-1], 4, "31.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtSlots("", ts.SlotsForEpoch(4)[:ts.API.TimeProvider().EpochDurationSlots()-1], 4, "31.3", ts.Nodes(), true, false)
 
 	ts.Node("nodeA").SetProtocolParametersHash(iotago.Identifier{})
 
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{39}, 4, "38.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{39}, 4, "38.3", ts.Nodes(), true, false)
 
 	ts.Node("nodeA").SetProtocolParametersHash(hash1)
 
 	// Epoch 6: issue half before restarting and half after restarting.
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{40, 41, 42, 43}, 4, "39.3", ts.Nodes(), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{40, 41, 42, 43}, 4, "39.3", ts.Nodes(), true, false)
 
 	{
 		var expectedRootBlocks []*blocks.Block
@@ -293,14 +292,14 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}
 
 	// Can only continue to issue on nodeA, nodeB, nodeC, nodeD, nodeF. nodeE and nodeG were just restarted and don't have the latest unaccepted state.
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{44}, 4, "43.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{44}, 4, "43.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF"), true, false)
 
 	// TODO: would be great to dynamically add accounts for later nodes.
 	// Can't issue on nodeG as its account is not known.
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{45, 46, 47}, 4, "44.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, false)
 
-	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
-	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, nil)
+	ts.IssueBlocksAtEpoch("", 6, 4, "47.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, false)
+	ts.IssueBlocksAtEpoch("", 7, 4, "55.3", ts.Nodes("nodeA", "nodeB", "nodeC", "nodeD", "nodeF", "nodeE1"), true, false)
 
 	// Restart node (and add protocol parameters) and add another node from snapshot (also with protocol parameters already set).
 	{
@@ -382,7 +381,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			ExpirySlot:                            iotago.MaxSlotIndex,
 			OutputID:                              ts.AccountOutput("Genesis:1").OutputID(),
 			BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeA").Validator.PublicKey))),
-			ValidatorStake:                        mock.MinValidatorAccountAmount,
+			ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 			DelegationStake:                       0,
 			FixedCost:                             0,
 			StakeEndEpoch:                         iotago.MaxEpochIndex,
@@ -395,7 +394,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 			ExpirySlot:                            iotago.MaxSlotIndex,
 			OutputID:                              ts.AccountOutput("Genesis:4").OutputID(),
 			BlockIssuerKeys:                       iotago.NewBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(ts.Node("nodeD").Validator.PublicKey))),
-			ValidatorStake:                        mock.MinValidatorAccountAmount,
+			ValidatorStake:                        mock.MinValidatorAccountAmount(ts.API.ProtocolParameters()),
 			DelegationStake:                       0,
 			FixedCost:                             0,
 			StakeEndEpoch:                         iotago.MaxEpochIndex,
@@ -411,8 +410,8 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	// Check that issuing still produces the same commitments on the nodes that upgraded. The nodes that did not upgrade
 	// should not be able to issue and process blocks with the new version.
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{64, 65}, 4, "63.3", ts.Nodes("nodeB", "nodeC"), false, nil)
-	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{66, 67, 68, 69, 70, 71}, 4, "65.3", ts.Nodes("nodeB", "nodeC"), true, nil)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{64, 65}, 4, "63.3", ts.Nodes("nodeB", "nodeC"), false, false)
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{66, 67, 68, 69, 70, 71}, 4, "65.3", ts.Nodes("nodeB", "nodeC"), true, false)
 
 	// Nodes that did not set up the new protocol parameters are not able to process blocks with the new version.
 	ts.AssertNodeState(ts.Nodes("nodeA", "nodeD", "nodeF", "nodeG"),

@@ -3,10 +3,12 @@ name: Run Docker Network and Check Health
 on:
   workflow_dispatch:
   pull_request:
-    paths-ignore:
-      - 'documentation/**'
-      - 'scripts/**'
-      - 'tools/**'
+    paths:
+      - '**'
+      - '!documentation/**'
+      - '!scripts/**'
+      - '!tools/**'
+      - 'tools/genesis-snapshot/**'
 
 concurrency: 
   group: run-and-check-group

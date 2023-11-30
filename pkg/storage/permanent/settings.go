@@ -16,7 +16,6 @@ import (
 	"github.com/iotaledger/hive.go/stringify"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 const (
@@ -42,11 +41,11 @@ type Settings struct {
 	storeFutureProtocolParameters    *kvstore.TypedStore[iotago.Version, *types.Tuple[iotago.EpochIndex, iotago.Identifier]]
 	storeProtocolParameters          *kvstore.TypedStore[iotago.Version, iotago.ProtocolParameters]
 
-	apiProvider *api.EpochBasedProvider
+	apiProvider *iotago.EpochBasedProvider
 }
 
-func NewSettings(store kvstore.KVStore, opts ...options.Option[api.EpochBasedProvider]) (settings *Settings) {
-	apiProvider := api.NewEpochBasedProvider(opts...)
+func NewSettings(store kvstore.KVStore, opts ...options.Option[iotago.EpochBasedProvider]) (settings *Settings) {
+	apiProvider := iotago.NewEpochBasedProvider(opts...)
 
 	s := &Settings{
 		store:       store,
@@ -176,7 +175,7 @@ func (s *Settings) loadFutureProtocolParameters() {
 	}
 }
 
-func (s *Settings) APIProvider() *api.EpochBasedProvider {
+func (s *Settings) APIProvider() *iotago.EpochBasedProvider {
 	return s.apiProvider
 }
 

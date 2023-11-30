@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -22,11 +21,7 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 		e.HookConstructed(func() {
 			// wait for submodules to be constructed (so all of their properties are available)
 			module.OnAllConstructed(func() {
-				t.Construct(e.TipManager, e.Ledger.ConflictDAG(), e.Ledger.MemPool().TransactionMetadata, func() iotago.BlockIDs { return lo.Keys(e.EvictionState.ActiveRootBlocks()) }, DynamicLivenessThreshold(e.SybilProtection.SeatManager().OnlineCommittee().Size))
-
-				e.Events.AcceptedBlockProcessed.Hook(func(block *blocks.Block) {
-					t.SetAcceptanceTime(block.IssuingTime())
-				})
+				t.Construct(e.TipManager, e.Ledger.SpendDAG(), e.Ledger.MemPool().TransactionMetadata, func() iotago.BlockIDs { return lo.Keys(e.EvictionState.ActiveRootBlocks()) }, DynamicLivenessThreshold(e.SybilProtection.SeatManager().OnlineCommittee().Size))
 			}, e.TipManager, e.Ledger, e.SybilProtection)
 		})
 

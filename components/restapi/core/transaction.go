@@ -6,15 +6,14 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
-	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/nodeclient/apimodels"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func blockIDByTransactionID(c echo.Context) (iotago.BlockID, error) {
-	txID, err := httpserver.ParseTransactionIDParam(c, restapipkg.ParameterTransactionID)
+	txID, err := httpserver.ParseTransactionIDParam(c, api.ParameterTransactionID)
 	if err != nil {
-		return iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to parse transaction ID %s", c.Param(restapipkg.ParameterTransactionID))
+		return iotago.EmptyBlockID, ierrors.Wrapf(err, "failed to parse transaction ID %s", c.Param(api.ParameterTransactionID))
 	}
 
 	return blockIDFromTransactionID(txID)
@@ -50,11 +49,32 @@ func blockByTransactionID(c echo.Context) (*model.Block, error) {
 	return block, nil
 }
 
-func blockMetadataFromTransactionID(c echo.Context) (*apimodels.BlockMetadataResponse, error) {
+func blockMetadataFromTransactionID(c echo.Context) (*api.BlockMetadataResponse, error) {
 	blockID, err := blockIDByTransactionID(c)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrBadRequest, "failed to get block ID by transaction ID: %s", err)
 	}
 
 	return blockMetadataByBlockID(blockID)
+}
+
+func transactionMetadataFromTransactionID(c echo.Context) (*api.TransactionMetadataResponse, error) {
+	txID, err := httpserver.ParseTransactionIDParam(c, api.ParameterTransactionID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to parse transaction ID %s", c.Param(api.ParameterTransactionID))
+	}
+
+	blockID, err := blockIDFromTransactionID(txID)
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrNotFound, "failed to get block ID from transaction ID: %v", err)
+	}
+
+	metadata, err := transactionMetadataByBlockID(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata.TransactionID = txID
+
+	return metadata, nil
 }

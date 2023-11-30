@@ -17,7 +17,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -34,7 +33,7 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
 
 	topStakersSeatManager := &SeatManager{
-		apiProvider:     api.SingleVersionProvider(testAPI),
+		apiProvider:     iotago.SingleVersionProvider(testAPI),
 		committeeStore:  committeeStore,
 		events:          seatmanager.NewEvents(),
 		activityTracker: activitytrackerv1.NewActivityTracker(time.Second * 30),
@@ -88,7 +87,7 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
 
 	s := &SeatManager{
-		apiProvider:     api.SingleVersionProvider(testAPI),
+		apiProvider:     iotago.SingleVersionProvider(testAPI),
 		committeeStore:  committeeStore,
 		events:          seatmanager.NewEvents(),
 		activityTracker: activitytrackerv1.NewActivityTracker(time.Second * 30),

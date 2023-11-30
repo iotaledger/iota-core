@@ -16,12 +16,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // MemPool is a component that manages the state of transactions that are not yet included in the ledger state.
-type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
+type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] struct {
 	// vm is the virtual machine that is used to validate and execute transactions.
 	vm mempool.VM
 
@@ -53,8 +53,8 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	// invalidate blocks that try to spend them.
 	delayedOutputStateEviction *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata]]
 
-	// conflictDAG is the DAG that is used to keep track of the conflicts between transactions.
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, VoteRank]
+	// spendDAG is the DAG that is used to keep track of the conflicts between transactions.
+	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, VoteRank]
 
 	apiProvider iotago.APIProvider
 
@@ -69,20 +69,18 @@ type MemPool[VoteRank conflictdag.VoteRankType[VoteRank]] struct {
 	// evictionMutex is used to synchronize the eviction of slots.
 	evictionMutex syncutils.RWMutex
 
-	optForkAllTransactions bool
-
 	signedTransactionAttached *event.Event1[mempool.SignedTransactionMetadata]
 
 	transactionAttached *event.Event1[mempool.TransactionMetadata]
 }
 
 // New is the constructor of the MemPool.
-func New[VoteRank conflictdag.VoteRankType[VoteRank]](
+func New[VoteRank spenddag.VoteRankType[VoteRank]](
 	vm mempool.VM,
 	stateResolver mempool.StateResolver,
 	mutationsFunc func(iotago.SlotIndex) (kvstore.KVStore, error),
 	workers *workerpool.Group,
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, VoteRank],
+	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, VoteRank],
 	apiProvider iotago.APIProvider,
 	errorHandler func(error),
 	opts ...options.Option[MemPool[VoteRank]],
@@ -99,7 +97,7 @@ func New[VoteRank conflictdag.VoteRankType[VoteRank]](
 		executionWorkers:           workers.CreatePool("executionWorkers", workerpool.WithWorkerCount(1)),
 		delayedTransactionEviction: shrinkingmap.New[iotago.SlotIndex, ds.Set[iotago.TransactionID]](),
 		delayedOutputStateEviction: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata]](),
-		conflictDAG:                conflictDAG,
+		spendDAG:                   spendDAG,
 		apiProvider:                apiProvider,
 		errorHandler:               errorHandler,
 		signedTransactionAttached:  event.New1[mempool.SignedTransactionMetadata](),
@@ -246,8 +244,10 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 		})
 	}
 
-	maxCommittableAge := m.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge()
-	if slot <= maxCommittableAge {
+	protocolParams := m.apiProvider.APIForSlot(slot).ProtocolParameters()
+	genesisSlot := protocolParams.GenesisSlot()
+	maxCommittableAge := protocolParams.MaxCommittableAge()
+	if slot <= genesisSlot+maxCommittableAge {
 		return
 	}
 
@@ -350,23 +350,13 @@ func (m *MemPool[VoteRank]) executeTransaction(executionContext context.Context,
 }
 
 func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
-	if m.optForkAllTransactions {
-		inputsToFork := lo.Filter(transaction.inputs, func(metadata *StateMetadata) bool {
-			return !metadata.state.IsReadOnly()
-		})
+	inputsToFork := lo.Filter(transaction.inputs, func(metadata *StateMetadata) bool {
+		return !metadata.state.IsReadOnly()
+	})
 
-		m.forkTransaction(transaction, ds.NewSet(lo.Map(inputsToFork, func(stateMetadata *StateMetadata) mempool.StateID {
-			return stateMetadata.state.StateID()
-		})...))
-	} else {
-		lo.ForEach(transaction.inputs, func(input *StateMetadata) {
-			if !input.state.IsReadOnly() {
-				input.OnDoubleSpent(func() {
-					m.forkTransaction(transaction, ds.NewSet(input.state.StateID()))
-				})
-			}
-		})
-	}
+	m.forkTransaction(transaction, ds.NewSet(lo.Map(inputsToFork, func(stateMetadata *StateMetadata) mempool.StateID {
+		return stateMetadata.state.StateID()
+	})...))
 
 	// if !lo.Return2(transaction.IsOrphaned()) && transaction.setBooked() {
 	if transaction.setBooked() {
@@ -377,7 +367,7 @@ func (m *MemPool[VoteRank]) bookTransaction(transaction *TransactionMetadata) {
 func (m *MemPool[VoteRank]) forkTransaction(transactionMetadata *TransactionMetadata, resourceIDs ds.Set[mempool.StateID]) {
 	transactionMetadata.conflicting.Trigger()
 
-	if err := m.conflictDAG.UpdateConflictingResources(transactionMetadata.ID(), resourceIDs); err != nil {
+	if err := m.spendDAG.UpdateSpentResources(transactionMetadata.ID(), resourceIDs); err != nil {
 		// this is a hack, as with a reactive.Variable we cannot set it to 0 and still check if it was orphaned.
 		transactionMetadata.orphanedSlot.Set(1)
 
@@ -469,7 +459,7 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 }
 
 func (m *MemPool[VoteRank]) setup() {
-	m.conflictDAG.Events().ConflictAccepted.Hook(func(id iotago.TransactionID) {
+	m.spendDAG.Events().SpenderAccepted.Hook(func(id iotago.TransactionID) {
 		if transaction, exists := m.cachedTransactions.Get(id); exists {
 			transaction.setConflictAccepted()
 		}
@@ -483,6 +473,8 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 			stateDiff, err := m.stateDiff(slot)
 			if err != nil {
 				m.errorHandler(ierrors.Wrapf(err, "failed to get state diff for slot %d", slot))
+
+				return
 			}
 
 			if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
@@ -492,10 +484,10 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	})
 
 	transaction.OnConflicting(func() {
-		m.conflictDAG.CreateConflict(transaction.ID())
+		m.spendDAG.CreateSpender(transaction.ID())
 
-		unsubscribe := transaction.parentConflictIDs.OnUpdate(func(appliedMutations ds.SetMutations[iotago.TransactionID]) {
-			if err := m.conflictDAG.UpdateConflictParents(transaction.ID(), appliedMutations.AddedElements(), appliedMutations.DeletedElements()); err != nil {
+		unsubscribe := transaction.parentSpenderIDs.OnUpdate(func(appliedMutations ds.SetMutations[iotago.TransactionID]) {
+			if err := m.spendDAG.UpdateSpenderParents(transaction.ID(), appliedMutations.AddedElements(), appliedMutations.DeletedElements()); err != nil {
 				panic(err)
 			}
 		})
@@ -503,7 +495,7 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 		transaction.OnEvicted(func() {
 			unsubscribe()
 
-			m.conflictDAG.EvictConflict(transaction.ID())
+			m.spendDAG.EvictSpender(transaction.ID())
 		})
 	})
 
@@ -577,12 +569,6 @@ func (m *MemPool[VoteRank]) setupSignedTransaction(signedTransactionMetadata *Si
 	signedTransactionMetadata.evicted.OnTrigger(func() {
 		m.cachedSignedTransactions.Delete(signedTransactionMetadata.ID())
 	})
-}
-
-func WithForkAllTransactions[VoteRank conflictdag.VoteRankType[VoteRank]](forkAllTransactions bool) options.Option[MemPool[VoteRank]] {
-	return func(m *MemPool[VoteRank]) {
-		m.optForkAllTransactions = forkAllTransactions
-	}
 }
 
 var _ mempool.MemPool[vote.MockedRank] = new(MemPool[vote.MockedRank])

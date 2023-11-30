@@ -77,19 +77,28 @@ func (b *BlockDispatcher) Dispatch(block *model.Block, src peer.ID) error {
 	}
 
 	matchingEngineFound := false
-	for _, engine := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
-		if engine != nil && !engine.WasShutdown() && (engine.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || engine.BlockRequester.HasTicker(block.ID())) {
-			if b.inSyncWindow(engine, block) {
-				engine.ProcessBlockFromPeer(block, src)
-			} else {
-				// Stick too new blocks into the unsolid commitment buffer so that they can be dispatched once the
-				// engine instance is in sync (mostly needed for tests).
-				if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
-					return ierrors.Errorf("failed to add block %s to unsolid commitment buffer", block.ID())
+	for _, e := range []*engine.Engine{b.protocol.MainEngineInstance(), b.protocol.CandidateEngineInstance()} {
+		if e != nil {
+			// The engine is locked while it's being reset, so that no new blocks enter the dataflow, here we make sure that this process is exclusive
+			e.RLock()
+
+			if !e.WasShutdown() && e.ChainID() == slotCommitment.Chain().ForkingPoint.ID() || e.BlockRequester.HasTicker(block.ID()) {
+				if b.inSyncWindow(e, block) {
+					e.ProcessBlockFromPeer(block, src)
+				} else {
+					// Stick too new blocks into the unsolid commitment buffer so that they can be dispatched once the
+					// engine instance is in sync (mostly needed for tests).
+					if !b.unsolidCommitmentBlocks.Add(slotCommitment.ID(), types.NewTuple(block, src)) {
+						e.RUnlock()
+
+						return ierrors.Errorf("failed to add block %s to unsolid commitment buffer", block.ID())
+					}
 				}
+
+				matchingEngineFound = true
 			}
 
-			matchingEngineFound = true
+			e.RUnlock()
 		}
 	}
 
@@ -268,7 +277,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 	}
 	targetEngine.Reset()
 
-	// Once all blocks are booked we
+	// Once all blocks are booked and their weight propagated we
 	//   1. Mark all transactions as accepted
 	//   2. Mark all blocks as accepted
 	//   3. Force commitment of the slot
@@ -289,6 +298,17 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 			b.protocol.HandleError(ierrors.Errorf("producedCommitment ID mismatch: %s != %s", producedCommitment.ID(), commitmentID))
 			return
 		}
+
+		// 5. We add all blocks as root blocks. We can only do it after the commitment of the slot because otherwise
+		//    confirmation of the blocks can't be properly propagated (as it skips propagation to root blocks).
+		for slotCommitmentID, blockIDsForCommitment := range blockIDsBySlotCommitmentID {
+			for _, blockID := range blockIDsForCommitment {
+				// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
+				// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
+				// block cache and thus if not root blocks no block in the next slot can become solid.
+				targetEngine.EvictionState.AddRootBlock(blockID, slotCommitmentID)
+			}
+		}
 	}
 
 	blockBookedFunc := func(_ bool, _ bool) {
@@ -298,7 +318,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 		// 1. Mark all transactions as accepted
 		for _, transactionID := range transactionIDs {
-			targetEngine.Ledger.ConflictDAG().SetAccepted(transactionID)
+			targetEngine.Ledger.SpendDAG().SetAccepted(transactionID)
 		}
 
 		// 2. Mark all blocks as accepted
@@ -323,10 +343,11 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 
 	if len(blockIDs) == 0 {
 		forceCommitmentFunc()
+
 		return nil
 	}
 
-	for slotCommitmentID, blockIDsForCommitment := range blockIDsBySlotCommitmentID {
+	for _, blockIDsForCommitment := range blockIDsBySlotCommitmentID {
 		for _, blockID := range blockIDsForCommitment {
 			block, _ := targetEngine.BlockDAG.GetOrRequestBlock(blockID)
 			if block == nil { // this should never happen as we're requesting the blocks for this slot so it can't be evicted.
@@ -334,12 +355,7 @@ func (b *BlockDispatcher) processWarpSyncResponse(commitmentID iotago.Commitment
 				continue
 			}
 
-			// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
-			// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
-			// block cache and thus if not root blocks no block in the next slot can become solid.
-			targetEngine.EvictionState.AddRootBlock(blockID, slotCommitmentID)
-
-			block.Booked().OnUpdate(blockBookedFunc)
+			block.WeightPropagated().OnUpdate(blockBookedFunc)
 		}
 	}
 

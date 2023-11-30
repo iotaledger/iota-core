@@ -20,8 +20,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/rmc"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag/spenddagv1"
 	mempoolv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/v1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
@@ -41,7 +41,7 @@ type Ledger struct {
 	sybilProtection          sybilprotection.SybilProtection
 	commitmentLoader         func(iotago.SlotIndex) (*model.Commitment, error)
 	memPool                  mempool.MemPool[ledger.BlockVoteRank]
-	conflictDAG              conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
+	spendDAG                 spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 	retainTransactionFailure func(iotago.BlockID, error)
 	errorHandler             func(error)
 
@@ -63,12 +63,12 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 		e.HookConstructed(func() {
 			e.Events.Ledger.LinkTo(l.events)
-			l.conflictDAG = conflictdagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
-			e.Events.ConflictDAG.LinkTo(l.conflictDAG.Events())
+			l.spendDAG = spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
+			e.Events.SpendDAG.LinkTo(l.spendDAG.Events())
 
 			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
 
-			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, e.Workers.CreateGroup("MemPool"), l.conflictDAG, l.apiProvider, l.errorHandler, mempoolv1.WithForkAllTransactions[ledger.BlockVoteRank](true))
+			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, e.Workers.CreateGroup("MemPool"), l.spendDAG, l.apiProvider, l.errorHandler)
 			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput, l.accountsLedger.Account)
@@ -110,7 +110,7 @@ func New(
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
 		errorHandler:     errorHandler,
-		conflictDAG:      conflictdagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](sybilProtection.SeatManager().OnlineCommittee().Size),
+		spendDAG:         spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](sybilProtection.SeatManager().OnlineCommittee().Size),
 	}
 }
 
@@ -138,10 +138,10 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (attachedTransaction mem
 	return nil, false
 }
 
-func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, accountRoot iotago.Identifier, err error) {
+func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, accountRoot iotago.Identifier, created utxoledger.Outputs, consumed utxoledger.Spents, err error) {
 	ledgerIndex, err := l.utxoLedger.ReadLedgerSlot()
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, err
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, err
 	}
 
 	if slot != ledgerIndex+1 {
@@ -150,32 +150,32 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 
 	stateDiff, err := l.memPool.StateDiff(slot)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to retrieve state diff for slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to retrieve state diff for slot %d: %w", slot, err)
 	}
 
 	// collect outputs and allotments from the "uncompacted" stateDiff
 	// outputs need to be processed in the "uncompacted" version of the state diff, as we need to be able to store
 	// and retrieve intermediate outputs to show to the user
-	spends, outputs, accountDiffs, err := l.processStateDiffTransactions(stateDiff)
+	spenders, outputs, accountDiffs, err := l.processStateDiffTransactions(stateDiff)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to process state diff transactions in slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to process state diff transactions in slot %d: %w", slot, err)
 	}
 
 	// Now we process the collected account changes, for that we consume the "compacted" state diff to get the overall
-	// account changes at UTXO level without needing to worry about multiple spends of the same account in the same slot,
+	// account changes at UTXO level without needing to worry about multiple spenders of the same account in the same slot,
 	// we only care about the initial account output to be consumed and the final account output to be created.
 	// output side
 	createdAccounts, consumedAccounts, destroyedAccounts, err := l.processCreatedAndConsumedAccountOutputs(stateDiff, accountDiffs)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to process outputs consumed and created in slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to process outputs consumed and created in slot %d: %w", slot, err)
 	}
 
 	l.prepareAccountDiffs(accountDiffs, slot, consumedAccounts, createdAccounts)
 
 	// Commit the changes
 	// Update the UTXO ledger
-	if err = l.utxoLedger.ApplyDiff(slot, outputs, spends); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to UTXO ledger for slot %d: %w", slot, err)
+	if err = l.utxoLedger.ApplyDiff(slot, outputs, spenders); err != nil {
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to apply diff to UTXO ledger for slot %d: %w", slot, err)
 	}
 
 	// Update the Accounts ledger
@@ -187,15 +187,15 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	}
 	rmcForSlot, err := l.rmcManager.RMC(rmcSlot)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("ledger failed to get RMC for slot %d: %w", rmcSlot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("ledger failed to get RMC for slot %d: %w", rmcSlot, err)
 	}
 	if err = l.accountsLedger.ApplyDiff(slot, rmcForSlot, accountDiffs, destroyedAccounts); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to Accounts ledger for slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to apply diff to Accounts ledger for slot %d: %w", slot, err)
 	}
 
 	// Update the mana manager's cache
 	if err = l.manaManager.ApplyDiff(slot, destroyedAccounts, createdAccounts, accountDiffs); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, ierrors.Errorf("failed to apply diff to mana manager for slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to apply diff to mana manager for slot %d: %w", slot, err)
 	}
 
 	// Mark each transaction as committed so the mempool can evict it
@@ -204,9 +204,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 		return true
 	})
 
-	l.events.StateDiffApplied.Trigger(slot, outputs, spends)
-
-	return l.utxoLedger.StateTreeRoot(), stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), nil
+	return l.utxoLedger.StateTreeRoot(), stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), outputs, spenders, nil
 }
 
 func (l *Ledger) AddAccount(output *utxoledger.Output, blockIssuanceCredits iotago.BlockIssuanceCredits) error {
@@ -309,8 +307,8 @@ func (l *Ledger) TransactionMetadataByAttachment(blockID iotago.BlockID) (mempoo
 	return l.memPool.TransactionMetadataByAttachment(blockID)
 }
 
-func (l *Ledger) ConflictDAG() conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank] {
-	return l.conflictDAG
+func (l *Ledger) SpendDAG() spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank] {
+	return l.spendDAG
 }
 
 func (l *Ledger) MemPool() mempool.MemPool[ledger.BlockVoteRank] {
@@ -357,7 +355,7 @@ func (l *Ledger) Reset() {
 
 func (l *Ledger) Shutdown() {
 	l.TriggerStopped()
-	l.conflictDAG.Shutdown()
+	l.spendDAG.Shutdown()
 }
 
 // Process the collected account changes. The consumedAccounts and createdAccounts maps only contain outputs with a
@@ -771,7 +769,7 @@ func (l *Ledger) blockPreAccepted(block *blocks.Block) {
 		return
 	}
 
-	if err := l.conflictDAG.CastVotes(vote.NewVote(seat, voteRank), block.ConflictIDs()); err != nil {
+	if err := l.spendDAG.CastVotes(vote.NewVote(seat, voteRank), block.SpenderIDs()); err != nil {
 		l.errorHandler(ierrors.Wrapf(err, "failed to cast votes for block %s", block.ID()))
 	}
 }

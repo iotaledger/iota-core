@@ -10,13 +10,13 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
@@ -78,10 +78,17 @@ func (t *TestSuite) InitPerformanceTracker() {
 		rewardsStore.GetEpoch,
 		poolStatsStore,
 		committeeStore,
-		committeeCandidatesStore.GetEpoch,
+		func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error) {
+			return kvstore.NewTypedStore(lo.PanicOnErr(committeeCandidatesStore.GetEpoch(epoch)),
+				iotago.AccountID.Bytes,
+				iotago.AccountIDFromBytes,
+				iotago.SlotIndex.Bytes,
+				iotago.SlotIndexFromBytes,
+			), nil
+		},
 		performanceFactorFunc,
 		t.latestCommittedEpoch,
-		api.SingleVersionProvider(t.api),
+		iotago.SingleVersionProvider(t.api),
 		func(err error) {},
 	)
 }

@@ -24,12 +24,12 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 			return false
 		}
 
-		// Skip propagation if the block is already accepted.
+		// Skip propagation if the block is already confirmed.
 		if block.IsConfirmed() {
 			return false
 		}
 
-		// Skip further propagation if the witness is not new.
+		// Skip further propagation if the ratifier is not new.
 		propagateFurther := block.AddConfirmationRatifier(seat)
 
 		if g.shouldConfirm(block) {

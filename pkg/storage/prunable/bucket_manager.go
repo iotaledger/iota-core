@@ -70,6 +70,40 @@ func (b *BucketManager) Get(epoch iotago.EpochIndex, realm kvstore.Realm) (kvsto
 	return lo.PanicOnErr(kv.WithExtendedRealm(realm)), nil
 }
 
+func (b *BucketManager) Lock() {
+	// Lock b.mutex so that a new DBInstance is not created
+	b.mutex.Lock()
+	// Lock b.openDBsCacheMutex so that DBInstance is not retrieved from cache
+	b.openDBsCacheMutex.Lock()
+
+	// Lock access to all KVStores so that they can't be reopened by components that store references to them (e.g., StateDiff)
+	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
+		db.LockAccess()
+
+		return true
+	})
+}
+
+func (b *BucketManager) Unlock() {
+	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
+		db.UnlockAccess()
+
+		return true
+	})
+
+	b.openDBsCacheMutex.Unlock()
+	b.mutex.Unlock()
+}
+
+func (b *BucketManager) CloseWithoutLocking() {
+	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
+		db.CloseWithoutLocking()
+		b.openDBsCache.Remove(epoch)
+
+		return true
+	})
+}
+
 func (b *BucketManager) Shutdown() {
 	b.openDBsCacheMutex.Lock()
 	defer b.openDBsCacheMutex.Unlock()
@@ -171,21 +205,21 @@ func (b *BucketManager) getDBInstance(epoch iotago.EpochIndex) *database.DBInsta
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	b.openDBsCacheMutex.Lock()
-	defer b.openDBsCacheMutex.Unlock()
-
-	// check if exists again, as other goroutine might have created it in parallel
+	// check if exists again, as another goroutine might have created it in parallel
 	db := lo.Return1(b.openDBs.GetOrCreate(epoch, func() *database.DBInstance {
-		db := database.NewDBInstance(b.dbConfig.WithDirectory(dbPathFromIndex(b.dbConfig.Directory, epoch)))
+		db := database.NewDBInstance(b.dbConfig.WithDirectory(dbPathFromIndex(b.dbConfig.Directory, epoch)), func(d *database.DBInstance) {
+			b.openDBsCacheMutex.Lock()
+			defer b.openDBsCacheMutex.Unlock()
 
-		// Remove the cached db size since we will open the db
-		b.dbSizes.Delete(epoch)
+			// Mark the db as used in the cache.
+			b.openDBsCache.Put(epoch, d)
+
+			// Remove the cached db size since we will open the db.
+			b.dbSizes.Delete(epoch)
+		})
 
 		return db
 	}))
-
-	// Mark the db as used in the cache
-	b.openDBsCache.Put(epoch, db)
 
 	return db
 }
@@ -235,10 +269,10 @@ func (b *BucketManager) DeleteBucket(epoch iotago.EpochIndex) (deleted bool) {
 }
 
 // PruneSlots prunes the data of all slots in the range [from, to] in the given epoch.
-func (b *BucketManager) PruneSlots(epoch iotago.EpochIndex, pruningRange [2]iotago.SlotIndex) error {
+func (b *BucketManager) PruneSlots(epoch iotago.EpochIndex, startPruneRange iotago.SlotIndex, endPruneRange iotago.SlotIndex) error {
 	epochStore := b.getDBInstance(epoch).KVStore()
 
-	for slot := pruningRange[0]; slot <= pruningRange[1]; slot++ {
+	for slot := startPruneRange; slot <= endPruneRange; slot++ {
 		if err := epochStore.DeletePrefix(slot.MustBytes()); err != nil {
 			return ierrors.Wrapf(err, "error while clearing slot %d in bucket for epoch %d", slot, epoch)
 		}

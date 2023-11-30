@@ -31,11 +31,12 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 				5,
 			),
 		),
+		testsuite.WithWaitFor(15*time.Second),
 	)
 	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
-	ts.AddGenesisWallet("default", node0)
+	ts.AddDefaultWallet(node0)
 	ts.AddValidatorNode("node1")
 	ts.AddNode("node2")
 
@@ -47,9 +48,8 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	// Revive chain on node0.
 	{
-		block0 := ts.IssueValidationBlock("block0", node0,
-			mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(50)),
-		)
+		ts.SetCurrentSlot(50)
+		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0)
 		require.EqualValues(t, 48, ts.Block("block0").SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
@@ -59,20 +59,20 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	// Need to issue to slot 52 so that all other nodes can warp sync up to slot 49 and then commit slot 50 themselves.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{51, 52}, 2, "block0", ts.Nodes("node0"), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{51, 52}, 2, "block0", ts.Nodes("node0"), true, false)
 
-		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(50, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
 		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes()...)
 	}
 
 	// Continue issuing on all nodes for a few slots.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{53, 54, 55, 56, 57}, 3, "52.1", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{53, 54, 55, 56, 57}, 3, "52.1", ts.Nodes(), true, false)
 
-		ts.AssertEqualStoredCommitmentAtIndex(55, ts.Nodes()...)
-		ts.AssertLatestCommitmentSlotIndex(55, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("57.0"), true, ts.Nodes()...)
+		ts.AssertLatestCommitmentSlotIndex(55, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(55, ts.Nodes()...)
 	}
 
 	// Start node3 from genesis snapshot.
@@ -87,11 +87,11 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	// Continue issuing on all nodes for a few slots.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{58, 59}, 3, "57.2", ts.Nodes("node0", "node1", "node2"), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{58, 59}, 3, "57.2", ts.Nodes("node0", "node1", "node2"), true, false)
 
-		ts.AssertEqualStoredCommitmentAtIndex(57, ts.Nodes()...)
-		ts.AssertLatestCommitmentSlotIndex(57, ts.Nodes()...)
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("59.0"), true, ts.Nodes()...)
+		ts.AssertLatestCommitmentSlotIndex(57, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(57, ts.Nodes()...)
 	}
 
 	// Check that commitments from 1-49 are empty.
@@ -121,7 +121,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
-	ts.AddGenesisWallet("default", node0)
+	ts.AddDefaultWallet(node0)
 	ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
 
@@ -129,11 +129,11 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 
 	// Issue up to slot 10, committing slot 8.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, false)
 
+		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(8, ts.Nodes()...)
-		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 	}
 
 	// Create snapshot and restart node0 from it.
@@ -158,9 +158,8 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 
 	// Revive chain on node0-restarted.
 	{
-		block0 := ts.IssueValidationBlock("block0", node0restarted,
-			mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(20)),
-		)
+		ts.SetCurrentSlot(20)
+		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted)
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
@@ -170,7 +169,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, false)
 
 		ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)
@@ -182,11 +181,11 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 		// are not used again.
 		ts.SetAutomaticTransactionIssuingCounters(node2.Partition, 24)
 
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, false)
 
+		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(23, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(23, ts.Nodes()...)
-		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 	}
 
 	// Check that commitments from 8-19 are empty -> all previously accepted blocks in 9,10 have been orphaned.
@@ -216,7 +215,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	defer ts.Shutdown()
 
 	node0 := ts.AddValidatorNode("node0")
-	ts.AddGenesisWallet("default", node0)
+	ts.AddDefaultWallet(node0)
 	ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
 
@@ -224,11 +223,11 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 
 	// Issue up to slot 10, committing slot 8.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, false)
 
+		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(8, ts.Nodes()...)
-		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 	}
 
 	for _, node := range ts.Nodes("node0", "node1") {
@@ -249,9 +248,8 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 
 	// Revive chain on node0-restarted.
 	{
-		block0 := ts.IssueValidationBlock("block0", node0restarted,
-			mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(20)),
-		)
+		ts.SetCurrentSlot(20)
+		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0restarted)
 		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
 		// Reviving the chain should select one parent from the last committed slot.
 		require.Len(t, block0.Parents(), 1)
@@ -261,7 +259,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, false)
 
 		ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)
@@ -273,11 +271,11 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 		// are not used again.
 		ts.SetAutomaticTransactionIssuingCounters(node2.Partition, 24)
 
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, false)
 
+		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(23, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(23, ts.Nodes()...)
-		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 	}
 
 	// Check that commitments from 8-19 are empty -> all previously accepted blocks in 9,10 have been orphaned.

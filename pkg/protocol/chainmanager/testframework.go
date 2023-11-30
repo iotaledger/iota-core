@@ -12,7 +12,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type TestFramework struct {
@@ -38,7 +37,7 @@ func NewTestFramework(test *testing.T, a iotago.API, opts ...options.Option[Test
 	}
 
 	return options.Apply(&TestFramework{
-		Instance: NewManager(api.SingleVersionProvider(a), handleError),
+		Instance: NewManager(iotago.SingleVersionProvider(a), handleError),
 
 		test: test,
 		api:  a,

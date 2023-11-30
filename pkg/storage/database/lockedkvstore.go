@@ -2,7 +2,6 @@ package database
 
 import (
 	"github.com/iotaledger/hive.go/ds/types"
-	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
@@ -11,27 +10,27 @@ import (
 type lockedKVStore struct {
 	*openableKVStore
 
-	instanceMutex *syncutils.RWMutex
+	accessMutex *syncutils.StarvingMutex
 }
 
-func newLockedKVStore(storeInstance kvstore.KVStore, dbInstance *DBInstance) *lockedKVStore {
+func newLockedKVStore(storeInstance kvstore.KVStore, openStoreIfNecessary func(), closeStore func()) *lockedKVStore {
 	return &lockedKVStore{
-		openableKVStore: newOpenableKVStore(storeInstance, dbInstance),
-		instanceMutex:   new(syncutils.RWMutex),
+		openableKVStore: newOpenableKVStore(storeInstance, openStoreIfNecessary, closeStore),
+		accessMutex:     syncutils.NewStarvingMutex(),
 	}
 }
 
-func (s *lockedKVStore) Lock() {
-	s.instanceMutex.Lock()
+func (s *lockedKVStore) LockAccess() {
+	s.accessMutex.Lock()
 }
 
-func (s *lockedKVStore) Unlock() {
-	s.instanceMutex.Unlock()
+func (s *lockedKVStore) UnlockAccess() {
+	s.accessMutex.Unlock()
 }
 
 func (s *lockedKVStore) WithRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.withRealm(realm)
 }
@@ -44,76 +43,76 @@ func (s *lockedKVStore) withRealm(realm kvstore.Realm) (kvstore.KVStore, error) 
 			dbPrefix:      realm,
 		},
 
-		instanceMutex: s.instanceMutex,
+		accessMutex: s.accessMutex,
 	}, nil
 }
 
 func (s *lockedKVStore) WithExtendedRealm(realm kvstore.Realm) (kvstore.KVStore, error) {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.withRealm(s.buildKeyPrefix(realm))
 }
 
 func (s *lockedKVStore) Iterate(prefix kvstore.KeyPrefix, kvConsumerFunc kvstore.IteratorKeyValueConsumerFunc, direction ...kvstore.IterDirection) error {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.openableKVStore.Iterate(prefix, kvConsumerFunc, direction...)
 }
 
 func (s *lockedKVStore) IterateKeys(prefix kvstore.KeyPrefix, consumerFunc kvstore.IteratorKeyConsumerFunc, direction ...kvstore.IterDirection) error {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.openableKVStore.IterateKeys(prefix, consumerFunc, direction...)
 }
 
 func (s *lockedKVStore) Clear() error {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.openableKVStore.Clear()
 }
 
 func (s *lockedKVStore) Get(key kvstore.Key) (value kvstore.Value, err error) {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.openableKVStore.Get(key)
 }
 
 func (s *lockedKVStore) Set(key kvstore.Key, value kvstore.Value) error {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.openableKVStore.Set(key, value)
 }
 
 func (s *lockedKVStore) Has(key kvstore.Key) (bool, error) {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.openableKVStore.Has(key)
 }
 
 func (s *lockedKVStore) Delete(key kvstore.Key) error {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.openableKVStore.Delete(key)
 }
 
 func (s *lockedKVStore) DeletePrefix(prefix kvstore.KeyPrefix) error {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.openableKVStore.DeletePrefix(prefix)
 }
 
 func (s *lockedKVStore) Flush() error {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.FlushWithoutLocking()
 }
@@ -123,12 +122,8 @@ func (s *lockedKVStore) FlushWithoutLocking() error {
 }
 
 func (s *lockedKVStore) Close() error {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
-
-	if err := s.FlushWithoutLocking(); err != nil {
-		return ierrors.Wrap(err, "failed to flush database")
-	}
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return s.CloseWithoutLocking()
 }
@@ -138,8 +133,8 @@ func (s *lockedKVStore) CloseWithoutLocking() error {
 }
 
 func (s *lockedKVStore) Batched() (kvstore.BatchedMutations, error) {
-	s.instanceMutex.RLock()
-	defer s.instanceMutex.RUnlock()
+	s.accessMutex.RLock()
+	defer s.accessMutex.RUnlock()
 
 	return &syncedBatchedMutations{
 		openableKVStoreBatchedMutations: &openableKVStoreBatchedMutations{
@@ -165,8 +160,8 @@ type syncedBatchedMutations struct {
 }
 
 func (s *syncedBatchedMutations) Commit() error {
-	s.parentStore.instanceMutex.RLock()
-	defer s.parentStore.instanceMutex.RUnlock()
+	s.parentStore.accessMutex.RLock()
+	defer s.parentStore.accessMutex.RUnlock()
 
 	return s.openableKVStoreBatchedMutations.Commit()
 }

@@ -32,7 +32,8 @@ type Prunable struct {
 func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[BucketManager]) *Prunable {
 	dir := utils.NewDirectory(dbConfig.Directory, true)
 	semiPermanentDBConfig := dbConfig.WithDirectory(dir.PathWithCreate("semipermanent"))
-	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig)
+	// openedCallback is nil because we don't need to do anything when reopening the store.
+	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig, nil)
 
 	return &Prunable{
 		apiProvider:       apiProvider,
@@ -50,22 +51,20 @@ func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler 
 
 func Clone(source *Prunable, dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[BucketManager]) (*Prunable, error) {
 	// Lock semi-permanent DB and prunable slot store so that nobody can try to use or open them while cloning.
-	source.semiPermanentDB.Lock()
-	defer source.semiPermanentDB.Unlock()
+	source.semiPermanentDB.LockAccess()
+	defer source.semiPermanentDB.UnlockAccess()
 
-	source.prunableSlotStore.mutex.Lock()
-	defer source.prunableSlotStore.mutex.Unlock()
+	source.prunableSlotStore.Lock()
+	defer source.prunableSlotStore.Unlock()
 
-	// Close forked prunable storage before copying its contents.
+	// Close forked prunable storage before copying its contents. All necessary locks are already acquired.
 	source.semiPermanentDB.CloseWithoutLocking()
-	source.prunableSlotStore.Shutdown()
+	source.prunableSlotStore.CloseWithoutLocking()
 
 	// Copy the storage on disk to new location.
 	if err := copydir.Copy(source.prunableSlotStore.dbConfig.Directory, dbConfig.Directory); err != nil {
 		return nil, ierrors.Wrap(err, "failed to copy prunable storage directory to new storage path")
 	}
-
-	source.semiPermanentDB.Open()
 
 	return New(dbConfig, apiProvider, errorHandler, opts...), nil
 }
@@ -142,16 +141,16 @@ func (p *Prunable) Flush() {
 	}
 }
 
-func (p *Prunable) Rollback(targetEpoch iotago.EpochIndex, pruningRange [2]iotago.SlotIndex) error {
-	if err := p.prunableSlotStore.PruneSlots(targetEpoch, pruningRange); err != nil {
-		return ierrors.Wrapf(err, "failed to prune slots in range [%d, %d] from target epoch %d", pruningRange[0], pruningRange[1], targetEpoch)
+func (p *Prunable) Rollback(targetEpoch iotago.EpochIndex, startPruneRange iotago.SlotIndex, endPruneRange iotago.SlotIndex) error {
+	if err := p.prunableSlotStore.PruneSlots(targetEpoch, startPruneRange, endPruneRange); err != nil {
+		return ierrors.Wrapf(err, "failed to prune slots in range [%d, %d] from target epoch %d", startPruneRange, endPruneRange, targetEpoch)
 	}
 
-	if err := p.rollbackCommitteesCandidates(targetEpoch, pruningRange[0]-1); err != nil {
+	if err := p.rollbackCommitteesCandidates(targetEpoch, startPruneRange); err != nil {
 		return ierrors.Wrapf(err, "failed to rollback committee candidates to target epoch %d", targetEpoch)
 	}
 
-	lastPrunedCommitteeEpoch, err := p.rollbackCommitteeEpochs(targetEpoch+1, pruningRange[0]-1)
+	lastPrunedCommitteeEpoch, err := p.rollbackCommitteeEpochs(targetEpoch+1, startPruneRange-1)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to rollback committee epochs to target epoch %d", targetEpoch)
 	}
@@ -229,7 +228,7 @@ func (p *Prunable) shouldRollbackCommittee(epoch iotago.EpochIndex, targetSlot i
 	return true, nil
 }
 
-func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochIndex, targetSlot iotago.SlotIndex) error {
+func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochIndex, deletionStartSlot iotago.SlotIndex) error {
 	candidatesToRollback := make([]iotago.AccountID, 0)
 
 	candidates, err := p.CommitteeCandidates(targetSlotEpoch)
@@ -237,23 +236,8 @@ func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochInde
 		return ierrors.Wrap(err, "failed to get candidates store")
 	}
 
-	var innerErr error
-	if err = candidates.Iterate(kvstore.EmptyPrefix, func(key kvstore.Key, value kvstore.Value) bool {
-		accountID, _, err := iotago.AccountIDFromBytes(key)
-		if err != nil {
-			innerErr = err
-
-			return false
-		}
-
-		candidacySlot, _, err := iotago.SlotIndexFromBytes(value)
-		if err != nil {
-			innerErr = err
-
-			return false
-		}
-
-		if candidacySlot < targetSlot {
+	if err = candidates.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, candidacySlot iotago.SlotIndex) bool {
+		if candidacySlot >= deletionStartSlot {
 			candidatesToRollback = append(candidatesToRollback, accountID)
 		}
 
@@ -262,13 +246,9 @@ func (p *Prunable) rollbackCommitteesCandidates(targetSlotEpoch iotago.EpochInde
 		return ierrors.Wrap(err, "failed to collect candidates to rollback")
 	}
 
-	if innerErr != nil {
-		return ierrors.Wrap(innerErr, "failed to iterate through candidates")
-	}
-
 	for _, candidateToRollback := range candidatesToRollback {
-		if err = candidates.Delete(candidateToRollback[:]); err != nil {
-			return ierrors.Wrapf(innerErr, "failed to rollback candidate %s", candidateToRollback)
+		if err = candidates.Delete(candidateToRollback); err != nil {
+			return ierrors.Wrapf(err, "failed to rollback candidate %s", candidateToRollback)
 		}
 	}
 
