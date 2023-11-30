@@ -103,8 +103,8 @@ func Test_Delegation_DelayedClaimingDestroyOutputWithoutRewards(t *testing.T) {
 
 	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
 	accountAddress := tpkg.RandAccountAddress()
-	var block1Slot iotago.SlotIndex = 1
-	ts.SetCurrentSlot(block1Slot)
+	var block1_2Slot iotago.SlotIndex = 1
+	ts.SetCurrentSlot(block1_2Slot)
 	tx1 := ts.DefaultWallet().CreateDelegationFromInput(
 		"TX1",
 		"Genesis:0",
@@ -112,25 +112,23 @@ func Test_Delegation_DelayedClaimingDestroyOutputWithoutRewards(t *testing.T) {
 		mock.WithDelegationStartEpoch(1),
 	)
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
-	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
 
-	// TRANSITION TO DELAYED CLAIMING
-	block2Slot := ts.CurrentSlot()
+	// TRANSITION TO DELAYED CLAIMING (IN THE SAME SLOT)
 	latestCommitment := ts.DefaultWallet().Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
-	apiForSlot := ts.DefaultWallet().Node.Protocol.APIForSlot(block2Slot)
+	apiForSlot := ts.DefaultWallet().Node.Protocol.APIForSlot(block1_2Slot)
 
 	futureBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MinCommittableAge()
 	futureBoundedEpochIndex := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
 
-	registrationSlot := apiForSlot.TimeProvider().EpochEnd(apiForSlot.TimeProvider().EpochFromSlot(block2Slot))
+	registrationSlot := apiForSlot.TimeProvider().EpochEnd(apiForSlot.TimeProvider().EpochFromSlot(block1_2Slot))
 	delegationEndEpoch := futureBoundedEpochIndex
 	if futureBoundedSlotIndex > registrationSlot {
 		delegationEndEpoch = futureBoundedEpochIndex + 1
 	}
 
 	tx2 := ts.DefaultWallet().DelayedClaimingTransition("TX2", "TX1:0", delegationEndEpoch)
-	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
-	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
+	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(block1.ID()))
+	latestParents := ts.CommitUntilSlot(block1_2Slot, block2.ID())
 
 	// CLAIM ZERO REWARDS
 	block3Slot := ts.CurrentSlot()
