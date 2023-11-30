@@ -61,8 +61,8 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expectedBlocksBySlotCommitmentID map[iotago.CommitmentID]iotago.BlockIDs, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
-	t.Eventually(func() error {
-		for _, node := range nodes {
+	for _, node := range nodes {
+		t.Eventually(func() error {
 			storedCommitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
 			if err != nil {
 				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error loading commitment for slot: %d", node.Name, slot)
@@ -89,8 +89,8 @@ func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expecte
 			if !assert.Equal(t.fakeTesting, committedBlocksBySlotCommitmentID, expectedBlocksBySlotCommitmentID) {
 				return ierrors.Errorf("AssertStorageCommitmentBlocks: %s: expected %s, got %s", node.Name, expectedBlocksBySlotCommitmentID, committedBlocksBySlotCommitmentID)
 			}
-		}
 
-		return nil
-	})
+			return nil
+		})
+	}
 }

@@ -159,3 +159,21 @@ func (t *TestSuite) AssertTransactionInCacheConflicts(transactionConflicts map[*
 		}
 	}
 }
+
+func (t *TestSuite) AssertTransactionFailure(signedTxID iotago.SignedTransactionID, txFailureReason error, nodes ...*mock.Node) {
+	for _, node := range nodes {
+		t.Eventually(func() error {
+
+			txFailure, exists := node.TransactionFailure(signedTxID)
+			if !exists {
+				return ierrors.Errorf("%s: failure for signed transaction %s does not exist", node.Name, signedTxID)
+			}
+
+			if !ierrors.Is(txFailure.Error, txFailureReason) {
+				return ierrors.Errorf("%s: expected tx failure reason %s, got %s", node.Name, txFailureReason, txFailure.Error)
+			}
+
+			return nil
+		})
+	}
+}
