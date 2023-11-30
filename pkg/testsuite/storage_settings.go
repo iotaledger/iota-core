@@ -83,8 +83,9 @@ func (t *TestSuite) AssertLatestCommitmentSlotIndex(slot iotago.SlotIndex, nodes
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if slot != node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot() {
-				return ierrors.Errorf("AssertLatestCommitmentSlotIndex: %s: expected %v, got %v", node.Name, slot, node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot())
+			latestCommittedSlot := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
+			if slot != latestCommittedSlot {
+				return ierrors.Errorf("AssertLatestCommitmentSlotIndex: %s: expected %v, got %v", node.Name, slot, latestCommittedSlot)
 			}
 
 			return nil

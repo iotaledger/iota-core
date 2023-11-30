@@ -11,8 +11,8 @@ import (
 )
 
 func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes ...*mock.Node) {
-	t.Eventually(func() error {
-		for _, node := range nodes {
+	for _, node := range nodes {
+		t.Eventually(func() error {
 			actualAccountData, exists, err := node.Protocol.Engines.Main.Get().Ledger.Account(accountData.ID, node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
 			if err != nil {
 				return ierrors.Wrap(err, "AssertAccountData: failed to load account data")
@@ -64,15 +64,15 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 			if accountData.LatestSupportedProtocolVersionAndHash != actualAccountData.LatestSupportedProtocolVersionAndHash {
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected latest supported protocol version and hash %d, got %d", node.Name, accountData.ID, accountData.LatestSupportedProtocolVersionAndHash, actualAccountData.LatestSupportedProtocolVersionAndHash)
 			}
-		}
 
-		return nil
-	})
+			return nil
+		})
+	}
 }
 
 func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.SlotIndex, accountDiff *model.AccountDiff, destroyed bool, nodes ...*mock.Node) {
-	t.Eventually(func() error {
-		for _, node := range nodes {
+	for _, node := range nodes {
+		t.Eventually(func() error {
 
 			accountsDiffStorage, err := node.Protocol.Engines.Main.Get().Storage.AccountDiffs(index)
 			if err != nil {
@@ -149,8 +149,8 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 			if !assert.Equal(t.fakeTesting, accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected new latest supported protocol version change %d but actual %d for account %s at slot %d", node.Name, accountDiff.NewLatestSupportedVersionAndHash, actualAccountDiff.NewLatestSupportedVersionAndHash, accountID, index)
 			}
-		}
 
-		return nil
-	})
+			return nil
+		})
+	}
 }

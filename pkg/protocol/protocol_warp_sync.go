@@ -189,7 +189,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 				// 1. Mark all transactions as accepted
 				for _, transactionID := range transactionIDs {
-					targetEngine.Ledger.ConflictDAG().SetAccepted(transactionID)
+					targetEngine.Ledger.SpendDAG().SetAccepted(transactionID)
 				}
 
 				// 2. Mark all blocks as accepted and wait for them to be notarized

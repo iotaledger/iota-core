@@ -86,6 +86,6 @@ func (s *SignedTransactionMetadata) evictAttachment(id iotago.BlockID) {
 	defer s.attachmentsMutex.Unlock()
 
 	if s.attachments.Delete(id) && s.attachments.IsEmpty() {
-		s.evicted.Trigger()
+		s.setEvicted()
 	}
 }

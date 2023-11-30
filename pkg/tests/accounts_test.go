@@ -238,10 +238,9 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
 		mock.WithStakingFeature(stakedAmount, 421, 0, 10),
 		mock.WithAccountAmount(validatorAccountAmount),
+		mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Node.Protocol.CommittedAPI().ProtocolParameters())),
 	)
 
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	ts.SetCurrentSlot(block1Slot)
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
