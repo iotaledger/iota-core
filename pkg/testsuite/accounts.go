@@ -64,6 +64,7 @@ func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes .
 			if accountData.LatestSupportedProtocolVersionAndHash != actualAccountData.LatestSupportedProtocolVersionAndHash {
 				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected latest supported protocol version and hash %d, got %d", node.Name, accountData.ID, accountData.LatestSupportedProtocolVersionAndHash, actualAccountData.LatestSupportedProtocolVersionAndHash)
 			}
+
 			return nil
 		})
 	}
