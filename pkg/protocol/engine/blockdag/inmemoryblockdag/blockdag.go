@@ -93,8 +93,10 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 			unsolidParents.Delete(parent.ID)
 			fmt.Println("unsolid Parents of ", block.ID(), unsolidParents)
 
-			if unsolidParentsCount.Add(-1) == 0 {
+			if counter := unsolidParentsCount.Add(-1); counter == 0 {
+				fmt.Println("unsolid counter", counter)
 				if block.SetSolid() {
+					fmt.Println("unsolid Trigger", counter)
 					b.events.BlockSolid.Trigger(block)
 				}
 			}
