@@ -1,8 +1,10 @@
 package inmemoryblockdag
 
 import (
+	"fmt"
 	"sync/atomic"
 
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -74,6 +76,8 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 	var unsolidParentsCount atomic.Int32
 	unsolidParentsCount.Store(int32(len(block.Parents())))
 
+	unsolidParents := ds.NewSet[iotago.BlockID]()
+
 	block.ForEachParent(func(parent iotago.Parent) {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
@@ -82,7 +86,13 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 			return
 		}
 
+		unsolidParents.Add(parent.ID)
+		fmt.Println("unsolid Parents of ", block.ID(), unsolidParents)
+
 		parentBlock.Solid().OnUpdateOnce(func(_ bool, _ bool) {
+			unsolidParents.Delete(parent.ID)
+			fmt.Println("unsolid Parents of ", block.ID(), unsolidParents)
+
 			if unsolidParentsCount.Add(-1) == 0 {
 				if block.SetSolid() {
 					b.events.BlockSolid.Trigger(block)
