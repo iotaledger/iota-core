@@ -53,22 +53,29 @@ func newBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 			})
 		})
 
-		protocol.Chains.WithElements(func(chain *Chain) func() {
-			return chain.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (shutdown func()) {
-				return engineInstance.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
-			})
-		})
+		//protocol.Chains.WithElements(func(chain *Chain) func() {
+		//	return chain.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (shutdown func()) {
+		//		return engineInstance.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
+		//	})
+		//})
 
-		protocol.Chains.Main.Get().Engine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
-			if engine != nil {
-				unsubscribeOnEngineChange(func() (unsubscribe func()) {
-					return lo.Batch(
-						engine.Events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) { b.SendResponse(block.ModelBlock()) }).Unhook,
-						engine.Events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) { b.SendResponse(block.ModelBlock()) }).Unhook,
-					)
-				})
-			}
+		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
+			return lo.Batch(
+				engine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook,
+				engine.Events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) { b.SendResponse(block.ModelBlock()) }).Unhook,
+				engine.Events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) { b.SendResponse(block.ModelBlock()) }).Unhook,
+			)
 		})
+		//protocol.Chains.Main.Get().Engine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
+		//	if engine != nil {
+		//		unsubscribeOnEngineChange(func() (unsubscribe func()) {
+		//			return lo.Batch(
+		//				engine.Events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) { b.SendResponse(block.ModelBlock()) }).Unhook,
+		//				engine.Events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) { b.SendResponse(block.ModelBlock()) }).Unhook,
+		//			)
+		//		})
+		//	}
+		//})
 	})
 
 	return b
