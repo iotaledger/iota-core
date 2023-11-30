@@ -97,6 +97,52 @@ func Test_Delegation_DestroyOutputWithoutRewards(t *testing.T) {
 	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
 }
 
+func Test_Delegation_DelayedClaimingDestroyOutputWithoutRewards(t *testing.T) {
+	ts, node1, node2 := setupDelegationTestsuite(t)
+	defer ts.Shutdown()
+
+	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
+	accountAddress := tpkg.RandAccountAddress()
+	var block1Slot iotago.SlotIndex = 1
+	ts.SetCurrentSlot(block1Slot)
+	tx1 := ts.DefaultWallet().CreateDelegationFromInput(
+		"TX1",
+		"Genesis:0",
+		mock.WithDelegatedValidatorAddress(accountAddress),
+		mock.WithDelegationStartEpoch(1),
+	)
+	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
+
+	// TRANSITION TO DELAYED CLAIMING
+	block2Slot := ts.CurrentSlot()
+	latestCommitment := ts.DefaultWallet().Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	apiForSlot := ts.DefaultWallet().Node.Protocol.APIForSlot(block2Slot)
+
+	futureBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MinCommittableAge()
+	futureBoundedEpochIndex := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+
+	registrationSlot := apiForSlot.TimeProvider().EpochEnd(apiForSlot.TimeProvider().EpochFromSlot(block2Slot))
+	delegationEndEpoch := futureBoundedEpochIndex
+	if futureBoundedSlotIndex > registrationSlot {
+		delegationEndEpoch = futureBoundedEpochIndex + 1
+	}
+
+	tx2 := ts.DefaultWallet().DelayedClaimingTransition("TX2", "TX1:0", delegationEndEpoch)
+	block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))
+	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
+
+	// CLAIM ZERO REWARDS
+	block3Slot := ts.CurrentSlot()
+	tx3 := ts.DefaultWallet().ClaimDelegatorRewards("TX3", "TX2:0")
+	block3 := ts.IssueBasicBlockWithOptions("block3", ts.DefaultWallet(), tx3, mock.WithStrongParents(latestParents...))
+
+	ts.CommitUntilSlot(block3Slot, block3.ID())
+
+	ts.AssertTransactionsExist([]*iotago.Transaction{tx3.Transaction}, true, node1, node2)
+	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx3.Transaction}, true, node1, node2)
+}
+
 // Test that a staking Account which did not earn rewards can remove its staking feature.
 func Test_Account_RemoveStakingFeatureWithoutRewards(t *testing.T) {
 	ts, node1, node2 := setupDelegationTestsuite(t)
