@@ -244,8 +244,10 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 		})
 	}
 
-	maxCommittableAge := m.apiProvider.APIForSlot(slot).ProtocolParameters().MaxCommittableAge()
-	if slot <= maxCommittableAge {
+	protocolParams := m.apiProvider.APIForSlot(slot).ProtocolParameters()
+	genesisSlot := protocolParams.GenesisSlot()
+	maxCommittableAge := protocolParams.MaxCommittableAge()
+	if slot <= genesisSlot+maxCommittableAge {
 		return
 	}
 
