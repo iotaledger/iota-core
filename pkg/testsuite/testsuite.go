@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -312,6 +313,28 @@ func (t *TestSuite) Nodes(names ...string) []*mock.Node {
 	}
 
 	return nodes
+}
+
+func (t *TestSuite) AccountsOfNodes(names ...string) []iotago.AccountID {
+	nodes := t.Nodes(names...)
+
+	return lo.Map(nodes, func(node *mock.Node) iotago.AccountID {
+		return node.Validator.AccountID
+	})
+}
+
+func (t *TestSuite) SeatOfNodes(slot iotago.SlotIndex, names ...string) []account.SeatIndex {
+	nodes := t.Nodes(names...)
+
+	return lo.Map(nodes, func(node *mock.Node) account.SeatIndex {
+		seatedAccounts, exists := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(slot)
+		require.True(t.Testing, exists, "node %s: committee at slot %d does not exist", node.Name, slot)
+
+		seat, exists := seatedAccounts.GetSeat(node.Validator.AccountID)
+		require.True(t.Testing, exists, "node %s: seat for account %s does not exist", node.Name, node.Validator.AccountID)
+
+		return seat
+	})
 }
 
 func (t *TestSuite) Wait(nodes ...*mock.Node) {

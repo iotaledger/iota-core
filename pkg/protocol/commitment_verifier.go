@@ -5,7 +5,6 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -13,20 +12,25 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-// CommitmentVerifier is a helper to verify the attestations of a commitment.
 type CommitmentVerifier struct {
-	// engine contains a reference to the engine instance that is used to verify the attestations.
-	engine *engine.Engine
+	engine                   *engine.Engine
+	lastCommonSlotBeforeFork iotago.SlotIndex
 
-	// validatorAccountsAtFork contains the accounts of the validators at the forking point.
-	validatorAccountsAtFork map[iotago.AccountID]*accounts.AccountData
+	// epoch is the epoch of the currently verified commitment. Initially, it is set to the epoch of the last common commitment before the fork.
+	epoch iotago.EpochIndex
+
+	// validatorAccountsData is the accounts data of the validators for the current epoch as known at lastCommonSlotBeforeFork.
+	// Initially, it is set to the accounts data of the validators for the epoch of the last common commitment before the fork.
+	validatorAccountsData map[iotago.AccountID]*accounts.AccountData
 }
 
-// newCommitmentVerifier creates a new CommitmentVerifier instance.
 func newCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) (*CommitmentVerifier, error) {
-	committeeAtForkingPoint, exists := mainEngine.SybilProtection.SeatManager().CommitteeInSlot(lastCommonCommitmentBeforeFork.Slot())
+	apiForSlot := mainEngine.APIForSlot(lastCommonCommitmentBeforeFork.Slot())
+	epoch := apiForSlot.TimeProvider().EpochFromSlot(lastCommonCommitmentBeforeFork.Slot())
+
+	committeeAtForkingPoint, exists := mainEngine.SybilProtection.SeatManager().CommitteeInEpoch(epoch)
 	if !exists {
-		return nil, ierrors.Errorf("committee in slot %d does not exist", lastCommonCommitmentBeforeFork.Slot())
+		return nil, ierrors.Errorf("committee in epoch %d of last commonCommitment slot %d before fork does not exist", epoch, lastCommonCommitmentBeforeFork.Slot())
 	}
 
 	accountsAtForkingPoint, err := committeeAtForkingPoint.Accounts()
@@ -34,40 +38,74 @@ func newCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBefore
 		return nil, ierrors.Wrapf(err, "failed to get accounts from committee for slot %d", lastCommonCommitmentBeforeFork.Slot())
 	}
 
+	validatorAccountsDataAtForkingPoint, err := mainEngine.Ledger.PastAccounts(accountsAtForkingPoint.IDs(), lastCommonCommitmentBeforeFork.Slot())
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to get past accounts for slot %d", lastCommonCommitmentBeforeFork.Slot())
+	}
+
 	return &CommitmentVerifier{
-		engine:                  mainEngine,
-		validatorAccountsAtFork: lo.PanicOnErr(mainEngine.Ledger.PastAccounts(accountsAtForkingPoint.IDs(), lastCommonCommitmentBeforeFork.Slot())),
-		// TODO: what happens if the committee rotated after the fork?
+		engine:                   mainEngine,
+		lastCommonSlotBeforeFork: lastCommonCommitmentBeforeFork.Slot(),
+		epoch:                    epoch,
+		validatorAccountsData:    validatorAccountsDataAtForkingPoint,
 	}, nil
 }
 
-// verifyCommitment verifies the given commitment and returns the blockIDs and cumulative weight of the attestations.
 func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
-	tree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(), iotago.Identifier.Bytes, iotago.IdentifierFromBytes, iotago.AccountID.Bytes, iotago.AccountIDFromBytes, (*iotago.Attestation).Bytes, iotago.AttestationFromBytes(c.engine))
+	// 1. Verify that the provided attestations are indeed the ones that were included in the commitment.
+	tree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(),
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		iotago.AccountID.Bytes,
+		iotago.AccountIDFromBytes,
+		(*iotago.Attestation).Bytes,
+		iotago.AttestationFromBytes(c.engine),
+	)
 
 	for _, att := range attestations {
-		if setErr := tree.Set(att.Header.IssuerID, att); setErr != nil {
+		if err := tree.Set(att.Header.IssuerID, att); err != nil {
 			return nil, 0, ierrors.Wrapf(err, "failed to set attestation for issuerID %s", att.Header.IssuerID)
 		}
 	}
-
 	if !iotago.VerifyProof(merkleProof, tree.Root(), commitment.RootsID()) {
 		return nil, 0, ierrors.Errorf("invalid merkle proof for attestations for commitment %s", commitment.ID())
 	}
 
+	// 2. Update validatorAccountsData if fork happened across epoch boundaries.
+	//    We try to use the latest accounts data (at lastCommonSlotBeforeFork) for the current epoch.
+	//    This is necessary because the committee might have rotated at the epoch boundary and different validators might be part of it.
+	//    In case anything goes wrong we keep using previously known accounts data (initially set to the accounts data
+	//    of the validators for the epoch of the last common commitment before the fork).
+	apiForSlot := c.engine.APIForSlot(commitment.Slot())
+	commitmentEpoch := apiForSlot.TimeProvider().EpochFromSlot(commitment.Slot())
+	if commitmentEpoch > c.epoch {
+		c.epoch = commitmentEpoch
+
+		committee, exists := c.engine.SybilProtection.SeatManager().CommitteeInEpoch(commitmentEpoch)
+		if exists {
+			validatorAccounts, err := committee.Accounts()
+			if err == nil {
+				validatorAccountsData, err := c.engine.Ledger.PastAccounts(validatorAccounts.IDs(), c.lastCommonSlotBeforeFork)
+				if err == nil {
+					c.validatorAccountsData = validatorAccountsData
+				}
+			}
+		}
+	}
+
+	// 3. Verify attestations.
 	blockIDs, seatCount, err := c.verifyAttestations(attestations)
 	if err != nil {
 		return nil, 0, ierrors.Wrapf(err, "error validating attestations for commitment %s", commitment.ID())
 	}
 
 	if seatCount > commitment.Weight.Get() {
-		return nil, 0, ierrors.Errorf("attestations for commitment %s have more seats (%d) than the commitment weight (%d)", commitment.ID(), seatCount, commitment.Weight.Get())
+		return nil, 0, ierrors.Errorf("invalid cumulative weight for commitment %s: expected %d, got %d", commitment.ID(), commitment.CumulativeWeight(), seatCount)
 	}
 
 	return blockIDs, seatCount, nil
 }
 
-// verifyAttestations verifies the given attestations and returns the blockIDs and cumulative weight of the attestations.
 func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestation) (iotago.BlockIDs, uint64, error) {
 	visitedIdentities := ds.NewSet[iotago.AccountID]()
 	var blockIDs iotago.BlockIDs
@@ -79,11 +117,13 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 		//    1. The attestation might be fake.
 		//    2. The issuer might have added a new public key in the meantime, but we don't know about it yet
 		//       since we only have the ledger state at the forking point.
-		accountData, exists := c.validatorAccountsAtFork[att.Header.IssuerID]
+		accountData, exists := c.validatorAccountsData[att.Header.IssuerID]
 
-		// We always need to have the accountData for a validator.
+		// We don't know the account data of the issuer. Ignore.
+		// This could be due to committee rotation at epoch boundary where a new validator (unknown at forking point)
+		// is selected into the committee.
 		if !exists {
-			return nil, 0, ierrors.Errorf("accountData for issuerID %s does not exist", att.Header.IssuerID)
+			continue
 		}
 
 		switch signature := att.Signature.(type) {
@@ -111,12 +151,14 @@ func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestati
 			return nil, 0, ierrors.Errorf("issuerID %s contained in multiple attestations", att.Header.IssuerID)
 		}
 
-		// TODO: this might differ if we have a Accounts with changing weights depending on the Slot/epoch
 		attestationBlockID, err := att.BlockID()
 		if err != nil {
 			return nil, 0, ierrors.Wrap(err, "error calculating blockID from attestation")
 		}
 
+		// We need to make sure that the issuer is actually part of the committee for the slot of the attestation (issuance of the block).
+		// Note: here we're explicitly not using the slot of the commitment we're verifying, but the slot of the attestation.
+		// This is because at the time the attestation was created, the committee might have been different from the one at commitment time (due to rotation at epoch boundary).
 		committee, exists := c.engine.SybilProtection.SeatManager().CommitteeInSlot(attestationBlockID.Slot())
 		if !exists {
 			return nil, 0, ierrors.Errorf("committee for slot %d does not exist", attestationBlockID.Slot())

@@ -96,7 +96,7 @@ func Test_WeightPropagation(t *testing.T) {
 			ts.Block("block3-basic"): {"tx1"},
 			ts.Block("block4-basic"): {"tx2"},
 		}, node1, node2)
-		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Pending, ts.Nodes()...)
+		ts.AssertSpendersInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Pending, ts.Nodes()...)
 		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
 	}
 
@@ -111,7 +111,7 @@ func Test_WeightPropagation(t *testing.T) {
 
 		// Make sure that neither approval (conflict weight),
 		// nor witness (block weight) was not propagated using basic blocks and caused acceptance.
-		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Pending, ts.Nodes()...)
+		ts.AssertSpendersInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Pending, ts.Nodes()...)
 		ts.AssertTransactionsInCacheAccepted(wallet.Transactions("tx2"), false, node1, node2)
 		ts.AssertTransactionsInCacheRejected(wallet.Transactions("tx1"), false, node1, node2)
 		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
@@ -247,7 +247,7 @@ func Test_MultipleAttachments(t *testing.T) {
 		ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
 			wallet.Transaction("tx1"): {"tx1"},
 		}, ts.Nodes()...)
-		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1"}, acceptance.Accepted, ts.Nodes()...)
+		ts.AssertSpendersInCacheAcceptanceState([]string{"tx1"}, acceptance.Accepted, ts.Nodes()...)
 	}
 
 	// Create a transaction that is included and whose conflict is accepted, but whose inputs are not accepted.
@@ -283,7 +283,7 @@ func Test_MultipleAttachments(t *testing.T) {
 			wallet.Transaction("tx1"): {"tx1"},
 			wallet.Transaction("tx2"): {"tx2"},
 		}, nodeA, nodeB)
-		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, ts.Nodes()...)
+		ts.AssertSpendersInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, ts.Nodes()...)
 	}
 
 	// Issue a block that includes tx1, and make sure that tx2 is accepted as well as a consequence.
@@ -313,7 +313,7 @@ func Test_MultipleAttachments(t *testing.T) {
 			wallet.Transaction("tx1"): {"tx1"},
 			wallet.Transaction("tx2"): {"tx2"},
 		}, nodeA, nodeB)
-		ts.AssertConflictsInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, nodeA, nodeB)
+		ts.AssertSpendersInCacheAcceptanceState([]string{"tx1", "tx2"}, acceptance.Accepted, nodeA, nodeB)
 	}
 }
 
@@ -405,7 +405,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 
 	// Advance both nodes at the edge of slot 1 committability
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4}, 1, "block2.4", ts.Nodes("node1", "node2"), false, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4}, 1, "block2.4", ts.Nodes("node1", "node2"), false, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -424,7 +424,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 			ts.Block("block2.tx1"): {"tx1"},
 		}, node1, node2)
 
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, false)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.Nodes()...)
 	}
@@ -440,7 +440,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		ts.SplitIntoPartitions(partitions)
 
 		// Only node2 will commit after issuing this one
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, false)
 
 		ts.AssertNodeState(ts.Nodes("node1"),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -531,7 +531,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	// Sync up the nodes to he same point and check consistency between them.
 	{
 		// Let node1 catch up with commitment 1
-		ts.IssueBlocksAtSlots("5.1", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, nil)
+		ts.IssueBlocksAtSlots("5.1", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, false)
 
 		ts.AssertNodeState(ts.Nodes("node1", "node2"),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -577,7 +577,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 	{
 		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2", "tx4"), true, node1, node2)
 
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, false)
 
 		ts.AssertNodeState(ts.Nodes("node1", "node2"),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -662,7 +662,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 	// Advance both nodes at the edge of slot 1 committability
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4}, 1, "Genesis", ts.Nodes("node1", "node2"), false, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4}, 1, "Genesis", ts.Nodes("node1", "node2"), false, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -674,7 +674,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		ts.SetCurrentSlot(5)
 		ts.IssueValidationBlockWithHeaderOptions("", node1, mock.WithSlotCommitment(genesisCommitment), mock.WithStrongParents(ts.BlockIDsWithPrefix("4.0")...))
 
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "4.0", ts.Nodes("node1"), false, false)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("5.0"), true, ts.Nodes()...)
 	}
@@ -689,7 +689,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		ts.SplitIntoPartitions(partitions)
 
 		// Only node2 will commit after issuing this one
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, false)
 
 		ts.AssertNodeState(ts.Nodes("node1"),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -731,7 +731,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 	// Sync up the nodes to he same point and check consistency between them.
 	{
 		// Let node1 catch up with commitment 1
-		ts.IssueBlocksAtSlots("5.1", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, nil)
+		ts.IssueBlocksAtSlots("5.1", []iotago.SlotIndex{5}, 1, "5.0", ts.Nodes("node2"), false, false)
 
 		ts.AssertNodeState(ts.Nodes("node1", "node2"),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
@@ -763,7 +763,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), true, node1, node2)
 		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)
 
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{6, 7, 8, 9, 10}, 5, "5.1", ts.Nodes("node1", "node2"), false, false)
 
 		ts.AssertNodeState(ts.Nodes("node1", "node2"),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),

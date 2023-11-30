@@ -103,14 +103,13 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 						r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAttached in retainer"))
 					}
 
-					transactionMetadata.OnConflicting(func() {
-						// transaction is not included yet, thus EarliestIncludedAttachment is not set.
-						r.RetainTransactionFailure(attachment, iotago.ErrTxConflicting)
-					})
-
 					transactionMetadata.OnInvalid(func(err error) {
 						// transaction is not included yet, thus EarliestIncludedAttachment is not set.
 						r.RetainTransactionFailure(attachment, err)
+					})
+
+					transactionMetadata.OnRejected(func() {
+						r.RetainTransactionFailure(attachment, iotago.ErrTxConflicting)
 					})
 
 					transactionMetadata.OnAccepted(func() {

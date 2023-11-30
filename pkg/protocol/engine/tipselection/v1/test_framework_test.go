@@ -10,7 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag/spenddagv1"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	tipmanagertests "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/tests"
 	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
@@ -49,7 +49,7 @@ func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) *T
 
 		t.Instance = tipselectionv1.New().Construct(
 			t.TipManager.Instance,
-			conflictdagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](t.CommitteeSize),
+			spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](t.CommitteeSize),
 			transactionMetadataRetriever,
 			rootBlocksRetriever,
 			t.expectedLivenessDuration,

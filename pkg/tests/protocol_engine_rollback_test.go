@@ -130,7 +130,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 	// Issue up to slot 11 - just before committee selection for the next epoch.
 	// Committee will be reused at slot 10 is finalized or slot 12 is committed, whichever happens first.
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
@@ -156,7 +156,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 	}
 
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16}, 4, "P0:11.3", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16}, 4, "P0:11.3", ts.Nodes(), true, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(13),
@@ -317,7 +317,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 	// Issue up to slot 11 - just before committee selection for the next epoch.
 	// Committee will be reused when slot 10 is finalized or slot 12 is committed, whichever happens first.
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
@@ -350,7 +350,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 	}
 
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
@@ -511,7 +511,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 	// Issue up to slot 11 - just before committee selection for the next epoch.
 	// Committee will be reused at slot 10 is finalized or slot 12 is committed, whichever happens first.
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
@@ -544,7 +544,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 	}
 
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16, 17, 18, 19}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15, 16, 17, 18, 19}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
@@ -705,7 +705,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 	// Issue up to slot 11 - just before committee selection for the next epoch.
 	// Committee will be reused at slot 10 is finalized or slot 12 is committed, whichever happens first.
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, 4, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),
@@ -738,7 +738,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 	}
 
 	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, nil)
+		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{12, 13, 14, 15}, 4, "P0:11.3", []*mock.Node{node0, node1}, true, false)
 
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithLatestFinalizedSlot(8),

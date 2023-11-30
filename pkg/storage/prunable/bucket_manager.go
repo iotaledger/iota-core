@@ -269,10 +269,10 @@ func (b *BucketManager) DeleteBucket(epoch iotago.EpochIndex) (deleted bool) {
 }
 
 // PruneSlots prunes the data of all slots in the range [from, to] in the given epoch.
-func (b *BucketManager) PruneSlots(epoch iotago.EpochIndex, pruningRange [2]iotago.SlotIndex) error {
+func (b *BucketManager) PruneSlots(epoch iotago.EpochIndex, startPruneRange iotago.SlotIndex, endPruneRange iotago.SlotIndex) error {
 	epochStore := b.getDBInstance(epoch).KVStore()
 
-	for slot := pruningRange[0]; slot <= pruningRange[1]; slot++ {
+	for slot := startPruneRange; slot <= endPruneRange; slot++ {
 		if err := epochStore.DeletePrefix(slot.MustBytes()); err != nil {
 			return ierrors.Wrapf(err, "error while clearing slot %d in bucket for epoch %d", slot, epoch)
 		}

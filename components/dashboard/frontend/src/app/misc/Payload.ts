@@ -108,7 +108,7 @@ export class Balance {
     color: string;
 }
 
-export class Conflict {
+export class Spend {
     tx_id: string;
     opinion: Opinion;
 }

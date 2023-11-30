@@ -84,7 +84,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 
 	// Epoch 0: issue 4 rows per slot.
 	{
-		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.Nodes()...)
 
@@ -198,7 +198,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	// Epoch 0: issue 4 rows per slot.
 	{
-		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 0, 4, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefixes("1", "2", "3", "4", "5", "6", "7"), true, ts.Nodes()...)
 
@@ -244,7 +244,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 
 	// Epoch 1: skip slot 10 and issue 6 rows per slot
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{8, 9, 11, 12, 13}, 6, "7.3", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{8, 9, 11, 12, 13}, 6, "7.3", ts.Nodes(), true, false)
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefixes("8", "9", "11", "12", "13"), true, ts.Nodes()...)
 
@@ -377,7 +377,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		}
 
 		// Only issue on nodes that have the latest state in memory.
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{14, 15}, 6, "13.5", ts.Nodes("nodeA", "nodeB"), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{14, 15}, 6, "13.5", ts.Nodes("nodeA", "nodeB"), true, false)
 
 		for _, slot := range []iotago.SlotIndex{12, 13} {
 			aliases := lo.Map([]string{"nodeA", "nodeB"}, func(s string) string {
@@ -397,11 +397,11 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	// Epoch 2-4
 	{
 		// Issue on all nodes except nodeD as its account is not yet known.
-		ts.IssueBlocksAtEpoch("", 2, 4, "15.5", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 2, 4, "15.5", ts.Nodes(), true, false)
 
 		// Issue on all nodes.
-		ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, nil)
-		ts.IssueBlocksAtEpoch("", 4, 4, "31.3", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtEpoch("", 3, 4, "23.3", ts.Nodes(), true, false)
+		ts.IssueBlocksAtEpoch("", 4, 4, "31.3", ts.Nodes(), true, false)
 
 		var expectedActiveRootBlocks []*blocks.Block
 		for _, slot := range []iotago.SlotIndex{35, 36, 37} {

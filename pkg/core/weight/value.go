@@ -5,7 +5,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/acceptance"
 )
 
-// Value represents an immutable multi-tiered weight value, which is used to determine the order of Conflicts.
+// Value represents an immutable multi-tiered weight value, which is used to determine the order of spenders.
 type Value struct {
 	// cumulativeWeight is the lowest tier which accrues weight in a cumulative manner (i.e. PoW or burned mana).
 	cumulativeWeight int64
@@ -13,7 +13,7 @@ type Value struct {
 	// validatorsWeight is the second tier which tracks weight in a non-cumulative manner (BFT style).
 	validatorsWeight int64
 
-	// acceptanceState is the final tier which determines the decision of the Conflict.
+	// acceptanceState is the final tier which determines the decision of the spender.
 	acceptanceState acceptance.State
 }
 
