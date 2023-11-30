@@ -424,8 +424,8 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 	}
 
 	apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
-	potentialMana := w.PotentialMana(apiForSlot, input, w.currentSlot)
-	storedMana := lo.PanicOnErr(apiForSlot.ManaDecayProvider().ManaWithDecay(input.StoredMana(), input.SlotCreated(), w.currentSlot))
+	potentialMana := w.PotentialMana(apiForSlot, input)
+	storedMana := w.StoredMana(apiForSlot, input)
 
 	accountOutput := builder.NewAccountOutputBuilderFromPrevious(inputAccount).
 		RemoveFeature(iotago.FeatureStaking).
@@ -519,7 +519,7 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 		panic(fmt.Sprintf("failed to calculate reward for output %s: %s", inputName, err))
 	}
 
-	potentialMana := w.PotentialMana(apiForSlot, input, w.currentSlot)
+	potentialMana := w.PotentialMana(apiForSlot, input)
 
 	// Create Basic Output where the reward will be put.
 	outputStates := iotago.Outputs[iotago.Output]{&iotago.BasicOutput{
@@ -547,8 +547,8 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 	return signedTransaction
 }
 
-// Computes the Potential Mana that the output generates until target slot.
-func (w *Wallet) PotentialMana(api iotago.API, input *utxoledger.Output, targetSlot iotago.SlotIndex) iotago.Mana {
+// Computes the Potential Mana that the output generates until the current slot.
+func (w *Wallet) PotentialMana(api iotago.API, input *utxoledger.Output) iotago.Mana {
 	minDeposit := lo.PanicOnErr(api.StorageScoreStructure().MinDeposit(input.Output()))
 
 	if minDeposit > input.BaseTokenAmount() {
@@ -557,7 +557,12 @@ func (w *Wallet) PotentialMana(api iotago.API, input *utxoledger.Output, targetS
 
 	excessBaseTokens := input.BaseTokenAmount() - minDeposit
 
-	return lo.PanicOnErr(api.ManaDecayProvider().ManaGenerationWithDecay(excessBaseTokens, input.SlotCreated(), targetSlot))
+	return lo.PanicOnErr(api.ManaDecayProvider().ManaGenerationWithDecay(excessBaseTokens, input.SlotCreated(), w.currentSlot))
+}
+
+// Computes the decay on stored mana that the output holds until the current slot.
+func (w *Wallet) StoredMana(api iotago.API, input *utxoledger.Output) iotago.Mana {
+	return lo.PanicOnErr(api.ManaDecayProvider().ManaWithDecay(input.StoredMana(), input.SlotCreated(), w.currentSlot))
 }
 
 func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, recipientWallet *Wallet) *iotago.SignedTransaction {
