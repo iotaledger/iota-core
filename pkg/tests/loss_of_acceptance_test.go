@@ -171,8 +171,6 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
 	{
-		fmt.Println("ISSUE BLOCKS SO THAT NODES CAN WARP SYNC UP TO SLOT 19")
-
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, false)
 
 		ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
