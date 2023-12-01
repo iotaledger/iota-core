@@ -232,9 +232,12 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 // deriveWarpSyncMode defines how a chain determines whether it is in warp sync mode or not.
 func (c *Chain) deriveWarpSyncMode() func() {
 	return c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSyncMode bool, latestProducedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
+		c.Log("warp sync mode", log.LevelTrace, "warpSyncMode", warpSyncMode, "latestProducedCommitment", latestProducedCommitment, "warpSyncThreshold", warpSyncThreshold, "outOfSyncThreshold", outOfSyncThreshold)
+
+		// TODO: we don't set a latestProducedCommitment when forking, and therefore it is always nil after an engine is forked
 		// if we have no latest produced commitment, then the engine is not yet initialized and warp sync is disabled
 		if latestProducedCommitment == nil {
-			return false
+			return true
 		}
 
 		// if warp sync mode is enabled, keep it enabled until we are no longer below the warp sync threshold
