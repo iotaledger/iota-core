@@ -30,7 +30,7 @@ type AttestationsProtocol struct {
 	// commitmentVerifiers contains the commitment verifiers that are used to verify received attestations.
 	commitmentVerifiers *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *CommitmentVerifier]
 
-	// Logger embeds a logger that can be used to log messages emitted by this chain.
+	// Logger embeds a logger that can be used to log messages emitted by this component.
 	log.Logger
 }
 

@@ -232,12 +232,10 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 // deriveWarpSyncMode defines how a chain determines whether it is in warp sync mode or not.
 func (c *Chain) deriveWarpSyncMode() func() {
 	return c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSyncMode bool, latestProducedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
-		c.Log("warp sync mode", log.LevelTrace, "warpSyncMode", warpSyncMode, "latestProducedCommitment", latestProducedCommitment, "warpSyncThreshold", warpSyncThreshold, "outOfSyncThreshold", outOfSyncThreshold)
-
-		// TODO: we don't set a latestProducedCommitment when forking, and therefore it is always nil after an engine is forked
-		// if we have no latest produced commitment, then the engine is not yet initialized and warp sync is disabled
+		// latest produced commitment is nil if we have not produced any commitment yet (intermediary state during
+		// startup)
 		if latestProducedCommitment == nil {
-			return true
+			return warpSyncMode
 		}
 
 		// if warp sync mode is enabled, keep it enabled until we are no longer below the warp sync threshold
@@ -328,11 +326,7 @@ func (c *Chain) deriveOutOfSyncThreshold(latestSeenSlot reactive.ReadableVariabl
 // committable age or 0 if this would cause an overflow to the negative numbers).
 func (c *Chain) deriveWarpSyncThreshold(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex], engineInstance *engine.Engine) func() {
 	return c.WarpSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
-		// The offset needs to be always at least minCommittableAge as we measure whether to turn off WarpSyncMode
-		// against the LatestProducedCommitment. As such, we always need to warp sync at least a window of minCommittableAge slots,
-		// so that we can commit.
-		// For example assuming minCommittable=3: if we warpsync until slot 17, the highest commitment we can produce is 14.
-		warpSyncOffset := engineInstance.LatestAPI().ProtocolParameters().MinCommittableAge() + engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge()
+		warpSyncOffset := engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge()
 		if warpSyncOffset < latestSeenSlot {
 			return latestSeenSlot - warpSyncOffset
 		}
