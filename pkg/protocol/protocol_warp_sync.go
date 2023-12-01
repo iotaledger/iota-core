@@ -196,17 +196,12 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				if totalBlocks == 0 {
 					allBlocksNotarized.Trigger()
 				} else {
-					for slotCommitmentID, blockIDs := range blockIDsBySlotCommitment {
+					for _, blockIDs := range blockIDsBySlotCommitment {
 						for _, blockID := range blockIDs {
 							block, exists := targetEngine.BlockCache.Block(blockID)
 							if !exists { // this should never happen as we just booked these blocks in this slot.
 								continue
 							}
-
-							// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
-							// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
-							// block cache and thus if not root blocks no block in the next slot can become solid.
-							targetEngine.EvictionState.AddRootBlock(block.ID(), slotCommitmentID)
 
 							targetEngine.BlockGadget.SetAccepted(block)
 
@@ -234,6 +229,21 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 						return
 					}
+
+					// TODO: maybe we don't need to set root blocks as we leave a window for warp sync now.
+					for slotCommitmentID, blockIDs := range blockIDsBySlotCommitment {
+						for _, blockID := range blockIDs {
+							block, exists := targetEngine.BlockCache.Block(blockID)
+							if !exists { // this should never happen as we just booked these blocks in this slot.
+								continue
+							}
+
+							// We need to make sure that we add all blocks as root blocks because we don't know which blocks are root blocks without
+							// blocks from future slots. We're committing the current slot which then leads to the eviction of the blocks from the
+							// block cache and thus if not root blocks no block in the next slot can become solid.
+							targetEngine.EvictionState.AddRootBlock(block.ID(), slotCommitmentID)
+						}
+					}
 				})
 			}
 
@@ -241,7 +251,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				// Let's assume that MCA is 5: when we want to book 15, we expect to have the commitment of 10 to load
 				// accounts from it, hence why we make committable the slot at - MCA + 1 with respect of the current slot.
 				minimumCommittableAge := w.protocol.APIForSlot(commitmentID.Slot()).ProtocolParameters().MinCommittableAge()
-				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - minimumCommittableAge + 1); exists {
+				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - minimumCommittableAge); exists {
 					committableCommitment.IsCommittable.Set(true)
 				}
 			})
@@ -269,8 +279,9 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 						continue
 					}
 
-					// TODO: this will need to be changed to WeightPropagated before marking a block as actually booked.
-					block.Booked().OnUpdate(func(_ bool, _ bool) {
+					// We need to make sure that all blocks are fully booked and their weight propagated before we can
+					// move the window forward. This is in order to ensure that confirmation and finalization is correctly propagated.
+					block.WeightPropagated().OnUpdate(func(_ bool, _ bool) {
 						if bookedBlocks.Add(1) != totalBlocks {
 							return
 						}
