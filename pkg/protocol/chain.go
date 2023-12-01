@@ -325,7 +325,12 @@ func (c *Chain) deriveOutOfSyncThreshold(latestSeenSlot reactive.ReadableVariabl
 // committable age or 0 if this would cause an overflow to the negative numbers).
 func (c *Chain) deriveWarpSyncThreshold(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex], engineInstance *engine.Engine) func() {
 	return c.WarpSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
-		if warpSyncOffset := engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge(); warpSyncOffset < latestSeenSlot {
+		// The offset needs to be always at least minCommittableAge as we measure whether to turn off WarpSyncMode
+		// against the LatestProducedCommitment. As such, we always need to warp sync at least a window of minCommittableAge slots,
+		// so that we can commit.
+		// For example assuming minCommittable=3: if we warpsync until slot 17, the highest commitment we can produce is 14.
+		warpSyncOffset := engineInstance.LatestAPI().ProtocolParameters().MinCommittableAge() + engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge()
+		if warpSyncOffset < latestSeenSlot {
 			return latestSeenSlot - warpSyncOffset
 		}
 
