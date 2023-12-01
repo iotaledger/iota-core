@@ -232,9 +232,10 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 // deriveWarpSyncMode defines how a chain determines whether it is in warp sync mode or not.
 func (c *Chain) deriveWarpSyncMode() func() {
 	return c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSyncMode bool, latestProducedCommitment *Commitment, warpSyncThreshold iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
-		// if we have no latest produced commitment, then the engine is not yet initialized and warp sync is disabled
+		// latest produced commitment is nil if we have not produced any commitment yet (intermediary state during
+		// startup)
 		if latestProducedCommitment == nil {
-			return false
+			return warpSyncMode
 		}
 
 		// if warp sync mode is enabled, keep it enabled until we are no longer below the warp sync threshold
@@ -325,7 +326,8 @@ func (c *Chain) deriveOutOfSyncThreshold(latestSeenSlot reactive.ReadableVariabl
 // committable age or 0 if this would cause an overflow to the negative numbers).
 func (c *Chain) deriveWarpSyncThreshold(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex], engineInstance *engine.Engine) func() {
 	return c.WarpSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
-		if warpSyncOffset := engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge(); warpSyncOffset < latestSeenSlot {
+		warpSyncOffset := engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge()
+		if warpSyncOffset < latestSeenSlot {
 			return latestSeenSlot - warpSyncOffset
 		}
 

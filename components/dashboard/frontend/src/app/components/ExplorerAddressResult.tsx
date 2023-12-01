@@ -8,11 +8,9 @@ import {ExplorerStore, ExplorerOutput, OutputMetadata} from "../stores/ExplorerS
 import Spinner from "react-bootstrap/Spinner";
 import ListGroup from "react-bootstrap/ListGroup";
 import Alert from "react-bootstrap/Alert";
-import {Link} from 'react-router-dom';
 import {displayManaUnit} from "../utils";
 import {OutputType, outputToComponent, outputTypeToName} from "../utils/output";
 import {Button, ListGroupItem} from "react-bootstrap";
-import {resolveBase58ConflictID} from "../utils/conflict";
 
 interface Props {
     nodeStore?: NodeStore;
@@ -222,15 +220,13 @@ class OutputMeta extends React.Component<omProps, any> {
         let pendingMana = this.props.pendingMana;
         return (
             <ListGroup>
-                ConflictIDs: 
+                SpendIDs: 
                 <ListGroup>
                     {
-                        metadata.conflictIDs.map((value, index) => {
+                        metadata.spendIDs.map((value, index) => {
                             return (
-                                <ListGroup.Item key={"ConflictID" + index + 1} className="text-break">
-                                    <Link to={`/explorer/conflict/${value}`}>
-                                        {resolveBase58ConflictID(value)}
-                                    </Link>
+                                <ListGroup.Item key={"SpendID" + index + 1} className="text-break">
+                                    {value}
                                 </ListGroup.Item>
                             )
                         })

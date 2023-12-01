@@ -230,6 +230,7 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 			if currentChain == nil {
 				currentChain = c.commitments.protocol.Chains.newChain()
 				currentChain.ForkingPoint.Set(c)
+				currentChain.LatestProducedCommitment.Set(parent)
 			}
 
 			return currentChain

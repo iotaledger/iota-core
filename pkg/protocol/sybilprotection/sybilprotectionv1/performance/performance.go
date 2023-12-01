@@ -21,7 +21,7 @@ type Tracker struct {
 	rewardsStorePerEpochFunc       func(epoch iotago.EpochIndex) (kvstore.KVStore, error)
 	poolStatsStore                 *epochstore.Store[*model.PoolsStats]
 	committeeStore                 *epochstore.Store[*account.Accounts]
-	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error)
+	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error)
 	nextEpochCommitteeCandidates   *shrinkingmap.ShrinkingMap[iotago.AccountID, iotago.SlotIndex]
 	validatorPerformancesFunc      func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
 	latestAppliedEpoch             iotago.EpochIndex
@@ -38,7 +38,7 @@ func NewTracker(
 	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error),
 	poolStatsStore *epochstore.Store[*model.PoolsStats],
 	committeeStore *epochstore.Store[*account.Accounts],
-	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error),
+	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error),
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
 	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider iotago.APIProvider,
@@ -109,7 +109,7 @@ func (t *Tracker) TrackCandidateBlock(block *blocks.Block) {
 				return currentValue
 			}
 
-			err = committeeCandidatesStore.Set(block.ProtocolBlock().Header.IssuerID[:], block.ID().Slot().MustBytes())
+			err = committeeCandidatesStore.Set(block.ProtocolBlock().Header.IssuerID, block.ID().Slot())
 			if err != nil {
 				// if there is an error, and we don't register a candidate, then we might eventually create a different commitment
 				t.errHandler(ierrors.Wrapf(err, "error while updating candidate activity for epoch %d", blockEpoch))
@@ -158,25 +158,11 @@ func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago
 		return nil, ierrors.Wrapf(err, "error while retrieving candidates for epoch %d", epoch)
 	}
 
-	var innerErr error
-	err = candidateStore.IterateKeys(kvstore.EmptyPrefix, func(key kvstore.Key) bool {
-		accountID, _, err := iotago.AccountIDFromBytes(key)
-		if err != nil {
-			innerErr = err
-
-			return false
-		}
-
+	if err = candidateStore.IterateKeys(kvstore.EmptyPrefix, func(accountID iotago.AccountID) bool {
 		candidates.Add(accountID)
 
 		return true
-	})
-
-	if innerErr != nil {
-		return nil, ierrors.Wrapf(innerErr, "error while iterating through candidates for epoch %d", epoch)
-	}
-
-	if err != nil {
+	}); err != nil {
 		return nil, ierrors.Wrapf(err, "error while retrieving candidates for epoch %d", epoch)
 	}
 

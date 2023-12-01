@@ -30,7 +30,7 @@ func (s *Storage) Committee() *epochstore.Store[*account.Accounts] {
 	return s.prunable.Committee()
 }
 
-func (s *Storage) CommitteeCandidates(epoch iotago.EpochIndex) (kvstore.KVStore, error) {
+func (s *Storage) CommitteeCandidates(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error) {
 	return s.prunable.CommitteeCandidates(epoch)
 }
 
@@ -134,14 +134,18 @@ func (s *Storage) Rollback(targetSlot iotago.SlotIndex) error {
 	return s.prunable.Rollback(s.pruningRange(targetSlot))
 }
 
-func (s *Storage) pruningRange(targetSlot iotago.SlotIndex) (targetEpoch iotago.EpochIndex, pruneRange [2]iotago.SlotIndex) {
-	epochOfSlot := func(slot iotago.SlotIndex) iotago.EpochIndex {
-		return s.Settings().APIProvider().APIForSlot(slot).TimeProvider().EpochFromSlot(slot)
+func (s *Storage) pruningRange(targetSlot iotago.SlotIndex) (targetEpoch iotago.EpochIndex, startSlot iotago.SlotIndex, endSlot iotago.SlotIndex) {
+	timeProvider := s.Settings().APIProvider().APIForSlot(targetSlot).TimeProvider()
+
+	targetEpoch = timeProvider.EpochFromSlot(targetSlot)
+
+	startSlot = targetSlot + 1
+	endSlot = s.Settings().LatestStoredSlot()
+
+	// If startSlot is in the next epoch, there's no need to prune a range of slots as the next epoch is going to be pruned on epoch-level anyway.
+	if timeProvider.EpochFromSlot(startSlot) > targetEpoch {
+		endSlot = 0
 	}
 
-	if targetEpoch, pruneRange = epochOfSlot(targetSlot), [2]iotago.SlotIndex{targetSlot + 1, s.Settings().LatestStoredSlot()}; epochOfSlot(pruneRange[0]) > targetEpoch {
-		pruneRange[1] = s.Settings().APIProvider().APIForEpoch(targetEpoch).TimeProvider().EpochEnd(targetEpoch)
-	}
-
-	return targetEpoch, pruneRange
+	return targetEpoch, startSlot, endSlot
 }

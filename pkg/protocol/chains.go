@@ -31,7 +31,7 @@ type Chains struct {
 	// HeaviestVerifiedCandidate contains the candidate chain with the heaviest verified weight.
 	HeaviestVerifiedCandidate reactive.Variable[*Chain]
 
-	// LatestSeenSlot contains the latest slot that was seen by any of the chains.
+	// LatestSeenSlot contains the slot of the latest commitment of any received block.
 	LatestSeenSlot reactive.Variable[iotago.SlotIndex]
 
 	// protocol contains a reference to the Protocol instance that this component belongs to.
@@ -158,7 +158,7 @@ func (c *Chains) deriveLatestSeenSlot(protocol *Protocol) func() {
 			}),
 
 			protocol.Network.OnBlockReceived(func(block *model.Block, src peer.ID) {
-				c.LatestSeenSlot.Set(mainEngine.LatestAPI().TimeProvider().SlotFromTime(block.ProtocolBlock().Header.IssuingTime))
+				c.LatestSeenSlot.Set(block.ProtocolBlock().Header.SlotCommitmentID.Slot())
 			}),
 		)
 	})

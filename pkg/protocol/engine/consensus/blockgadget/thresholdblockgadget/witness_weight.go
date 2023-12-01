@@ -8,6 +8,8 @@ import (
 )
 
 func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
+	defer votingBlock.SetWeightPropagated()
+
 	// Only track witness weight for issuers that are part of the committee.
 	seat, isValid := g.isCommitteeValidationBlock(votingBlock)
 	if !isValid {

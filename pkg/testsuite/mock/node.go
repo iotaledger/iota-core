@@ -357,20 +357,20 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		instance.LogTrace("SybilProtection.CommitteeSelected", "epoch", epoch, "committee", committee.IDs())
 	})
 
-	events.ConflictDAG.ConflictCreated.Hook(func(conflictID iotago.TransactionID) {
-		instance.LogTrace("ConflictDAG.ConflictCreated", "conflictID", conflictID)
+	events.SpendDAG.SpenderCreated.Hook(func(conflictID iotago.TransactionID) {
+		instance.LogTrace("ConflictDAG.SpendCreated", "conflictID", conflictID)
 	})
 
-	events.ConflictDAG.ConflictEvicted.Hook(func(conflictID iotago.TransactionID) {
-		instance.LogTrace("ConflictDAG.ConflictEvicted", "conflictID", conflictID)
+	events.SpendDAG.SpenderEvicted.Hook(func(conflictID iotago.TransactionID) {
+		instance.LogTrace("ConflictDAG.SpendEvicted", "conflictID", conflictID)
 	})
 
-	events.ConflictDAG.ConflictRejected.Hook(func(conflictID iotago.TransactionID) {
-		instance.LogTrace("ConflictDAG.ConflictRejected", "conflictID", conflictID)
+	events.SpendDAG.SpenderRejected.Hook(func(conflictID iotago.TransactionID) {
+		instance.LogTrace("ConflictDAG.SpendRejected", "conflictID", conflictID)
 	})
 
-	events.ConflictDAG.ConflictAccepted.Hook(func(conflictID iotago.TransactionID) {
-		instance.LogTrace("ConflictDAG.ConflictAccepted", "conflictID", conflictID)
+	events.SpendDAG.SpenderAccepted.Hook(func(conflictID iotago.TransactionID) {
+		instance.LogTrace("ConflictDAG.SpendAccepted", "conflictID", conflictID)
 	})
 
 	instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {

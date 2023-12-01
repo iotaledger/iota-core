@@ -60,7 +60,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	// Need to issue to slot 52 so that all other nodes can warp sync up to slot 49 and then commit slot 50 themselves.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{51, 52}, 2, "block0", ts.Nodes("node0"), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{51, 52}, 2, "block0", ts.Nodes("node0"), true, false)
 
 		ts.AssertLatestCommitmentSlotIndex(50, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(50, ts.Nodes()...)
@@ -69,7 +69,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	// Continue issuing on all nodes for a few slots.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{53, 54, 55, 56, 57}, 3, "52.1", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{53, 54, 55, 56, 57}, 3, "52.1", ts.Nodes(), true, false)
 
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("57.0"), true, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(55, ts.Nodes()...)
@@ -88,7 +88,7 @@ func TestLossOfAcceptanceFromGenesis(t *testing.T) {
 
 	// Continue issuing on all nodes for a few slots.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{58, 59}, 3, "57.2", ts.Nodes("node0", "node1", "node2"), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{58, 59}, 3, "57.2", ts.Nodes("node0", "node1", "node2"), true, false)
 
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("59.0"), true, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(57, ts.Nodes()...)
@@ -131,7 +131,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 
 	// Issue up to slot 10, committing slot 8.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
@@ -173,7 +173,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	{
 		fmt.Println("ISSUE BLOCKS SO THAT NODES CAN WARP SYNC UP TO SLOT 19")
 
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, false)
 
 		ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)
@@ -185,7 +185,7 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 		// are not used again.
 		ts.SetAutomaticTransactionIssuingCounters(node2.Partition, 24)
 
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, false)
 
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(23, ts.Nodes()...)
@@ -228,7 +228,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 
 	// Issue up to slot 10, committing slot 8.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, false)
 
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
@@ -264,7 +264,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 
 	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, false)
 
 		ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)
@@ -276,7 +276,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 		// are not used again.
 		ts.SetAutomaticTransactionIssuingCounters(node2.Partition, 24)
 
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, nil)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, false)
 
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(23, ts.Nodes()...)

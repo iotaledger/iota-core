@@ -148,64 +148,68 @@ func (o *SybilProtection) CommitSlot(slot iotago.SlotIndex) (committeeRoot iotag
 	timeProvider := apiForSlot.TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
-
+	currentEpochEndSlot := timeProvider.EpochEnd(currentEpoch)
 	maxCommittableAge := apiForSlot.ProtocolParameters().MaxCommittableAge()
 
-	// If the committed slot is `maxCommittableSlot`
-	// away from the end of the epoch, then register a committee for the next epoch.
-	if timeProvider.EpochEnd(currentEpoch) == slot+maxCommittableAge {
-		if _, committeeExists := o.seatManager.CommitteeInEpoch(nextEpoch); !committeeExists {
-			// If the committee for the epoch wasn't set before due to finalization of a slot,
-			// we promote the current committee to also serve in the next epoch.
-			committeeAccounts, err := o.reuseCommittee(currentEpoch, nextEpoch)
-			if err != nil {
-				return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to reuse committee for epoch %d", nextEpoch)
+	// Determine the committee root.
+	{
+		// If the committed slot is `maxCommittableAge` away from the end of the epoch, then register (reuse)
+		// a committee for the next epoch if it hasn't been selected yet.
+		if slot+maxCommittableAge == currentEpochEndSlot {
+			if _, committeeExists := o.seatManager.CommitteeInEpoch(nextEpoch); !committeeExists {
+				// If the committee for the epoch wasn't set before due to finalization of a slot,
+				// we promote the current committee to also serve in the next epoch.
+				committeeAccounts, err := o.reuseCommittee(currentEpoch, nextEpoch)
+				if err != nil {
+					return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to reuse committee for epoch %d", nextEpoch)
+				}
+
+				o.events.CommitteeSelected.Trigger(committeeAccounts, nextEpoch)
+			}
+		}
+
+		targetCommitteeEpoch := currentEpoch
+		if slot+maxCommittableAge >= currentEpochEndSlot {
+			targetCommitteeEpoch = nextEpoch
+		}
+
+		committeeRoot, err = o.committeeRoot(targetCommitteeEpoch)
+		if err != nil {
+			return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to calculate committee root for epoch %d", targetCommitteeEpoch)
+		}
+	}
+
+	// Handle performance tracking for the current epoch.
+	{
+		if slot == currentEpochEndSlot {
+			committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
+			if !exists {
+				return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "committee for a finished epoch %d not found", currentEpoch)
 			}
 
-			o.events.CommitteeSelected.Trigger(committeeAccounts, nextEpoch)
+			err = o.performanceTracker.ApplyEpoch(currentEpoch, committee)
+			if err != nil {
+				return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to apply epoch %d", currentEpoch)
+			}
 		}
 	}
 
-	if timeProvider.EpochEnd(currentEpoch) == slot {
-		committee, exists := o.performanceTracker.LoadCommitteeForEpoch(currentEpoch)
-		if !exists {
-			return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "committee for a finished epoch %d not found", currentEpoch)
+	// Determine the rewards root.
+	{
+		targetRewardsEpoch := currentEpoch
+		if slot == currentEpochEndSlot {
+			targetRewardsEpoch = nextEpoch
 		}
 
-		err = o.performanceTracker.ApplyEpoch(currentEpoch, committee)
+		rewardsRoot, err = o.performanceTracker.RewardsRoot(targetRewardsEpoch)
 		if err != nil {
-			return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to apply epoch %d", currentEpoch)
+			return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to calculate rewards root for epoch %d", targetRewardsEpoch)
 		}
-	}
-
-	var targetCommitteeEpoch iotago.EpochIndex
-
-	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) > slot+maxCommittableAge {
-		targetCommitteeEpoch = currentEpoch
-	} else {
-		targetCommitteeEpoch = nextEpoch
-	}
-
-	committeeRoot, err = o.committeeRoot(targetCommitteeEpoch)
-	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to calculate committee root for epoch %d", targetCommitteeEpoch)
-	}
-
-	var targetRewardsEpoch iotago.EpochIndex
-	if apiForSlot.TimeProvider().EpochEnd(currentEpoch) == slot {
-		targetRewardsEpoch = nextEpoch
-	} else {
-		targetRewardsEpoch = currentEpoch
-	}
-
-	rewardsRoot, err = o.performanceTracker.RewardsRoot(targetRewardsEpoch)
-	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, ierrors.Wrapf(err, "failed to calculate rewards root for epoch %d", targetRewardsEpoch)
 	}
 
 	o.lastCommittedSlot = slot
 
-	return
+	return committeeRoot, rewardsRoot, nil
 }
 
 func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) (committeeRoot iotago.Identifier, err error) {
