@@ -18,7 +18,7 @@ type BlockMetadata struct {
 func (m *BlockMetadata) BlockMetadataResponse() *api.BlockMetadataResponse {
 	return &api.BlockMetadataResponse{
 		BlockID:             m.BlockID,
-		BlockState:          m.BlockState.String(),
+		BlockState:          m.BlockState,
 		BlockFailureReason:  m.BlockFailureReason,
 		TransactionMetadata: m.TransactionMetadataResponse(),
 	}
@@ -31,7 +31,7 @@ func (m *BlockMetadata) TransactionMetadataResponse() *api.TransactionMetadataRe
 
 	return &api.TransactionMetadataResponse{
 		TransactionID:            m.TransactionID,
-		TransactionState:         m.TransactionState.String(),
+		TransactionState:         m.TransactionState,
 		TransactionFailureReason: m.TransactionFailureReason,
 	}
 }
