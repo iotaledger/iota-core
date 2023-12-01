@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
-	"github.com/iotaledger/iota-core/pkg/utils"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -160,7 +159,7 @@ func Test_Account_RemoveStakingFeatureWithoutRewards(t *testing.T) {
 	fixedCost := iotago.Mana(421)
 	stakedAmount := mock.MinValidatorAccountAmount(ts.API.ProtocolParameters())
 
-	blockIssuerFeatKey := utils.RandBlockIssuerKey()
+	blockIssuerFeatKey := tpkg.RandBlockIssuerKey()
 	// Set the expiry slot beyond the end epoch of the staking feature so we don't have to remove the feature.
 	blockIssuerFeatExpirySlot := ts.API.TimeProvider().EpochEnd(claimingEpoch)
 
