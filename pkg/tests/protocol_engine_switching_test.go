@@ -377,7 +377,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	ts := testsuite.NewTestSuite(t,
-		testsuite.WithWaitFor(30*time.Second),
+		testsuite.WithWaitFor(15*time.Second),
 
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
@@ -402,7 +402,7 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	node2 := ts.AddValidatorNode("node2")
 	node3 := ts.AddValidatorNode("node3")
 
-	const expectedCommittedSlotAfterPartitionMerge = 19
+	const expectedCommittedSlotAfterPartitionMerge = 18
 	nodesP1 := []*mock.Node{node0, node1, node2}
 	nodesP2 := []*mock.Node{node3}
 
@@ -605,6 +605,9 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
 		ts.AssertMainEngineSwitchedCount(1, nodesP2...)
 
+		// Make sure that enough activity messages are issued so that a block in slot 21 gets accepted and triggers commitment of slot 18.
+		time.Sleep(3 * time.Second)
+
 		ctxP1Cancel()
 		wg.Wait()
 	}
@@ -613,12 +616,10 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
 	// This is to make sure that the storage was copied correctly during engine switching.
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...) // not all blocks of slot 19 are available on node3 (buffer issue?)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
 
-	ts.AssertNodeState(ts.Nodes(),
-		testsuite.WithEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge),
-	)
+	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 
 	// Assert committee in epoch 1.
 	ts.AssertSybilProtectionCandidates(0, ts.AccountsOfNodes("node1", "node2"), ts.Nodes()...)
