@@ -392,19 +392,19 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 	})
 
 	events.SpendDAG.SpenderCreated.Hook(func(conflictID iotago.TransactionID) {
-		instance.LogTrace("ConflictDAG.SpendCreated", "conflictID", conflictID)
+		instance.LogTrace("SpendDAG.SpenderCreated", "conflictID", conflictID)
 	})
 
 	events.SpendDAG.SpenderEvicted.Hook(func(conflictID iotago.TransactionID) {
-		instance.LogTrace("ConflictDAG.SpendEvicted", "conflictID", conflictID)
+		instance.LogTrace("SpendDAG.SpenderEvicted", "conflictID", conflictID)
 	})
 
 	events.SpendDAG.SpenderRejected.Hook(func(conflictID iotago.TransactionID) {
-		instance.LogTrace("ConflictDAG.SpendRejected", "conflictID", conflictID)
+		instance.LogTrace("SpendDAG.SpenderRejected", "conflictID", conflictID)
 	})
 
 	events.SpendDAG.SpenderAccepted.Hook(func(conflictID iotago.TransactionID) {
-		instance.LogTrace("ConflictDAG.SpendAccepted", "conflictID", conflictID)
+		instance.LogTrace("SpendDAG.SpenderAccepted", "conflictID", conflictID)
 	})
 
 	instance.Ledger.MemPool().OnSignedTransactionAttached(
@@ -525,16 +525,16 @@ func (n *Node) FilteredBlocks() []*postsolidfilter.BlockFilteredEvent {
 	return n.filteredBlockEvents
 }
 
-func (n *Node) MainEngineSwitchedCount() int {
-	return int(n.mainEngineSwitchedCount.Load())
-}
-
 func (n *Node) TransactionFailure(txID iotago.SignedTransactionID) (InvalidSignedTransactionEvent, bool) {
 	n.mutex.RLock()
 	defer n.mutex.RUnlock()
 	event, exists := n.invalidTransactionEvents[txID]
 
 	return event, exists
+}
+
+func (n *Node) MainEngineSwitchedCount() int {
+	return int(n.mainEngineSwitchedCount.Load())
 }
 
 func (n *Node) AttachedBlocks() []*blocks.Block {

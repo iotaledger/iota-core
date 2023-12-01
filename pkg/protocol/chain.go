@@ -157,6 +157,8 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (dispatched bool)
 func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c; currentChain != nil; {
 		switch forkingPoint := currentChain.ForkingPoint.Get(); {
+		case forkingPoint == nil:
+			return nil, false
 		case forkingPoint.Slot() == slot:
 			return forkingPoint, true
 		case slot > forkingPoint.Slot():
@@ -333,6 +335,14 @@ func (c *Chain) deriveWarpSyncThreshold(latestSeenSlot reactive.ReadableVariable
 
 		return 0
 	}, latestSeenSlot))
+}
+
+func warpSyncThreshold(latestSeenSlot iotago.SlotIndex, minCommittableAge iotago.SlotIndex) iotago.SlotIndex {
+	if minCommittableAge < latestSeenSlot {
+		return latestSeenSlot - minCommittableAge + 1
+	}
+
+	return 0
 }
 
 // addCommitment adds the given commitment to this chain.

@@ -68,8 +68,15 @@ func (t *TestSuite) AssertCommitmentSlotIndexExists(slot iotago.SlotIndex, nodes
 				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found", node.Name, slot)
 			}
 
+			// Make sure the main chain exists
+			mainChain := node.Protocol.Chains.Main.Get()
+			if mainChain == nil {
+				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: main chain not found when checking for commitment at index %v", node.Name, slot)
+			}
+
 			// Make sure the commitment is also available in the ChainManager.
-			if node.Protocol.Chains.Main.Get().LatestCommitment.Get().ID().Slot() < slot {
+			latestCommitment := mainChain.LatestCommitment.Get()
+			if latestCommitment == nil || latestCommitment.ID().Slot() < slot {
 				return ierrors.Errorf("AssertCommitmentSlotIndexExists: %s: commitment at index %v not found in ChainManager", node.Name, slot)
 			}
 
@@ -126,8 +133,12 @@ func (t *TestSuite) AssertChainID(expectedChainID iotago.CommitmentID, nodes ...
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			actualChainID := node.Protocol.Chains.Main.Get().ForkingPoint.Get().ID()
+			mainChain := node.Protocol.Chains.Main.Get()
+			if mainChain == nil {
+				return ierrors.Errorf("AssertChainID: %s: main chain not found", node.Name)
+			}
 
+			actualChainID := mainChain.ForkingPoint.Get().ID()
 			if expectedChainID != actualChainID {
 				fmt.Println(expectedChainID, actualChainID)
 
