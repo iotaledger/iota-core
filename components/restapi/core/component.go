@@ -96,7 +96,7 @@ func configure() error {
 		}
 		c.Response().Header().Set(echo.HeaderLocation, resp.BlockID.ToHex())
 
-		return httpserver.JSONResponse(c, http.StatusCreated, resp)
+		return responseByHeader(c, resp, http.StatusCreated)
 	}, checkNodeSynced())
 
 	routeGroup.GET(api.CoreEndpointBlockIssuance, func(c echo.Context) error {
@@ -294,7 +294,7 @@ func checkNodeSynced() echo.MiddlewareFunc {
 	}
 }
 
-func responseByHeader(c echo.Context, obj any) error {
+func responseByHeader(c echo.Context, obj any, httpStatusCode ...int) error {
 	// TODO: that should take the API that belongs to the object
-	return httpserver.SendResponseByHeader(c, deps.Protocol.CommittedAPI(), obj)
+	return httpserver.SendResponseByHeader(c, deps.Protocol.CommittedAPI(), obj, httpStatusCode...)
 }
