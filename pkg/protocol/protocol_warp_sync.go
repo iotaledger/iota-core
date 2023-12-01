@@ -47,7 +47,7 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
-			return chain.WarpSyncMode.OnUpdate(func(_ bool, warpSyncMode bool) {
+			return chain.WarpSyncModeEnabled.OnUpdate(func(_ bool, warpSyncMode bool) {
 				if warpSyncMode {
 					engine.Workers.WaitChildren()
 					engine.Reset()
@@ -110,7 +110,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			return
 		}
 
-		if !chain.WarpSyncMode.Get() {
+		if !chain.WarpSyncModeEnabled.Get() {
 			w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
 
 			return
@@ -161,7 +161,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			targetEngine.Workers.WaitChildren()
 
-			if !chain.WarpSyncMode.Get() {
+			if !chain.WarpSyncModeEnabled.Get() {
 				w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
 
 				return blocksToWarpSync
@@ -177,7 +177,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			//   2. Mark all blocks as accepted
 			//   3. Force commitment of the slot
 			forceCommitmentFunc := func() {
-				if !chain.WarpSyncMode.Get() {
+				if !chain.WarpSyncModeEnabled.Get() {
 					return
 				}
 
@@ -248,10 +248,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			}
 
 			commitment.IsFullyBooked.OnUpdateOnce(func(_ bool, _ bool) {
-				// Let's assume that MCA is 5: when we want to book 15, we expect to have the commitment of 10 to load
-				// accounts from it, hence why we make committable the slot at - MCA + 1 with respect of the current slot.
-				minimumCommittableAge := w.protocol.APIForSlot(commitmentID.Slot()).ProtocolParameters().MinCommittableAge()
-				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - minimumCommittableAge + 1); exists {
+				if committableCommitment, exists := chain.Commitment(warpSyncThreshold(targetEngine, commitmentID.Slot())); exists {
 					committableCommitment.IsCommittable.Set(true)
 				}
 			})
