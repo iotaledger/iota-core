@@ -45,19 +45,13 @@ func newBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 			return commitment.ReplayDroppedBlocks.OnUpdate(func(_ bool, replayBlocks bool) {
 				if replayBlocks {
 					for _, droppedBlock := range b.droppedBlocksBuffer.GetValues(commitment.ID()) {
-						b.LogError("replaying dropped block", "commitmentID", commitment.ID(), "blockID", droppedBlock.A.ID())
+						b.LogTrace("replaying dropped block", "commitmentID", commitment.ID(), "blockID", droppedBlock.A.ID())
 
 						b.ProcessResponse(droppedBlock.A, droppedBlock.B)
 					}
 				}
 			})
 		})
-
-		//protocol.Chains.WithElements(func(chain *Chain) func() {
-		//	return chain.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (shutdown func()) {
-		//		return engineInstance.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook
-		//	})
-		//})
 
 		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
 			return lo.Batch(
@@ -66,16 +60,6 @@ func newBlocksProtocol(protocol *Protocol) *BlocksProtocol {
 				engine.Events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) { b.SendResponse(block.ModelBlock()) }).Unhook,
 			)
 		})
-		//protocol.Chains.Main.Get().Engine.OnUpdateWithContext(func(_ *engine.Engine, engine *engine.Engine, unsubscribeOnEngineChange func(subscriptionFactory func() (unsubscribe func()))) {
-		//	if engine != nil {
-		//		unsubscribeOnEngineChange(func() (unsubscribe func()) {
-		//			return lo.Batch(
-		//				engine.Events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) { b.SendResponse(block.ModelBlock()) }).Unhook,
-		//				engine.Events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) { b.SendResponse(block.ModelBlock()) }).Unhook,
-		//			)
-		//		})
-		//	}
-		//})
 	})
 
 	return b
@@ -115,15 +99,13 @@ func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 			if !b.droppedBlocksBuffer.Add(block.ProtocolBlock().Header.SlotCommitmentID, types.NewTuple(block, from)) {
 				b.LogError("failed to add dropped block referencing unsolid commitment to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
 			} else {
-				b.LogDebug("dropped block referencing unsolid commitment added to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
+				b.LogTrace("dropped block referencing unsolid commitment added to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
 			}
 
 			return
-		} else if block.ProtocolBlock().Header.SlotCommitmentID.Slot() >= 19 {
-			b.LogError("received block", "blockID", block.ID(), "commitment", commitment.LogName())
-		} else {
-			b.LogTrace("received block", "blockID", block.ID(), "commitment", commitment.LogName())
 		}
+
+		b.LogTrace("received block", "blockID", block.ID(), "commitment", commitment.LogName())
 	})
 }
 
