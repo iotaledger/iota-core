@@ -92,7 +92,7 @@ func newChain(chains *Chains) *Chain {
 		ClaimedWeight:            reactive.NewVariable[uint64](),
 		AttestedWeight:           reactive.NewVariable[uint64](),
 		VerifiedWeight:           reactive.NewVariable[uint64](),
-		WarpSyncMode:             reactive.NewVariable[bool](),
+		WarpSyncMode:             reactive.NewVariable[bool]().Init(true),
 		WarpSyncThreshold:        reactive.NewVariable[iotago.SlotIndex](),
 		OutOfSyncThreshold:       reactive.NewVariable[iotago.SlotIndex](),
 		RequestAttestations:      reactive.NewVariable[bool](),
@@ -326,9 +326,9 @@ func (c *Chain) deriveOutOfSyncThreshold(latestSeenSlot reactive.ReadableVariabl
 // committable age or 0 if this would cause an overflow to the negative numbers).
 func (c *Chain) deriveWarpSyncThreshold(latestSeenSlot reactive.ReadableVariable[iotago.SlotIndex], engineInstance *engine.Engine) func() {
 	return c.WarpSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
-		warpSyncOffset := engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge()
+		warpSyncOffset := engineInstance.LatestAPI().ProtocolParameters().MinCommittableAge()
 		if warpSyncOffset < latestSeenSlot {
-			return latestSeenSlot - warpSyncOffset
+			return latestSeenSlot - warpSyncOffset + 1
 		}
 
 		return 0

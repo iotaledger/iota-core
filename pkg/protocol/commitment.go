@@ -158,6 +158,7 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 	return lo.Batch(
 		// mark commitments that are marked as root as verified
 		c.IsCommitted.InheritFrom(c.IsRoot),
+		c.IsAboveLatestVerifiedCommitment.InheritFrom(c.IsRoot),
 
 		// mark commitments that are marked as verified as attested, fully booked and committable
 		c.IsAttested.InheritFrom(c.IsCommitted),

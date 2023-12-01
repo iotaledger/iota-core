@@ -251,7 +251,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				// Let's assume that MCA is 5: when we want to book 15, we expect to have the commitment of 10 to load
 				// accounts from it, hence why we make committable the slot at - MCA + 1 with respect of the current slot.
 				minimumCommittableAge := w.protocol.APIForSlot(commitmentID.Slot()).ProtocolParameters().MinCommittableAge()
-				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - minimumCommittableAge); exists {
+				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - minimumCommittableAge + 1); exists {
 					committableCommitment.IsCommittable.Set(true)
 				}
 			})

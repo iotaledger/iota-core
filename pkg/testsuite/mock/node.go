@@ -45,6 +45,11 @@ func UnregisterIDAliases() {
 	idAliases = make(map[peer.ID]string)
 }
 
+type InvalidSignedTransactionEvent struct {
+	Metadata mempool.SignedTransactionMetadata
+	Error    error
+}
+
 type Node struct {
 	Testing *testing.T
 
@@ -72,10 +77,11 @@ type Node struct {
 	logHandler          slog.Handler
 	enableEngineLogging bool
 
-	mutex               syncutils.RWMutex
-	attachedBlocks      []*blocks.Block
-	currentSlot         iotago.SlotIndex
-	filteredBlockEvents []*postsolidfilter.BlockFilteredEvent
+	mutex                    syncutils.RWMutex
+	attachedBlocks           []*blocks.Block
+	currentSlot              iotago.SlotIndex
+	filteredBlockEvents      []*postsolidfilter.BlockFilteredEvent
+	invalidTransactionEvents map[iotago.SignedTransactionID]InvalidSignedTransactionEvent
 }
 
 func NewNode(t *testing.T, net *Network, partition string, name string, validator bool, logHandler slog.Handler) *Node {
@@ -113,7 +119,8 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		logHandler:          logHandler,
 		enableEngineLogging: true,
 
-		attachedBlocks: make([]*blocks.Block, 0),
+		attachedBlocks:           make([]*blocks.Block, 0),
+		invalidTransactionEvents: make(map[iotago.SignedTransactionID]InvalidSignedTransactionEvent),
 	}
 }
 
@@ -179,6 +186,33 @@ func (n *Node) hookEvents() {
 
 		n.filteredBlockEvents = append(n.filteredBlockEvents, event)
 	})
+
+	n.Protocol.Engines.Main.Get().Ledger.MemPool().OnSignedTransactionAttached(
+		func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
+			signedTxID := signedTransactionMetadata.ID()
+
+			signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
+				n.mutex.Lock()
+				defer n.mutex.Unlock()
+
+				n.invalidTransactionEvents[signedTxID] = InvalidSignedTransactionEvent{
+					Metadata: signedTransactionMetadata,
+					Error:    err,
+				}
+			})
+
+			transactionMetadata := signedTransactionMetadata.TransactionMetadata()
+
+			transactionMetadata.OnInvalid(func(err error) {
+				n.mutex.Lock()
+				defer n.mutex.Unlock()
+
+				n.invalidTransactionEvents[signedTxID] = InvalidSignedTransactionEvent{
+					Metadata: signedTransactionMetadata,
+					Error:    err,
+				}
+			})
+		})
 }
 
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
@@ -373,6 +407,14 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		instance.LogTrace("ConflictDAG.SpendAccepted", "conflictID", conflictID)
 	})
 
+	instance.Ledger.MemPool().OnSignedTransactionAttached(
+		func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
+			signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
+				instance.LogTrace("MemPool.SignedTransactionSignaturesInvalid", "tx", signedTransactionMetadata.ID(), "err", err)
+			})
+		},
+	)
+
 	instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
 		instance.LogTrace("Ledger.TransactionAttached", "tx", transactionMetadata.ID())
 
@@ -485,6 +527,14 @@ func (n *Node) FilteredBlocks() []*postsolidfilter.BlockFilteredEvent {
 
 func (n *Node) MainEngineSwitchedCount() int {
 	return int(n.mainEngineSwitchedCount.Load())
+}
+
+func (n *Node) TransactionFailure(txID iotago.SignedTransactionID) (InvalidSignedTransactionEvent, bool) {
+	n.mutex.RLock()
+	defer n.mutex.RUnlock()
+	event, exists := n.invalidTransactionEvents[txID]
+
+	return event, exists
 }
 
 func (n *Node) AttachedBlocks() []*blocks.Block {
