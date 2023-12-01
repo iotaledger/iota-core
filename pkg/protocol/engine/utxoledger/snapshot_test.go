@@ -13,17 +13,16 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	iotago_tpkg "github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func TestOutput_SnapshotBytes(t *testing.T) {
-	outputID := utils.RandOutputID(2)
-	blockID := utils.RandBlockID()
-	txID := utils.RandTransactionID()
-	slotBooked := utils.RandSlotIndex()
-	iotaOutput := utils.RandOutput(iotago.OutputBasic)
+	outputID := iotago_tpkg.RandOutputID(2)
+	blockID := iotago_tpkg.RandBlockID()
+	txID := iotago_tpkg.RandTransactionID()
+	slotBooked := iotago_tpkg.RandSlot()
+	iotaOutput := iotago_tpkg.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
@@ -54,11 +53,11 @@ func TestOutput_SnapshotBytes(t *testing.T) {
 }
 
 func TestOutputFromSnapshotReader(t *testing.T) {
-	txID := utils.RandTransactionID()
-	outputID := utils.RandOutputID(2)
-	blockID := utils.RandBlockID()
-	slotBooked := utils.RandSlotIndex()
-	iotaOutput := utils.RandOutput(iotago.OutputBasic)
+	txID := iotago_tpkg.RandTransactionID()
+	outputID := iotago_tpkg.RandOutputID(2)
+	blockID := iotago_tpkg.RandBlockID()
+	slotBooked := iotago_tpkg.RandSlot()
+	iotaOutput := iotago_tpkg.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
@@ -78,11 +77,11 @@ func TestOutputFromSnapshotReader(t *testing.T) {
 }
 
 func TestSpent_SnapshotBytes(t *testing.T) {
-	txID := utils.RandTransactionID()
-	outputID := utils.RandOutputID(2)
-	blockID := utils.RandBlockID()
-	slotBooked := utils.RandSlotIndex()
-	iotaOutput := utils.RandOutput(iotago.OutputBasic)
+	txID := iotago_tpkg.RandTransactionID()
+	outputID := iotago_tpkg.RandOutputID(2)
+	blockID := iotago_tpkg.RandBlockID()
+	slotBooked := iotago_tpkg.RandSlot()
+	iotaOutput := iotago_tpkg.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
@@ -94,8 +93,8 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 	output := utxoledger.NewOutput(iotago.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, slotBooked, iotaOutput, iotaOutputBytes, outputProof, outputProofBytes)
 	outputSnapshotBytes := output.SnapshotBytes()
 
-	transactionID := utils.RandTransactionID()
-	slotSpent := utils.RandSlotIndex()
+	transactionID := iotago_tpkg.RandTransactionID()
+	slotSpent := iotago_tpkg.RandSlot()
 	spent := utxoledger.NewSpent(output, transactionID, slotSpent)
 
 	snapshotBytes := spent.SnapshotBytes()
@@ -107,11 +106,11 @@ func TestSpent_SnapshotBytes(t *testing.T) {
 }
 
 func TestSpentFromSnapshotReader(t *testing.T) {
-	txID := utils.RandTransactionID()
-	outputID := utils.RandOutputID(2)
-	blockID := utils.RandBlockID()
-	slotBooked := utils.RandSlotIndex()
-	iotaOutput := utils.RandOutput(iotago.OutputBasic)
+	txID := iotago_tpkg.RandTransactionID()
+	outputID := iotago_tpkg.RandOutputID(2)
+	blockID := iotago_tpkg.RandBlockID()
+	slotBooked := iotago_tpkg.RandSlot()
+	iotaOutput := iotago_tpkg.RandOutput(iotago.OutputBasic)
 	iotaOutputBytes, err := iotago_tpkg.TestAPI.Encode(iotaOutput)
 	require.NoError(t, err)
 
@@ -122,8 +121,8 @@ func TestSpentFromSnapshotReader(t *testing.T) {
 
 	output := utxoledger.NewOutput(iotago.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, slotBooked, iotaOutput, iotaOutputBytes, outputProof, outputProofBytes)
 
-	transactionID := utils.RandTransactionID()
-	slotSpent := utils.RandSlotIndex()
+	transactionID := iotago_tpkg.RandTransactionID()
+	slotSpent := iotago_tpkg.RandSlot()
 	spent := utxoledger.NewSpent(output, transactionID, slotSpent)
 
 	snapshotBytes := spent.SnapshotBytes()
@@ -136,7 +135,7 @@ func TestSpentFromSnapshotReader(t *testing.T) {
 }
 
 func TestReadSlotDiffToSnapshotReader(t *testing.T) {
-	slot := utils.RandSlotIndex()
+	slot := iotago_tpkg.RandSlot()
 	slotDiff := &utxoledger.SlotDiff{
 		Slot: slot,
 		Outputs: utxoledger.Outputs{
@@ -164,7 +163,7 @@ func TestReadSlotDiffToSnapshotReader(t *testing.T) {
 }
 
 func TestWriteSlotDiffToSnapshotWriter(t *testing.T) {
-	slot := utils.RandSlotIndex()
+	slot := iotago_tpkg.RandSlot()
 	slotDiff := &utxoledger.SlotDiff{
 		Slot: slot,
 		Outputs: utxoledger.Outputs{
