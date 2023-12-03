@@ -47,8 +47,8 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
-			return chain.WarpSyncMode.OnUpdate(func(_ bool, warpSyncMode bool) {
-				if warpSyncMode {
+			return chain.WarpSyncModeEnabled.OnUpdate(func(_ bool, warpSyncModeEnabled bool) {
+				if warpSyncModeEnabled {
 					engine.Workers.WaitChildren()
 					engine.Reset()
 				}
@@ -110,7 +110,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			return
 		}
 
-		if !chain.WarpSyncMode.Get() {
+		if !chain.WarpSyncModeEnabled.Get() {
 			w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
 
 			return
@@ -161,7 +161,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			targetEngine.Workers.WaitChildren()
 
-			if !chain.WarpSyncMode.Get() {
+			if !chain.WarpSyncModeEnabled.Get() {
 				w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
 
 				return blocksToWarpSync
@@ -177,7 +177,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			//   2. Mark all blocks as accepted
 			//   3. Force commitment of the slot
 			forceCommitmentFunc := func() {
-				if !chain.WarpSyncMode.Get() {
+				if !chain.WarpSyncModeEnabled.Get() {
 					return
 				}
 
@@ -247,20 +247,25 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				})
 			}
 
+			// Once all blocks are fully booked we can mark the commitment that is minCommittableAge older as this
+			// commitment to be committable.
 			commitment.IsFullyBooked.OnUpdateOnce(func(_ bool, _ bool) {
-				// Let's assume that MCA is 5: when we want to book 15, we expect to have the commitment of 10 to load
-				// accounts from it, hence why we make committable the slot at - MCA + 1 with respect of the current slot.
-				minimumCommittableAge := w.protocol.APIForSlot(commitmentID.Slot()).ProtocolParameters().MinCommittableAge()
-				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - minimumCommittableAge); exists {
-					committableCommitment.IsCommittable.Set(true)
+				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - targetEngine.LatestAPI().ProtocolParameters().MinCommittableAge()); exists {
+					w.workerPool.Submit(func() {
+						committableCommitment.IsCommittable.Set(true)
+					})
 				}
 			})
 
-			commitment.IsCommittable.OnUpdateOnce(func(_ bool, _ bool) {
-				w.workerPool.Submit(forceCommitmentFunc)
+			// force commit one by one and wait for the parent to be committed before we can commit the next one
+			commitment.Parent.WithNonEmptyValue(func(parent *Commitment) (teardown func()) {
+				return parent.IsCommitted.WithNonEmptyValue(func(_ bool) (teardown func()) {
+					return commitment.IsCommittable.OnTrigger(forceCommitmentFunc)
+				})
 			})
 
 			if totalBlocks == 0 {
+				commitment.IsCommittable.Set(true)
 				commitment.IsFullyBooked.Set(true)
 
 				return blocksToWarpSync

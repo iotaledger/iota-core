@@ -5,6 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -22,6 +23,9 @@ type CommitmentVerifier struct {
 	// validatorAccountsData is the accounts data of the validators for the current epoch as known at lastCommonSlotBeforeFork.
 	// Initially, it is set to the accounts data of the validators for the epoch of the last common commitment before the fork.
 	validatorAccountsData map[iotago.AccountID]*accounts.AccountData
+
+	// mutex is used to synchronize access to validatorAccountsData and epoch.
+	mutex syncutils.RWMutex
 }
 
 func newCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) (*CommitmentVerifier, error) {
@@ -76,6 +80,7 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestatio
 	//    This is necessary because the committee might have rotated at the epoch boundary and different validators might be part of it.
 	//    In case anything goes wrong we keep using previously known accounts data (initially set to the accounts data
 	//    of the validators for the epoch of the last common commitment before the fork).
+	c.mutex.Lock()
 	apiForSlot := c.engine.APIForSlot(commitment.Slot())
 	commitmentEpoch := apiForSlot.TimeProvider().EpochFromSlot(commitment.Slot())
 	if commitmentEpoch > c.epoch {
@@ -92,6 +97,7 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestatio
 			}
 		}
 	}
+	c.mutex.Unlock()
 
 	// 3. Verify attestations.
 	blockIDs, seatCount, err := c.verifyAttestations(attestations)
@@ -107,6 +113,9 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestatio
 }
 
 func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestation) (iotago.BlockIDs, uint64, error) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
 	visitedIdentities := ds.NewSet[iotago.AccountID]()
 	var blockIDs iotago.BlockIDs
 	var seatCount uint64

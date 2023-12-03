@@ -158,11 +158,11 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 	return lo.Batch(
 		// mark commitments that are marked as root as verified
 		c.IsCommitted.InheritFrom(c.IsRoot),
+		c.ReplayDroppedBlocks.InheritFrom(c.IsRoot),
 
-		// mark commitments that are marked as verified as attested, fully booked and committable
+		// mark commitments that are marked as verified as attested and fully booked
 		c.IsAttested.InheritFrom(c.IsCommitted),
 		c.IsFullyBooked.InheritFrom(c.IsCommitted),
-		c.IsCommittable.InheritFrom(c.IsCommitted),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			// the weight can be fixed as a one time operation (as it only relies on static information from the parent
@@ -274,17 +274,17 @@ func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment)
 // deriveWarpSyncBlocks derives the WarpSyncBlocks flag of this Commitment which is true if our Chain is requesting
 // warp sync, and we are the directly above the latest verified Commitment.
 func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func() {
-	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSync bool, parentIsFullyBooked bool, isFullyBooked bool) bool {
-		return engineInstance != nil && warpSync && parentIsFullyBooked && !isFullyBooked
-	}, chain.Engine, chain.WarpSyncMode, parent.IsFullyBooked, c.IsFullyBooked))
+	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSyncModeEnabled bool, parentIsFullyBooked bool, isFullyBooked bool) bool {
+		return engineInstance != nil && warpSyncModeEnabled && parentIsFullyBooked && !isFullyBooked
+	}, chain.Engine, chain.WarpSyncModeEnabled, parent.IsFullyBooked, c.IsFullyBooked))
 }
 
 // deriveReplayDroppedBlocks derives the ReplayDroppedBlocks flag of this Commitment which is true if our Chain has an
 // engine, is no longer requesting warp sync, and we are above the latest verified Commitment.
 func (c *Commitment) deriveReplayDroppedBlocks(chain *Chain) func() {
-	return c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, engineInstance *engine.Engine, warpSyncing bool, isAboveLatestVerifiedCommitment bool) bool {
-		return engineInstance != nil && !warpSyncing && isAboveLatestVerifiedCommitment
-	}, chain.Engine, chain.WarpSyncMode, c.IsAboveLatestVerifiedCommitment))
+	return c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, engineInstance *engine.Engine, warpSyncModeEnabled bool, isAboveLatestVerifiedCommitment bool) bool {
+		return engineInstance != nil && !warpSyncModeEnabled && isAboveLatestVerifiedCommitment
+	}, chain.Engine, chain.WarpSyncModeEnabled, c.IsAboveLatestVerifiedCommitment))
 }
 
 // forceChain forces the Chain of this Commitment to the given Chain by promoting it to the main child of its parent if
@@ -295,4 +295,13 @@ func (c *Commitment) forceChain(targetChain *Chain) {
 			parent.MainChild.Set(c)
 		}
 	}
+}
+
+// cumulativeWeight returns the cumulative weight of this Commitment while gracefully handling nil receivers.
+func (c *Commitment) cumulativeWeight() uint64 {
+	if c == nil {
+		return 0
+	}
+
+	return c.CumulativeWeight()
 }

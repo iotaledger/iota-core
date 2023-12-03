@@ -173,8 +173,6 @@ func TestLossOfAcceptanceFromSnapshot(t *testing.T) {
 	{
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0-restarted"), true, false)
 
-		time.Sleep(10 * time.Second)
-
 		ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)
 	}
