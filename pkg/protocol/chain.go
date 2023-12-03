@@ -307,7 +307,11 @@ func (c *Chain) deriveParentChain(forkingPoint *Commitment) (shutdown func()) {
 // times the max committable age or 0 if this would cause an overflow to the negative numbers).
 func (c *Chain) deriveOutOfSyncThreshold(engineInstance *engine.Engine) func() {
 	return c.OutOfSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
-		return outOfSyncThreshold(engineInstance, latestSeenSlot)
+		if outOfSyncOffset := 2 * engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge(); outOfSyncOffset < latestSeenSlot {
+			return latestSeenSlot - outOfSyncOffset
+		}
+
+		return 0
 	}, c.chains.LatestSeenSlot))
 }
 
@@ -376,13 +380,4 @@ func (c *Chain) verifiedWeight() reactive.Variable[uint64] {
 // "address" the variable across multiple chains in a generic way.
 func (c *Chain) attestedWeight() reactive.Variable[uint64] {
 	return c.AttestedWeight
-}
-
-// outOfSyncThreshold returns the slot index at which the node is considered out of sync.
-func outOfSyncThreshold(engineInstance *engine.Engine, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
-	if outOfSyncOffset := 2 * engineInstance.LatestAPI().ProtocolParameters().MaxCommittableAge(); outOfSyncOffset < latestSeenSlot {
-		return latestSeenSlot - outOfSyncOffset
-	}
-
-	return 0
 }
