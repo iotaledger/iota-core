@@ -223,9 +223,7 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 		}),
 
 		c.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (shutdown func()) {
-			return c.OutOfSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
-				return outOfSyncThreshold(engineInstance, latestSeenSlot)
-			}, c.chains.LatestSeenSlot))
+			return c.deriveOutOfSyncThreshold(engineInstance)
 		}),
 	)
 }
@@ -245,7 +243,7 @@ func (c *Chain) deriveWarpSyncMode() func() {
 
 // deriveClaimedWeight defines how a chain determines its claimed weight (by setting the cumulative weight of the
 // latest commitment).
-func (c *Chain) deriveClaimedWeight() func() {
+func (c *Chain) deriveClaimedWeight() (shutdown func()) {
 	return c.ClaimedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestCommitment *Commitment) uint64 {
 		if latestCommitment == nil {
 			return 0
@@ -303,6 +301,14 @@ func (c *Chain) deriveParentChain(forkingPoint *Commitment) (shutdown func()) {
 	c.ParentChain.Set(nil)
 
 	return nil
+}
+
+// deriveOutOfSyncThreshold defines how a chain determines its "out of sync" threshold (the latest seen slot minus 2
+// times the max committable age or 0 if this would cause an overflow to the negative numbers).
+func (c *Chain) deriveOutOfSyncThreshold(engineInstance *engine.Engine) func() {
+	return c.OutOfSyncThreshold.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSeenSlot iotago.SlotIndex) iotago.SlotIndex {
+		return outOfSyncThreshold(engineInstance, latestSeenSlot)
+	}, c.chains.LatestSeenSlot))
 }
 
 // addCommitment adds the given commitment to this chain.
