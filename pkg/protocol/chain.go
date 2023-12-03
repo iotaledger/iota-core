@@ -209,21 +209,10 @@ func (c *Chain) initLogger() (shutdown func()) {
 // initDerivedProperties initializes the behavior of this chain by setting up the relations between its properties.
 func (c *Chain) initDerivedProperties() (shutdown func()) {
 	return lo.Batch(
-		c.ClaimedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestCommitment *Commitment) uint64 {
-			return latestCommitment.cumulativeWeight()
-		}, c.LatestCommitment)),
-
-		c.VerifiedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestProducedCommitment *Commitment) uint64 {
-			return latestProducedCommitment.cumulativeWeight()
-		}, c.LatestProducedCommitment)),
-
-		c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(enabled bool, latestFullyBookedSlot iotago.SlotIndex, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
-			return warpSyncModeEnabled(enabled, latestFullyBookedSlot, latestSeenSlot, outOfSyncThreshold)
-		}, c.LatestFullyBookedSlot, c.chains.LatestSeenSlot, c.OutOfSyncThreshold, c.WarpSyncMode.Get())),
-
-		c.LatestAttestedCommitment.WithNonEmptyValue(func(latestAttestedCommitment *Commitment) (shutdown func()) {
-			return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
-		}),
+		c.deriveClaimedWeight(),
+		c.deriveVerifiedWeight(),
+		c.deriveLatestAttestedWeight(),
+		c.deriveWarpSyncMode(),
 
 		c.ForkingPoint.WithValue(func(forkingPoint *Commitment) (shutdown func()) {
 			return c.deriveParentChain(forkingPoint)
@@ -239,6 +228,38 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 			}, c.chains.LatestSeenSlot))
 		}),
 	)
+}
+
+// deriveWarpSyncMode defines how a chain determines whether it is in warp sync mode or not.
+func (c *Chain) deriveWarpSyncMode() func() {
+	return c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(enabled bool, latestFullyBookedSlot iotago.SlotIndex, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
+		return warpSyncModeEnabled(enabled, latestFullyBookedSlot, latestSeenSlot, outOfSyncThreshold)
+	}, c.LatestFullyBookedSlot, c.chains.LatestSeenSlot, c.OutOfSyncThreshold, c.WarpSyncMode.Get()))
+}
+
+// deriveClaimedWeight defines how a chain determines its claimed weight (by setting the cumulative weight of the
+// latest commitment).
+func (c *Chain) deriveClaimedWeight() func() {
+	return c.ClaimedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestCommitment *Commitment) uint64 {
+		return latestCommitment.cumulativeWeight()
+	}, c.LatestCommitment))
+}
+
+// deriveLatestAttestedWeight defines how a chain determines its attested weight (by inheriting the cumulative attested
+// weight of the latest attested commitment). It uses inheritance instead of simply setting the value as the cumulative
+// attested weight can change over time depending on the attestations that are received.
+func (c *Chain) deriveLatestAttestedWeight() func() {
+	return c.LatestAttestedCommitment.WithNonEmptyValue(func(latestAttestedCommitment *Commitment) (shutdown func()) {
+		return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
+	})
+}
+
+// deriveVerifiedWeight defines how a chain determines its verified weight (by setting the cumulative weight of the
+// latest produced commitment).
+func (c *Chain) deriveVerifiedWeight() func() {
+	return c.VerifiedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestProducedCommitment *Commitment) uint64 {
+		return latestProducedCommitment.cumulativeWeight()
+	}, c.LatestProducedCommitment))
 }
 
 // deriveChildChains defines how a chain determines its ChildChains (by adding each child to the set).
