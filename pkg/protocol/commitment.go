@@ -256,8 +256,8 @@ func (c *Commitment) deriveCumulativeAttestedWeight(parent *Commitment) func() {
 // deriveIsAboveLatestVerifiedCommitment derives the IsAboveLatestVerifiedCommitment flag of this Commitment which is
 // true if the parent is already above the latest verified Commitment or if the parent is verified and we are not.
 func (c *Commitment) deriveIsAboveLatestVerifiedCommitment(parent *Commitment) func() {
-	return c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, parentAboveLatestVerifiedCommitment bool, parentIsCommitted bool, isCommitted bool) bool {
-		return parentAboveLatestVerifiedCommitment || (parentIsCommitted && !isCommitted)
+	return c.IsAboveLatestVerifiedCommitment.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, parentAboveLatestVerifiedCommitment bool, parentIsVerified bool, isVerified bool) bool {
+		return parentAboveLatestVerifiedCommitment || (parentIsVerified && !isVerified)
 	}, parent.IsAboveLatestVerifiedCommitment, parent.IsVerified, c.IsVerified))
 }
 
