@@ -209,7 +209,7 @@ func (p *Protocol) waitInitialized() {
 	var waitInitialized sync.WaitGroup
 
 	waitInitialized.Add(1)
-	p.Commitments.Root.OnUpdateOnce(func(_, rootCommitment *Commitment) {
+	p.Commitments.Root.OnUpdateOnce(func(_ *Commitment, _ *Commitment) {
 		waitInitialized.Done()
 	}, func(_ *Commitment, rootCommitment *Commitment) bool { return rootCommitment != nil })
 
