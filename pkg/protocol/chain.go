@@ -313,7 +313,7 @@ func (c *Chain) addCommitment(newCommitment *Commitment) (shutdown func()) {
 
 	return lo.Batch(
 		newCommitment.IsAttested.OnTrigger(func() { c.LatestAttestedCommitment.Set(newCommitment) }),
-		newCommitment.IsCommitted.OnTrigger(func() { c.LatestProducedCommitment.Set(newCommitment) }),
+		newCommitment.IsVerified.OnTrigger(func() { c.LatestProducedCommitment.Set(newCommitment) }),
 		newCommitment.IsFullyBooked.OnTrigger(func() { c.LatestFullyBookedSlot.Set(newCommitment.Slot()) }),
 	)
 }

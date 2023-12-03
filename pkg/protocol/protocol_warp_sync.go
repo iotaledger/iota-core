@@ -259,7 +259,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			// force commit one by one and wait for the parent to be committed before we can commit the next one
 			commitment.Parent.WithNonEmptyValue(func(parent *Commitment) (teardown func()) {
-				return parent.IsCommitted.WithNonEmptyValue(func(_ bool) (teardown func()) {
+				return parent.IsVerified.WithNonEmptyValue(func(_ bool) (teardown func()) {
 					return commitment.IsCommittable.OnTrigger(forceCommitmentFunc)
 				})
 			})
