@@ -156,11 +156,10 @@ func (c *Commitment) initLogger() (shutdown func()) {
 // initDerivedProperties initializes the behavior of this Commitment by setting up the relations between its properties.
 func (c *Commitment) initDerivedProperties() (shutdown func()) {
 	return lo.Batch(
-		// mark commitments that are marked as root as verified
+		// mark commitments that are marked as root as committed
 		c.IsCommitted.InheritFrom(c.IsRoot),
-		c.ReplayDroppedBlocks.InheritFrom(c.IsRoot),
 
-		// mark commitments that are marked as verified as attested and fully booked
+		// mark commitments that are marked as committed as attested and fully booked
 		c.IsAttested.InheritFrom(c.IsCommitted),
 		c.IsFullyBooked.InheritFrom(c.IsCommitted),
 
@@ -230,7 +229,6 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 			if currentChain == nil {
 				currentChain = c.commitments.protocol.Chains.newChain()
 				currentChain.ForkingPoint.Set(c)
-				currentChain.LatestProducedCommitment.Set(parent)
 			}
 
 			return currentChain
