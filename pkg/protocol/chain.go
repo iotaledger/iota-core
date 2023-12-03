@@ -217,8 +217,8 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 			return latestProducedCommitment.cumulativeWeight()
 		}, c.LatestProducedCommitment)),
 
-		c.WarpSyncModeEnabled.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSyncMode bool, latestFullyBookedCommitment *Commitment, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
-			return warpSyncModeEnabled(warpSyncMode, latestFullyBookedCommitment, latestSeenSlot, outOfSyncThreshold)
+		c.WarpSyncModeEnabled.DeriveValueFrom(reactive.NewDerivedVariable3(func(enabled bool, latestFullyBookedCommitment *Commitment, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
+			return warpSyncModeEnabled(enabled, latestFullyBookedCommitment, latestSeenSlot, outOfSyncThreshold)
 		}, c.LatestFullyBookedCommitment, c.chains.LatestSeenSlot, c.OutOfSyncThreshold, c.WarpSyncModeEnabled.Get())),
 
 		c.LatestAttestedCommitment.WithNonEmptyValue(func(latestAttestedCommitment *Commitment) (shutdown func()) {
@@ -347,18 +347,18 @@ func outOfSyncThreshold(engineInstance *engine.Engine, latestSeenSlot iotago.Slo
 }
 
 // warpSyncModeEnabled determines whether warp sync mode should be enabled or not.
-func warpSyncModeEnabled(enabled bool, latestProducedCommitment *Commitment, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
+func warpSyncModeEnabled(enabled bool, latestFullyBookedCommitment *Commitment, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
 	// latest produced commitment is nil if we have not produced any commitment yet (intermediary state during
 	// startup)
-	if latestProducedCommitment == nil {
+	if latestFullyBookedCommitment == nil {
 		return enabled
 	}
 
 	// if warp sync mode is enabled, keep it enabled until we are no longer below the warp sync threshold
 	if enabled {
-		return latestProducedCommitment.ID().Slot() < latestSeenSlot
+		return latestFullyBookedCommitment.ID().Slot() < latestSeenSlot
 	}
 
 	// if warp sync mode is disabled, enable it only if we fall below the out of sync threshold
-	return latestProducedCommitment.ID().Slot() < outOfSyncThreshold
+	return latestFullyBookedCommitment.ID().Slot() < outOfSyncThreshold
 }

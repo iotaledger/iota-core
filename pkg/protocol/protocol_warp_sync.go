@@ -47,8 +47,8 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
-			return chain.WarpSyncModeEnabled.OnUpdate(func(_ bool, warpSyncMode bool) {
-				if warpSyncMode {
+			return chain.WarpSyncModeEnabled.OnUpdate(func(_ bool, warpSyncModeEnabled bool) {
+				if warpSyncModeEnabled {
 					engine.Workers.WaitChildren()
 					engine.Reset()
 				}
