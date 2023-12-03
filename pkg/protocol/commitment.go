@@ -160,10 +160,9 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 		c.IsCommitted.InheritFrom(c.IsRoot),
 		c.ReplayDroppedBlocks.InheritFrom(c.IsRoot),
 
-		// mark commitments that are marked as verified as attested, fully booked and committable
+		// mark commitments that are marked as verified as attested and fully booked
 		c.IsAttested.InheritFrom(c.IsCommitted),
 		c.IsFullyBooked.InheritFrom(c.IsCommitted),
-		c.IsCommittable.InheritFrom(c.IsCommitted),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			// the weight can be fixed as a one time operation (as it only relies on static information from the parent
