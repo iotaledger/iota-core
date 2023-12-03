@@ -232,8 +232,14 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 
 // deriveWarpSyncMode defines how a chain determines whether it is in warp sync mode or not.
 func (c *Chain) deriveWarpSyncMode() func() {
-	return c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(enabled bool, latestFullyBookedSlot iotago.SlotIndex, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
-		return warpSyncModeEnabled(enabled, latestFullyBookedSlot, latestSeenSlot, outOfSyncThreshold)
+	return c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSyncMode bool, latestFullyBookedSlot iotago.SlotIndex, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
+		// if warp sync mode is enabled, keep it enabled until we have fully booked all slots
+		if warpSyncMode {
+			return latestFullyBookedSlot < latestSeenSlot
+		}
+
+		// if warp sync mode is disabled, enable it only if we fall below the out of sync threshold
+		return latestFullyBookedSlot < outOfSyncThreshold
 	}, c.LatestFullyBookedSlot, c.chains.LatestSeenSlot, c.OutOfSyncThreshold, c.WarpSyncMode.Get()))
 }
 
@@ -241,7 +247,11 @@ func (c *Chain) deriveWarpSyncMode() func() {
 // latest commitment).
 func (c *Chain) deriveClaimedWeight() func() {
 	return c.ClaimedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestCommitment *Commitment) uint64 {
-		return latestCommitment.cumulativeWeight()
+		if latestCommitment == nil {
+			return 0
+		}
+
+		return latestCommitment.CumulativeWeight()
 	}, c.LatestCommitment))
 }
 
@@ -258,7 +268,11 @@ func (c *Chain) deriveLatestAttestedWeight() func() {
 // latest produced commitment).
 func (c *Chain) deriveVerifiedWeight() func() {
 	return c.VerifiedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestProducedCommitment *Commitment) uint64 {
-		return latestProducedCommitment.cumulativeWeight()
+		if latestProducedCommitment == nil {
+			return 0
+		}
+
+		return latestProducedCommitment.CumulativeWeight()
 	}, c.LatestProducedCommitment))
 }
 
@@ -365,15 +379,4 @@ func outOfSyncThreshold(engineInstance *engine.Engine, latestSeenSlot iotago.Slo
 	}
 
 	return 0
-}
-
-// warpSyncModeEnabled determines whether warp sync mode should be enabled or not.
-func warpSyncModeEnabled(enabled bool, latestFullyBookedSlot iotago.SlotIndex, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
-	// if warp sync mode is enabled, keep it enabled until we are no longer below the warp sync threshold
-	if enabled {
-		return latestFullyBookedSlot < latestSeenSlot
-	}
-
-	// if warp sync mode is disabled, enable it only if we fall below the out of sync threshold
-	return latestFullyBookedSlot < outOfSyncThreshold
 }

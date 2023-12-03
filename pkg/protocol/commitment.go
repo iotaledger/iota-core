@@ -294,12 +294,3 @@ func (c *Commitment) forceChain(targetChain *Chain) {
 		}
 	}
 }
-
-// cumulativeWeight returns the cumulative weight of this Commitment while gracefully handling nil receivers.
-func (c *Commitment) cumulativeWeight() uint64 {
-	if c == nil {
-		return 0
-	}
-
-	return c.CumulativeWeight()
-}
