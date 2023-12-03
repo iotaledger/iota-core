@@ -47,7 +47,7 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 
 	protocol.Constructed.OnTrigger(func() {
 		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
-			return chain.WarpSyncModeEnabled.OnUpdate(func(_ bool, warpSyncModeEnabled bool) {
+			return chain.WarpSyncMode.OnUpdate(func(_ bool, warpSyncModeEnabled bool) {
 				if warpSyncModeEnabled {
 					engine.Workers.WaitChildren()
 					engine.Reset()
@@ -110,7 +110,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			return
 		}
 
-		if !chain.WarpSyncModeEnabled.Get() {
+		if !chain.WarpSyncMode.Get() {
 			w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
 
 			return
@@ -161,7 +161,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			targetEngine.Workers.WaitChildren()
 
-			if !chain.WarpSyncModeEnabled.Get() {
+			if !chain.WarpSyncMode.Get() {
 				w.LogTrace("response for chain without warp-sync", "chain", chain.LogName(), "fromPeer", from)
 
 				return blocksToWarpSync
@@ -177,7 +177,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			//   2. Mark all blocks as accepted
 			//   3. Force commitment of the slot
 			forceCommitmentFunc := func() {
-				if !chain.WarpSyncModeEnabled.Get() {
+				if !chain.WarpSyncMode.Get() {
 					return
 				}
 

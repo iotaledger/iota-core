@@ -48,8 +48,8 @@ type Chain struct {
 	// latest verified commitment.
 	VerifiedWeight reactive.Variable[uint64]
 
-	// WarpSyncModeEnabled contains a flag that indicates whether this chain is in warp sync mode.
-	WarpSyncModeEnabled reactive.Variable[bool]
+	// WarpSyncMode contains a flag that indicates whether this chain is in warp sync mode.
+	WarpSyncMode reactive.Variable[bool]
 
 	// OutOfSyncThreshold contains the slot at which the chain will consider itself to be out of sync and switch to warp
 	// sync mode. It is derived from the latest network slot minus two times the max committable age.
@@ -92,7 +92,7 @@ func newChain(chains *Chains) *Chain {
 		ClaimedWeight:               reactive.NewVariable[uint64](),
 		AttestedWeight:              reactive.NewVariable[uint64](),
 		VerifiedWeight:              reactive.NewVariable[uint64](),
-		WarpSyncModeEnabled:         reactive.NewVariable[bool]().Init(true),
+		WarpSyncMode:                reactive.NewVariable[bool]().Init(true),
 		OutOfSyncThreshold:          reactive.NewVariable[iotago.SlotIndex](),
 		RequestAttestations:         reactive.NewVariable[bool](),
 		StartEngine:                 reactive.NewVariable[bool](),
@@ -187,7 +187,7 @@ func (c *Chain) initLogger() (shutdown func()) {
 	c.Logger, shutdown = c.chains.NewEntityLogger("")
 
 	return lo.Batch(
-		c.WarpSyncModeEnabled.LogUpdates(c, log.LevelTrace, "WarpSyncModeEnabled"),
+		c.WarpSyncMode.LogUpdates(c, log.LevelTrace, "WarpSyncMode"),
 		c.OutOfSyncThreshold.LogUpdates(c, log.LevelTrace, "OutOfSyncThreshold"),
 		c.ForkingPoint.LogUpdates(c, log.LevelTrace, "ForkingPoint", (*Commitment).LogName),
 		c.ClaimedWeight.LogUpdates(c, log.LevelTrace, "ClaimedWeight"),
@@ -217,9 +217,9 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 			return latestProducedCommitment.cumulativeWeight()
 		}, c.LatestProducedCommitment)),
 
-		c.WarpSyncModeEnabled.DeriveValueFrom(reactive.NewDerivedVariable3(func(enabled bool, latestFullyBookedCommitment *Commitment, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
+		c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(enabled bool, latestFullyBookedCommitment *Commitment, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
 			return warpSyncModeEnabled(enabled, latestFullyBookedCommitment, latestSeenSlot, outOfSyncThreshold)
-		}, c.LatestFullyBookedCommitment, c.chains.LatestSeenSlot, c.OutOfSyncThreshold, c.WarpSyncModeEnabled.Get())),
+		}, c.LatestFullyBookedCommitment, c.chains.LatestSeenSlot, c.OutOfSyncThreshold, c.WarpSyncMode.Get())),
 
 		c.LatestAttestedCommitment.WithNonEmptyValue(func(latestAttestedCommitment *Commitment) (shutdown func()) {
 			return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
@@ -299,7 +299,7 @@ func (c *Chain) dispatchBlockToSpawnedEngine(block *model.Block, src peer.ID) (d
 	}
 
 	// perform additional checks if we are in warp sync mode (only let blocks pass that we requested)
-	if c.WarpSyncModeEnabled.Get() {
+	if c.WarpSyncMode.Get() {
 		// abort if the target commitment does not exist
 		targetCommitment, targetCommitmentExists := c.Commitment(targetSlot)
 		if !targetCommitmentExists {

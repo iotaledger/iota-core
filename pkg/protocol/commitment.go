@@ -276,7 +276,7 @@ func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment)
 func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func() {
 	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSyncModeEnabled bool, parentIsFullyBooked bool, isFullyBooked bool) bool {
 		return engineInstance != nil && warpSyncModeEnabled && parentIsFullyBooked && !isFullyBooked
-	}, chain.Engine, chain.WarpSyncModeEnabled, parent.IsFullyBooked, c.IsFullyBooked))
+	}, chain.Engine, chain.WarpSyncMode, parent.IsFullyBooked, c.IsFullyBooked))
 }
 
 // deriveReplayDroppedBlocks derives the ReplayDroppedBlocks flag of this Commitment which is true if our Chain has an
@@ -284,7 +284,7 @@ func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func
 func (c *Commitment) deriveReplayDroppedBlocks(chain *Chain) func() {
 	return c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, engineInstance *engine.Engine, warpSyncModeEnabled bool, isAboveLatestVerifiedCommitment bool) bool {
 		return engineInstance != nil && !warpSyncModeEnabled && isAboveLatestVerifiedCommitment
-	}, chain.Engine, chain.WarpSyncModeEnabled, c.IsAboveLatestVerifiedCommitment))
+	}, chain.Engine, chain.WarpSyncMode, c.IsAboveLatestVerifiedCommitment))
 }
 
 // forceChain forces the Chain of this Commitment to the given Chain by promoting it to the main child of its parent if
