@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -158,8 +157,6 @@ func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 	if err = candidateEngine.Attestations.Rollback(slot); err != nil {
 		return nil, ierrors.Wrap(err, "error while rolling back attestations storage on candidate engine")
 	}
-
-	e.Log("forked engine", log.LevelTrace, "name", newEngineAlias[0:8], "slot", slot)
 
 	return candidateEngine, nil
 }

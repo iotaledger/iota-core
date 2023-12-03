@@ -272,16 +272,16 @@ func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment)
 // deriveWarpSyncBlocks derives the WarpSyncBlocks flag of this Commitment which is true if our Chain is requesting
 // warp sync, and we are the directly above the latest verified Commitment.
 func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func() {
-	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSyncModeEnabled bool, parentIsFullyBooked bool, isFullyBooked bool) bool {
-		return engineInstance != nil && warpSyncModeEnabled && parentIsFullyBooked && !isFullyBooked
+	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSync bool, parentIsFullyBooked bool, isFullyBooked bool) bool {
+		return engineInstance != nil && warpSync && parentIsFullyBooked && !isFullyBooked
 	}, chain.Engine, chain.WarpSyncMode, parent.IsFullyBooked, c.IsFullyBooked))
 }
 
 // deriveReplayDroppedBlocks derives the ReplayDroppedBlocks flag of this Commitment which is true if our Chain has an
 // engine, is no longer requesting warp sync, and we are above the latest verified Commitment.
 func (c *Commitment) deriveReplayDroppedBlocks(chain *Chain) func() {
-	return c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, engineInstance *engine.Engine, warpSyncModeEnabled bool, isAboveLatestVerifiedCommitment bool) bool {
-		return engineInstance != nil && !warpSyncModeEnabled && isAboveLatestVerifiedCommitment
+	return c.ReplayDroppedBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, engineInstance *engine.Engine, warpSyncing bool, isAboveLatestVerifiedCommitment bool) bool {
+		return engineInstance != nil && !warpSyncing && isAboveLatestVerifiedCommitment
 	}, chain.Engine, chain.WarpSyncMode, c.IsAboveLatestVerifiedCommitment))
 }
 

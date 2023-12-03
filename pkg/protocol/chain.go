@@ -156,8 +156,6 @@ func (c *Chain) DispatchBlock(block *model.Block, src peer.ID) (dispatched bool)
 func (c *Chain) Commitment(slot iotago.SlotIndex) (commitment *Commitment, exists bool) {
 	for currentChain := c; currentChain != nil; {
 		switch forkingPoint := currentChain.ForkingPoint.Get(); {
-		case forkingPoint == nil:
-			return nil, false
 		case forkingPoint.Slot() == slot:
 			return forkingPoint, true
 		case slot > forkingPoint.Slot():
@@ -214,17 +212,9 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 		c.deriveLatestAttestedWeight(),
 		c.deriveWarpSyncMode(),
 
-		c.ForkingPoint.WithValue(func(forkingPoint *Commitment) (shutdown func()) {
-			return c.deriveParentChain(forkingPoint)
-		}),
-
-		c.ParentChain.WithNonEmptyValue(func(parentChain *Chain) (shutdown func()) {
-			return parentChain.deriveChildChains(c)
-		}),
-
-		c.Engine.WithNonEmptyValue(func(engineInstance *engine.Engine) (shutdown func()) {
-			return c.deriveOutOfSyncThreshold(engineInstance)
-		}),
+		c.ForkingPoint.WithValue(c.deriveParentChain),
+		c.ParentChain.WithNonEmptyValue(lo.Bind(c, (*Chain).deriveChildChains)),
+		c.Engine.WithNonEmptyValue(c.deriveOutOfSyncThreshold),
 	)
 }
 
