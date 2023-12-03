@@ -51,7 +51,7 @@ func (u *UnsolidCommitmentBuffer[V]) Add(commitmentID iotago.CommitmentID, value
 	u.mutex.RLock()
 	defer u.mutex.RUnlock()
 
-	if u.lastEvictedSlot != 0 && commitmentID.Slot() <= u.lastEvictedSlot {
+	if commitmentID.Slot() <= u.lastEvictedSlot {
 		return false
 	}
 
