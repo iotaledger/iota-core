@@ -289,7 +289,7 @@ func (c *Commitment) deriveReplayDroppedBlocks(chain *Chain) func() {
 // the parent is on the target Chain.
 func (c *Commitment) forceChain(targetChain *Chain) {
 	if currentChain := c.Chain.Get(); currentChain != targetChain {
-		if parent := c.Parent.Get(); parent.Chain.Get() == targetChain {
+		if parent := c.Parent.Get(); parent != nil && parent.Chain.Get() == targetChain {
 			parent.MainChild.Set(c)
 		}
 	}
