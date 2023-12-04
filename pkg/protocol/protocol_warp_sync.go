@@ -210,20 +210,24 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				}
 
 				allBlocksNotarized.OnTrigger(func() {
-					// 3. Force commitment of the slot
-					producedCommitment, err := targetEngine.Notarization.ForceCommit(commitmentID.Slot())
-					if err != nil {
-						w.protocol.LogError("failed to force commitment", "commitmentID", commitmentID, "err", err)
+					// This needs to happen in a separate worker since the trigger for block notarized while the lock in
+					// the notarization is still held.
+					w.workerPool.Submit(func() {
+						// 3. Force commitment of the slot
+						producedCommitment, err := targetEngine.Notarization.ForceCommit(commitmentID.Slot())
+						if err != nil {
+							w.protocol.LogError("failed to force commitment", "commitmentID", commitmentID, "err", err)
 
-						return
-					}
+							return
+						}
 
-					// 4. Verify that the produced commitment is the same as the initially requested one
-					if producedCommitment.ID() != commitmentID {
-						w.protocol.LogError("commitment does not match", "expectedCommitmentID", commitmentID, "producedCommitmentID", producedCommitment.ID())
+						// 4. Verify that the produced commitment is the same as the initially requested one
+						if producedCommitment.ID() != commitmentID {
+							w.protocol.LogError("commitment does not match", "expectedCommitmentID", commitmentID, "producedCommitmentID", producedCommitment.ID())
 
-						return
-					}
+							return
+						}
+					})
 				})
 			}
 
