@@ -28,7 +28,7 @@ type Chains struct {
 	// HeaviestAttestedCandidate contains the candidate chain with the heaviest weight as checked by attestations. The chain has not been instantiated into an engine yet.
 	HeaviestAttestedCandidate reactive.Variable[*Chain]
 
-	// HeaviestVerifiedCandidate contains the candidate chain with the heaviest verified weight.
+	// HeaviestVerifiedCandidate contains the candidate chain with the heaviest verified weight, meaning the chain has been instantiated into an engine and the commitments have been produced by the engine itself.
 	HeaviestVerifiedCandidate reactive.Variable[*Chain]
 
 	// LatestSeenSlot contains the slot of the latest commitment of any received block.
