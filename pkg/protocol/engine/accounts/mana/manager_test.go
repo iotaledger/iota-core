@@ -133,10 +133,10 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 		mana, err := manager.GetManaOnAccount(accountIDValid, 1)
 		require.NoError(t, err)
 
-		decayedMana, err := manaDecayProvider.ManaWithDecay(iotago.MaxMana/2+iotago.Mana(iotago.MaxBlockIssuanceCredits/2+iotago.MaxBlockIssuanceCredits/4), 0, 1)
+		decayedMana, err := manaDecayProvider.DecayManaBySlots(iotago.MaxMana/2+iotago.Mana(iotago.MaxBlockIssuanceCredits/2+iotago.MaxBlockIssuanceCredits/4), 0, 1)
 		require.NoError(t, err)
 
-		generatedMana, err := manaDecayProvider.ManaGenerationWithDecay(iotago.MaxBaseToken/2, 0, 1)
+		generatedMana, err := manaDecayProvider.GenerateManaAndDecayBySlots(iotago.MaxBaseToken/2, 0, 1)
 		require.NoError(t, err)
 
 		require.EqualValues(t, decayedMana+generatedMana, mana)
@@ -153,17 +153,17 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 		mana, err := manager.GetManaOnAccount(accountIDRecentOutput, 2)
 		require.NoError(t, err)
 
-		decayedStoredMana, err := manaDecayProvider.ManaWithDecay(iotago.MaxMana/2, 1, 2)
+		decayedStoredMana, err := manaDecayProvider.DecayManaBySlots(iotago.MaxMana/2, 1, 2)
 		require.NoError(t, err)
-		decayedBIC2Slots, err := manaDecayProvider.ManaWithDecay(iotago.Mana(iotago.MaxBlockIssuanceCredits/2+iotago.MaxBlockIssuanceCredits/4), 0, 2)
+		decayedBIC2Slots, err := manaDecayProvider.DecayManaBySlots(iotago.Mana(iotago.MaxBlockIssuanceCredits/2+iotago.MaxBlockIssuanceCredits/4), 0, 2)
 		require.NoError(t, err)
 
-		generatedMana, err := manaDecayProvider.ManaGenerationWithDecay(iotago.MaxBaseToken/2, 1, 2)
+		generatedMana, err := manaDecayProvider.GenerateManaAndDecayBySlots(iotago.MaxBaseToken/2, 1, 2)
 		require.NoError(t, err)
 
 		require.EqualValues(t, decayedBIC2Slots+decayedStoredMana+generatedMana, mana)
 
-		decayedBIC1Slot, err := manaDecayProvider.ManaWithDecay(iotago.Mana(iotago.MaxBlockIssuanceCredits/2+iotago.MaxBlockIssuanceCredits/4), 0, 2)
+		decayedBIC1Slot, err := manaDecayProvider.DecayManaBySlots(iotago.Mana(iotago.MaxBlockIssuanceCredits/2+iotago.MaxBlockIssuanceCredits/4), 0, 2)
 		require.NoError(t, err)
 
 		// Make sure that cache entry is for slot 1.
@@ -178,20 +178,20 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 		mana, err := manager.GetManaOnAccount(accountIDRecentBIC, 2)
 		require.NoError(t, err)
 
-		decayedStoredMana2Slots, err := manaDecayProvider.ManaWithDecay(iotago.MaxMana/2, 0, 0)
+		decayedStoredMana2Slots, err := manaDecayProvider.DecayManaBySlots(iotago.MaxMana/2, 0, 0)
 		require.NoError(t, err)
 
-		generatedMana1Slot, err := manaDecayProvider.ManaGenerationWithDecay(iotago.MaxBaseToken/2, 0, 1)
+		generatedMana1Slot, err := manaDecayProvider.GenerateManaAndDecayBySlots(iotago.MaxBaseToken/2, 0, 1)
 		require.NoError(t, err)
 
-		decayedBIC, err := manaDecayProvider.ManaWithDecay(iotago.Mana(iotago.MaxBlockIssuanceCredits/2+iotago.MaxBlockIssuanceCredits/4), 1, 1)
+		decayedBIC, err := manaDecayProvider.DecayManaBySlots(iotago.Mana(iotago.MaxBlockIssuanceCredits/2+iotago.MaxBlockIssuanceCredits/4), 1, 1)
 		require.NoError(t, err)
 
 		// generatedMana1Slot is multiplied to calculate generation for two slots. It cannot be done in a single step
 		// because the value does not match due to approximation errors inherent to the underlying calculation method.
 		require.EqualValues(t, decayedStoredMana2Slots+generatedMana1Slot*2+decayedBIC, mana)
 
-		decayedStoredMana1Slot, err := manaDecayProvider.ManaWithDecay(iotago.MaxMana/2, 0, 1)
+		decayedStoredMana1Slot, err := manaDecayProvider.DecayManaBySlots(iotago.MaxMana/2, 0, 1)
 		require.NoError(t, err)
 
 		// Make sure that cache entry is for slot 1.

@@ -557,12 +557,12 @@ func (w *Wallet) PotentialMana(api iotago.API, input *utxoledger.Output) iotago.
 
 	excessBaseTokens := input.BaseTokenAmount() - minDeposit
 
-	return lo.PanicOnErr(api.ManaDecayProvider().ManaGenerationWithDecay(excessBaseTokens, input.SlotCreated(), w.currentSlot))
+	return lo.PanicOnErr(api.ManaDecayProvider().GenerateManaAndDecayBySlots(excessBaseTokens, input.SlotCreated(), w.currentSlot))
 }
 
 // Computes the decay on stored mana that the output holds until the current slot.
 func (w *Wallet) StoredMana(api iotago.API, input *utxoledger.Output) iotago.Mana {
-	return lo.PanicOnErr(api.ManaDecayProvider().ManaWithDecay(input.StoredMana(), input.SlotCreated(), w.currentSlot))
+	return lo.PanicOnErr(api.ManaDecayProvider().DecayManaBySlots(input.StoredMana(), input.SlotCreated(), w.currentSlot))
 }
 
 func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, recipientWallet *Wallet) *iotago.SignedTransaction {

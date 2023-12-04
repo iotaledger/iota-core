@@ -79,24 +79,24 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, slot iotago.SlotI
 
 	// Apply decay to stored, potential and BIC mana that was calculated when adding the entry to cache
 	// so that it's correct for the requested slot.
-	manaWithDecay, err := manaDecayProvider.ManaWithDecay(mana.Value(), mana.UpdateTime(), slot)
+	DecayManaBySlots, err := manaDecayProvider.DecayManaBySlots(mana.Value(), mana.UpdateTime(), slot)
 	if err != nil {
 		return 0, err
 	}
 
 	// Calculate newly generated potential mana since last update time.
-	manaPotential, err := manaDecayProvider.ManaGenerationWithDecay(mana.ExcessBaseTokens(), mana.UpdateTime(), slot)
+	manaPotential, err := manaDecayProvider.GenerateManaAndDecayBySlots(mana.ExcessBaseTokens(), mana.UpdateTime(), slot)
 	if err != nil {
 		return 0, err
 	}
 
 	// Add potential mana to the decayed mana.
-	manaWithDecayAndGeneration, err := safemath.SafeAdd(manaWithDecay, manaPotential)
+	DecayManaBySlotsAndGeneration, err := safemath.SafeAdd(DecayManaBySlots, manaPotential)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "overflow when adding stored and potential mana for account %s", accountID)
 	}
 
-	return manaWithDecayAndGeneration, nil
+	return DecayManaBySlotsAndGeneration, nil
 }
 
 func (m *Manager) getMana(accountID iotago.AccountID, output *utxoledger.Output, slot iotago.SlotIndex) (*accounts.Mana, error) {
@@ -124,12 +124,12 @@ func (m *Manager) getMana(accountID iotago.AccountID, output *utxoledger.Output,
 	var manaUpdateTime iotago.SlotIndex
 	var totalMana iotago.Mana
 	if bicUpdateTime > output.SlotCreated() {
-		manaPotential, err := manaDecayProvider.ManaGenerationWithDecay(excessBaseTokens, output.SlotCreated(), bicUpdateTime)
+		manaPotential, err := manaDecayProvider.GenerateManaAndDecayBySlots(excessBaseTokens, output.SlotCreated(), bicUpdateTime)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to calculate mana generation with decay (excessBaseTokens: %d; outputSlotCreated: %d; targetSlot: %d)", excessBaseTokens, output.SlotCreated(), bicUpdateTime)
 		}
 
-		manaStored, err := manaDecayProvider.ManaWithDecay(output.StoredMana(), output.SlotCreated(), bicUpdateTime)
+		manaStored, err := manaDecayProvider.DecayManaBySlots(output.StoredMana(), output.SlotCreated(), bicUpdateTime)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to calculate mana with decay (storedMana: %d; outputSlotCreated: %d; targetSlot: %d)", output.StoredMana(), output.SlotCreated(), bicUpdateTime)
 		}
@@ -147,7 +147,7 @@ func (m *Manager) getMana(accountID iotago.AccountID, output *utxoledger.Output,
 		manaUpdateTime = bicUpdateTime
 	} else if output.SlotCreated() > bicUpdateTime {
 		// Decay BIC to match the Output creation time.
-		bicWithDecay, err := manaDecayProvider.ManaWithDecay(bic, bicUpdateTime, output.SlotCreated())
+		bicWithDecay, err := manaDecayProvider.DecayManaBySlots(bic, bicUpdateTime, output.SlotCreated())
 		if err != nil {
 			return nil, err
 		}
