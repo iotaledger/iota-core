@@ -549,15 +549,7 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 
 // Computes the Potential Mana that the output generates until the current slot.
 func (w *Wallet) PotentialMana(api iotago.API, input *utxoledger.Output) iotago.Mana {
-	minDeposit := lo.PanicOnErr(api.StorageScoreStructure().MinDeposit(input.Output()))
-
-	if minDeposit > input.BaseTokenAmount() {
-		return 0
-	}
-
-	excessBaseTokens := input.BaseTokenAmount() - minDeposit
-
-	return lo.PanicOnErr(api.ManaDecayProvider().GenerateManaAndDecayBySlots(excessBaseTokens, input.SlotCreated(), w.currentSlot))
+	return lo.PanicOnErr(iotago.PotentialMana(api.ManaDecayProvider(), api.StorageScoreStructure(), input.Output(), input.SlotCreated(), w.currentSlot))
 }
 
 // Computes the decay on stored mana that the output holds until the current slot.
