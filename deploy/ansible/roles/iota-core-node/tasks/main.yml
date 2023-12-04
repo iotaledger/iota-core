@@ -4,7 +4,7 @@
   poll: 5
 
 - name: Set log rotation for a maximum size of 5GB
-  ansible.builtin.lineinfile:
+  lineinfile:
     path: /etc/logrotate.d/rsyslog
     regexp: '^\{\n\s*rotate'
     insertbefore: '^\{\n\s*rotate'
