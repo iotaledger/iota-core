@@ -89,7 +89,7 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 
 		p.Constructed.Trigger()
 
-		p.waitMainEngineInitialized()
+		p.waitInitialized()
 	})
 }
 
@@ -204,14 +204,14 @@ func (p *Protocol) initNetwork() (shutdown func()) {
 	)
 }
 
-// waitMainEngineInitialized waits until the main engine is initialized.
-func (p *Protocol) waitMainEngineInitialized() {
+// waitInitialized waits until the main engine is initialized (published its root commitment).
+func (p *Protocol) waitInitialized() {
 	var waitInitialized sync.WaitGroup
 
 	waitInitialized.Add(1)
-	p.Engines.Main.OnUpdateOnce(func(_ *engine.Engine, engine *engine.Engine) {
-		engine.Initialized.OnTrigger(waitInitialized.Done)
-	})
+	p.Commitments.Root.OnUpdateOnce(func(_ *Commitment, _ *Commitment) {
+		waitInitialized.Done()
+	}, func(_ *Commitment, rootCommitment *Commitment) bool { return rootCommitment != nil })
 
 	waitInitialized.Wait()
 }

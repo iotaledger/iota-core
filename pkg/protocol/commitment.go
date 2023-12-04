@@ -56,6 +56,12 @@ type Commitment struct {
 	// IsAttested contains a flag indicating if we have received attestations for this Commitment.
 	IsAttested reactive.Event
 
+	// IsSynced contains a flag that indicates if a Commitment was fully downloaded and processed.
+	IsSynced reactive.Event
+
+	// IsCommittable contains a flag that indicates if a Commitment is ready to be committed by the warp sync process.
+	IsCommittable reactive.Event
+
 	// IsVerified contains a flag indicating if this Commitment is verified (we produced this Commitment ourselves by
 	// booking all the contained blocks and transactions).
 	IsVerified reactive.Event
@@ -65,7 +71,7 @@ type Commitment struct {
 	IsAboveLatestVerifiedCommitment reactive.Variable[bool]
 
 	// ReplayDroppedBlocks contains a flag indicating if we should replay the blocks that were dropped while the
-	//Commitment was pending.
+	// Commitment was pending.
 	ReplayDroppedBlocks reactive.Variable[bool]
 
 	// IsEvicted contains a flag indicating if this Commitment was evicted from the Protocol.
@@ -94,6 +100,8 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
 		IsRoot:                          reactive.NewEvent(),
 		IsAttested:                      reactive.NewEvent(),
+		IsSynced:                        reactive.NewEvent(),
+		IsCommittable:                   reactive.NewEvent(),
 		IsVerified:                      reactive.NewEvent(),
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
 		ReplayDroppedBlocks:             reactive.NewVariable[bool](),
@@ -135,6 +143,8 @@ func (c *Commitment) initLogger() (shutdown func()) {
 		c.CumulativeAttestedWeight.LogUpdates(c, log.LevelTrace, "CumulativeAttestedWeight"),
 		c.IsRoot.LogUpdates(c, log.LevelTrace, "IsRoot"),
 		c.IsAttested.LogUpdates(c, log.LevelTrace, "IsAttested"),
+		c.IsSynced.LogUpdates(c, log.LevelTrace, "IsSynced"),
+		c.IsCommittable.LogUpdates(c, log.LevelTrace, "IsCommittable"),
 		c.IsVerified.LogUpdates(c, log.LevelTrace, "IsVerified"),
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
@@ -149,8 +159,9 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 		// mark commitments that are marked as root as verified
 		c.IsVerified.InheritFrom(c.IsRoot),
 
-		// mark commitments that are marked as verified as attested
+		// mark commitments that are marked as verified as attested and synced
 		c.IsAttested.InheritFrom(c.IsVerified),
+		c.IsSynced.InheritFrom(c.IsVerified),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			// the weight can be fixed as a one time operation (as it only relies on static information from the parent
@@ -167,7 +178,11 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 				c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
 					return lo.Batch(
 						c.deriveRequestAttestations(chain, parent),
-						c.deriveWarpSyncBlocks(chain, parent),
+
+						// only start requesting blocks once the engine is ready
+						chain.WithInitializedEngine(func(_ *engine.Engine) (shutdown func()) {
+							return c.deriveWarpSyncBlocks(chain, parent)
+						}),
 					)
 				}),
 			)
@@ -259,11 +274,11 @@ func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment)
 }
 
 // deriveWarpSyncBlocks derives the WarpSyncBlocks flag of this Commitment which is true if our Chain is requesting
-// warp sync, and we are the directly above the latest verified Commitment.
+// warp sync, and we are the directly above the latest commitment that is synced (has downloaded everything).
 func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func() {
-	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSync bool, parentIsVerified bool, isVerified bool) bool {
-		return engineInstance != nil && warpSync && parentIsVerified && !isVerified
-	}, chain.Engine, chain.WarpSyncMode, parent.IsVerified, c.IsVerified))
+	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, warpSyncMode bool, parentIsSynced bool, isSynced bool) bool {
+		return warpSyncMode && parentIsSynced && !isSynced
+	}, chain.WarpSyncMode, parent.IsSynced, c.IsSynced))
 }
 
 // deriveReplayDroppedBlocks derives the ReplayDroppedBlocks flag of this Commitment which is true if our Chain has an
@@ -278,7 +293,7 @@ func (c *Commitment) deriveReplayDroppedBlocks(chain *Chain) func() {
 // the parent is on the target Chain.
 func (c *Commitment) forceChain(targetChain *Chain) {
 	if currentChain := c.Chain.Get(); currentChain != targetChain {
-		if parent := c.Parent.Get(); parent.Chain.Get() == targetChain {
+		if parent := c.Parent.Get(); parent != nil && parent.Chain.Get() == targetChain {
 			parent.MainChild.Set(c)
 		}
 	}
