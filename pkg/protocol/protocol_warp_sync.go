@@ -176,7 +176,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			//   1. Mark all transactions as accepted
 			//   2. Mark all blocks as accepted
 			//   3. Force commitment of the slot
-			forceCommitmentFunc := func() {
+			commitmentFunc := func() {
 				if !chain.WarpSyncMode.Get() {
 					return
 				}
@@ -250,21 +250,23 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			// Once all blocks are fully booked we can mark the commitment that is minCommittableAge older as this
 			// commitment to be committable.
 			commitment.IsSynced.OnUpdateOnce(func(_ bool, _ bool) {
-				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - targetEngine.LatestAPI().ProtocolParameters().MinCommittableAge()); exists {
-					w.workerPool.Submit(func() {
+				// update the flag in a worker since it can potentially cause a commit
+				w.workerPool.Submit(func() {
+					if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - targetEngine.LatestAPI().ProtocolParameters().MinCommittableAge()); exists {
 						committableCommitment.IsCommittable.Set(true)
-					})
-				}
+					}
+				})
 			})
 
-			// force commit one by one and wait for the parent to be committed before we can commit the next one
+			// force commit one by one and wait for the parent to be verified before we commit the next one
 			commitment.Parent.WithNonEmptyValue(func(parent *Commitment) (teardown func()) {
 				return parent.IsVerified.WithNonEmptyValue(func(_ bool) (teardown func()) {
-					return commitment.IsCommittable.OnTrigger(forceCommitmentFunc)
+					return commitment.IsCommittable.OnTrigger(commitmentFunc)
 				})
 			})
 
 			if totalBlocks == 0 {
+				// mark empty slots as committable and synced
 				commitment.IsCommittable.Set(true)
 				commitment.IsSynced.Set(true)
 
