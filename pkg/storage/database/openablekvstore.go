@@ -10,14 +10,14 @@ import (
 )
 
 type openableKVStore struct {
-	openIfNecessary func() // openIfNecessary callback should synchronize itself and make sure that storeInstance is ready to use after.
+	openIfNecessary func() error // openIfNecessary callback should synchronize itself and make sure that storeInstance is ready to use after.
 	closeStore      func()
 	storeInstance   kvstore.KVStore // storeInstance is a KVStore that is holding the reference to the underlying database.
 	parentStore     *openableKVStore
 	dbPrefix        kvstore.KeyPrefix
 }
 
-func newOpenableKVStore(storeInstance kvstore.KVStore, openStoreIfNecessary func(), closeStore func()) *openableKVStore {
+func newOpenableKVStore(storeInstance kvstore.KVStore, openStoreIfNecessary func() error, closeStore func()) *openableKVStore {
 	return &openableKVStore{
 		openIfNecessary: openStoreIfNecessary,
 		closeStore:      closeStore,
@@ -36,12 +36,14 @@ func (s *openableKVStore) topParent() *openableKVStore {
 	return current
 }
 
-func (s *openableKVStore) instance() kvstore.KVStore {
+func (s *openableKVStore) instance() (kvstore.KVStore, error) {
 	parent := s.topParent()
 	// openIfNecessary callback should synchronize itself and make sure that storeInstance is ready to use after.
-	parent.openIfNecessary()
+	if err := parent.openIfNecessary(); err != nil {
+		return nil, err
+	}
 
-	return parent.storeInstance
+	return parent.storeInstance, nil
 }
 
 func (s *openableKVStore) Replace(newKVStore kvstore.KVStore) {
@@ -75,43 +77,88 @@ func (s *openableKVStore) Realm() kvstore.Realm {
 }
 
 func (s *openableKVStore) Iterate(prefix kvstore.KeyPrefix, kvConsumerFunc kvstore.IteratorKeyValueConsumerFunc, direction ...kvstore.IterDirection) error {
-	return s.instance().Iterate(s.buildKeyPrefix(prefix), func(key kvstore.Key, value kvstore.Value) bool {
+	instance, err := s.instance()
+	if err != nil {
+		return err
+	}
+
+	return instance.Iterate(s.buildKeyPrefix(prefix), func(key kvstore.Key, value kvstore.Value) bool {
 		return kvConsumerFunc(utils.CopyBytes(key)[len(s.dbPrefix):], value)
 	}, direction...)
 }
 
 func (s *openableKVStore) IterateKeys(prefix kvstore.KeyPrefix, consumerFunc kvstore.IteratorKeyConsumerFunc, direction ...kvstore.IterDirection) error {
-	return s.instance().IterateKeys(s.buildKeyPrefix(prefix), func(key kvstore.Key) bool {
+	instance, err := s.instance()
+	if err != nil {
+		return err
+	}
+
+	return instance.IterateKeys(s.buildKeyPrefix(prefix), func(key kvstore.Key) bool {
 		return consumerFunc(utils.CopyBytes(key)[len(s.dbPrefix):])
 	}, direction...)
 }
 
 func (s *openableKVStore) Clear() error {
-	return s.instance().DeletePrefix(s.dbPrefix)
+	instance, err := s.instance()
+	if err != nil {
+		return err
+	}
+
+	return instance.DeletePrefix(s.dbPrefix)
 }
 
 func (s *openableKVStore) Get(key kvstore.Key) (value kvstore.Value, err error) {
-	return s.instance().Get(byteutils.ConcatBytes(s.dbPrefix, key))
+	instance, err := s.instance()
+	if err != nil {
+		return nil, err
+	}
+
+	return instance.Get(byteutils.ConcatBytes(s.dbPrefix, key))
 }
 
 func (s *openableKVStore) Set(key kvstore.Key, value kvstore.Value) error {
-	return s.instance().Set(byteutils.ConcatBytes(s.dbPrefix, key), value)
+	instance, err := s.instance()
+	if err != nil {
+		return err
+	}
+
+	return instance.Set(byteutils.ConcatBytes(s.dbPrefix, key), value)
 }
 
 func (s *openableKVStore) Has(key kvstore.Key) (bool, error) {
-	return s.instance().Has(byteutils.ConcatBytes(s.dbPrefix, key))
+	instance, err := s.instance()
+	if err != nil {
+		return false, err
+	}
+
+	return instance.Has(byteutils.ConcatBytes(s.dbPrefix, key))
 }
 
 func (s *openableKVStore) Delete(key kvstore.Key) error {
-	return s.instance().Delete(byteutils.ConcatBytes(s.dbPrefix, key))
+	instance, err := s.instance()
+	if err != nil {
+		return err
+	}
+
+	return instance.Delete(byteutils.ConcatBytes(s.dbPrefix, key))
 }
 
 func (s *openableKVStore) DeletePrefix(prefix kvstore.KeyPrefix) error {
-	return s.instance().DeletePrefix(s.buildKeyPrefix(prefix))
+	instance, err := s.instance()
+	if err != nil {
+		return err
+	}
+
+	return instance.DeletePrefix(s.buildKeyPrefix(prefix))
 }
 
 func (s *openableKVStore) Flush() error {
-	return s.instance().Flush()
+	instance, err := s.instance()
+	if err != nil {
+		return err
+	}
+
+	return instance.Flush()
 }
 
 func (s *openableKVStore) Close() error {
@@ -175,7 +222,12 @@ func (s *openableKVStoreBatchedMutations) Cancel() {
 }
 
 func (s *openableKVStoreBatchedMutations) Commit() error {
-	batched, err := s.parentStore.instance().Batched()
+	instance, err := s.parentStore.instance()
+	if err != nil {
+		return err
+	}
+
+	batched, err := instance.Batched()
 	if err != nil {
 		return err
 	}
