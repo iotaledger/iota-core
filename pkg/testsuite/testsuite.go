@@ -120,11 +120,10 @@ type TestSuite struct {
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
-	genesisSeed := tpkg.RandEd25519Seed()
 	return options.Apply(&TestSuite{
 		Testing:                             testingT,
 		fakeTesting:                         &testing.T{},
-		genesisKeyManager:                   lo.PanicOnErr(wallet.NewKeyManager(genesisSeed[:], 0)),
+		genesisKeyManager:                   lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath)),
 		network:                             mock.NewNetwork(),
 		Directory:                           utils.NewDirectory(testingT.TempDir()),
 		nodes:                               orderedmap.New[string, *mock.Node](),

@@ -9,7 +9,6 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/tpkg"
 	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
@@ -37,8 +36,7 @@ type Wallet struct {
 func NewWallet(t *testing.T, name string, node *Node, keyManager ...*wallet.KeyManager) *Wallet {
 	var km *wallet.KeyManager
 	if len(keyManager) == 0 {
-		randomSeed := tpkg.RandEd25519Seed()
-		km = lo.PanicOnErr(wallet.NewKeyManager(randomSeed[:], 0))
+		km = lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath))
 	} else {
 		km = keyManager[0]
 	}
