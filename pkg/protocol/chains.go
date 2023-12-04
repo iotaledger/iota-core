@@ -22,7 +22,7 @@ type Chains struct {
 	// Main contains the main chain.
 	Main reactive.Variable[*Chain]
 
-	// HeaviestClaimedCandidate contains the candidate chain with the heaviest claimed weight.
+	// HeaviestClaimedCandidate contains the candidate chain with the heaviest claimed weight according to its latest commitment. The weight has neither been checked via attestations nor verified by downloading all data.
 	HeaviestClaimedCandidate reactive.Variable[*Chain]
 
 	// HeaviestAttestedCandidate contains the candidate chain with the heaviest attested weight.
