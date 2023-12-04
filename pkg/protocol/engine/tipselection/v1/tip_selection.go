@@ -187,6 +187,9 @@ func (t *TipSelection) classifyTip(tipMetadata tipmanager.TipMetadata) {
 		tipMetadata.TipPool().Set(tipmanager.DroppedTipPool)
 	}
 
+	t.livenessThresholdQueueMutex.RLock()
+	defer t.livenessThresholdQueueMutex.RUnlock()
+
 	t.livenessThresholdQueue.Push(tipMetadata, tipMetadata.Block().IssuingTime().Add(t.livenessThreshold(tipMetadata)))
 }
 
