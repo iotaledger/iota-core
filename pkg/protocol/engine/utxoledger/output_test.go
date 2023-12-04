@@ -15,7 +15,6 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	iotago_tpkg "github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -108,7 +107,7 @@ func CreateOutputAndAssertSerialization(t *testing.T, blockID iotago.BlockID, in
 }
 
 func CreateSpentAndAssertSerialization(t *testing.T, output *utxoledger.Output) *utxoledger.Spent {
-	transactionID := utils.RandTransactionID()
+	transactionID := iotago_tpkg.RandTransactionID()
 
 	indexSpent := iotago.SlotIndex(6788362)
 
@@ -128,13 +127,13 @@ func CreateSpentAndAssertSerialization(t *testing.T, output *utxoledger.Output) 
 
 func TestBasicOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.T) {
 	txCommitment := iotago_tpkg.Rand32ByteArray()
-	txCreationSlot := utils.RandSlotIndex()
-	blockID := utils.RandBlockID()
-	address := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
-	senderAddress := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
-	tag := utils.RandBytes(23)
+	txCreationSlot := iotago_tpkg.RandSlot()
+	blockID := iotago_tpkg.RandBlockID()
+	address := iotago_tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	senderAddress := iotago_tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	tag := iotago_tpkg.RandBytes(23)
 	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
-	index := utils.RandSlotIndex()
+	index := iotago_tpkg.RandSlot()
 
 	iotaOutput := &iotago.BasicOutput{
 		Amount: amount,
@@ -166,13 +165,13 @@ func TestBasicOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.T) 
 
 func TestBasicOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) {
 	txCommitment := iotago_tpkg.Rand32ByteArray()
-	txCreationSlot := utils.RandSlotIndex()
-	blockID := utils.RandBlockID()
-	address := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
-	senderAddress := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	txCreationSlot := iotago_tpkg.RandSlot()
+	blockID := iotago_tpkg.RandBlockID()
+	address := iotago_tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	senderAddress := iotago_tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
-	index := utils.RandSlotIndex()
-	timeLockUnlockSlot := utils.RandSlotIndex()
+	index := iotago_tpkg.RandSlot()
+	timeLockUnlockSlot := iotago_tpkg.RandSlot()
 
 	iotaOutput := &iotago.BasicOutput{
 		Amount: amount,
@@ -205,12 +204,12 @@ func TestBasicOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) {
 
 func TestNFTOutputSerialization(t *testing.T) {
 	txCommitment := iotago_tpkg.Rand32ByteArray()
-	txCreationSlot := utils.RandSlotIndex()
-	blockID := utils.RandBlockID()
-	address := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
-	nftID := utils.RandNFTID()
+	txCreationSlot := iotago_tpkg.RandSlot()
+	blockID := iotago_tpkg.RandBlockID()
+	address := iotago_tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	nftID := iotago_tpkg.RandNFTID()
 	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
-	index := utils.RandSlotIndex()
+	index := iotago_tpkg.RandSlot()
 
 	iotaOutput := &iotago.NFTOutput{
 		Amount: amount,
@@ -224,7 +223,7 @@ func TestNFTOutputSerialization(t *testing.T) {
 		ImmutableFeatures: iotago.NFTOutputImmFeatures{
 			&iotago.MetadataFeature{
 				Entries: iotago.MetadataFeatureEntries{
-					"data": utils.RandBytes(12),
+					"data": iotago_tpkg.RandBytes(12),
 				},
 			},
 		},
@@ -243,14 +242,14 @@ func TestNFTOutputSerialization(t *testing.T) {
 
 func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 	txCommitment := iotago_tpkg.Rand32ByteArray()
-	txCreationSlot := utils.RandSlotIndex()
-	blockID := utils.RandBlockID()
-	address := utils.RandNFTID()
-	issuerAddress := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
-	nftID := utils.RandNFTID()
+	txCreationSlot := iotago_tpkg.RandSlot()
+	blockID := iotago_tpkg.RandBlockID()
+	address := iotago_tpkg.RandNFTID()
+	issuerAddress := iotago_tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	nftID := iotago_tpkg.RandNFTID()
 	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
-	index := utils.RandSlotIndex()
-	expirationUnlockSlot := utils.RandSlotIndex()
+	index := iotago_tpkg.RandSlot()
+	expirationUnlockSlot := iotago_tpkg.RandSlot()
 
 	iotaOutput := &iotago.NFTOutput{
 		Amount: amount,
@@ -268,7 +267,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 		ImmutableFeatures: iotago.NFTOutputImmFeatures{
 			&iotago.MetadataFeature{
 				Entries: iotago.MetadataFeatureEntries{
-					"data": utils.RandBytes(12),
+					"data": iotago_tpkg.RandBytes(12),
 				},
 			},
 			&iotago.IssuerFeature{
@@ -290,14 +289,14 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 
 func TestAccountOutputSerialization(t *testing.T) {
 	txCommitment := iotago_tpkg.Rand32ByteArray()
-	txCreationSlot := utils.RandSlotIndex()
-	blockID := utils.RandBlockID()
-	aliasID := utils.RandAccountID()
-	address := utils.RandAccountID().ToAddress()
-	issuer := utils.RandNFTID()
-	sender := utils.RandAccountID()
+	txCreationSlot := iotago_tpkg.RandSlot()
+	blockID := iotago_tpkg.RandBlockID()
+	aliasID := iotago_tpkg.RandAccountID()
+	address := iotago_tpkg.RandAccountID().ToAddress()
+	issuer := iotago_tpkg.RandNFTID()
+	sender := iotago_tpkg.RandAccountID()
 	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
-	index := utils.RandSlotIndex()
+	index := iotago_tpkg.RandSlot()
 
 	iotaOutput := &iotago.AccountOutput{
 		Amount:    amount,
@@ -332,15 +331,15 @@ func TestAccountOutputSerialization(t *testing.T) {
 
 func TestAnchorOutputSerialization(t *testing.T) {
 	txCommitment := iotago_tpkg.Rand32ByteArray()
-	txCreationSlot := utils.RandSlotIndex()
-	blockID := utils.RandBlockID()
-	aliasID := utils.RandAnchorID()
-	stateController := utils.RandAnchorID()
-	governor := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
-	issuer := utils.RandNFTID()
-	sender := utils.RandAnchorID()
+	txCreationSlot := iotago_tpkg.RandSlot()
+	blockID := iotago_tpkg.RandBlockID()
+	aliasID := iotago_tpkg.RandAnchorID()
+	stateController := iotago_tpkg.RandAnchorID()
+	governor := iotago_tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	issuer := iotago_tpkg.RandNFTID()
+	sender := iotago_tpkg.RandAnchorID()
 	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
-	index := utils.RandSlotIndex()
+	index := iotago_tpkg.RandSlot()
 
 	iotaOutput := &iotago.AnchorOutput{
 		Amount:   amount,
@@ -378,16 +377,16 @@ func TestAnchorOutputSerialization(t *testing.T) {
 
 func TestFoundryOutputSerialization(t *testing.T) {
 	txCommitment := iotago_tpkg.Rand32ByteArray()
-	txCreationSlot := utils.RandSlotIndex()
-	blockID := utils.RandBlockID()
-	aliasID := utils.RandAccountID()
+	txCreationSlot := iotago_tpkg.RandSlot()
+	blockID := iotago_tpkg.RandBlockID()
+	aliasID := iotago_tpkg.RandAccountID()
 	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
-	index := utils.RandSlotIndex()
+	index := iotago_tpkg.RandSlot()
 	supply := new(big.Int).SetUint64(iotago_tpkg.RandUint64(math.MaxUint64))
 
 	iotaOutput := &iotago.FoundryOutput{
 		Amount:       amount,
-		SerialNumber: utils.RandUint32(math.MaxUint32),
+		SerialNumber: iotago_tpkg.RandUint32(math.MaxUint32),
 		TokenScheme: &iotago.SimpleTokenScheme{
 			MintedTokens:  supply,
 			MeltedTokens:  new(big.Int).SetBytes([]byte{0}),
@@ -415,17 +414,17 @@ func TestFoundryOutputSerialization(t *testing.T) {
 
 func TestDelegationOutputSerialization(t *testing.T) {
 	txCommitment := iotago_tpkg.Rand32ByteArray()
-	txCreationSlot := utils.RandSlotIndex()
-	blockID := utils.RandBlockID()
-	address := utils.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
+	txCreationSlot := iotago_tpkg.RandSlot()
+	blockID := iotago_tpkg.RandBlockID()
+	address := iotago_tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
-	index := utils.RandSlotIndex()
+	index := iotago_tpkg.RandSlot()
 
 	iotaOutput := &iotago.DelegationOutput{
 		Amount:           amount,
 		DelegatedAmount:  amount,
 		DelegationID:     iotago_tpkg.RandDelegationID(),
-		ValidatorAddress: utils.RandAddress(iotago.AddressAccount).(*iotago.AccountAddress),
+		ValidatorAddress: iotago_tpkg.RandAddress(iotago.AddressAccount).(*iotago.AccountAddress),
 		StartEpoch:       iotago_tpkg.RandEpoch(),
 		UnlockConditions: iotago.DelegationOutputUnlockConditions{
 			&iotago.AddressUnlockCondition{

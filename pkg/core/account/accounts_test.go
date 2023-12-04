@@ -2,13 +2,13 @@ package account_test
 
 import (
 	"bytes"
-	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func TestAccounts(t *testing.T) {
@@ -49,7 +49,7 @@ func TestAccounts(t *testing.T) {
 	})
 
 	// check "Get" for non existing IDs
-	_, exists := accounts.Get([32]byte{0, randByte()})
+	_, exists := accounts.Get([32]byte{0, tpkg.RandByte()})
 	require.False(t, exists)
 
 	for id, stake := range issuers {
@@ -118,7 +118,7 @@ func TestAccounts(t *testing.T) {
 	/*
 
 		// Get a non existed account
-		_, exist = accounts.Get([32]byte{randByte()})
+		_, exist = accounts.Get([32]byte{tpkg.RandByte()})
 		require.False(t, exist)
 
 	*/
@@ -131,7 +131,7 @@ func generateAccounts(count int) (map[iotago.AccountID]iotago.BaseToken, iotago.
 	var totalStake iotago.BaseToken
 
 	for i := 0; i < count; i++ {
-		id := iotago.AccountID([32]byte{randByte()})
+		id := iotago.AccountID([32]byte{tpkg.RandByte()})
 		if _, exist := seenIDs[id]; exist {
 			i--
 			continue
@@ -144,8 +144,4 @@ func generateAccounts(count int) (map[iotago.AccountID]iotago.BaseToken, iotago.
 	}
 
 	return issuers, totalStake
-}
-
-func randByte() byte {
-	return byte(rand.Intn(256))
 }

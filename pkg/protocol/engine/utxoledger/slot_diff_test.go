@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2/byteutils"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger/tpkg"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	iotago_tpkg "github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -21,10 +20,10 @@ import (
 func TestSimpleSlotDiffSerialization(t *testing.T) {
 	indexBooked := iotago.SlotIndex(255975)
 
-	txID := utils.RandTransactionID()
-	outputID := utils.RandOutputID()
-	blockID := utils.RandBlockID()
-	address := utils.RandAddress(iotago.AddressEd25519)
+	txID := iotago_tpkg.RandTransactionID()
+	outputID := iotago_tpkg.RandOutputID()
+	blockID := iotago_tpkg.RandBlockID()
+	address := iotago_tpkg.RandAddress(iotago.AddressEd25519)
 	amount := iotago.BaseToken(832493)
 	iotaOutput := &iotago.BasicOutput{
 		Amount: amount,
@@ -41,7 +40,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 
 	output := utxoledger.CreateOutput(iotago.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, iotaOutput, outputProof)
 
-	transactionIDSpent := utils.RandTransactionID()
+	transactionIDSpent := iotago_tpkg.RandTransactionID()
 
 	indexSpent := indexBooked + 1
 

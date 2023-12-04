@@ -96,17 +96,17 @@ func TestManager_Candidates(t *testing.T) {
 	issuer2 := tpkg.RandAccountID()
 	issuer3 := tpkg.RandAccountID()
 	{
-		block1 := tpkg.RandBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
+		block1 := tpkg.RandBlock(tpkg.RandBasicBlockBody(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 
 		block1.Header.IssuingTime = ts.api.TimeProvider().SlotStartTime(1)
 		block1.Header.IssuerID = issuer1
 
-		block2 := tpkg.RandBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
+		block2 := tpkg.RandBlock(tpkg.RandBasicBlockBody(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 
 		block2.Header.IssuingTime = ts.api.TimeProvider().SlotStartTime(2)
 		block2.Header.IssuerID = issuer2
 
-		block3 := tpkg.RandBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
+		block3 := tpkg.RandBlock(tpkg.RandBasicBlockBody(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 
 		block3.Header.IssuingTime = ts.api.TimeProvider().SlotStartTime(3)
 		block3.Header.IssuerID = issuer3
@@ -117,16 +117,16 @@ func TestManager_Candidates(t *testing.T) {
 	}
 
 	{
-		block4 := tpkg.RandBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
+		block4 := tpkg.RandBlock(tpkg.RandBasicBlockBody(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 		block4.Header.IssuingTime = ts.api.TimeProvider().SlotStartTime(4)
 		block4.Header.IssuerID = issuer1
 
-		block5 := tpkg.RandBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
+		block5 := tpkg.RandBlock(tpkg.RandBasicBlockBody(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 
 		block5.Header.IssuingTime = ts.api.TimeProvider().SlotStartTime(5)
 		block5.Header.IssuerID = issuer2
 
-		block6 := tpkg.RandBlock(tpkg.RandBasicBlock(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
+		block6 := tpkg.RandBlock(tpkg.RandBasicBlockBody(ts.api, iotago.PayloadCandidacyAnnouncement), ts.api, 0)
 
 		block6.Header.IssuingTime = ts.api.TimeProvider().SlotStartTime(6)
 		block6.Header.IssuerID = issuer3
