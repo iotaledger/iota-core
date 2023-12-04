@@ -167,11 +167,6 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				return blocksToWarpSync
 			}
 
-			// make sure the engine is clean and requires a warp-sync before we start processing the blocks
-			if targetEngine.Storage.Settings().LatestCommitment().ID().Slot() > commitmentID.Slot() {
-				return blocksToWarpSync
-			}
-
 			// Once all blocks are booked we
 			//   1. Mark all transactions as accepted
 			//   2. Mark all blocks as accepted

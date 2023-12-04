@@ -71,7 +71,7 @@ type Commitment struct {
 	IsAboveLatestVerifiedCommitment reactive.Variable[bool]
 
 	// ReplayDroppedBlocks contains a flag indicating if we should replay the blocks that were dropped while the
-	//Commitment was pending.
+	// Commitment was pending.
 	ReplayDroppedBlocks reactive.Variable[bool]
 
 	// IsEvicted contains a flag indicating if this Commitment was evicted from the Protocol.
@@ -274,7 +274,7 @@ func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment)
 }
 
 // deriveWarpSyncBlocks derives the WarpSyncBlocks flag of this Commitment which is true if our Chain is requesting
-// warp sync, and we are the directly above the latest verified Commitment.
+// warp sync, and we are the directly above the latest commitment that is synced (has downloaded everything).
 func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func() {
 	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, warpSyncMode bool, parentIsSynced bool, isSynced bool) bool {
 		return warpSyncMode && parentIsSynced && !isSynced
