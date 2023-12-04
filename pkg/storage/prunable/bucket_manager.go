@@ -205,21 +205,37 @@ func (b *BucketManager) getDBInstance(epoch iotago.EpochIndex) *database.DBInsta
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	// check if exists again, as another goroutine might have created it in parallel
-	db := lo.Return1(b.openDBs.GetOrCreate(epoch, func() *database.DBInstance {
-		db := database.NewDBInstance(b.dbConfig.WithDirectory(dbPathFromIndex(b.dbConfig.Directory, epoch)), func(d *database.DBInstance) {
-			b.openDBsCacheMutex.Lock()
-			defer b.openDBsCacheMutex.Unlock()
-
-			// Mark the db as used in the cache.
-			b.openDBsCache.Put(epoch, d)
-
-			// Remove the cached db size since we will open the db.
-			b.dbSizes.Delete(epoch)
-		})
+	// Try to retrieve the DBInstance from cache in the first step.
+	// This puts the DBInstance at the front of the LRU cache.
+	b.openDBsCacheMutex.Lock()
+	if db, exists := b.openDBsCache.Get(epoch); exists {
+		b.openDBsCacheMutex.Unlock()
 
 		return db
-	}))
+	}
+	b.openDBsCacheMutex.Unlock()
+
+	openedCallback := func(d *database.DBInstance) {
+		b.openDBsCacheMutex.Lock()
+		defer b.openDBsCacheMutex.Unlock()
+
+		// Mark the db as used in the cache.
+		b.openDBsCache.Put(epoch, d)
+
+		// Remove the cached db size since we will open the db.
+		b.dbSizes.Delete(epoch)
+	}
+
+	// check if exists again, as another goroutine might have created it in parallel
+	db, created := b.openDBs.GetOrCreate(epoch, func() *database.DBInstance {
+		return database.NewDBInstance(b.dbConfig.WithDirectory(dbPathFromIndex(b.dbConfig.Directory, epoch)), openedCallback)
+	})
+
+	if created {
+		// Call openedCallback here instead of inside NewDBInstance to avoid a deadlock due to
+		// locking `b.openDBs` and `b.openDBsCacheMutex` in different order.
+		openedCallback(db)
+	}
 
 	return db
 }

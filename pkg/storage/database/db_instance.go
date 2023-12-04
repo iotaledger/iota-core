@@ -64,10 +64,6 @@ func NewDBInstance(dbConfig Config, openedCallback func(d *DBInstance)) *DBInsta
 
 	dbInstance.healthTracker = storeHealthTracker
 
-	if openedCallback != nil {
-		openedCallback(dbInstance)
-	}
-
 	return dbInstance
 }
 
