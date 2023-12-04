@@ -12,7 +12,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
-var ValidatorDockerName = map[string]string{
+var ValidatorContainerName = map[string]string{
 	"V1": "docker-network-inx-validator-1-1",
 	"V2": "docker-network-inx-validator-2-1",
 	"V3": "docker-network-inx-validator-3-1",
@@ -50,7 +50,7 @@ func SmallerCommittee(client *nodeclient.Client) error {
 	currentEpoch := client.CommittedAPI().TimeProvider().EpochFromSlot(status.LatestAcceptedBlockSlot)
 
 	// stop validator 2
-	err = DockerContainerStop("V2")
+	err = DockerContainerStop(ValidatorContainerName["V2"])
 	if err != nil {
 		return ierrors.Wrap(err, "dockerStop failed")
 	}
@@ -61,7 +61,7 @@ func SmallerCommittee(client *nodeclient.Client) error {
 	}
 
 	// restart validator 2
-	err = DockerContainerRestart("V2")
+	err = DockerContainerRestart(ValidatorContainerName["V2"])
 	if err != nil {
 		return ierrors.Wrap(err, "dockerRestart failed")
 	}
@@ -79,7 +79,7 @@ func ReuseDueToNoFinalization(client *nodeclient.Client) error {
 	defer fmt.Printf("Test......done\n\n\n")
 
 	// stop 2 validators, finalization should stop
-	err := DockerContainerStop("V2", "V3")
+	err := DockerContainerStop(ValidatorContainerName["V2"], ValidatorContainerName["V3"])
 	if err != nil {
 		return ierrors.Wrap(err, "dockerStop failed")
 	}
@@ -111,7 +111,7 @@ func ReuseDueToNoFinalization(client *nodeclient.Client) error {
 	}
 
 	// revive 1 validator, committee size should be 3, finalization should resume
-	err = DockerContainerRestart("V2")
+	err = DockerContainerRestart(ValidatorContainerName["V2"])
 	if err != nil {
 		return ierrors.Wrap(err, "dockerRestart failed")
 	}
@@ -231,24 +231,18 @@ func DockerNetworkStop() {
 	exec.Command("rm", "docker-network.snapshot").Run()
 }
 
-func DockerContainerStop(containerIndex ...string) error {
-	fmt.Println("Stop validator", containerIndex, "......")
+func DockerContainerStop(containerName ...string) error {
+	fmt.Println("Stop validator", containerName, "......")
 
-	args := []string{"stop"}
-	for _, i := range containerIndex {
-		args = append(args, ValidatorDockerName[i])
-	}
+	args := append([]string{"stop"}, containerName...)
 
 	return exec.Command("docker", args...).Run()
 }
 
-func DockerContainerRestart(containerIndex ...string) error {
-	fmt.Println("Restart validator", containerIndex, "......")
+func DockerContainerRestart(containerName ...string) error {
+	fmt.Println("Restart validator", containerName, "......")
 
-	args := []string{"restart"}
-	for _, i := range containerIndex {
-		args = append(args, ValidatorDockerName[i])
-	}
+	args := append([]string{"restart"}, containerName...)
 
 	return exec.Command("docker", args...).Run()
 }
