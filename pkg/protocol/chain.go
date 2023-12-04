@@ -48,8 +48,8 @@ type Chain struct {
 	// WarpSyncMode contains a flag that indicates whether this chain is in warp sync mode.
 	WarpSyncMode reactive.Variable[bool]
 
-	// LatestFullyBookedSlot contains the latest commitment of this chain for which all blocks were booked.
-	LatestFullyBookedSlot reactive.Variable[iotago.SlotIndex]
+	// LatestSyncedSlot contains the latest commitment of this chain for which all blocks were booked.
+	LatestSyncedSlot reactive.Variable[iotago.SlotIndex]
 
 	// OutOfSyncThreshold contains the slot at which the chain will consider itself to be out of sync and switch to warp
 	// sync mode. It is derived from the latest network slot minus two times the max committable age.
@@ -92,7 +92,7 @@ func newChain(chains *Chains) *Chain {
 		AttestedWeight:           reactive.NewVariable[uint64](),
 		VerifiedWeight:           reactive.NewVariable[uint64](),
 		WarpSyncMode:             reactive.NewVariable[bool]().Init(true),
-		LatestFullyBookedSlot:    reactive.NewVariable[iotago.SlotIndex](),
+		LatestSyncedSlot:         reactive.NewVariable[iotago.SlotIndex](),
 		OutOfSyncThreshold:       reactive.NewVariable[iotago.SlotIndex](),
 		RequestAttestations:      reactive.NewVariable[bool](),
 		StartEngine:              reactive.NewVariable[bool](),
@@ -186,7 +186,7 @@ func (c *Chain) initLogger() (shutdown func()) {
 
 	return lo.Batch(
 		c.WarpSyncMode.LogUpdates(c, log.LevelTrace, "WarpSyncMode"),
-		c.LatestFullyBookedSlot.LogUpdates(c, log.LevelTrace, "LatestFullyBookedSlot"),
+		c.LatestSyncedSlot.LogUpdates(c, log.LevelTrace, "LatestSyncedSlot"),
 		c.OutOfSyncThreshold.LogUpdates(c, log.LevelTrace, "OutOfSyncThreshold"),
 		c.ForkingPoint.LogUpdates(c, log.LevelTrace, "ForkingPoint", (*Commitment).LogName),
 		c.ClaimedWeight.LogUpdates(c, log.LevelTrace, "ClaimedWeight"),
@@ -220,15 +220,15 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 
 // deriveWarpSyncMode defines how a chain determines whether it is in warp sync mode or not.
 func (c *Chain) deriveWarpSyncMode() func() {
-	return c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSyncMode bool, latestFullyBookedSlot iotago.SlotIndex, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
-		// if warp sync mode is enabled, keep it enabled until we have fully booked all slots
+	return c.WarpSyncMode.DeriveValueFrom(reactive.NewDerivedVariable3(func(warpSyncMode bool, latestSyncedSlot iotago.SlotIndex, latestSeenSlot iotago.SlotIndex, outOfSyncThreshold iotago.SlotIndex) bool {
+		// if warp sync mode is enabled, keep it enabled until we have synced all slots
 		if warpSyncMode {
-			return latestFullyBookedSlot < latestSeenSlot
+			return latestSyncedSlot < latestSeenSlot
 		}
 
 		// if warp sync mode is disabled, enable it only if we fall below the out of sync threshold
-		return latestFullyBookedSlot < outOfSyncThreshold
-	}, c.LatestFullyBookedSlot, c.chains.LatestSeenSlot, c.OutOfSyncThreshold, c.WarpSyncMode.Get()))
+		return latestSyncedSlot < outOfSyncThreshold
+	}, c.LatestSyncedSlot, c.chains.LatestSeenSlot, c.OutOfSyncThreshold, c.WarpSyncMode.Get()))
 }
 
 // deriveClaimedWeight defines how a chain determines its claimed weight (by setting the cumulative weight of the
@@ -314,7 +314,7 @@ func (c *Chain) addCommitment(newCommitment *Commitment) (shutdown func()) {
 	return lo.Batch(
 		newCommitment.IsAttested.OnTrigger(func() { c.LatestAttestedCommitment.Set(newCommitment) }),
 		newCommitment.IsVerified.OnTrigger(func() { c.LatestProducedCommitment.Set(newCommitment) }),
-		newCommitment.IsFullyBooked.OnTrigger(func() { c.LatestFullyBookedSlot.Set(newCommitment.Slot()) }),
+		newCommitment.IsSynced.OnTrigger(func() { c.LatestSyncedSlot.Set(newCommitment.Slot()) }),
 	)
 }
 

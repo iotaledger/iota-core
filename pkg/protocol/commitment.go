@@ -56,8 +56,8 @@ type Commitment struct {
 	// IsAttested contains a flag indicating if we have received attestations for this Commitment.
 	IsAttested reactive.Event
 
-	// IsFullyBooked contains a flag indicating if we have received all blocks for this Commitment.
-	IsFullyBooked reactive.Event
+	// IsSynced contains a flag indicating if we have downloaded all objects enclosed in this Commitment.
+	IsSynced reactive.Event
 
 	// IsCommittable contains a flag indicating if this Commitment is committable (we have received all blocks and all attestations).
 	IsCommittable reactive.Event
@@ -100,7 +100,7 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
 		IsRoot:                          reactive.NewEvent(),
 		IsAttested:                      reactive.NewEvent(),
-		IsFullyBooked:                   reactive.NewEvent(),
+		IsSynced:                        reactive.NewEvent(),
 		IsCommittable:                   reactive.NewEvent(),
 		IsVerified:                      reactive.NewEvent(),
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
@@ -143,7 +143,7 @@ func (c *Commitment) initLogger() (shutdown func()) {
 		c.CumulativeAttestedWeight.LogUpdates(c, log.LevelTrace, "CumulativeAttestedWeight"),
 		c.IsRoot.LogUpdates(c, log.LevelTrace, "IsRoot"),
 		c.IsAttested.LogUpdates(c, log.LevelTrace, "IsAttested"),
-		c.IsFullyBooked.LogUpdates(c, log.LevelTrace, "IsFullyBooked"),
+		c.IsSynced.LogUpdates(c, log.LevelTrace, "IsSynced"),
 		c.IsCommittable.LogUpdates(c, log.LevelTrace, "IsCommittable"),
 		c.IsVerified.LogUpdates(c, log.LevelTrace, "IsVerified"),
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
@@ -161,7 +161,7 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 
 		// mark commitments that are marked as verified as attested and fully booked
 		c.IsAttested.InheritFrom(c.IsVerified),
-		c.IsFullyBooked.InheritFrom(c.IsVerified),
+		c.IsSynced.InheritFrom(c.IsVerified),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			// the weight can be fixed as a one time operation (as it only relies on static information from the parent
@@ -274,7 +274,7 @@ func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment)
 func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func() {
 	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSync bool, parentIsFullyBooked bool, isFullyBooked bool) bool {
 		return engineInstance != nil && warpSync && parentIsFullyBooked && !isFullyBooked
-	}, chain.Engine, chain.WarpSyncMode, parent.IsFullyBooked, c.IsFullyBooked))
+	}, chain.Engine, chain.WarpSyncMode, parent.IsSynced, c.IsSynced))
 }
 
 // deriveReplayDroppedBlocks derives the ReplayDroppedBlocks flag of this Commitment which is true if our Chain has an

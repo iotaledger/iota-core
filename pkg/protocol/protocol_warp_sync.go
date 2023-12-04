@@ -249,7 +249,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			// Once all blocks are fully booked we can mark the commitment that is minCommittableAge older as this
 			// commitment to be committable.
-			commitment.IsFullyBooked.OnUpdateOnce(func(_ bool, _ bool) {
+			commitment.IsSynced.OnUpdateOnce(func(_ bool, _ bool) {
 				if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - targetEngine.LatestAPI().ProtocolParameters().MinCommittableAge()); exists {
 					w.workerPool.Submit(func() {
 						committableCommitment.IsCommittable.Set(true)
@@ -266,7 +266,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			if totalBlocks == 0 {
 				commitment.IsCommittable.Set(true)
-				commitment.IsFullyBooked.Set(true)
+				commitment.IsSynced.Set(true)
 
 				return blocksToWarpSync
 			}
@@ -291,7 +291,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 							return
 						}
 
-						commitment.IsFullyBooked.Set(true)
+						commitment.IsSynced.Set(true)
 					})
 				}
 			}
