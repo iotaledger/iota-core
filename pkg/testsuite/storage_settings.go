@@ -1,8 +1,6 @@
 package testsuite
 
 import (
-	"fmt"
-
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -129,8 +127,6 @@ func (t *TestSuite) AssertChainID(expectedChainID iotago.CommitmentID, nodes ...
 			actualChainID := node.Protocol.Chains.Main.Get().ForkingPoint.Get().ID()
 
 			if expectedChainID != actualChainID {
-				fmt.Println(expectedChainID, actualChainID)
-
 				return ierrors.Errorf("AssertChainID: %s: expected %s (index: %d), got %s (index: %d)", node.Name, expectedChainID, expectedChainID.Slot(), actualChainID, actualChainID.Slot())
 			}
 
