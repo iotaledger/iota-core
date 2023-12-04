@@ -27,17 +27,14 @@
     dest: /opt/iota-core/docker-compose.yml
     mode: '0644'
 
-- name: Kill existing services
+- name: Kill & teardown existing services
   community.docker.docker_compose:
     project_src: /opt/iota-core
-    timeout: 1
-    state: present
-    stopped: yes
-
-- name: Tear down existing services
-  community.docker.docker_compose:
-    project_src: /opt/iota-core
+    timeout: 5
     state: absent
+    stopped: true
+    remove_orphans: true
+    remove_volumes: true
 
 - name: Create DB directory
   file:
