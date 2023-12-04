@@ -56,10 +56,10 @@ type Commitment struct {
 	// IsAttested contains a flag indicating if we have received attestations for this Commitment.
 	IsAttested reactive.Event
 
-	// IsSynced contains a flag indicating if we have downloaded all objects enclosed in this Commitment.
+	// IsSynced contains a flag that indicates if a Commitment was fully downloaded and processed.
 	IsSynced reactive.Event
 
-	// IsCommittable contains a flag indicating if this Commitment is committable (we have received all blocks and all attestations).
+	// IsCommittable contains a flag that indicates if a Commitment is ready to be committed by the warp sync process.
 	IsCommittable reactive.Event
 
 	// IsVerified contains a flag indicating if this Commitment is verified (we produced this Commitment ourselves by
