@@ -6,8 +6,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
-	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
 // Options stores the details about snapshots created for integration tests.
@@ -25,7 +25,7 @@ type Options struct {
 	RootBlocks map[iotago.BlockID]iotago.CommitmentID
 
 	// GenesisKeyManager defines the key manager used to generate keypair that can spend Genesis outputs.
-	GenesisKeyManager *mock.KeyManager
+	GenesisKeyManager *wallet.KeyManager
 
 	// Accounts defines the accounts that are created in the ledger as part of the Genesis.
 	Accounts []AccountDetails
@@ -85,7 +85,7 @@ func WithAddGenesisRootBlock(add bool) options.Option[Options] {
 }
 
 // WithGenesisKeyManager defines the seed used to generate keypair that can spend Genesis outputs.
-func WithGenesisKeyManager(keyManager *mock.KeyManager) options.Option[Options] {
+func WithGenesisKeyManager(keyManager *wallet.KeyManager) options.Option[Options] {
 	return func(m *Options) {
 		m.GenesisKeyManager = keyManager
 	}
