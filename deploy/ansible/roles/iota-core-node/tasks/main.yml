@@ -3,6 +3,14 @@
   async: 300
   poll: 5
 
+- name: Set log rotation for a maximum size of 5GB
+  ansible.builtin.lineinfile:
+    path: /etc/logrotate.d/rsyslog
+    regexp: '^\{\n\s*rotate'
+    insertbefore: '^\{\n\s*rotate'
+    line: '    maxsize 5G'
+  notify: restart rsyslog
+
 - name: Create node directory
   file:
     path: /opt/iota-core
