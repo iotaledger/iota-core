@@ -178,7 +178,11 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 				c.Chain.WithNonEmptyValue(func(chain *Chain) func() {
 					return lo.Batch(
 						c.deriveRequestAttestations(chain, parent),
-						c.deriveWarpSyncBlocks(chain, parent),
+
+						// only start requesting blocks once the engine is ready
+						chain.WithInitializedEngine(func(_ *engine.Engine) (shutdown func()) {
+							return c.deriveWarpSyncBlocks(chain, parent)
+						}),
 					)
 				}),
 			)
@@ -272,9 +276,9 @@ func (c *Commitment) deriveRequestAttestations(chain *Chain, parent *Commitment)
 // deriveWarpSyncBlocks derives the WarpSyncBlocks flag of this Commitment which is true if our Chain is requesting
 // warp sync, and we are the directly above the latest verified Commitment.
 func (c *Commitment) deriveWarpSyncBlocks(chain *Chain, parent *Commitment) func() {
-	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable4(func(_ bool, engineInstance *engine.Engine, warpSync bool, parentIsFullyBooked bool, isFullyBooked bool) bool {
-		return engineInstance != nil && warpSync && parentIsFullyBooked && !isFullyBooked
-	}, chain.Engine, chain.WarpSyncMode, parent.IsSynced, c.IsSynced))
+	return c.WarpSyncBlocks.DeriveValueFrom(reactive.NewDerivedVariable3(func(_ bool, warpSyncMode bool, parentIsSynced bool, isSynced bool) bool {
+		return warpSyncMode && parentIsSynced && !isSynced
+	}, chain.WarpSyncMode, parent.IsSynced, c.IsSynced))
 }
 
 // deriveReplayDroppedBlocks derives the ReplayDroppedBlocks flag of this Commitment which is true if our Chain has an
