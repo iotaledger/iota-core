@@ -159,7 +159,7 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 		// mark commitments that are marked as root as verified
 		c.IsVerified.InheritFrom(c.IsRoot),
 
-		// mark commitments that are marked as verified as attested and fully booked
+		// mark commitments that are marked as verified as attested and synced
 		c.IsAttested.InheritFrom(c.IsVerified),
 		c.IsSynced.InheritFrom(c.IsVerified),
 
