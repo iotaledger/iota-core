@@ -17,7 +17,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -326,7 +325,7 @@ func (t *TestSuite) BlockIssuerKey(alias string, createIfNotExists bool) iotago.
 		panic(fmt.Sprintf("block issuer key with alias '%s' does not exist", alias))
 	}
 
-	t.blockIssuerKeys[alias] = utils.RandBlockIssuerKey()
+	t.blockIssuerKeys[alias] = tpkg.RandBlockIssuerKey()
 
 	return t.blockIssuerKeys[alias]
 }
