@@ -22,13 +22,13 @@ type Chains struct {
 	// Main contains the main chain.
 	Main reactive.Variable[*Chain]
 
-	// HeaviestClaimedCandidate contains the candidate chain with the heaviest claimed weight.
+	// HeaviestClaimedCandidate contains the candidate chain with the heaviest claimed weight according to its latest commitment. The weight has neither been checked via attestations nor verified by downloading all data.
 	HeaviestClaimedCandidate reactive.Variable[*Chain]
 
-	// HeaviestAttestedCandidate contains the candidate chain with the heaviest attested weight.
+	// HeaviestAttestedCandidate contains the candidate chain with the heaviest weight as checked by attestations. The chain has not been instantiated into an engine yet.
 	HeaviestAttestedCandidate reactive.Variable[*Chain]
 
-	// HeaviestVerifiedCandidate contains the candidate chain with the heaviest verified weight.
+	// HeaviestVerifiedCandidate contains the candidate chain with the heaviest verified weight, meaning the chain has been instantiated into an engine and the commitments have been produced by the engine itself.
 	HeaviestVerifiedCandidate reactive.Variable[*Chain]
 
 	// LatestSeenSlot contains the slot of the latest commitment of any received block.
