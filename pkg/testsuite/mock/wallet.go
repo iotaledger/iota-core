@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
+	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
 // Wallet is an object representing a wallet (similar to a FireFly wallet) capable of the following:
@@ -24,7 +25,7 @@ type Wallet struct {
 
 	Node *Node
 
-	keyManager *KeyManager
+	keyManager *wallet.KeyManager
 
 	BlockIssuer *BlockIssuer
 
@@ -33,11 +34,11 @@ type Wallet struct {
 	currentSlot  iotago.SlotIndex
 }
 
-func NewWallet(t *testing.T, name string, node *Node, keyManager ...*KeyManager) *Wallet {
-	var km *KeyManager
+func NewWallet(t *testing.T, name string, node *Node, keyManager ...*wallet.KeyManager) *Wallet {
+	var km *wallet.KeyManager
 	if len(keyManager) == 0 {
 		randomSeed := tpkg.RandEd25519Seed()
-		km = NewKeyManager(randomSeed[:], 0)
+		km = lo.PanicOnErr(wallet.NewKeyManager(randomSeed[:], 0))
 	} else {
 		km = keyManager[0]
 	}

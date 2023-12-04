@@ -29,6 +29,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 	"github.com/iotaledger/iota.go/v4/tpkg"
+	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
 // idAliases contains a list of aliases registered for a set of IDs.
@@ -55,7 +56,7 @@ type Node struct {
 
 	Name       string
 	Validator  *BlockIssuer
-	KeyManager *KeyManager
+	KeyManager *wallet.KeyManager
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -83,7 +84,7 @@ type Node struct {
 
 func NewNode(t *testing.T, net *Network, partition string, name string, validator bool) *Node {
 	seed := tpkg.RandEd25519Seed()
-	keyManager := NewKeyManager(seed[:], 0)
+	keyManager := lo.PanicOnErr(wallet.NewKeyManager(seed[:], 0))
 	priv, pub := keyManager.KeyPair()
 
 	accountID := iotago.AccountID(blake2b.Sum256(pub))
