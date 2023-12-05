@@ -79,7 +79,7 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, slot iotago.SlotI
 
 	// Apply decay to stored, potential and BIC mana that was calculated when adding the entry to cache
 	// so that it's correct for the requested slot.
-	DecayManaBySlots, err := manaDecayProvider.DecayManaBySlots(mana.Value(), mana.UpdateTime(), slot)
+	manaWithDecay, err := manaDecayProvider.DecayManaBySlots(mana.Value(), mana.UpdateTime(), slot)
 	if err != nil {
 		return 0, err
 	}
@@ -91,12 +91,12 @@ func (m *Manager) GetManaOnAccount(accountID iotago.AccountID, slot iotago.SlotI
 	}
 
 	// Add potential mana to the decayed mana.
-	DecayManaBySlotsAndGeneration, err := safemath.SafeAdd(DecayManaBySlots, manaPotential)
+	manaWithDecayAndGeneration, err := safemath.SafeAdd(manaWithDecay, manaPotential)
 	if err != nil {
 		return 0, ierrors.Wrapf(err, "overflow when adding stored and potential mana for account %s", accountID)
 	}
 
-	return DecayManaBySlotsAndGeneration, nil
+	return manaWithDecayAndGeneration, nil
 }
 
 func (m *Manager) getMana(accountID iotago.AccountID, output *utxoledger.Output, slot iotago.SlotIndex) (*accounts.Mana, error) {
