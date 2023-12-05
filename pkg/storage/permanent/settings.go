@@ -30,13 +30,14 @@ const (
 )
 
 type Settings struct {
-	mutex                            syncutils.RWMutex
 	store                            kvstore.KVStore
 	storeSnapshotImported            *kvstore.TypedValue[bool]
 	storeLatestCommitment            *kvstore.TypedValue[*model.Commitment]
 	storeLatestFinalizedSlot         *kvstore.TypedValue[iotago.SlotIndex]
 	storeLatestProcessedSlot         *kvstore.TypedValue[iotago.SlotIndex]
 	storeLatestIssuedValidationBlock *kvstore.TypedValue[*model.Block]
+
+	mutex                            syncutils.RWMutex
 	storeProtocolVersionEpochMapping *kvstore.TypedStore[iotago.Version, iotago.EpochIndex]
 	storeFutureProtocolParameters    *kvstore.TypedStore[iotago.Version, *types.Tuple[iotago.EpochIndex, iotago.Identifier]]
 	storeProtocolParameters          *kvstore.TypedStore[iotago.Version, iotago.ProtocolParameters]
@@ -235,30 +236,18 @@ func (s *Settings) StoreFutureProtocolParametersHash(version iotago.Version, has
 }
 
 func (s *Settings) IsSnapshotImported() bool {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
 	return lo.PanicOnErr(s.storeSnapshotImported.Has())
 }
 
 func (s *Settings) SetSnapshotImported() (err error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.storeSnapshotImported.Set(true)
 }
 
 func (s *Settings) LatestCommitment() *model.Commitment {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
 	return s.latestCommitment()
 }
 
 func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	s.apiProvider.SetCommittedSlot(latestCommitment.Slot())
 
 	// Delete the old future protocol parameters if they exist.
@@ -280,13 +269,6 @@ func (s *Settings) latestCommitment() *model.Commitment {
 	return commitment
 }
 
-func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	return s.latestFinalizedSlot()
-}
-
 func (s *Settings) SetLatestFinalizedSlot(slot iotago.SlotIndex) (err error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -294,7 +276,7 @@ func (s *Settings) SetLatestFinalizedSlot(slot iotago.SlotIndex) (err error) {
 	return s.storeLatestFinalizedSlot.Set(slot)
 }
 
-func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
+func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 	latestFinalizedSlot, err := s.storeLatestFinalizedSlot.Get()
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
@@ -307,22 +289,19 @@ func (s *Settings) latestFinalizedSlot() iotago.SlotIndex {
 }
 
 func (s *Settings) LatestStoredSlot() iotago.SlotIndex {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
 	return read(s.storeLatestProcessedSlot)
 }
 
 func (s *Settings) SetLatestStoredSlot(slot iotago.SlotIndex) (err error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	return s.storeLatestProcessedSlot.Set(slot)
 }
 
 func (s *Settings) AdvanceLatestStoredSlot(slot iotago.SlotIndex) (err error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	// We don't need to advance the latest stored slot if it's already ahead of the given slot.
+	// We check this before Compute to avoid contention inside the TypedValue.
+	if s.LatestStoredSlot() >= slot {
+		return nil
+	}
 
 	if _, err = s.storeLatestProcessedSlot.Compute(func(latestStoredSlot iotago.SlotIndex, _ bool) (newValue iotago.SlotIndex, err error) {
 		if latestStoredSlot >= slot {
@@ -338,9 +317,6 @@ func (s *Settings) AdvanceLatestStoredSlot(slot iotago.SlotIndex) (err error) {
 }
 
 func (s *Settings) LatestIssuedValidationBlock() *model.Block {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
 	return read(s.storeLatestIssuedValidationBlock)
 }
 
