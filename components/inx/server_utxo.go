@@ -346,7 +346,7 @@ func (s *Server) ListenToLedgerUpdates(req *inx.SlotRangeRequest, srv inx.INX_Li
 		case done:
 			cancel()
 		}
-	}).Unhook
+	}, event.WithWorkerPool(wp)).Unhook
 
 	<-ctx.Done()
 	unhook()
