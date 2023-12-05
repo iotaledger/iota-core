@@ -19,8 +19,6 @@ func main() {
 	switch configSelected {
 	case "docker":
 		opts = append(opts, presets.Docker...)
-	case "test":
-		opts = append(opts, presets.DockerTest...)
 	case "feature":
 		opts = append(opts, presets.Feature...)
 	default:
