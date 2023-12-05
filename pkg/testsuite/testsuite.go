@@ -29,50 +29,6 @@ import (
 	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
-func DefaultProtocolParameterOptions(networkName string) []options.Option[iotago.V3ProtocolParameters] {
-	return []options.Option[iotago.V3ProtocolParameters]{
-		iotago.WithNetworkOptions(
-			networkName,
-			"rms",
-		),
-		iotago.WithSupplyOptions(
-			1_000_0000,
-			100,
-			1,
-			10,
-			100,
-			100,
-			100,
-		),
-		iotago.WithRewardsOptions(8, 8, 31, 1154, 2, 1),
-		iotago.WithStakingOptions(1, 100, 1),
-
-		iotago.WithTimeProviderOptions(
-			0,
-			GenesisTimeWithOffsetBySlots(0, DefaultSlotDurationInSeconds),
-			DefaultSlotDurationInSeconds,
-			DefaultSlotsPerEpochExponent,
-		),
-		iotago.WithLivenessOptions(
-			DefaultLivenessThresholdLowerBoundInSeconds,
-			DefaultLivenessThresholdUpperBoundInSeconds,
-			DefaultMinCommittableAge,
-			DefaultMaxCommittableAge,
-			DefaultEpochNearingThreshold,
-		),
-		iotago.WithCongestionControlOptions(
-			DefaultMinReferenceManaCost,
-			DefaultRMCIncrease,
-			DefaultRMCDecrease,
-			DefaultRMCIncreaseThreshold,
-			DefaultRMCDecreaseThreshold,
-			DefaultSchedulerRate,
-			DefaultMaxBufferSize,
-			DefaultMaxValBufferSize,
-		),
-	}
-}
-
 type WalletOptions struct {
 	Amount               iotago.BaseToken
 	BlockIssuanceCredits iotago.BlockIssuanceCredits
@@ -136,8 +92,8 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 
-		t.ProtocolParameterOptions = append(DefaultProtocolParameterOptions(testingT.Name()), t.ProtocolParameterOptions...)
-		t.API = iotago.V3API(iotago.NewV3ProtocolParameters(t.ProtocolParameterOptions...))
+		t.ProtocolParameterOptions = append(t.ProtocolParameterOptions, iotago.WithNetworkOptions(testingT.Name()))
+		t.API = iotago.V3API(iotago.NewV3TestProtocolParameters(t.ProtocolParameterOptions...))
 
 		genesisBlock := blocks.NewRootBlock(t.API.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(t.API).MustID(), time.Unix(t.API.ProtocolParameters().GenesisUnixTimestamp(), 0))
 		t.RegisterBlock("Genesis", genesisBlock)

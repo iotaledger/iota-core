@@ -22,13 +22,7 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 				testsuite.DefaultSlotDurationInSeconds,
 				8,
 			),
-			iotago.WithLivenessOptions(
-				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
-				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
-				testsuite.DefaultMinCommittableAge,
-				100,
-				120,
-			),
+			iotago.WithStakingOptions(2, 10, 10),
 		),
 	)
 

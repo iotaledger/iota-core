@@ -13,7 +13,7 @@ import (
 
 func TestCalculate(t *testing.T) {
 
-	protocolParams := iotago.NewV3ProtocolParameters(iotago.WithVersion(3))
+	protocolParams := iotago.NewV3TestProtocolParameters(iotago.WithVersion(3))
 	storageScoreStructure := iotago.NewStorageScoreStructure(protocolParams.StorageScoreParameters())
 
 	type test struct {

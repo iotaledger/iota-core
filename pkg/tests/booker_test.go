@@ -327,8 +327,8 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 				testsuite.DefaultSlotsPerEpochExponent,
 			),
 			iotago.WithLivenessOptions(
-				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
-				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
+				15,
+				15,
 				2,
 				5,
 				testsuite.DefaultEpochNearingThreshold,
@@ -600,8 +600,8 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 				testsuite.DefaultSlotsPerEpochExponent,
 			),
 			iotago.WithLivenessOptions(
-				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
-				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
+				15,
+				15,
 				2,
 				5,
 				testsuite.DefaultEpochNearingThreshold,
