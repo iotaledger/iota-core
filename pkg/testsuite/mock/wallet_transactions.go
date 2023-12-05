@@ -44,7 +44,7 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(outputStates),
@@ -90,7 +90,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(outputStates),
@@ -122,7 +122,7 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(iotago.Outputs[iotago.Output]{delegationOutput}),
@@ -152,7 +152,7 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
 	)
@@ -182,7 +182,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string) *iotag
 			AccountID: inputAccount.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithAccountInput(input),
 		WithOutputs(destructionOutputs),
@@ -251,7 +251,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 			AccountID: implicitAccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
@@ -262,7 +262,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 }
 
 func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outputCount int, inputName string) *iotago.SignedTransaction {
-	apiForSlot := w.Node.Protocol.MainEngineInstance().APIForSlot(w.currentSlot)
+	apiForSlot := w.Node.Protocol.Engines.Main.Get().APIForSlot(w.currentSlot)
 	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
@@ -322,7 +322,7 @@ func (w *Wallet) RemoveFeatureFromAccount(featureType iotago.FeatureType, transa
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
 	)
@@ -413,7 +413,7 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", inputName))
 	}
 
-	rewardMana, _, _, err := w.Node.Protocol.MainEngineInstance().SybilProtection.ValidatorReward(
+	rewardMana, _, _, err := w.Node.Protocol.Engines.Main.Get().SybilProtection.ValidatorReward(
 		inputAccount.AccountID,
 		inputAccount.FeatureSet().Staking().StakedAmount,
 		inputAccount.FeatureSet().Staking().StartEpoch,
@@ -443,7 +443,7 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
 	)
@@ -509,7 +509,7 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 		delegationEnd = apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex) - iotago.EpochIndex(1)
 	}
 
-	rewardMana, _, _, err := w.Node.Protocol.MainEngineInstance().SybilProtection.DelegatorReward(
+	rewardMana, _, _, err := w.Node.Protocol.Engines.Main.Get().SybilProtection.DelegatorReward(
 		inputDelegation.ValidatorAddress.AccountID(),
 		inputDelegation.DelegatedAmount,
 		inputDelegation.StartEpoch,
@@ -539,7 +539,7 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 			rewardMana,
 		),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithOutputs(outputStates),
 	)

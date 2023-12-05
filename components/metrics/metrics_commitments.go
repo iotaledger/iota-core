@@ -6,7 +6,7 @@ import (
 
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/components/metrics/collector"
-	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -47,9 +47,11 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Number of forks seen by the node."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.ChainManager.ForkDetected.Hook(func(_ *chainmanager.Fork) {
-				deps.Collector.Increment(commitmentsNamespace, forksCount)
-			}, event.WithWorkerPool(Component.WorkerPool))
+			deps.Protocol.Chains.HeaviestVerifiedCandidate.OnUpdate(func(prevHeaviestVerifiedCandidate *protocol.Chain, _ *protocol.Chain) {
+				if prevHeaviestVerifiedCandidate != nil {
+					Component.WorkerPool.Submit(func() { deps.Collector.Increment(commitmentsNamespace, forksCount) })
+				}
+			})
 		}),
 	)),
 	collector.WithMetric(collector.NewMetric(acceptedBlocks,

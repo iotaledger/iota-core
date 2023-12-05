@@ -149,7 +149,7 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 
 		var b *blocks.Block
 		// Only issue validator blocks if account has staking feature and is part of committee.
-		if node.Validator != nil && lo.Return1(node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)).HasAccount(node.Validator.AccountID) {
+		if node.Validator != nil && lo.Return1(node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)).HasAccount(node.Validator.AccountID) {
 			blockHeaderOptions := append(issuingOptionsCopy[node.Name], mock.WithIssuingTime(issuingTime))
 			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)
 			t.assertParentsExistFromBlockOptions(blockHeaderOptions, node)
@@ -220,7 +220,7 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 				if useCommitmentAtMinCommittableAge {
 					// Make sure that all nodes create blocks throughout the slot that commit to the same commitment at slot-minCommittableAge-1.
 					for _, node := range nodes {
-						commitment, err := node.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentSlot)
+						commitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentSlot)
 						require.NoError(t.Testing, err)
 
 						issuingOptions[node.Name] = []options.Option[mock.BlockHeaderParams]{
@@ -263,7 +263,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.Blo
 	// then issue one more block to accept the last in the chain which will trigger commitment of the second last in the chain
 	activeValidators := t.Validators()
 
-	latestCommittedSlot := activeValidators[0].Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot()
+	latestCommittedSlot := activeValidators[0].Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
 	if latestCommittedSlot >= slot {
 		return parents
 	}
@@ -274,21 +274,21 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.Blo
 		// preacceptance of nextBlockSlot
 		for _, node := range activeValidators {
 			require.True(t.Testing, node.IsValidator(), "node: %s: is not a validator node", node.Name)
-			committeeAtBlockSlot, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)
+			committeeAtBlockSlot, exists := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)
 			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, t.currentSlot)
 			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
 				blockName := fmt.Sprintf("chain-%s-%d-%s", parents[0].Alias(), chainIndex, node.Name)
-				latestCommitment := node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+				latestCommitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 				tips = []iotago.BlockID{t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...)).ID()}
 			}
 		}
 		// acceptance of nextBlockSlot
 		for _, node := range activeValidators {
-			committeeAtBlockSlot, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)
+			committeeAtBlockSlot, exists := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)
 			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, t.currentSlot)
 			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
 				blockName := fmt.Sprintf("chain-%s-%d-%s", parents[0].Alias(), chainIndex+1, node.Name)
-				latestCommitment := node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+				latestCommitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 				tips = []iotago.BlockID{t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...)).ID()}
 			}
 		}

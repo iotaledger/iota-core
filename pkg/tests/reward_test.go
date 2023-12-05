@@ -113,7 +113,7 @@ func Test_Delegation_DelayedClaimingDestroyOutputWithoutRewards(t *testing.T) {
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
 
 	// TRANSITION TO DELAYED CLAIMING (IN THE SAME SLOT)
-	latestCommitment := ts.DefaultWallet().Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	latestCommitment := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment()
 	apiForSlot := ts.DefaultWallet().Node.Protocol.APIForSlot(block1_2Slot)
 
 	futureBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MinCommittableAge()
@@ -243,7 +243,7 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 			0,
 		),
 		mock.WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: ts.DefaultWallet().Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}))
 
 	ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithStrongParents(latestParents...))

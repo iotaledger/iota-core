@@ -15,7 +15,7 @@ func (s *Server) ReadIsValidatorAccount(_ context.Context, accountInfoRequest *i
 		return nil, ierrors.Wrap(err, "error when parsing account id")
 	}
 
-	account, exists, err := deps.Protocol.MainEngineInstance().Ledger.Account(accountID, slot)
+	account, exists, err := deps.Protocol.Engines.Main.Get().Ledger.Account(accountID, slot)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "error when retrieving account data for %s", accountID)
 	}
@@ -29,7 +29,7 @@ func (s *Server) ReadIsCommitteeMember(_ context.Context, accountInfoRequest *in
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error when parsing account id")
 	}
-	committee, exists := deps.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)
+	committee, exists := deps.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(slot)
 	if !exists {
 		return nil, ierrors.Errorf("committee does not exist for slot %d", slot)
 	}
@@ -44,7 +44,7 @@ func (s *Server) ReadIsCandidate(_ context.Context, accountInfoRequest *inx.Acco
 		return nil, ierrors.Wrap(err, "error when parsing account id")
 	}
 
-	isCandidateActive, err := deps.Protocol.MainEngineInstance().SybilProtection.IsCandidateActive(accountID, deps.Protocol.APIForSlot(slot).TimeProvider().EpochFromSlot(slot))
+	isCandidateActive, err := deps.Protocol.Engines.Main.Get().SybilProtection.IsCandidateActive(accountID, deps.Protocol.APIForSlot(slot).TimeProvider().EpochFromSlot(slot))
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error when checking if candidate is active")
 	}

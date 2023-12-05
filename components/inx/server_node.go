@@ -17,7 +17,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 	// to send finalized commitment.
 	if !status.HasPruned || status.LatestFinalizedSlot > deps.Protocol.CommittedAPI().TimeProvider().EpochEnd(status.LastPrunedEpoch) {
 		var err error
-		finalizedCommitment, err = deps.Protocol.MainEngineInstance().Storage.Commitments().Load(status.LatestFinalizedSlot)
+		finalizedCommitment, err = deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(status.LatestFinalizedSlot)
 		if err != nil {
 			return nil
 		}
@@ -35,7 +35,7 @@ func inxNodeStatus(status *syncmanager.SyncStatus) *inx.NodeStatus {
 }
 
 func (s *Server) ReadNodeStatus(context.Context, *inx.NoParams) (*inx.NodeStatus, error) {
-	return inxNodeStatus(deps.Protocol.MainEngineInstance().SyncManager.SyncStatus()), nil
+	return inxNodeStatus(deps.Protocol.Engines.Main.Get().SyncManager.SyncStatus()), nil
 }
 
 func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_ListenToNodeStatusServer) error {
@@ -96,7 +96,7 @@ func (s *Server) ListenToNodeStatus(req *inx.NodeStatusRequest, srv inx.INX_List
 
 func (s *Server) ReadNodeConfiguration(context.Context, *inx.NoParams) (*inx.NodeConfiguration, error) {
 	protoParams := make([]*inx.RawProtocolParameters, 0)
-	provider := deps.Protocol.MainEngineInstance().Storage.Settings().APIProvider()
+	provider := deps.Protocol.Engines.Main.Get().Storage.Settings().APIProvider()
 	for _, version := range provider.ProtocolEpochVersions() {
 		protocolParams := provider.ProtocolParameters(version.Version)
 		if protocolParams == nil {

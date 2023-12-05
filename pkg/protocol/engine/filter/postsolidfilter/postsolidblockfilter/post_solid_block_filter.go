@@ -28,7 +28,7 @@ type PostSolidBlockFilter struct {
 func NewProvider(opts ...options.Option[PostSolidBlockFilter]) module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter] {
 	return module.Provide(func(e *engine.Engine) postsolidfilter.PostSolidFilter {
 		c := New(opts...)
-		e.HookConstructed(func() {
+		e.Constructed.OnTrigger(func() {
 			c.accountRetrieveFunc = e.Ledger.Account
 			c.blockCacheRetrieveFunc = e.BlockCache.Block
 

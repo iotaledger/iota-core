@@ -55,7 +55,7 @@ func sendVertex(blk *blocks.Block, confirmed bool) {
 		IsTx:                isTx,
 		IsTxAccepted: func() bool {
 			if isTx {
-				txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(signedTransaction.Transaction.ID()))
+				txMetadata, exists := deps.Protocol.Engines.Main.Get().Ledger.MemPool().TransactionMetadata(lo.PanicOnErr(signedTransaction.Transaction.ID()))
 				if exists {
 					return txMetadata.IsAccepted()
 				}
