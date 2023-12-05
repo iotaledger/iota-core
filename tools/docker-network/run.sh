@@ -40,15 +40,15 @@ fi
 echo "Create snapshot"
 
 # Run Go command in Docker container
-# docker run --rm \
-#   --user $(id -u) \
-#   -v "$(realpath $(pwd)/../../):/workspace" \
-#   -v "${HOME}/.cache/go-build:/go-cache" \
-#   -v "${HOME}/go/pkg/mod:/go-mod-cache" \
-#   -e GOCACHE="/go-cache" \
-#   -e GOMODCACHE="/go-mod-cache" \
-#   -w "/workspace/tools/genesis-snapshot" \
-#   golang:1.21-bookworm go run -tags=rocksdb . --config docker --seed 7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih
+docker run --rm \
+  --user $(id -u) \
+  -v "$(realpath $(pwd)/../../):/workspace" \
+  -v "${HOME}/.cache/go-build:/go-cache" \
+  -v "${HOME}/go/pkg/mod:/go-mod-cache" \
+  -e GOCACHE="/go-cache" \
+  -e GOMODCACHE="/go-mod-cache" \
+  -w "/workspace/tools/genesis-snapshot" \
+  golang:1.21-bookworm go run -tags=rocksdb . --config docker --seed 7R1itJx5hVuo9w9hjg5cwKFmek4HMSoBDgJZN8hKGxih
 
 
 # Move and set permissions for the .snapshot file
