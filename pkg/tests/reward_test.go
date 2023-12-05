@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock.Node) {
+func setupRewardTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock.Node) {
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
@@ -69,7 +69,7 @@ func setupDelegationTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *
 // Test that a Delegation Output which delegates to an account which does not exist / did not receive rewards
 // can be destroyed.
 func Test_Delegation_DestroyOutputWithoutRewards(t *testing.T) {
-	ts, node1, node2 := setupDelegationTestsuite(t)
+	ts, node1, node2 := setupRewardTestsuite(t)
 	defer ts.Shutdown()
 
 	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
@@ -97,7 +97,7 @@ func Test_Delegation_DestroyOutputWithoutRewards(t *testing.T) {
 }
 
 func Test_Delegation_DelayedClaimingDestroyOutputWithoutRewards(t *testing.T) {
-	ts, node1, node2 := setupDelegationTestsuite(t)
+	ts, node1, node2 := setupRewardTestsuite(t)
 	defer ts.Shutdown()
 
 	// CREATE DELEGATION TO NEW ACCOUNT FROM BASIC UTXO
@@ -142,7 +142,7 @@ func Test_Delegation_DelayedClaimingDestroyOutputWithoutRewards(t *testing.T) {
 
 // Test that a staking Account which did not earn rewards can remove its staking feature.
 func Test_Account_RemoveStakingFeatureWithoutRewards(t *testing.T) {
-	ts, node1, node2 := setupDelegationTestsuite(t)
+	ts, node1, node2 := setupRewardTestsuite(t)
 	defer ts.Shutdown()
 
 	// CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
@@ -221,7 +221,7 @@ func Test_Account_RemoveStakingFeatureWithoutRewards(t *testing.T) {
 }
 
 func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
-	ts, node1, node2 := setupDelegationTestsuite(t)
+	ts, node1, node2 := setupRewardTestsuite(t)
 	defer ts.Shutdown()
 
 	// CREATE NFT FROM BASIC UTXO
@@ -259,7 +259,7 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 
 // Test that delegations in all forms are correctly reflected in the staked and delegated amounts.
 func Test_Account_StakeAmountCalculation(t *testing.T) {
-	ts, _, _ := setupDelegationTestsuite(t)
+	ts, _, _ := setupRewardTestsuite(t)
 	defer ts.Shutdown()
 
 	// STEP 1: CREATE NEW ACCOUNT WITH A BLOCK ISSUER FEATURE FROM BASIC UTXO.
