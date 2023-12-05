@@ -47,7 +47,7 @@ func DefaultProtocolParameterOptions(networkName string) []options.Option[iotago
 			100,
 			100,
 		),
-		iotago.WithRewardsOptions(8, 8, 31, 1154, 2, 1),
+		iotago.WithRewardsOptions(8, 8, 11, 1154, 2, 1),
 		iotago.WithStakingOptions(1, 100, 1),
 
 		iotago.WithTimeProviderOptions(
