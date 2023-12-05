@@ -5,7 +5,7 @@ go 1.21
 replace github.com/iotaledger/iota-core => ../../
 
 require (
-	github.com/iotaledger/hive.go/app v0.0.0-20231128212135-383bfd07ce91
+	github.com/iotaledger/hive.go/app v0.0.0-20231130155327-398db92f09a3
 	github.com/iotaledger/hive.go/apputils v0.0.0-20230829152614-7afc7a4d89b3
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
 )
@@ -56,22 +56,22 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/hive.go/ads v0.0.0-20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/constraints v0.0.0-20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/crypto v0.0.0-20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/ds v0.0.0-20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/lo v0.0.0-20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/log v0.0.0-20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/logger v0.0.0-20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231128212135-383bfd07ce91 // indirect
-	github.com/iotaledger/hive.go/stringify v0.0.0-20231128212135-383bfd07ce91 // indirect
+	github.com/iotaledger/hive.go/ads v0.0.0-20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/constraints v0.0.0-20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/crypto v0.0.0-20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/ds v0.0.0-20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/lo v0.0.0-20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/log v0.0.0-20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/logger v0.0.0-20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231130155327-398db92f09a3 // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20231130155327-398db92f09a3 // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231201123347-1c44b3f24221 // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231201114846-3bb5c3fd5665 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231201114738-56b50084ab22 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231204084048-9c12053adaf6 // indirect
 	github.com/ipfs/boxo v0.13.1 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect

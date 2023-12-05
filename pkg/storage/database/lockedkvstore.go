@@ -13,7 +13,7 @@ type lockedKVStore struct {
 	accessMutex *syncutils.StarvingMutex
 }
 
-func newLockedKVStore(storeInstance kvstore.KVStore, openStoreIfNecessary func(), closeStore func()) *lockedKVStore {
+func newLockedKVStore(storeInstance kvstore.KVStore, openStoreIfNecessary func() error, closeStore func()) *lockedKVStore {
 	return &lockedKVStore{
 		openableKVStore: newOpenableKVStore(storeInstance, openStoreIfNecessary, closeStore),
 		accessMutex:     syncutils.NewStarvingMutex(),

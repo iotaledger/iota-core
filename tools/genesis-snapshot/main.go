@@ -8,9 +8,9 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	"github.com/iotaledger/iota-core/tools/genesis-snapshot/presets"
+	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
 func main() {
@@ -49,7 +49,10 @@ func parseFlags() (opt []options.Option[snapshotcreator.Options], conf string) {
 	if err != nil {
 		log.Fatal(ierrors.Wrap(err, "failed to decode base58 seed"))
 	}
-	keyManager := mock.NewKeyManager(genesisSeed[:], 0)
+	keyManager, err := wallet.NewKeyManager(genesisSeed[:], wallet.DefaultIOTAPath)
+	if err != nil {
+		log.Fatal(ierrors.Wrap(err, "failed to create KeyManager from seed"))
+	}
 	opt = append(opt, snapshotcreator.WithGenesisKeyManager(keyManager))
 
 	return opt, *config

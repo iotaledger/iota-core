@@ -1,66 +1,62 @@
 package toolset
 
 import (
-	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
 	"os"
 
 	flag "github.com/spf13/pflag"
-	"github.com/wollac/iota-crypto-demo/pkg/bip32path"
-	"github.com/wollac/iota-crypto-demo/pkg/bip39"
-	"github.com/wollac/iota-crypto-demo/pkg/slip10"
-	"github.com/wollac/iota-crypto-demo/pkg/slip10/eddsa"
 
 	"github.com/iotaledger/hive.go/app/configuration"
 	"github.com/iotaledger/hive.go/crypto"
+	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
-func printEd25519Info(mnemonic bip39.Mnemonic, path bip32path.Path, prvKey ed25519.PrivateKey, pubKey ed25519.PublicKey, hrp iotago.NetworkPrefix, outputJSON bool) error {
-	addr := iotago.Ed25519AddressFromPubKey(pubKey)
+type walletInfo struct {
+	BIP39          string `json:"mnemonic,omitempty"`
+	BIP32          string `json:"path,omitempty"`
+	PrivateKey     string `json:"privateKey,omitempty"`
+	PublicKey      string `json:"publicKey"`
+	Ed25519Address string `json:"ed25519"`
+	Bech32Address  string `json:"bech32"`
+}
 
-	type keys struct {
-		BIP39          string `json:"mnemonic,omitempty"`
-		BIP32          string `json:"path,omitempty"`
-		PrivateKey     string `json:"privateKey,omitempty"`
-		PublicKey      string `json:"publicKey"`
-		Ed25519Address string `json:"ed25519"`
-		Bech32Address  string `json:"bech32"`
-	}
+func printKeyManagerInfo(keyManager *wallet.KeyManager, hrp iotago.NetworkPrefix, outputJSON bool) error {
+	addr := keyManager.Address(iotago.AddressEd25519)
+	privKey, pubKey := keyManager.KeyPair()
 
-	k := keys{
+	w := walletInfo{
 		PublicKey:      hex.EncodeToString(pubKey),
-		Ed25519Address: hex.EncodeToString(addr[:]),
+		PrivateKey:     hex.EncodeToString(privKey),
+		Ed25519Address: addr.String(),
 		Bech32Address:  addr.Bech32(hrp),
+		BIP39:          keyManager.Mnemonic().String(),
+		BIP32:          keyManager.Path().String(),
 	}
 
-	if prvKey != nil {
-		k.PrivateKey = hex.EncodeToString(prvKey)
-	}
+	return printWalletInfo(w, outputJSON)
+}
 
-	if mnemonic != nil {
-		k.BIP39 = mnemonic.String()
-		k.BIP32 = path.String()
-	}
-
+func printWalletInfo(info walletInfo, outputJSON bool) error {
 	if outputJSON {
-		return printJSON(k)
+		return printJSON(info)
 	}
 
-	if len(k.BIP39) > 0 {
-		fmt.Println("Your seed BIP39 mnemonic: ", k.BIP39)
+	if len(info.BIP39) > 0 {
+		fmt.Println("Your seed BIP39 mnemonic: ", info.BIP39)
 		fmt.Println()
-		fmt.Println("Your BIP32 path:          ", k.BIP32)
+		fmt.Println("Your BIP32 path:          ", info.BIP32)
 	}
 
-	if k.PrivateKey != "" {
-		fmt.Println("Your ed25519 private key: ", k.PrivateKey)
+	if info.PrivateKey != "" {
+		fmt.Println("Your ed25519 private key: ", info.PrivateKey)
 	}
 
-	fmt.Println("Your ed25519 public key:  ", k.PublicKey)
-	fmt.Println("Your ed25519 address:     ", k.Ed25519Address)
-	fmt.Println("Your bech32 address:      ", k.Bech32Address)
+	fmt.Println("Your ed25519 public key:  ", info.PublicKey)
+	fmt.Println("Your ed25519 address:     ", info.Ed25519Address)
+	fmt.Println("Your bech32 address:      ", info.Bech32Address)
 
 	return nil
 }
@@ -93,43 +89,21 @@ func generateEd25519Key(args []string) error {
 		return fmt.Errorf("'%s' not specified", FlagToolBIP32Path)
 	}
 
-	var mnemonicSentence bip39.Mnemonic
+	var err error
+	var keyManager *wallet.KeyManager
 	if len(*mnemonicFlag) == 0 {
-		// Generate random entropy by using ed25519 key generation and using the private key seed (32 bytes)
-		_, random, err := ed25519.GenerateKey(nil)
-		if err != nil {
-			return err
-		}
-		entropy := random.Seed()
-
-		mnemonicSentence, err = bip39.EntropyToMnemonic(entropy)
+		keyManager, err = wallet.NewKeyManagerFromRandom(*bip32Path)
 		if err != nil {
 			return err
 		}
 	} else {
-		mnemonicSentence = bip39.ParseMnemonic(*mnemonicFlag)
-		if len(mnemonicSentence) != 24 {
-			return fmt.Errorf("'%s' contains an invalid sentence length. Mnemonic should be 24 words", FlagToolMnemonic)
+		keyManager, err = wallet.NewKeyManagerFromMnemonic(*mnemonicFlag, *bip32Path)
+		if err != nil {
+			return err
 		}
 	}
 
-	path, err := bip32path.ParsePath(*bip32Path)
-	if err != nil {
-		return err
-	}
-
-	seed, err := bip39.MnemonicToSeed(mnemonicSentence, "")
-	if err != nil {
-		return err
-	}
-
-	key, err := slip10.DeriveKeyFromPath(seed, eddsa.Ed25519(), path)
-	if err != nil {
-		return err
-	}
-	pubKey, prvKey := key.Key.(eddsa.Seed).Ed25519Key()
-
-	return printEd25519Info(mnemonicSentence, path, ed25519.PrivateKey(prvKey), ed25519.PublicKey(pubKey), iotago.NetworkPrefix(*hrpFlag), *outputJSONFlag)
+	return printKeyManagerInfo(keyManager, iotago.NetworkPrefix(*hrpFlag), *outputJSONFlag)
 }
 
 func generateEd25519Address(args []string) error {
@@ -155,18 +129,28 @@ func generateEd25519Address(args []string) error {
 	}
 
 	if len(*hrpFlag) == 0 {
-		return fmt.Errorf("'%s' not specified", FlagToolHRP)
+		return ierrors.Errorf("'%s' not specified", FlagToolHRP)
 	}
 
 	if len(*publicKeyFlag) == 0 {
-		return fmt.Errorf("'%s' not specified", FlagToolPublicKey)
+		return ierrors.Errorf("'%s' not specified", FlagToolPublicKey)
 	}
 
 	// parse pubkey
 	pubKey, err := crypto.ParseEd25519PublicKeyFromString(*publicKeyFlag)
 	if err != nil {
-		return fmt.Errorf("can't decode '%s': %w", FlagToolPublicKey, err)
+		return ierrors.Wrapf(err, "can't decode '%s'", FlagToolPublicKey)
 	}
 
-	return printEd25519Info(nil, nil, nil, pubKey, iotago.NetworkPrefix(*hrpFlag), *outputJSONFlag)
+	addr := iotago.Ed25519AddressFromPubKey(pubKey)
+
+	hrp := iotago.NetworkPrefix(*hrpFlag)
+
+	w := walletInfo{
+		PublicKey:      hex.EncodeToString(pubKey),
+		Ed25519Address: addr.String(),
+		Bech32Address:  addr.Bech32(hrp),
+	}
+
+	return printWalletInfo(w, *outputJSONFlag)
 }

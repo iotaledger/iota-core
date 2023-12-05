@@ -25,6 +25,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
+	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
 var (
@@ -62,7 +63,7 @@ type BlockIssuer struct {
 	optsRateSetterEnabled       bool
 }
 
-func NewBlockIssuer(t *testing.T, name string, keyManager *KeyManager, accountID iotago.AccountID, validator bool, opts ...options.Option[BlockIssuer]) *BlockIssuer {
+func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, accountID iotago.AccountID, validator bool, opts ...options.Option[BlockIssuer]) *BlockIssuer {
 	priv, pub := keyManager.KeyPair()
 
 	if accountID == iotago.EmptyAccountID {
@@ -100,7 +101,7 @@ func (i *BlockIssuer) Shutdown() {
 	i.workerPool.ShutdownComplete.Wait()
 }
 
-func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, issuerAccount Account, node *Node, opts ...options.Option[ValidatorBlockParams]) (*blocks.Block, error) {
+func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, issuerAccount wallet.Account, node *Node, opts ...options.Option[ValidatorBlockParams]) (*blocks.Block, error) {
 	blockParams := options.Apply(&ValidatorBlockParams{}, opts)
 
 	if blockParams.BlockHeader.IssuingTime == nil {
@@ -189,7 +190,7 @@ func (i *BlockIssuer) CreateValidationBlock(ctx context.Context, alias string, i
 }
 
 func (i *BlockIssuer) IssueValidationBlock(ctx context.Context, alias string, node *Node, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
-	block, err := i.CreateValidationBlock(ctx, alias, NewEd25519Account(i.AccountID, i.privateKey), node, opts...)
+	block, err := i.CreateValidationBlock(ctx, alias, wallet.NewEd25519Account(i.AccountID, i.privateKey), node, opts...)
 	require.NoError(i.Testing, err)
 
 	require.NoError(i.Testing, i.IssueBlock(block.ModelBlock(), node))
@@ -369,7 +370,7 @@ func (i *BlockIssuer) IssueBlockAndAwaitEvent(ctx context.Context, block *model.
 	}
 }
 
-func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, node *Node, optIssuerAccount ...Account) (iotago.BlockID, error) {
+func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, node *Node, optIssuerAccount ...wallet.Account) (iotago.BlockID, error) {
 	// if anything changes, need to make a new signature
 	var resign bool
 
@@ -462,7 +463,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 			issuerAccount := optIssuerAccount[0]
 			iotaBlock.Header.IssuerID = issuerAccount.ID()
 
-			signature, signatureErr := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(issuerAccount.Address().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
+			signature, signatureErr := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(issuerAccount.OwnerAddress().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
 			if signatureErr != nil {
 				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
 			}
@@ -515,7 +516,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 	}
 
 	if blockParams.Issuer == nil {
-		blockParams.Issuer = NewEd25519Account(i.AccountID, i.privateKey)
+		blockParams.Issuer = wallet.NewEd25519Account(i.AccountID, i.privateKey)
 	} else if blockParams.Issuer.ID() != i.AccountID {
 		return ierrors.Errorf("provided issuer account %s, but issuer provided in the block params is different %s", i.AccountID, blockParams.Issuer.ID())
 	}
