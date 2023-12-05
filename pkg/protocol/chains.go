@@ -98,26 +98,30 @@ func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (s
 
 	c.Main.Set(mainChain)
 
+	// only switch to the heavier chain if the latest commitment is enough slots away from the forking point.
+	forkingPointBelowChainSwitchingThreshold := func(chain *Chain) func(_ *Commitment, latestCommitment *Commitment) bool {
+		return func(_ *Commitment, latestCommitment *Commitment) bool {
+			forkingPoint := chain.ForkingPoint.Get()
+
+			return forkingPoint != nil && latestCommitment != nil && (latestCommitment.ID().Slot()-forkingPoint.ID().Slot()) > chainSwitchingThreshold
+		}
+	}
+
 	return lo.Batch(
 		c.HeaviestClaimedCandidate.WithNonEmptyValue(func(heaviestClaimedCandidate *Chain) (shutdown func()) {
 			return heaviestClaimedCandidate.RequestAttestations.ToggleValue(true)
 		}),
 
 		c.HeaviestAttestedCandidate.WithNonEmptyValue(func(heaviestAttestedCandidate *Chain) (shutdown func()) {
-			return heaviestAttestedCandidate.StartEngine.ToggleValue(true)
+			return heaviestAttestedCandidate.LatestAttestedCommitment.OnUpdateOnce(func(_ *Commitment, _ *Commitment) {
+				heaviestAttestedCandidate.StartEngine.Set(true)
+			}, forkingPointBelowChainSwitchingThreshold(heaviestAttestedCandidate))
 		}),
 
 		c.HeaviestVerifiedCandidate.WithNonEmptyValue(func(heaviestVerifiedCandidate *Chain) (shutdown func()) {
-			// only switch to the heaviest chain if the latest produced commitment is enough slots away from the forking point.
-			chainSwitchingCondition := func(_ *Commitment, latestProducedCommitment *Commitment) bool {
-				forkingPoint := heaviestVerifiedCandidate.ForkingPoint.Get()
-
-				return forkingPoint != nil && latestProducedCommitment != nil && (latestProducedCommitment.ID().Slot()-forkingPoint.ID().Slot()) > chainSwitchingThreshold
-			}
-
 			return heaviestVerifiedCandidate.LatestProducedCommitment.OnUpdateOnce(func(_ *Commitment, latestProducedCommitment *Commitment) {
 				c.Main.Set(heaviestVerifiedCandidate)
-			}, chainSwitchingCondition)
+			}, forkingPointBelowChainSwitchingThreshold(heaviestVerifiedCandidate))
 		}),
 
 		c.WithElements(func(candidateChain *Chain) (shutdown func()) {
