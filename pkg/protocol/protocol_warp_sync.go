@@ -40,7 +40,7 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 		Logger:     lo.Return1(protocol.Logger.NewChildLogger("WarpSync")),
 		protocol:   protocol,
 		workerPool: protocol.Workers.CreatePool("WarpSync", workerpool.WithWorkerCount(1)),
-		ticker:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
+		ticker:     eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.WarpSyncRequesterOptions...),
 	}
 
 	c.ticker.Events.Tick.Hook(c.SendRequest)

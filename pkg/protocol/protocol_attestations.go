@@ -40,7 +40,7 @@ func newAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Attestations")),
 		protocol:            protocol,
 		workerPool:          protocol.Workers.CreatePool("Attestations"),
-		ticker:              eventticker.New[iotago.SlotIndex, iotago.CommitmentID](),
+		ticker:              eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.AttestationRequesterOptions...),
 		commitmentVerifiers: shrinkingmap.New[iotago.CommitmentID, *CommitmentVerifier](),
 	}
 

@@ -61,7 +61,9 @@ type Options struct {
 	// StorageOptions contains the options for the Storage.
 	StorageOptions []options.Option[storage.Storage]
 
-	CommitmentRequesterOptions []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]
+	CommitmentRequesterOptions  []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]
+	AttestationRequesterOptions []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]
+	WarpSyncRequesterOptions    []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]
 
 	// PreSolidFilterProvider contains the provider for the PreSolidFilter engine modules.
 	PreSolidFilterProvider module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]
@@ -285,5 +287,23 @@ func WithEngineOptions(opts ...options.Option[engine.Engine]) options.Option[Pro
 func WithStorageOptions(opts ...options.Option[storage.Storage]) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.Options.StorageOptions = append(p.Options.StorageOptions, opts...)
+	}
+}
+
+func WithCommitmentRequesterOptions(opts ...options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.CommitmentRequesterOptions = append(p.Options.CommitmentRequesterOptions, opts...)
+	}
+}
+
+func WithAttestationRequesterOptions(opts ...options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.AttestationRequesterOptions = append(p.Options.AttestationRequesterOptions, opts...)
+	}
+}
+
+func WithWarpSyncRequesterOptions(opts ...options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]]) options.Option[Protocol] {
+	return func(p *Protocol) {
+		p.Options.WarpSyncRequesterOptions = append(p.Options.WarpSyncRequesterOptions, opts...)
 	}
 }
