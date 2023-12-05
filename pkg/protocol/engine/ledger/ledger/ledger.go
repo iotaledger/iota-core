@@ -507,7 +507,6 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 
 			createdAccounts[accountID] = createdOutput
 		case iotago.OutputDelegation:
-			// The DelegationOutput was created or transitioned => determine later if we need to add the stake to the validator.
 			delegationOutput, _ := createdOutput.Output().(*iotago.DelegationOutput)
 			delegationID := delegationOutput.DelegationID
 			// Check if the output was newly created or if it was transitioned to delayed claiming.
@@ -563,19 +562,10 @@ func (l *Ledger) processCreatedAndConsumedAccountOutputs(stateDiff mempool.State
 
 		case iotago.OutputDelegation:
 			delegationOutput, _ := spentOutput.Output().(*iotago.DelegationOutput)
-			delegationID := delegationOutput.DelegationID
-			if delegationID == iotago.EmptyDelegationID() {
-				delegationID = iotago.DelegationIDFromOutputID(spentOutput.OutputID())
-			}
-
-			// TODO: do we have a testcase that checks transitioning a delegation output twice in the same slot?
-			if _, createdDelegationExists := newAccountDelegation[delegationID]; createdDelegationExists {
-				// the delegation output was created and destroyed in the same slot => do not track the delegation as newly created
-				delete(newAccountDelegation, delegationID)
-			} else if delegationOutput.DelegationID.Empty() {
-				// The Delegation Output was destroyed or transitioned to delayed claiming => subtract the stake from the validator account.
-				// We check for a non-zero Delegation ID so we don't remove the stake twice when the output was destroyed
-				// in delayed claiming, since we already subtract it when the output is transitioned.
+			// The Delegation Output was destroyed or transitioned to delayed claiming.
+			// Delegation ID zeroed => Output was in delegating state => remove the stake.
+			// Delegation ID non-zero => Output was in delayed claiming state, hence not delegating => no need to remove the stake.
+			if delegationOutput.DelegationID.Empty() {
 				accountDiff := getAccountDiff(accountDiffs, delegationOutput.ValidatorAddress.AccountID())
 				accountDiff.DelegationStakeChange -= int64(delegationOutput.DelegatedAmount)
 			}

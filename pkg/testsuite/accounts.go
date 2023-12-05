@@ -10,6 +10,36 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+func (t *TestSuite) AssertAccountStake(accountID iotago.AccountID, validatorStake iotago.BaseToken, delegationStake iotago.BaseToken,
+	nodes ...*mock.Node) {
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
+			if err != nil {
+				return ierrors.Wrap(err, "AssertAccountData: failed to load account data")
+			}
+			if !exists {
+				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
+			}
+
+			if accountID != actualAccountData.ID {
+				return ierrors.Errorf("AssertAccountData: %s: expected %s, got %s", node.Name, accountID, actualAccountData.ID)
+			}
+
+			if validatorStake != actualAccountData.ValidatorStake {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected validator stake %d, got %d", node.Name, accountID, validatorStake, actualAccountData.ValidatorStake)
+			}
+
+			if delegationStake != actualAccountData.DelegationStake {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected delegation stake %d, got %d", node.Name, accountID, delegationStake, actualAccountData.DelegationStake)
+			}
+
+			return nil
+		},
+		)
+	}
+}
+
 func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes ...*mock.Node) {
 	for _, node := range nodes {
 		t.Eventually(func() error {
