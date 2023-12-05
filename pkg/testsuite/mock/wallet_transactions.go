@@ -111,9 +111,9 @@ func (w *Wallet) DelegationStartFromSlot(slot iotago.SlotIndex) iotago.EpochInde
 
 	if pastBoundedSlotIndex <= registrationSlot {
 		return pastBoundedEpochIndex + 1
-	} else {
-		return pastBoundedEpochIndex + 2
 	}
+
+	return pastBoundedEpochIndex + 2
 }
 
 func (w *Wallet) DelegationEndFromSlot(slot iotago.SlotIndex) iotago.EpochIndex {
@@ -127,9 +127,9 @@ func (w *Wallet) DelegationEndFromSlot(slot iotago.SlotIndex) iotago.EpochIndex 
 
 	if futureBoundedEpochIndex <= iotago.EpochIndex(registrationSlot) {
 		return futureBoundedEpochIndex
-	} else {
-		return futureBoundedEpochIndex + 1
 	}
+
+	return futureBoundedEpochIndex + 1
 }
 
 // Returns the registration slot in the epoch X corresponding to the given slot.
