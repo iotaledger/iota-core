@@ -14,12 +14,13 @@ func (t *TestSuite) AssertAccountStake(accountID iotago.AccountID, validatorStak
 	nodes ...*mock.Node) {
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
+
+			actualAccountData, exists, err := node.Protocol.Engines.Main.Get().Ledger.Account(accountID, node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
 			if err != nil {
 				return ierrors.Wrap(err, "AssertAccountData: failed to load account data")
 			}
 			if !exists {
-				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
+				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountID, node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
 			}
 
 			if accountID != actualAccountData.ID {
