@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -68,8 +67,13 @@ type Engine struct {
 	Retainer            retainer.Retainer
 	SyncManager         syncmanager.SyncManager
 	UpgradeOrchestrator upgrade.Orchestrator
-	RootCommitment      reactive.Variable[*model.Commitment]
-	LatestCommitment    reactive.Variable[*model.Commitment]
+
+	// RootCommitment contains the earliest commitment that that blocks we are solidifying will refer to, and is mainly
+	// used to determine the cut-off point for the actively managed commitments in the protocol.
+	RootCommitment reactive.Variable[*model.Commitment]
+
+	// LatestCommitment contains the latest commitment that we have produced.
+	LatestCommitment reactive.Variable[*model.Commitment]
 
 	Workers      *workerpool.Group
 	errorHandler func(error)
@@ -498,34 +502,6 @@ func (e *Engine) setupPruning() {
 	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", workerpool.WithWorkerCount(1))))
 }
 
-// EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
-// commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
-// from being processed as their chain will be deemed unsolid.
-// lastFinalizedSlot is needed to make sure that the root commitment is not younger than the last finalized slot.
-// If setting the root commitment based on the last evicted slot this basically means we won't be able to solidify another
-// chain beyond a window based on eviction, which in turn is based on acceptance. In case of a partition, this behavior is
-// clearly not desired.
-func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment *model.Commitment) {
-	api := e.APIForSlot(lastFinalizedSlot)
-
-	genesisSlot := api.ProtocolParameters().GenesisSlot()
-	maxCommittableAge := api.ProtocolParameters().MaxCommittableAge()
-
-	var earliestRootCommitmentSlot iotago.SlotIndex
-	if lastFinalizedSlot <= genesisSlot+maxCommittableAge {
-		earliestRootCommitmentSlot = genesisSlot
-	} else {
-		earliestRootCommitmentSlot = lastFinalizedSlot - maxCommittableAge
-	}
-
-	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentSlot)
-	if err != nil {
-		panic(fmt.Sprintf("could not load earliest commitment %d after engine initialization: %s", earliestRootCommitmentSlot, err))
-	}
-
-	return rootCommitment
-}
-
 func (e *Engine) ErrorHandler(componentName string) func(error) {
 	return func(err error) {
 		e.errorHandler(ierrors.Wrap(err, componentName))
@@ -580,8 +556,8 @@ func (e *Engine) initLatestCommitment() {
 	})
 }
 
-func (e *Engine) initReactiveModule(logger log.Logger) (reactiveModule *module.ReactiveModule) {
-	logger, stopLogging := logger.NewEntityLogger("Engine")
+func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *module.ReactiveModule) {
+	logger, unsubscribeFromParentLogger := parentLogger.NewEntityLogger("Engine")
 	reactiveModule = module.NewReactiveModule(logger)
 
 	e.RootCommitment.LogUpdates(reactiveModule, log.LevelTrace, "RootCommitment")
@@ -590,7 +566,7 @@ func (e *Engine) initReactiveModule(logger log.Logger) (reactiveModule *module.R
 	reactiveModule.Shutdown.OnTrigger(func() {
 		reactiveModule.LogDebug("shutting down")
 
-		stopLogging()
+		unsubscribeFromParentLogger()
 
 		// Shutdown should be performed in the reverse dataflow order.
 		e.BlockRequester.Shutdown()
