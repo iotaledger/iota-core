@@ -73,6 +73,14 @@ func (c *CommitmentsProtocol) SendResponse(commitment *Commitment, to peer.ID) {
 // ProcessResponse processes the given commitment response.
 func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment, from peer.ID) {
 	c.workerPool.Submit(func() {
+		// Verify the commitment's version corresponds to the protocol version for the slot.
+		apiForSlot := c.protocol.APIForSlot(commitmentModel.Slot())
+		if apiForSlot.Version() != commitmentModel.Commitment().ProtocolVersion {
+			c.LogDebug("received commitment with invalid protocol version", "commitment", commitmentModel.ID(), "version", commitmentModel.Commitment().ProtocolVersion, "expectedVersion", apiForSlot.Version(), "fromPeer", from)
+
+			return
+		}
+
 		if commitment, published, err := c.protocol.Commitments.publishCommitmentModel(commitmentModel); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
 		} else if published {
