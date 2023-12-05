@@ -6,6 +6,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
 type BlockHeaderParams struct {
@@ -15,7 +16,7 @@ type BlockHeaderParams struct {
 	LatestFinalizedSlot     *iotago.SlotIndex
 	IssuingTime             *time.Time
 	ProtocolVersion         *iotago.Version
-	Issuer                  Account
+	Issuer                  wallet.Account
 	SkipReferenceValidation bool
 }
 type BasicBlockParams struct {
@@ -86,7 +87,7 @@ func WithProtocolVersion(version iotago.Version) func(builder *BlockHeaderParams
 		builder.ProtocolVersion = &version
 	}
 }
-func WithIssuer(issuer Account) func(builder *BlockHeaderParams) {
+func WithIssuer(issuer wallet.Account) func(builder *BlockHeaderParams) {
 	return func(builder *BlockHeaderParams) {
 		builder.Issuer = issuer
 	}

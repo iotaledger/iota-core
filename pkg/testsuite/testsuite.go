@@ -26,6 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
+	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
 func DefaultProtocolParameterOptions(networkName string) []options.Option[iotago.V3ProtocolParameters] {
@@ -113,17 +114,16 @@ type TestSuite struct {
 	uniqueBlockTimeCounter              atomic.Int64
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
 	mutex                               syncutils.RWMutex
-	genesisKeyManager                   *mock.KeyManager
+	genesisKeyManager                   *wallet.KeyManager
 
 	currentSlot iotago.SlotIndex
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
-	genesisSeed := tpkg.RandEd25519Seed()
 	return options.Apply(&TestSuite{
 		Testing:                             testingT,
 		fakeTesting:                         &testing.T{},
-		genesisKeyManager:                   mock.NewKeyManager(genesisSeed[:], 0),
+		genesisKeyManager:                   lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath)),
 		network:                             mock.NewNetwork(),
 		Directory:                           utils.NewDirectory(testingT.TempDir()),
 		nodes:                               orderedmap.New[string, *mock.Node](),
@@ -471,7 +471,7 @@ func (t *TestSuite) DefaultWallet() *mock.Wallet {
 	return defaultWallet
 }
 
-func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*mock.KeyManager) *mock.Wallet {
+func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*wallet.KeyManager) *mock.Wallet {
 	newWallet := mock.NewWallet(t.Testing, name, node, keyManager...)
 	newWallet.SetBlockIssuer(accountID)
 	t.wallets.Set(name, newWallet)
