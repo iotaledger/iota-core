@@ -101,7 +101,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 }
 
 func (w *Wallet) DelegationStartFromSlot(slot iotago.SlotIndex) iotago.EpochIndex {
-	latestCommitment := w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	latestCommitment := w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment()
 	apiForSlot := w.Node.Protocol.APIForSlot(slot)
 
 	pastBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MaxCommittableAge()
@@ -117,7 +117,7 @@ func (w *Wallet) DelegationStartFromSlot(slot iotago.SlotIndex) iotago.EpochInde
 }
 
 func (w *Wallet) DelegationEndFromSlot(slot iotago.SlotIndex) iotago.EpochIndex {
-	latestCommitment := w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	latestCommitment := w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment()
 	apiForSlot := w.Node.Protocol.APIForSlot(slot)
 
 	futureBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MinCommittableAge()
