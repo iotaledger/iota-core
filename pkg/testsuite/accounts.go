@@ -10,7 +10,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertAccountStake(accountID iotago.AccountID, validatorStake, delegationStake iotago.BaseToken,
+func (t *TestSuite) AssertAccountStake(accountID iotago.AccountID, validatorStake iotago.BaseToken, delegationStake iotago.BaseToken,
 	nodes ...*mock.Node) {
 	for _, node := range nodes {
 		t.Eventually(func() error {
