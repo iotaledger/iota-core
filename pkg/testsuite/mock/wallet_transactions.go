@@ -100,6 +100,46 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 	return signedTransaction
 }
 
+func (w *Wallet) DelegationStartFromSlot(slot iotago.SlotIndex) iotago.EpochIndex {
+	latestCommitment := w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	apiForSlot := w.Node.Protocol.APIForSlot(slot)
+
+	pastBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MaxCommittableAge()
+	pastBoundedEpochIndex := apiForSlot.TimeProvider().EpochFromSlot(pastBoundedSlotIndex)
+
+	registrationSlot := w.registrationSlot(slot)
+
+	if pastBoundedSlotIndex <= registrationSlot {
+		return pastBoundedEpochIndex + 1
+	} else {
+		return pastBoundedEpochIndex + 2
+	}
+}
+
+func (w *Wallet) DelegationEndFromSlot(slot iotago.SlotIndex) iotago.EpochIndex {
+	latestCommitment := w.Node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+	apiForSlot := w.Node.Protocol.APIForSlot(slot)
+
+	futureBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MinCommittableAge()
+	futureBoundedEpochIndex := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+
+	registrationSlot := w.registrationSlot(slot)
+
+	if futureBoundedEpochIndex <= iotago.EpochIndex(registrationSlot) {
+		return futureBoundedEpochIndex
+	} else {
+		return futureBoundedEpochIndex + 1
+	}
+}
+
+// Returns the registration slot in the epoch X corresponding to the given slot.
+// This is the registration slot for epoch X+1.
+func (w *Wallet) registrationSlot(slot iotago.SlotIndex) iotago.SlotIndex {
+	apiForSlot := w.Node.Protocol.APIForSlot(slot)
+
+	return apiForSlot.TimeProvider().EpochEnd(apiForSlot.TimeProvider().EpochFromSlot(slot)) - apiForSlot.ProtocolParameters().EpochNearingThreshold()
+}
+
 // DelayedClaimingTransition transitions DelegationOutput into delayed claiming state by setting DelegationID and EndEpoch.
 func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName string, delegationEndEpoch iotago.EpochIndex) *iotago.SignedTransaction {
 	input := w.Output(inputName)
