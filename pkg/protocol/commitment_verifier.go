@@ -105,6 +105,28 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestatio
 		return nil, 0, ierrors.Wrapf(err, "error validating attestations for commitment %s", commitment.ID())
 	}
 
+	// 4. Verify that calculated weight from attestations is lower or equal to weight of commitment.
+	//    This is necessary due to public key changes of validators in the window of forking point and the current state of
+	//    the other chain (as validators could have added/removed public keys that we don't know about yet).
+	//
+	//	a) The weight should be equal if all public keys are known and unchanged.
+	//
+	//	b) A public key is added to an account.
+	//     We do not count a seat for the issuer for this slot and the computed CW will be lower than the CW in
+	//	   the commitment. This is fine, since this is a rare occasion and a heavier chain will become heavier anyway, eventually.
+	//	   It will simply take a bit longer to accumulate enough CW so that the chain-switch rule kicks in.
+	//     Note: In an extreme scenario where all validators add and use a new public key, the chain will never become heavier.
+	//           This can only be prevented by adding such key changes provably to the commitments so that these changes
+	//           can be reconstructed and verified by nodes that do not have the latest ledger state.
+	//
+	//	c) A public key is removed from an account.
+	//    We count the seat for the issuer for this slot even though we shouldn't have. According to the protocol, a valid
+	//    chain with such a block can never exist because the block itself (here provided as an attestation) would be invalid.
+	//    However, we do not know about this yet since we do not have the latest ledger state.
+	//    In a rare and elaborate scenario, an attacker might have acquired such removed (private) keys and could
+	//    fabricate attestations and thus a theoretically heavier chain (solely when looking on the chain backed by attestations)
+	//    than it actually is. Nodes might consider to switch to this chain, even though it is invalid which will be discovered
+	//    before the candidate chain/engine is activated (it will never get heavier than the current chain).
 	if seatCount > commitment.Weight.Get() {
 		return nil, 0, ierrors.Errorf("invalid cumulative weight for commitment %s: expected %d, got %d", commitment.ID(), commitment.CumulativeWeight(), seatCount)
 	}
