@@ -13,8 +13,8 @@ export enum WSMsgType {
     ManaMapOnline,
     BlkManaDashboardAddress,
     RateSetter,
-    ConflictSet,
-    Conflict,
+    SpendSet,
+    Spend,
     SlotInfo,
 }
 

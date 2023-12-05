@@ -13,7 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -23,7 +23,7 @@ type Booker struct {
 
 	blockCache *blocks.Blocks
 
-	conflictDAG conflictdag.ConflictDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
+	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 
 	ledger ledger.Ledger
 
@@ -41,7 +41,7 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 		e.HookConstructed(func() {
 			b.ledger = e.Ledger
 			b.ledger.HookConstructed(func() {
-				b.conflictDAG = b.ledger.ConflictDAG()
+				b.spendDAG = b.ledger.SpendDAG()
 
 				b.ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
 					transaction.OnAccepted(func() {
@@ -108,7 +108,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 		}
 
 		transactionMetadata.OnBooked(func() {
-			block.SetPayloadConflictIDs(transactionMetadata.ConflictIDs())
+			block.SetPayloadSpenderIDs(transactionMetadata.SpenderIDs())
 			b.setupBlock(block)
 		})
 	})
@@ -158,37 +158,37 @@ func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockI
 }
 
 func (b *Booker) book(block *blocks.Block) error {
-	conflictsToInherit, err := b.inheritConflicts(block)
+	spendersToInherit, err := b.inheritSpenders(block)
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to inherit conflicts for block %s", block.ID())
+		return ierrors.Wrapf(err, "failed to inherit spenders for block %s", block.ID())
 	}
 
-	// The block does not inherit conflicts that have been orphaned with respect to its commitment.
-	for it := conflictsToInherit.Iterator(); it.HasNext(); {
-		conflictID := it.Next()
+	// The block does not inherit spenders that have been orphaned with respect to its commitment.
+	for it := spendersToInherit.Iterator(); it.HasNext(); {
+		spenderID := it.Next()
 
-		txMetadata, exists := b.ledger.MemPool().TransactionMetadata(conflictID)
+		txMetadata, exists := b.ledger.MemPool().TransactionMetadata(spenderID)
 		if !exists {
-			return ierrors.Errorf("failed to load transaction %s for block %s", conflictID.String(), block.ID())
+			return ierrors.Errorf("failed to load transaction %s for block %s", spenderID.String(), block.ID())
 		}
 
 		if orphanedSlot, orphaned := txMetadata.OrphanedSlot(); orphaned && orphanedSlot <= block.SlotCommitmentID().Slot() {
-			// Merge-to-master orphaned conflicts.
-			conflictsToInherit.Delete(conflictID)
+			// Merge-to-master orphaned spenders.
+			spendersToInherit.Delete(spenderID)
 		}
 	}
 
-	block.SetConflictIDs(conflictsToInherit)
+	block.SetSpenderIDs(spendersToInherit)
 	block.SetBooked()
 	b.events.BlockBooked.Trigger(block)
 
 	return nil
 }
 
-func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotago.TransactionID], err error) {
-	conflictIDsToInherit := ds.NewSet[iotago.TransactionID]()
+func (b *Booker) inheritSpenders(block *blocks.Block) (spenderIDs ds.Set[iotago.TransactionID], err error) {
+	spenderIDsToInherit := ds.NewSet[iotago.TransactionID]()
 
-	// Inherit conflictIDs from parents based on the parent type.
+	// Inherit spenderIDs from parents based on the parent type.
 	for _, parent := range block.ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
@@ -198,30 +198,30 @@ func (b *Booker) inheritConflicts(block *blocks.Block) (conflictIDs ds.Set[iotag
 
 		switch parent.Type {
 		case iotago.StrongParentType:
-			conflictIDsToInherit.AddAll(parentBlock.ConflictIDs())
+			spenderIDsToInherit.AddAll(parentBlock.SpenderIDs())
 		case iotago.WeakParentType:
-			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
+			spenderIDsToInherit.AddAll(parentBlock.PayloadSpenderIDs())
 		case iotago.ShallowLikeParentType:
 			// Check whether the parent contains a conflicting TX,
 			// otherwise reference is invalid and the block should be marked as invalid as well.
-			if signedTransaction, hasTx := parentBlock.SignedTransaction(); !hasTx || !parentBlock.PayloadConflictIDs().Has(lo.PanicOnErr(signedTransaction.Transaction.ID())) {
+			if signedTransaction, hasTx := parentBlock.SignedTransaction(); !hasTx || !parentBlock.PayloadSpenderIDs().Has(lo.PanicOnErr(signedTransaction.Transaction.ID())) {
 				return nil, ierrors.Wrapf(err, "shallow like parent %s does not contain a conflicting transaction", parent.ID.String())
 			}
 
-			conflictIDsToInherit.AddAll(parentBlock.PayloadConflictIDs())
-			//  remove all conflicting conflicts from conflictIDsToInherit
-			for _, conflictID := range parentBlock.PayloadConflictIDs().ToSlice() {
-				if conflictingConflicts, exists := b.conflictDAG.ConflictingConflicts(conflictID); exists {
-					conflictIDsToInherit.DeleteAll(b.conflictDAG.FutureCone(conflictingConflicts))
+			spenderIDsToInherit.AddAll(parentBlock.PayloadSpenderIDs())
+			//  remove all conflicting spenders from spenderIDsToInherit
+			for _, spenderID := range parentBlock.PayloadSpenderIDs().ToSlice() {
+				if conflictingSpends, exists := b.spendDAG.ConflictingSpenders(spenderID); exists {
+					spenderIDsToInherit.DeleteAll(b.spendDAG.FutureCone(conflictingSpends))
 				}
 			}
 		}
 	}
 
-	// Add all conflicts from the block's payload itself.
-	// Forking on booking: we determine the block's PayloadConflictIDs by treating each TX as a conflict.
-	conflictIDsToInherit.AddAll(block.PayloadConflictIDs())
+	// Add all spenders from the block's payload itself.
+	// Forking on booking: we determine the block's PayloadSpenderIDs by treating each TX as a spender.
+	spenderIDsToInherit.AddAll(block.PayloadSpenderIDs())
 
-	// Only inherit conflicts that are not yet accepted (aka merge to master).
-	return b.conflictDAG.UnacceptedConflicts(conflictIDsToInherit), nil
+	// Only inherit spenders that are not yet accepted (aka merge to master).
+	return b.spendDAG.UnacceptedSpenders(spenderIDsToInherit), nil
 }

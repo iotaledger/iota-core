@@ -3,6 +3,14 @@
   async: 300
   poll: 5
 
+- name: Set log rotation for a maximum size of 5GB
+  lineinfile:
+    path: /etc/logrotate.d/rsyslog
+    regexp: '^\{\n\s*rotate'
+    insertbefore: '^\{\n\s*rotate'
+    line: '    maxsize 5G'
+  notify: restart rsyslog
+
 - name: Create node directory
   file:
     path: /opt/iota-core
@@ -27,17 +35,14 @@
     dest: /opt/iota-core/docker-compose.yml
     mode: '0644'
 
-- name: Kill existing services
+- name: Kill & teardown existing services
   community.docker.docker_compose:
     project_src: /opt/iota-core
-    timeout: 1
-    state: present
-    stopped: yes
-
-- name: Tear down existing services
-  community.docker.docker_compose:
-    project_src: /opt/iota-core
+    timeout: 5
     state: absent
+    stopped: true
+    remove_orphans: true
+    remove_volumes: true
 
 - name: Create DB directory
   file:

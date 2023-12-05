@@ -13,12 +13,12 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite/depositcalculator"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
-	"github.com/iotaledger/iota-core/pkg/utils"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
 func Test_TransitionAndDestroyAccount(t *testing.T) {
-	oldGenesisOutputKey := utils.RandBlockIssuerKey()
+	oldGenesisOutputKey := tpkg.RandBlockIssuerKey()
 
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
@@ -97,7 +97,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// MODIFY EXISTING GENESIS ACCOUNT
-	newGenesisOutputKey := utils.RandBlockIssuerKey()
+	newGenesisOutputKey := tpkg.RandBlockIssuerKey()
 	var block1Slot iotago.SlotIndex = 1
 	// set the expiry of the genesis account to be the block slot + max committable age.
 	newExpirySlot := block1Slot + ts.API.ProtocolParameters().MaxCommittableAge()
@@ -217,7 +217,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
-	newAccountBlockIssuerKey := utils.RandBlockIssuerKey()
+	newAccountBlockIssuerKey := tpkg.RandBlockIssuerKey()
 	// set the expiry slot of the transitioned genesis account to the latest committed + MaxCommittableAge
 	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
 
@@ -238,10 +238,9 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{newAccountBlockIssuerKey}, newAccountExpirySlot),
 		mock.WithStakingFeature(stakedAmount, 421, 0, 10),
 		mock.WithAccountAmount(validatorAccountAmount),
+		mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Node.Protocol.CommittedAPI().ProtocolParameters())),
 	)
 
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
 	ts.SetCurrentSlot(block1Slot)
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
 	latestParents := ts.CommitUntilSlot(block1Slot, block1.ID())
@@ -431,7 +430,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 
 	// TRANSITION IMPLICIT ACCOUNT TO ACCOUNT OUTPUT.
 	// USE IMPLICIT ACCOUNT AS BLOCK ISSUER.
-	fullAccountBlockIssuerKey := utils.RandBlockIssuerKey()
+	fullAccountBlockIssuerKey := tpkg.RandBlockIssuerKey()
 
 	block2Slot := ts.CurrentSlot()
 	tx2 := newUserWallet.TransitionImplicitAccountToAccountOutput(
@@ -747,7 +746,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// MODIFY EXISTING GENESIS ACCOUNT
-	newWallet1IssuerKey := utils.RandBlockIssuerKey()
+	newWallet1IssuerKey := tpkg.RandBlockIssuerKey()
 	var block1Slot iotago.SlotIndex = 1
 	var latestParents []iotago.BlockID
 	ts.SetCurrentSlot(block1Slot)

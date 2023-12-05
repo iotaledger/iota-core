@@ -40,12 +40,12 @@ func (t *TestSuite) AssertAttestationsForSlot(slot iotago.SlotIndex, blocks []*b
 				return ierrors.Wrapf(err, "AssertAttestationsForSlot: %s: error iterating over attestation tree", node.Name)
 			}
 
-			if len(expectedAttestations) != len(storedAttestations) {
-				return ierrors.Errorf("AssertAttestationsForSlot: %s: expected %d attestation(s), got %d", node.Name, len(expectedAttestations), len(storedAttestations))
-			}
-
 			if !assert.ElementsMatch(t.fakeTesting, expectedAttestations, storedAttestations) {
 				return ierrors.Errorf("AssertAttestationsForSlot: %s: expected attestation(s) %s, got %s", node.Name, expectedAttestations, storedAttestations)
+			}
+
+			if len(expectedAttestations) != len(storedAttestations) {
+				return ierrors.Errorf("AssertAttestationsForSlot: %s: expected %d attestation(s), got %d", node.Name, len(expectedAttestations), len(storedAttestations))
 			}
 
 			return nil

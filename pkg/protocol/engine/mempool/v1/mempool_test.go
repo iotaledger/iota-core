@@ -18,18 +18,14 @@ import (
 	"github.com/iotaledger/iota-core/pkg/core/vote"
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/conflictdag/conflictdagv1"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag/spenddagv1"
 	mempooltests "github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/tests"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-func TestMemPoolV1_InterfaceWithoutForkingEverything(t *testing.T) {
-	mempooltests.TestAllWithoutForkingEverything(t, newTestFramework)
-}
-
 func TestMemPoolV1_InterfaceWithForkingEverything(t *testing.T) {
-	mempooltests.TestAllWithForkingEverything(t, newForkingTestFramework)
+	mempooltests.TestAll(t, newTestFramework)
 }
 
 func TestMempoolV1_ResourceCleanup(t *testing.T) {
@@ -40,12 +36,12 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	}
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
-	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](func() int { return 0 })
+	spendDAG := spenddagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](func() int { return 0 })
 	memPoolInstance := New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference)
-	}, mutationsFunc, workers, conflictDAG, iotago.SingleVersionProvider(tpkg.TestAPI), func(error) {})
+	}, mutationsFunc, workers, spendDAG, iotago.SingleVersionProvider(tpkg.TestAPI), func(error) {})
 
-	tf := mempooltests.NewTestFramework(t, memPoolInstance, conflictDAG, ledgerState, workers)
+	tf := mempooltests.NewTestFramework(t, memPoolInstance, spendDAG, ledgerState, workers)
 
 	issueTransactions := func(startIndex, transactionCount int, prevStateAlias string) (int, string) {
 		index := startIndex
@@ -59,6 +55,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 			tf.RequireBooked(txAlias)
 
 			tf.MarkAttachmentIncluded(blockAlias)
+			tf.SpendDAG.SetAccepted(tf.TransactionID(txAlias))
 
 			prevStateAlias = fmt.Sprintf("tx%d:0", index)
 
@@ -144,7 +141,7 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	workers := workerpool.NewGroup(t.Name())
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
-	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
+	spendDAG := spenddagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
 
 	mutationsFunc := func(index iotago.SlotIndex) (kvstore.KVStore, error) {
 		return mapdb.NewMapDB(), nil
@@ -152,20 +149,5 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference)
-	}, mutationsFunc, workers, conflictDAG, iotago.SingleVersionProvider(tpkg.TestAPI), func(error) {}), conflictDAG, ledgerState, workers)
-}
-
-func newForkingTestFramework(t *testing.T) *mempooltests.TestFramework {
-	workers := workerpool.NewGroup(t.Name())
-
-	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
-	conflictDAG := conflictdagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
-
-	mutationsFunc := func(index iotago.SlotIndex) (kvstore.KVStore, error) {
-		return mapdb.NewMapDB(), nil
-	}
-
-	return mempooltests.NewTestFramework(t, New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
-		return ledgerState.ResolveOutputState(reference)
-	}, mutationsFunc, workers, conflictDAG, iotago.SingleVersionProvider(tpkg.TestAPI), func(error) {}, WithForkAllTransactions[vote.MockedRank](true)), conflictDAG, ledgerState, workers)
+	}, mutationsFunc, workers, spendDAG, iotago.SingleVersionProvider(tpkg.TestAPI), func(error) {}), spendDAG, ledgerState, workers)
 }

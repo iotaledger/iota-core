@@ -9,6 +9,7 @@ import (
 
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -76,7 +77,14 @@ func (t *TestSuite) InitPerformanceTracker() {
 		rewardsStore.GetEpoch,
 		poolStatsStore,
 		committeeStore,
-		committeeCandidatesStore.GetEpoch,
+		func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error) {
+			return kvstore.NewTypedStore(lo.PanicOnErr(committeeCandidatesStore.GetEpoch(epoch)),
+				iotago.AccountID.Bytes,
+				iotago.AccountIDFromBytes,
+				iotago.SlotIndex.Bytes,
+				iotago.SlotIndexFromBytes,
+			), nil
+		},
 		performanceFactorFunc,
 		t.latestCommittedEpoch,
 		iotago.SingleVersionProvider(t.api),
@@ -287,7 +295,7 @@ func (t *TestSuite) applyPerformanceFactor(accountID iotago.AccountID, epoch iot
 		}
 
 		for i := uint64(0); i < validationBlocksSentPerSlot; i++ {
-			valBlock := tpkg.RandValidationBlock(t.api)
+			valBlock := tpkg.RandValidationBlockBody(t.api)
 			block := tpkg.RandBlock(valBlock, t.api, 10)
 			block.Header.IssuerID = accountID
 			subslotIndex := i

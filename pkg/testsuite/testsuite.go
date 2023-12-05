@@ -16,6 +16,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
@@ -25,6 +26,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
+	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
 func DefaultProtocolParameterOptions(networkName string) []options.Option[iotago.V3ProtocolParameters] {
@@ -112,17 +114,16 @@ type TestSuite struct {
 	uniqueBlockTimeCounter              atomic.Int64
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
 	mutex                               syncutils.RWMutex
-	genesisKeyManager                   *mock.KeyManager
+	genesisKeyManager                   *wallet.KeyManager
 
 	currentSlot iotago.SlotIndex
 }
 
 func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestSuite {
-	genesisSeed := tpkg.RandEd25519Seed()
 	return options.Apply(&TestSuite{
 		Testing:                             testingT,
 		fakeTesting:                         &testing.T{},
-		genesisKeyManager:                   mock.NewKeyManager(genesisSeed[:], 0),
+		genesisKeyManager:                   lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath)),
 		network:                             mock.NewNetwork(),
 		Directory:                           utils.NewDirectory(testingT.TempDir()),
 		nodes:                               orderedmap.New[string, *mock.Node](),
@@ -309,6 +310,28 @@ func (t *TestSuite) Nodes(names ...string) []*mock.Node {
 	return nodes
 }
 
+func (t *TestSuite) AccountsOfNodes(names ...string) []iotago.AccountID {
+	nodes := t.Nodes(names...)
+
+	return lo.Map(nodes, func(node *mock.Node) iotago.AccountID {
+		return node.Validator.AccountID
+	})
+}
+
+func (t *TestSuite) SeatOfNodes(slot iotago.SlotIndex, names ...string) []account.SeatIndex {
+	nodes := t.Nodes(names...)
+
+	return lo.Map(nodes, func(node *mock.Node) account.SeatIndex {
+		seatedAccounts, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)
+		require.True(t.Testing, exists, "node %s: committee at slot %d does not exist", node.Name, slot)
+
+		seat, exists := seatedAccounts.GetSeat(node.Validator.AccountID)
+		require.True(t.Testing, exists, "node %s: seat for account %s does not exist", node.Name, node.Validator.AccountID)
+
+		return seat
+	})
+}
+
 func (t *TestSuite) Wait(nodes ...*mock.Node) {
 	for _, node := range nodes {
 		node.Wait()
@@ -448,7 +471,7 @@ func (t *TestSuite) DefaultWallet() *mock.Wallet {
 	return defaultWallet
 }
 
-func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*mock.KeyManager) *mock.Wallet {
+func (t *TestSuite) AddWallet(name string, node *mock.Node, accountID iotago.AccountID, keyManager ...*wallet.KeyManager) *mock.Wallet {
 	newWallet := mock.NewWallet(t.Testing, name, node, keyManager...)
 	newWallet.SetBlockIssuer(accountID)
 	t.wallets.Set(name, newWallet)

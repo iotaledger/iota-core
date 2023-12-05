@@ -34,18 +34,23 @@ func NewDBInstance(dbConfig Config, openedCallback func(d *DBInstance)) *DBInsta
 	// lockedKVStore and the underlying openableKVStore don't handle opening and closing the underlying store by themselves,
 	// but delegate that to the entity that constructed it. It needs to be done like that, because opening and closing the underlying store also
 	// modifies the state of the DBInstance. Other methods (e.g. Flush) that don't modify the state of DBInstance can be handled directly.
-	lockableKVStore := newLockedKVStore(db, func() {
+	lockableKVStore := newLockedKVStore(db, func() error {
 		if dbInstance.isClosed.Load() {
 			storeInstanceMutex.Lock()
 			defer storeInstanceMutex.Unlock()
 
 			if dbInstance.isClosed.Load() {
-				dbInstance.Open()
+				if err := dbInstance.Open(); err != nil {
+					return err
+				}
+
 				if openedCallback != nil {
 					openedCallback(dbInstance)
 				}
 			}
 		}
+
+		return nil
 	}, func() {
 		dbInstance.CloseWithoutLocking()
 	})
@@ -64,10 +69,6 @@ func NewDBInstance(dbConfig Config, openedCallback func(d *DBInstance)) *DBInsta
 
 	dbInstance.healthTracker = storeHealthTracker
 
-	if openedCallback != nil {
-		openedCallback(dbInstance)
-	}
-
 	return dbInstance
 }
 
@@ -82,7 +83,9 @@ func (d *DBInstance) Flush() {
 	defer d.store.UnlockAccess()
 
 	if !d.isClosed.Load() {
-		_ = d.store.instance().Flush()
+		if instance, err := d.store.instance(); err == nil {
+			_ = instance.Flush()
+		}
 	}
 }
 
@@ -113,13 +116,13 @@ func (d *DBInstance) CloseWithoutLocking() {
 
 // Open re-opens a closed DBInstance. It must only be called while holding a lock on DBInstance,
 // otherwise it might cause a race condition and corruption of node's state.
-func (d *DBInstance) Open() {
+func (d *DBInstance) Open() error {
 	if !d.isClosed.Load() {
-		panic("cannot open DBInstance that is not closed")
+		panic(ErrDatabaseNotClosed)
 	}
 
 	if d.isShutdown.Load() {
-		panic("cannot open DBInstance that is shutdown")
+		return ErrDatabaseShutdown
 	}
 
 	d.store.Replace(lo.PanicOnErr(StoreWithDefaultSettings(d.dbConfig.Directory, false, d.dbConfig.Engine)))
@@ -127,8 +130,11 @@ func (d *DBInstance) Open() {
 	d.isClosed.Store(false)
 
 	if err := d.healthTracker.MarkCorrupted(); err != nil {
+		// panic immediately as in this case the database state is corrupted
 		panic(err)
 	}
+
+	return nil
 }
 
 func (d *DBInstance) LockAccess() {

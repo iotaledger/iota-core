@@ -13,7 +13,6 @@ import { Link } from 'react-router-dom';
 import { BasicPayload } from './BasicPayload'
 import { TransactionPayload } from './TransactionPayload'
 import { getPayloadType, PayloadType } from '../misc/Payload'
-import { resolveBase58ConflictID } from "../utils/conflict";
 import { FaucetPayload } from './FaucetPayload';
 import { TaggedDataPayload } from './TaggedDataPayload';
 
@@ -124,50 +123,14 @@ export class ExplorerBlockQueryResult extends React.Component<Props, any> {
                                         Sequence Number: {blk.sequenceNumber}
                                     </ListGroup.Item>
                                     <ListGroup.Item>
-                                        ConflictIDs:
+                                        SpendIDs:
                                         <ListGroup>
                                             {
-                                                blk.conflictIDs.map((value, index) => {
+                                                blk.spendIDs.map((value, index) => {
                                                     return (
-                                                        <ListGroup.Item key={"ConflictID" + index + 1}
+                                                        <ListGroup.Item key={"SpendID" + index + 1}
                                                             className="text-break">
-                                                            <Link to={`/explorer/conflict/${value}`}>
-                                                                {resolveBase58ConflictID(value)}
-                                                            </Link>
-                                                        </ListGroup.Item>
-                                                    )
-                                                })
-                                            }
-                                        </ListGroup>
-                                    </ListGroup.Item>
-                                    <ListGroup.Item>
-                                        AddedConflictIDs:
-                                        <ListGroup>
-                                            {
-                                                blk.addedConflictIDs.map((value, index) => {
-                                                    return (
-                                                        <ListGroup.Item key={"AddedConflictID" + index + 1}
-                                                            className="text-break">
-                                                            <Link to={`/explorer/conflict/${value}`}>
-                                                                {resolveBase58ConflictID(value)}
-                                                            </Link>
-                                                        </ListGroup.Item>
-                                                    )
-                                                })
-                                            }
-                                        </ListGroup>
-                                    </ListGroup.Item>
-                                    <ListGroup.Item>
-                                        SubtractedConflictIDs:
-                                        <ListGroup>
-                                            {
-                                                blk.subtractedConflictIDs.map((value, index) => {
-                                                    return (
-                                                        <ListGroup.Item key={"SubtractedConflictID" + index + 1}
-                                                            className="text-break">
-                                                            <Link to={`/explorer/conflict/${value}`}>
-                                                                {resolveBase58ConflictID(value)}
-                                                            </Link>
+                                                                {value}
                                                         </ListGroup.Item>
                                                     )
                                                 })
