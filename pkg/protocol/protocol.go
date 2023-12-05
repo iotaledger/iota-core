@@ -2,316 +2,216 @@ package protocol
 
 import (
 	"context"
-	"fmt"
+	"sync"
 	"time"
 
-	"github.com/iotaledger/hive.go/runtime/event"
+	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/iotaledger/hive.go/ds/reactive"
+	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
-	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
-	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blockdag/inmemoryblockdag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker/inmemorybooker"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/clock/blocktime"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler/drr"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget/totalweightslotgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter/postsolidblockfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter/presolidblockfilter"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
-	ledger1 "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/ledger"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/syncmanager/trivialsyncmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
-	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection"
-	tipselectionv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipselection/v1"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/upgrade/signalingupgradeorchestrator"
-	"github.com/iotaledger/iota-core/pkg/protocol/enginemanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
-	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
-	"github.com/iotaledger/iota-core/pkg/retainer"
-	retainer1 "github.com/iotaledger/iota-core/pkg/retainer/retainer"
-	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// Protocol is an implementation of the IOTA core protocol.
 type Protocol struct {
-	context         context.Context
-	Events          *Events
-	BlockDispatcher *BlockDispatcher
-	EngineManager   *enginemanager.EngineManager
-	ChainManager    *chainmanager.Manager
+	// Events contains a centralized access point for all events that are triggered by the main engine of the protocol.
+	Events *Events
 
-	Workers           *workerpool.Group
-	networkDispatcher network.Endpoint
-	networkProtocol   *core.Protocol
+	// Workers contains the worker pools that are used by the protocol.
+	Workers *workerpool.Group
 
-	activeEngineMutex syncutils.RWMutex
-	mainEngine        *engine.Engine
-	candidateEngine   *candidateEngine
+	// Network contains the network endpoint of the protocol.
+	Network *core.Protocol
 
-	optsBaseDirectory           string
-	optsSnapshotPath            string
-	optsChainSwitchingThreshold int
+	// Commitments contains the commitments that are managed by the protocol.
+	Commitments *Commitments
 
-	optsEngineOptions       []options.Option[engine.Engine]
-	optsChainManagerOptions []options.Option[chainmanager.Manager]
-	optsStorageOptions      []options.Option[storage.Storage]
+	// Chains contains the chains that are managed by the protocol.
+	Chains *Chains
 
-	optsPreSolidFilterProvider      module.Provider[*engine.Engine, presolidfilter.PreSolidFilter]
-	optsPostSolidFilterProvider     module.Provider[*engine.Engine, postsolidfilter.PostSolidFilter]
-	optsBlockDAGProvider            module.Provider[*engine.Engine, blockdag.BlockDAG]
-	optsTipManagerProvider          module.Provider[*engine.Engine, tipmanager.TipManager]
-	optsTipSelectionProvider        module.Provider[*engine.Engine, tipselection.TipSelection]
-	optsBookerProvider              module.Provider[*engine.Engine, booker.Booker]
-	optsClockProvider               module.Provider[*engine.Engine, clock.Clock]
-	optsBlockGadgetProvider         module.Provider[*engine.Engine, blockgadget.Gadget]
-	optsSlotGadgetProvider          module.Provider[*engine.Engine, slotgadget.Gadget]
-	optsSybilProtectionProvider     module.Provider[*engine.Engine, sybilprotection.SybilProtection]
-	optsNotarizationProvider        module.Provider[*engine.Engine, notarization.Notarization]
-	optsAttestationProvider         module.Provider[*engine.Engine, attestation.Attestations]
-	optsSyncManagerProvider         module.Provider[*engine.Engine, syncmanager.SyncManager]
-	optsLedgerProvider              module.Provider[*engine.Engine, ledger.Ledger]
-	optsRetainerProvider            module.Provider[*engine.Engine, retainer.Retainer]
-	optsSchedulerProvider           module.Provider[*engine.Engine, scheduler.Scheduler]
-	optsUpgradeOrchestratorProvider module.Provider[*engine.Engine, upgrade.Orchestrator]
+	// BlocksProtocol contains the subcomponent that is responsible for handling block requests and responses.
+	BlocksProtocol *BlocksProtocol
 
-	optsAttestationRequesterTryInterval time.Duration
-	optsAttestationRequesterMaxRetries  int
+	// CommitmentsProtocol contains the subcomponent that is responsible for handling commitment requests and responses.
+	CommitmentsProtocol *CommitmentsProtocol
 
-	module.Module
+	// AttestationsProtocol contains the subcomponent that is responsible for handling attestation requests and
+	// responses.
+	AttestationsProtocol *AttestationsProtocol
+
+	// WarpSyncProtocol contains the subcomponent that is responsible for handling warp sync requests and responses.
+	WarpSyncProtocol *WarpSyncProtocol
+
+	// Engines contains the engines that are managed by the protocol.
+	Engines *Engines
+
+	// Options contains the options that were used to create the protocol.
+	Options *Options
+
+	// EvictionState contains the eviction state of the protocol.
+	reactive.EvictionState[iotago.SlotIndex]
+
+	// ReactiveModule embeds the reactive module logic of the protocol.
+	*module.ReactiveModule
 }
 
-func New(workers *workerpool.Group, dispatcher network.Endpoint, opts ...options.Option[Protocol]) (protocol *Protocol) {
+// New creates a new protocol instance from the given parameters.
+func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.Endpoint, opts ...options.Option[Protocol]) *Protocol {
 	return options.Apply(&Protocol{
-		Events:                          NewEvents(),
-		Workers:                         workers,
-		networkDispatcher:               dispatcher,
-		optsPreSolidFilterProvider:      presolidblockfilter.NewProvider(),
-		optsPostSolidFilterProvider:     postsolidblockfilter.NewProvider(),
-		optsBlockDAGProvider:            inmemoryblockdag.NewProvider(),
-		optsTipManagerProvider:          tipmanagerv1.NewProvider(),
-		optsTipSelectionProvider:        tipselectionv1.NewProvider(),
-		optsBookerProvider:              inmemorybooker.NewProvider(),
-		optsClockProvider:               blocktime.NewProvider(),
-		optsBlockGadgetProvider:         thresholdblockgadget.NewProvider(),
-		optsSlotGadgetProvider:          totalweightslotgadget.NewProvider(),
-		optsSybilProtectionProvider:     sybilprotectionv1.NewProvider(),
-		optsNotarizationProvider:        slotnotarization.NewProvider(),
-		optsAttestationProvider:         slotattestation.NewProvider(),
-		optsSyncManagerProvider:         trivialsyncmanager.NewProvider(),
-		optsLedgerProvider:              ledger1.NewProvider(),
-		optsRetainerProvider:            retainer1.NewProvider(),
-		optsSchedulerProvider:           drr.NewProvider(),
-		optsUpgradeOrchestratorProvider: signalingupgradeorchestrator.NewProvider(),
-
-		optsBaseDirectory:           "",
-		optsChainSwitchingThreshold: 3,
-
-		optsAttestationRequesterTryInterval: 3 * time.Second,
-		optsAttestationRequesterMaxRetries:  3,
+		Events:         NewEvents(),
+		Workers:        workers,
+		Options:        NewDefaultOptions(),
+		ReactiveModule: module.NewReactiveModule(logger),
+		EvictionState:  reactive.NewEvictionState[iotago.SlotIndex](),
 	}, opts, func(p *Protocol) {
-		p.BlockDispatcher = NewBlockDispatcher(p)
-	}, (*Protocol).initEngineManager, (*Protocol).initChainManager, (*Protocol).initNetworkProtocol, (*Protocol).TriggerConstructed)
-}
+		shutdownSubComponents := p.initSubcomponents(networkEndpoint)
 
-// Run runs the protocol.
-func (p *Protocol) Run(ctx context.Context) error {
-	var innerCtxCancel func()
+		p.Initialized.OnTrigger(func() {
+			shutdown := lo.Batch(
+				p.initEviction(),
+				p.initGlobalEventsRedirection(),
+				p.initNetwork(),
 
-	p.context, innerCtxCancel = context.WithCancel(ctx)
-	defer innerCtxCancel()
+				shutdownSubComponents,
+			)
 
-	p.linkToEngine(p.mainEngine)
+			p.Shutdown.OnTrigger(shutdown)
+		})
 
-	rootCommitment := p.mainEngine.EarliestRootCommitment(p.mainEngine.Storage.Settings().LatestFinalizedSlot())
+		p.Constructed.Trigger()
 
-	// The root commitment is the earliest commitment we will ever need to know to solidify commitment chains, we can
-	// then initialize the chain manager with it, and identify our engine to be on such chain.
-	// Upon engine restart, such chain will be loaded with the latest finalized slot, and the chain manager, not needing
-	// persistent storage, will be able to continue from there.
-	p.mainEngine.SetChainID(rootCommitment.ID())
-	p.ChainManager.Initialize(rootCommitment)
-
-	// Fill the chain manager with all our known commitments so that the chain is solid
-	for i := rootCommitment.Slot(); i <= p.mainEngine.Storage.Settings().LatestCommitment().Slot(); i++ {
-		if cm, err := p.mainEngine.Storage.Commitments().Load(i); err == nil {
-			p.ChainManager.ProcessCommitment(cm)
-		}
-	}
-
-	p.runNetworkProtocol()
-
-	p.TriggerInitialized()
-
-	<-p.context.Done()
-
-	p.TriggerShutdown()
-
-	p.shutdown()
-
-	p.TriggerStopped()
-
-	return p.context.Err()
-}
-
-func (p *Protocol) linkToEngine(engineInstance *engine.Engine) {
-	p.Events.Engine.LinkTo(engineInstance.Events)
-}
-
-func (p *Protocol) shutdown() {
-	if p.networkProtocol != nil {
-		p.networkProtocol.Shutdown()
-	}
-
-	p.ChainManager.Shutdown()
-	p.Workers.Shutdown()
-
-	p.activeEngineMutex.RLock()
-	p.mainEngine.Shutdown()
-	if p.candidateEngine != nil {
-		p.candidateEngine.engine.Shutdown()
-	}
-	p.activeEngineMutex.RUnlock()
-}
-
-func (p *Protocol) initEngineManager() {
-	p.EngineManager = enginemanager.New(
-		p.Workers.CreateGroup("EngineManager"),
-		p.HandleError,
-		p.optsBaseDirectory,
-		DatabaseVersion,
-		p.optsStorageOptions,
-		p.optsEngineOptions,
-		p.optsPreSolidFilterProvider,
-		p.optsPostSolidFilterProvider,
-		p.optsBlockDAGProvider,
-		p.optsBookerProvider,
-		p.optsClockProvider,
-		p.optsBlockGadgetProvider,
-		p.optsSlotGadgetProvider,
-		p.optsSybilProtectionProvider,
-		p.optsNotarizationProvider,
-		p.optsAttestationProvider,
-		p.optsLedgerProvider,
-		p.optsSchedulerProvider,
-		p.optsTipManagerProvider,
-		p.optsTipSelectionProvider,
-		p.optsRetainerProvider,
-		p.optsUpgradeOrchestratorProvider,
-		p.optsSyncManagerProvider,
-	)
-
-	mainEngine, err := p.EngineManager.LoadActiveEngine(p.optsSnapshotPath)
-	if err != nil {
-		panic(fmt.Sprintf("could not load active engine: %s", err))
-	}
-	p.mainEngine = mainEngine
-}
-
-func (p *Protocol) initChainManager() {
-	p.ChainManager = chainmanager.NewManager(p, p.HandleError, p.optsChainManagerOptions...)
-	p.Events.ChainManager.LinkTo(p.ChainManager.Events)
-
-	// This needs to be hooked so that the ChainManager always knows the commitments we issued.
-	// Else our own BlockIssuer might use a commitment that the ChainManager does not know yet.
-	p.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
-		p.ChainManager.ProcessCommitment(details.Commitment)
+		p.waitInitialized()
 	})
-
-	p.Events.Engine.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
-		rootCommitment := p.MainEngineInstance().EarliestRootCommitment(slot)
-
-		// It is essential that we set the rootCommitment before evicting the chainManager's state, this way
-		// we first specify the chain's cut-off point, and only then evict the state. It is also important to
-		// note that no multiple goroutines should be allowed to perform this operation at once, hence the
-		// hooking worker pool should always have a single worker or these two calls should be protected by a lock.
-		p.ChainManager.SetRootCommitment(rootCommitment)
-
-		// We want to evict just below the height of our new root commitment (so that the slot of the root commitment
-		// stays in memory storage and with it the root commitment itself as well).
-		if rootCommitment.ID().Slot() > 0 {
-			p.ChainManager.EvictUntil(rootCommitment.ID().Slot() - 1)
-		}
-	})
-
-	wpForking := p.Workers.CreatePool("Protocol.Forking", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
-	p.Events.ChainManager.ForkDetected.Hook(p.onForkDetected, event.WithWorkerPool(wpForking))
 }
 
+// IssueBlock issues a block to the node.
 func (p *Protocol) IssueBlock(block *model.Block) error {
-	return p.BlockDispatcher.Dispatch(block, p.networkDispatcher.LocalPeerID())
+	p.Network.Events.BlockReceived.Trigger(block, "self")
+
+	return nil
 }
 
-func (p *Protocol) MainEngineInstance() *engine.Engine {
-	p.activeEngineMutex.RLock()
-	defer p.activeEngineMutex.RUnlock()
+// Run starts the protocol.
+func (p *Protocol) Run(ctx context.Context) error {
+	p.Initialized.Trigger()
 
-	return p.mainEngine
+	<-ctx.Done()
+
+	p.Shutdown.Trigger()
+	p.Stopped.Trigger()
+
+	return ctx.Err()
 }
 
-func (p *Protocol) CandidateEngineInstance() *engine.Engine {
-	p.activeEngineMutex.RLock()
-	defer p.activeEngineMutex.RUnlock()
-
-	if p.candidateEngine == nil {
-		return nil
+// APIForVersion returns the API for the given version.
+func (p *Protocol) APIForVersion(version iotago.Version) (api iotago.API, err error) {
+	if mainEngineInstance := p.Engines.Main.Get(); mainEngineInstance != nil {
+		return mainEngineInstance.APIForVersion(version)
 	}
 
-	return p.candidateEngine.engine
+	return nil, ierrors.New("no engine instance available")
 }
 
-func (p *Protocol) Network() *core.Protocol {
-	return p.networkProtocol
-}
-
-func (p *Protocol) CommittedAPI() iotago.API {
-	return p.MainEngineInstance().CommittedAPI()
-}
-
-func (p *Protocol) LatestAPI() iotago.API {
-	return p.MainEngineInstance().LatestAPI()
-}
-
-func (p *Protocol) APIForVersion(version iotago.Version) (iotago.API, error) {
-	return p.MainEngineInstance().APIForVersion(version)
-}
-
-func (p *Protocol) APIForTime(t time.Time) iotago.API {
-	return p.MainEngineInstance().APIForTime(t)
-}
-
+// APIForSlot returns the API for the given slot.
 func (p *Protocol) APIForSlot(slot iotago.SlotIndex) iotago.API {
-	return p.MainEngineInstance().APIForSlot(slot)
+	return p.Engines.Main.Get().APIForSlot(slot)
 }
 
+// APIForEpoch returns the API for the given epoch.
 func (p *Protocol) APIForEpoch(epoch iotago.EpochIndex) iotago.API {
-	return p.MainEngineInstance().APIForEpoch(epoch)
+	return p.Engines.Main.Get().APIForEpoch(epoch)
 }
 
-func (p *Protocol) HandleError(err error) {
-	if err != nil {
-		p.Events.Error.Trigger(err)
+// APIForTime returns the API for the given time.
+func (p *Protocol) APIForTime(t time.Time) iotago.API {
+	return p.Engines.Main.Get().APIForTime(t)
+}
+
+// CommittedAPI returns the API for the committed state.
+func (p *Protocol) CommittedAPI() iotago.API {
+	return p.Engines.Main.Get().CommittedAPI()
+}
+
+// LatestAPI returns the latest API.
+func (p *Protocol) LatestAPI() iotago.API {
+	return p.Engines.Main.Get().LatestAPI()
+}
+
+// initSubcomponents initializes the subcomponents of the protocol and returns a function that shuts them down.
+func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown func()) {
+	p.Network = core.NewProtocol(networkEndpoint, p.Workers.CreatePool("NetworkProtocol"), p)
+	p.BlocksProtocol = newBlocksProtocol(p)
+	p.CommitmentsProtocol = newCommitmentsProtocol(p)
+	p.AttestationsProtocol = newAttestationsProtocol(p)
+	p.WarpSyncProtocol = newWarpSyncProtocol(p)
+	p.Commitments = newCommitments(p)
+	p.Chains = newChains(p)
+	p.Engines = newEngines(p)
+
+	return func() {
+		p.BlocksProtocol.Shutdown()
+		p.CommitmentsProtocol.Shutdown()
+		p.AttestationsProtocol.Shutdown()
+		p.WarpSyncProtocol.Shutdown()
+		p.Network.Shutdown()
+		p.Workers.WaitChildren()
+		p.Engines.Shutdown.Trigger()
+		p.Workers.Shutdown()
 	}
 }
 
-var _ iotago.APIProvider = &Protocol{}
+// initEviction initializes the eviction of old data when the engine advances and returns a function that shuts it down.
+func (p *Protocol) initEviction() (shutdown func()) {
+	return p.Commitments.Root.OnUpdate(func(_ *Commitment, rootCommitment *Commitment) {
+		// TODO: DECIDE ON DATA AVAILABILITY TIMESPAN / EVICTION STRATEGY
+		// p.Evict(rootCommitment.Slot() - 1)
+	})
+}
+
+// initGlobalEventsRedirection initializes the global events redirection of the protocol and returns a function that
+// shuts it down.
+func (p *Protocol) initGlobalEventsRedirection() (shutdown func()) {
+	return p.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (shutdown func()) {
+		p.Events.Engine.LinkTo(mainEngine.Events)
+
+		return func() {
+			p.Events.Engine.LinkTo(nil)
+		}
+	})
+}
+
+// initNetwork initializes the network of the protocol and returns a function that shuts it down.
+func (p *Protocol) initNetwork() (shutdown func()) {
+	return lo.Batch(
+		p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
+		p.Network.OnBlockReceived(p.BlocksProtocol.ProcessResponse),
+		p.Network.OnBlockRequestReceived(p.BlocksProtocol.ProcessRequest),
+		p.Network.OnCommitmentReceived(p.CommitmentsProtocol.ProcessResponse),
+		p.Network.OnCommitmentRequestReceived(p.CommitmentsProtocol.ProcessRequest),
+		p.Network.OnAttestationsReceived(p.AttestationsProtocol.ProcessResponse),
+		p.Network.OnAttestationsRequestReceived(p.AttestationsProtocol.ProcessRequest),
+		p.Network.OnWarpSyncResponseReceived(p.WarpSyncProtocol.ProcessResponse),
+		p.Network.OnWarpSyncRequestReceived(p.WarpSyncProtocol.ProcessRequest),
+	)
+}
+
+// waitInitialized waits until the main engine is initialized (published its root commitment).
+func (p *Protocol) waitInitialized() {
+	var waitInitialized sync.WaitGroup
+
+	waitInitialized.Add(1)
+	p.Commitments.Root.OnUpdateOnce(func(_ *Commitment, _ *Commitment) {
+		waitInitialized.Done()
+	}, func(_ *Commitment, rootCommitment *Commitment) bool { return rootCommitment != nil })
+
+	waitInitialized.Wait()
+}

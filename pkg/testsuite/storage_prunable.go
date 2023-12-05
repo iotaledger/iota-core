@@ -26,7 +26,7 @@ func (t *TestSuite) AssertPrunedUntil(expectedStorage *types.Tuple[int, bool],
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if err := t.assertPrunedUntil(node.Protocol.MainEngineInstance().Storage, expectedStorage, expectedDecidedUpgrades, expectedPoolStats, expectedCommittee, expectedRewards); err != nil {
+			if err := t.assertPrunedUntil(node.Protocol.Engines.Main.Get().Storage, expectedStorage, expectedDecidedUpgrades, expectedPoolStats, expectedCommittee, expectedRewards); err != nil {
 				return ierrors.Wrapf(err, "AssertPrunedSlot: %s", node.Name)
 			}
 

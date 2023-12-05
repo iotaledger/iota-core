@@ -57,7 +57,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 		s.errorHandler = e.ErrorHandler("scheduler")
 		s.basicBuffer = NewBufferQueue()
 
-		e.HookConstructed(func() {
+		e.Constructed.OnTrigger(func() {
 			s.latestCommittedSlot = func() iotago.SlotIndex {
 				return e.Storage.Settings().LatestCommitment().Slot()
 			}
@@ -121,7 +121,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 				s.removeIssuer(accountID, ierrors.New("account destroyed"))
 			})
 
-			e.HookInitialized(s.Start)
+			e.Initialized.OnTrigger(s.Start)
 		})
 
 		return s

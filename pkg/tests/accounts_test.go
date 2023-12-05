@@ -205,7 +205,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 	// CREATE NEW ACCOUNT WITH BLOCK ISSUER AND STAKING FEATURES FROM BASIC UTXO
 	newAccountBlockIssuerKey := tpkg.RandBlockIssuerKey()
 	// set the expiry slot of the transitioned genesis account to the latest committed + MaxCommittableAge
-	newAccountExpirySlot := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
+	newAccountExpirySlot := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot() + ts.API.ProtocolParameters().MaxCommittableAge()
 
 	stakedAmount := iotago.BaseToken(10000)
 
@@ -421,7 +421,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 		),
 		mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
 	)
-	block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+	block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 	block2 := ts.IssueBasicBlockWithOptions("block2", newUserWallet, tx2, mock.WithStrongParents(latestParents...))
 	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
 
@@ -543,7 +543,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	// Try to issue more blocks from each of the issuers - one succeeds in issuing a block,
 	// the other has the block rejected in the PostSolidFilter as his account has negative BIC value.
 	{
-		block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
 		block21 := ts.IssueBasicBlockWithOptions("block2.1", wallet1, &iotago.TaggedData{}, mock.WithSlotCommitment(block2Commitment))
 
@@ -586,7 +586,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 				Mana:      iotago.Mana(allottedBIC),
 			}}, "Genesis:0")
 
-		block3Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		block3Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 		// Wallet 1 whose account is not locked is issuing the block to unlock the account of wallet 2.
 		block31 := ts.IssueBasicBlockWithOptions("block3.1", wallet1, tx1, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block3Commitment))
 
@@ -618,7 +618,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 
 	// Issue block from the unlocked account of wallet 2 to make sure that it's actually unlocked.
 	{
-		block4Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		block4Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
 		block4 := ts.IssueBasicBlockWithOptions("block4", wallet2, &iotago.TaggedData{}, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block4Commitment))
 
@@ -768,7 +768,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 				Mana:      iotago.Mana(allottedBIC),
 			}}, "Genesis:0")
 
-		block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 		// Wallet 2 whose account is not locked is issuing the block to unlock the account of wallet 1.
 		block2 := ts.IssueBasicBlockWithOptions("block2", wallet2, tx2, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block2Commitment))
 
@@ -805,7 +805,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 			mock.WithBlockIssuerExpirySlot(newExpirySlot),
 		)
 
-		block3Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		block3Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
 		// Wallet 1, which already has non-negative BIC issues the block.
 		block3 := ts.IssueBasicBlockWithOptions("block3", wallet1, tx3, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block3Commitment))
@@ -843,7 +843,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 		// create a transaction which destroys the genesis account.
 
 		tx4 := wallet1.DestroyAccount("TX4", "TX3:0")
-		block4Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		block4Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
 		block4 := ts.IssueBasicBlockWithOptions("block4", wallet2, tx4, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block4Commitment))
 		latestParents = ts.CommitUntilSlot(block4Slot, block4.ID())
@@ -979,7 +979,7 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 
 	// TRY TO SPEND THE BASIC OUTPUT FROM AN ACCOUNT ADDRESS
 	{
-		block2Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		block2Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
 		tx2 := wallet1.SendFundsFromAccount(
 			"TX2",
@@ -1026,7 +1026,7 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 				Mana:      iotago.Mana(allottedBIC),
 			}}, "TX0:1")
 
-		block3Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		block3Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
 		// Wallet 2 whose account is not locked is issuing the block to unlock the account of wallet 1.
 		block3 := ts.IssueBasicBlockWithOptions("block3", wallet2, tx3, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block3Commitment))
@@ -1060,7 +1060,7 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 	block4Slot := ts.CurrentSlot()
 	// SPEND THE BASIC OUTPUT FROM AN ACCOUNT ADDRESS
 	{
-		block4Commitment := node1.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment().Commitment()
+		block4Commitment := node1.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
 		tx4 := wallet1.SendFundsFromAccount(
 			"TX4",

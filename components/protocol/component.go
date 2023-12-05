@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/daemon"
@@ -139,6 +140,7 @@ func provide(c *dig.Container) error {
 		}
 
 		return protocol.New(
+			log.NewLogger("node"),
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
@@ -176,16 +178,8 @@ func provide(c *dig.Container) error {
 }
 
 func configure() error {
-	deps.Protocol.Events.Error.Hook(func(err error) {
-		Component.LogErrorf("ProtocolError, error: %s", err)
-	})
-
-	deps.Protocol.Events.Network.Error.Hook(func(err error, id peer.ID) {
-		Component.LogErrorf("NetworkError, error: %s, peerID: %s", err.Error(), id)
-	})
-
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(block *model.Block, source peer.ID) {
-		Component.LogDebugf("BlockReceived, blockID: %s, peerID: %s", block.ID(), source)
+	deps.Protocol.Network.OnBlockReceived(func(block *model.Block, source peer.ID) {
+		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})
 
 	deps.Protocol.Events.Engine.BlockProcessed.Hook(func(blockID iotago.BlockID) {
@@ -276,16 +270,12 @@ func configure() error {
 		Component.LogDebugf("BlockSkipped, blockID: %s", block.ID())
 	})
 
-	deps.Protocol.Events.ChainManager.RequestCommitment.Hook(func(id iotago.CommitmentID) {
-		Component.LogDebugf("RequestCommitment, commitmentID: %s", id)
+	deps.Protocol.Network.OnCommitmentRequestReceived(func(commitmentID iotago.CommitmentID, id peer.ID) {
+		Component.LogDebugf("SlotCommitmentRequestReceived: %s", commitmentID)
 	})
 
-	deps.Protocol.Events.Network.SlotCommitmentRequestReceived.Hook(func(commitmentID iotago.CommitmentID, id peer.ID) {
-		Component.LogDebugf("SlotCommitmentRequestReceived, commitmentID: %s", commitmentID)
-	})
-
-	deps.Protocol.Events.Network.SlotCommitmentReceived.Hook(func(commitment *model.Commitment, id peer.ID) {
-		Component.LogDebugf("SlotCommitmentReceived, commitmentID: %s", commitment.ID())
+	deps.Protocol.Network.OnCommitmentReceived(func(commitment *model.Commitment, id peer.ID) {
+		Component.LogDebugf("SlotCommitmentReceived: %s", commitment.ID())
 	})
 
 	deps.Protocol.Events.Engine.SybilProtection.CommitteeSelected.Hook(func(committee *account.Accounts, epoch iotago.EpochIndex) {

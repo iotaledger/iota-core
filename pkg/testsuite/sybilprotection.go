@@ -17,7 +17,7 @@ func (t *TestSuite) AssertSybilProtectionCommittee(epoch iotago.EpochIndex, expe
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			committeeInEpoch, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInEpoch(epoch)
+			committeeInEpoch, exists := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInEpoch(epoch)
 			if !exists {
 				return ierrors.Errorf("AssertSybilProtectionCommittee: %s: failed to get committee in epoch %d", node.Name, epoch)
 			}
@@ -46,7 +46,7 @@ func (t *TestSuite) AssertSybilProtectionCandidates(epoch iotago.EpochIndex, exp
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			candidates, err := node.Protocol.MainEngineInstance().SybilProtection.EligibleValidators(epoch)
+			candidates, err := node.Protocol.Engines.Main.Get().SybilProtection.EligibleValidators(epoch)
 			candidateIDs := lo.Map(candidates, func(candidate *accounts.AccountData) iotago.AccountID {
 				return candidate.ID
 			})
@@ -70,7 +70,7 @@ func (t *TestSuite) AssertSybilProtectionOnlineCommittee(expectedSeats []account
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			seats := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().OnlineCommittee().ToSlice()
+			seats := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().OnlineCommittee().ToSlice()
 			if !assert.ElementsMatch(t.fakeTesting, expectedSeats, seats) {
 				return ierrors.Errorf("AssertSybilProtectionOnlineCommittee: %s: expected %v, got %v", node.Name, expectedSeats, seats)
 			}

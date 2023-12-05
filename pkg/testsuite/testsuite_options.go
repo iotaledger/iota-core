@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"log/slog"
 	"os"
 	"time"
 
@@ -36,6 +37,12 @@ func WithSnapshotOptions(snapshotOptions ...options.Option[snapshotcreator.Optio
 func WithProtocolParametersOptions(protocolParameterOptions ...options.Option[iotago.V3ProtocolParameters]) options.Option[TestSuite] {
 	return func(t *TestSuite) {
 		t.ProtocolParameterOptions = protocolParameterOptions
+	}
+}
+
+func WithLogHandler(logHandler slog.Handler) options.Option[TestSuite] {
+	return func(t *TestSuite) {
+		t.optsLogHandler = logHandler
 	}
 }
 

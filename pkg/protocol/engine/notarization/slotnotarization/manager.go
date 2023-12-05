@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -44,16 +45,21 @@ type Manager struct {
 
 	commitmentMutex syncutils.RWMutex
 
+	log.Logger
+
 	module.Module
 }
 
 func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
-		m := NewManager(e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
+		logger, shutdownLogger := e.NewChildLogger("NotarizationManager")
+
+		m := NewManager(logger, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
+		m.HookShutdown(shutdownLogger)
 
 		m.apiProvider = e
 
-		e.HookConstructed(func() {
+		e.Constructed.OnTrigger(func() {
 			m.storage = e.Storage
 			m.acceptedTimeFunc = e.Clock.Accepted().Time
 
@@ -81,12 +87,15 @@ func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 			m.TriggerConstructed()
 		})
 
+		e.Shutdown.OnTrigger(m.Shutdown)
+
 		return m
 	})
 }
 
-func NewManager(workers *workerpool.Group, errorHandler func(error)) *Manager {
+func NewManager(logger log.Logger, workers *workerpool.Group, errorHandler func(error)) *Manager {
 	return &Manager{
+		Logger:       logger,
 		events:       notarization.NewEvents(),
 		workers:      workers,
 		errorHandler: errorHandler,
@@ -94,12 +103,15 @@ func NewManager(workers *workerpool.Group, errorHandler func(error)) *Manager {
 }
 
 func (m *Manager) Shutdown() {
-	m.TriggerStopped()
+	m.TriggerShutdown()
+
 	// Alternative 2
 	if m.acceptedBlockProcessedDetach != nil {
 		m.acceptedBlockProcessedDetach()
 	}
 	m.workers.Shutdown()
+
+	m.TriggerStopped()
 }
 
 // tryCommitUntil tries to create slot commitments until the new provided acceptance time.
@@ -248,6 +260,8 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 		cumulativeWeight,
 		rmc,
 	)
+
+	m.LogTrace("Committing", "commitment", newCommitment, "roots ", roots)
 
 	newModelCommitment, err := model.CommitmentFromCommitment(newCommitment, apiForSlot, serix.WithValidation())
 	if err != nil {

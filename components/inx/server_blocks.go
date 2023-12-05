@@ -19,14 +19,14 @@ import (
 )
 
 func (s *Server) ReadActiveRootBlocks(_ context.Context, _ *inx.NoParams) (*inx.RootBlocksResponse, error) {
-	activeRootBlocks := deps.Protocol.MainEngineInstance().EvictionState.ActiveRootBlocks()
+	activeRootBlocks := deps.Protocol.Engines.Main.Get().EvictionState.ActiveRootBlocks()
 
 	return inx.WrapRootBlocks(activeRootBlocks), nil
 }
 
 func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlock, error) {
 	blkID := blockID.Unwrap()
-	block, exists := deps.Protocol.MainEngineInstance().Block(blkID) // block +1
+	block, exists := deps.Protocol.Engines.Main.Get().Block(blkID) // block +1
 	if !exists {
 		return nil, status.Errorf(codes.NotFound, "block %s not found", blkID.ToHex())
 	}
@@ -146,7 +146,7 @@ func (s *Server) ListenToConfirmedBlocks(_ *inx.NoParams, srv inx.INX_ListenToCo
 }
 
 func (s *Server) ReadAcceptedBlocks(slot *inx.SlotIndex, srv inx.INX_ReadAcceptedBlocksServer) error {
-	blocksStore, err := deps.Protocol.MainEngineInstance().Storage.Blocks(slot.Unwrap())
+	blocksStore, err := deps.Protocol.Engines.Main.Get().Storage.Blocks(slot.Unwrap())
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "failed to get blocks: %s", err.Error())
 	}
@@ -203,7 +203,7 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.Block) (*inx.Blo
 }
 
 func getINXBlockMetadata(blockID iotago.BlockID) (*inx.BlockMetadata, error) {
-	retainerBlockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	retainerBlockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Errorf("failed to get BlockMetadata: %v", err)
 	}

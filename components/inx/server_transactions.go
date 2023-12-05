@@ -20,7 +20,7 @@ func getINXTransactionMetadata(transactionID iotago.TransactionID) (*inx.Transac
 		// Get the first output of that transaction (using index 0)
 		outputID := iotago.OutputIDFromTransactionIDAndIndex(transactionID, 0)
 
-		output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
+		output, spent, err := deps.Protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 		if err != nil {
 			return iotago.EmptyBlockID, status.Errorf(codes.Internal, "failed to get output %s: %s", outputID.ToHex(), err)
 		}
@@ -37,7 +37,7 @@ func getINXTransactionMetadata(transactionID iotago.TransactionID) (*inx.Transac
 		return nil, err
 	}
 
-	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get block metadata %s: %s", blockID.ToHex(), err)
 	}

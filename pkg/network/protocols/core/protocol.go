@@ -5,6 +5,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/ds/bytesfilter"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ds/types"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -32,6 +33,8 @@ type Protocol struct {
 
 	requestedBlockHashes      *shrinkingmap.ShrinkingMap[iotago.Identifier, types.Empty]
 	requestedBlockHashesMutex syncutils.Mutex
+
+	shutdown reactive.Event
 }
 
 func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, apiProvider iotago.APIProvider, opts ...options.Option[Protocol]) (protocol *Protocol) {
@@ -43,6 +46,7 @@ func NewProtocol(network network.Endpoint, workerPool *workerpool.WorkerPool, ap
 		apiProvider:               apiProvider,
 		duplicateBlockBytesFilter: bytesfilter.New(iotago.IdentifierFromData, 10000),
 		requestedBlockHashes:      shrinkingmap.New[iotago.Identifier, types.Empty](shrinkingmap.WithShrinkingThresholdCount(1000)),
+		shutdown:                  reactive.NewEvent(),
 	}, opts, func(p *Protocol) {
 		network.RegisterProtocol(newPacket, p.handlePacket)
 	})
@@ -70,7 +74,7 @@ func (p *Protocol) SendSlotCommitment(cm *model.Commitment, to ...peer.ID) {
 	}}}, to...)
 }
 
-func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...peer.ID) {
+func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], to ...peer.ID) error {
 	byteBuffer := stream.NewByteBuffer()
 
 	if err := stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
@@ -82,7 +86,7 @@ func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago
 
 		return len(attestations), nil
 	}); err != nil {
-		panic(err)
+		return err
 	}
 
 	p.network.Send(&nwmodels.Packet{Body: &nwmodels.Packet_Attestations{Attestations: &nwmodels.Attestations{
@@ -90,6 +94,8 @@ func (p *Protocol) SendAttestations(cm *model.Commitment, attestations []*iotago
 		Attestations: lo.PanicOnErr(byteBuffer.Bytes()),
 		MerkleProof:  lo.PanicOnErr(merkleProof.Bytes()),
 	}}}, to...)
+
+	return nil
 }
 
 func (p *Protocol) RequestSlotCommitment(id iotago.CommitmentID, to ...peer.ID) {
@@ -104,11 +110,53 @@ func (p *Protocol) RequestAttestations(id iotago.CommitmentID, to ...peer.ID) {
 	}}}, to...)
 }
 
+func (p *Protocol) OnBlockReceived(callback func(block *model.Block, src peer.ID)) (unsubscribe func()) {
+	return p.Events.BlockReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnBlockRequestReceived(callback func(blockID iotago.BlockID, src peer.ID)) (unsubscribe func()) {
+	return p.Events.BlockRequestReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnCommitmentReceived(callback func(commitment *model.Commitment, src peer.ID)) (unsubscribe func()) {
+	return p.Events.SlotCommitmentReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnCommitmentRequestReceived(callback func(commitmentID iotago.CommitmentID, src peer.ID)) (unsubscribe func()) {
+	return p.Events.SlotCommitmentRequestReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnAttestationsReceived(callback func(*model.Commitment, []*iotago.Attestation, *merklehasher.Proof[iotago.Identifier], peer.ID)) (unsubscribe func()) {
+	return p.Events.AttestationsReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnAttestationsRequestReceived(callback func(commitmentID iotago.CommitmentID, src peer.ID)) (unsubscribe func()) {
+	return p.Events.AttestationsRequestReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnWarpSyncResponseReceived(callback func(commitmentID iotago.CommitmentID, blockIDs map[iotago.CommitmentID]iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], src peer.ID)) (unsubscribe func()) {
+	return p.Events.WarpSyncResponseReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnWarpSyncRequestReceived(callback func(commitmentID iotago.CommitmentID, src peer.ID)) (unsubscribe func()) {
+	return p.Events.WarpSyncRequestReceived.Hook(callback).Unhook
+}
+
+func (p *Protocol) OnError(callback func(err error, src peer.ID)) (unsubscribe func()) {
+	return p.Events.Error.Hook(callback).Unhook
+}
+
 func (p *Protocol) Shutdown() {
 	p.network.Shutdown()
 
 	p.workerPool.Shutdown()
 	p.workerPool.ShutdownComplete.Wait()
+
+	p.shutdown.Trigger()
+}
+
+func (p *Protocol) OnShutdown(callback func()) (unsubscribe func()) {
+	return p.shutdown.OnTrigger(callback)
 }
 
 func (p *Protocol) handlePacket(nbr peer.ID, packet proto.Message) (err error) {

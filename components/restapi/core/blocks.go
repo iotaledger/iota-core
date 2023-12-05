@@ -16,7 +16,7 @@ func blockByID(c echo.Context) (*iotago.Block, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
 	}
 
-	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "block not found: %s", blockID.ToHex())
 	}
@@ -25,7 +25,7 @@ func blockByID(c echo.Context) (*iotago.Block, error) {
 }
 
 func blockMetadataByBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
-	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
 	}
@@ -34,7 +34,7 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse,
 }
 
 func transactionMetadataByBlockID(blockID iotago.BlockID) (*api.TransactionMetadataResponse, error) {
-	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
 	}
@@ -62,7 +62,7 @@ func blockWithMetadataByID(c echo.Context) (*api.BlockWithMetadataResponse, erro
 		return nil, ierrors.Wrapf(err, "failed to parse block ID %s", c.Param(api.ParameterBlockID))
 	}
 
-	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
 		return nil, ierrors.Wrapf(echo.ErrNotFound, "no transaction found for block ID %s", blockID.ToHex())
 	}
@@ -79,7 +79,7 @@ func blockWithMetadataByID(c echo.Context) (*api.BlockWithMetadataResponse, erro
 }
 
 func blockIssuance() (*api.IssuanceBlockHeaderResponse, error) {
-	references := deps.Protocol.MainEngineInstance().TipSelection.SelectTips(iotago.BasicBlockMaxParents)
+	references := deps.Protocol.Engines.Main.Get().TipSelection.SelectTips(iotago.BasicBlockMaxParents)
 	if len(references[iotago.StrongParentType]) == 0 {
 		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "no strong parents available")
 	}
@@ -88,8 +88,8 @@ func blockIssuance() (*api.IssuanceBlockHeaderResponse, error) {
 		StrongParents:       references[iotago.StrongParentType],
 		WeakParents:         references[iotago.WeakParentType],
 		ShallowLikeParents:  references[iotago.ShallowLikeParentType],
-		LatestFinalizedSlot: deps.Protocol.MainEngineInstance().SyncManager.LatestFinalizedSlot(),
-		LatestCommitment:    deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Commitment(),
+		LatestFinalizedSlot: deps.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot(),
+		LatestCommitment:    deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment(),
 	}
 
 	return resp, nil

@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,8 +9,10 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -67,6 +68,13 @@ type Engine struct {
 	SyncManager         syncmanager.SyncManager
 	UpgradeOrchestrator upgrade.Orchestrator
 
+	// RootCommitment contains the earliest commitment that that blocks we are solidifying will refer to, and is mainly
+	// used to determine the cut-off point for the actively managed commitments in the protocol.
+	RootCommitment reactive.Variable[*model.Commitment]
+
+	// LatestCommitment contains the latest commitment that we have produced.
+	LatestCommitment reactive.Variable[*model.Commitment]
+
 	Workers      *workerpool.Group
 	errorHandler func(error)
 
@@ -75,19 +83,17 @@ type Engine struct {
 	chainID iotago.CommitmentID
 	mutex   syncutils.RWMutex
 
-	accessMutex syncutils.RWMutex
-
 	optsSnapshotPath     string
 	optsEntryPointsDepth int
 	optsSnapshotDepth    int
 	optsBlockRequester   []options.Option[eventticker.EventTicker[iotago.SlotIndex, iotago.BlockID]]
 
-	module.Module
+	*module.ReactiveModule
 }
 
 func New(
+	logger log.Logger,
 	workers *workerpool.Group,
-	errorHandler func(error),
 	storageInstance *storage.Storage,
 	preSolidFilterProvider module.Provider[*Engine, presolidfilter.PreSolidFilter],
 	postSolidFilterProvider module.Provider[*Engine, postsolidfilter.PostSolidFilter],
@@ -108,25 +114,30 @@ func New(
 	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	opts ...options.Option[Engine],
 ) (engine *Engine) {
-	var needsToImportSnapshot bool
+	var importSnapshot bool
 	var file *os.File
 	var fileErr error
 
 	return options.Apply(
 		&Engine{
-			Events:        NewEvents(),
-			Storage:       storageInstance,
-			EvictionState: eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks, storageInstance.GenesisRootBlockID),
-			Workers:       workers,
-			errorHandler:  errorHandler,
+			Events:           NewEvents(),
+			Storage:          storageInstance,
+			EvictionState:    eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks, storageInstance.GenesisRootBlockID),
+			RootCommitment:   reactive.NewVariable[*model.Commitment](),
+			LatestCommitment: reactive.NewVariable[*model.Commitment](),
+			Workers:          workers,
 
 			optsSnapshotPath:  "snapshot.bin",
 			optsSnapshotDepth: 5,
 		}, opts, func(e *Engine) {
-			needsToImportSnapshot = !e.Storage.Settings().IsSnapshotImported() && e.optsSnapshotPath != ""
+			e.ReactiveModule = e.initReactiveModule(logger)
+
+			e.errorHandler = func(err error) {
+				e.LogTrace("engine error", "err", err)
+			}
 
 			// Import the settings from the snapshot file if needed.
-			if needsToImportSnapshot {
+			if importSnapshot = !e.Storage.Settings().IsSnapshotImported() && e.optsSnapshotPath != ""; importSnapshot {
 				file, fileErr = os.Open(e.optsSnapshotPath)
 				if fileErr != nil {
 					panic(ierrors.Wrap(fileErr, "failed to open snapshot file"))
@@ -138,7 +149,11 @@ func New(
 			}
 		},
 		func(e *Engine) {
-			// Setup all components
+			// setup reactive variables
+			e.initRootCommitment()
+			e.initLatestCommitment()
+
+			// setup all components
 			e.BlockCache = blocks.New(e.EvictionState, e.Storage.Settings().APIProvider())
 			e.BlockRequester = eventticker.New(e.optsBlockRequester...)
 			e.SybilProtection = sybilProtectionProvider(e)
@@ -164,18 +179,18 @@ func New(
 		(*Engine).setupBlockRequester,
 		(*Engine).setupPruning,
 		(*Engine).acceptanceHandler,
-		(*Engine).TriggerConstructed,
 		func(e *Engine) {
+			e.Constructed.Trigger()
+
 			// Make sure that we have the protocol parameters for the latest supported iota.go protocol version of the software.
 			// If not the user needs to update the protocol parameters file.
 			// This can only happen after a user updated the node version and the new protocol version is not yet active.
 			if _, err := e.APIForVersion(iotago.LatestProtocolVersion()); err != nil {
 				panic(ierrors.Wrap(err, "no protocol parameters for latest protocol version found"))
 			}
-		},
-		func(e *Engine) {
+
 			// Import the rest of the snapshot if needed.
-			if needsToImportSnapshot {
+			if importSnapshot {
 				if err := e.ImportContents(file); err != nil {
 					panic(ierrors.Wrap(err, "failed to import snapshot contents"))
 				}
@@ -211,11 +226,11 @@ func New(
 
 				e.Reset()
 			}
+
+			e.Initialized.Trigger()
+
+			e.LogDebug("initialized", "settings", e.Storage.Settings().String())
 		},
-		func(e *Engine) {
-			fmt.Println("Engine Settings", e.Storage.Settings().String())
-		},
-		(*Engine).TriggerInitialized,
 	)
 }
 
@@ -226,11 +241,7 @@ func (e *Engine) ProcessBlockFromPeer(block *model.Block, source peer.ID) {
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (e *Engine) Reset() {
-	e.accessMutex.Lock()
-	defer e.accessMutex.Unlock()
-
-	// Waits for all pending tasks to be processed.
-	e.Workers.WaitChildren()
+	e.LogDebug("resetting", "target-slot", e.Storage.Settings().LatestCommitment().Slot())
 
 	// Reset should be performed in the same order as Shutdown.
 	e.BlockRequester.Clear()
@@ -252,42 +263,11 @@ func (e *Engine) Reset() {
 	e.Retainer.Reset()
 	e.EvictionState.Reset()
 	e.BlockCache.Reset()
-
 	e.Storage.Reset()
 
 	latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
 	latestCommittedTime := e.APIForSlot(latestCommittedSlot).TimeProvider().SlotEndTime(latestCommittedSlot)
 	e.Clock.Reset(latestCommittedTime)
-}
-
-func (e *Engine) Shutdown() {
-	if !e.WasShutdown() {
-		e.TriggerShutdown()
-
-		// Shutdown should be performed in the reverse dataflow order.
-		e.BlockRequester.Shutdown()
-		e.Scheduler.Shutdown()
-		e.TipSelection.Shutdown()
-		e.TipManager.Shutdown()
-		e.Attestations.Shutdown()
-		e.SyncManager.Shutdown()
-		e.Notarization.Shutdown()
-		e.Clock.Shutdown()
-		e.SlotGadget.Shutdown()
-		e.BlockGadget.Shutdown()
-		e.UpgradeOrchestrator.Shutdown()
-		e.SybilProtection.Shutdown()
-		e.Booker.Shutdown()
-		e.Ledger.Shutdown()
-		e.PostSolidFilter.Shutdown()
-		e.BlockDAG.Shutdown()
-		e.PreSolidFilter.Shutdown()
-		e.Retainer.Shutdown()
-		e.Workers.Shutdown()
-		e.Storage.Shutdown()
-
-		e.TriggerStopped()
-	}
 }
 
 func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {
@@ -297,7 +277,11 @@ func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {
 func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	cachedBlock, exists := e.BlockCache.Block(id)
 	if exists && !cachedBlock.IsRootBlock() {
-		return cachedBlock.ModelBlock(), !cachedBlock.IsMissing()
+		if cachedBlock.IsMissing() {
+			return nil, false
+		}
+
+		return cachedBlock.ModelBlock(), true
 	}
 
 	s, err := e.Storage.Blocks(id.Slot())
@@ -522,46 +506,105 @@ func (e *Engine) setupPruning() {
 	}, event.WithWorkerPool(e.Workers.CreatePool("PruneEngine", workerpool.WithWorkerCount(1))))
 }
 
-// EarliestRootCommitment is used to make sure that the chainManager knows the earliest possible
-// commitment that blocks we are solidifying will refer to. Failing to do so will prevent those blocks
-// from being processed as their chain will be deemed unsolid.
-// lastFinalizedSlot is needed to make sure that the root commitment is not younger than the last finalized slot.
-// If setting the root commitment based on the last evicted slot this basically means we won't be able to solidify another
-// chain beyond a window based on eviction, which in turn is based on acceptance. In case of a partition, this behavior is
-// clearly not desired.
-func (e *Engine) EarliestRootCommitment(lastFinalizedSlot iotago.SlotIndex) (earliestCommitment *model.Commitment) {
-	api := e.APIForSlot(lastFinalizedSlot)
-
-	genesisSlot := api.ProtocolParameters().GenesisSlot()
-	maxCommittableAge := api.ProtocolParameters().MaxCommittableAge()
-
-	var earliestRootCommitmentSlot iotago.SlotIndex
-	if lastFinalizedSlot <= genesisSlot+maxCommittableAge {
-		earliestRootCommitmentSlot = genesisSlot
-	} else {
-		earliestRootCommitmentSlot = lastFinalizedSlot - maxCommittableAge
-	}
-
-	rootCommitment, err := e.Storage.Commitments().Load(earliestRootCommitmentSlot)
-	if err != nil {
-		panic(fmt.Sprintf("could not load earliest commitment %d after engine initialization: %s", earliestRootCommitmentSlot, err))
-	}
-
-	return rootCommitment
-}
-
 func (e *Engine) ErrorHandler(componentName string) func(error) {
 	return func(err error) {
 		e.errorHandler(ierrors.Wrap(err, componentName))
 	}
 }
 
-func (e *Engine) RLock() {
-	e.accessMutex.RLock()
+func (e *Engine) initRootCommitment() {
+	updateRootCommitment := func(lastFinalizedSlot iotago.SlotIndex) {
+		e.RootCommitment.Compute(func(rootCommitment *model.Commitment) *model.Commitment {
+			protocolParams := e.APIForSlot(lastFinalizedSlot).ProtocolParameters()
+			maxCommittableAge := protocolParams.MaxCommittableAge()
+
+			targetSlot := protocolParams.GenesisSlot()
+			if lastFinalizedSlot > targetSlot+maxCommittableAge {
+				targetSlot = lastFinalizedSlot - maxCommittableAge
+			}
+
+			if rootCommitment != nil && targetSlot == rootCommitment.Slot() {
+				return rootCommitment
+			}
+
+			commitment, err := e.Storage.Commitments().Load(targetSlot)
+			if err != nil {
+				e.LogError("failed to load root commitment", "slot", targetSlot, "err", err)
+			}
+
+			return commitment
+		})
+	}
+
+	e.Constructed.OnTrigger(func() {
+		unsubscribe := e.Events.SlotGadget.SlotFinalized.Hook(updateRootCommitment).Unhook
+
+		e.Initialized.OnTrigger(func() {
+			updateRootCommitment(e.Storage.Settings().LatestFinalizedSlot())
+		})
+
+		e.Shutdown.OnTrigger(unsubscribe)
+	})
 }
 
-func (e *Engine) RUnlock() {
-	e.accessMutex.RUnlock()
+func (e *Engine) initLatestCommitment() {
+	updateLatestCommitment := func(latestCommitment *model.Commitment) {
+		e.LatestCommitment.Compute(func(currentLatestCommitment *model.Commitment) *model.Commitment {
+			return lo.Cond(currentLatestCommitment == nil || currentLatestCommitment.Slot() < latestCommitment.Slot(), latestCommitment, currentLatestCommitment)
+		})
+	}
+
+	e.Constructed.OnTrigger(func() {
+		unsubscribe := e.Events.Notarization.LatestCommitmentUpdated.Hook(updateLatestCommitment).Unhook
+
+		e.Initialized.OnTrigger(func() {
+			updateLatestCommitment(e.Storage.Settings().LatestCommitment())
+		})
+
+		e.Shutdown.OnTrigger(unsubscribe)
+	})
+}
+
+func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *module.ReactiveModule) {
+	logger, unsubscribeFromParentLogger := parentLogger.NewEntityLogger("Engine")
+	reactiveModule = module.NewReactiveModule(logger)
+
+	e.RootCommitment.LogUpdates(reactiveModule, log.LevelTrace, "RootCommitment")
+	e.LatestCommitment.LogUpdates(reactiveModule, log.LevelTrace, "LatestCommitment")
+
+	reactiveModule.Shutdown.OnTrigger(func() {
+		reactiveModule.LogDebug("shutting down")
+
+		unsubscribeFromParentLogger()
+
+		// Shutdown should be performed in the reverse dataflow order.
+		e.BlockRequester.Shutdown()
+		e.Scheduler.Shutdown()
+		e.TipSelection.Shutdown()
+		e.TipManager.Shutdown()
+		e.Attestations.Shutdown()
+		e.SyncManager.Shutdown()
+		e.Notarization.Shutdown()
+		e.Clock.Shutdown()
+		e.SlotGadget.Shutdown()
+		e.BlockGadget.Shutdown()
+		e.UpgradeOrchestrator.Shutdown()
+		e.SybilProtection.Shutdown()
+		e.Booker.Shutdown()
+		e.Ledger.Shutdown()
+		e.PostSolidFilter.Shutdown()
+		e.BlockDAG.Shutdown()
+		e.PreSolidFilter.Shutdown()
+		e.Retainer.Shutdown()
+		e.Workers.Shutdown()
+		e.Storage.Shutdown()
+
+		reactiveModule.LogDebug("stopped")
+
+		e.Stopped.Trigger()
+	})
+
+	return reactiveModule
 }
 
 // endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

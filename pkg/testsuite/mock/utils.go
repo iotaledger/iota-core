@@ -24,6 +24,12 @@ func MinValidatorAccountAmount(protocolParameters iotago.ProtocolParameters) iot
 	))
 }
 
+func MinDelegationAmount(protocolParameters iotago.ProtocolParameters) iotago.BaseToken {
+	return lo.PanicOnErr(depositcalculator.MinDeposit(protocolParameters, iotago.OutputDelegation,
+		depositcalculator.WithAddress(&iotago.Ed25519Address{}),
+	))
+}
+
 // TODO: add the correct formula later.
 //
 //nolint:revive

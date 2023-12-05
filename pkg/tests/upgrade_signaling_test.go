@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
-	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -58,12 +57,6 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	)
 
 	nodeOptionsWithoutV5 := []options.Option[protocol.Protocol]{
-		protocol.WithChainManagerOptions(
-			chainmanager.WithCommitmentRequesterOptions(
-				eventticker.RetryInterval[iotago.SlotIndex, iotago.CommitmentID](1*time.Second),
-				eventticker.RetryJitter[iotago.SlotIndex, iotago.CommitmentID](500*time.Millisecond),
-			),
-		),
 		protocol.WithEngineOptions(
 			engine.WithBlockRequesterOptions(
 				eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
@@ -224,7 +217,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	}, ts.Nodes()...)
 
 	// check that rollback is correct
-	pastAccounts, err := ts.Node("nodeA").Protocol.MainEngineInstance().Ledger.PastAccounts(iotago.AccountIDs{ts.Node("nodeA").Validator.AccountID}, 7)
+	pastAccounts, err := ts.Node("nodeA").Protocol.Engines.Main.Get().Ledger.PastAccounts(iotago.AccountIDs{ts.Node("nodeA").Validator.AccountID}, 7)
 	require.NoError(t, err)
 	require.Contains(t, pastAccounts, ts.Node("nodeA").Validator.AccountID)
 	require.Equal(t, model.VersionAndHash{Version: 4, Hash: hash2}, pastAccounts[ts.Node("nodeA").Validator.AccountID].LatestSupportedProtocolVersionAndHash)
@@ -272,7 +265,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 		// Create snapshot.
 		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-		require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+		require.NoError(t, ts.Node("nodeA").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
 
 		{
 			nodeG := ts.AddNode("nodeG")
@@ -331,7 +324,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 		// Create snapshot and start new nodeH from it.
 		{
 			snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-			require.NoError(t, ts.Node("nodeE2").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+			require.NoError(t, ts.Node("nodeE2").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
 
 			nodeG := ts.AddNode("nodeH")
 			nodeG.Initialize(true,

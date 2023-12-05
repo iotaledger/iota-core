@@ -51,6 +51,8 @@ func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
 	roots, _, err := rootsStorage.Load(c.CommitmentID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to load roots for slot %d", c.CommitmentID)
+	} else if roots == nil {
+		return nil, ierrors.Errorf("roots for slot %d are not known, yet", c.CommitmentID)
 	}
 
 	return roots, nil

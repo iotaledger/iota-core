@@ -106,7 +106,7 @@ func run() error {
 }
 
 func configureComponentCountersEvents() {
-	deps.Protocol.Events.Network.BlockReceived.Hook(func(_ *model.Block, _ peer.ID) {
+	deps.Protocol.Network.OnBlockReceived(func(_ *model.Block, _ peer.ID) {
 		incComponentCounter(Received)
 	})
 

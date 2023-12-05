@@ -20,7 +20,7 @@ func (t *TestSuite) AssertActiveRootBlocks(expectedBlocks []*blocks.Block, nodes
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			activeRootBlocks := node.Protocol.MainEngineInstance().EvictionState.ActiveRootBlocks()
+			activeRootBlocks := node.Protocol.Engines.Main.Get().EvictionState.ActiveRootBlocks()
 
 			if !assert.Equal(t.fakeTesting, expectedRootBlocks, activeRootBlocks) {
 				return ierrors.Errorf("AssertActiveRootBlocks: %s: expected %v, got %v", node.Name, expectedRootBlocks, activeRootBlocks)
@@ -36,8 +36,8 @@ func (t *TestSuite) AssertEvictedSlot(expectedIndex iotago.SlotIndex, nodes ...*
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			if expectedIndex != lo.Return1(node.Protocol.MainEngineInstance().EvictionState.LastEvictedSlot()) {
-				return ierrors.Errorf("AssertEvictedSlot: %s: expected %d, got %d", node.Name, expectedIndex, lo.Return1(node.Protocol.MainEngineInstance().EvictionState.LastEvictedSlot()))
+			if expectedIndex != lo.Return1(node.Protocol.Engines.Main.Get().EvictionState.LastEvictedSlot()) {
+				return ierrors.Errorf("AssertEvictedSlot: %s: expected %d, got %d", node.Name, expectedIndex, lo.Return1(node.Protocol.Engines.Main.Get().EvictionState.LastEvictedSlot()))
 			}
 
 			return nil

@@ -5,6 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
@@ -16,18 +17,18 @@ type CommitmentVerifier struct {
 	engine                   *engine.Engine
 	lastCommonSlotBeforeFork iotago.SlotIndex
 
-	// cumulativeWeight is the cumulative weight of the verified commitments. It is updated after each verification.
-	cumulativeWeight uint64
-
 	// epoch is the epoch of the currently verified commitment. Initially, it is set to the epoch of the last common commitment before the fork.
 	epoch iotago.EpochIndex
 
 	// validatorAccountsData is the accounts data of the validators for the current epoch as known at lastCommonSlotBeforeFork.
 	// Initially, it is set to the accounts data of the validators for the epoch of the last common commitment before the fork.
 	validatorAccountsData map[iotago.AccountID]*accounts.AccountData
+
+	// mutex is used to synchronize access to validatorAccountsData and epoch.
+	mutex syncutils.RWMutex
 }
 
-func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) (*CommitmentVerifier, error) {
+func newCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBeforeFork *model.Commitment) (*CommitmentVerifier, error) {
 	apiForSlot := mainEngine.APIForSlot(lastCommonCommitmentBeforeFork.Slot())
 	epoch := apiForSlot.TimeProvider().EpochFromSlot(lastCommonCommitmentBeforeFork.Slot())
 
@@ -48,14 +49,13 @@ func NewCommitmentVerifier(mainEngine *engine.Engine, lastCommonCommitmentBefore
 
 	return &CommitmentVerifier{
 		engine:                   mainEngine,
-		cumulativeWeight:         lastCommonCommitmentBeforeFork.CumulativeWeight(),
 		lastCommonSlotBeforeFork: lastCommonCommitmentBeforeFork.Slot(),
 		epoch:                    epoch,
 		validatorAccountsData:    validatorAccountsDataAtForkingPoint,
 	}, nil
 }
 
-func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
+func (c *CommitmentVerifier) verifyCommitment(commitment *Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier]) (blockIDsFromAttestations iotago.BlockIDs, cumulativeWeight uint64, err error) {
 	// 1. Verify that the provided attestations are indeed the ones that were included in the commitment.
 	tree := ads.NewMap[iotago.Identifier](mapdb.NewMapDB(),
 		iotago.Identifier.Bytes,
@@ -80,6 +80,7 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 	//    This is necessary because the committee might have rotated at the epoch boundary and different validators might be part of it.
 	//    In case anything goes wrong we keep using previously known accounts data (initially set to the accounts data
 	//    of the validators for the epoch of the last common commitment before the fork).
+	c.mutex.Lock()
 	apiForSlot := c.engine.APIForSlot(commitment.Slot())
 	commitmentEpoch := apiForSlot.TimeProvider().EpochFromSlot(commitment.Slot())
 	if commitmentEpoch > c.epoch {
@@ -96,6 +97,7 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 			}
 		}
 	}
+	c.mutex.Unlock()
 
 	// 3. Verify attestations.
 	blockIDs, seatCount, err := c.verifyAttestations(attestations)
@@ -103,7 +105,7 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 		return nil, 0, ierrors.Wrapf(err, "error validating attestations for commitment %s", commitment.ID())
 	}
 
-	// 4. Verify that calculated cumulative weight from attestations is lower or equal to cumulative weight of commitment.
+	// 4. Verify that calculated weight from attestations is lower or equal to weight of commitment.
 	//    This is necessary due to public key changes of validators in the window of forking point and the current state of
 	//    the other chain (as validators could have added/removed public keys that we don't know about yet).
 	//
@@ -125,15 +127,17 @@ func (c *CommitmentVerifier) verifyCommitment(commitment *model.Commitment, atte
 	//    fabricate attestations and thus a theoretically heavier chain (solely when looking on the chain backed by attestations)
 	//    than it actually is. Nodes might consider to switch to this chain, even though it is invalid which will be discovered
 	//    before the candidate chain/engine is activated (it will never get heavier than the current chain).
-	c.cumulativeWeight += seatCount
-	if c.cumulativeWeight > commitment.CumulativeWeight() {
-		return nil, 0, ierrors.Errorf("invalid cumulative weight for commitment %s: expected %d, got %d", commitment.ID(), commitment.CumulativeWeight(), c.cumulativeWeight)
+	if seatCount > commitment.Weight.Get() {
+		return nil, 0, ierrors.Errorf("invalid cumulative weight for commitment %s: expected %d, got %d", commitment.ID(), commitment.CumulativeWeight(), seatCount)
 	}
 
-	return blockIDs, c.cumulativeWeight, nil
+	return blockIDs, seatCount, nil
 }
 
 func (c *CommitmentVerifier) verifyAttestations(attestations []*iotago.Attestation) (iotago.BlockIDs, uint64, error) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
 	visitedIdentities := ds.NewSet[iotago.AccountID]()
 	var blockIDs iotago.BlockIDs
 	var seatCount uint64

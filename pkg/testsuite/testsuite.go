@@ -2,6 +2,8 @@ package testsuite
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -14,6 +16,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -66,6 +69,7 @@ type TestSuite struct {
 	optsSnapshotOptions []options.Option[snapshotcreator.Options]
 	optsWaitFor         time.Duration
 	optsTick            time.Duration
+	optsLogHandler      slog.Handler
 
 	uniqueBlockTimeCounter              atomic.Int64
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
@@ -87,8 +91,9 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
 		automaticTransactionIssuingCounters: *shrinkingmap.New[string, int](),
 
-		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
-		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
+		optsWaitFor:    durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:       durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
+		optsLogHandler: log.NewTextHandler(os.Stdout),
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 
@@ -278,7 +283,7 @@ func (t *TestSuite) SeatOfNodes(slot iotago.SlotIndex, names ...string) []accoun
 	nodes := t.Nodes(names...)
 
 	return lo.Map(nodes, func(node *mock.Node) account.SeatIndex {
-		seatedAccounts, exists := node.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(slot)
+		seatedAccounts, exists := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(slot)
 		require.True(t.Testing, exists, "node %s: committee at slot %d does not exist", node.Name, slot)
 
 		seat, exists := seatedAccounts.GetSeat(node.Validator.AccountID)
@@ -327,7 +332,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 		panic(fmt.Sprintf("cannot add validator node %s to partition %s: framework already running", name, partition))
 	}
 
-	node := mock.NewNode(t.Testing, t.network, partition, name, validator)
+	node := mock.NewNode(t.Testing, t.network, partition, name, validator, t.optsLogHandler)
 	t.nodes.Set(name, node)
 	node.SetCurrentSlot(t.currentSlot)
 
@@ -515,7 +520,7 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 
 	if _, firstNode, exists := t.nodes.Head(); exists {
 		t.wallets.ForEach(func(_ string, wallet *mock.Wallet) bool {
-			if err := firstNode.Protocol.MainEngineInstance().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
+			if err := firstNode.Protocol.Engines.Main.Get().Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
 				wallet.AddOutput(fmt.Sprintf("Genesis:%d", output.OutputID().Index()), output)
 				return true
 			}); err != nil {

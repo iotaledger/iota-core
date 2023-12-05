@@ -229,7 +229,7 @@ func (t *TestSuite) validatorReward(alias string, epoch iotago.EpochIndex, profi
 	residualValidatorFactor := ((profitMarginComplement * poolRewardsNoFixedCost) >> profitMarginExponent) * stakeAmount / poolStake
 	unDecayedEpochRewards := fixedCost + profitMarginFactor + residualValidatorFactor
 	decayProvider := t.api.ManaDecayProvider()
-	decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epoch, epoch)
+	decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(unDecayedEpochRewards), epoch, epoch)
 	require.NoError(t.T, err)
 
 	return decayedEpochRewards
@@ -250,7 +250,7 @@ func (t *TestSuite) delegatorReward(epoch iotago.EpochIndex, profitMargin, poolR
 	unDecayedEpochRewards := (((profitMarginComplement * poolRewards) >> profitMarginExponent) * delegatedAmount) / poolStake
 
 	decayProvider := t.api.ManaDecayProvider()
-	decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epoch, epoch)
+	decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(unDecayedEpochRewards), epoch, epoch)
 	require.NoError(t.T, err)
 
 	return decayedEpochRewards

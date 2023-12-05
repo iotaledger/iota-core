@@ -490,7 +490,7 @@ func (m *Manager) computeBlockBurnsForSlot(slot iotago.SlotIndex, rmc iotago.Man
 					return nil, ierrors.Wrapf(err, "cannot compute penalty for over-issuing validator, account %s could not be retrieved", accountID)
 				}
 				punishmentEpochs := apiForSlot.ProtocolParameters().PunishmentEpochs()
-				manaPunishment, err := apiForSlot.ManaDecayProvider().ManaGenerationWithDecay(accountData.ValidatorStake, slot, slot+apiForSlot.TimeProvider().EpochDurationSlots()*iotago.SlotIndex(punishmentEpochs))
+				manaPunishment, err := apiForSlot.ManaDecayProvider().GenerateManaAndDecayBySlots(accountData.ValidatorStake, slot, slot+apiForSlot.TimeProvider().EpochDurationSlots()*iotago.SlotIndex(punishmentEpochs))
 				if err != nil {
 					return nil, ierrors.Wrapf(err, "cannot compute penalty for over-issuing validator with account ID %s due to problem with mana generation", accountID)
 				}
@@ -526,7 +526,7 @@ func (m *Manager) commitAccountTree(slot iotago.SlotIndex, accountDiffChanges ma
 		if diffChange.BICChange != 0 || !exists {
 			// decay the credits to the current slot if the account exists
 			if exists {
-				decayedPreviousCredits, err := m.apiProvider.APIForSlot(slot).ManaDecayProvider().ManaWithDecay(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateSlot, slot)
+				decayedPreviousCredits, err := m.apiProvider.APIForSlot(slot).ManaDecayProvider().DecayManaBySlots(iotago.Mana(accountData.Credits.Value), accountData.Credits.UpdateSlot, slot)
 				if err != nil {
 					return ierrors.Wrapf(err, "can't retrieve account, could not decay credits for account (%s) in slot (%d)", accountData.ID, slot)
 				}

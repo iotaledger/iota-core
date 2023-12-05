@@ -2,6 +2,7 @@ package tests
 
 import (
 	"testing"
+	"time"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -348,7 +349,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		node2.Validator.AccountID,
 	}, ts.Nodes()...)
 
-	genesisCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(0)).Commitment()
+	genesisCommitment := lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(0)).Commitment()
 
 	// Create and issue double spends
 	{
@@ -457,7 +458,7 @@ func Test_SpendRejectedCommittedRace(t *testing.T) {
 		)
 	}
 
-	commitment1 := lo.PanicOnErr(node2.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
+	commitment1 := lo.PanicOnErr(node2.Protocol.Engines.Main.Get().Storage.Commitments().Load(1)).Commitment()
 
 	// This should be booked on the rejected tx1 conflict
 	tx4 := wallet.CreateBasicOutputsEquallyFromInput("tx4", 1, "tx1:0")
@@ -621,7 +622,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		node2.Validator.AccountID,
 	}, ts.Nodes()...)
 
-	genesisCommitment := lo.PanicOnErr(node1.Protocol.MainEngineInstance().Storage.Commitments().Load(0)).Commitment()
+	genesisCommitment := lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(0)).Commitment()
 
 	// Create and issue double spends
 	{
@@ -706,7 +707,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		)
 	}
 
-	commitment1 := lo.PanicOnErr(node2.Protocol.MainEngineInstance().Storage.Commitments().Load(1)).Commitment()
+	commitment1 := lo.PanicOnErr(node2.Protocol.Engines.Main.Get().Storage.Commitments().Load(1)).Commitment()
 
 	// Issue a block booked on a pending conflict on node2
 	{
@@ -774,4 +775,58 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 
 		ts.AssertTransactionsExist(wallet.Transactions("tx1", "tx2"), false, node1, node2)
 	}
+}
+
+func Test_RootBlockShallowLike(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				4,
+				5,
+			),
+		),
+
+		testsuite.WithWaitFor(5*time.Second),
+	)
+	defer ts.Shutdown()
+
+	node1 := ts.AddValidatorNode("node1")
+	wallet := ts.AddDefaultWallet(node1)
+	ts.Run(true, map[string][]options.Option[protocol.Protocol]{})
+
+	tx1 := wallet.CreateBasicOutputsEquallyFromInput("tx1", 1, "Genesis:0")
+
+	ts.IssueBasicBlockWithOptions("block1", wallet, tx1, mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(1)))
+	ts.IssueBasicBlockWithOptions("block2", wallet, &iotago.TaggedData{}, mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(1)))
+
+	ts.AssertTransactionsExist(wallet.Transactions("tx1"), true, node1)
+
+	ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
+		ts.Block("block1"): {"tx1"},
+	}, node1)
+
+	ts.AssertTransactionInCacheConflicts(map[*iotago.Transaction][]string{
+		wallet.Transaction("tx1"): {"tx1"},
+	}, node1)
+
+	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4}, 2, "block", ts.Nodes(), true, false)
+
+	ts.AssertActiveRootBlocks(ts.Blocks("Genesis", "block1", "block2", "2.1-node1"), ts.Nodes()...)
+
+	ts.IssueBasicBlockWithOptions("block-shallow-like-valid", wallet, &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("4.1-node1")), mock.WithShallowLikeParents(ts.BlockID("block1")), mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(5)))
+	ts.AssertBlocksInCacheBooked(ts.Blocks("block-shallow-like-valid"), true, node1)
+	ts.AssertBlocksInCacheInvalid(ts.Blocks("block-shallow-like-valid"), false, node1)
+
+	ts.IssueBasicBlockWithOptions("block-shallow-like-invalid", wallet, &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("4.1-node1")), mock.WithShallowLikeParents(ts.BlockID("block2")), mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(5)))
+	ts.AssertBlocksInCacheBooked(ts.Blocks("block-shallow-like-invalid"), false, node1)
+	ts.AssertBlocksInCacheInvalid(ts.Blocks("block-shallow-like-invalid"), true, node1)
 }
