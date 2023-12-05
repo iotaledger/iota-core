@@ -113,29 +113,7 @@ func (b *BlocksProtocol) ProcessResponse(block *model.Block, from peer.ID) {
 func (b *BlocksProtocol) ProcessRequest(blockID iotago.BlockID, from peer.ID) {
 	b.workerPool.Submit(func() {
 		block, exists := b.protocol.Engines.Main.Get().Block(blockID)
-
-		// TODO: CHECK why blocks can be nil here:
-		//panic: runtime error: invalid memory address or nil pointer dereference
-		//[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x10c2ac3]
-		//
-		//	goroutine 302684 [running]:
-		//	github.com/iotaledger/iota-core/pkg/model.(*Block).Data(...)
-		//	/actions-runner/_work/iota-core/iota-core/pkg/model/block.go:85
-		//	github.com/iotaledger/iota-core/pkg/network/protocols/core.(*Protocol).SendBlock(0xc0045f0420, 0x0, {0xc0045a7c70, 0x1, 0x1})
-		//	/actions-runner/_work/iota-core/iota-core/pkg/network/protocols/core/protocol.go:57 +0x43
-		//	github.com/iotaledger/iota-core/pkg/protocol.(*BlocksProtocol).ProcessRequest-fm.(*BlocksProtocol).ProcessRequest.func1()
-		//	/actions-runner/_work/iota-core/iota-core/pkg/protocol/protocol_blocks.go:128 +0x1ae
-		//	github.com/iotaledger/hive.go/runtime/workerpool.(*Task).run(0xc0035f4060)
-		//	/home/runner/go/pkg/mod/github.com/iotaledger/hive.go/runtime@v0.0.0-20231109195003-91f206338890/workerpool/task.go:48 +0xb6
-		//	github.com/iotaledger/hive.go/runtime/workerpool.(*WorkerPool).workerReadLoop(0xc0021408c0)
-		//	/home/runner/go/pkg/mod/github.com/iotaledger/hive.go/runtime@v0.0.0-20231109195003-91f206338890/workerpool/workerpool.go:190 +0x3b
-		//	github.com/iotaledger/hive.go/runtime/workerpool.(*WorkerPool).worker(0xc0021408c0)
-		//	/home/runner/go/pkg/mod/github.com/iotaledger/hive.go/runtime@v0.0.0-20231109195003-91f206338890/workerpool/workerpool.go:170 +0x69
-		//	created by github.com/iotaledger/hive.go/runtime/workerpool.(*WorkerPool).startWorkers in goroutine 282432
-		//	/home/runner/go/pkg/mod/github.com/iotaledger/hive.go/runtime@v0.0.0-20231109195003-91f206338890/workerpool/workerpool.go:162 +0x32
-		//	FAIL	github.com/iotaledger/iota-core/pkg/tests	151.748s
-		//	FAIL
-		if !exists || block == nil {
+		if !exists {
 			b.LogTrace("requested block not found", "blockID", blockID)
 
 			return

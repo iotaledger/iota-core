@@ -277,7 +277,11 @@ func (e *Engine) BlockFromCache(id iotago.BlockID) (*blocks.Block, bool) {
 func (e *Engine) Block(id iotago.BlockID) (*model.Block, bool) {
 	cachedBlock, exists := e.BlockCache.Block(id)
 	if exists && !cachedBlock.IsRootBlock() {
-		return cachedBlock.ModelBlock(), !cachedBlock.IsMissing()
+		if cachedBlock.IsMissing() {
+			return nil, false
+		}
+
+		return cachedBlock.ModelBlock(), true
 	}
 
 	s, err := e.Storage.Blocks(id.Slot())
