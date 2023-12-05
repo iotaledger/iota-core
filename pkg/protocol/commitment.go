@@ -164,9 +164,10 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 		c.IsSynced.InheritFrom(c.IsVerified),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
-			// the weight can be fixed as a one time operation (as it only relies on static information from the parent
-			// commitment)
-			c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
+			// the weight can be fixed as a one time operation (it only relies on static information)
+			if parent.CumulativeWeight() < c.CumulativeWeight() {
+				c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
+			}
 
 			return lo.Batch(
 				parent.deriveChildren(c),

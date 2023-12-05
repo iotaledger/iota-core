@@ -523,7 +523,12 @@ func (e *Engine) initRootCommitment() {
 				return rootCommitment
 			}
 
-			return lo.Return1(e.Storage.Commitments().Load(targetSlot))
+			commitment, err := e.Storage.Commitments().Load(targetSlot)
+			if err != nil {
+				e.LogError("failed to load root commitment", "slot", targetSlot, "err", err)
+			}
+
+			return commitment
 		})
 	}
 
@@ -540,8 +545,8 @@ func (e *Engine) initRootCommitment() {
 
 func (e *Engine) initLatestCommitment() {
 	updateLatestCommitment := func(latestCommitment *model.Commitment) {
-		e.LatestCommitment.Compute(func(currentLatestComponent *model.Commitment) *model.Commitment {
-			return lo.Cond(currentLatestComponent == nil || currentLatestComponent.Slot() < latestCommitment.Slot(), latestCommitment, currentLatestComponent)
+		e.LatestCommitment.Compute(func(currentLatestCommitment *model.Commitment) *model.Commitment {
+			return lo.Cond(currentLatestCommitment == nil || currentLatestCommitment.Slot() < latestCommitment.Slot(), latestCommitment, currentLatestCommitment)
 		})
 	}
 

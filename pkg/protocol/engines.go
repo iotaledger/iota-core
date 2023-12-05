@@ -11,6 +11,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts/accountsledger"
@@ -68,37 +69,6 @@ func newEngines(protocol *Protocol) *Engines {
 	e.Constructed.Trigger()
 
 	return e
-}
-
-// LoadMainEngine loads the main engine from disk or creates a new one if no engine exists.
-func (e *Engines) LoadMainEngine(snapshotPath string) (*engine.Engine, error) {
-	info := &engineInfo{}
-	if err := ioutils.ReadJSONFromFile(e.infoFilePath(), info); err != nil && !ierrors.Is(err, os.ErrNotExist) {
-		return nil, ierrors.Errorf("unable to read engine info file: %w", err)
-	}
-
-	// load previous engine as main engine if it exists.
-	if len(info.Name) > 0 {
-		if exists, isDirectory, err := ioutils.PathExists(e.directory.Path(info.Name)); err == nil && exists && isDirectory {
-			e.Main.Set(e.loadEngineInstanceFromSnapshot(info.Name, snapshotPath))
-		}
-	}
-
-	// load new engine if no previous engine exists.
-	e.Main.Compute(func(mainEngine *engine.Engine) *engine.Engine {
-		if mainEngine != nil {
-			return mainEngine
-		}
-
-		return e.loadEngineInstanceFromSnapshot(lo.PanicOnErr(uuid.NewUUID()).String(), snapshotPath)
-	})
-
-	// cleanup candidates
-	if err := e.CleanupCandidates(); err != nil {
-		return nil, err
-	}
-
-	return e.Main.Get(), nil
 }
 
 // ForkAtSlot creates a new engine instance that forks from the main engine at the given slot.
@@ -161,8 +131,35 @@ func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 	return candidateEngine, nil
 }
 
-// CleanupCandidates removes all engine instances that are not the main engine.
-func (e *Engines) CleanupCandidates() error {
+// loadMainEngine loads the main engine from disk or creates a new one if no engine exists.
+func (e *Engines) loadMainEngine(snapshotPath string) (*engine.Engine, error) {
+	info := &engineInfo{}
+	if err := ioutils.ReadJSONFromFile(e.infoFilePath(), info); err != nil && !ierrors.Is(err, os.ErrNotExist) {
+		return nil, ierrors.Errorf("unable to read engine info file: %w", err)
+	}
+
+	e.Main.Compute(func(mainEngine *engine.Engine) *engine.Engine {
+		// load previous engine as main engine if it exists.
+		if len(info.Name) > 0 {
+			if exists, isDirectory, err := ioutils.PathExists(e.directory.Path(info.Name)); err == nil && exists && isDirectory {
+				return e.loadEngineInstanceFromSnapshot(info.Name, snapshotPath)
+			}
+		}
+
+		// load new engine if no previous engine exists.
+		return e.loadEngineInstanceFromSnapshot(lo.PanicOnErr(uuid.NewUUID()).String(), snapshotPath)
+	})
+
+	// cleanup candidates
+	if err := e.cleanupCandidates(); err != nil {
+		return nil, err
+	}
+
+	return e.Main.Get(), nil
+}
+
+// cleanupCandidates removes all engine instances that are not the main engine.
+func (e *Engines) cleanupCandidates() error {
 	activeDir := filepath.Base(e.Main.Get().Storage.Directory())
 
 	dirs, err := e.directory.SubDirs()
@@ -192,14 +189,34 @@ func (e *Engines) loadEngineInstanceFromSnapshot(engineAlias string, snapshotPat
 		e.protocol.LogError("engine error", "err", err, "name", engineAlias[0:8])
 	}
 
-	e.protocol.Options.EngineOptions = append(e.protocol.Options.EngineOptions, engine.WithSnapshotPath(snapshotPath))
-
-	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...))
+	return e.loadEngineInstanceWithStorage(engineAlias, storage.Create(e.directory.Path(engineAlias), DatabaseVersion, errorHandler, e.protocol.Options.StorageOptions...), engine.WithSnapshotPath(snapshotPath))
 }
 
 // loadEngineInstanceWithStorage loads an engine instance with the given storage.
-func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *storage.Storage) *engine.Engine {
-	return engine.New(e.protocol.Logger, e.protocol.Workers.CreateGroup(engineAlias), storage, e.protocol.Options.PreSolidFilterProvider, e.protocol.Options.PostSolidFilterProvider, e.protocol.Options.BlockDAGProvider, e.protocol.Options.BookerProvider, e.protocol.Options.ClockProvider, e.protocol.Options.BlockGadgetProvider, e.protocol.Options.SlotGadgetProvider, e.protocol.Options.SybilProtectionProvider, e.protocol.Options.NotarizationProvider, e.protocol.Options.AttestationProvider, e.protocol.Options.LedgerProvider, e.protocol.Options.SchedulerProvider, e.protocol.Options.TipManagerProvider, e.protocol.Options.TipSelectionProvider, e.protocol.Options.RetainerProvider, e.protocol.Options.UpgradeOrchestratorProvider, e.protocol.Options.SyncManagerProvider, e.protocol.Options.EngineOptions...)
+func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *storage.Storage, engineOptions ...options.Option[engine.Engine]) *engine.Engine {
+	return engine.New(
+		e.protocol.Logger,
+		e.protocol.Workers.CreateGroup(engineAlias),
+		storage,
+		e.protocol.Options.PreSolidFilterProvider,
+		e.protocol.Options.PostSolidFilterProvider,
+		e.protocol.Options.BlockDAGProvider,
+		e.protocol.Options.BookerProvider,
+		e.protocol.Options.ClockProvider,
+		e.protocol.Options.BlockGadgetProvider,
+		e.protocol.Options.SlotGadgetProvider,
+		e.protocol.Options.SybilProtectionProvider,
+		e.protocol.Options.NotarizationProvider,
+		e.protocol.Options.AttestationProvider,
+		e.protocol.Options.LedgerProvider,
+		e.protocol.Options.SchedulerProvider,
+		e.protocol.Options.TipManagerProvider,
+		e.protocol.Options.TipSelectionProvider,
+		e.protocol.Options.RetainerProvider,
+		e.protocol.Options.UpgradeOrchestratorProvider,
+		e.protocol.Options.SyncManagerProvider,
+		append(e.protocol.Options.EngineOptions, engineOptions...)...,
+	)
 }
 
 // syncMainEngineFromMainChain syncs the main engine from the main chain.
@@ -235,7 +252,7 @@ func (e *Engines) injectEngineInstances() (shutdown func()) {
 
 				if newEngine, err := func() (*engine.Engine, error) {
 					if e.Main.Get() == nil {
-						return e.LoadMainEngine(e.protocol.Options.SnapshotPath)
+						return e.loadMainEngine(e.protocol.Options.SnapshotPath)
 					}
 
 					return e.ForkAtSlot(chain.ForkingPoint.Get().Slot() - 1)
