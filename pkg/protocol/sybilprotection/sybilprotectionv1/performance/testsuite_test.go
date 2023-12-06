@@ -2,7 +2,6 @@ package performance
 
 import (
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -278,21 +277,12 @@ func (t *TestSuite) calculatePoolRewardFloat(epoch iotago.EpochIndex, totalValid
 	poolStakeFloat := float64(poolStake)
 	validatorStakeFloat := float64(validatorStake)
 	performanceFactorFloat := float64(performanceFactor) / float64(params.ValidationBlocksPerSlot())
-	// theta := float64(params.RewardsParameters().ManaShareCoefficient)
-	// S := float64(params.TokenSupply())
-	// gamma := float64(params.ManaParameters().GenerationRate) * math.Pow(2.0, -float64(params.ManaParameters().GenerationRateExponent))
-	d := math.Pow(2.0, float64(params.SlotsPerEpochExponent()))
-	betaDelta := d * float64(params.SlotDurationInSeconds()) / 3.0 / (365 * 24 * 60 * 60)
 
-	targetRewardFloat := float64(t.api.ComputedFinalReward())
+	targetReward, _ := params.RewardsParameters().TargetReward(epoch, t.api)
+	targetRewardFloat := float64(targetReward)
 
-	// targetRewardFloat := theta * S * gamma * d
-	if epoch <= params.RewardsParameters().BootstrappingDuration {
-		targetRewardFloat = float64(t.api.ComputedInitialReward()) * math.Exp(-betaDelta*float64(epoch))
-		//	targetRewardFloat = targetRewardFloat * betaDelta * math.Exp(1) / (1 - math.Exp(-betaDelta)) * math.Exp(-betaDelta*float64(epoch))
-	}
 	poolCoefficientFloat := (poolStakeFloat/totalStakeFloat + validatorStakeFloat/totalValidatorsStakeFloat) / 2.0
-	PoolRewardFloat := poolCoefficientFloat * targetRewardFloat * performanceFactorFloat
+	PoolRewardFloat := poolCoefficientFloat * float64(targetRewardFloat) * performanceFactorFloat
 	return PoolRewardFloat
 }
 

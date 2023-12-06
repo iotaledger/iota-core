@@ -51,7 +51,7 @@ func TestManager_Rewards(t *testing.T) {
 	// better performin validator should get more rewards
 	ts.AssertValidatorRewardGreaterThan("A", "B", epoch, epochActions)
 
-	epoch = iotago.EpochIndex(3)
+	epoch = iotago.EpochIndex(3000)
 	epochActions = map[string]*EpochActions{
 		"A": {
 			PoolStake:                   10,
