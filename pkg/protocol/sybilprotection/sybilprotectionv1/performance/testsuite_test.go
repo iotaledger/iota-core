@@ -282,7 +282,7 @@ func (t *TestSuite) calculatePoolRewardFloat(epoch iotago.EpochIndex, totalValid
 	targetRewardFloat := float64(targetReward)
 
 	poolCoefficientFloat := (poolStakeFloat/totalStakeFloat + validatorStakeFloat/totalValidatorsStakeFloat) / 2.0
-	PoolRewardFloat := poolCoefficientFloat * float64(targetRewardFloat) * performanceFactorFloat
+	PoolRewardFloat := poolCoefficientFloat * targetRewardFloat * performanceFactorFloat
 	return PoolRewardFloat
 }
 
