@@ -35,10 +35,10 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 		Features: iotago.BasicOutputFeatures{},
 	}
 
-	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txID.Identifier(), txID.Slot(), iotago.TxEssenceOutputs{iotaOutput}, 0)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.ZeroCostTestAPI, txID.Identifier(), txID.Slot(), iotago.TxEssenceOutputs{iotaOutput}, 0)
 	require.NoError(t, err)
 
-	output := utxoledger.CreateOutput(iotago.SingleVersionProvider(iotago_tpkg.TestAPI), outputID, blockID, indexBooked, iotaOutput, outputProof)
+	output := utxoledger.CreateOutput(iotago.SingleVersionProvider(iotago_tpkg.ZeroCostTestAPI), outputID, blockID, indexBooked, iotaOutput, outputProof)
 
 	transactionIDSpent := iotago_tpkg.RandTransactionID()
 
@@ -63,7 +63,7 @@ func TestSimpleSlotDiffSerialization(t *testing.T) {
 }
 
 func TestSlotDiffSerialization(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.ZeroCostTestAPI))
 
 	outputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),
