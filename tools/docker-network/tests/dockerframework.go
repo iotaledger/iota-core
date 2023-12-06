@@ -150,7 +150,7 @@ func (d *DockerTestFramework) GetRandomNode() *nodeclient.Client {
 	return nil
 }
 
-func (d *DockerTestFramework) AssertCommitteeSelection(expectedEpoch iotago.EpochIndex, expectedCommitteeSize int) {
+func (d *DockerTestFramework) AssertCommitteeSize(expectedEpoch iotago.EpochIndex, expectedCommitteeSize int) {
 	fmt.Println("Wait for committee selection..., expected epoch: ", expectedEpoch, ", expected committee size: ", expectedCommitteeSize)
 	defer fmt.Println("Wait for committee selection......done")
 

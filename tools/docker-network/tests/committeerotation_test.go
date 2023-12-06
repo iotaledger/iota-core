@@ -50,13 +50,13 @@ func Test_SmallerCommittee(t *testing.T) {
 	err = d.StopContainer("V2")
 	require.NoError(t, err)
 
-	d.AssertCommitteeSelection(currentEpoch+2, 3)
+	d.AssertCommitteeSize(currentEpoch+2, 3)
 
 	// restart validator 2
 	err = d.RestartContainer("V2")
 	require.NoError(t, err)
 
-	d.AssertCommitteeSelection(currentEpoch+3, 4)
+	d.AssertCommitteeSize(currentEpoch+3, 4)
 }
 
 func Test_ReuseDueToNoFinalization(t *testing.T) {
@@ -88,7 +88,7 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 	currentEpoch := node.CommittedAPI().TimeProvider().EpochFromSlot(prevFinalizedSlot)
 
 	// Due to no finalization, committee should be reused, remain 4 validators
-	d.AssertCommitteeSelection(currentEpoch+2, 4)
+	d.AssertCommitteeSize(currentEpoch+2, 4)
 
 	// check if finalization stops
 	fmt.Println("Second finalized slot: ", status.LatestFinalizedSlot)
@@ -104,7 +104,7 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 	err = d.RestartContainer("V2")
 	require.NoError(t, err)
 
-	d.AssertCommitteeSelection(currentEpoch+3, 3)
+	d.AssertCommitteeSize(currentEpoch+3, 3)
 
 	// wait finalization to catch up and check if the finalization resumes
 	time.Sleep(5 * time.Second)
