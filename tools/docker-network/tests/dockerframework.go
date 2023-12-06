@@ -247,7 +247,7 @@ func (d *DockerTestFramework) DumpContainerLogsToFiles() {
 		}
 
 		filePath := fmt.Sprintf("%s/%s.log", d.logDirectoryPath, name)
-		logCmd := fmt.Sprintf("docker logs -f %s > %s &", name, filePath)
+		logCmd := fmt.Sprintf("docker logs -f %s > %s 2>&1 &", name, filePath)
 		err := exec.Command("bash", "-c", logCmd).Run()
 		require.NoError(d.Testing, err)
 	}
