@@ -23,7 +23,6 @@ import (
 func TestTopStakers_InitializeCommittee(t *testing.T) {
 	var testAPI = iotago.V3API(
 		iotago.NewV3TestProtocolParameters(
-			iotago.WithSupplyOptions(2_779_530_283_277_761, 0, 0, 0, 0, 0, 0),
 			iotago.WithWorkScoreOptions(0, 1, 0, 0, 0, 0, 0, 0, 0, 0), // all zero except block offset gives all blocks workscore = 1
 			iotago.WithTargetCommitteeSize(3),
 		),

@@ -69,7 +69,11 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		return accounts.SelectCommittee(members...), true
 	}
 
-	t.testAPI = iotago.V3API(iotago.NewV3TestProtocolParameters())
+	t.testAPI = iotago.V3API(
+		iotago.NewV3TestProtocolParameters(
+			iotago.WithLivenessOptions(5, 5, 1, 2, 8),
+		),
+	)
 
 	t.apiProvider = iotago.SingleVersionProvider(t.testAPI)
 
