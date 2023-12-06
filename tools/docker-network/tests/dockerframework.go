@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,7 +46,8 @@ type DockerTestFramework struct {
 	clientURLs              map[string]string
 	nodeClients             map[string]*nodeclient.Client
 
-	snapshotPath string
+	snapshotPath     string
+	logDirectoryPath string
 
 	optsProtocolParameterOptions []options.Option[iotago.V3ProtocolParameters]
 	optsSnapshotOptions          []options.Option[snapshotcreator.Options]
@@ -68,6 +71,7 @@ func NewDockerTestFramework(t *testing.T, validatorNames map[string]string, clie
 		protocolParams := iotago.NewV3ProtocolParameters(d.optsProtocolParameterOptions...)
 		api := iotago.V3API(protocolParams)
 
+		d.logDirectoryPath = createLogDirectory(t.Name())
 		d.snapshotPath = snapshotFilePath
 		d.optsSnapshotOptions = append(DefaultAccountOptions(protocolParams),
 			[]options.Option[snapshotcreator.Options]{
@@ -106,6 +110,9 @@ func (d *DockerTestFramework) Run() error {
 			fmt.Printf("Waiting for node %s to be available...\n", name)
 		}
 	}
+
+	// make sure all nodes are up then we can start dumping logs
+	d.DumpContainerLogsToFiles()
 
 	return nil
 }
@@ -224,6 +231,28 @@ func (d *DockerTestFramework) RestartContainer(containerIndex ...string) error {
 	return dockerContainerRestart(args...)
 }
 
+func (d *DockerTestFramework) DumpContainerLogsToFiles() {
+	// get container names
+	cmd := "docker compose ps | awk '{print $1}' | tail -n +2"
+	containerNamesBytes, err := exec.Command("bash", "-c", cmd).Output()
+	require.NoError(d.Testing, err)
+
+	// dump logs to files
+	fmt.Println("Dump container logs to files...")
+	containerNames := strings.Split(string(containerNamesBytes), "\n")
+
+	for _, name := range containerNames {
+		if name == "" {
+			continue
+		}
+
+		filePath := fmt.Sprintf("%s/%s.log", d.logDirectoryPath, name)
+		logCmd := fmt.Sprintf("docker logs -f %s > %s &", name, filePath)
+		err := exec.Command("bash", "-c", logCmd).Run()
+		require.NoError(d.Testing, err)
+	}
+}
+
 // Eventually asserts that given condition will be met in opts.waitFor time,
 // periodically checking target function each opts.tick.
 //
@@ -285,4 +314,26 @@ func getNodeStatus(client *nodeclient.Client) (*api.InfoResNodeStatus, error) {
 	}
 
 	return info.Status, nil
+}
+
+func createLogDirectory(testName string) string {
+	// make sure logs/ exists
+	err := os.Mkdir("logs", 0755)
+	if err != nil {
+		if !os.IsExist(err) {
+			panic(err)
+		}
+	}
+
+	// create directory for this run
+	timestamp := time.Now().Format("20060102_150405")
+	dir := fmt.Sprintf("logs/%s-%s", timestamp, testName)
+	err = os.Mkdir(dir, 0755)
+	if err != nil {
+		if !os.IsExist(err) {
+			panic(err)
+		}
+	}
+
+	return dir
 }
