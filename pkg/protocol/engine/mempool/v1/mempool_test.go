@@ -39,7 +39,7 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 	spendDAG := spenddagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](func() int { return 0 })
 	memPoolInstance := New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference)
-	}, mutationsFunc, workers, spendDAG, iotago.SingleVersionProvider(tpkg.TestAPI), func(error) {})
+	}, mutationsFunc, workers, spendDAG, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), func(error) {})
 
 	tf := mempooltests.NewTestFramework(t, memPoolInstance, spendDAG, ledgerState, workers)
 
@@ -149,5 +149,5 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 
 	return mempooltests.NewTestFramework(t, New[vote.MockedRank](new(mempooltests.VM), func(reference mempool.StateReference) *promise.Promise[mempool.State] {
 		return ledgerState.ResolveOutputState(reference)
-	}, mutationsFunc, workers, spendDAG, iotago.SingleVersionProvider(tpkg.TestAPI), func(error) {}), spendDAG, ledgerState, workers)
+	}, mutationsFunc, workers, spendDAG, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), func(error) {}), spendDAG, ledgerState, workers)
 }

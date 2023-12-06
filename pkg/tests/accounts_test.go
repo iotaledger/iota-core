@@ -26,14 +26,7 @@ func Test_TransitionAndDestroyAccount(t *testing.T) {
 				0,
 				testsuite.GenesisTimeWithOffsetBySlots(200, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
-				8,
-			),
-			iotago.WithLivenessOptions(
-				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
-				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
-				testsuite.DefaultMinCommittableAge,
-				100,
-				120,
+				testsuite.DefaultSlotsPerEpochExponent,
 			),
 		),
 	)
@@ -171,14 +164,7 @@ func Test_StakeDelegateAndDelayedClaim(t *testing.T) {
 				0,
 				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
-				8,
-			),
-			iotago.WithLivenessOptions(
-				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
-				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
-				testsuite.DefaultMinCommittableAge,
-				100,
-				120,
+				testsuite.DefaultSlotsPerEpochExponent,
 			),
 		),
 	)
@@ -355,14 +341,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 				0,
 				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
-				8,
-			),
-			iotago.WithLivenessOptions(
-				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
-				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
-				testsuite.DefaultMinCommittableAge,
-				100,
-				120,
+				testsuite.DefaultSlotsPerEpochExponent,
 			),
 		),
 	)
@@ -483,14 +462,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 				iotago.SlotIndex(0),
 				testsuite.GenesisTimeWithOffsetBySlots(iotago.SlotIndex(200), testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
-				8,
-			),
-			iotago.WithLivenessOptions(
-				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
-				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
-				testsuite.DefaultMinCommittableAge,
-				100,
-				testsuite.DefaultEpochNearingThreshold,
+				testsuite.DefaultSlotsPerEpochExponent,
 			),
 		),
 	)
@@ -681,14 +653,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 				0,
 				testsuite.GenesisTimeWithOffsetBySlots(200, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
-				8,
-			),
-			iotago.WithLivenessOptions(
-				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
-				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
-				testsuite.DefaultMinCommittableAge,
-				100,
-				testsuite.DefaultEpochNearingThreshold,
+				testsuite.DefaultSlotsPerEpochExponent,
 			),
 		),
 	)
@@ -885,8 +850,8 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 
 		// assert diff of the destroyed account.
 		ts.AssertAccountDiff(wallet1.BlockIssuer.AccountID, block4Slot, &model.AccountDiff{
-			BICChange:              -iotago.BlockIssuanceCredits(9500),
-			PreviousUpdatedSlot:    21,
+			BICChange:              -iotago.BlockIssuanceCredits(wallet1BIC),
+			PreviousUpdatedSlot:    block3Slot,
 			NewExpirySlot:          0,
 			PreviousExpirySlot:     newExpirySlot,
 			NewOutputID:            iotago.EmptyOutputID,
@@ -908,14 +873,7 @@ func Test_NegativeBIC_AccountOwnedBasicOutputLocked(t *testing.T) {
 				0,
 				testsuite.GenesisTimeWithOffsetBySlots(200, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
-				8,
-			),
-			iotago.WithLivenessOptions(
-				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
-				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
-				testsuite.DefaultMinCommittableAge,
-				100,
-				testsuite.DefaultEpochNearingThreshold,
+				testsuite.DefaultSlotsPerEpochExponent,
 			),
 		),
 	)

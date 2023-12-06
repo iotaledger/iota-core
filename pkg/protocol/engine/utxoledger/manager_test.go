@@ -14,7 +14,7 @@ import (
 )
 
 func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.ZeroCostTestAPI))
 
 	outputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),
@@ -88,7 +88,7 @@ func TestConfirmationApplyAndRollbackToEmptyLedger(t *testing.T) {
 }
 
 func TestConfirmationApplyAndRollbackToPreviousLedger(t *testing.T) {
-	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.ZeroCostTestAPI))
 
 	previousOutputs := utxoledger.Outputs{
 		tpkg.RandLedgerStateOutputWithType(iotago.OutputBasic),

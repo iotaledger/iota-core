@@ -49,7 +49,7 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	defer ts.Shutdown()
 
 	// We "pretend" to have version 5 but reuse the same protocol parameters as for version 3.
-	v5ProtocolParameters := iotago.NewV3ProtocolParameters(
+	v5ProtocolParameters := iotago.NewV3SnapshotProtocolParameters(
 		append(
 			ts.ProtocolParameterOptions,
 			iotago.WithVersion(5),
