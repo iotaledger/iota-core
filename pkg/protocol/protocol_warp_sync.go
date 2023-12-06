@@ -292,61 +292,54 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 // ProcessRequest processes the given warp sync request.
 func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	w.workerPool.Submit(func() {
-		commitment, err := w.protocol.Commitments.Get(commitmentID)
-		if err != nil {
-			if !ierrors.Is(err, ErrorCommitmentNotFound) {
-				w.LogError("failed to load commitment for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
-			} else {
-				w.LogTrace("failed to load commitment for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
-			}
-
-			return
+		if commitment, err := w.protocol.Commitments.Get(commitmentID); err == nil {
+			w.processRequest(commitment.TargetEngine(), commitmentID, from)
+		} else if ierrors.Is(err, ErrorCommitmentNotFound) {
+			w.processRequest(w.protocol.Engines.Main.Get(), commitmentID, from)
+		} else {
+			w.LogDebug("failed to load commitment for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
 		}
-
-		chain := commitment.Chain.Get()
-		if chain == nil {
-			w.LogTrace("warp-sync request for unsolid commitment", "commitment", commitment.LogName(), "fromPeer", from)
-
-			return
-		}
-
-		targetEngine := commitment.TargetEngine()
-		if targetEngine == nil {
-			w.LogTrace("warp-sync request for chain without engine", "chain", chain.LogName(), "fromPeer", from)
-
-			return
-		}
-
-		committedSlot, err := targetEngine.CommittedSlot(commitmentID)
-		if err != nil {
-			w.LogTrace("warp-sync request for uncommitted slot", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from)
-
-			return
-		}
-
-		blockIDsBySlotCommitment, err := committedSlot.BlocksIDsBySlotCommitmentID()
-		if err != nil {
-			w.LogTrace("failed to get block ids for warp-sync request", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from, "err", err)
-
-			return
-		}
-
-		roots, err := committedSlot.Roots()
-		if err != nil {
-			w.LogTrace("failed to get roots for warp-sync request", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from, "err", err)
-
-			return
-		}
-
-		transactionIDs, err := committedSlot.TransactionIDs()
-		if err != nil {
-			w.LogTrace("failed to get transaction ids for warp-sync request", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from, "err", err)
-
-			return
-		}
-
-		w.SendResponse(commitment, blockIDsBySlotCommitment, roots, transactionIDs, from)
 	})
+}
+
+func (w *WarpSyncProtocol) processRequest(targetEngine *engine.Engine, commitmentID iotago.CommitmentID, from peer.ID) {
+	if targetEngine == nil {
+		w.LogTrace("warp-sync request for chain without engine", "commitmentID", commitmentID, "fromPeer", from)
+
+		return
+	}
+
+	committedSlot, err := targetEngine.CommittedSlot(commitmentID)
+	if err != nil {
+		w.LogTrace("warp-sync request for uncommitted slot", "commitmentID", commitmentID, "fromPeer", from)
+
+		return
+	}
+
+	blockIDsBySlotCommitment, err := committedSlot.BlocksIDsBySlotCommitmentID()
+	if err != nil {
+		w.LogTrace("failed to get block ids for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
+
+		return
+	}
+
+	roots, err := committedSlot.Roots()
+	if err != nil {
+		w.LogTrace("failed to get roots for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
+
+		return
+	}
+
+	transactionIDs, err := committedSlot.TransactionIDs()
+	if err != nil {
+		w.LogTrace("failed to get transaction ids for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
+
+		return
+	}
+
+	w.protocol.Network.SendWarpSyncResponse(commitmentID, blockIDsBySlotCommitment, roots.TangleProof(), transactionIDs, roots.MutationProof(), from)
+
+	w.LogTrace("sent response", "commitmentID", commitmentID, "toPeer", from)
 }
 
 // Shutdown shuts down the warp sync protocol.

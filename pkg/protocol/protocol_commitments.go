@@ -94,9 +94,29 @@ func (c *CommitmentsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, f
 	c.workerPool.Submit(func() {
 		commitment, err := c.protocol.Commitments.Get(commitmentID)
 		if err != nil {
-			logLevel := lo.Cond(ierrors.Is(err, ErrorCommitmentNotFound), log.LevelTrace, log.LevelError)
+			if !ierrors.Is(err, ErrorCommitmentNotFound) {
+				c.LogError("failed to load commitment for commitment request", "commitmentID", commitmentID, "fromPeer", from, "error", err)
 
-			c.Log("failed to load commitment for commitment request", logLevel, "commitmentID", commitmentID, "fromPeer", from, "error", err)
+				return
+			}
+
+			slotAPI, slotAPIErr := c.protocol.Engines.Main.Get().CommittedSlot(commitmentID)
+			if slotAPIErr != nil {
+				c.LogDebug("failed to load committed slot for commitment request", "commitmentID", commitmentID, "fromPeer", from, "error", slotAPIErr)
+
+				return
+			}
+
+			commitmentModel, slotAPIErr := slotAPI.Commitment()
+			if slotAPIErr != nil {
+				c.LogDebug("failed to load commitment for commitment request", "commitmentID", commitmentID, "fromPeer", from, "error", slotAPIErr)
+
+				return
+			}
+
+			c.protocol.Network.SendSlotCommitment(commitmentModel, from)
+
+			c.LogTrace("sent commitment", "commitmentID", commitmentID, "toPeer", from)
 
 			return
 		}

@@ -172,8 +172,9 @@ func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown
 // initEviction initializes the eviction of old data when the engine advances and returns a function that shuts it down.
 func (p *Protocol) initEviction() (shutdown func()) {
 	return p.Commitments.Root.OnUpdate(func(_ *Commitment, rootCommitment *Commitment) {
-		// TODO: DECIDE ON DATA AVAILABILITY TIMESPAN / EVICTION STRATEGY
-		// p.Evict(rootCommitment.Slot() - 1)
+		if rootSlot := rootCommitment.Slot(); rootSlot > 0 {
+			p.Evict(rootSlot - 1)
+		}
 	})
 }
 
