@@ -74,14 +74,14 @@ func setupExplorerRoutes(routeGroup *echo.Group) {
 }
 
 func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
-	block, exists := deps.Protocol.MainEngineInstance().Block(blockID)
+	block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
 	if !exists {
 		return nil, ierrors.Errorf("block not found: %s", blockID.ToHex())
 	}
 
-	cachedBlock, _ := deps.Protocol.MainEngineInstance().BlockCache.Block(blockID)
+	cachedBlock, _ := deps.Protocol.Engines.Main.Get().BlockCache.Block(blockID)
 
-	blockMetadata, err := deps.Protocol.MainEngineInstance().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "block metadata %s", blockID.ToHex())
 	}
@@ -196,12 +196,12 @@ func getTransaction(c echo.Context) error {
 	outputID := iotago.OutputID{}
 	copy(outputID[:], txID[:])
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, err := deps.Protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
 		return err
 	}
 
-	block, exists := deps.Protocol.MainEngineInstance().Block(output.BlockID())
+	block, exists := deps.Protocol.Engines.Main.Get().Block(output.BlockID())
 	if !exists {
 		return ierrors.Errorf("block not found: %s", output.BlockID().ToHex())
 	}
@@ -223,12 +223,12 @@ func getTransactionMetadata(c echo.Context) error {
 	// Get the first output of that transaction (using index 0)
 	outputID := iotago.OutputID{}
 	copy(outputID[:], txID[:])
-	txMetadata, exists := deps.Protocol.MainEngineInstance().Ledger.MemPool().TransactionMetadata(txID)
+	txMetadata, exists := deps.Protocol.Engines.Main.Get().Ledger.MemPool().TransactionMetadata(txID)
 	if !exists {
 		return ierrors.Errorf("tx metadata not found: %s", txID.ToHex())
 	}
 
-	conflicts, _ := deps.Protocol.MainEngineInstance().Ledger.SpendDAG().ConflictingSpenders(txID)
+	conflicts, _ := deps.Protocol.Engines.Main.Get().Ledger.SpendDAG().ConflictingSpenders(txID)
 
 	return httpserver.JSONResponse(c, http.StatusOK, NewTransactionMetadata(txMetadata, conflicts))
 }
@@ -239,7 +239,7 @@ func getOutput(c echo.Context) error {
 		return err
 	}
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, err := deps.Protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
 		return err
 	}
@@ -253,7 +253,7 @@ func getSlotDetailsByID(c echo.Context) error {
 		return err
 	}
 
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentID.Slot())
+	commitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentID.Slot())
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,7 @@ func getSlotDetailsByID(c echo.Context) error {
 		return ierrors.Errorf("commitment in the store for slot %d does not match the given commitmentID (%s != %s)", commitmentID.Slot(), commitment.ID(), commitmentID)
 	}
 
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(commitmentID.Slot())
+	diffs, err := deps.Protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
 		return err
 	}

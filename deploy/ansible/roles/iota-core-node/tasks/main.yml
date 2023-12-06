@@ -4,12 +4,12 @@
   poll: 5
 
 - name: Set log rotation for a maximum size of 5GB
-  lineinfile:
+  blockinfile:
     path: /etc/logrotate.d/rsyslog
-    regexp: '^\{\n\s*rotate'
-    insertbefore: '^\{\n\s*rotate'
-    line: '    maxsize 5G'
-  notify: restart rsyslog
+    block: maxsize 5G
+    marker: "# {mark} ANSIBLE MANAGED BLOCK"
+    insertafter: "{\n"
+    state: present
 
 - name: Create node directory
   file:

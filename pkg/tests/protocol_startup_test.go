@@ -60,7 +60,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -116,7 +116,7 @@ func Test_BookInCommittedSlot(t *testing.T) {
 			ts.AssertAttestationsForSlot(slot, ts.Blocks(aliases...), ts.Nodes()...)
 		}
 		ts.SetCurrentSlot(5)
-		commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(3)).Commitment()
+		commitment := lo.PanicOnErr(nodeA.Protocol.Engines.Main.Get().Storage.Commitments().Load(3)).Commitment()
 		ts.IssueValidationBlockWithHeaderOptions("5*", ts.Node("nodeA"), mock.WithSlotCommitment(commitment), mock.WithStrongParents(ts.BlockIDsWithPrefix("4.3-")...))
 
 		ts.AssertBlocksExist(ts.Blocks("5*"), false, ts.Nodes("nodeA")...)
@@ -173,8 +173,8 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	}
 
 	expectedOnlineCommittee := []account.SeatIndex{
-		lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
-		lo.Return1(lo.Return1(nodeA.Protocol.MainEngineInstance().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeA.Validator.AccountID)),
+		lo.Return1(lo.Return1(nodeA.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(1)).GetSeat(nodeB.Validator.AccountID)),
 	}
 
 	// Verify that nodes have the expected states.
@@ -328,7 +328,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 			{
 				// Create snapshot.
 				snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-				require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+				require.NoError(t, ts.Node("nodeA").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
 
 				nodeD := ts.AddNode("nodeD")
 				nodeD.Initialize(true, append(nodeOptions,
@@ -349,7 +349,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 				ts.AssertStorageRootBlocks(expectedStorageRootBlocksFrom9, ts.Nodes("nodeD")...)
 			}
 
-			slot7Commitment := lo.PanicOnErr(nodeA.Protocol.MainEngineInstance().Storage.Commitments().Load(7))
+			slot7Commitment := lo.PanicOnErr(nodeA.Protocol.Engines.Main.Get().Storage.Commitments().Load(7))
 
 			ts.AssertNodeState(ts.Nodes("nodeC-restarted", "nodeD"),
 				testsuite.WithSnapshotImported(true),
@@ -478,7 +478,7 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 	{
 		// Create snapshot.
 		snapshotPath := ts.Directory.Path(fmt.Sprintf("%d_snapshot", time.Now().Unix()))
-		require.NoError(t, ts.Node("nodeA").Protocol.MainEngineInstance().WriteSnapshot(snapshotPath))
+		require.NoError(t, ts.Node("nodeA").Protocol.Engines.Main.Get().WriteSnapshot(snapshotPath))
 
 		nodeD := ts.AddNode("nodeE")
 		nodeD.Initialize(true, append(nodeOptions,

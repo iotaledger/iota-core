@@ -39,7 +39,7 @@ func NewProvider(opts ...options.Option[PreSolidBlockFilter]) module.Provider[*e
 		f := New(e, opts...)
 		f.TriggerConstructed()
 
-		e.HookConstructed(func() {
+		e.Constructed.OnTrigger(func() {
 			e.Events.PreSolidFilter.LinkTo(f.events)
 			e.SybilProtection.HookInitialized(func() {
 				f.committeeFunc = e.SybilProtection.SeatManager().CommitteeInSlot

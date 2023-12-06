@@ -55,7 +55,7 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 				e.Events.SeatManager.LinkTo(s.events)
 
-				e.HookConstructed(func() {
+				e.Constructed.OnTrigger(func() {
 					s.TriggerConstructed()
 
 					// We need to mark validators as active upon solidity of blocks as otherwise we would not be able to

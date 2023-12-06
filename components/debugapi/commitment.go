@@ -9,11 +9,11 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/walker"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
+	"github.com/iotaledger/iota-core/pkg/protocol"
 )
 
 func chainManagerAllChainsDot() (string, error) {
-	rootCommitment := deps.Protocol.ChainManager.RootCommitment()
+	rootCommitment := deps.Protocol.Chains.Main.Get().ForkingPoint.Get()
 	g := graphviz.New()
 	defer g.Close()
 
@@ -32,7 +32,7 @@ func chainManagerAllChainsDot() (string, error) {
 }
 
 func chainManagerAllChainsRendered() ([]byte, error) {
-	rootCommitment := deps.Protocol.ChainManager.RootCommitment()
+	rootCommitment := deps.Protocol.Chains.Main.Get().ForkingPoint.Get()
 	g := graphviz.New()
 	defer g.Close()
 
@@ -50,7 +50,7 @@ func chainManagerAllChainsRendered() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func prepareCommitmentGraph(g *graphviz.Graphviz, rootCommitment *chainmanager.ChainCommitment) (*cgraph.Graph, error) {
+func prepareCommitmentGraph(g *graphviz.Graphviz, rootCommitment *protocol.Commitment) (*cgraph.Graph, error) {
 	graph, err := g.Graph()
 	if err != nil {
 		return nil, err
@@ -62,36 +62,39 @@ func prepareCommitmentGraph(g *graphviz.Graphviz, rootCommitment *chainmanager.C
 	}
 	root.SetColor("green")
 
-	for commitmentWalker := walker.New[*chainmanager.ChainCommitment](false).Push(rootCommitment); commitmentWalker.HasNext(); {
+	for commitmentWalker := walker.New[*protocol.Commitment](false).Push(rootCommitment); commitmentWalker.HasNext(); {
 		parentCommitment := commitmentWalker.Next()
 		parent, parentErr := createNode(graph, parentCommitment)
 		if parentErr != nil {
 			return nil, parentErr
 		}
 
-		for _, childCommitment := range parentCommitment.Children() {
+		if err = parentCommitment.Children.ForEach(func(childCommitment *protocol.Commitment) error {
 			child, childErr := createNode(graph, childCommitment)
 			if childErr != nil {
-				return nil, childErr
+				return childErr
 			}
 
-			if childCommitment.Chain().ForkingPoint.ID() == deps.Protocol.MainEngineInstance().ChainID() {
+			if childCommitment.Chain.Get() == deps.Protocol.Chains.Main.Get() {
 				child.SetColor("green")
 			}
 
 			if _, edgeErr := graph.CreateEdge(fmt.Sprintf("%s -> %s", parentCommitment.ID().String()[:8], childCommitment.ID().String()[:8]), parent, child); edgeErr != nil {
-				return nil, ierrors.Wrapf(edgeErr, "could not create edge %s -> %s", parentCommitment.ID().String()[:8], childCommitment.ID().String()[:8])
+				return ierrors.Wrapf(edgeErr, "could not create edge %s -> %s", parentCommitment.ID().String()[:8], childCommitment.ID().String()[:8])
 			}
 
 			commitmentWalker.Push(childCommitment)
 
+			return nil
+		}); err != nil {
+			return nil, err
 		}
 	}
 
 	return graph, nil
 }
 
-func createNode(graph *cgraph.Graph, commitment *chainmanager.ChainCommitment) (*cgraph.Node, error) {
+func createNode(graph *cgraph.Graph, commitment *protocol.Commitment) (*cgraph.Node, error) {
 	node, err := graph.Node(fmt.Sprintf("%d: %s", commitment.ID().Slot(), commitment.ID().String()[:8]))
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "could not create node %s", commitment.ID().String()[:8])

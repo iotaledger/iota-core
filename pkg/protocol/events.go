@@ -1,34 +1,18 @@
 package protocol
 
-import (
-	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/iota-core/pkg/network/protocols/core"
-	"github.com/iotaledger/iota-core/pkg/protocol/chainmanager"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
-)
+import "github.com/iotaledger/iota-core/pkg/protocol/engine"
 
+// Events exposes the Events of the main engine of the protocol at a single endpoint.
+//
+// TODO: It should be replaced with reactive calls to the corresponding events and be deleted but we can do this in a
+// later PR (to minimize the code changes to review).
 type Events struct {
-	CandidateEngineActivated *event.Event1[*engine.Engine]
-	MainEngineSwitched       *event.Event1[*engine.Engine]
-	MainEngineRestarted      *event.Event1[*engine.Engine]
-	Error                    *event.Event1[error]
-
-	Network      *core.Events
-	Engine       *engine.Events
-	ChainManager *chainmanager.Events
-
-	event.Group[Events, *Events]
+	Engine *engine.Events
 }
 
-var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
+// NewEvents creates a new Events instance.
+func NewEvents() *Events {
 	return &Events{
-		CandidateEngineActivated: event.New1[*engine.Engine](),
-		MainEngineSwitched:       event.New1[*engine.Engine](),
-		MainEngineRestarted:      event.New1[*engine.Engine](),
-		Error:                    event.New1[error](),
-
-		Network:      core.NewEvents(),
-		Engine:       engine.NewEvents(),
-		ChainManager: chainmanager.NewEvents(),
+		Engine: engine.NewEvents(),
 	}
-})
+}

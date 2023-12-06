@@ -18,14 +18,14 @@ func NewProvider(opts ...options.Option[TipSelection]) module.Provider[*engine.E
 	return module.Provide(func(e *engine.Engine) tipselection.TipSelection {
 		t := New(opts...)
 
-		e.HookConstructed(func() {
+		e.Constructed.OnTrigger(func() {
 			// wait for submodules to be constructed (so all of their properties are available)
 			module.OnAllConstructed(func() {
 				t.Construct(e.TipManager, e.Ledger.SpendDAG(), e.Ledger.MemPool().TransactionMetadata, func() iotago.BlockIDs { return lo.Keys(e.EvictionState.ActiveRootBlocks()) }, DynamicLivenessThreshold(e.SybilProtection.SeatManager().OnlineCommittee().Size))
 			}, e.TipManager, e.Ledger, e.SybilProtection)
 		})
 
-		e.HookShutdown(t.Shutdown)
+		e.Shutdown.OnTrigger(t.Shutdown)
 
 		return t
 	})

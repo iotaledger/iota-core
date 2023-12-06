@@ -95,7 +95,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		}
 
 		decayProvider := t.apiProvider.APIForEpoch(epoch).ManaDecayProvider()
-		decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epoch, epochEnd)
+		decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(unDecayedEpochRewards), epoch, epochEnd)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epoch, validatorID)
 		}
@@ -172,7 +172,7 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 		}
 
 		decayProvider := t.apiProvider.APIForEpoch(epoch).ManaDecayProvider()
-		decayedEpochRewards, err := decayProvider.RewardsWithDecay(iotago.Mana(unDecayedEpochRewards), epoch, epochEnd)
+		decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(unDecayedEpochRewards), epoch, epochEnd)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epoch, validatorID)
 		}

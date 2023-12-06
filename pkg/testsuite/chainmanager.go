@@ -10,20 +10,16 @@ func (t *TestSuite) AssertChainManagerIsSolid(nodes ...*mock.Node) {
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			rootCommitment := node.Protocol.ChainManager.RootCommitment()
-			chain := node.Protocol.ChainManager.Chain(rootCommitment.ID())
+			chain := node.Protocol.Chains.Main.Get()
 			if chain == nil {
 				return ierrors.Errorf("AssertChainManagerIsSolid: %s: chain is nil", node.Name)
 			}
 
-			latestChainCommitment := chain.LatestCommitment()
-			latestCommitment := node.Protocol.MainEngineInstance().Storage.Settings().LatestCommitment()
+			latestChainCommitment := chain.LatestCommitment.Get()
+			latestCommitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment()
 
 			if latestCommitment.ID() != latestChainCommitment.ID() {
-				return ierrors.Errorf("AssertChainManagerIsSolid: %s: latest commitment is not equal, expected %d, got %d", node.Name, latestCommitment.ID(), latestChainCommitment.ID())
-			}
-			if !latestChainCommitment.SolidEvent().WasTriggered() {
-				return ierrors.Errorf("AssertChainManagerIsSolid: %s: is not solid", node.Name)
+				return ierrors.Errorf("AssertChainManagerIsSolid: %s: latest commitment is not equal, expected %s, got %s", node.Name, latestCommitment.ID(), latestChainCommitment.ID())
 			}
 
 			return nil

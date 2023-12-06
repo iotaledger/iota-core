@@ -10,15 +10,45 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes ...*mock.Node) {
+func (t *TestSuite) AssertAccountStake(accountID iotago.AccountID, validatorStake iotago.BaseToken, delegationStake iotago.BaseToken,
+	nodes ...*mock.Node) {
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			actualAccountData, exists, err := node.Protocol.MainEngineInstance().Ledger.Account(accountData.ID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
+			actualAccountData, exists, err := node.Protocol.Engines.Main.Get().Ledger.Account(accountID, node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
 			if err != nil {
 				return ierrors.Wrap(err, "AssertAccountData: failed to load account data")
 			}
 			if !exists {
-				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.MainEngineInstance().SyncManager.LatestCommitment().Slot())
+				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountID, node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
+			}
+
+			if accountID != actualAccountData.ID {
+				return ierrors.Errorf("AssertAccountData: %s: expected %s, got %s", node.Name, accountID, actualAccountData.ID)
+			}
+
+			if validatorStake != actualAccountData.ValidatorStake {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected validator stake %d, got %d", node.Name, accountID, validatorStake, actualAccountData.ValidatorStake)
+			}
+
+			if delegationStake != actualAccountData.DelegationStake {
+				return ierrors.Errorf("AssertAccountData: %s: accountID %s expected delegation stake %d, got %d", node.Name, accountID, delegationStake, actualAccountData.DelegationStake)
+			}
+
+			return nil
+		},
+		)
+	}
+}
+
+func (t *TestSuite) AssertAccountData(accountData *accounts.AccountData, nodes ...*mock.Node) {
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			actualAccountData, exists, err := node.Protocol.Engines.Main.Get().Ledger.Account(accountData.ID, node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
+			if err != nil {
+				return ierrors.Wrap(err, "AssertAccountData: failed to load account data")
+			}
+			if !exists {
+				return ierrors.Errorf("AssertAccountData: %s: account %s does not exist with latest committed slot %d", node.Name, accountData.ID, node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
 			}
 
 			if accountData.ID != actualAccountData.ID {
@@ -74,7 +104,7 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 	for _, node := range nodes {
 		t.Eventually(func() error {
 
-			accountsDiffStorage, err := node.Protocol.MainEngineInstance().Storage.AccountDiffs(index)
+			accountsDiffStorage, err := node.Protocol.Engines.Main.Get().Storage.AccountDiffs(index)
 			if err != nil {
 				return ierrors.Wrapf(err, "AssertAccountDiff: %s: failed to load accounts diff for slot %d", node.Name, index)
 			}

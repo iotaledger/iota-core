@@ -21,7 +21,7 @@ import (
 
 func AssertOutputUnspentAndSpentTransitions(t *testing.T, output *utxoledger.Output, spent *utxoledger.Spent) {
 	outputID := output.OutputID()
-	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.TestAPI))
+	manager := utxoledger.New(mapdb.NewMapDB(), iotago.SingleVersionProvider(iotago_tpkg.ZeroCostTestAPI))
 
 	require.NoError(t, manager.AddGenesisUnspentOutput(output))
 
@@ -80,7 +80,7 @@ func CreateOutputAndAssertSerialization(t *testing.T, blockID iotago.BlockID, in
 	outputID, err := outputProof.OutputID(iotaOutput)
 	require.NoError(t, err)
 
-	iotagoAPI := iotago_tpkg.TestAPI
+	iotagoAPI := iotago_tpkg.ZeroCostTestAPI
 	output := utxoledger.CreateOutput(iotago.SingleVersionProvider(iotagoAPI), outputID, blockID, indexBooked, iotaOutput, outputProof)
 	outputBytes, err := iotagoAPI.Encode(output.Output())
 	require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestBasicOutputOnEd25519WithoutSpendConstraintsSerialization(t *testing.T) 
 		},
 	}
 
-	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.ZeroCostTestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
 	require.NoError(t, err)
 
 	output := CreateOutputAndAssertSerialization(t, blockID, index, iotaOutput, outputProof)
@@ -190,7 +190,7 @@ func TestBasicOutputOnEd25519WithSpendConstraintsSerialization(t *testing.T) {
 		},
 	}
 
-	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.ZeroCostTestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
 	require.NoError(t, err)
 
 	output := CreateOutputAndAssertSerialization(t, blockID, index, iotaOutput, outputProof)
@@ -229,7 +229,7 @@ func TestNFTOutputSerialization(t *testing.T) {
 		},
 	}
 
-	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.ZeroCostTestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
 	require.NoError(t, err)
 
 	output := CreateOutputAndAssertSerialization(t, blockID, index, iotaOutput, outputProof)
@@ -276,7 +276,7 @@ func TestNFTOutputWithSpendConstraintsSerialization(t *testing.T) {
 		},
 	}
 
-	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.ZeroCostTestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
 	require.NoError(t, err)
 
 	output := CreateOutputAndAssertSerialization(t, blockID, index, iotaOutput, outputProof)
@@ -318,7 +318,7 @@ func TestAccountOutputSerialization(t *testing.T) {
 		},
 	}
 
-	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.ZeroCostTestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
 	require.NoError(t, err)
 
 	output := CreateOutputAndAssertSerialization(t, blockID, index, iotaOutput, outputProof)
@@ -364,7 +364,7 @@ func TestAnchorOutputSerialization(t *testing.T) {
 		},
 	}
 
-	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.ZeroCostTestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
 	require.NoError(t, err)
 
 	output := CreateOutputAndAssertSerialization(t, blockID, index, iotaOutput, outputProof)
@@ -401,7 +401,7 @@ func TestFoundryOutputSerialization(t *testing.T) {
 		ImmutableFeatures: iotago.FoundryOutputImmFeatures{},
 	}
 
-	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.ZeroCostTestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
 	require.NoError(t, err)
 
 	output := CreateOutputAndAssertSerialization(t, blockID, index, iotaOutput, outputProof)
@@ -433,7 +433,7 @@ func TestDelegationOutputSerialization(t *testing.T) {
 		},
 	}
 
-	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.TestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
+	outputProof, err := iotago.NewOutputIDProof(iotago_tpkg.ZeroCostTestAPI, txCommitment, txCreationSlot, iotago.TxEssenceOutputs{iotaOutput}, 0)
 	require.NoError(t, err)
 
 	output := CreateOutputAndAssertSerialization(t, blockID, index, iotaOutput, outputProof)

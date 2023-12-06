@@ -49,7 +49,7 @@ type Block struct {
 	dropped   bool
 
 	// Notarization
-	notarized reactive.Variable[bool]
+	notarized reactive.Event
 
 	mutex syncutils.RWMutex
 
@@ -88,7 +88,7 @@ func NewBlock(data *model.Block) *Block {
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
 		weightPropagated:      reactive.NewVariable[bool](),
-		notarized:             reactive.NewVariable[bool](),
+		notarized:             reactive.NewEvent(),
 		workScore:             data.WorkScore(),
 	}
 }
@@ -112,7 +112,7 @@ func NewRootBlock(blockID iotago.BlockID, commitmentID iotago.CommitmentID, issu
 		preAccepted:      true,
 		accepted:         reactive.NewVariable[bool](),
 		weightPropagated: reactive.NewVariable[bool](),
-		notarized:        reactive.NewVariable[bool](),
+		notarized:        reactive.NewEvent(),
 		scheduled:        true,
 	}
 
@@ -140,7 +140,7 @@ func NewMissingBlock(blockID iotago.BlockID) *Block {
 		booked:                reactive.NewVariable[bool](),
 		accepted:              reactive.NewVariable[bool](),
 		weightPropagated:      reactive.NewVariable[bool](),
-		notarized:             reactive.NewVariable[bool](),
+		notarized:             reactive.NewEvent(),
 	}
 }
 
@@ -622,7 +622,7 @@ func (b *Block) SetWeightPropagated() (wasUpdated bool) {
 	return !b.weightPropagated.Set(true)
 }
 
-func (b *Block) Notarized() reactive.Variable[bool] {
+func (b *Block) Notarized() reactive.Event {
 	return b.notarized
 }
 
@@ -631,7 +631,7 @@ func (b *Block) IsNotarized() (isBooked bool) {
 }
 
 func (b *Block) SetNotarized() (wasUpdated bool) {
-	return !b.notarized.Set(true)
+	return b.notarized.Trigger()
 }
 
 func (b *Block) String() string {

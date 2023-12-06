@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/booker"
@@ -27,7 +28,8 @@ type Booker struct {
 
 	ledger ledger.Ledger
 
-	retainBlockFailure func(id iotago.BlockID, reason api.BlockFailureReason)
+	loadBlockFromStorage func(id iotago.BlockID) (*model.Block, bool)
+	retainBlockFailure   func(id iotago.BlockID, reason api.BlockFailureReason)
 
 	errorHandler func(error)
 	apiProvider  iotago.APIProvider
@@ -38,11 +40,11 @@ type Booker struct {
 func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine, booker.Booker] {
 	return module.Provide(func(e *engine.Engine) booker.Booker {
 		b := New(e, e.BlockCache, e.ErrorHandler("booker"), opts...)
-		e.HookConstructed(func() {
+		e.Constructed.OnTrigger(func() {
 			b.ledger = e.Ledger
 			b.ledger.HookConstructed(func() {
 				b.spendDAG = b.ledger.SpendDAG()
-
+				b.loadBlockFromStorage = e.Block
 				b.ledger.MemPool().OnTransactionAttached(func(transaction mempool.TransactionMetadata) {
 					transaction.OnAccepted(func() {
 						b.events.TransactionAccepted.Trigger(transaction)
@@ -193,6 +195,7 @@ func (b *Booker) inheritSpenders(block *blocks.Block) (spenderIDs ds.Set[iotago.
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
 			b.retainBlockFailure(block.ID(), api.BlockFailureParentNotFound)
+
 			return nil, ierrors.Errorf("parent %s does not exist", parent.ID)
 		}
 
@@ -202,6 +205,21 @@ func (b *Booker) inheritSpenders(block *blocks.Block) (spenderIDs ds.Set[iotago.
 		case iotago.WeakParentType:
 			spenderIDsToInherit.AddAll(parentBlock.PayloadSpenderIDs())
 		case iotago.ShallowLikeParentType:
+			// If parent block is a RootBlock, then make sure that the block contains a transaction;
+			// otherwise, the reference is invalid.
+			if parentBlock.IsRootBlock() {
+				parentModelBlock, exists := b.loadBlockFromStorage(parent.ID)
+				if !exists {
+					return nil, ierrors.Wrapf(err, "shallow like parent %s does not exist in storage", parent.ID.String())
+				}
+
+				if _, hasTx := parentModelBlock.SignedTransaction(); !hasTx {
+					return nil, ierrors.Wrapf(err, "shallow like parent %s does not contain a conflicting transaction", parent.ID.String())
+				}
+
+				break
+			}
+
 			// Check whether the parent contains a conflicting TX,
 			// otherwise reference is invalid and the block should be marked as invalid as well.
 			if signedTransaction, hasTx := parentBlock.SignedTransaction(); !hasTx || !parentBlock.PayloadSpenderIDs().Has(lo.PanicOnErr(signedTransaction.Transaction.ID())) {

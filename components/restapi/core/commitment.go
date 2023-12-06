@@ -14,14 +14,14 @@ func getCommitmentBySlot(slot iotago.SlotIndex, latestCommitment ...*model.Commi
 	if len(latestCommitment) > 0 {
 		latest = latestCommitment[0]
 	} else {
-		latest = deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+		latest = deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 	}
 
 	if slot > latest.Slot() {
 		return nil, ierrors.Wrapf(echo.ErrBadRequest, "commitment is from a future slot (%d > %d)", slot, latest.Slot())
 	}
 
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(slot)
+	commitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment, slot: %d, error: %w", slot, err)
 	}
@@ -34,14 +34,14 @@ func getCommitmentByID(commitmentID iotago.CommitmentID, latestCommitment ...*mo
 	if len(latestCommitment) > 0 {
 		latest = latestCommitment[0]
 	} else {
-		latest = deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+		latest = deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 	}
 
 	if commitmentID.Slot() > latest.Slot() {
 		return nil, ierrors.Wrapf(echo.ErrBadRequest, "commitment ID (%s) is from a future slot (%d > %d)", commitmentID, commitmentID.Slot(), latest.Slot())
 	}
 
-	commitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(commitmentID.Slot())
+	commitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(commitmentID.Slot())
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
 	}
@@ -54,7 +54,7 @@ func getCommitmentByID(commitmentID iotago.CommitmentID, latestCommitment ...*mo
 }
 
 func getUTXOChanges(commitmentID iotago.CommitmentID) (*api.UTXOChangesResponse, error) {
-	diffs, err := deps.Protocol.MainEngineInstance().Ledger.SlotDiffs(commitmentID.Slot())
+	diffs, err := deps.Protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
 	}

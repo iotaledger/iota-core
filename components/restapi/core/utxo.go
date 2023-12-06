@@ -16,7 +16,7 @@ func outputByID(c echo.Context) (*api.OutputResponse, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
 	}
 
-	output, err := deps.Protocol.MainEngineInstance().Ledger.Output(outputID)
+	output, err := deps.Protocol.Engines.Main.Get().Ledger.Output(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
 	}
@@ -33,7 +33,7 @@ func outputMetadataByID(c echo.Context) (*api.OutputMetadata, error) {
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
 	}
 
-	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
+	output, spent, err := deps.Protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
 	}
@@ -51,7 +51,7 @@ func outputWithMetadataByID(c echo.Context) (*api.OutputWithMetadataResponse, er
 		return nil, ierrors.Wrapf(err, "failed to parse output ID %s", c.Param(api.ParameterOutputID))
 	}
 
-	output, spent, err := deps.Protocol.MainEngineInstance().Ledger.OutputOrSpent(outputID)
+	output, spent, err := deps.Protocol.Engines.Main.Get().Ledger.OutputOrSpent(outputID)
 	if err != nil {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from the Ledger: %s", outputID.ToHex(), err)
 	}
@@ -82,14 +82,14 @@ func outputWithMetadataByID(c echo.Context) (*api.OutputWithMetadataResponse, er
 }
 
 func newOutputMetadataResponse(output *utxoledger.Output) (*api.OutputMetadata, error) {
-	latestCommitment := deps.Protocol.MainEngineInstance().SyncManager.LatestCommitment()
+	latestCommitment := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 
 	includedSlot := output.SlotBooked()
 	includedCommitmentID := iotago.EmptyCommitmentID
 
 	if includedSlot <= latestCommitment.Slot() &&
-		includedSlot >= deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot() {
-		includedCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(includedSlot)
+		includedSlot >= deps.Protocol.Engines.Main.Get().CommittedAPI().ProtocolParameters().GenesisSlot() {
+		includedCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(includedSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", includedSlot, err)
 		}
@@ -118,8 +118,8 @@ func newSpentMetadataResponse(spent *utxoledger.Spent) (*api.OutputMetadata, err
 	spentCommitmentID := iotago.EmptyCommitmentID
 
 	if spentSlot <= newOutputMetadataResponse.LatestCommitmentID.Slot() &&
-		spentSlot >= deps.Protocol.MainEngineInstance().CommittedAPI().ProtocolParameters().GenesisSlot() {
-		spentCommitment, err := deps.Protocol.MainEngineInstance().Storage.Commitments().Load(spentSlot)
+		spentSlot >= deps.Protocol.Engines.Main.Get().CommittedAPI().ProtocolParameters().GenesisSlot() {
+		spentCommitment, err := deps.Protocol.Engines.Main.Get().Storage.Commitments().Load(spentSlot)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to load commitment with index %d: %s", spentSlot, err)
 		}

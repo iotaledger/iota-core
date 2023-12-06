@@ -168,6 +168,7 @@ func TestStorage_PruneBySize(t *testing.T) {
 
 func TestStorage_RestoreFromDisk(t *testing.T) {
 	tf := NewTestFramework(t, t.TempDir(), storage.WithPruningDelay(1))
+	defer tf.Shutdown()
 
 	totalEpochs := 9
 	tf.GeneratePermanentData(5 * MB)
@@ -213,6 +214,7 @@ func TestStorage_RestoreFromDisk(t *testing.T) {
 
 func TestStorage_CopyFromForkedStorageEmpty(t *testing.T) {
 	tf1 := NewTestFramework(t, t.TempDir())
+	defer tf1.Shutdown()
 
 	totalEpochs := 14
 	// Generate data in the old storage (source). It contains data since the genesis and one epoch after the fork.

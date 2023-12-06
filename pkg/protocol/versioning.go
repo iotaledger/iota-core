@@ -1,3 +1,6 @@
 package protocol
 
-const DatabaseVersion byte = 1
+const (
+	// DatabaseVersion defines the current version of the database.
+	DatabaseVersion byte = 1
+)

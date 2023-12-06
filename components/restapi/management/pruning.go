@@ -10,7 +10,7 @@ import (
 )
 
 func pruneDatabase(c echo.Context) (*api.PruneDatabaseResponse, error) {
-	if deps.Protocol.MainEngineInstance().Storage.IsPruning() {
+	if deps.Protocol.Engines.Main.Get().Storage.IsPruning() {
 		return nil, ierrors.Wrapf(echo.ErrServiceUnavailable, "node is already pruning")
 	}
 
@@ -30,14 +30,14 @@ func pruneDatabase(c echo.Context) (*api.PruneDatabaseResponse, error) {
 	var err error
 
 	if request.Epoch != 0 {
-		err = deps.Protocol.MainEngineInstance().Storage.PruneByEpochIndex(request.Epoch)
+		err = deps.Protocol.Engines.Main.Get().Storage.PruneByEpochIndex(request.Epoch)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "pruning database failed: %s", err)
 		}
 	}
 
 	if request.Depth != 0 {
-		_, _, err := deps.Protocol.MainEngineInstance().Storage.PruneByDepth(request.Depth)
+		_, _, err := deps.Protocol.Engines.Main.Get().Storage.PruneByDepth(request.Depth)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "pruning database failed: %s", err)
 		}
@@ -49,13 +49,13 @@ func pruneDatabase(c echo.Context) (*api.PruneDatabaseResponse, error) {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "pruning database failed: %s", err)
 		}
 
-		err = deps.Protocol.MainEngineInstance().Storage.PruneBySize(pruningTargetDatabaseSizeBytes)
+		err = deps.Protocol.Engines.Main.Get().Storage.PruneBySize(pruningTargetDatabaseSizeBytes)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "pruning database failed: %s", err)
 		}
 	}
 
-	targetEpoch, hasPruned := deps.Protocol.MainEngineInstance().Storage.LastPrunedEpoch()
+	targetEpoch, hasPruned := deps.Protocol.Engines.Main.Get().Storage.LastPrunedEpoch()
 	if hasPruned {
 		targetEpoch++
 	}

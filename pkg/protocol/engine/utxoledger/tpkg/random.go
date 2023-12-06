@@ -14,9 +14,9 @@ func RandLedgerStateOutput() *utxoledger.Output {
 func RandLedgerStateOutputWithOutput(output iotago.Output) *utxoledger.Output {
 	outputs := iotago.TxEssenceOutputs{output}
 	txID := tpkg.RandTransactionID()
-	proof := lo.PanicOnErr(iotago.NewOutputIDProof(tpkg.TestAPI, txID.Identifier(), txID.Slot(), outputs, 0))
+	proof := lo.PanicOnErr(iotago.NewOutputIDProof(tpkg.ZeroCostTestAPI, txID.Identifier(), txID.Slot(), outputs, 0))
 
-	return utxoledger.CreateOutput(iotago.SingleVersionProvider(tpkg.TestAPI), tpkg.RandOutputID(), tpkg.RandBlockID(), tpkg.RandSlot(), outputs[0], proof)
+	return utxoledger.CreateOutput(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), tpkg.RandOutputID(), tpkg.RandBlockID(), tpkg.RandSlot(), outputs[0], proof)
 }
 
 func RandLedgerStateOutputWithType(outputType iotago.OutputType) *utxoledger.Output {

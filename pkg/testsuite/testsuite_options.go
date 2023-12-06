@@ -1,6 +1,7 @@
 package testsuite
 
 import (
+	"log/slog"
 	"os"
 	"time"
 
@@ -39,6 +40,12 @@ func WithProtocolParametersOptions(protocolParameterOptions ...options.Option[io
 	}
 }
 
+func WithLogHandler(logHandler slog.Handler) options.Option[TestSuite] {
+	return func(t *TestSuite) {
+		t.optsLogHandler = logHandler
+	}
+}
+
 func GenesisTimeWithOffsetBySlots(slots iotago.SlotIndex, slotDurationInSeconds uint8) int64 {
 	return time.Now().Truncate(time.Duration(slotDurationInSeconds)*time.Second).Unix() - int64(slotDurationInSeconds)*int64(slots)
 }
@@ -57,22 +64,23 @@ func durationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time
 	return d
 }
 
-const (
-	DefaultSlotDurationInSeconds uint8 = 10
-	DefaultSlotsPerEpochExponent uint8 = 5
+var (
+	defaultProtocolParams              = iotago.NewV3TestProtocolParameters()
+	DefaultSlotDurationInSeconds uint8 = defaultProtocolParams.SlotDurationInSeconds()
+	DefaultSlotsPerEpochExponent uint8 = defaultProtocolParams.SlotsPerEpochExponent()
 
-	DefaultLivenessThresholdLowerBoundInSeconds uint16           = 30
-	DefaultLivenessThresholdUpperBoundInSeconds uint16           = 30
-	DefaultMinCommittableAge                    iotago.SlotIndex = 10
-	DefaultMaxCommittableAge                    iotago.SlotIndex = 20
-	DefaultEpochNearingThreshold                iotago.SlotIndex = 24
+	DefaultLivenessThresholdLowerBoundInSeconds uint16           = uint16(defaultProtocolParams.LivenessThresholdLowerBound().Seconds())
+	DefaultLivenessThresholdUpperBoundInSeconds uint16           = uint16(defaultProtocolParams.LivenessThresholdUpperBound().Seconds())
+	DefaultMinCommittableAge                    iotago.SlotIndex = defaultProtocolParams.MinCommittableAge()
+	DefaultMaxCommittableAge                    iotago.SlotIndex = defaultProtocolParams.MaxCommittableAge()
+	DefaultEpochNearingThreshold                iotago.SlotIndex = defaultProtocolParams.EpochNearingThreshold()
 
-	DefaultMinReferenceManaCost iotago.Mana      = 500
-	DefaultRMCIncrease          iotago.Mana      = 500
-	DefaultRMCDecrease          iotago.Mana      = 500
-	DefaultRMCIncreaseThreshold iotago.WorkScore = 8 * DefaultSchedulerRate
-	DefaultRMCDecreaseThreshold iotago.WorkScore = 5 * DefaultSchedulerRate
-	DefaultSchedulerRate        iotago.WorkScore = 100000
-	DefaultMaxBufferSize        uint32           = 100 * iotago.MaxBlockSize
-	DefaultMaxValBufferSize     uint32           = 100 * iotago.MaxBlockSize
+	DefaultMinReferenceManaCost iotago.Mana      = defaultProtocolParams.CongestionControlParameters().MinReferenceManaCost
+	DefaultRMCIncrease          iotago.Mana      = defaultProtocolParams.CongestionControlParameters().Increase
+	DefaultRMCDecrease          iotago.Mana      = defaultProtocolParams.CongestionControlParameters().Decrease
+	DefaultRMCIncreaseThreshold iotago.WorkScore = defaultProtocolParams.CongestionControlParameters().IncreaseThreshold
+	DefaultRMCDecreaseThreshold iotago.WorkScore = defaultProtocolParams.CongestionControlParameters().DecreaseThreshold
+	DefaultSchedulerRate        iotago.WorkScore = defaultProtocolParams.CongestionControlParameters().SchedulerRate
+	DefaultMaxBufferSize        uint32           = defaultProtocolParams.CongestionControlParameters().MaxBufferSize
+	DefaultMaxValBufferSize     uint32           = defaultProtocolParams.CongestionControlParameters().MaxValidationBufferSize
 )

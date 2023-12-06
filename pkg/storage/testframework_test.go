@@ -48,7 +48,7 @@ func NewTestFramework(t *testing.T, baseDir string, storageOpts ...options.Optio
 
 	storageFactoryFunc := func() *storage.Storage {
 		instance := storage.Create(baseDir, 0, errorHandler, storageOpts...)
-		require.NoError(t, instance.Settings().StoreProtocolParametersForStartEpoch(iotago.NewV3ProtocolParameters(), 0))
+		require.NoError(t, instance.Settings().StoreProtocolParametersForStartEpoch(iotago.NewV3TestProtocolParameters(), 0))
 
 		return instance
 	}
