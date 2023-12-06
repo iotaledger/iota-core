@@ -65,7 +65,7 @@ func durationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time
 }
 
 var (
-	defaultProtocolParams              = iotago.NewV3TestProtocolParameters()
+	defaultProtocolParams              = iotago.NewV3SnapshotProtocolParameters()
 	DefaultSlotDurationInSeconds uint8 = defaultProtocolParams.SlotDurationInSeconds()
 	DefaultSlotsPerEpochExponent uint8 = defaultProtocolParams.SlotsPerEpochExponent()
 

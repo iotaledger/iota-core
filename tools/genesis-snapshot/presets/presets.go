@@ -1,6 +1,8 @@
 package presets
 
 import (
+	"time"
+
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
@@ -15,18 +17,20 @@ import (
 
 var (
 	// use defaults from iota.go
-	protocolParamsBase = iotago.NewV3TestProtocolParameters(
-		iotago.WithNetworkOptions("default"),
+	protocolParamsBase = iotago.NewV3SnapshotProtocolParameters(
+		iotago.WithNetworkOptions("default", iotago.PrefixTestnet),
 	)
 
 	// use defaults from iota.go
-	protocolParamsDocker = iotago.NewV3TestProtocolParameters(
-		iotago.WithNetworkOptions("docker"),
+	protocolParamsDocker = iotago.NewV3SnapshotProtocolParameters(
+		iotago.WithNetworkOptions("docker", iotago.PrefixTestnet),
+		iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 13),
 	)
 
 	// use defaults from iota.go
-	protocolParamsFeature = iotago.NewV3TestProtocolParameters(
-		iotago.WithNetworkOptions("feature"),
+	protocolParamsFeature = iotago.NewV3SnapshotProtocolParameters(
+		iotago.WithNetworkOptions("feature", iotago.PrefixTestnet),
+		iotago.WithTimeProviderOptions(666666, time.Now().Unix()-100_000, 10, 13),
 	)
 )
 
