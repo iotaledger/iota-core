@@ -142,6 +142,26 @@ func configure() error {
 		return responseByHeader(c, resp)
 	})
 
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentByIDUTXOChangesFull), func(c echo.Context) error {
+		commitmentID, err := httpserver.ParseCommitmentIDParam(c, api.ParameterCommitmentID)
+		if err != nil {
+			return err
+		}
+
+		// load the commitment to check if it matches the given commitmentID
+		commitment, err := getCommitmentByID(commitmentID)
+		if err != nil {
+			return err
+		}
+
+		resp, err := getUTXOChangesFull(commitment.ID())
+		if err != nil {
+			return err
+		}
+
+		return responseByHeader(c, resp)
+	})
+
 	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentBySlot), func(c echo.Context) error {
 		index, err := httpserver.ParseSlotParam(c, api.ParameterSlot)
 		if err != nil {
@@ -168,6 +188,25 @@ func configure() error {
 		}
 
 		resp, err := getUTXOChanges(commitment.ID())
+		if err != nil {
+			return err
+		}
+
+		return responseByHeader(c, resp)
+	})
+
+	routeGroup.GET(api.EndpointWithEchoParameters(api.CoreEndpointCommitmentBySlotUTXOChangesFull), func(c echo.Context) error {
+		slot, err := httpserver.ParseSlotParam(c, api.ParameterSlot)
+		if err != nil {
+			return err
+		}
+
+		commitment, err := getCommitmentBySlot(slot)
+		if err != nil {
+			return err
+		}
+
+		resp, err := getUTXOChangesFull(commitment.ID())
 		if err != nil {
 			return err
 		}
