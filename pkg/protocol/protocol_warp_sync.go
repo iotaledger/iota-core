@@ -293,16 +293,23 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	w.workerPool.Submit(func() {
 		if commitment, err := w.protocol.Commitments.Get(commitmentID); err == nil {
-			w.processRequest(commitment.TargetEngine(), commitmentID, from)
+			w.processRequestWithEngine(commitment.TargetEngine(), commitmentID, from)
 		} else if ierrors.Is(err, ErrorCommitmentNotFound) {
-			w.processRequest(w.protocol.Engines.Main.Get(), commitmentID, from)
+			w.processRequestWithEngine(w.protocol.Engines.Main.Get(), commitmentID, from)
 		} else {
 			w.LogDebug("failed to load commitment for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
 		}
 	})
 }
 
-func (w *WarpSyncProtocol) processRequest(targetEngine *engine.Engine, commitmentID iotago.CommitmentID, from peer.ID) {
+// Shutdown shuts down the warp sync protocol.
+func (w *WarpSyncProtocol) Shutdown() {
+	w.ticker.Shutdown()
+	w.workerPool.Shutdown().ShutdownComplete.Wait()
+}
+
+// processRequestWithEngine processes a warp-sync request by sourcing the requested commitment from the given engine.
+func (w *WarpSyncProtocol) processRequestWithEngine(targetEngine *engine.Engine, commitmentID iotago.CommitmentID, from peer.ID) {
 	if targetEngine == nil {
 		w.LogTrace("warp-sync request for chain without engine", "commitmentID", commitmentID, "fromPeer", from)
 
@@ -340,10 +347,4 @@ func (w *WarpSyncProtocol) processRequest(targetEngine *engine.Engine, commitmen
 	w.protocol.Network.SendWarpSyncResponse(commitmentID, blockIDsBySlotCommitment, roots.TangleProof(), transactionIDs, roots.MutationProof(), from)
 
 	w.LogTrace("sent response", "commitmentID", commitmentID, "toPeer", from)
-}
-
-// Shutdown shuts down the warp sync protocol.
-func (w *WarpSyncProtocol) Shutdown() {
-	w.ticker.Shutdown()
-	w.workerPool.Shutdown().ShutdownComplete.Wait()
 }
