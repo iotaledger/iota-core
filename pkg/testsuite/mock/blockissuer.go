@@ -583,7 +583,7 @@ func (i *BlockIssuer) validateReferences(issuingTime time.Time, slotCommitmentIn
 		}
 
 		if b.IssuingTime().After(issuingTime) {
-			return ierrors.Errorf("cannot issue block if the parents issuingTime is ahead block's issuingTime: %s vs %s", b.IssuingTime(), issuingTime)
+			return ierrors.Errorf("cannot issue block if the parents issuingTime is ahead block's issuingTime: %s vs %s", b.IssuingTime(), issuingTime.UTC())
 		}
 		if b.SlotCommitmentID().Slot() > slotCommitmentIndex {
 			return ierrors.Errorf("cannot issue block if the commitment is ahead of its parents' commitment: %s vs %s", b.SlotCommitmentID().Slot(), slotCommitmentIndex)
