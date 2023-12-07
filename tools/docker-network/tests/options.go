@@ -1,7 +1,11 @@
+//go:build dockertests
+
 package tests
 
 import (
 	"time"
+
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/lo"
@@ -10,7 +14,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/hexutil"
-	"golang.org/x/crypto/blake2b"
 )
 
 var DefaultProtocolParametersOptions = []options.Option[iotago.V3ProtocolParameters]{

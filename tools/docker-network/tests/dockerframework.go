@@ -1,3 +1,5 @@
+//go:build dockertests
+
 package tests
 
 import (
@@ -10,6 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mr-tron/base58"
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -19,8 +24,6 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 	"github.com/iotaledger/iota.go/v4/wallet"
-	"github.com/mr-tron/base58"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -339,7 +342,7 @@ func (d *DockerTestFramework) Eventually(condition func() error, waitForSync ...
 	}
 }
 
-///////////////////////////////
+// /////////////////////////////
 
 func createLogDirectory(testName string) string {
 	// make sure logs/ exists

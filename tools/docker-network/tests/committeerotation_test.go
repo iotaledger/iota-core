@@ -1,3 +1,5 @@
+//go:build dockertests
+
 package tests
 
 import (
@@ -5,12 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_SmallerCommittee(t *testing.T) {
+	fmt.Println("Test_SmallerCommittee")
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
