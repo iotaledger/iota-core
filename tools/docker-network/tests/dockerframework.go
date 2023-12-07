@@ -39,12 +39,17 @@ var (
 	}
 )
 
+type Node struct {
+	Name          string
+	ContainerName string
+	ClientURL     string
+	Client        *nodeclient.Client
+}
+
 type DockerTestFramework struct {
 	Testing *testing.T
 
-	validatorContainerNames map[string]string
-	clientURLs              map[string]string
-	nodeClients             map[string]*nodeclient.Client
+	nodes map[string]*Node
 
 	snapshotPath     string
 	logDirectoryPath string
@@ -56,15 +61,13 @@ type DockerTestFramework struct {
 	optsTick                     time.Duration
 }
 
-func NewDockerTestFramework(t *testing.T, validatorNames map[string]string, clientURLs map[string]string, opts ...options.Option[DockerTestFramework]) *DockerTestFramework {
+func NewDockerTestFramework(t *testing.T, opts ...options.Option[DockerTestFramework]) *DockerTestFramework {
 	return options.Apply(&DockerTestFramework{
-		Testing:                 t,
-		validatorContainerNames: validatorNames,
-		clientURLs:              clientURLs,
-		nodeClients:             make(map[string]*nodeclient.Client),
-		optsWaitForSync:         5 * time.Minute,
-		optsWaitFor:             2 * time.Minute,
-		optsTick:                5 * time.Second,
+		Testing:         t,
+		nodes:           make(map[string]*Node),
+		optsWaitForSync: 5 * time.Minute,
+		optsWaitFor:     2 * time.Minute,
+		optsTick:        5 * time.Second,
 	}, opts, func(d *DockerTestFramework) {
 		d.optsProtocolParameterOptions = append(DefaultProtocolParametersOptions, d.optsProtocolParameterOptions...)
 		protocolParams := iotago.NewV3SnapshotProtocolParameters(d.optsProtocolParameterOptions...)
@@ -96,17 +99,18 @@ func (d *DockerTestFramework) Run() error {
 	}()
 
 	// first wait until the nodes are available
-	d.nodeClients = make(map[string]*nodeclient.Client)
-	for name, url := range d.clientURLs {
+	for _, node := range d.Nodes() {
 		for {
-			client, err := nodeclient.New(url)
+			client, err := nodeclient.New(node.ClientURL)
 			if err == nil {
-				d.nodeClients[name] = client
+				node.Client = client
+				d.nodes[node.Name] = node
+
 				break
 			}
 
 			time.Sleep(d.optsTick)
-			fmt.Printf("Waiting for node %s to be available...\n", name)
+			fmt.Printf("Waiting for node %s to be available...\n", node.Name)
 		}
 	}
 
@@ -121,15 +125,15 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 	defer fmt.Println("Wait until the nodes are synced......done")
 
 	d.Eventually(func() error {
-		for name, client := range d.nodeClients {
+		for _, node := range d.nodes {
 			for {
-				synced, err := client.Health(context.TODO())
+				synced, err := node.Client.Health(context.TODO())
 				if err != nil {
 					return err
 				}
 
 				if synced {
-					fmt.Println("Node", name, "is synced")
+					fmt.Println("Node", node.Name, "is synced")
 					break
 				}
 			}
@@ -141,27 +145,45 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 	return nil
 }
 
-func (d *DockerTestFramework) GetRandomNode() *nodeclient.Client {
-	for _, client := range d.nodeClients {
-		return client
+func (d *DockerTestFramework) AddNode(name string, containerName string, clientURL string) {
+	d.nodes[name] = &Node{
+		Name:          name,
+		ContainerName: containerName,
+		ClientURL:     clientURL,
+	}
+}
+
+func (d *DockerTestFramework) Nodes() []*Node {
+	nodes := make([]*Node, 0, len(d.nodes))
+	for _, node := range d.nodes {
+		nodes = append(nodes, node)
 	}
 
-	return nil
+	return nodes
+}
+
+func (d *DockerTestFramework) Node(name string) *Node {
+	node, exist := d.nodes[name]
+	require.True(d.Testing, exist)
+
+	return node
+}
+
+func (d *DockerTestFramework) NodeStatus(name string) *api.InfoResNodeStatus {
+	node := d.Node(name)
+
+	info, err := node.Client.Info(context.TODO())
+	require.NoError(d.Testing, err)
+
+	return info.Status
 }
 
 func (d *DockerTestFramework) AssertCommitteeSize(expectedEpoch iotago.EpochIndex, expectedCommitteeSize int) {
 	fmt.Println("Wait for committee selection..., expected epoch: ", expectedEpoch, ", expected committee size: ", expectedCommitteeSize)
 	defer fmt.Println("Wait for committee selection......done")
 
-	var node *nodeclient.Client
-	for _, client := range d.nodeClients {
-		node = client
-		break
-	}
-	status, err := getNodeStatus(node)
-	require.NoError(d.Testing, err)
-
-	api := node.CommittedAPI()
+	status := d.NodeStatus("V1")
+	api := d.Node("V1").Client.CommittedAPI()
 	expectedSlotStart := api.TimeProvider().EpochStart(expectedEpoch)
 	require.Greater(d.Testing, expectedSlotStart, status.LatestAcceptedBlockSlot)
 
@@ -171,8 +193,8 @@ func (d *DockerTestFramework) AssertCommitteeSize(expectedEpoch iotago.EpochInde
 	time.Sleep(secToWait)
 
 	d.Eventually(func() error {
-		for _, client := range d.nodeClients {
-			resp, err := client.Committee(context.TODO())
+		for _, node := range d.nodes {
+			resp, err := node.Client.Committee(context.TODO())
 			if err != nil {
 				return err
 			}
@@ -191,11 +213,10 @@ func (d *DockerTestFramework) AssertCommitteeSize(expectedEpoch iotago.EpochInde
 }
 
 func (d *DockerTestFramework) AssertFinalizedSlot(condition func(iotago.SlotIndex) error) {
-	for _, client := range d.nodeClients {
-		status, err := getNodeStatus(client)
-		require.NoError(d.Testing, err)
+	for _, node := range d.nodes {
+		status := d.NodeStatus(node.Name)
 
-		err = condition(status.LatestFinalizedSlot)
+		err := condition(status.LatestFinalizedSlot)
 		require.NoError(d.Testing, err)
 	}
 }
@@ -208,26 +229,20 @@ func (d *DockerTestFramework) Stop() {
 	exec.Command("rm", d.snapshotPath).Run()
 }
 
-func (d *DockerTestFramework) StopContainer(containerIndex ...string) error {
-	fmt.Println("Stop validator", containerIndex, "......")
+func (d *DockerTestFramework) StopContainer(containerName ...string) error {
+	fmt.Println("Stop validator", containerName, "......")
 
-	args := []string{}
-	for _, index := range containerIndex {
-		args = append(args, d.validatorContainerNames[index])
-	}
+	args := append([]string{"stop"}, containerName...)
 
-	return dockerContainerStop(args...)
+	return exec.Command("docker", args...).Run()
 }
 
-func (d *DockerTestFramework) RestartContainer(containerIndex ...string) error {
-	fmt.Println("Restart validator", containerIndex, "......")
+func (d *DockerTestFramework) RestartContainer(containerName ...string) error {
+	fmt.Println("Restart validator", containerName, "......")
 
-	args := []string{}
-	for _, index := range containerIndex {
-		args = append(args, d.validatorContainerNames[index])
-	}
+	args := append([]string{"restart"}, containerName...)
 
-	return dockerContainerRestart(args...)
+	return exec.Command("docker", args...).Run()
 }
 
 func (d *DockerTestFramework) DumpContainerLogsToFiles() {
@@ -289,31 +304,6 @@ func (d *DockerTestFramework) Eventually(condition func() error, waitForSync ...
 }
 
 ///////////////////////////////
-
-func dockerContainerStop(containerName ...string) error {
-	fmt.Println("Stop validator", containerName, "......")
-
-	args := append([]string{"stop"}, containerName...)
-
-	return exec.Command("docker", args...).Run()
-}
-
-func dockerContainerRestart(containerName ...string) error {
-	fmt.Println("Restart validator", containerName, "......")
-
-	args := append([]string{"restart"}, containerName...)
-
-	return exec.Command("docker", args...).Run()
-}
-
-func getNodeStatus(client *nodeclient.Client) (*api.InfoResNodeStatus, error) {
-	info, err := client.Info(context.TODO())
-	if err != nil {
-		return nil, err
-	}
-
-	return info.Status, nil
-}
 
 func createLogDirectory(testName string) string {
 	// make sure logs/ exists
