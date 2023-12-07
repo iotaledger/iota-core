@@ -212,7 +212,8 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	}
 
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
-		validatorPerformances := make([]*model.ValidatorPerformance, timeProvider.EpochDurationSlots())
+		validatorPerformances := make([]*model.ValidatorPerformance, 0, timeProvider.EpochDurationSlots())
+
 		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
 			validatorSlotPerformances, err := t.validatorPerformancesFunc(slot)
 			if err != nil {
