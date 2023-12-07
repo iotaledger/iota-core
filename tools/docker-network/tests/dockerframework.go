@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
@@ -40,10 +41,11 @@ var (
 )
 
 type Node struct {
-	Name          string
-	ContainerName string
-	ClientURL     string
-	Client        *nodeclient.Client
+	Name                 string
+	ContainerName        string
+	ClientURL            string
+	Client               *nodeclient.Client
+	AccountAddressBech32 string
 }
 
 type DockerTestFramework struct {
@@ -145,6 +147,15 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 	return nil
 }
 
+func (d *DockerTestFramework) AddValidatorNode(name string, containerName string, clientURL string, accAddrBech32 string) {
+	d.nodes[name] = &Node{
+		Name:                 name,
+		ContainerName:        containerName,
+		ClientURL:            clientURL,
+		AccountAddressBech32: accAddrBech32,
+	}
+}
+
 func (d *DockerTestFramework) AddNode(name string, containerName string, clientURL string) {
 	d.nodes[name] = &Node{
 		Name:          name,
@@ -153,10 +164,19 @@ func (d *DockerTestFramework) AddNode(name string, containerName string, clientU
 	}
 }
 
-func (d *DockerTestFramework) Nodes() []*Node {
-	nodes := make([]*Node, 0, len(d.nodes))
-	for _, node := range d.nodes {
-		nodes = append(nodes, node)
+func (d *DockerTestFramework) Nodes(names ...string) []*Node {
+	if len(names) == 0 {
+		nodes := make([]*Node, 0, len(d.nodes))
+		for _, node := range d.nodes {
+			nodes = append(nodes, node)
+		}
+
+		return nodes
+	}
+
+	nodes := make([]*Node, len(names))
+	for i, name := range names {
+		nodes[i] = d.Node(name)
 	}
 
 	return nodes
@@ -178,8 +198,19 @@ func (d *DockerTestFramework) NodeStatus(name string) *api.InfoResNodeStatus {
 	return info.Status
 }
 
-func (d *DockerTestFramework) AssertCommitteeSize(expectedEpoch iotago.EpochIndex, expectedCommitteeSize int) {
-	fmt.Println("Wait for committee selection..., expected epoch: ", expectedEpoch, ", expected committee size: ", expectedCommitteeSize)
+func (d *DockerTestFramework) AccountsFromNodes(nodes ...*Node) []string {
+	var accounts []string
+	for _, node := range nodes {
+		if node.AccountAddressBech32 != "" {
+			accounts = append(accounts, node.AccountAddressBech32)
+		}
+	}
+
+	return accounts
+}
+
+func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, expectedCommitteeMember []string) {
+	fmt.Println("Wait for committee selection..., expected epoch: ", expectedEpoch, ", expected committee size: ", len(expectedCommitteeMember))
 	defer fmt.Println("Wait for committee selection......done")
 
 	status := d.NodeStatus("V1")
@@ -200,11 +231,16 @@ func (d *DockerTestFramework) AssertCommitteeSize(expectedEpoch iotago.EpochInde
 			}
 
 			if resp.Epoch == expectedEpoch {
-				if len(resp.Committee) == expectedCommitteeSize {
-					return nil
-				} else {
-					return ierrors.Errorf("committee does not updated as expected")
+				members := make([]string, len(resp.Committee))
+				for i, member := range resp.Committee {
+					members[i] = member.AddressBech32
 				}
+
+				if match := lo.Equal(expectedCommitteeMember, members); match {
+					return nil
+				}
+
+				return ierrors.Errorf("committee members does not match as expected, expected: %v, actual: %v", expectedCommitteeMember, members)
 			}
 		}
 
