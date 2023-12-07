@@ -87,7 +87,7 @@ func calculateValidatorReward(t *testing.T, ts *testsuite.TestSuite, accountID i
 	return decayedRewards
 }
 
-func setupValidatorTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock.Node, *mock.Node, iotago.BlockID) {
+func setupValidatorTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock.Node, *mock.Node) {
 	var slotDuration uint8 = 5
 	var slotsPerEpochExponent uint8 = 5
 	var validationBlocksPerSlot uint8 = 5
@@ -95,6 +95,8 @@ func setupValidatorTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *m
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithStakingOptions(1, validationBlocksPerSlot, 1),
+			// Pick larger values for ManaShareCoefficient and DecayBalancingConstant for more precision in the calculations.
+			iotago.WithRewardsOptions(8, 8, 11, 1154, 200, 200),
 			iotago.WithTimeProviderOptions(
 				0,
 				testsuite.GenesisTimeWithOffsetBySlots(1000, slotDuration),
@@ -126,28 +128,61 @@ func setupValidatorTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *m
 	vnode2.Protocol.SetLogLevel(log.LevelError)
 	node3.Protocol.SetLogLevel(log.LevelError)
 
-	tip := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().TipSelection.SelectTips(1)[iotago.StrongParentType][0]
-
 	ts.SetCurrentSlot(1)
 
-	return ts, vnode1, vnode2, node3, tip
+	return ts, vnode1, vnode2, node3
 }
 
-func Test_ValidatorReward(t *testing.T) {
-	ts, vnode1, vnode2, _, tip := setupValidatorTestsuite(t)
+type EpochPerformanceMap = map[iotago.EpochIndex]uint64
+type ValidatorTest struct {
+	ts *testsuite.TestSuite
+
+	subslotDuration         time.Duration
+	epochPerformanceFactors EpochPerformanceMap
+}
+
+func Test_Validator_PerfectIssuance(t *testing.T) {
+	ts, _, _, _ := setupValidatorTestsuite(t)
 	defer ts.Shutdown()
 
 	subslotDuration := time.Duration(ts.API.ProtocolParameters().SlotDurationInSeconds()/ts.API.ProtocolParameters().ValidationBlocksPerSlot()) * time.Second
+	validationBlocksPerSlot := uint64(ts.API.ProtocolParameters().ValidationBlocksPerSlot())
+	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
+
+	test := ValidatorTest{
+		ts:              ts,
+		subslotDuration: subslotDuration,
+		epochPerformanceFactors: EpochPerformanceMap{
+			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
+			0: (validationBlocksPerSlot * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			1: (validationBlocksPerSlot * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			2: (validationBlocksPerSlot * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+		},
+	}
+
+	validatorTest(t, test)
+}
+
+func validatorTest(t *testing.T, test ValidatorTest) {
+	ts := test.ts
+	subslotDuration := test.subslotDuration
+
+	tip := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().TipSelection.SelectTips(1)[iotago.StrongParentType][0]
+	startEpoch := iotago.EpochIndex(0)
+	endEpoch := iotago.EpochIndex(len(test.epochPerformanceFactors) - 1)
+	fmt.Printf("ValidatorTest: startEpoch=%d, endEpoch=%d\n", startEpoch, endEpoch)
 
 	// Validate until the last slot of the epoch is definitely committed.
-	var epochEndSlot iotago.SlotIndex = ts.API.TimeProvider().EpochEnd(ts.API.TimeProvider().EpochFromSlot(ts.CurrentSlot())) + ts.API.ProtocolParameters().MaxCommittableAge()
+	var endEpochSlot iotago.SlotIndex = ts.API.TimeProvider().EpochEnd(endEpoch) + ts.API.ProtocolParameters().MaxCommittableAge()
+	// Needed to increase the block timestamp monotonically relative to the parent.
 	subSlotBlockCounter := 0
 
-	for slot := ts.CurrentSlot(); slot <= epochEndSlot; slot++ {
-		slotStartTime := ts.API.TimeProvider().SlotStartTime(ts.CurrentSlot()).UTC()
+	for slot := ts.CurrentSlot(); slot <= endEpochSlot; slot++ {
+		ts.SetCurrentSlot(slot)
 
+		slotStartTime := ts.API.TimeProvider().SlotStartTime(ts.CurrentSlot()).UTC()
 		for subslotIdx := uint8(0); subslotIdx < ts.API.ProtocolParameters().ValidationBlocksPerSlot(); subslotIdx++ {
-			for _, node := range []*mock.Node{vnode1, vnode2} {
+			for _, node := range ts.Validators() {
 				blockName := fmt.Sprintf("block-%s-%d/%d", node.Name, ts.CurrentSlot(), subslotIdx)
 				latestCommitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
@@ -166,8 +201,6 @@ func Test_ValidatorReward(t *testing.T) {
 			}
 			subSlotBlockCounter = 0
 		}
-
-		ts.SetCurrentSlot(slot + 1)
 	}
 
 	ts.Wait(ts.Nodes()...)
@@ -186,15 +219,16 @@ func Test_ValidatorReward(t *testing.T) {
 		totalValidatorStake += accountData.ValidatorStake
 	})
 
+	// Determine the rewards the validators actually got.
 	actualRewards := make(map[iotago.AccountID]iotago.Mana, len(ts.Validators()))
 	claimingEpoch := ts.API.TimeProvider().EpochFromSlot(ts.CurrentSlot())
 
 	for _, validatorAccount := range []string{"Genesis:1", "Genesis:2"} {
 		output := ts.DefaultWallet().Output(validatorAccount)
-		accId := output.Output().(*iotago.AccountOutput).AccountID
+		accountID := output.Output().(*iotago.AccountOutput).AccountID
 
 		rewardMana, _, _, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().SybilProtection.ValidatorReward(
-			accId,
+			accountID,
 			output.Output().FeatureSet().Staking().StakedAmount,
 			output.Output().FeatureSet().Staking().StartEpoch,
 			claimingEpoch,
@@ -203,18 +237,19 @@ func Test_ValidatorReward(t *testing.T) {
 			panic(err)
 		}
 
-		actualRewards[accId] = rewardMana
+		actualRewards[accountID] = rewardMana
 	}
 
 	for accountID, actualReward := range actualRewards {
-		validationBlocksPerSlot := uint64(ts.API.ProtocolParameters().ValidationBlocksPerSlot())
-		epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
+		lastRewardEpoch := iotago.EpochIndex(len(test.epochPerformanceFactors))
+		rewards := make([]reward, 0, lastRewardEpoch)
+		for epoch := iotago.EpochIndex(0); epoch < lastRewardEpoch; epoch++ {
+			epochPerformanceFactor := test.epochPerformanceFactors[epoch]
+			reward := calculateEpochReward(t, ts, accountID, epoch, epochPerformanceFactor, totalStake, totalValidatorStake)
+			rewards = append(rewards, reward)
+		}
 
-		// A validator cannot issue blocks in slot 0, so we have to deduct those blocks from the performance factor.
-		epochPerformanceFactor := ((validationBlocksPerSlot * epochDurationSlots) - validationBlocksPerSlot) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent())
-
-		calculatedReward := calculateEpochReward(t, ts, accountID, 0, epochPerformanceFactor, totalStake, totalValidatorStake)
-		expectedReward := calculateValidatorReward(t, ts, accountID, []reward{calculatedReward}, 0, claimingEpoch)
+		expectedReward := calculateValidatorReward(t, ts, accountID, rewards, startEpoch, claimingEpoch)
 
 		require.Equal(t, expectedReward, actualReward, "expected reward for account %s to be %d, was %d", accountID, expectedReward, actualReward)
 	}
