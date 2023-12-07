@@ -70,7 +70,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	}
 
 	t.testAPI = iotago.V3API(
-		iotago.NewV3TestProtocolParameters(
+		iotago.NewV3SnapshotProtocolParameters(
 			iotago.WithLivenessOptions(5, 5, 1, 2, 8),
 		),
 	)

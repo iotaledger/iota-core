@@ -40,7 +40,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 		poolRewards: make(map[iotago.EpochIndex]map[string]*model.PoolRewards),
 		epochStats:  make(map[iotago.EpochIndex]*model.PoolsStats),
 		api: iotago.V3API(
-			iotago.NewV3TestProtocolParameters(
+			iotago.NewV3SnapshotProtocolParameters(
 				iotago.WithTimeProviderOptions(0, time.Now().Unix(), 10, 3),
 				iotago.WithLivenessOptions(5, 5, 1, 2, 3),
 				iotago.WithRewardsOptions(8, 8, 11, 2, 1),
