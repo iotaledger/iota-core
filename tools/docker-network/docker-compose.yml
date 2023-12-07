@@ -282,7 +282,6 @@ services:
       --inx.address=node-1-validator:9029
       --faucet.bindAddress=inx-faucet:8091
       --faucet.rateLimit.enabled=false
-      --logger.level=debug
 
   inx-validator-1:
     image: iotaledger/inx-validator:1.0-alpha
