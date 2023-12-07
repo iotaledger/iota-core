@@ -19,6 +19,7 @@ func Test_SmallerCommittee(t *testing.T) {
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
+			iotago.WithRewardsOptions(8, 8, 10, 2, 1),
 			iotago.WithTargetCommitteeSize(4),
 		))
 	defer d.Stop()
@@ -57,7 +58,8 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
-			iotago.WithLivenessOptions(30, 30, 2, 4, 8),
+			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
+			iotago.WithRewardsOptions(8, 8, 10, 2, 1),
 			iotago.WithTargetCommitteeSize(4),
 		))
 	defer d.Stop()
