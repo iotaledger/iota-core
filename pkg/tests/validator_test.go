@@ -137,7 +137,9 @@ type EpochPerformanceMap = map[iotago.EpochIndex]uint64
 type ValidatorTest struct {
 	ts *testsuite.TestSuite
 
-	subslotDuration         time.Duration
+	// How many validation blocks per slot the validator test nodes are supposed to issue.
+	// Can be set to a different value than the protocol parameter to model under- or overissuance.
+	validationBlocksPerSlot uint8
 	epochPerformanceFactors EpochPerformanceMap
 }
 
@@ -145,13 +147,12 @@ func Test_Validator_PerfectIssuance(t *testing.T) {
 	ts, _, _, _ := setupValidatorTestsuite(t)
 	defer ts.Shutdown()
 
-	subslotDuration := time.Duration(ts.API.ProtocolParameters().SlotDurationInSeconds()/ts.API.ProtocolParameters().ValidationBlocksPerSlot()) * time.Second
 	validationBlocksPerSlot := uint64(ts.API.ProtocolParameters().ValidationBlocksPerSlot())
 	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
 
 	test := ValidatorTest{
-		ts:              ts,
-		subslotDuration: subslotDuration,
+		ts:                      ts,
+		validationBlocksPerSlot: ts.API.ProtocolParameters().ValidationBlocksPerSlot(),
 		epochPerformanceFactors: EpochPerformanceMap{
 			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
 			0: (validationBlocksPerSlot * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
@@ -163,25 +164,45 @@ func Test_Validator_PerfectIssuance(t *testing.T) {
 	validatorTest(t, test)
 }
 
+func Test_Validator_OverIssuance(t *testing.T) {
+	ts, _, _, _ := setupValidatorTestsuite(t)
+	defer ts.Shutdown()
+
+	test := ValidatorTest{
+		ts: ts,
+		// Issue one more block than supposed to.
+		validationBlocksPerSlot: ts.API.ProtocolParameters().ValidationBlocksPerSlot() + 1,
+		epochPerformanceFactors: EpochPerformanceMap{
+			// We expect 0 rewards for overissuance.
+			// We model that in this test by setting performance factor to 0.
+			0: 0,
+			1: 0,
+			2: 0,
+		},
+	}
+
+	validatorTest(t, test)
+}
+
 func validatorTest(t *testing.T, test ValidatorTest) {
 	ts := test.ts
-	subslotDuration := test.subslotDuration
 
 	tip := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().TipSelection.SelectTips(1)[iotago.StrongParentType][0]
 	startEpoch := iotago.EpochIndex(0)
 	endEpoch := iotago.EpochIndex(len(test.epochPerformanceFactors) - 1)
 	fmt.Printf("ValidatorTest: startEpoch=%d, endEpoch=%d\n", startEpoch, endEpoch)
 
+	subslotDuration := time.Duration(ts.API.ProtocolParameters().SlotDurationInSeconds()/test.validationBlocksPerSlot) * time.Second
 	// Validate until the last slot of the epoch is definitely committed.
 	var endEpochSlot iotago.SlotIndex = ts.API.TimeProvider().EpochEnd(endEpoch) + ts.API.ProtocolParameters().MaxCommittableAge()
 	// Needed to increase the block timestamp monotonically relative to the parent.
-	subSlotBlockCounter := 0
+	subSlotBlockCounter := time.Duration(0)
 
 	for slot := ts.CurrentSlot(); slot <= endEpochSlot; slot++ {
 		ts.SetCurrentSlot(slot)
 
 		slotStartTime := ts.API.TimeProvider().SlotStartTime(ts.CurrentSlot()).UTC()
-		for subslotIdx := uint8(0); subslotIdx < ts.API.ProtocolParameters().ValidationBlocksPerSlot(); subslotIdx++ {
+		for subslotIdx := uint8(0); subslotIdx < test.validationBlocksPerSlot; subslotIdx++ {
 			for _, node := range ts.Validators() {
 				blockName := fmt.Sprintf("block-%s-%d/%d", node.Name, ts.CurrentSlot(), subslotIdx)
 				latestCommitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
@@ -199,7 +220,6 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 				tip = validationBlock.ID()
 				subSlotBlockCounter += 1
 			}
-			subSlotBlockCounter = 0
 		}
 	}
 
