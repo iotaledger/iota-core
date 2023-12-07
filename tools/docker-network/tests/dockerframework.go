@@ -66,9 +66,8 @@ func NewDockerTestFramework(t *testing.T, validatorNames map[string]string, clie
 		optsWaitFor:             2 * time.Minute,
 		optsTick:                5 * time.Second,
 	}, opts, func(d *DockerTestFramework) {
-		d.optsProtocolParameterOptions = append(DefaultProtocolParameterOptions, d.optsProtocolParameterOptions...)
-
-		protocolParams := iotago.NewV3ProtocolParameters(d.optsProtocolParameterOptions...)
+		d.optsProtocolParameterOptions = append(DefaultProtocolParametersOptions, d.optsProtocolParameterOptions...)
+		protocolParams := iotago.NewV3SnapshotProtocolParameters(d.optsProtocolParameterOptions...)
 		api := iotago.V3API(protocolParams)
 
 		d.logDirectoryPath = createLogDirectory(t.Name())
