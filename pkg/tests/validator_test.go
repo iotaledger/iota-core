@@ -15,79 +15,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-type reward struct {
-	Mana         iotago.Mana
-	ProfitMargin uint64
-}
-
-// Calculates the reward according to
-// https://github.com/iotaledger/tips/blob/tip40/tips/TIP-0040/tip-0040.md#calculations-3.
-//
-// For testing purposes, assumes that the account's staking data is the same in the latest committed slot
-// as in the epoch for which to calculate rewards.
-func calculateEpochReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, epoch iotago.EpochIndex, epochPerformanceFactor uint64, totalStake iotago.BaseToken, totalValidatorStake iotago.BaseToken) reward {
-
-	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
-	targetReward := lo.PanicOnErr(ts.API.ProtocolParameters().RewardsParameters().TargetReward(epoch, ts.API))
-	accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(accountID, latestCommittedSlot)
-	if err != nil || !exists {
-		t.Fatal(exists, err)
-	}
-
-	poolStake := accountData.ValidatorStake + accountData.DelegationStake
-	poolCoefficientExp := iotago.BaseToken(ts.API.ProtocolParameters().RewardsParameters().PoolCoefficientExponent)
-
-	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot()
-	poolCoefficient := ((poolStake << poolCoefficientExp) / totalStake) + (accountData.ValidatorStake<<poolCoefficientExp)/totalValidatorStake
-
-	scaledPoolReward := iotago.Mana(poolCoefficient) * targetReward * iotago.Mana(epochPerformanceFactor)
-	poolReward := (scaledPoolReward / iotago.Mana(validationBlocksPerSlot)) >> (poolCoefficientExp + 1)
-
-	profitMargin := (totalValidatorStake << iotago.BaseToken(ts.API.ProtocolParameters().RewardsParameters().ProfitMarginExponent)) / (totalValidatorStake + totalStake)
-
-	return reward{Mana: poolReward, ProfitMargin: uint64(profitMargin)}
-}
-
-// Calculates a validator's reward according to
-// https://github.com/iotaledger/tips/blob/tip40/tips/TIP-0040/tip-0040.md#calculations-4.
-func calculateValidatorReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, rewards []reward, startEpoch iotago.EpochIndex, claimingEpoch iotago.EpochIndex) iotago.Mana {
-	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
-	accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(accountID, latestCommittedSlot)
-	if err != nil || !exists {
-		t.Fatal(exists, err)
-	}
-
-	profitMarginExponent := ts.API.ProtocolParameters().RewardsParameters().ProfitMarginExponent
-	stakedAmount := accountData.ValidatorStake
-	fixedCost := accountData.FixedCost
-	poolStake := accountData.ValidatorStake + accountData.DelegationStake
-	rewardEpoch := startEpoch
-	decayedRewards := iotago.Mana(0)
-
-	for _, reward := range rewards {
-		if reward.Mana >= fixedCost {
-			rewardWithoutFixedCost := uint64(reward.Mana) - uint64(fixedCost)
-
-			profitMarginComplement := (1 << profitMarginExponent) - reward.ProfitMargin
-			profitMarginFactor := (reward.ProfitMargin * rewardWithoutFixedCost) >> profitMarginExponent
-
-			intermediate := ((profitMarginComplement * rewardWithoutFixedCost) >> profitMarginExponent)
-			residualValidatorFactor := lo.PanicOnErr(safemath.Safe64MulDiv(intermediate, uint64(stakedAmount), uint64(poolStake)))
-
-			undecayedRewards := uint64(fixedCost) + profitMarginFactor + residualValidatorFactor
-
-			decayedRewards += lo.PanicOnErr(ts.API.ManaDecayProvider().DecayManaByEpochs(iotago.Mana(undecayedRewards), rewardEpoch, claimingEpoch))
-		} else {
-			decayedRewards += 0
-		}
-
-		rewardEpoch++
-	}
-
-	return decayedRewards
-}
-
-func setupValidatorTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *mock.Node, *mock.Node) {
+func setupValidatorTestsuite(t *testing.T) *testsuite.TestSuite {
 	var slotDuration uint8 = 5
 	var slotsPerEpochExponent uint8 = 5
 	var validationBlocksPerSlot uint8 = 5
@@ -130,7 +58,7 @@ func setupValidatorTestsuite(t *testing.T) (*testsuite.TestSuite, *mock.Node, *m
 
 	ts.SetCurrentSlot(1)
 
-	return ts, vnode1, vnode2, node3
+	return ts
 }
 
 type EpochPerformanceMap = map[iotago.EpochIndex]uint64
@@ -144,7 +72,7 @@ type ValidatorTest struct {
 }
 
 func Test_Validator_PerfectIssuance(t *testing.T) {
-	ts, _, _, _ := setupValidatorTestsuite(t)
+	ts := setupValidatorTestsuite(t)
 	defer ts.Shutdown()
 
 	validationBlocksPerSlot := uint64(ts.API.ProtocolParameters().ValidationBlocksPerSlot())
@@ -165,7 +93,7 @@ func Test_Validator_PerfectIssuance(t *testing.T) {
 }
 
 func Test_Validator_OverIssuance(t *testing.T) {
-	ts, _, _, _ := setupValidatorTestsuite(t)
+	ts := setupValidatorTestsuite(t)
 	defer ts.Shutdown()
 
 	test := ValidatorTest{
@@ -178,6 +106,28 @@ func Test_Validator_OverIssuance(t *testing.T) {
 			0: 0,
 			1: 0,
 			2: 0,
+		},
+	}
+
+	validatorTest(t, test)
+}
+
+func Test_Validator_UnderIssuance(t *testing.T) {
+	ts := setupValidatorTestsuite(t)
+	defer ts.Shutdown()
+
+	// Issue less than supposed to.
+	validationBlocksPerSlot := uint64(ts.API.ProtocolParameters().ValidationBlocksPerSlot() - 2)
+	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
+
+	test := ValidatorTest{
+		ts:                      ts,
+		validationBlocksPerSlot: uint8(validationBlocksPerSlot),
+		epochPerformanceFactors: EpochPerformanceMap{
+			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
+			0: (validationBlocksPerSlot * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			1: (validationBlocksPerSlot * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			2: (validationBlocksPerSlot * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
 		},
 	}
 
@@ -273,4 +223,76 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 
 		require.Equal(t, expectedReward, actualReward, "expected reward for account %s to be %d, was %d", accountID, expectedReward, actualReward)
 	}
+}
+
+type reward struct {
+	Mana         iotago.Mana
+	ProfitMargin uint64
+}
+
+// Calculates the reward according to
+// https://github.com/iotaledger/tips/blob/tip40/tips/TIP-0040/tip-0040.md#calculations-3.
+//
+// For testing purposes, assumes that the account's staking data is the same in the latest committed slot
+// as in the epoch for which to calculate rewards.
+func calculateEpochReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, epoch iotago.EpochIndex, epochPerformanceFactor uint64, totalStake iotago.BaseToken, totalValidatorStake iotago.BaseToken) reward {
+
+	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
+	targetReward := lo.PanicOnErr(ts.API.ProtocolParameters().RewardsParameters().TargetReward(epoch, ts.API))
+	accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(accountID, latestCommittedSlot)
+	if err != nil || !exists {
+		t.Fatal(exists, err)
+	}
+
+	poolStake := accountData.ValidatorStake + accountData.DelegationStake
+	poolCoefficientExp := iotago.BaseToken(ts.API.ProtocolParameters().RewardsParameters().PoolCoefficientExponent)
+
+	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot()
+	poolCoefficient := ((poolStake << poolCoefficientExp) / totalStake) + (accountData.ValidatorStake<<poolCoefficientExp)/totalValidatorStake
+
+	scaledPoolReward := iotago.Mana(poolCoefficient) * targetReward * iotago.Mana(epochPerformanceFactor)
+	poolReward := (scaledPoolReward / iotago.Mana(validationBlocksPerSlot)) >> (poolCoefficientExp + 1)
+
+	profitMargin := (totalValidatorStake << iotago.BaseToken(ts.API.ProtocolParameters().RewardsParameters().ProfitMarginExponent)) / (totalValidatorStake + totalStake)
+
+	return reward{Mana: poolReward, ProfitMargin: uint64(profitMargin)}
+}
+
+// Calculates a validator's reward according to
+// https://github.com/iotaledger/tips/blob/tip40/tips/TIP-0040/tip-0040.md#calculations-4.
+func calculateValidatorReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, rewards []reward, startEpoch iotago.EpochIndex, claimingEpoch iotago.EpochIndex) iotago.Mana {
+	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
+	accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(accountID, latestCommittedSlot)
+	if err != nil || !exists {
+		t.Fatal(exists, err)
+	}
+
+	profitMarginExponent := ts.API.ProtocolParameters().RewardsParameters().ProfitMarginExponent
+	stakedAmount := accountData.ValidatorStake
+	fixedCost := accountData.FixedCost
+	poolStake := accountData.ValidatorStake + accountData.DelegationStake
+	rewardEpoch := startEpoch
+	decayedRewards := iotago.Mana(0)
+
+	for _, reward := range rewards {
+		if reward.Mana >= fixedCost {
+			rewardWithoutFixedCost := uint64(reward.Mana) - uint64(fixedCost)
+
+			profitMarginComplement := (1 << profitMarginExponent) - reward.ProfitMargin
+			profitMarginFactor := (reward.ProfitMargin * rewardWithoutFixedCost) >> profitMarginExponent
+
+			intermediate := ((profitMarginComplement * rewardWithoutFixedCost) >> profitMarginExponent)
+			residualValidatorFactor := lo.PanicOnErr(safemath.Safe64MulDiv(intermediate, uint64(stakedAmount), uint64(poolStake)))
+
+			undecayedRewards := uint64(fixedCost) + profitMarginFactor + residualValidatorFactor
+
+			decayedRewards += lo.PanicOnErr(ts.API.ManaDecayProvider().DecayManaByEpochs(iotago.Mana(undecayedRewards), rewardEpoch, claimingEpoch))
+		} else {
+			decayedRewards += 0
+		}
+
+		rewardEpoch++
+	}
+
+	return decayedRewards
 }
