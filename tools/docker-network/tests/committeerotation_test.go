@@ -89,7 +89,7 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 	currentEpoch := clt.CommittedAPI().TimeProvider().EpochFromSlot(prevFinalizedSlot)
 
 	// Due to no finalization, committee should be reused, remain 4 validators
-	d.AssertCommittee(currentEpoch+2, d.AccountsFromNodes(d.Nodes("V1", "V4")...))
+	d.AssertCommittee(currentEpoch+2, d.AccountsFromNodes(d.Nodes()...))
 
 	// check if finalization stops
 	fmt.Println("Second finalized slot: ", status.LatestFinalizedSlot)
@@ -105,7 +105,7 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 	err = d.RestartContainer(d.Node("V2").ContainerName)
 	require.NoError(t, err)
 
-	d.AssertCommittee(currentEpoch+3, d.AccountsFromNodes(d.Nodes()...))
+	d.AssertCommittee(currentEpoch+3, d.AccountsFromNodes(d.Nodes("V1", "V2", "V4")...))
 
 	// wait finalization to catch up and check if the finalization resumes
 	time.Sleep(5 * time.Second)
