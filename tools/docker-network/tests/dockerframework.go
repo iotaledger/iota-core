@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -216,6 +217,8 @@ func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, e
 	fmt.Println("Wait for committee selection..., expected epoch: ", expectedEpoch, ", expected committee size: ", len(expectedCommitteeMember))
 	defer fmt.Println("Wait for committee selection......done")
 
+	sort.Strings(expectedCommitteeMember)
+
 	status := d.NodeStatus("V1")
 	api := d.Node("V1").Client.CommittedAPI()
 	expectedSlotStart := api.TimeProvider().EpochStart(expectedEpoch)
@@ -239,6 +242,7 @@ func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, e
 					members[i] = member.AddressBech32
 				}
 
+				sort.Strings(members)
 				if match := lo.Equal(expectedCommitteeMember, members); match {
 					return nil
 				}
