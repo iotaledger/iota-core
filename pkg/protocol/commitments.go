@@ -1,11 +1,15 @@
 package protocol
 
 import (
+	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -28,6 +32,12 @@ type Commitments struct {
 	// It acts as a cache and a way to address commitments generically even if they are still unsolid.
 	cachedRequests *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
 
+	// workerPool contains the worker pool that is used to process commitment requests and responses asynchronously.
+	workerPool *workerpool.WorkerPool
+
+	// ticker contains the ticker that is used to send commitment requests.
+	ticker *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+
 	// Logger contains a reference to the logger that is used by this component.
 	log.Logger
 }
@@ -39,16 +49,65 @@ func newCommitments(protocol *Protocol) *Commitments {
 		Root:           reactive.NewVariable[*Commitment](),
 		protocol:       protocol,
 		cachedRequests: shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
+		workerPool:     protocol.Workers.CreatePool("Commitments"),
+		ticker:         eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.CommitmentRequesterOptions...),
 	}
 
 	shutdown := lo.Batch(
 		c.initLogger(),
 		c.initEngineCommitmentSynchronization(),
+
+		c.ticker.Events.Tick.Hook(c.SendRequest).Unhook,
 	)
 
-	protocol.Shutdown.OnTrigger(shutdown)
+	protocol.Shutdown.OnTrigger(func() {
+		shutdown()
+
+		c.ticker.Shutdown()
+	})
 
 	return c
+}
+
+// SendRequest sends a commitment request for the given commitment ID to all peers.
+func (c *Commitments) SendRequest(commitmentID iotago.CommitmentID) {
+	c.workerPool.Submit(func() {
+		c.protocol.Network.RequestSlotCommitment(commitmentID)
+
+		c.LogDebug("request", "commitment", commitmentID)
+	})
+}
+
+// ProcessResponse processes the given commitment response.
+func (c *Commitments) ProcessResponse(commitment *model.Commitment, from peer.ID) {
+	c.workerPool.Submit(func() {
+		// verify the commitment's version corresponds to the protocol version for the slot.
+		if apiForSlot := c.protocol.APIForSlot(commitment.Slot()); apiForSlot.Version() != commitment.Commitment().ProtocolVersion {
+			c.LogDebug("received commitment with invalid protocol version", "commitment", commitment.ID(), "version", commitment.Commitment().ProtocolVersion, "expectedVersion", apiForSlot.Version(), "fromPeer", from)
+
+			return
+		}
+
+		if commitmentMetadata, published, err := c.protocol.Commitments.publishCommitment(commitment); err != nil {
+			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
+		} else if published {
+			c.LogTrace("received response", "commitment", commitmentMetadata.LogName(), "fromPeer", from)
+		}
+	})
+}
+
+// ProcessRequest processes the given commitment request.
+func (c *Commitments) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+	submitLoggedRequest(c.workerPool, func() error {
+		commitment, err := c.protocol.Commitments.Commitment(commitmentID)
+		if err != nil {
+			return ierrors.Wrap(err, "failed to load commitment")
+		}
+
+		c.protocol.Network.SendSlotCommitment(commitment, from)
+
+		return nil
+	}, c, "commitmentID", commitmentID, "fromPeer", from)
 }
 
 // Commitment returns the Commitment for the given commitmentID. It tries to retrieve the Commitment from the
@@ -162,7 +221,7 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 				return
 			}
 
-			// publish the model
+			// publish the commitment
 			commitmentMetadata, _, err := c.publishCommitment(commitment)
 			if err != nil {
 				c.LogError("failed to publish commitment from engine", "engine", engine.LogName(), "commitment", commitment, "err", err)
@@ -218,7 +277,11 @@ func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, requestIfM
 
 	// start ticker if requested
 	if lo.First(requestIfMissing) {
-		c.protocol.CommitmentsProtocol.StartTicker(cachedRequest, commitmentID)
+		c.ticker.StartTicker(commitmentID)
+
+		cachedRequest.OnComplete(func() {
+			c.ticker.StopTicker(commitmentID)
+		})
 	}
 
 	// handle successful resolutions

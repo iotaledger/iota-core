@@ -41,9 +41,6 @@ type Protocol struct {
 	// BlocksProtocol contains the subcomponent that is responsible for handling block requests and responses.
 	BlocksProtocol *BlocksProtocol
 
-	// CommitmentsProtocol contains the subcomponent that is responsible for handling commitment requests and responses.
-	CommitmentsProtocol *CommitmentsProtocol
-
 	// AttestationsProtocol contains the subcomponent that is responsible for handling attestation requests and
 	// responses.
 	AttestationsProtocol *AttestationsProtocol
@@ -150,7 +147,6 @@ func (p *Protocol) LatestAPI() iotago.API {
 func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown func()) {
 	p.Network = core.NewProtocol(networkEndpoint, p.Workers.CreatePool("NetworkProtocol"), p)
 	p.BlocksProtocol = newBlocksProtocol(p)
-	p.CommitmentsProtocol = newCommitmentsProtocol(p)
 	p.AttestationsProtocol = newAttestationsProtocol(p)
 	p.WarpSyncProtocol = newWarpSyncProtocol(p)
 	p.Commitments = newCommitments(p)
@@ -159,7 +155,6 @@ func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown
 
 	return func() {
 		p.BlocksProtocol.Shutdown()
-		p.CommitmentsProtocol.Shutdown()
 		p.AttestationsProtocol.Shutdown()
 		p.WarpSyncProtocol.Shutdown()
 		p.Network.Shutdown()
@@ -196,8 +191,8 @@ func (p *Protocol) initNetwork() (shutdown func()) {
 		p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
 		p.Network.OnBlockReceived(p.BlocksProtocol.ProcessResponse),
 		p.Network.OnBlockRequestReceived(p.BlocksProtocol.ProcessRequest),
-		p.Network.OnCommitmentReceived(p.CommitmentsProtocol.ProcessResponse),
-		p.Network.OnCommitmentRequestReceived(p.CommitmentsProtocol.ProcessRequest),
+		p.Network.OnCommitmentReceived(p.Commitments.ProcessResponse),
+		p.Network.OnCommitmentRequestReceived(p.Commitments.ProcessRequest),
 		p.Network.OnAttestationsReceived(p.AttestationsProtocol.ProcessResponse),
 		p.Network.OnAttestationsRequestReceived(p.AttestationsProtocol.ProcessRequest),
 		p.Network.OnWarpSyncResponseReceived(p.WarpSyncProtocol.ProcessResponse),
