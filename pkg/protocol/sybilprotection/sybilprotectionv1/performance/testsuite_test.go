@@ -164,14 +164,19 @@ func (t *TestSuite) AssertEpochRewards(epoch iotago.EpochIndex, actions map[stri
 		poolRewards := t.poolRewards[epoch][alias].PoolRewards
 		expectedValidatorReward := t.validatorReward(alias, epoch, t.epochStats[epoch].ProfitMargin, uint64(poolRewards), uint64(action.ValidatorStake), uint64(action.PoolStake), uint64(action.FixedCost), action)
 
+		mockStakingFeature := &iotago.StakingFeature{
+			StakedAmount: actions[alias].ValidatorStake,
+			StartEpoch:   epoch,
+			EndEpoch:     epoch,
+		}
 		accountID := t.Account(alias, true)
-		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID, actions[alias].ValidatorStake, epoch, epoch)
+		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID, mockStakingFeature, epoch)
 		require.NoError(t.T, err)
 		require.Equal(t.T, expectedValidatorReward, actualValidatorReward)
 
 		for delegatedAmount := range action.Delegators {
 			expectedDelegatorReward := t.delegatorReward(epoch, t.epochStats[epoch].ProfitMargin, uint64(poolRewards), uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost), action)
-			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epoch, epoch)
+			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
 			require.NoError(t.T, err)
 			require.Equal(t.T, expectedDelegatorReward, actualDelegatorReward)
 		}
@@ -180,29 +185,39 @@ func (t *TestSuite) AssertEpochRewards(epoch iotago.EpochIndex, actions map[stri
 }
 
 func (t *TestSuite) AssertNoReward(alias string, epoch iotago.EpochIndex, actions map[string]*EpochActions) {
+	mockStakingFeature := &iotago.StakingFeature{
+		StakedAmount: actions[alias].ValidatorStake,
+		StartEpoch:   epoch,
+		EndEpoch:     epoch,
+	}
 	accID := t.Account(alias, false)
-	actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accID, actions[alias].ValidatorStake, epoch, epoch)
+	actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accID, mockStakingFeature, epoch)
 	require.NoError(t.T, err)
 	require.Equal(t.T, iotago.Mana(0), actualValidatorReward)
 	action, exists := actions[alias]
 	require.True(t.T, exists)
 	for delegatedAmount := range action.Delegators {
-		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch)
+		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
 		require.NoError(t.T, err)
 		require.Equal(t.T, iotago.Mana(0), actualDelegatorReward)
 	}
 }
 
 func (t *TestSuite) AssertRewardForDelegatorsOnly(alias string, epoch iotago.EpochIndex, actions map[string]*EpochActions) {
+	mockStakingFeature := &iotago.StakingFeature{
+		StakedAmount: actions[alias].ValidatorStake,
+		StartEpoch:   epoch,
+		EndEpoch:     epoch,
+	}
 	accID := t.Account(alias, false)
-	actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accID, actions[alias].ValidatorStake, epoch, epoch)
+	actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accID, mockStakingFeature, epoch)
 	require.NoError(t.T, err)
 	require.Equal(t.T, iotago.Mana(0), actualValidatorReward)
 	action, exists := actions[alias]
 	require.True(t.T, exists)
 
 	for delegatedAmount := range action.Delegators {
-		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch)
+		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
 		expectedDelegatorReward := t.delegatorReward(epoch, t.epochStats[epoch].ProfitMargin, uint64(t.poolRewards[epoch][alias].PoolRewards), uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost), action)
 
 		require.NoError(t.T, err)
@@ -320,12 +335,18 @@ func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[s
 		delegatorRewardPerAccount[epoch] = make(map[string]iotago.Mana)
 		validatorRewardPerAccount[epoch] = make(map[string]iotago.Mana)
 		for aliasAccount := range epochActions {
-			reward, _, _, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epoch, epoch)
+			reward, _, _, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epoch, epoch, epoch)
 			require.NoError(t.T, err)
 			delegatorRewardPerAccount[epoch][aliasAccount] = reward
 		}
 		for aliasAccount := range epochActions {
-			reward, _, _, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true), 1, epoch, epoch)
+			reward, _, _, err := t.Instance.ValidatorReward(t.Account(aliasAccount, true),
+				&iotago.StakingFeature{
+					StakedAmount: 1,
+					StartEpoch:   epoch,
+					EndEpoch:     epoch,
+				},
+				epoch)
 			require.NoError(t.T, err)
 			validatorRewardPerAccount[epoch][aliasAccount] = reward
 		}
@@ -334,12 +355,22 @@ func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[s
 }
 
 func (t *TestSuite) AssertValidatorRewardGreaterThan(alias1 string, alias2 string, epoch iotago.EpochIndex, actions map[string]*EpochActions) {
+	mockStakingFeature1 := &iotago.StakingFeature{
+		StakedAmount: actions[alias1].ValidatorStake,
+		StartEpoch:   epoch,
+		EndEpoch:     epoch,
+	}
+	mockStakingFeature2 := &iotago.StakingFeature{
+		StakedAmount: actions[alias2].ValidatorStake,
+		StartEpoch:   epoch,
+		EndEpoch:     epoch,
+	}
 	accID1 := t.Account(alias1, false)
-	actualValidatorReward1, _, _, err := t.Instance.ValidatorReward(accID1, actions[alias1].ValidatorStake, epoch, epoch)
+	actualValidatorReward1, _, _, err := t.Instance.ValidatorReward(accID1, mockStakingFeature1, epoch)
 	require.NoError(t.T, err)
 
 	accID2 := t.Account(alias2, false)
-	actualValidatorReward2, _, _, err := t.Instance.ValidatorReward(accID2, actions[alias2].ValidatorStake, epoch, epoch)
+	actualValidatorReward2, _, _, err := t.Instance.ValidatorReward(accID2, mockStakingFeature2, epoch)
 	require.NoError(t.T, err)
 
 	require.Greater(t.T, actualValidatorReward1, actualValidatorReward2)
