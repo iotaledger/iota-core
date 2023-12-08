@@ -6,7 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -123,15 +122,37 @@ func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment
 
 // ProcessRequest processes the given attestation request.
 func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	a.workerPool.Submit(func() {
-		if commitment, err := a.protocol.Commitments.Get(commitmentID, false); err == nil {
-			a.processRequestWithEngine(commitment.TargetEngine(), commitmentID, from)
-		} else if ierrors.Is(err, ErrorCommitmentNotFound) {
-			a.processRequestWithEngine(a.protocol.Engines.Main.Get(), commitmentID, from)
-		} else {
-			a.LogError("failed to load requested commitment", "commitmentID", commitmentID, "fromPeer", from, "err", err)
+	a.protocol.processCommitmentRequest(a.workerPool, commitmentID, func(engineInstance *engine.Engine) error {
+		if engineInstance.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
+			return ierrors.New("not committed yet")
 		}
-	})
+
+		commitmentModel, err := engineInstance.Storage.Commitments().Load(commitmentID.Slot())
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to load commitment")
+		} else if commitmentModel.ID() != commitmentID {
+			return ierrors.Errorf("commitment ID mismatch: %s != %s", commitmentModel.ID(), commitmentID)
+		}
+
+		attestations, err := engineInstance.Attestations.Get(commitmentID.Slot())
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to load attestations")
+		}
+
+		rootsStorage, err := engineInstance.Storage.Roots(commitmentID.Slot())
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to load roots storage")
+		}
+
+		roots, exists, err := rootsStorage.Load(commitmentID)
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to load roots")
+		} else if !exists {
+			return ierrors.New("roots not found")
+		}
+
+		return a.protocol.Network.SendAttestations(commitmentModel, attestations, roots.AttestationsProof(), from)
+	}, a, "fromPeer", from)
 }
 
 // Shutdown shuts down the attestation protocol.
@@ -187,69 +208,4 @@ func (a *AttestationsProtocol) sendRequest(commitmentID iotago.CommitmentID) {
 			a.LogError("failed to load commitment", "commitmentID", commitmentID, "err", err)
 		}
 	})
-}
-
-// processRequestWithEngine processes an attestation request by sourcing the requested commitment from the given engine.
-func (a *AttestationsProtocol) processRequestWithEngine(engineInstance *engine.Engine, commitmentID iotago.CommitmentID, from peer.ID) {
-	if engineInstance == nil {
-		a.LogTrace("request for commitment without engine", "commitmentID", commitmentID, "fromPeer", from)
-
-		return
-	}
-
-	if engineInstance.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
-		a.LogTrace("requested commitment not verified", "commitmentID", commitmentID, "fromPeer", from)
-
-		return
-	}
-
-	commitmentModel, err := engineInstance.Storage.Commitments().Load(commitmentID.Slot())
-	if err != nil {
-		if !ierrors.Is(err, kvstore.ErrKeyNotFound) {
-			a.LogError("failed to load requested commitment from engine", "commitmentID", commitmentID, "fromPeer", from, "err", err)
-		} else {
-			a.LogTrace("requested commitment not found in engine", "commitmentID", commitmentID, "fromPeer", from)
-		}
-
-		return
-	}
-
-	if commitmentModel.ID() != commitmentID {
-		a.LogTrace("commitment ID mismatch", "requestedCommitment", commitmentID, "loadedCommitment", commitmentModel.ID(), "fromPeer", from)
-
-		return
-	}
-
-	attestations, err := engineInstance.Attestations.Get(commitmentID.Slot())
-	if err != nil {
-		a.LogDebug("failed to load requested attestations", "commitmentID", commitmentID, "fromPeer", from)
-
-		return
-	}
-
-	rootsStorage, err := engineInstance.Storage.Roots(commitmentID.Slot())
-	if err != nil {
-		a.LogDebug("failed to load roots storage for requested attestations", "commitmentID", commitmentID, "fromPeer", from)
-
-		return
-	}
-
-	roots, exists, err := rootsStorage.Load(commitmentID)
-	if err != nil {
-		a.LogDebug("failed to load roots for requested attestations", "commitmentID", commitmentID, "err", err, "fromPeer", from)
-
-		return
-	} else if !exists {
-		a.LogDebug("roots not found for requested attestations", "commitmentID", commitmentID, "fromPeer", from)
-
-		return
-	}
-
-	if err = a.protocol.Network.SendAttestations(commitmentModel, attestations, roots.AttestationsProof(), from); err != nil {
-		a.LogError("failed to send attestations", "commitmentID", commitmentID, "fromPeer", from, "err", err)
-
-		return
-	}
-
-	a.LogTrace("processed request", "commitmentID", commitmentID, "fromPeer", from)
 }

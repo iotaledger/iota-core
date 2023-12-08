@@ -216,3 +216,34 @@ func (p *Protocol) waitInitialized() {
 
 	waitInitialized.Wait()
 }
+
+// processCommitmentRequest is a generic utility function that implements common logic for processing requests from the network.
+func (p *Protocol) processCommitmentRequest(workerPool *workerpool.WorkerPool, commitmentID iotago.CommitmentID, handleRequest func(targetEngine *engine.Engine) error, logger log.Logger, loggerArgs ...any) {
+	submitRequest := func(processRequest func() error) {
+		workerPool.Submit(func() {
+			if err := processRequest(); err != nil {
+				logger.LogDebug("failed to answer request", append(loggerArgs, "commitmentID", commitmentID, "err", err)...)
+			} else {
+				logger.LogTrace("answered request", append(loggerArgs, "commitmentID", commitmentID)...)
+			}
+		})
+	}
+
+	submitRequest(func() error {
+		var targetEngine *engine.Engine
+
+		if commitment, err := p.Commitments.Get(commitmentID, false); err == nil {
+			targetEngine = commitment.TargetEngine()
+		} else if ierrors.Is(err, ErrorCommitmentNotFound) {
+			targetEngine = p.Engines.Main.Get()
+		} else {
+			return err
+		}
+
+		if targetEngine == nil {
+			return ierrors.New("no target engine found")
+		}
+
+		return handleRequest(targetEngine)
+	})
+}

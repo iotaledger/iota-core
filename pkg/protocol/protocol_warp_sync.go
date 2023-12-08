@@ -291,11 +291,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 // ProcessRequest processes the given warp sync request.
 func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	processWithEngine := func(targetEngine *engine.Engine) (err error) {
-		if targetEngine == nil {
-			return ierrors.New("no engine found")
-		}
-
+	w.protocol.processCommitmentRequest(w.workerPool, commitmentID, func(targetEngine *engine.Engine) (err error) {
 		committedSlot, err := targetEngine.CommittedSlot(commitmentID)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to load committed slot")
@@ -319,20 +315,7 @@ func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from
 		w.protocol.Network.SendWarpSyncResponse(commitmentID, blockIDsBySlotCommitment, roots.TangleProof(), transactionIDs, roots.MutationProof(), from)
 
 		return nil
-	}
-
-	processRequest(w.workerPool, func() error {
-		commitment, err := w.protocol.Commitments.Get(commitmentID)
-		if err == nil {
-			return processWithEngine(commitment.TargetEngine())
-		}
-
-		if ierrors.Is(err, ErrorCommitmentNotFound) {
-			return processWithEngine(w.protocol.Engines.Main.Get())
-		}
-
-		return err
-	}, w, "commitmentID", commitmentID, "fromPeer", from)
+	}, w, "fromPeer", from)
 }
 
 // Shutdown shuts down the warp sync protocol.
