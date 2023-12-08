@@ -55,7 +55,7 @@ func newChains(protocol *Protocol) *Chains {
 
 	shutdown := lo.Batch(
 		c.initLogger(protocol.NewChildLogger("Chains")),
-		c.initChainSwitching(protocol.Options.ChainSwitchingThreshold),
+		c.initChainSwitching(),
 
 		protocol.Constructed.WithNonEmptyValue(func(_ bool) (shutdown func()) {
 			return c.deriveLatestSeenSlot(protocol)
@@ -92,7 +92,7 @@ func (c *Chains) initLogger(logger log.Logger, shutdownLogger func()) (shutdown 
 }
 
 // initChainSwitching initializes the chain switching logic.
-func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (shutdown func()) {
+func (c *Chains) initChainSwitching() (shutdown func()) {
 	mainChain := c.newChain()
 	mainChain.StartEngine.Set(true)
 
@@ -102,6 +102,7 @@ func (c *Chains) initChainSwitching(chainSwitchingThreshold iotago.SlotIndex) (s
 	forkingPointBelowChainSwitchingThreshold := func(chain *Chain) func(_ *Commitment, latestCommitment *Commitment) bool {
 		return func(_ *Commitment, latestCommitment *Commitment) bool {
 			forkingPoint := chain.ForkingPoint.Get()
+			chainSwitchingThreshold := iotago.SlotIndex(c.protocol.APIForSlot(latestCommitment.Slot()).ProtocolParameters().ChainSwitchingThreshold())
 
 			return forkingPoint != nil && latestCommitment != nil && (latestCommitment.ID().Slot()-forkingPoint.ID().Slot()) > chainSwitchingThreshold
 		}

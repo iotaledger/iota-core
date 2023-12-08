@@ -117,7 +117,7 @@ func (t *TestFramework) IssueSignedBlockAtSlotWithBurnedMana(alias string, slot 
 }
 
 func TestPostSolidFilter_NoAccount(t *testing.T) {
-	testAPI := tpkg.TestAPI
+	testAPI := tpkg.ZeroCostTestAPI
 
 	tf := NewTestFramework(t,
 		iotago.SingleVersionProvider(testAPI),
@@ -179,7 +179,7 @@ func TestPostSolidFilter_NoAccount(t *testing.T) {
 }
 
 func TestPostSolidFilter_BurnedMana(t *testing.T) {
-	testAPI := tpkg.TestAPI
+	testAPI := tpkg.ZeroCostTestAPI
 
 	tf := NewTestFramework(t,
 		iotago.SingleVersionProvider(testAPI),
@@ -227,7 +227,7 @@ func TestPostSolidFilter_BurnedMana(t *testing.T) {
 }
 
 func TestPostSolidFilter_Expiry(t *testing.T) {
-	testAPI := tpkg.TestAPI
+	testAPI := tpkg.ZeroCostTestAPI
 
 	tf := NewTestFramework(t,
 		iotago.SingleVersionProvider(testAPI),

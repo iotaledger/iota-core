@@ -111,7 +111,7 @@ func mockedCommitteeFunc(validatorAccountID iotago.AccountID) func(iotago.SlotIn
 func TestFilter_WithMaxAllowedWallClockDrift(t *testing.T) {
 	allowedDrift := 3 * time.Second
 
-	testAPI := tpkg.TestAPI
+	testAPI := tpkg.ZeroCostTestAPI
 
 	tf := NewTestFramework(t,
 		iotago.SingleVersionProvider(testAPI),
@@ -137,12 +137,12 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 	apiProvider := iotago.NewEpochBasedProvider(
 		iotago.WithAPIForMissingVersionCallback(
 			func(params iotago.ProtocolParameters) (iotago.API, error) {
-				return iotago.V3API(iotago.NewV3ProtocolParameters(iotago.WithVersion(params.Version()))), nil
+				return iotago.V3API(iotago.NewV3SnapshotProtocolParameters(iotago.WithVersion(params.Version()))), nil
 			},
 		),
 	)
-	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithVersion(3)), 0)
-	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithVersion(4)), 3)
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3SnapshotProtocolParameters(iotago.WithVersion(3)), 0)
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3SnapshotProtocolParameters(iotago.WithVersion(4)), 3)
 
 	timeProvider := apiProvider.CommittedAPI().TimeProvider()
 
@@ -187,7 +187,7 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 	valid.Add("G")
 	require.NoError(t, tf.IssueBlockAtSlotWithVersion("G", timeProvider.EpochStart(5)+5, 4, apiProvider))
 
-	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3ProtocolParameters(iotago.WithVersion(5)), 10)
+	apiProvider.AddProtocolParametersAtEpoch(iotago.NewV3SnapshotProtocolParameters(iotago.WithVersion(5)), 10)
 
 	valid.Add("H")
 	require.NoError(t, tf.IssueBlockAtSlotWithVersion("H", timeProvider.EpochEnd(9), 4, apiProvider))
@@ -200,7 +200,7 @@ func TestFilter_ProtocolVersion(t *testing.T) {
 }
 
 func TestFilter_ValidationBlocks(t *testing.T) {
-	testAPI := tpkg.TestAPI
+	testAPI := tpkg.ZeroCostTestAPI
 
 	tf := NewTestFramework(t,
 		iotago.SingleVersionProvider(testAPI),

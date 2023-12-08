@@ -24,7 +24,7 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 		switch id {
 		case accountIDOverflow:
 			return utxoledger.CreateOutput(
-				iotago.SingleVersionProvider(tpkg.TestAPI),
+				iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI),
 				iotago.OutputIDFromTransactionIDAndIndex(iotago.NewTransactionID(0, tpkg.Rand32ByteArray()), 0),
 				tpkg.RandBlockID(),
 				tpkg.RandSlot(),
@@ -33,11 +33,11 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 					Mana:      iotago.MaxMana/2 + iotago.MaxMana/4,
 					AccountID: accountIDOverflow,
 				},
-				lo.PanicOnErr(iotago.NewOutputIDProof(tpkg.TestAPI, tpkg.Rand32ByteArray(), tpkg.RandSlot(), iotago.TxEssenceOutputs{tpkg.RandBasicOutput(iotago.AddressEd25519)}, 0)),
+				lo.PanicOnErr(iotago.NewOutputIDProof(tpkg.ZeroCostTestAPI, tpkg.Rand32ByteArray(), tpkg.RandSlot(), iotago.TxEssenceOutputs{tpkg.RandBasicOutput(iotago.AddressEd25519)}, 0)),
 			), nil
 		case accountIDRecentOutput:
 			return utxoledger.CreateOutput(
-				iotago.SingleVersionProvider(tpkg.TestAPI),
+				iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI),
 				iotago.OutputIDFromTransactionIDAndIndex(iotago.NewTransactionID(1, tpkg.Rand32ByteArray()), 0),
 				tpkg.RandBlockID(),
 				tpkg.RandSlot(),
@@ -46,11 +46,11 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 					Mana:      iotago.MaxMana / 2,
 					AccountID: id,
 				},
-				lo.PanicOnErr(iotago.NewOutputIDProof(tpkg.TestAPI, tpkg.Rand32ByteArray(), tpkg.RandSlot(), iotago.TxEssenceOutputs{tpkg.RandBasicOutput(iotago.AddressEd25519)}, 0)),
+				lo.PanicOnErr(iotago.NewOutputIDProof(tpkg.ZeroCostTestAPI, tpkg.Rand32ByteArray(), tpkg.RandSlot(), iotago.TxEssenceOutputs{tpkg.RandBasicOutput(iotago.AddressEd25519)}, 0)),
 			), nil
 		default:
 			return utxoledger.CreateOutput(
-				iotago.SingleVersionProvider(tpkg.TestAPI),
+				iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI),
 				iotago.OutputIDFromTransactionIDAndIndex(iotago.NewTransactionID(0, tpkg.Rand32ByteArray()), 0),
 				tpkg.RandBlockID(),
 				tpkg.RandSlot(),
@@ -59,7 +59,7 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 					Mana:      iotago.MaxMana / 2,
 					AccountID: id,
 				},
-				lo.PanicOnErr(iotago.NewOutputIDProof(tpkg.TestAPI, tpkg.Rand32ByteArray(), tpkg.RandSlot(), iotago.TxEssenceOutputs{tpkg.RandBasicOutput(iotago.AddressEd25519)}, 0)),
+				lo.PanicOnErr(iotago.NewOutputIDProof(tpkg.ZeroCostTestAPI, tpkg.Rand32ByteArray(), tpkg.RandSlot(), iotago.TxEssenceOutputs{tpkg.RandBasicOutput(iotago.AddressEd25519)}, 0)),
 			), nil
 		}
 	}
@@ -100,7 +100,7 @@ func TestManager_GetManaOnAccountOverflow(t *testing.T) {
 		}
 	}
 
-	manager := NewManager(iotago.SingleVersionProvider(tpkg.TestAPI), outputRetriever, accountRetriever)
+	manager := NewManager(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), outputRetriever, accountRetriever)
 	manaDecayProvider := manager.apiProvider.LatestAPI().ManaDecayProvider()
 
 	// The value for this account will overflow because component values are too big.
