@@ -280,8 +280,7 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 
 		rewardMana, _, _, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().SybilProtection.ValidatorReward(
 			accountID,
-			output.Output().FeatureSet().Staking().StakedAmount,
-			output.Output().FeatureSet().Staking().StartEpoch,
+			output.Output().FeatureSet().Staking(),
 			claimingEpoch,
 		)
 		if err != nil {

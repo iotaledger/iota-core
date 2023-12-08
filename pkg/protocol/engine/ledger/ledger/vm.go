@@ -97,9 +97,13 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 				accountID = iotago.AccountIDFromOutputID(outputID)
 			}
 
-			reward, _, _, rewardErr := v.ledger.sybilProtection.ValidatorReward(accountID, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+			apiForSlot := v.ledger.apiProvider.APIForSlot(commitmentInput.Slot)
+			futureBoundedSlotIndex := commitmentInput.Slot + apiForSlot.ProtocolParameters().MinCommittableAge()
+			claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+
+			reward, _, _, rewardErr := v.ledger.sybilProtection.ValidatorReward(accountID, stakingFeature, claimingEpoch)
 			if rewardErr != nil {
-				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimStakingReward, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch)
+				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimStakingReward, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d, claimingEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch, claimingEpoch)
 			}
 
 			rewardInputSet[accountID] = reward
@@ -108,17 +112,19 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 			delegationID := castOutput.DelegationID
 			delegationEnd := castOutput.EndEpoch
 
+			apiForSlot := v.ledger.apiProvider.APIForSlot(commitmentInput.Slot)
+			futureBoundedSlotIndex := commitmentInput.Slot + apiForSlot.ProtocolParameters().MinCommittableAge()
+			claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+
 			if delegationID.Empty() {
 				delegationID = iotago.DelegationIDFromOutputID(outputID)
 
 				// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
 				// "last epoch", which is the epoch index corresponding to the future bounded slot index minus 1.
-				apiForSlot := v.ledger.apiProvider.APIForSlot(commitmentInput.Slot)
-				futureBoundedSlotIndex := commitmentInput.Slot + apiForSlot.ProtocolParameters().MinCommittableAge()
-				delegationEnd = apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex) - iotago.EpochIndex(1)
+				delegationEnd = claimingEpoch - iotago.EpochIndex(1)
 			}
 
-			reward, _, _, rewardErr := v.ledger.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd)
+			reward, _, _, rewardErr := v.ledger.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd, claimingEpoch)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimDelegationReward, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}

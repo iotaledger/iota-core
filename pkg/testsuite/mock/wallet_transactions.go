@@ -453,17 +453,20 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", inputName))
 	}
 
+	apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
+	latestCommittedSlot := w.Node.Protocol.Chains.Main.Get().LatestCommitment.Get().Slot()
+	futureBoundedSlotIndex := latestCommittedSlot + apiForSlot.ProtocolParameters().MinCommittableAge()
+	claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+
 	rewardMana, _, _, err := w.Node.Protocol.Engines.Main.Get().SybilProtection.ValidatorReward(
 		inputAccount.AccountID,
-		inputAccount.FeatureSet().Staking().StakedAmount,
-		inputAccount.FeatureSet().Staking().StartEpoch,
-		inputAccount.FeatureSet().Staking().EndEpoch,
+		inputAccount.FeatureSet().Staking(),
+		claimingEpoch,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to calculate reward for output %s: %s", inputName, err))
 	}
 
-	apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
 	potentialMana := w.PotentialMana(apiForSlot, input)
 	storedMana := w.StoredMana(apiForSlot, input)
 
@@ -541,12 +544,14 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 	}
 
 	apiForSlot := w.Node.Protocol.APIForSlot(w.currentSlot)
+	futureBoundedSlotIndex := w.currentSlot + apiForSlot.ProtocolParameters().MinCommittableAge()
+	claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+
 	delegationEnd := inputDelegation.EndEpoch
 	// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
 	// "last epoch" for the rewards calculation.
 	if inputDelegation.DelegationID.Empty() {
-		futureBoundedSlotIndex := w.currentSlot + apiForSlot.ProtocolParameters().MinCommittableAge()
-		delegationEnd = apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex) - iotago.EpochIndex(1)
+		delegationEnd = claimingEpoch - iotago.EpochIndex(1)
 	}
 
 	rewardMana, _, _, err := w.Node.Protocol.Engines.Main.Get().SybilProtection.DelegatorReward(
@@ -554,7 +559,9 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 		inputDelegation.DelegatedAmount,
 		inputDelegation.StartEpoch,
 		delegationEnd,
+		claimingEpoch,
 	)
+
 	if err != nil {
 		panic(fmt.Sprintf("failed to calculate reward for output %s: %s", inputName, err))
 	}
