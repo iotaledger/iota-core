@@ -69,6 +69,20 @@ func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...
 	return cachedRequest.Result(), cachedRequest.Err()
 }
 
+// TargetEngine returns the engine that manages the data for the given commitment (or nil if no engine was found while
+// commitment IDs below the Root are resolved against the main engine).
+func (c *Commitments) TargetEngine(commitmentID iotago.CommitmentID) (targetEngine *engine.Engine) {
+	if commitmentID.Slot() <= c.Root.Get().Slot() {
+		targetEngine = c.protocol.Engines.Main.Get()
+	} else if commitment, err := c.Get(commitmentID); err == nil {
+		targetEngine = commitment.TargetEngine()
+	} else if !ierrors.Is(err, ErrorCommitmentNotFound) {
+		c.LogDebug("failed to retrieve commitment", "commitmentID", commitmentID, "err", err)
+	}
+
+	return targetEngine
+}
+
 // initLogger initializes the logger for this component.
 func (c *Commitments) initLogger() (shutdown func()) {
 	c.Logger, shutdown = c.protocol.NewChildLogger("Commitments")

@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
@@ -122,7 +121,12 @@ func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment
 
 // ProcessRequest processes the given attestation request.
 func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	a.protocol.processCommitmentRequest(a.workerPool, commitmentID, func(engineInstance *engine.Engine) error {
+	logRequest(a.workerPool, func() error {
+		engineInstance := a.protocol.Commitments.TargetEngine(commitmentID)
+		if engineInstance == nil {
+			return ierrors.New("no engine found")
+		}
+
 		if engineInstance.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
 			return ierrors.New("not committed yet")
 		}
@@ -152,7 +156,7 @@ func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, 
 		}
 
 		return a.protocol.Network.SendAttestations(commitmentModel, attestations, roots.AttestationsProof(), from)
-	}, a, "fromPeer", from)
+	}, a, "commitmentID", commitmentID, "fromPeer", from)
 }
 
 // Shutdown shuts down the attestation protocol.
