@@ -56,58 +56,12 @@ func newCommitments(protocol *Protocol) *Commitments {
 	shutdown := lo.Batch(
 		c.initLogger(),
 		c.initEngineCommitmentSynchronization(),
-
-		c.ticker.Events.Tick.Hook(c.SendRequest).Unhook,
+		c.initTicker(),
 	)
 
-	protocol.Shutdown.OnTrigger(func() {
-		shutdown()
-
-		c.ticker.Shutdown()
-	})
+	protocol.Shutdown.OnTrigger(shutdown)
 
 	return c
-}
-
-// SendRequest sends a commitment request for the given commitment ID to all peers.
-func (c *Commitments) SendRequest(commitmentID iotago.CommitmentID) {
-	c.workerPool.Submit(func() {
-		c.protocol.Network.RequestSlotCommitment(commitmentID)
-
-		c.LogDebug("request", "commitment", commitmentID)
-	})
-}
-
-// ProcessResponse processes the given commitment response.
-func (c *Commitments) ProcessResponse(commitment *model.Commitment, from peer.ID) {
-	c.workerPool.Submit(func() {
-		// verify the commitment's version corresponds to the protocol version for the slot.
-		if apiForSlot := c.protocol.APIForSlot(commitment.Slot()); apiForSlot.Version() != commitment.Commitment().ProtocolVersion {
-			c.LogDebug("received commitment with invalid protocol version", "commitment", commitment.ID(), "version", commitment.Commitment().ProtocolVersion, "expectedVersion", apiForSlot.Version(), "fromPeer", from)
-
-			return
-		}
-
-		if commitmentMetadata, published, err := c.protocol.Commitments.publishCommitment(commitment); err != nil {
-			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
-		} else if published {
-			c.LogTrace("received response", "commitment", commitmentMetadata.LogName(), "fromPeer", from)
-		}
-	})
-}
-
-// ProcessRequest processes the given commitment request.
-func (c *Commitments) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	submitLoggedRequest(c.workerPool, func() error {
-		commitment, err := c.protocol.Commitments.Commitment(commitmentID)
-		if err != nil {
-			return ierrors.Wrap(err, "failed to load commitment")
-		}
-
-		c.protocol.Network.SendSlotCommitment(commitment, from)
-
-		return nil
-	}, c, "commitmentID", commitmentID, "fromPeer", from)
 }
 
 // Commitment returns the Commitment for the given commitmentID. It tries to retrieve the Commitment from the
@@ -174,6 +128,17 @@ func (c *Commitments) initEngineCommitmentSynchronization() func() {
 			}),
 		)
 	})
+}
+
+// initTicker initializes the ticker that is used to send commitment requests.
+func (c *Commitments) initTicker() (shutdown func()) {
+	unsubscribeFromTicker := c.ticker.Events.Tick.Hook(c.sendRequest).Unhook
+
+	return func() {
+		unsubscribeFromTicker()
+
+		c.ticker.Shutdown()
+	}
 }
 
 // publishRootCommitment publishes the root commitment of the main engine.
@@ -322,6 +287,47 @@ func (c *Commitments) initCommitment(commitment *Commitment, slotEvicted reactiv
 
 		commitment.IsEvicted.Trigger()
 	})
+}
+
+// sendRequest sends a commitment request for the given commitment ID to all peers.
+func (c *Commitments) sendRequest(commitmentID iotago.CommitmentID) {
+	c.workerPool.Submit(func() {
+		c.protocol.Network.RequestSlotCommitment(commitmentID)
+
+		c.LogDebug("request", "commitment", commitmentID)
+	})
+}
+
+// processResponse processes the given commitment response.
+func (c *Commitments) processResponse(commitment *model.Commitment, from peer.ID) {
+	c.workerPool.Submit(func() {
+		// verify the commitment's version corresponds to the protocol version for the slot.
+		if apiForSlot := c.protocol.APIForSlot(commitment.Slot()); apiForSlot.Version() != commitment.Commitment().ProtocolVersion {
+			c.LogDebug("received commitment with invalid protocol version", "commitment", commitment.ID(), "version", commitment.Commitment().ProtocolVersion, "expectedVersion", apiForSlot.Version(), "fromPeer", from)
+
+			return
+		}
+
+		if commitmentMetadata, published, err := c.protocol.Commitments.publishCommitment(commitment); err != nil {
+			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
+		} else if published {
+			c.LogTrace("received response", "commitment", commitmentMetadata.LogName(), "fromPeer", from)
+		}
+	})
+}
+
+// processRequest processes the given commitment request.
+func (c *Commitments) processRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+	submitLoggedRequest(c.workerPool, func() error {
+		commitment, err := c.protocol.Commitments.Commitment(commitmentID)
+		if err != nil {
+			return ierrors.Wrap(err, "failed to load commitment")
+		}
+
+		c.protocol.Network.SendSlotCommitment(commitment, from)
+
+		return nil
+	}, c, "commitmentID", commitmentID, "fromPeer", from)
 }
 
 // targetEngine returns the engine that manages the data for the given commitment (or nil if no engine was found while
