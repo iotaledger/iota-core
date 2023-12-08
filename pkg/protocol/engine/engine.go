@@ -327,6 +327,10 @@ func (e *Engine) LatestAPI() iotago.API {
 
 // CommittedSlot returns the committed slot for the given slot index.
 func (e *Engine) CommittedSlot(commitmentID iotago.CommitmentID) (*CommittedSlotAPI, error) {
+	if e == nil {
+		return nil, ierrors.New("engine is nil")
+	}
+
 	if e.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
 		return nil, ierrors.Errorf("slot %d is not committed yet", commitmentID.Slot())
 	}

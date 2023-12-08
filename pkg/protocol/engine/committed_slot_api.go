@@ -5,6 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
 // CommittedSlotAPI is a wrapper for the Engine that provides access to the data of a committed slot.
@@ -35,6 +36,26 @@ func (c *CommittedSlotAPI) Commitment() (commitment *model.Commitment, err error
 	}
 
 	return commitment, nil
+}
+
+func (c *CommittedSlotAPI) Attestations() (attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], err error) {
+	if attestations, err = c.engine.Attestations.Get(c.CommitmentID.Slot()); err != nil {
+		return nil, nil, ierrors.Wrapf(err, "failed to load attestations")
+	}
+
+	rootsStorage, err := c.engine.Storage.Roots(c.CommitmentID.Slot())
+	if err != nil {
+		return nil, nil, ierrors.Wrapf(err, "failed to load roots storage")
+	}
+
+	roots, exists, err := rootsStorage.Load(c.CommitmentID)
+	if err != nil {
+		return nil, nil, ierrors.Wrapf(err, "failed to load roots")
+	} else if !exists {
+		return nil, nil, ierrors.New("roots not found")
+	}
+
+	return attestations, roots.AttestationsProof(), nil
 }
 
 // Roots returns the roots of the slot.

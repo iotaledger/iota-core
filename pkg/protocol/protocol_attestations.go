@@ -121,41 +121,23 @@ func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment
 
 // ProcessRequest processes the given attestation request.
 func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	logRequest(a.workerPool, func() error {
-		engineInstance := a.protocol.Commitments.TargetEngine(commitmentID)
-		if engineInstance == nil {
-			return ierrors.New("no engine found")
+	submitLoggedRequest(a.workerPool, func() error {
+		engineAPI, err := a.protocol.Commitments.TargetEngine(commitmentID).CommittedSlot(commitmentID)
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to load committed slot API")
 		}
 
-		if engineInstance.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
-			return ierrors.New("not committed yet")
-		}
-
-		commitmentModel, err := engineInstance.Storage.Commitments().Load(commitmentID.Slot())
+		commitmentModel, err := engineAPI.Commitment()
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to load commitment")
-		} else if commitmentModel.ID() != commitmentID {
-			return ierrors.Errorf("commitment ID mismatch: %s != %s", commitmentModel.ID(), commitmentID)
 		}
 
-		attestations, err := engineInstance.Attestations.Get(commitmentID.Slot())
+		attestations, proof, err := engineAPI.Attestations()
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to load attestations")
 		}
 
-		rootsStorage, err := engineInstance.Storage.Roots(commitmentID.Slot())
-		if err != nil {
-			return ierrors.Wrapf(err, "failed to load roots storage")
-		}
-
-		roots, exists, err := rootsStorage.Load(commitmentID)
-		if err != nil {
-			return ierrors.Wrapf(err, "failed to load roots")
-		} else if !exists {
-			return ierrors.New("roots not found")
-		}
-
-		return a.protocol.Network.SendAttestations(commitmentModel, attestations, roots.AttestationsProof(), from)
+		return a.protocol.Network.SendAttestations(commitmentModel, attestations, proof, from)
 	}, a, "commitmentID", commitmentID, "fromPeer", from)
 }
 
