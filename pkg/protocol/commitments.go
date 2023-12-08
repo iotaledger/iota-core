@@ -119,23 +119,23 @@ func (c *Commitments) initEngineCommitmentSynchronization() func() {
 
 // publishRootCommitment publishes the root commitment of the main engine.
 func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine.Engine) func() {
-	return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, newRootCommitmentModel *model.Commitment) {
-		newRootCommitment, published, err := c.publishCommitment(newRootCommitmentModel)
+	return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, rootCommitment *model.Commitment) {
+		commitmentMetadata, published, err := c.publishCommitment(rootCommitment)
 		if err != nil {
-			c.LogError("failed to publish new root commitment", "id", newRootCommitmentModel.ID(), "error", err)
+			c.LogError("failed to publish new root commitment", "id", rootCommitment.ID(), "error", err)
 
 			return
 		}
 
-		newRootCommitment.IsRoot.Set(true)
+		commitmentMetadata.IsRoot.Set(true)
 		if published {
-			newRootCommitment.Chain.Set(mainChain)
+			commitmentMetadata.Chain.Set(mainChain)
 		}
 
 		// TODO: USE SET HERE (debug eviction issues)
-		mainChain.ForkingPoint.DefaultTo(newRootCommitment)
+		mainChain.ForkingPoint.DefaultTo(commitmentMetadata)
 
-		c.Root.Set(newRootCommitment)
+		c.Root.Set(commitmentMetadata)
 	})
 }
 
@@ -144,7 +144,7 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 	latestPublishedSlot := chain.LastCommonSlot()
 
 	return engine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {
-		loadModel := func(slot iotago.SlotIndex) (*model.Commitment, error) {
+		loadCommitment := func(slot iotago.SlotIndex) (*model.Commitment, error) {
 			// prevent disk access if possible
 			if slot == latestCommitment.Slot() {
 				return latestCommitment, nil
@@ -154,8 +154,8 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 		}
 
 		for ; latestPublishedSlot < latestCommitment.Slot(); latestPublishedSlot++ {
-			// retrieve the model to publish
-			modelToPublish, err := loadModel(latestPublishedSlot + 1)
+			// retrieve the commitment to publish
+			commitment, err := loadCommitment(latestPublishedSlot + 1)
 			if err != nil {
 				c.LogError("failed to load commitment to publish from engine", "slot", latestPublishedSlot+1, "err", err)
 
@@ -163,18 +163,18 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 			}
 
 			// publish the model
-			publishedCommitment, _, err := c.publishCommitment(modelToPublish)
+			commitmentMetadata, _, err := c.publishCommitment(commitment)
 			if err != nil {
-				c.LogError("failed to publish commitment from engine", "engine", engine.LogName(), "commitment", modelToPublish, "err", err)
+				c.LogError("failed to publish commitment from engine", "engine", engine.LogName(), "commitment", commitment, "err", err)
 
 				return
 			}
 
 			// mark it as produced by ourselves and force it to be on the right chain (in case our chain produced a
 			// different commitment than the one we erroneously expected it to be - we always trust our engine most).
-			publishedCommitment.AttestedWeight.Set(publishedCommitment.Weight.Get())
-			publishedCommitment.IsVerified.Set(true)
-			publishedCommitment.forceChain(chain)
+			commitmentMetadata.AttestedWeight.Set(commitmentMetadata.Weight.Get())
+			commitmentMetadata.IsVerified.Set(true)
+			commitmentMetadata.forceChain(chain)
 		}
 	})
 }

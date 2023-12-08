@@ -62,20 +62,19 @@ func (c *CommitmentsProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 }
 
 // ProcessResponse processes the given commitment response.
-func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment, from peer.ID) {
+func (c *CommitmentsProtocol) ProcessResponse(commitment *model.Commitment, from peer.ID) {
 	c.workerPool.Submit(func() {
-		// Verify the commitment's version corresponds to the protocol version for the slot.
-		apiForSlot := c.protocol.APIForSlot(commitmentModel.Slot())
-		if apiForSlot.Version() != commitmentModel.Commitment().ProtocolVersion {
-			c.LogDebug("received commitment with invalid protocol version", "commitment", commitmentModel.ID(), "version", commitmentModel.Commitment().ProtocolVersion, "expectedVersion", apiForSlot.Version(), "fromPeer", from)
+		// verify the commitment's version corresponds to the protocol version for the slot.
+		if apiForSlot := c.protocol.APIForSlot(commitment.Slot()); apiForSlot.Version() != commitment.Commitment().ProtocolVersion {
+			c.LogDebug("received commitment with invalid protocol version", "commitment", commitment.ID(), "version", commitment.Commitment().ProtocolVersion, "expectedVersion", apiForSlot.Version(), "fromPeer", from)
 
 			return
 		}
 
-		if commitment, published, err := c.protocol.Commitments.publishCommitment(commitmentModel); err != nil {
+		if commitmentMetadata, published, err := c.protocol.Commitments.publishCommitment(commitment); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
 		} else if published {
-			c.LogTrace("received response", "commitment", commitment.LogName(), "fromPeer", from)
+			c.LogTrace("received response", "commitment", commitmentMetadata.LogName(), "fromPeer", from)
 		}
 	})
 }
