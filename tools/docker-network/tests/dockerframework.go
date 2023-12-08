@@ -50,6 +50,7 @@ type Node struct {
 	ClientURL            string
 	Client               *nodeclient.Client
 	AccountAddressBech32 string
+	ContainerConfigs     string
 }
 
 type DockerTestFramework struct {
@@ -120,6 +121,7 @@ func (d *DockerTestFramework) Run() error {
 		}
 	}
 
+	d.GetContainersConfigs()
 	// make sure all nodes are up then we can start dumping logs
 	d.DumpContainerLogsToFiles()
 
@@ -211,6 +213,50 @@ func (d *DockerTestFramework) AccountsFromNodes(nodes ...*Node) []string {
 	}
 
 	return accounts
+}
+
+func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
+	// build a new image from the current one so we could set IssueCandidacyPayload to false,
+	// the committed image will not remember the container configs, so it's fine to commit the first validator of the nodes
+	newImageName := "no-candidacy-payload-image"
+	err := exec.Command("docker", "commit", nodes[0].ContainerName, newImageName).Run()
+	require.NoError(d.Testing, err)
+
+	for _, node := range nodes {
+		if node.AccountAddressBech32 == "" {
+			continue
+		}
+
+		// stop the inx-validator that issues candidacy payload
+		err = d.StopContainer(node.ContainerName)
+		require.NoError(d.Testing, err)
+
+		// start a new inx-validator that does not issue candidacy payload
+		newContainerName := fmt.Sprintf("%s-1", node.ContainerName)
+		cmd := fmt.Sprintf("docker run --network docker-network_iota-core --name %s %s %s --validator.issueCandidacyPayload=false &", newContainerName, newImageName, node.ContainerConfigs)
+		err = exec.Command("bash", "-c", cmd).Run()
+		require.NoError(d.Testing, err)
+	}
+}
+
+func (d *DockerTestFramework) StartIssueCandidacyPayload(nodes ...*Node) {
+	for _, node := range nodes {
+		if node.AccountAddressBech32 == "" {
+			continue
+		}
+
+		// stop and remove the inx-validator that does not issue candidacy payload
+		newContainerName := fmt.Sprintf("%s-1", node.ContainerName)
+		err := d.StopContainer(newContainerName)
+		require.NoError(d.Testing, err)
+
+		err = exec.Command("docker", "rm", newContainerName).Run()
+		require.NoError(d.Testing, err)
+
+		// start the inx-validator that issues candidacy payload
+		err = d.RestartContainer(node.ContainerName)
+		require.NoError(d.Testing, err)
+	}
 }
 
 func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, expectedCommitteeMember []string) {
@@ -307,6 +353,22 @@ func (d *DockerTestFramework) DumpContainerLogsToFiles() {
 		logCmd := fmt.Sprintf("docker logs -f %s > %s 2>&1 &", name, filePath)
 		err := exec.Command("bash", "-c", logCmd).Run()
 		require.NoError(d.Testing, err)
+	}
+}
+
+func (d *DockerTestFramework) GetContainersConfigs() {
+	// get container configs
+	for _, node := range d.Nodes() {
+		cmd := fmt.Sprintf("docker inspect --format='{{.Config.Cmd}}' %s", node.ContainerName)
+		containerConfigsBytes, err := exec.Command("bash", "-c", cmd).Output()
+		require.NoError(d.Testing, err)
+
+		configs := string(containerConfigsBytes)
+		// remove "[" and "]"
+		configs = configs[1 : len(configs)-2]
+
+		node.ContainerConfigs = configs
+		d.nodes[node.Name] = node
 	}
 }
 
