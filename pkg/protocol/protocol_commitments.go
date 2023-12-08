@@ -60,15 +60,6 @@ func (c *CommitmentsProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 	})
 }
 
-// SendResponse sends a commitment response for the given commitment to the given peer.
-func (c *CommitmentsProtocol) SendResponse(commitment *Commitment, to peer.ID) {
-	c.workerPool.Submit(func() {
-		c.protocol.Network.SendSlotCommitment(commitment.Commitment, to)
-
-		c.LogTrace("sent commitment", "commitment", commitment.LogName(), "toPeer", to)
-	})
-}
-
 // ProcessResponse processes the given commitment response.
 func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment, from peer.ID) {
 	c.workerPool.Submit(func() {
