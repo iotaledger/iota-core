@@ -16,6 +16,9 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// IOTA Mainnet Max Supply.
+const MAX_SUPPLY = iotago.BaseToken(4_600_000_000_000_000)
+
 func setupValidatorTestsuite(t *testing.T, walletOpts ...options.Option[testsuite.WalletOptions]) *testsuite.TestSuite {
 	var slotDuration uint8 = 5
 	var slotsPerEpochExponent uint8 = 5
@@ -23,9 +26,12 @@ func setupValidatorTestsuite(t *testing.T, walletOpts ...options.Option[testsuit
 
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
+			iotago.WithSupplyOptions(MAX_SUPPLY, 63, 1, 17, 32, 21, 70),
 			iotago.WithStakingOptions(1, validationBlocksPerSlot, 1),
 			// Pick larger values for ManaShareCoefficient and DecayBalancingConstant for more precision in the calculations.
-			iotago.WithRewardsOptions(8, 8, 11, 1154, 200, 200),
+			iotago.WithRewardsOptions(8, 8, 11, 200, 200),
+			// Pick Increase/Decrease threshold in accordance with sanity checks (necessary because we changed slot duration).
+			iotago.WithCongestionControlOptions(1, 0, 0, 400_000, 300_000, 100_000, 1000, 100),
 			iotago.WithTimeProviderOptions(
 				0,
 				testsuite.GenesisTimeWithOffsetBySlots(1000, slotDuration),
@@ -33,8 +39,8 @@ func setupValidatorTestsuite(t *testing.T, walletOpts ...options.Option[testsuit
 				slotsPerEpochExponent,
 			),
 			iotago.WithLivenessOptions(
-				testsuite.DefaultLivenessThresholdLowerBoundInSeconds,
-				testsuite.DefaultLivenessThresholdUpperBoundInSeconds,
+				10,
+				20,
 				5,
 				10,
 				15,
@@ -43,8 +49,19 @@ func setupValidatorTestsuite(t *testing.T, walletOpts ...options.Option[testsuit
 	)
 
 	// Add validator nodes to the network. This will add validator accounts to the snapshot.
-	vnode1 := ts.AddValidatorNode("node1", append(walletOpts, testsuite.WithWalletAmount(20_000_000))...)
-	vnode2 := ts.AddValidatorNode("node2", append(walletOpts, testsuite.WithWalletAmount(25_000_000))...)
+	vnode1 := ts.AddValidatorNode("node1", append(
+		[]options.Option[testsuite.WalletOptions]{
+			testsuite.WithWalletAmount(20_000_000),
+		},
+		walletOpts...,
+	)...)
+	vnode2 := ts.AddValidatorNode("node2", append(
+		[]options.Option[testsuite.WalletOptions]{
+			testsuite.WithWalletAmount(25_000_000),
+		},
+		walletOpts...,
+	)...)
+
 	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	node3 := ts.AddNode("node3")
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
@@ -114,6 +131,29 @@ func Test_Validator_PerfectIssuanceWithNonZeroFixedCost(t *testing.T) {
 	validatorTest(t, test)
 }
 
+func Test_Validator_PerfectIssuanceWithHugeStake(t *testing.T) {
+	// This gives both validators the max supply as stake, which is unrealistic,
+	// but is supposed to test if one validator with a huge stake causes an overflow in the rewards calculation.
+	ts := setupValidatorTestsuite(t, testsuite.WithWalletAmount(MAX_SUPPLY))
+	defer ts.Shutdown()
+
+	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot()
+	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
+
+	test := ValidatorTest{
+		ts:                      ts,
+		validationBlocksPerSlot: validationBlocksPerSlot,
+		epochPerformanceFactors: EpochPerformanceMap{
+			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
+			0: (uint64(validationBlocksPerSlot) * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			1: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			2: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+		},
+	}
+
+	validatorTest(t, test)
+}
+
 func Test_Validator_OverIssuance(t *testing.T) {
 	ts := setupValidatorTestsuite(t)
 	defer ts.Shutdown()
@@ -157,7 +197,7 @@ func Test_Validator_UnderIssuance(t *testing.T) {
 }
 
 func Test_Validator_FixedCostExceedsRewards(t *testing.T) {
-	ts := setupValidatorTestsuite(t, testsuite.WithWalletFixedCost(10_000_000))
+	ts := setupValidatorTestsuite(t, testsuite.WithWalletFixedCost(iotago.MaxMana))
 	defer ts.Shutdown()
 
 	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot()
@@ -166,7 +206,6 @@ func Test_Validator_FixedCostExceedsRewards(t *testing.T) {
 		ts:                      ts,
 		validationBlocksPerSlot: validationBlocksPerSlot,
 		epochPerformanceFactors: EpochPerformanceMap{
-			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
 			0: 0,
 			1: 0,
 			2: 0,
@@ -302,6 +341,9 @@ func calculateEpochReward(t *testing.T, ts *testsuite.TestSuite, accountID iotag
 
 // Calculates a validator's reward according to
 // https://github.com/iotaledger/tips/blob/tip40/tips/TIP-0040/tip-0040.md#calculations-4.
+//
+// For testing purposes, assumes that the account's staking data is the same in the latest committed slot
+// as in the epoch for which to calculate rewards.
 func calculateValidatorReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, rewards []reward, startEpoch iotago.EpochIndex, claimingEpoch iotago.EpochIndex) iotago.Mana {
 	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
 	accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(accountID, latestCommittedSlot)
