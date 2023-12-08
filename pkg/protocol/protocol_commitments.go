@@ -91,38 +91,21 @@ func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment,
 
 // ProcessRequest processes the given commitment request.
 func (c *CommitmentsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	c.workerPool.Submit(func() {
-		commitment, err := c.protocol.Commitments.Get(commitmentID)
-		if err != nil {
-			if !ierrors.Is(err, ErrorCommitmentNotFound) {
-				c.LogError("failed to load commitment for commitment request", "commitmentID", commitmentID, "fromPeer", from, "error", err)
-
-				return
-			}
-
-			slotAPI, slotAPIErr := c.protocol.Engines.Main.Get().CommittedSlot(commitmentID)
-			if slotAPIErr != nil {
-				c.LogDebug("failed to load committed slot for commitment request", "commitmentID", commitmentID, "fromPeer", from, "error", slotAPIErr)
-
-				return
-			}
-
-			commitmentModel, slotAPIErr := slotAPI.Commitment()
-			if slotAPIErr != nil {
-				c.LogDebug("failed to load commitment for commitment request", "commitmentID", commitmentID, "fromPeer", from, "error", slotAPIErr)
-
-				return
-			}
-
+	logRequest(c.workerPool, func() error {
+		if commitment, err := c.protocol.Commitments.Get(commitmentID); err == nil {
+			c.protocol.Network.SendSlotCommitment(commitment.Commitment, from)
+		} else if !ierrors.Is(err, ErrorCommitmentNotFound) {
+			return ierrors.Wrapf(err, "failed to load commitment")
+		} else if slotAPI, slotAPIErr := c.protocol.Engines.Main.Get().CommittedSlot(commitmentID); slotAPIErr != nil {
+			return ierrors.Wrapf(slotAPIErr, "failed to load committed slot API")
+		} else if commitmentModel, commitmentModelErr := slotAPI.Commitment(); commitmentModelErr != nil {
+			return ierrors.Wrapf(commitmentModelErr, "failed to load commitment")
+		} else {
 			c.protocol.Network.SendSlotCommitment(commitmentModel, from)
-
-			c.LogTrace("sent commitment", "commitmentID", commitmentID, "toPeer", from)
-
-			return
 		}
 
-		c.SendResponse(commitment, from)
-	})
+		return nil
+	}, c, "commitmentID", commitmentID, "fromPeer", from)
 }
 
 // Shutdown shuts down the commitment protocol and waits for all pending requests to be processed.
