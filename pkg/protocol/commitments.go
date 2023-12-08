@@ -69,17 +69,16 @@ func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...
 	return cachedRequest.Result(), cachedRequest.Err()
 }
 
-// Model returns the model of the Commitment for the given commitmentID.
+// Model returns the model of the Commitment for the given commitmentID. It tries to retrieve the Commitment from the
+// cache first and falls back to serve it from the main engine if the Commitment is below the Root commitment.
 func (c *Commitments) Model(commitmentID iotago.CommitmentID) (model *model.Commitment, err error) {
-	// serve from cache first
 	commitment, err := c.Get(commitmentID)
 	if err == nil {
 		return commitment.Commitment, nil
-	} else if !ierrors.Is(err, ErrorCommitmentNotFound) {
+	} else if !ierrors.Is(err, ErrorCommitmentNotFound) || commitmentID.Slot() > c.Root.Get().Slot() {
 		return nil, ierrors.Wrapf(err, "failed to load commitment")
 	}
 
-	// otherwise, load from main engine
 	engineAPI, err := c.protocol.Engines.Main.Get().CommittedSlot(commitmentID)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to load engine API")

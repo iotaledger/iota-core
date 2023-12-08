@@ -91,14 +91,14 @@ func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment,
 // ProcessRequest processes the given commitment request.
 func (c *CommitmentsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	c.workerPool.Submit(func() {
-		commitmentModel, err := c.protocol.Commitments.Model(commitmentID)
+		commitment, err := c.protocol.Commitments.Model(commitmentID)
 		if err != nil {
 			c.LogDebug("failed to answer request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
 
 			return
 		}
 
-		c.protocol.Network.SendSlotCommitment(commitmentModel, from)
+		c.protocol.Network.SendSlotCommitment(commitment, from)
 
 		c.LogTrace("answered request", "commitmentID", commitmentID, "fromPeer", from)
 	})
