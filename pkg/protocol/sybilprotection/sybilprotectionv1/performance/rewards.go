@@ -29,6 +29,14 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *
 	firstRewardEpoch = stakingFeature.StartEpoch
 	lastRewardEpoch = stakingFeature.EndEpoch
 
+	// When claiming rewards in epoch X for epoch X-1, decay of X-(X-1) = 1 would be applied. Since epoch X is the
+	// very first epoch in which one can claim those rewards, decaying by 1 is odd, as one could never claim the full reward then.
+	// Hence, deduct one epoch worth of decay.
+	claimingEpoch, err = safemath.SafeSub(claimingEpoch, 1)
+	if err != nil {
+		return 0, 0, 0, ierrors.Wrapf(err, "claimingEpoch must be set to at least 1")
+	}
+
 	// Limit reward fetching only to committed epochs.
 	if lastRewardEpoch > t.latestAppliedEpoch {
 		lastRewardEpoch = t.latestAppliedEpoch
@@ -120,6 +128,14 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 
 	firstRewardEpoch = epochStart
 	lastRewardEpoch = epochEnd
+
+	// When claiming rewards in epoch X for epoch X-1, decay of X-(X-1) = 1 would be applied. Since epoch X is the
+	// very first epoch in which one can claim those rewards, decaying by 1 is odd, as one could never claim the full reward then.
+	// Hence, deduct one epoch worth of decay.
+	claimingEpoch, err = safemath.SafeSub(claimingEpoch, 1)
+	if err != nil {
+		return 0, 0, 0, ierrors.Wrapf(err, "claimingEpoch must be set to at least 1")
+	}
 
 	// limit looping to committed epochs
 	if lastRewardEpoch > t.latestAppliedEpoch {

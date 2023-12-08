@@ -369,7 +369,7 @@ func calculateValidatorReward(t *testing.T, ts *testsuite.TestSuite, accountID i
 
 			undecayedRewards := uint64(fixedCost) + profitMarginFactor + residualValidatorFactor
 
-			decayedRewards += lo.PanicOnErr(ts.API.ManaDecayProvider().DecayManaByEpochs(iotago.Mana(undecayedRewards), rewardEpoch, claimingEpoch))
+			decayedRewards += lo.PanicOnErr(ts.API.ManaDecayProvider().DecayManaByEpochs(iotago.Mana(undecayedRewards), rewardEpoch, claimingEpoch-1))
 		} else {
 			decayedRewards += 0
 		}
