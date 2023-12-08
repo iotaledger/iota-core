@@ -72,10 +72,10 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 // SendRequest sends a warp sync request for the given commitment ID to all peers.
 func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 	w.workerPool.Submit(func() {
-		if commitment, err := w.protocol.Commitments.Get(commitmentID, false); err == nil {
+		if commitmentMetadata, err := w.protocol.Commitments.Metadata(commitmentID, false); err == nil {
 			w.protocol.Network.SendWarpSyncRequest(commitmentID)
 
-			w.LogDebug("request", "commitment", commitment.LogName())
+			w.LogDebug("request", "commitment", commitmentMetadata.LogName())
 		}
 	})
 }
@@ -92,7 +92,7 @@ func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDsBySlotCo
 // ProcessResponse processes the given warp sync response.
 func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	w.workerPool.Submit(func() {
-		commitment, err := w.protocol.Commitments.Get(commitmentID)
+		commitmentMetadata, err := w.protocol.Commitments.Metadata(commitmentID)
 		if err != nil {
 			if !ierrors.Is(err, ErrorCommitmentNotFound) {
 				w.LogError("failed to load commitment for response", "commitmentID", commitmentID, "fromPeer", from, "err", err)
@@ -103,9 +103,9 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			return
 		}
 
-		chain := commitment.Chain.Get()
+		chain := commitmentMetadata.Chain.Get()
 		if chain == nil {
-			w.LogTrace("failed to get chain for response", "commitment", commitment.LogName(), "fromPeer", from)
+			w.LogTrace("failed to get chain for response", "commitment", commitmentMetadata.LogName(), "fromPeer", from)
 
 			return
 		}
@@ -116,16 +116,16 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			return
 		}
 
-		targetEngine := commitment.TargetEngine()
+		targetEngine := commitmentMetadata.TargetEngine()
 		if targetEngine == nil {
-			w.LogDebug("failed to get target engine for response", "commitment", commitment.LogName())
+			w.LogDebug("failed to get target engine for response", "commitment", commitmentMetadata.LogName())
 
 			return
 		}
 
-		commitment.BlocksToWarpSync.Compute(func(blocksToWarpSync ds.Set[iotago.BlockID]) ds.Set[iotago.BlockID] {
-			if blocksToWarpSync != nil || !commitment.WarpSyncBlocks.Get() {
-				w.LogTrace("response for already synced commitment", "commitment", commitment.LogName(), "fromPeer", from)
+		commitmentMetadata.BlocksToWarpSync.Compute(func(blocksToWarpSync ds.Set[iotago.BlockID]) ds.Set[iotago.BlockID] {
+			if blocksToWarpSync != nil || !commitmentMetadata.WarpSyncBlocks.Get() {
+				w.LogTrace("response for already synced commitment", "commitment", commitmentMetadata.LogName(), "fromPeer", from)
 
 				return blocksToWarpSync
 			}
@@ -140,8 +140,8 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				}
 			}
 
-			if !iotago.VerifyProof(proof, acceptedBlocks.Root(), commitment.RootsID()) {
-				w.LogError("failed to verify blocks proof", "commitment", commitment.LogName(), "blockIDs", blockIDsBySlotCommitment, "proof", proof, "fromPeer", from)
+			if !iotago.VerifyProof(proof, acceptedBlocks.Root(), commitmentMetadata.RootsID()) {
+				w.LogError("failed to verify blocks proof", "commitment", commitmentMetadata.LogName(), "blockIDs", blockIDsBySlotCommitment, "proof", proof, "fromPeer", from)
 
 				return blocksToWarpSync
 			}
@@ -151,8 +151,8 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 				_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
 			}
 
-			if !iotago.VerifyProof(mutationProof, acceptedTransactionIDs.Root(), commitment.RootsID()) {
-				w.LogError("failed to verify mutations proof", "commitment", commitment.LogName(), "transactionIDs", transactionIDs, "proof", mutationProof, "fromPeer", from)
+			if !iotago.VerifyProof(mutationProof, acceptedTransactionIDs.Root(), commitmentMetadata.RootsID()) {
+				w.LogError("failed to verify mutations proof", "commitment", commitmentMetadata.LogName(), "transactionIDs", transactionIDs, "proof", mutationProof, "fromPeer", from)
 
 				return blocksToWarpSync
 			}
@@ -233,7 +233,7 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 			// Once all blocks are fully booked we can mark the commitment that is minCommittableAge older as this
 			// commitment to be committable.
-			commitment.IsSynced.OnUpdateOnce(func(_ bool, _ bool) {
+			commitmentMetadata.IsSynced.OnUpdateOnce(func(_ bool, _ bool) {
 				// update the flag in a worker since it can potentially cause a commit
 				w.workerPool.Submit(func() {
 					if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - targetEngine.LatestAPI().ProtocolParameters().MinCommittableAge()); exists {
@@ -243,16 +243,16 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 			})
 
 			// force commit one by one and wait for the parent to be verified before we commit the next one
-			commitment.Parent.WithNonEmptyValue(func(parent *Commitment) (teardown func()) {
+			commitmentMetadata.Parent.WithNonEmptyValue(func(parent *Commitment) (teardown func()) {
 				return parent.IsVerified.WithNonEmptyValue(func(_ bool) (teardown func()) {
-					return commitment.IsCommittable.OnTrigger(commitmentFunc)
+					return commitmentMetadata.IsCommittable.OnTrigger(commitmentFunc)
 				})
 			})
 
 			if totalBlocks == 0 {
 				// mark empty slots as committable and synced
-				commitment.IsCommittable.Set(true)
-				commitment.IsSynced.Set(true)
+				commitmentMetadata.IsCommittable.Set(true)
+				commitmentMetadata.IsSynced.Set(true)
 
 				return blocksToWarpSync
 			}
@@ -277,12 +277,12 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 							return
 						}
 
-						commitment.IsSynced.Set(true)
+						commitmentMetadata.IsSynced.Set(true)
 					})
 				}
 			}
 
-			w.LogDebug("received response", "commitment", commitment.LogName())
+			w.LogDebug("received response", "commitment", commitmentMetadata.LogName())
 
 			return blocksToWarpSync
 		})
@@ -292,22 +292,22 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 // ProcessRequest processes the given warp sync request.
 func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	submitLoggedRequest(w.workerPool, func() (err error) {
-		committedSlot, err := w.protocol.Commitments.TargetEngine(commitmentID).CommittedSlot(commitmentID)
+		slotAPI, err := w.protocol.Commitments.targetEngine(commitmentID).CommittedSlot(commitmentID)
 		if err != nil {
-			return ierrors.Wrap(err, "failed to load committed slot")
+			return ierrors.Wrap(err, "failed to load slot api")
 		}
 
-		blockIDsBySlotCommitment, err := committedSlot.BlocksIDsBySlotCommitmentID()
+		blockIDsBySlotCommitment, err := slotAPI.BlocksIDsBySlotCommitmentID()
 		if err != nil {
 			return ierrors.Wrap(err, "failed to get block ids")
 		}
 
-		roots, err := committedSlot.Roots()
+		roots, err := slotAPI.Roots()
 		if err != nil {
 			return ierrors.Wrap(err, "failed to get roots")
 		}
 
-		transactionIDs, err := committedSlot.TransactionIDs()
+		transactionIDs, err := slotAPI.TransactionIDs()
 		if err != nil {
 			return ierrors.Wrap(err, "failed to get transaction ids")
 		}
@@ -321,5 +321,4 @@ func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from
 // Shutdown shuts down the warp sync protocol.
 func (w *WarpSyncProtocol) Shutdown() {
 	w.ticker.Shutdown()
-	w.workerPool.Shutdown().ShutdownComplete.Wait()
 }

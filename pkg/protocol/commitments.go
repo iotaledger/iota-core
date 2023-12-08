@@ -51,10 +51,28 @@ func newCommitments(protocol *Protocol) *Commitments {
 	return c
 }
 
-// Get returns the Commitment for the given commitmentID. If the Commitment is not available yet, it will return an
-// ErrorCommitmentNotFound. It is possible to trigger a request for the Commitment by passing true as the second
-// argument.
-func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...bool) (commitment *Commitment, err error) {
+// Commitment returns the Commitment for the given commitmentID. It tries to retrieve the Commitment from the
+// cache first and falls back to serve it from the main engine if the Commitment is below the Root commitment.
+func (c *Commitments) Commitment(commitmentID iotago.CommitmentID) (commitment *model.Commitment, err error) {
+	commitmentMetadata, err := c.Metadata(commitmentID)
+	if err == nil {
+		return commitmentMetadata.Commitment, nil
+	} else if !ierrors.Is(err, ErrorCommitmentNotFound) || commitmentID.Slot() > c.Root.Get().Slot() {
+		return nil, ierrors.Wrapf(err, "failed to load commitment metadata")
+	}
+
+	slotAPI, err := c.protocol.Engines.Main.Get().CommittedSlot(commitmentID)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to load engine API")
+	}
+
+	return slotAPI.Commitment()
+}
+
+// Metadata returns the protocol Commitment for the given commitmentID. If the Commitment is not available yet, it
+// will return an ErrorCommitmentNotFound. It is possible to trigger a request for the Commitment by passing true as the
+// second argument.
+func (c *Commitments) Metadata(commitmentID iotago.CommitmentID, requestIfMissing ...bool) (commitmentMetadata *Commitment, err error) {
 	cachedRequest, exists := c.cachedRequests.Get(commitmentID)
 	if !exists && lo.First(requestIfMissing) {
 		if cachedRequest = c.cachedRequest(commitmentID, true); cachedRequest.WasRejected() {
@@ -67,40 +85,6 @@ func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...
 	}
 
 	return cachedRequest.Result(), cachedRequest.Err()
-}
-
-// Model returns the model of the Commitment for the given commitmentID. It tries to retrieve the Commitment from the
-// cache first and falls back to serve it from the main engine if the Commitment is below the Root commitment.
-func (c *Commitments) Model(commitmentID iotago.CommitmentID) (model *model.Commitment, err error) {
-	commitment, err := c.Get(commitmentID)
-	if err == nil {
-		return commitment.Commitment, nil
-	} else if !ierrors.Is(err, ErrorCommitmentNotFound) || commitmentID.Slot() > c.Root.Get().Slot() {
-		return nil, ierrors.Wrapf(err, "failed to load commitment")
-	}
-
-	engineAPI, err := c.protocol.Engines.Main.Get().CommittedSlot(commitmentID)
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to load engine API")
-	}
-
-	return engineAPI.Commitment()
-}
-
-// TargetEngine returns the engine that manages the data for the given commitment (or nil if no engine was found while
-// commitment IDs below the Root are always resolved against the main engine).
-func (c *Commitments) TargetEngine(commitmentID iotago.CommitmentID) *engine.Engine {
-	if commitmentID.Slot() <= c.Root.Get().Slot() {
-		return c.protocol.Engines.Main.Get()
-	}
-
-	if commitment, err := c.Get(commitmentID); err == nil {
-		return commitment.TargetEngine()
-	} else if !ierrors.Is(err, ErrorCommitmentNotFound) {
-		c.LogDebug("failed to retrieve commitment", "commitmentID", commitmentID, "err", err)
-	}
-
-	return nil
 }
 
 // initLogger initializes the logger for this component.
@@ -136,7 +120,7 @@ func (c *Commitments) initEngineCommitmentSynchronization() func() {
 // publishRootCommitment publishes the root commitment of the main engine.
 func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine.Engine) func() {
 	return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, newRootCommitmentModel *model.Commitment) {
-		newRootCommitment, published, err := c.publishCommitmentModel(newRootCommitmentModel)
+		newRootCommitment, published, err := c.publishCommitment(newRootCommitmentModel)
 		if err != nil {
 			c.LogError("failed to publish new root commitment", "id", newRootCommitmentModel.ID(), "error", err)
 
@@ -179,7 +163,7 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 			}
 
 			// publish the model
-			publishedCommitment, _, err := c.publishCommitmentModel(modelToPublish)
+			publishedCommitment, _, err := c.publishCommitment(modelToPublish)
 			if err != nil {
 				c.LogError("failed to publish commitment from engine", "engine", engine.LogName(), "commitment", modelToPublish, "err", err)
 
@@ -195,25 +179,25 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 	})
 }
 
-// publishCommitmentModel publishes the given commitment model as a Commitment instance. If the Commitment was already
+// publishCommitment publishes the given commitment  as a Commitment instance. If the Commitment was already
 // published, it will return the existing Commitment instance. Otherwise, it will create a new Commitment instance and
 // resolve the Promise that was created for it.
-func (c *Commitments) publishCommitmentModel(model *model.Commitment) (commitment *Commitment, published bool, err error) {
+func (c *Commitments) publishCommitment(commitment *model.Commitment) (commitmentMetadata *Commitment, published bool, err error) {
 	// retrieve promise and abort if it was already rejected
-	cachedRequest := c.cachedRequest(model.ID())
+	cachedRequest := c.cachedRequest(commitment.ID())
 	if cachedRequest.WasRejected() {
-		return nil, false, ierrors.Wrapf(cachedRequest.Err(), "failed to request commitment %s", model.ID())
+		return nil, false, ierrors.Wrapf(cachedRequest.Err(), "failed to request commitment %s", commitment.ID())
 	}
 
 	// otherwise try to provideCommitment it and determine if we were the goroutine that resolved it
-	commitment = newCommitment(c, model)
-	cachedRequest.Resolve(commitment).OnSuccess(func(resolvedCommitment *Commitment) {
-		if published = resolvedCommitment == commitment; !published {
-			commitment = resolvedCommitment
+	commitmentMetadata = newCommitment(c, commitment)
+	cachedRequest.Resolve(commitmentMetadata).OnSuccess(func(resolvedCommitment *Commitment) {
+		if published = resolvedCommitment == commitmentMetadata; !published {
+			commitmentMetadata = resolvedCommitment
 		}
 	})
 
-	return commitment, published, nil
+	return commitmentMetadata, published, nil
 }
 
 // cachedRequest returns a singleton Promise for the given commitmentID. If the Promise does not exist yet, it will be
@@ -275,4 +259,20 @@ func (c *Commitments) initCommitment(commitment *Commitment, slotEvicted reactiv
 
 		commitment.IsEvicted.Trigger()
 	})
+}
+
+// targetEngine returns the engine that manages the data for the given commitment (or nil if no engine was found while
+// commitment IDs below the Root are always resolved against the main engine).
+func (c *Commitments) targetEngine(commitmentID iotago.CommitmentID) *engine.Engine {
+	if commitmentID.Slot() <= c.Root.Get().Slot() {
+		return c.protocol.Engines.Main.Get()
+	}
+
+	if commitmentMetadata, err := c.Metadata(commitmentID); err == nil {
+		return commitmentMetadata.TargetEngine()
+	} else if !ierrors.Is(err, ErrorCommitmentNotFound) {
+		c.LogDebug("failed to retrieve commitment", "commitmentID", commitmentID, "err", err)
+	}
+
+	return nil
 }

@@ -73,7 +73,7 @@ func newAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 // ProcessResponse processes the given attestation response.
 func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	a.workerPool.Submit(func() {
-		commitment, _, err := a.protocol.Commitments.publishCommitmentModel(commitmentModel)
+		commitment, _, err := a.protocol.Commitments.publishCommitment(commitmentModel)
 		if err != nil {
 			a.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitmentModel.ID(), "peer", from, "error", err)
 
@@ -122,17 +122,17 @@ func (a *AttestationsProtocol) ProcessResponse(commitmentModel *model.Commitment
 // ProcessRequest processes the given attestation request.
 func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	submitLoggedRequest(a.workerPool, func() error {
-		engineAPI, err := a.protocol.Commitments.TargetEngine(commitmentID).CommittedSlot(commitmentID)
+		slotAPI, err := a.protocol.Commitments.targetEngine(commitmentID).CommittedSlot(commitmentID)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to load committed slot API")
 		}
 
-		commitmentModel, err := engineAPI.Commitment()
+		commitmentModel, err := slotAPI.Commitment()
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to load commitment")
 		}
 
-		attestations, proof, err := engineAPI.Attestations()
+		attestations, proof, err := slotAPI.Attestations()
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to load attestations")
 		}
@@ -186,10 +186,10 @@ func (a *AttestationsProtocol) setupCommitmentVerifier(chain *Chain) (shutdown f
 // sendRequest sends an attestation request for the given commitment ID.
 func (a *AttestationsProtocol) sendRequest(commitmentID iotago.CommitmentID) {
 	a.workerPool.Submit(func() {
-		if commitment, err := a.protocol.Commitments.Get(commitmentID, false); err == nil {
+		if commitmentMetadata, err := a.protocol.Commitments.Metadata(commitmentID, false); err == nil {
 			a.protocol.Network.RequestAttestations(commitmentID)
 
-			a.LogDebug("request", "commitment", commitment.LogName())
+			a.LogDebug("request", "commitment", commitmentMetadata.LogName())
 		} else {
 			a.LogError("failed to load commitment", "commitmentID", commitmentID, "err", err)
 		}

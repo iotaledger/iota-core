@@ -4,6 +4,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -71,7 +72,7 @@ func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment,
 			return
 		}
 
-		if commitment, published, err := c.protocol.Commitments.publishCommitmentModel(commitmentModel); err != nil {
+		if commitment, published, err := c.protocol.Commitments.publishCommitment(commitmentModel); err != nil {
 			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
 		} else if published {
 			c.LogTrace("received response", "commitment", commitment.LogName(), "fromPeer", from)
@@ -81,18 +82,16 @@ func (c *CommitmentsProtocol) ProcessResponse(commitmentModel *model.Commitment,
 
 // ProcessRequest processes the given commitment request.
 func (c *CommitmentsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	c.workerPool.Submit(func() {
-		commitment, err := c.protocol.Commitments.Model(commitmentID)
+	submitLoggedRequest(c.workerPool, func() error {
+		commitment, err := c.protocol.Commitments.Commitment(commitmentID)
 		if err != nil {
-			c.LogDebug("failed to answer request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
-
-			return
+			return ierrors.Wrap(err, "failed to load commitment")
 		}
 
 		c.protocol.Network.SendSlotCommitment(commitment, from)
 
-		c.LogTrace("answered request", "commitmentID", commitmentID, "fromPeer", from)
-	})
+		return nil
+	}, c, "commitmentID", commitmentID, "fromPeer", from)
 }
 
 // Shutdown shuts down the commitment protocol and waits for all pending requests to be processed.
