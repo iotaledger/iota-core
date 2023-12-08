@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/stretchr/testify/require"
@@ -15,7 +16,7 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-func setupValidatorTestsuite(t *testing.T) *testsuite.TestSuite {
+func setupValidatorTestsuite(t *testing.T, walletOpts ...options.Option[testsuite.WalletOptions]) *testsuite.TestSuite {
 	var slotDuration uint8 = 5
 	var slotsPerEpochExponent uint8 = 5
 	var validationBlocksPerSlot uint8 = 5
@@ -42,8 +43,8 @@ func setupValidatorTestsuite(t *testing.T) *testsuite.TestSuite {
 	)
 
 	// Add validator nodes to the network. This will add validator accounts to the snapshot.
-	vnode1 := ts.AddValidatorNode("node1", testsuite.WithWalletAmount(20_000_000))
-	vnode2 := ts.AddValidatorNode("node2", testsuite.WithWalletAmount(25_000_000))
+	vnode1 := ts.AddValidatorNode("node1", append(walletOpts, testsuite.WithWalletAmount(20_000_000))...)
+	vnode2 := ts.AddValidatorNode("node2", append(walletOpts, testsuite.WithWalletAmount(25_000_000))...)
 	// Add a non-validator node to the network. This will not add any accounts to the snapshot.
 	node3 := ts.AddNode("node3")
 	// Add a default block issuer to the network. This will add another block issuer account to the snapshot.
@@ -75,17 +76,38 @@ func Test_Validator_PerfectIssuance(t *testing.T) {
 	ts := setupValidatorTestsuite(t)
 	defer ts.Shutdown()
 
-	validationBlocksPerSlot := uint64(ts.API.ProtocolParameters().ValidationBlocksPerSlot())
+	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot()
 	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
 
 	test := ValidatorTest{
 		ts:                      ts,
-		validationBlocksPerSlot: ts.API.ProtocolParameters().ValidationBlocksPerSlot(),
+		validationBlocksPerSlot: validationBlocksPerSlot,
 		epochPerformanceFactors: EpochPerformanceMap{
 			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
-			0: (validationBlocksPerSlot * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
-			1: (validationBlocksPerSlot * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
-			2: (validationBlocksPerSlot * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			0: (uint64(validationBlocksPerSlot) * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			1: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			2: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+		},
+	}
+
+	validatorTest(t, test)
+}
+
+func Test_Validator_PerfectIssuanceWithNonZeroFixedCost(t *testing.T) {
+	ts := setupValidatorTestsuite(t, testsuite.WithWalletFixedCost(1000))
+	defer ts.Shutdown()
+
+	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot()
+	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
+
+	test := ValidatorTest{
+		ts:                      ts,
+		validationBlocksPerSlot: validationBlocksPerSlot,
+		epochPerformanceFactors: EpochPerformanceMap{
+			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
+			0: (uint64(validationBlocksPerSlot) * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			1: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			2: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
 		},
 	}
 
@@ -117,17 +139,37 @@ func Test_Validator_UnderIssuance(t *testing.T) {
 	defer ts.Shutdown()
 
 	// Issue less than supposed to.
-	validationBlocksPerSlot := uint64(ts.API.ProtocolParameters().ValidationBlocksPerSlot() - 2)
+	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot() - 2
 	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
 
 	test := ValidatorTest{
 		ts:                      ts,
-		validationBlocksPerSlot: uint8(validationBlocksPerSlot),
+		validationBlocksPerSlot: validationBlocksPerSlot,
 		epochPerformanceFactors: EpochPerformanceMap{
 			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
-			0: (validationBlocksPerSlot * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
-			1: (validationBlocksPerSlot * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
-			2: (validationBlocksPerSlot * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			0: (uint64(validationBlocksPerSlot) * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			1: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			2: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+		},
+	}
+
+	validatorTest(t, test)
+}
+
+func Test_Validator_FixedCostExceedsRewards(t *testing.T) {
+	ts := setupValidatorTestsuite(t, testsuite.WithWalletFixedCost(10_000_000))
+	defer ts.Shutdown()
+
+	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot()
+
+	test := ValidatorTest{
+		ts:                      ts,
+		validationBlocksPerSlot: validationBlocksPerSlot,
+		epochPerformanceFactors: EpochPerformanceMap{
+			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
+			0: 0,
+			1: 0,
+			2: 0,
 		},
 	}
 

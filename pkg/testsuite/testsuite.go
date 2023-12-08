@@ -78,12 +78,19 @@ func DefaultProtocolParameterOptions(networkName string) []options.Option[iotago
 
 type WalletOptions struct {
 	Amount               iotago.BaseToken
+	FixedCost            iotago.Mana
 	BlockIssuanceCredits iotago.BlockIssuanceCredits
 }
 
 func WithWalletAmount(amount iotago.BaseToken) options.Option[WalletOptions] {
 	return func(opts *WalletOptions) {
 		opts.Amount = amount
+	}
+}
+
+func WithWalletFixedCost(fixedCost iotago.Mana) options.Option[WalletOptions] {
+	return func(opts *WalletOptions) {
+		opts.FixedCost = fixedCost
 	}
 }
 
@@ -394,7 +401,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
 			StakedAmount:         walletOptions.Amount,
 			StakingEndEpoch:      iotago.MaxEpochIndex,
-			FixedCost:            iotago.Mana(0),
+			FixedCost:            walletOptions.FixedCost,
 			AccountID:            node.Validator.AccountID,
 		}
 
