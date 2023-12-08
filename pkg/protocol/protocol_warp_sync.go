@@ -291,8 +291,8 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 
 // ProcessRequest processes the given warp sync request.
 func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	w.protocol.processCommitmentRequest(w.workerPool, commitmentID, func(targetEngine *engine.Engine) (err error) {
-		committedSlot, err := targetEngine.CommittedSlot(commitmentID)
+	w.protocol.processCommitmentRequest(w.workerPool, commitmentID, func(engineInstance *engine.Engine) (err error) {
+		committedSlot, err := engineInstance.CommittedSlot(commitmentID)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to load committed slot")
 		}
