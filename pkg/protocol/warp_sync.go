@@ -19,8 +19,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-// WarpSyncProtocol is a subcomponent of the protocol that is responsible for handling warp sync requests and responses.
-type WarpSyncProtocol struct {
+// WarpSync is a subcomponent of the protocol that is responsible for handling warp sync requests and responses.
+type WarpSync struct {
 	// protocol contains a reference to the Protocol instance that this component belongs to.
 	protocol *Protocol
 
@@ -34,9 +34,9 @@ type WarpSyncProtocol struct {
 	log.Logger
 }
 
-// newWarpSyncProtocol creates a new warp sync protocol instance for the given protocol.
-func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
-	c := &WarpSyncProtocol{
+// newWarpSync creates a new warp sync protocol instance for the given protocol.
+func newWarpSync(protocol *Protocol) *WarpSync {
+	c := &WarpSync{
 		Logger:     lo.Return1(protocol.Logger.NewChildLogger("WarpSync")),
 		protocol:   protocol,
 		workerPool: protocol.Workers.CreatePool("WarpSync", workerpool.WithWorkerCount(1)),
@@ -70,7 +70,7 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 }
 
 // SendRequest sends a warp sync request for the given commitment ID to all peers.
-func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
+func (w *WarpSync) SendRequest(commitmentID iotago.CommitmentID) {
 	w.workerPool.Submit(func() {
 		if commitmentMetadata, err := w.protocol.Commitments.Metadata(commitmentID, false); err == nil {
 			w.protocol.Network.SendWarpSyncRequest(commitmentID)
@@ -81,7 +81,7 @@ func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
 }
 
 // SendResponse sends a warp sync response for the given commitment ID to the given peer.
-func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, roots *iotago.Roots, transactionIDs iotago.TransactionIDs, to peer.ID) {
+func (w *WarpSync) SendResponse(commitment *Commitment, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, roots *iotago.Roots, transactionIDs iotago.TransactionIDs, to peer.ID) {
 	w.workerPool.Submit(func() {
 		w.protocol.Network.SendWarpSyncResponse(commitment.ID(), blockIDsBySlotCommitment, roots.TangleProof(), transactionIDs, roots.MutationProof(), to)
 
@@ -90,7 +90,7 @@ func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDsBySlotCo
 }
 
 // ProcessResponse processes the given warp sync response.
-func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
+func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	w.workerPool.Submit(func() {
 		commitmentMetadata, err := w.protocol.Commitments.Metadata(commitmentID)
 		if err != nil {
@@ -290,8 +290,8 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 }
 
 // ProcessRequest processes the given warp sync request.
-func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	submitLoggedRequest(w.workerPool, func() (err error) {
+func (w *WarpSync) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+	loggedWorkerPoolTask(w.workerPool, func() (err error) {
 		slotAPI, err := w.protocol.Commitments.targetEngine(commitmentID).CommittedSlot(commitmentID)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to load slot api")
@@ -319,6 +319,6 @@ func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from
 }
 
 // Shutdown shuts down the warp sync protocol.
-func (w *WarpSyncProtocol) Shutdown() {
+func (w *WarpSync) Shutdown() {
 	w.ticker.Shutdown()
 }

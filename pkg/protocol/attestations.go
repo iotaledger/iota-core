@@ -14,9 +14,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-// AttestationsProtocol is a subcomponent of the protocol that is responsible for handling attestation requests and
-// responses.
-type AttestationsProtocol struct {
+// Attestations is a subcomponent of the protocol that is responsible for handling attestation requests and responses.
+type Attestations struct {
 	// protocol contains a reference to the Protocol instance that this component belongs to.
 	protocol *Protocol
 
@@ -33,9 +32,9 @@ type AttestationsProtocol struct {
 	log.Logger
 }
 
-// newAttestationsProtocol creates a new attestation protocol instance for the given protocol.
-func newAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
-	a := &AttestationsProtocol{
+// newAttestations creates a new attestation protocol instance for the given protocol.
+func newAttestations(protocol *Protocol) *Attestations {
+	a := &Attestations{
 		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Attestations")),
 		protocol:            protocol,
 		workerPool:          protocol.Workers.CreatePool("Attestations"),
@@ -71,7 +70,7 @@ func newAttestationsProtocol(protocol *Protocol) *AttestationsProtocol {
 }
 
 // ProcessResponse processes the given attestation response.
-func (a *AttestationsProtocol) ProcessResponse(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
+func (a *Attestations) ProcessResponse(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	a.workerPool.Submit(func() {
 		commitmentMetadata, _, err := a.protocol.Commitments.publishCommitment(commitment)
 		if err != nil {
@@ -120,8 +119,8 @@ func (a *AttestationsProtocol) ProcessResponse(commitment *model.Commitment, att
 }
 
 // ProcessRequest processes the given attestation request.
-func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	submitLoggedRequest(a.workerPool, func() error {
+func (a *Attestations) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+	loggedWorkerPoolTask(a.workerPool, func() error {
 		slotAPI, err := a.protocol.Commitments.targetEngine(commitmentID).CommittedSlot(commitmentID)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to load committed slot API")
@@ -142,13 +141,13 @@ func (a *AttestationsProtocol) ProcessRequest(commitmentID iotago.CommitmentID, 
 }
 
 // Shutdown shuts down the attestation protocol.
-func (a *AttestationsProtocol) Shutdown() {
+func (a *Attestations) Shutdown() {
 	a.ticker.Shutdown()
 	a.workerPool.Shutdown().ShutdownComplete.Wait()
 }
 
 // setupCommitmentVerifier sets up the commitment verifier for the given chain.
-func (a *AttestationsProtocol) setupCommitmentVerifier(chain *Chain) (shutdown func()) {
+func (a *Attestations) setupCommitmentVerifier(chain *Chain) (shutdown func()) {
 	forkingPoint := chain.ForkingPoint.Get()
 	if forkingPoint == nil {
 		a.LogError("failed to retrieve forking point", "chain", chain.LogName())
@@ -184,7 +183,7 @@ func (a *AttestationsProtocol) setupCommitmentVerifier(chain *Chain) (shutdown f
 }
 
 // sendRequest sends an attestation request for the given commitment ID.
-func (a *AttestationsProtocol) sendRequest(commitmentID iotago.CommitmentID) {
+func (a *Attestations) sendRequest(commitmentID iotago.CommitmentID) {
 	a.workerPool.Submit(func() {
 		if commitmentMetadata, err := a.protocol.Commitments.Metadata(commitmentID, false); err == nil {
 			a.protocol.Network.RequestAttestations(commitmentID)

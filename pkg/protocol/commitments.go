@@ -318,7 +318,7 @@ func (c *Commitments) processResponse(commitment *model.Commitment, from peer.ID
 
 // processRequest processes the given commitment request.
 func (c *Commitments) processRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	submitLoggedRequest(c.workerPool, func() error {
+	loggedWorkerPoolTask(c.workerPool, func() error {
 		commitment, err := c.protocol.Commitments.Commitment(commitmentID)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to load commitment")
