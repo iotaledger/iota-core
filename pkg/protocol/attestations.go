@@ -126,12 +126,7 @@ func (a *Attestations) ProcessRequest(commitmentID iotago.CommitmentID, from pee
 			return ierrors.Wrapf(err, "failed to load committed slot API")
 		}
 
-		commitment, err := slotAPI.Commitment()
-		if err != nil {
-			return ierrors.Wrapf(err, "failed to load commitment")
-		}
-
-		attestations, proof, err := slotAPI.Attestations()
+		commitment, attestations, proof, err := slotAPI.Attestations()
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to load attestations")
 		}
