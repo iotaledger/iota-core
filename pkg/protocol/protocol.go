@@ -154,7 +154,6 @@ func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown
 
 	return func() {
 		p.Blocks.Shutdown()
-		p.Attestations.Shutdown()
 		p.WarpSync.Shutdown()
 		p.Network.Shutdown()
 		p.Workers.WaitChildren()

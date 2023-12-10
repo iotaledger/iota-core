@@ -22,8 +22,8 @@ type Attestations struct {
 	// workerPool contains the worker pool that is used to process attestation requests and responses asynchronously.
 	workerPool *workerpool.WorkerPool
 
-	// ticker contains the ticker that is used to send attestation requests.
-	ticker *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+	// requester contains the ticker that is used to send attestation requests.
+	requester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 
 	// commitmentVerifiers contains the commitment verifiers that are used to verify received attestations.
 	commitmentVerifiers *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *CommitmentVerifier]
@@ -38,32 +38,17 @@ func newAttestations(protocol *Protocol) *Attestations {
 		Logger:              lo.Return1(protocol.Logger.NewChildLogger("Attestations")),
 		protocol:            protocol,
 		workerPool:          protocol.Workers.CreatePool("Attestations"),
-		ticker:              eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.AttestationRequesterOptions...),
+		requester:           eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.AttestationRequesterOptions...),
 		commitmentVerifiers: shrinkingmap.New[iotago.CommitmentID, *CommitmentVerifier](),
 	}
 
-	a.ticker.Events.Tick.Hook(a.sendRequest)
-
 	protocol.Constructed.OnTrigger(func() {
-		protocol.Chains.WithElements(func(chain *Chain) (shutdown func()) {
-			return chain.RequestAttestations.WithNonEmptyValue(func(requestAttestations bool) (shutdown func()) {
-				return a.setupCommitmentVerifier(chain)
-			})
-		})
+		shutdown := lo.Batch(
+			a.initCommitmentVerifiers(),
+			a.initRequester(),
+		)
 
-		protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
-			return commitment.RequestAttestations.OnUpdate(func(_ bool, requestAttestations bool) {
-				if requestAttestations {
-					if commitment.CumulativeWeight() == 0 {
-						commitment.IsAttested.Set(true)
-					} else {
-						a.ticker.StartTicker(commitment.ID())
-					}
-				} else {
-					a.ticker.StopTicker(commitment.ID())
-				}
-			})
-		})
+		protocol.Shutdown.OnTrigger(shutdown)
 	})
 
 	return a
@@ -79,10 +64,42 @@ func (a *Attestations) Get(commitmentID iotago.CommitmentID) (commitment *model.
 	return slotAPI.Attestations()
 }
 
-// Shutdown shuts down the attestation protocol.
-func (a *Attestations) Shutdown() {
-	a.ticker.Shutdown()
-	a.workerPool.Shutdown().ShutdownComplete.Wait()
+// initCommitmentVerifiers initializes the commitment verifiers for all chains (once they are required).
+func (a *Attestations) initCommitmentVerifiers() func() {
+	return a.protocol.Chains.WithElements(func(chain *Chain) (shutdown func()) {
+		return chain.RequestAttestations.WithNonEmptyValue(func(requestAttestations bool) (shutdown func()) {
+			return a.setupCommitmentVerifier(chain)
+		})
+	})
+}
+
+// initRequester initializes the ticker that is used to send commitment requests.
+func (a *Attestations) initRequester() (shutdown func()) {
+	unsubscribeFromTicker := lo.Batch(
+		a.protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
+			return commitment.RequestAttestations.WithNonEmptyValue(func(_ bool) (teardown func()) {
+				if commitment.CumulativeWeight() == 0 {
+					commitment.IsAttested.Set(true)
+
+					return nil
+				}
+
+				a.requester.StartTicker(commitment.ID())
+
+				return func() {
+					a.requester.StopTicker(commitment.ID())
+				}
+			})
+		}),
+
+		a.requester.Events.Tick.Hook(a.sendRequest).Unhook,
+	)
+
+	return func() {
+		unsubscribeFromTicker()
+
+		a.requester.Shutdown()
+	}
 }
 
 // setupCommitmentVerifier sets up the commitment verifier for the given chain.
