@@ -72,11 +72,9 @@ func newWarpSync(protocol *Protocol) *WarpSync {
 // SendRequest sends a warp sync request for the given commitment ID to all peers.
 func (w *WarpSync) SendRequest(commitmentID iotago.CommitmentID) {
 	w.workerPool.Submit(func() {
-		if commitmentMetadata, err := w.protocol.Commitments.Metadata(commitmentID, false); err == nil {
-			w.protocol.Network.SendWarpSyncRequest(commitmentID)
+		w.protocol.Network.SendWarpSyncRequest(commitmentID)
 
-			w.LogDebug("request", "commitment", commitmentMetadata.LogName())
-		}
+		w.LogDebug("request", "commitmentID", commitmentID)
 	})
 }
 
@@ -92,7 +90,7 @@ func (w *WarpSync) SendResponse(commitment *Commitment, blockIDsBySlotCommitment
 // ProcessResponse processes the given warp sync response.
 func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	w.workerPool.Submit(func() {
-		commitmentMetadata, err := w.protocol.Commitments.Metadata(commitmentID)
+		commitment, err := w.protocol.Commitments.Get(commitmentID)
 		if err != nil {
 			if !ierrors.Is(err, ErrorCommitmentNotFound) {
 				w.LogError("failed to load commitment for response", "commitmentID", commitmentID, "fromPeer", from, "err", err)
@@ -103,9 +101,9 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsByS
 			return
 		}
 
-		chain := commitmentMetadata.Chain.Get()
+		chain := commitment.Chain.Get()
 		if chain == nil {
-			w.LogTrace("failed to get chain for response", "commitment", commitmentMetadata.LogName(), "fromPeer", from)
+			w.LogTrace("failed to get chain for response", "commitment", commitment.LogName(), "fromPeer", from)
 
 			return
 		}
@@ -116,16 +114,16 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsByS
 			return
 		}
 
-		targetEngine := commitmentMetadata.TargetEngine()
+		targetEngine := commitment.TargetEngine()
 		if targetEngine == nil {
-			w.LogDebug("failed to get target engine for response", "commitment", commitmentMetadata.LogName())
+			w.LogDebug("failed to get target engine for response", "commitment", commitment.LogName())
 
 			return
 		}
 
-		commitmentMetadata.BlocksToWarpSync.Compute(func(blocksToWarpSync ds.Set[iotago.BlockID]) ds.Set[iotago.BlockID] {
-			if blocksToWarpSync != nil || !commitmentMetadata.WarpSyncBlocks.Get() {
-				w.LogTrace("response for already synced commitment", "commitment", commitmentMetadata.LogName(), "fromPeer", from)
+		commitment.BlocksToWarpSync.Compute(func(blocksToWarpSync ds.Set[iotago.BlockID]) ds.Set[iotago.BlockID] {
+			if blocksToWarpSync != nil || !commitment.WarpSyncBlocks.Get() {
+				w.LogTrace("response for already synced commitment", "commitment", commitment.LogName(), "fromPeer", from)
 
 				return blocksToWarpSync
 			}
@@ -140,8 +138,8 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsByS
 				}
 			}
 
-			if !iotago.VerifyProof(proof, acceptedBlocks.Root(), commitmentMetadata.RootsID()) {
-				w.LogError("failed to verify blocks proof", "commitment", commitmentMetadata.LogName(), "blockIDs", blockIDsBySlotCommitment, "proof", proof, "fromPeer", from)
+			if !iotago.VerifyProof(proof, acceptedBlocks.Root(), commitment.RootsID()) {
+				w.LogError("failed to verify blocks proof", "commitment", commitment.LogName(), "blockIDs", blockIDsBySlotCommitment, "proof", proof, "fromPeer", from)
 
 				return blocksToWarpSync
 			}
@@ -151,8 +149,8 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsByS
 				_ = acceptedTransactionIDs.Add(transactionID) // a mapdb can never return an error
 			}
 
-			if !iotago.VerifyProof(mutationProof, acceptedTransactionIDs.Root(), commitmentMetadata.RootsID()) {
-				w.LogError("failed to verify mutations proof", "commitment", commitmentMetadata.LogName(), "transactionIDs", transactionIDs, "proof", mutationProof, "fromPeer", from)
+			if !iotago.VerifyProof(mutationProof, acceptedTransactionIDs.Root(), commitment.RootsID()) {
+				w.LogError("failed to verify mutations proof", "commitment", commitment.LogName(), "transactionIDs", transactionIDs, "proof", mutationProof, "fromPeer", from)
 
 				return blocksToWarpSync
 			}
@@ -233,7 +231,7 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsByS
 
 			// Once all blocks are fully booked we can mark the commitment that is minCommittableAge older as this
 			// commitment to be committable.
-			commitmentMetadata.IsSynced.OnUpdateOnce(func(_ bool, _ bool) {
+			commitment.IsSynced.OnUpdateOnce(func(_ bool, _ bool) {
 				// update the flag in a worker since it can potentially cause a commit
 				w.workerPool.Submit(func() {
 					if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - targetEngine.LatestAPI().ProtocolParameters().MinCommittableAge()); exists {
@@ -243,16 +241,16 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsByS
 			})
 
 			// force commit one by one and wait for the parent to be verified before we commit the next one
-			commitmentMetadata.Parent.WithNonEmptyValue(func(parent *Commitment) (teardown func()) {
+			commitment.Parent.WithNonEmptyValue(func(parent *Commitment) (teardown func()) {
 				return parent.IsVerified.WithNonEmptyValue(func(_ bool) (teardown func()) {
-					return commitmentMetadata.IsCommittable.OnTrigger(commitmentFunc)
+					return commitment.IsCommittable.OnTrigger(commitmentFunc)
 				})
 			})
 
 			if totalBlocks == 0 {
 				// mark empty slots as committable and synced
-				commitmentMetadata.IsCommittable.Set(true)
-				commitmentMetadata.IsSynced.Set(true)
+				commitment.IsCommittable.Set(true)
+				commitment.IsSynced.Set(true)
 
 				return blocksToWarpSync
 			}
@@ -277,12 +275,12 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsByS
 							return
 						}
 
-						commitmentMetadata.IsSynced.Set(true)
+						commitment.IsSynced.Set(true)
 					})
 				}
 			}
 
-			w.LogDebug("received response", "commitment", commitmentMetadata.LogName())
+			w.LogDebug("received response", "commitment", commitment.LogName())
 
 			return blocksToWarpSync
 		})

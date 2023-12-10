@@ -69,70 +69,14 @@ func newAttestations(protocol *Protocol) *Attestations {
 	return a
 }
 
-// ProcessResponse processes the given attestation response.
-func (a *Attestations) ProcessResponse(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
-	a.workerPool.Submit(func() {
-		commitmentMetadata, _, err := a.protocol.Commitments.publishCommitment(commitment)
-		if err != nil {
-			a.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitment.ID(), "peer", from, "error", err)
+// Get returns the commitment, and its attestations (including the corresponding merkle proof).
+func (a *Attestations) Get(commitmentID iotago.CommitmentID) (commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], err error) {
+	slotAPI, err := a.protocol.Commitments.targetEngine(commitmentID).CommittedSlot(commitmentID)
+	if err != nil {
+		return nil, nil, nil, ierrors.Wrapf(err, "failed to load committed slot API")
+	}
 
-			return
-		}
-
-		if commitmentMetadata.AttestedWeight.Compute(func(currentWeight uint64) uint64 {
-			if !commitmentMetadata.RequestAttestations.Get() {
-				a.LogTrace("received attestations for previously attested commitment", "commitment", commitmentMetadata.LogName())
-
-				return currentWeight
-			}
-
-			chain := commitmentMetadata.Chain.Get()
-			if chain == nil {
-				a.LogDebug("failed to find chain for commitment when processing attestations", "commitment", commitmentMetadata.LogName())
-
-				return currentWeight
-			}
-
-			commitmentVerifier, exists := a.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
-			if !exists || commitmentVerifier == nil {
-				a.LogDebug("failed to retrieve commitment verifier", "commitment", commitmentMetadata.LogName())
-
-				return currentWeight
-			}
-
-			_, actualWeight, err := commitmentVerifier.verifyCommitment(commitmentMetadata, attestations, merkleProof)
-			if err != nil {
-				a.LogError("failed to verify commitment", "commitment", commitmentMetadata.LogName(), "error", err)
-
-				return currentWeight
-			}
-
-			if actualWeight > currentWeight {
-				a.LogDebug("received response", "commitment", commitmentMetadata.LogName(), "fromPeer", from)
-			}
-
-			return actualWeight
-		}) > 0 {
-			commitmentMetadata.IsAttested.Set(true)
-		}
-	})
-}
-
-// ProcessRequest processes the given attestation request.
-func (a *Attestations) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	loggedWorkerPoolTask(a.workerPool, func() error {
-		slotAPI, err := a.protocol.Commitments.targetEngine(commitmentID).CommittedSlot(commitmentID)
-		if err != nil {
-			return ierrors.Wrapf(err, "failed to load committed slot API")
-		}
-
-		commitment, attestations, proof, err := slotAPI.Attestations()
-		if err != nil {
-			return ierrors.Wrapf(err, "failed to load attestations")
-		}
-
-		return a.protocol.Network.SendAttestations(commitment, attestations, proof, from)
-	}, a, "commitmentID", commitmentID, "fromPeer", from)
+	return slotAPI.Attestations()
 }
 
 // Shutdown shuts down the attestation protocol.
@@ -180,12 +124,73 @@ func (a *Attestations) setupCommitmentVerifier(chain *Chain) (shutdown func()) {
 // sendRequest sends an attestation request for the given commitment ID.
 func (a *Attestations) sendRequest(commitmentID iotago.CommitmentID) {
 	a.workerPool.Submit(func() {
-		if commitmentMetadata, err := a.protocol.Commitments.Metadata(commitmentID, false); err == nil {
+		if commitment, err := a.protocol.Commitments.Get(commitmentID, false); err == nil {
 			a.protocol.Network.RequestAttestations(commitmentID)
 
-			a.LogDebug("request", "commitment", commitmentMetadata.LogName())
+			a.LogDebug("request", "commitment", commitment.LogName())
 		} else {
 			a.LogError("failed to load commitment", "commitmentID", commitmentID, "err", err)
 		}
 	})
+}
+
+// processResponse processes the given attestation response.
+func (a *Attestations) processResponse(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
+	a.workerPool.Submit(func() {
+		publishedCommitment, _, err := a.protocol.Commitments.publishCommitment(commitment)
+		if err != nil {
+			a.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitment.ID(), "peer", from, "error", err)
+
+			return
+		}
+
+		if publishedCommitment.AttestedWeight.Compute(func(currentWeight uint64) uint64 {
+			if !publishedCommitment.RequestAttestations.Get() {
+				a.LogTrace("received attestations for previously attested commitment", "commitment", publishedCommitment.LogName())
+
+				return currentWeight
+			}
+
+			chain := publishedCommitment.Chain.Get()
+			if chain == nil {
+				a.LogDebug("failed to find chain for commitment when processing attestations", "commitment", publishedCommitment.LogName())
+
+				return currentWeight
+			}
+
+			commitmentVerifier, exists := a.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
+			if !exists || commitmentVerifier == nil {
+				a.LogDebug("failed to retrieve commitment verifier", "commitment", publishedCommitment.LogName())
+
+				return currentWeight
+			}
+
+			_, actualWeight, err := commitmentVerifier.verifyCommitment(publishedCommitment, attestations, merkleProof)
+			if err != nil {
+				a.LogError("failed to verify commitment", "commitment", publishedCommitment.LogName(), "error", err)
+
+				return currentWeight
+			}
+
+			if actualWeight > currentWeight {
+				a.LogDebug("received response", "commitment", publishedCommitment.LogName(), "fromPeer", from)
+			}
+
+			return actualWeight
+		}) > 0 {
+			publishedCommitment.IsAttested.Set(true)
+		}
+	})
+}
+
+// processRequest processes the given attestation request.
+func (a *Attestations) processRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+	loggedWorkerPoolTask(a.workerPool, func() error {
+		commitment, attestations, proof, err := a.Get(commitmentID)
+		if err != nil {
+			return ierrors.Wrap(err, "failed to load attestations")
+		}
+
+		return a.protocol.Network.SendAttestations(commitment, attestations, proof, from)
+	}, a, "commitmentID", commitmentID, "fromPeer", from)
 }

@@ -192,8 +192,8 @@ func (p *Protocol) initNetwork() (shutdown func()) {
 		p.Network.OnBlockRequestReceived(p.Blocks.ProcessRequest),
 		p.Network.OnCommitmentReceived(p.Commitments.processResponse),
 		p.Network.OnCommitmentRequestReceived(p.Commitments.processRequest),
-		p.Network.OnAttestationsReceived(p.Attestations.ProcessResponse),
-		p.Network.OnAttestationsRequestReceived(p.Attestations.ProcessRequest),
+		p.Network.OnAttestationsReceived(p.Attestations.processResponse),
+		p.Network.OnAttestationsRequestReceived(p.Attestations.processRequest),
 		p.Network.OnWarpSyncResponseReceived(p.WarpSync.ProcessResponse),
 		p.Network.OnWarpSyncRequestReceived(p.WarpSync.ProcessRequest),
 	)

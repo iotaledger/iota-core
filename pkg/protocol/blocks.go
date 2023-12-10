@@ -87,7 +87,7 @@ func (b *Blocks) SendResponse(block *model.Block) {
 func (b *Blocks) ProcessResponse(block *model.Block, from peer.ID) {
 	b.workerPool.Submit(func() {
 		// abort if the commitment belongs to an evicted slot
-		commitmentMetadata, err := b.protocol.Commitments.Metadata(block.ProtocolBlock().Header.SlotCommitmentID, true)
+		commitment, err := b.protocol.Commitments.Get(block.ProtocolBlock().Header.SlotCommitmentID, true)
 		if err != nil && ierrors.Is(ErrorSlotEvicted, err) {
 			b.LogError("dropped block referencing unsolidifiable commitment", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID(), "err", err)
 
@@ -95,7 +95,7 @@ func (b *Blocks) ProcessResponse(block *model.Block, from peer.ID) {
 		}
 
 		// add the block to the dropped blocks buffer if we could not dispatch it to the chain
-		if commitmentMetadata == nil || !commitmentMetadata.Chain.Get().DispatchBlock(block, from) {
+		if commitment == nil || !commitment.Chain.Get().DispatchBlock(block, from) {
 			if !b.droppedBlocksBuffer.Add(block.ProtocolBlock().Header.SlotCommitmentID, types.NewTuple(block, from)) {
 				b.LogError("failed to add dropped block referencing unsolid commitment to dropped blocks buffer", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID())
 			} else {
@@ -105,7 +105,7 @@ func (b *Blocks) ProcessResponse(block *model.Block, from peer.ID) {
 			return
 		}
 
-		b.LogTrace("received block", "blockID", block.ID(), "commitment", commitmentMetadata.LogName())
+		b.LogTrace("received block", "blockID", block.ID(), "commitment", commitment.LogName())
 	})
 }
 
