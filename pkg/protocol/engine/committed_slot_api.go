@@ -8,8 +8,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-// CommittedSlotAPI is a wrapper for the Engine that provides access to the data of a committed slot.
-type CommittedSlotAPI struct {
+// CommitmentAPI is a wrapper for the Engine that provides access to the data of a committed slot.
+type CommitmentAPI struct {
 	// engine is the Engine that is used to access the data.
 	engine *Engine
 
@@ -17,16 +17,16 @@ type CommittedSlotAPI struct {
 	CommitmentID iotago.CommitmentID
 }
 
-// NewCommittedSlotAPI creates a new CommittedSlotAPI.
-func NewCommittedSlotAPI(engine *Engine, commitmentID iotago.CommitmentID) *CommittedSlotAPI {
-	return &CommittedSlotAPI{
+// NewCommittedSlotAPI creates a new CommitmentAPI.
+func NewCommittedSlotAPI(engine *Engine, commitmentID iotago.CommitmentID) *CommitmentAPI {
+	return &CommitmentAPI{
 		engine:       engine,
 		CommitmentID: commitmentID,
 	}
 }
 
 // Commitment returns the commitment of the slot.
-func (c *CommittedSlotAPI) Commitment() (commitment *model.Commitment, err error) {
+func (c *CommitmentAPI) Commitment() (commitment *model.Commitment, err error) {
 	if commitment, err = c.engine.Storage.Commitments().Load(c.CommitmentID.Slot()); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to load commitment for slot %d", c.CommitmentID)
 	}
@@ -39,7 +39,7 @@ func (c *CommittedSlotAPI) Commitment() (commitment *model.Commitment, err error
 }
 
 // Attestations returns the commitment, attestations and the merkle proof of the slot.
-func (c *CommittedSlotAPI) Attestations() (commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], err error) {
+func (c *CommitmentAPI) Attestations() (commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], err error) {
 	commitment, err = c.Commitment()
 	if err != nil {
 		return nil, nil, nil, ierrors.Wrap(err, "failed to load commitment")
@@ -65,7 +65,7 @@ func (c *CommittedSlotAPI) Attestations() (commitment *model.Commitment, attesta
 }
 
 // Roots returns the roots of the slot.
-func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
+func (c *CommitmentAPI) Roots() (committedRoots *iotago.Roots, err error) {
 	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
 		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
@@ -86,7 +86,7 @@ func (c *CommittedSlotAPI) Roots() (committedRoots *iotago.Roots, err error) {
 }
 
 // BlocksIDsBySlotCommitmentID returns the accepted block IDs of the slot grouped by their SlotCommitmentID.
-func (c *CommittedSlotAPI) BlocksIDsBySlotCommitmentID() (map[iotago.CommitmentID]iotago.BlockIDs, error) {
+func (c *CommitmentAPI) BlocksIDsBySlotCommitmentID() (map[iotago.CommitmentID]iotago.BlockIDs, error) {
 	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
 		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
@@ -107,7 +107,7 @@ func (c *CommittedSlotAPI) BlocksIDsBySlotCommitmentID() (map[iotago.CommitmentI
 	return blockIDsBySlotCommitmentID, nil
 }
 
-func (c *CommittedSlotAPI) TransactionIDs() (iotago.TransactionIDs, error) {
+func (c *CommitmentAPI) TransactionIDs() (iotago.TransactionIDs, error) {
 	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
 		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}

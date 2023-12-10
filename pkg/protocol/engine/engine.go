@@ -325,8 +325,8 @@ func (e *Engine) LatestAPI() iotago.API {
 	return e.Storage.Settings().APIProvider().LatestAPI()
 }
 
-// CommittedSlot returns the committed slot for the given slot index.
-func (e *Engine) CommittedSlot(commitmentID iotago.CommitmentID) (*CommittedSlotAPI, error) {
+// CommitmentAPI returns the committed slot for the given slot index.
+func (e *Engine) CommitmentAPI(commitmentID iotago.CommitmentID) (*CommitmentAPI, error) {
 	if e == nil {
 		return nil, ierrors.New("engine is nil")
 	}

@@ -82,6 +82,21 @@ func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...
 	return cachedRequest.Result(), cachedRequest.Err()
 }
 
+// API returns the API for the given commitmentID. If the Commitment is not available, it will return
+// ErrorCommitmentNotFound.
+func (c *Commitments) API(commitmentID iotago.CommitmentID) (*engine.CommitmentAPI, error) {
+	if commitmentID.Slot() <= c.Root.Get().Slot() {
+		return c.protocol.Engines.Main.Get().CommitmentAPI(commitmentID)
+	}
+
+	commitment, err := c.Get(commitmentID)
+	if err != nil {
+		return nil, err
+	}
+
+	return commitment.TargetEngine().CommitmentAPI(commitmentID)
+}
+
 // initLogger initializes the logger for this component.
 func (c *Commitments) initLogger() (shutdown func()) {
 	c.Logger, shutdown = c.protocol.NewChildLogger("Commitments")
@@ -307,12 +322,12 @@ func (c *Commitments) processRequest(commitmentID iotago.CommitmentID, from peer
 			return nil, ierrors.Wrap(err, "failed to load commitment metadata")
 		}
 
-		slotAPI, err := c.protocol.Engines.Main.Get().CommittedSlot(commitmentID)
+		commitmentAPI, err := c.protocol.Engines.Main.Get().CommitmentAPI(commitmentID)
 		if err != nil {
 			return nil, ierrors.Wrap(err, "failed to load engine API")
 		}
 
-		return slotAPI.Commitment()
+		return commitmentAPI.Commitment()
 	}
 
 	loggedWorkerPoolTask(c.workerPool, func() error {
@@ -325,20 +340,4 @@ func (c *Commitments) processRequest(commitmentID iotago.CommitmentID, from peer
 
 		return nil
 	}, c, "commitmentID", commitmentID, "fromPeer", from)
-}
-
-// targetEngine returns the engine that manages the data for the given commitment (or nil if no engine was found while
-// commitment IDs below the Root are always resolved against the main engine).
-func (c *Commitments) targetEngine(commitmentID iotago.CommitmentID) *engine.Engine {
-	if commitmentID.Slot() <= c.Root.Get().Slot() {
-		return c.protocol.Engines.Main.Get()
-	}
-
-	if commitment, err := c.Get(commitmentID); err == nil {
-		return commitment.TargetEngine()
-	} else if !ierrors.Is(err, ErrorCommitmentNotFound) {
-		c.LogDebug("failed to retrieve commitment", "commitmentID", commitmentID, "err", err)
-	}
-
-	return nil
 }

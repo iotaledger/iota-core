@@ -290,22 +290,22 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsByS
 // ProcessRequest processes the given warp sync request.
 func (w *WarpSync) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	loggedWorkerPoolTask(w.workerPool, func() (err error) {
-		slotAPI, err := w.protocol.Commitments.targetEngine(commitmentID).CommittedSlot(commitmentID)
+		commitmentAPI, err := w.protocol.Commitments.API(commitmentID)
 		if err != nil {
 			return ierrors.Wrap(err, "failed to load slot api")
 		}
 
-		blockIDsBySlotCommitment, err := slotAPI.BlocksIDsBySlotCommitmentID()
+		blockIDsBySlotCommitment, err := commitmentAPI.BlocksIDsBySlotCommitmentID()
 		if err != nil {
 			return ierrors.Wrap(err, "failed to get block ids")
 		}
 
-		roots, err := slotAPI.Roots()
+		roots, err := commitmentAPI.Roots()
 		if err != nil {
 			return ierrors.Wrap(err, "failed to get roots")
 		}
 
-		transactionIDs, err := slotAPI.TransactionIDs()
+		transactionIDs, err := commitmentAPI.TransactionIDs()
 		if err != nil {
 			return ierrors.Wrap(err, "failed to get transaction ids")
 		}

@@ -56,12 +56,12 @@ func newAttestations(protocol *Protocol) *Attestations {
 
 // Get returns the commitment, and its attestations (including the corresponding merkle proof).
 func (a *Attestations) Get(commitmentID iotago.CommitmentID) (commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], err error) {
-	slotAPI, err := a.protocol.Commitments.targetEngine(commitmentID).CommittedSlot(commitmentID)
+	commitmentAPI, err := a.protocol.Commitments.API(commitmentID)
 	if err != nil {
 		return nil, nil, nil, ierrors.Wrapf(err, "failed to load committed slot API")
 	}
 
-	return slotAPI.Attestations()
+	return commitmentAPI.Attestations()
 }
 
 // initCommitmentVerifiers initializes the commitment verifiers for all chains (once they are required).
