@@ -4,12 +4,13 @@ package tests
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -23,7 +24,9 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
+	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
+	"github.com/iotaledger/iota.go/v4/tpkg"
 	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
@@ -60,21 +63,26 @@ type DockerTestFramework struct {
 
 	snapshotPath     string
 	logDirectoryPath string
+	seed             [32]byte
+	latestUsedIndex  atomic.Uint32
 
 	optsProtocolParameterOptions []options.Option[iotago.V3ProtocolParameters]
 	optsSnapshotOptions          []options.Option[snapshotcreator.Options]
 	optsWaitForSync              time.Duration
 	optsWaitFor                  time.Duration
 	optsTick                     time.Duration
+	optsFaucetURL                string
 }
 
 func NewDockerTestFramework(t *testing.T, opts ...options.Option[DockerTestFramework]) *DockerTestFramework {
 	return options.Apply(&DockerTestFramework{
 		Testing:         t,
 		nodes:           make(map[string]*Node),
+		seed:            tpkg.RandEd25519Seed(),
 		optsWaitForSync: 5 * time.Minute,
 		optsWaitFor:     2 * time.Minute,
 		optsTick:        5 * time.Second,
+		optsFaucetURL:   "http://localhost:8088",
 	}, opts, func(d *DockerTestFramework) {
 		d.optsProtocolParameterOptions = append(DefaultProtocolParametersOptions, d.optsProtocolParameterOptions...)
 		protocolParams := iotago.NewV3SnapshotProtocolParameters(d.optsProtocolParameterOptions...)
@@ -259,6 +267,126 @@ func (d *DockerTestFramework) StartIssueCandidacyPayload(nodes ...*Node) {
 	}
 }
 
+func (d *DockerTestFramework) CreateAndStakeAccount() *iotago.AccountAddress {
+	// request faucet funds
+	ctx := context.TODO()
+	receiverAddr, implicitPrivateKey := d.getAddress(iotago.AddressImplicitAccountCreation)
+	implicitOutputID, implicitAccountOutput := d.RequestFaucetFunds(ctx, receiverAddr)
+
+	accountID := iotago.AccountIDFromOutputID(implicitOutputID)
+	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
+	require.True(d.Testing, ok)
+
+	// make sure implicit account is committed
+	d.CheckAccountStatus(ctx, iotago.EmptyBlockID, implicitOutputID.TransactionID(), implicitOutputID, accountAddress)
+
+	// transition to full account with new Ed25519 address and staking feature
+	accEd25519Addr, accPrivateKey := d.getAddress(iotago.AddressEd25519)
+	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(accPrivateKey.Public().(ed25519.PublicKey))
+	accountOutput := builder.NewAccountOutputBuilder(accEd25519Addr, implicitAccountOutput.BaseTokenAmount()).
+		AccountID(accountID).
+		BlockIssuer(iotago.NewBlockIssuerKeys(accBlockIssuerKey), iotago.MaxSlotIndex).
+		Staking(implicitAccountOutput.BaseTokenAmount(), 1, 1).
+		MustBuild()
+
+	clt := d.Node("V1").Client
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	txBuilder := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: receiverAddr,
+			InputID:      implicitOutputID,
+			Input:        implicitAccountOutput,
+		}).
+		AddOutput(accountOutput).
+		SetCreationSlot(currentSlot).
+		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: accountID}).
+		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
+		AllotAllMana(currentSlot, accountID)
+
+	implicitAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForImplicitAccountCreationAddress(receiverAddr.(*iotago.ImplicitAccountCreationAddress), implicitPrivateKey))
+	signedTx, err := txBuilder.Build(implicitAddrSigner)
+	require.NoError(d.Testing, err)
+
+	// submit block to inx-blockIssuer
+	blkIssuerClt, err := clt.BlockIssuer(ctx)
+	require.NoError(d.Testing, err)
+
+	resp, err := blkIssuerClt.SendPayload(ctx, signedTx, issuerResp.LatestCommitment.MustID())
+	require.NoError(d.Testing, err)
+	fmt.Printf("send account staking in block %s of account %s\n\n", resp.BlockID.ToHex(), accountID.String())
+
+	// check if the account is committed
+	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	d.CheckAccountStatus(ctx, resp.BlockID, lo.PanicOnErr(signedTx.Transaction.ID()), accOutputID, accountAddress, true)
+
+	return accountAddress
+}
+
+func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iotago.BlockID, txID iotago.TransactionID, creationOutputID iotago.OutputID, accountAddress *iotago.AccountAddress, checkIndexer ...bool) {
+	// request by blockID if provided, otherwise use txID
+	// we take the slot from the blockID in case the tx is created earlier than the block.
+	clt := d.Node("V1").Client
+	slot := blkID.Slot()
+
+	if blkID == iotago.EmptyBlockID {
+		blkMetadata, err := clt.TransactionIncludedBlockMetadata(ctx, txID)
+		require.NoError(d.Testing, err)
+
+		blkID = blkMetadata.BlockID
+		slot = blkMetadata.BlockID.Slot()
+	}
+
+	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+
+	// wait for the account to be committed
+	d.AwaitCommitment(slot)
+
+	// Check the indexer
+	if len(checkIndexer) > 0 && checkIndexer[0] {
+		indexerClt, err := d.Node("V1").Client.Indexer(ctx)
+		require.NoError(d.Testing, err)
+
+		outputID, accountOutput, _, err := indexerClt.Account(ctx, accountAddress)
+		require.NoError(d.Testing, err)
+
+		fmt.Printf("Indexer returned: outputID %s, account %s, slot %d", outputID.String(), accountOutput.AccountID.ToAddress().Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), slot)
+	}
+
+	// check if the creation output exists
+	_, err := clt.OutputByID(ctx, creationOutputID)
+	require.NoError(d.Testing, err)
+
+	fmt.Printf("Account created, Bech addr: %s, slot: %d\n", accountAddress.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), slot)
+}
+
+func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, receiveAddr iotago.Address) (iotago.OutputID, iotago.Output) {
+	d.SendFaucetRequest(ctx, receiveAddr)
+
+	outputID, output, err := d.AwaitAddressUnspentOutputAccepted(ctx, receiveAddr)
+	require.NoError(d.Testing, err)
+
+	return outputID, output
+}
+
+func (d *DockerTestFramework) AssertValidatorExists(accountAddr *iotago.AccountAddress) {
+	d.Eventually(func() error {
+		for _, node := range d.nodes {
+			_, err := node.Client.StakingAccount(context.TODO(), accountAddr)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, expectedCommitteeMember []string) {
 	fmt.Println("Wait for committee selection..., expected epoch: ", expectedEpoch, ", expected committee size: ", len(expectedCommitteeMember))
 	defer fmt.Println("Wait for committee selection......done")
@@ -370,64 +498,4 @@ func (d *DockerTestFramework) GetContainersConfigs() {
 		node.ContainerConfigs = configs
 		d.nodes[node.Name] = node
 	}
-}
-
-// Eventually asserts that given condition will be met in opts.waitFor time,
-// periodically checking target function each opts.tick.
-//
-//	assert.Eventually(t, func() bool { return true; }, time.Second, 10*time.Millisecond)
-func (d *DockerTestFramework) Eventually(condition func() error, waitForSync ...bool) {
-	ch := make(chan error, 1)
-
-	deadline := d.optsWaitFor
-	if len(waitForSync) > 0 && waitForSync[0] {
-		deadline = d.optsWaitForSync
-	}
-
-	timer := time.NewTimer(deadline)
-	defer timer.Stop()
-
-	ticker := time.NewTicker(d.optsTick)
-	defer ticker.Stop()
-
-	var lastErr error
-	for tick := ticker.C; ; {
-		select {
-		case <-timer.C:
-			require.FailNow(d.Testing, "condition never satisfied", lastErr)
-		case <-tick:
-			tick = nil
-			go func() { ch <- condition() }()
-		case lastErr = <-ch:
-			// The condition is satisfied, we can exit.
-			if lastErr == nil {
-				return
-			}
-			tick = ticker.C
-		}
-	}
-}
-
-// /////////////////////////////
-
-func createLogDirectory(testName string) string {
-	// make sure logs/ exists
-	err := os.Mkdir("logs", 0755)
-	if err != nil {
-		if !os.IsExist(err) {
-			panic(err)
-		}
-	}
-
-	// create directory for this run
-	timestamp := time.Now().Format("20060102_150405")
-	dir := fmt.Sprintf("logs/%s-%s", timestamp, testName)
-	err = os.Mkdir(dir, 0755)
-	if err != nil {
-		if !os.IsExist(err) {
-			panic(err)
-		}
-	}
-
-	return dir
 }
