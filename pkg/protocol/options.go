@@ -51,10 +51,6 @@ type Options struct {
 	// SnapshotPath is the path to the snapshot file that should be used to initialize the protocol.
 	SnapshotPath string
 
-	// ChainSwitchingThreshold is the threshold that defines how far away a heavier chain needs to be from its forking
-	// point to be considered for switching.
-	ChainSwitchingThreshold iotago.SlotIndex
-
 	// EngineOptions contains the options for the Engines.
 	EngineOptions []options.Option[engine.Engine]
 
@@ -120,8 +116,7 @@ type Options struct {
 // NewDefaultOptions creates new default options instance for the Protocol.
 func NewDefaultOptions() *Options {
 	return &Options{
-		BaseDirectory:           "",
-		ChainSwitchingThreshold: 3,
+		BaseDirectory: "",
 
 		PreSolidFilterProvider:      presolidblockfilter.NewProvider(),
 		PostSolidFilterProvider:     postsolidblockfilter.NewProvider(),
@@ -154,13 +149,6 @@ func WithBaseDirectory(baseDirectory string) options.Option[Protocol] {
 func WithSnapshotPath(snapshot string) options.Option[Protocol] {
 	return func(p *Protocol) {
 		p.Options.SnapshotPath = snapshot
-	}
-}
-
-// WithChainSwitchingThreshold is an option for the Protocol that allows to set the chain switching threshold.
-func WithChainSwitchingThreshold(threshold iotago.SlotIndex) options.Option[Protocol] {
-	return func(p *Protocol) {
-		p.Options.ChainSwitchingThreshold = threshold
 	}
 }
 

@@ -38,7 +38,7 @@ type TestSuite struct {
 }
 
 func NewTestSuite(test *testing.T) *TestSuite {
-	testAPI := tpkg.TestAPI
+	testAPI := tpkg.ZeroCostTestAPI
 
 	t := &TestSuite{
 		T:               test,
@@ -65,7 +65,7 @@ func (t *TestSuite) initAccountLedger() *accountsledger.Manager {
 			prunableStores[slot] = mapdb.NewMapDB()
 		}
 
-		p := slotstore.NewAccountDiffs(slot, prunableStores[slot], tpkg.TestAPI)
+		p := slotstore.NewAccountDiffs(slot, prunableStores[slot], tpkg.ZeroCostTestAPI)
 
 		return p, nil
 	}
@@ -187,8 +187,8 @@ func (t *TestSuite) ApplySlotActions(slot iotago.SlotIndex, rmc iotago.Mana, act
 }
 
 func (t *TestSuite) createBlockWithRMC(accountID iotago.AccountID, slot iotago.SlotIndex, rmc iotago.Mana) *blocks.Block {
-	innerBlock := tpkg.RandBasicBlockWithIssuerAndRMC(tpkg.TestAPI, accountID, rmc)
-	innerBlock.Header.IssuingTime = tpkg.TestAPI.TimeProvider().SlotStartTime(slot)
+	innerBlock := tpkg.RandBasicBlockWithIssuerAndRMC(tpkg.ZeroCostTestAPI, accountID, rmc)
+	innerBlock.Header.IssuingTime = tpkg.ZeroCostTestAPI.TimeProvider().SlotStartTime(slot)
 	modelBlock, err := model.BlockFromBlock(innerBlock)
 
 	require.NoError(t.T, err)

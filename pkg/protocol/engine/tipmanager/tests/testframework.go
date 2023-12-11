@@ -34,7 +34,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		tipMetadataByAlias: make(map[string]tipmanager.TipMetadata),
 		blocksByID:         make(map[iotago.BlockID]*blocks.Block),
 		test:               test,
-		API:                tpkg.TestAPI,
+		API:                tpkg.ZeroCostTestAPI,
 	}
 
 	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID

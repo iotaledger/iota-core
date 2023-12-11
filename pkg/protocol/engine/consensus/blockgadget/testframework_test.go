@@ -42,7 +42,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		T:      test,
 		blocks: shrinkingmap.New[string, *blocks.Block](),
 
-		SeatManager: mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.TestAPI), epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)),
+		SeatManager: mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)),
 	}
 
 	evictionState := eviction.NewState(mapdb.NewMapDB(), func(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
@@ -53,10 +53,10 @@ func NewTestFramework(test *testing.T) *TestFramework {
 			iotago.CommitmentIDFromBytes,
 		), nil
 	}, func() iotago.BlockID {
-		return tpkg.TestAPI.ProtocolParameters().GenesisBlockID()
+		return tpkg.ZeroCostTestAPI.ProtocolParameters().GenesisBlockID()
 	})
 
-	t.blockCache = blocks.New(evictionState, iotago.SingleVersionProvider(tpkg.TestAPI))
+	t.blockCache = blocks.New(evictionState, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI))
 	instance := thresholdblockgadget.New(t.blockCache, t.SeatManager, func(err error) {
 		fmt.Printf(">> Gadget.Error: %s\n", err)
 	})
@@ -64,7 +64,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t.Events = instance.Events()
 	t.Instance = instance
 
-	genesisBlock := blocks.NewRootBlock(tpkg.TestAPI.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(tpkg.TestAPI).MustID(), time.Unix(tpkg.TestAPI.TimeProvider().GenesisUnixTime(), 0))
+	genesisBlock := blocks.NewRootBlock(tpkg.ZeroCostTestAPI.ProtocolParameters().GenesisBlockID(), iotago.NewEmptyCommitment(tpkg.ZeroCostTestAPI).MustID(), time.Unix(tpkg.ZeroCostTestAPI.TimeProvider().GenesisUnixTime(), 0))
 	t.blocks.Set("Genesis", genesisBlock)
 	genesisBlock.ID().RegisterAlias("Genesis")
 	evictionState.AddRootBlock(genesisBlock.ID(), genesisBlock.SlotCommitmentID())
@@ -106,7 +106,7 @@ func (t *TestFramework) CreateBlock(alias string, issuerAlias string, parents ..
 	_, priv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
 
-	block, err := builder.NewValidationBlockBuilder(tpkg.TestAPI).
+	block, err := builder.NewValidationBlockBuilder(tpkg.ZeroCostTestAPI).
 		StrongParents(t.BlockIDs(parents...)).
 		Sign(t.SeatManager.AccountID(issuerAlias), priv).
 		IssuingTime(time.Now()).

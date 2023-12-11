@@ -1,6 +1,8 @@
 package core
 
 import (
+	"time"
+
 	"github.com/labstack/echo/v4"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -84,12 +86,28 @@ func blockIssuance() (*api.IssuanceBlockHeaderResponse, error) {
 		return nil, ierrors.Wrap(echo.ErrServiceUnavailable, "no strong parents available")
 	}
 
+	// get the latest parent block issuing time
+	var latestParentBlockIssuingTime time.Time
+	for _, parentType := range []iotago.ParentsType{iotago.StrongParentType, iotago.WeakParentType, iotago.ShallowLikeParentType} {
+		for _, blockID := range references[parentType] {
+			block, exists := deps.Protocol.Engines.Main.Get().Block(blockID)
+			if !exists {
+				return nil, ierrors.Wrapf(echo.ErrNotFound, "no block found for parent, block ID: %s", blockID.ToHex())
+			}
+
+			if latestParentBlockIssuingTime.Before(block.ProtocolBlock().Header.IssuingTime) {
+				latestParentBlockIssuingTime = block.ProtocolBlock().Header.IssuingTime
+			}
+		}
+	}
+
 	resp := &api.IssuanceBlockHeaderResponse{
-		StrongParents:       references[iotago.StrongParentType],
-		WeakParents:         references[iotago.WeakParentType],
-		ShallowLikeParents:  references[iotago.ShallowLikeParentType],
-		LatestFinalizedSlot: deps.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot(),
-		LatestCommitment:    deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment(),
+		StrongParents:                references[iotago.StrongParentType],
+		WeakParents:                  references[iotago.WeakParentType],
+		ShallowLikeParents:           references[iotago.ShallowLikeParentType],
+		LatestParentBlockIssuingTime: latestParentBlockIssuingTime,
+		LatestFinalizedSlot:          deps.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot(),
+		LatestCommitment:             deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment(),
 	}
 
 	return resp, nil
