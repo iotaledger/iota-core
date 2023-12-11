@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -90,6 +91,7 @@ func (t *TestSuite) InitPerformanceTracker() {
 		t.latestCommittedEpoch,
 		iotago.SingleVersionProvider(t.api),
 		func(err error) {},
+		log.NewLogger("PerfTestsuite"),
 	)
 }
 
