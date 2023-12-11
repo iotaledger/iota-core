@@ -200,9 +200,9 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 	})
 }
 
-// publishCommitment publishes the given commitment and return a singleton Commitment instance as a Commitment instance. If the Commitment was already
-// published, it will return the existing Commitment instance. Otherwise, it will create a new Commitment instance and
-// resolve the Promise that was created for it.
+// publishCommitment publishes the given commitment and returns the singleton Commitment instance that is used to
+// represent it in our data structure (together with a boolean that indicates if we were the first goroutine to publish
+// the commitment).
 func (c *Commitments) publishCommitment(commitment *model.Commitment) (publishedCommitment *Commitment, published bool, err error) {
 	// retrieve promise and abort if it was already rejected
 	cachedRequest := c.cachedRequest(commitment.ID())
