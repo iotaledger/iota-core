@@ -210,7 +210,7 @@ func (c *Commitments) publishCommitment(commitment *model.Commitment) (published
 		return nil, false, ierrors.Wrapf(cachedRequest.Err(), "failed to request commitment %s", commitment.ID())
 	}
 
-	// otherwise try to provideCommitment it and determine if we were the goroutine that resolved it
+	// otherwise try to publish it and determine if we were the goroutine that published it
 	publishedCommitment = newCommitment(c, commitment)
 	cachedRequest.Resolve(publishedCommitment).OnSuccess(func(resolvedCommitment *Commitment) {
 		if published = resolvedCommitment == publishedCommitment; !published {
