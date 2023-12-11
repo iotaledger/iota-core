@@ -99,7 +99,7 @@ func (t *TestFramework) RequireStorageRootBlocks(expected ...string) {
 
 		loadedCommitmentID, exists, err := rootBlockStorage.Load(blockID)
 		require.NoError(t.Testing, err)
-		require.True(t.Testing, exists)
+		require.True(t.Testing, exists, "expected blockID %s to exist in rootBlockStorage", blockID)
 		require.Equal(t.Testing, commitmentID, loadedCommitmentID)
 	}
 }

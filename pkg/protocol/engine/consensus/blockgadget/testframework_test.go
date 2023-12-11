@@ -10,6 +10,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/kvstore"
+	hivedb "github.com/iotaledger/hive.go/kvstore/database"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -19,9 +20,10 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
+	"github.com/iotaledger/iota-core/pkg/storage/database"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
-	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -46,17 +48,15 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		SeatManager: mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)),
 	}
 
+	prunableStorage := prunable.New(database.Config{
+		Engine:    hivedb.EngineMapDB,
+		Directory: t.TempDir(),
+	}, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), func(err error) { panic(err) })
+
 	newSettings := permanent.NewSettings(mapdb.NewMapDB())
 	newSettings.StoreProtocolParametersForStartEpoch(tpkg.ZeroCostTestAPI.ProtocolParameters(), 0)
 
-	evictionState := eviction.NewState(newSettings, func(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
-		return slotstore.NewStore(slot, mapdb.NewMapDB(),
-			iotago.BlockID.Bytes,
-			iotago.BlockIDFromBytes,
-			iotago.CommitmentID.Bytes,
-			iotago.CommitmentIDFromBytes,
-		), nil
-	})
+	evictionState := eviction.NewState(newSettings, prunableStorage.RootBlocks)
 
 	t.blockCache = blocks.New(evictionState, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI))
 	instance := thresholdblockgadget.New(t.blockCache, t.SeatManager, func(err error) {

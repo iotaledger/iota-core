@@ -26,7 +26,7 @@ type State struct {
 
 	settings             *permanent.Settings
 	rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error)
-	lastEvictedSlot      iotago.SlotIndex
+	lastCommittedSlot    iotago.SlotIndex
 	evictionMutex        syncutils.RWMutex
 }
 
@@ -41,7 +41,7 @@ func NewState(settings *permanent.Settings, rootBlockStorageFunc func(iotago.Slo
 
 func (s *State) Initialize(lastCommittedSlot iotago.SlotIndex) {
 	// This marks the slot from which we only have root blocks, so starting with 0 is valid here, since we only have a root block for genesis.
-	s.lastEvictedSlot = lastCommittedSlot
+	s.lastCommittedSlot = lastCommittedSlot
 }
 
 func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
@@ -50,6 +50,8 @@ func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 	protocolParams := s.settings.APIProvider().APIForSlot(slot).ProtocolParameters()
 	genesisSlot := protocolParams.GenesisSlot()
 	maxCommittableAge := protocolParams.MaxCommittableAge()
+
+	s.lastCommittedSlot = slot
 
 	if slot < maxCommittableAge+genesisSlot {
 		s.evictionMutex.Unlock()
@@ -65,18 +67,16 @@ func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 		return
 	}
 
-	s.lastEvictedSlot = slot
-
 	s.evictionMutex.Unlock()
 
-	s.Events.SlotEvicted.Trigger(slot)
+	s.Events.SlotEvicted.Trigger(evictionSlot)
 }
 
 func (s *State) LastEvictedSlot() iotago.SlotIndex {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	return s.lastEvictedSlot
+	return s.lastCommittedSlot
 }
 
 // InRootBlockSlot checks if the Block associated with the given id is too old.
@@ -92,7 +92,7 @@ func (s *State) AllActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
 	defer s.evictionMutex.RUnlock()
 
 	activeRootBlocks := make(map[iotago.BlockID]iotago.CommitmentID)
-	startSlot, endSlot := s.activeIndexRange(s.lastEvictedSlot)
+	startSlot, endSlot := s.activeIndexRange(s.lastCommittedSlot)
 	for slot := startSlot; slot <= endSlot; slot++ {
 		// We assume the cache is always populated for the latest slots.
 		storage, err := s.rootBlockStorageFunc(slot)
@@ -108,6 +108,11 @@ func (s *State) AllActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
 		})
 	}
 
+	// We include genesis as a root block if the start of our active window is the genesis slot.
+	if startSlot == s.settings.APIProvider().APIForSlot(s.lastCommittedSlot).ProtocolParameters().GenesisSlot() {
+		activeRootBlocks[s.settings.APIProvider().CommittedAPI().ProtocolParameters().GenesisBlockID()] = model.NewEmptyCommitment(s.settings.APIProvider().CommittedAPI()).ID()
+	}
+
 	return activeRootBlocks
 }
 
@@ -115,7 +120,7 @@ func (s *State) LatestActiveRootBlock() (iotago.BlockID, iotago.CommitmentID) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
-	startSlot, endSlot := s.activeIndexRange(s.lastEvictedSlot)
+	startSlot, endSlot := s.activeIndexRange(s.lastCommittedSlot)
 	for slot := endSlot; slot >= startSlot; slot-- {
 		// We assume the cache is always populated for the latest slots.
 		storage, err := s.rootBlockStorageFunc(slot)
@@ -151,7 +156,7 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	defer s.evictionMutex.RUnlock()
 
 	// The rootblock is too old, ignore it.
-	if id.Slot() < lo.Return1(s.activeIndexRange(s.lastEvictedSlot)) {
+	if id.Slot() < lo.Return1(s.activeIndexRange(s.lastCommittedSlot)) {
 		return
 	}
 
@@ -334,7 +339,7 @@ func (s *State) activeIndexRange(targetSlot iotago.SlotIndex) (startSlot iotago.
 }
 
 func (s *State) withinActiveIndexRange(slot iotago.SlotIndex) bool {
-	startSlot, endSlot := s.activeIndexRange(s.lastEvictedSlot)
+	startSlot, endSlot := s.activeIndexRange(s.lastCommittedSlot)
 
 	return slot >= startSlot && slot <= endSlot
 }

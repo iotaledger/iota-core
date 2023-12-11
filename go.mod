@@ -12,21 +12,21 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/iotaledger/hive.go/ads v0.0.0-20231205131244-472357435a39
 	github.com/iotaledger/hive.go/app v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/constraints v0.0.0-20231206114953-6a65a82e30ad
+	github.com/iotaledger/hive.go/constraints v0.0.0-20231207181026-f482ac139305
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/crypto v0.0.0-20231206114953-6a65a82e30ad
+	github.com/iotaledger/hive.go/crypto v0.0.0-20231207181026-f482ac139305
 	github.com/iotaledger/hive.go/ds v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20231206114953-6a65a82e30ad
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20231207181026-f482ac139305
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20231205131244-472357435a39
-	github.com/iotaledger/hive.go/lo v0.0.0-20231206114953-6a65a82e30ad
+	github.com/iotaledger/hive.go/lo v0.0.0-20231207181026-f482ac139305
 	github.com/iotaledger/hive.go/log v0.0.0-20231206113509-4b4ff95ac61c
 	github.com/iotaledger/hive.go/logger v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231206114953-6a65a82e30ad
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231207181026-f482ac139305
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/stringify v0.0.0-20231206114953-6a65a82e30ad
+	github.com/iotaledger/hive.go/stringify v0.0.0-20231207181026-f482ac139305
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231206124511-b78dc962031f
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231206124145-f773dfe3927e
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231206123921-2af411eef0b5
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231211160706-492c65d5e3f5
 	github.com/labstack/echo/v4 v4.11.3
 	github.com/labstack/gommon v0.4.1
 	github.com/libp2p/go-libp2p v0.32.0
