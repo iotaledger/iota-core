@@ -52,6 +52,7 @@ func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 	maxCommittableAge := protocolParams.MaxCommittableAge()
 
 	if slot < maxCommittableAge+genesisSlot {
+		s.evictionMutex.Unlock()
 		return
 	}
 
@@ -60,6 +61,7 @@ func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 
 	// We do not evict slots that are empty
 	if evictionSlot >= s.settings.LatestNonEmptySlot() {
+		s.evictionMutex.Unlock()
 		return
 	}
 
@@ -332,7 +334,7 @@ func (s *State) activeIndexRange(targetSlot iotago.SlotIndex) (startSlot iotago.
 }
 
 func (s *State) withinActiveIndexRange(slot iotago.SlotIndex) bool {
-	startSlot, endSlot := s.activeIndexRange(slot)
+	startSlot, endSlot := s.activeIndexRange(s.lastEvictedSlot)
 
 	return slot >= startSlot && slot <= endSlot
 }
