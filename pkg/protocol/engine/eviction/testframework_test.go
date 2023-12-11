@@ -81,7 +81,7 @@ func (t *TestFramework) RootBlocks(aliases ...string) map[iotago.BlockID]iotago.
 
 func (t *TestFramework) RequireActiveRootBlocks(expected ...string) {
 	expectedRootBlocks := t.RootBlocks(expected...)
-	gotActiveRootBlocks := t.Instance.ActiveRootBlocks()
+	gotActiveRootBlocks := t.Instance.AllActiveRootBlocks()
 	require.Equalf(t.Testing, expectedRootBlocks, gotActiveRootBlocks, "active root blocks do not match, expected: %v, got: %v", expectedRootBlocks, gotActiveRootBlocks)
 }
 

@@ -23,6 +23,7 @@ const (
 	latestCommitmentKey
 	latestFinalizedSlotKey
 	latestStoredSlotKey
+	latestNonEmptySlotKey
 	protocolVersionEpochMappingKey
 	futureProtocolParametersKey
 	protocolParametersKey
@@ -81,6 +82,12 @@ func NewSettings(store kvstore.KVStore, opts ...options.Option[iotago.EpochBased
 		storeLatestStoredSlot: kvstore.NewTypedValue(
 			store,
 			[]byte{latestStoredSlotKey},
+			iotago.SlotIndex.Bytes,
+			iotago.SlotIndexFromBytes,
+		),
+		storeLatestNonEmptySlot: kvstore.NewTypedValue(
+			store,
+			[]byte{latestNonEmptySlotKey},
 			iotago.SlotIndex.Bytes,
 			iotago.SlotIndexFromBytes,
 		),
@@ -311,6 +318,34 @@ func (s *Settings) AdvanceLatestStoredSlot(slot iotago.SlotIndex) (err error) {
 		return slot, nil
 	}); err != nil {
 		return ierrors.Wrap(err, "failed to advance latest stored slot")
+	}
+
+	return nil
+}
+
+func (s *Settings) LatestNonEmptySlot() iotago.SlotIndex {
+	return read(s.storeLatestNonEmptySlot)
+}
+
+func (s *Settings) SetLatestNonEmptySlot(slot iotago.SlotIndex) (err error) {
+	return s.storeLatestNonEmptySlot.Set(slot)
+}
+
+func (s *Settings) AdvanceLatestNonEmptySlot(slot iotago.SlotIndex) (err error) {
+	// We don't need to advance the latest stored slot if it's already ahead of the given slot.
+	// We check this before Compute to avoid contention inside the TypedValue.
+	if s.LatestNonEmptySlot() >= slot {
+		return nil
+	}
+
+	if _, err = s.storeLatestNonEmptySlot.Compute(func(latestNonEmptySlot iotago.SlotIndex, _ bool) (newValue iotago.SlotIndex, err error) {
+		if latestNonEmptySlot >= slot {
+			return latestNonEmptySlot, kvstore.ErrTypedValueNotChanged
+		}
+
+		return slot, nil
+	}); err != nil {
+		return ierrors.Wrap(err, "failed to advance latest non-empty slot")
 	}
 
 	return nil

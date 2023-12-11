@@ -19,10 +19,6 @@ func (s *Storage) Accounts(optRealm ...byte) kvstore.KVStore {
 	return s.permanent.Accounts(optRealm...)
 }
 
-func (s *Storage) LatestNonEmptySlot(optRealm ...byte) kvstore.KVStore {
-	return s.permanent.LatestNonEmptySlot(optRealm...)
-}
-
 // Ledger returns the ledger storage (or a specialized sub-storage if a realm is provided).
 func (s *Storage) Ledger() *utxoledger.Manager {
 	return s.permanent.UTXOLedger()

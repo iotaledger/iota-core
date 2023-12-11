@@ -90,7 +90,7 @@ func (e *Engines) ForkAtSlot(slot iotago.SlotIndex) (*engine.Engine, error) {
 		return nil, ierrors.Wrap(err, "failed to rollback commitments")
 	}
 	// create temporary components and rollback their permanent state, which will be reflected on disk.
-	evictionState := eviction.NewState(newStorage.LatestNonEmptySlot(), newStorage.RootBlocks, newStorage.GenesisRootBlockID)
+	evictionState := eviction.NewState(newStorage.Settings(), newStorage.RootBlocks)
 	evictionState.Initialize(latestCommitment.Slot())
 
 	blockCache := blocks.New(evictionState, newStorage.Settings().APIProvider())

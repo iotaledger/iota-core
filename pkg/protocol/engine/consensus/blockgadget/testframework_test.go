@@ -19,6 +19,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget/thresholdblockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -45,15 +46,16 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		SeatManager: mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)),
 	}
 
-	evictionState := eviction.NewState(mapdb.NewMapDB(), func(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
+	newSettings := permanent.NewSettings(mapdb.NewMapDB())
+	newSettings.StoreProtocolParametersForStartEpoch(tpkg.ZeroCostTestAPI.ProtocolParameters(), 0)
+
+	evictionState := eviction.NewState(newSettings, func(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
 		return slotstore.NewStore(slot, mapdb.NewMapDB(),
 			iotago.BlockID.Bytes,
 			iotago.BlockIDFromBytes,
 			iotago.CommitmentID.Bytes,
 			iotago.CommitmentIDFromBytes,
 		), nil
-	}, func() iotago.BlockID {
-		return tpkg.ZeroCostTestAPI.ProtocolParameters().GenesisBlockID()
 	})
 
 	t.blockCache = blocks.New(evictionState, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI))

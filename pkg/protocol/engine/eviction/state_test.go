@@ -7,7 +7,9 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
@@ -21,9 +23,18 @@ func TestState_RootBlocks(t *testing.T) {
 		Directory: t.TempDir(),
 	}, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), errorHandler)
 
-	ts := NewTestFramework(t, prunableStorage, eviction.NewState(mapdb.NewMapDB(), prunableStorage.RootBlocks, func() iotago.BlockID {
-		return tpkg.ZeroCostTestAPI.ProtocolParameters().GenesisBlockID()
-	}, eviction.WithRootBlocksEvictionDelay(3)))
+	newSettings := permanent.NewSettings(mapdb.NewMapDB())
+	newSettings.StoreProtocolParametersForStartEpoch(tpkg.ZeroCostTestAPI.ProtocolParameters(), 0)
+
+	ts := NewTestFramework(t, prunableStorage, eviction.NewState(newSettings, func(slot iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error) {
+		return slotstore.NewStore(slot, mapdb.NewMapDB(),
+			iotago.BlockID.Bytes,
+			iotago.BlockIDFromBytes,
+			iotago.CommitmentID.Bytes,
+			iotago.CommitmentIDFromBytes,
+		), nil
+	}))
+
 	ts.CreateAndAddRootBlock("Genesis", 0, iotago.NewEmptyCommitment(tpkg.ZeroCostTestAPI).MustID())
 	ts.RequireActiveRootBlocks("Genesis")
 	ts.RequireLastEvictedSlot(0)

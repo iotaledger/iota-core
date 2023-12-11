@@ -122,7 +122,7 @@ func New(
 		&Engine{
 			Events:           NewEvents(),
 			Storage:          storageInstance,
-			EvictionState:    eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks, storageInstance.GenesisRootBlockID),
+			EvictionState:    eviction.NewState(storageInstance.Settings(), storageInstance.RootBlocks),
 			RootCommitment:   reactive.NewVariable[*model.Commitment](),
 			LatestCommitment: reactive.NewVariable[*model.Commitment](),
 			Workers:          workers,
@@ -466,16 +466,7 @@ func (e *Engine) setupEvictionState() {
 	wp := e.Workers.CreatePool("EvictionState", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		block.ForEachParent(func(parent iotago.Parent) {
-			if parent.ID.Slot() < block.ID().Slot() && !e.EvictionState.IsRootBlock(parent.ID) {
-				parentBlock, exists := e.Block(parent.ID)
-				if !exists {
-					e.errorHandler(ierrors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
-					return
-				}
-				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().Header.SlotCommitmentID)
-			}
-		})
+		e.EvictionState.AddRootBlock(block.ID(), block.SlotCommitmentID())
 	}, event.WithWorkerPool(wp))
 
 	e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {

@@ -3,8 +3,6 @@ package tipselectionv1
 import (
 	"time"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
@@ -30,8 +28,8 @@ type TipSelection struct {
 	// spendDAG is the SpendDAG that is used to track spenders.
 	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 
-	// rootBlocks is a function that returns the current root blocks.
-	rootBlocks func() iotago.BlockIDs
+	// rootBlock is a function that returns the current root blocks.
+	rootBlock func() iotago.BlockID
 
 	// livenessThreshold is a function that is used to determine the liveness threshold for a tip.
 	livenessThreshold func(tip tipmanager.TipMetadata) time.Duration
@@ -85,11 +83,11 @@ func New(opts ...options.Option[TipSelection]) *TipSelection {
 //
 // This method is separated from the constructor so the TipSelection can be initialized lazily after all dependencies
 // are available.
-func (t *TipSelection) Construct(tipManager tipmanager.TipManager, spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockIDs, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
+func (t *TipSelection) Construct(tipManager tipmanager.TipManager, spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockID, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
 	t.tipManager = tipManager
 	t.spendDAG = spendDAG
 	t.transactionMetadata = transactionMetadataRetriever
-	t.rootBlocks = rootBlocksRetriever
+	t.rootBlock = rootBlocksRetriever
 	t.livenessThreshold = livenessThresholdFunc
 
 	t.TriggerConstructed()
@@ -127,20 +125,7 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 				previousLikedInsteadConflicts = updatedLikedInsteadConflicts
 			}
 		}, amount); len(references[iotago.StrongParentType]) == 0 {
-			rootBlocks := t.rootBlocks()
-
-			// Sort the rootBlocks in descending order according to their slot.
-			slices.SortFunc(rootBlocks, func(i iotago.BlockID, j iotago.BlockID) int {
-				if i.Slot() == j.Slot() {
-					return 0
-				} else if i.Slot() < j.Slot() {
-					return 1
-				}
-
-				return -1
-			})
-
-			references[iotago.StrongParentType] = rootBlocks[:lo.Min(len(rootBlocks), t.optMaxStrongParents)]
+			references[iotago.StrongParentType] = iotago.BlockIDs{t.rootBlock()}
 		}
 
 		t.collectReferences(references, iotago.WeakParentType, t.tipManager.WeakTips, func(tip tipmanager.TipMetadata) {
