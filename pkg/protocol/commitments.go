@@ -82,16 +82,16 @@ func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...
 	return cachedRequest.Result(), cachedRequest.Err()
 }
 
-// API returns the API for the given commitmentID. If the Commitment is not available, it will return
+// API returns the CommitmentAPI for the given commitmentID. If the Commitment is not available, it will return
 // ErrorCommitmentNotFound.
-func (c *Commitments) API(commitmentID iotago.CommitmentID) (*engine.CommitmentAPI, error) {
+func (c *Commitments) API(commitmentID iotago.CommitmentID) (commitmentAPI *engine.CommitmentAPI, err error) {
 	if commitmentID.Slot() <= c.Root.Get().Slot() {
 		return c.protocol.Engines.Main.Get().CommitmentAPI(commitmentID)
 	}
 
 	commitment, err := c.Get(commitmentID)
 	if err != nil {
-		return nil, err
+		return nil, ierrors.Wrap(err, "failed to load commitment")
 	}
 
 	return commitment.TargetEngine().CommitmentAPI(commitmentID)
