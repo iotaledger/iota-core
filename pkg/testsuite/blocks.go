@@ -2,7 +2,6 @@ package testsuite
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/stretchr/testify/assert"
 
@@ -18,12 +17,6 @@ import (
 func (t *TestSuite) AssertBlock(block *blocks.Block, node *mock.Node) *model.Block {
 	var loadedBlock *model.Block
 	t.Eventually(func() error {
-		fmt.Println("Exists? ", block.ID())
-
-		if strings.HasPrefix(block.ID().String(), "BlockID(3.1-node") {
-			fmt.Println("break me")
-		}
-
 		var exists bool
 		loadedBlock, exists = node.Protocol.Engines.Main.Get().Block(block.ID())
 		if !exists {
@@ -32,15 +25,11 @@ func (t *TestSuite) AssertBlock(block *blocks.Block, node *mock.Node) *model.Blo
 		}
 
 		if block.ID() != loadedBlock.ID() {
-			fmt.Println("return2 ", block.ID())
 			return ierrors.Errorf("AssertBlock: %s: expected %s, got %s", node.Name, block.ID(), loadedBlock.ID())
 		}
 		if !assert.Equal(t.fakeTesting, block.ModelBlock().Data(), loadedBlock.Data()) {
-			fmt.Println("return3 ", block.ID())
 			return ierrors.Errorf("AssertBlock: %s: expected %s, got %s", node.Name, block.ModelBlock().Data(), loadedBlock.Data())
 		}
-
-		fmt.Println("return4 nil nil nil ", block.ID())
 
 		return nil
 	})

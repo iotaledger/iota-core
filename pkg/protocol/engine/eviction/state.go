@@ -47,29 +47,17 @@ func (s *State) Initialize(lastCommittedSlot iotago.SlotIndex) {
 func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 	s.evictionMutex.Lock()
 
-	protocolParams := s.settings.APIProvider().APIForSlot(slot).ProtocolParameters()
-	genesisSlot := protocolParams.GenesisSlot()
-	maxCommittableAge := protocolParams.MaxCommittableAge()
+	if slot <= s.lastCommittedSlot {
+		s.evictionMutex.Unlock()
+		return
+	}
 
 	s.lastCommittedSlot = slot
 
-	if slot < maxCommittableAge+genesisSlot {
-		s.evictionMutex.Unlock()
-		return
-	}
-
-	// We allow a maxCommittableAge window of available root blocks.
-	evictionSlot := slot - maxCommittableAge
-
-	// We do not evict slots that are empty
-	if evictionSlot >= s.settings.LatestNonEmptySlot() {
-		s.evictionMutex.Unlock()
-		return
-	}
-
 	s.evictionMutex.Unlock()
 
-	s.Events.SlotEvicted.Trigger(evictionSlot)
+	// We only delay eviction in the Eviction State, but components evict on committment, which in this context is slot.
+	s.Events.SlotEvicted.Trigger(slot)
 }
 
 func (s *State) LastEvictedSlot() iotago.SlotIndex {
@@ -121,7 +109,7 @@ func (s *State) LatestActiveRootBlock() (iotago.BlockID, iotago.CommitmentID) {
 	defer s.evictionMutex.RUnlock()
 
 	startSlot, endSlot := s.activeIndexRange(s.lastCommittedSlot)
-	for slot := endSlot; slot >= startSlot; slot-- {
+	for slot := endSlot; slot >= startSlot && slot > 0; slot-- {
 		// We assume the cache is always populated for the latest slots.
 		storage, err := s.rootBlockStorageFunc(slot)
 		// Slot too old, it was pruned.
