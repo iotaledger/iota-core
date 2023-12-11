@@ -58,7 +58,7 @@ func newAttestations(protocol *Protocol) *Attestations {
 func (a *Attestations) Get(commitmentID iotago.CommitmentID) (commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], err error) {
 	commitmentAPI, err := a.protocol.Commitments.API(commitmentID)
 	if err != nil {
-		return nil, nil, nil, ierrors.Wrapf(err, "failed to load committed slot API")
+		return nil, nil, nil, ierrors.Wrap(err, "failed to load commitment API")
 	}
 
 	return commitmentAPI.Attestations()

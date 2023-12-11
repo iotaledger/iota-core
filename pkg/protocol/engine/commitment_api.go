@@ -51,12 +51,12 @@ func (c *CommitmentAPI) Attestations() (commitment *model.Commitment, attestatio
 
 	rootsStorage, err := c.engine.Storage.Roots(c.CommitmentID.Slot())
 	if err != nil {
-		return nil, nil, nil, ierrors.Wrapf(err, "failed to load roots storage")
+		return nil, nil, nil, ierrors.Wrap(err, "failed to load roots storage")
 	}
 
 	roots, exists, err := rootsStorage.Load(c.CommitmentID)
 	if err != nil {
-		return nil, nil, nil, ierrors.Wrapf(err, "failed to load roots")
+		return nil, nil, nil, ierrors.Wrap(err, "failed to load roots")
 	} else if !exists {
 		return nil, nil, nil, ierrors.New("roots not found")
 	}
