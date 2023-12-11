@@ -35,8 +35,8 @@ type Commitments struct {
 	// workerPool contains the worker pool that is used to process commitment requests and responses asynchronously.
 	workerPool *workerpool.WorkerPool
 
-	// ticker contains the ticker that is used to send commitment requests.
-	ticker *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+	// requester contains the ticker that is used to send commitment requests.
+	requester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
 
 	// Logger contains a reference to the logger that is used by this component.
 	log.Logger
@@ -50,13 +50,13 @@ func newCommitments(protocol *Protocol) *Commitments {
 		protocol:       protocol,
 		cachedRequests: shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
 		workerPool:     protocol.Workers.CreatePool("Commitments"),
-		ticker:         eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.CommitmentRequesterOptions...),
+		requester:      eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.CommitmentRequesterOptions...),
 	}
 
 	shutdown := lo.Batch(
 		c.initLogger(),
 		c.initEngineCommitmentSynchronization(),
-		c.initTicker(),
+		c.initRequester(),
 	)
 
 	protocol.Shutdown.OnTrigger(shutdown)
@@ -64,9 +64,9 @@ func newCommitments(protocol *Protocol) *Commitments {
 	return c
 }
 
-// Get returns the protocol Commitment for the given commitmentID. If the Commitment is not available yet, it
-// will return an ErrorCommitmentNotFound. It is possible to trigger a request for the Commitment by passing true as the
-// second argument.
+// Get returns the Commitment for the given commitmentID. If the Commitment is not available yet, it will return an
+// ErrorCommitmentNotFound. It is possible to trigger a request for the Commitment by passing true as the second
+// argument.
 func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...bool) (commitment *Commitment, err error) {
 	cachedRequest, exists := c.cachedRequests.Get(commitmentID)
 	if !exists && lo.First(requestIfMissing) {
@@ -127,14 +127,14 @@ func (c *Commitments) initEngineCommitmentSynchronization() func() {
 	})
 }
 
-// initTicker initializes the ticker that is used to send commitment requests.
-func (c *Commitments) initTicker() (shutdown func()) {
-	unsubscribeFromTicker := c.ticker.Events.Tick.Hook(c.sendRequest).Unhook
+// initRequester initializes the requester that is used to request commitments from the network.
+func (c *Commitments) initRequester() (shutdown func()) {
+	unsubscribeFromTicker := c.requester.Events.Tick.Hook(c.sendRequest).Unhook
 
 	return func() {
 		unsubscribeFromTicker()
 
-		c.ticker.Shutdown()
+		c.requester.Shutdown()
 	}
 }
 
@@ -239,10 +239,10 @@ func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, requestIfM
 
 	// start ticker if requested
 	if lo.First(requestIfMissing) {
-		c.ticker.StartTicker(commitmentID)
+		c.requester.StartTicker(commitmentID)
 
 		cachedRequest.OnComplete(func() {
-			c.ticker.StopTicker(commitmentID)
+			c.requester.StopTicker(commitmentID)
 		})
 	}
 
