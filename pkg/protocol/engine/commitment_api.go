@@ -64,6 +64,26 @@ func (c *CommitmentAPI) Attestations() (commitment *model.Commitment, attestatio
 	return commitment, attestations, roots.AttestationsProof(), nil
 }
 
+// Mutations returns all accepted block IDs, the tangle proof, all accepted transaction IDs and the ledger state
+// mutation proof of the slot.
+func (c *CommitmentAPI) Mutations() (acceptedBlocksBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, acceptedBlocksProof *merklehasher.Proof[iotago.Identifier], acceptedTransactionIDs iotago.TransactionIDs, acceptedTransactionsProof *merklehasher.Proof[iotago.Identifier], err error) {
+	if acceptedBlocksBySlotCommitment, err = c.BlocksIDsBySlotCommitmentID(); err != nil {
+		return nil, nil, nil, nil, ierrors.Wrap(err, "failed to get block ids")
+	}
+
+	roots, err := c.Roots()
+	if err != nil {
+		return nil, nil, nil, nil, ierrors.Wrap(err, "failed to get roots")
+	}
+
+	acceptedTransactionIDs, err = c.TransactionIDs()
+	if err != nil {
+		return nil, nil, nil, nil, ierrors.Wrap(err, "failed to get transaction ids")
+	}
+
+	return acceptedBlocksBySlotCommitment, roots.TangleProof(), acceptedTransactionIDs, roots.MutationProof(), nil
+}
+
 // Roots returns the roots of the slot.
 func (c *CommitmentAPI) Roots() (committedRoots *iotago.Roots, err error) {
 	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {

@@ -295,22 +295,12 @@ func (w *WarpSync) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID
 			return ierrors.Wrap(err, "failed to load slot api")
 		}
 
-		blockIDsBySlotCommitment, err := commitmentAPI.BlocksIDsBySlotCommitmentID()
+		blocks, blocksProof, transactionIDs, transactionIDsProof, err := commitmentAPI.Mutations()
 		if err != nil {
-			return ierrors.Wrap(err, "failed to get block ids")
+			return ierrors.Wrap(err, "failed to get mutations")
 		}
 
-		roots, err := commitmentAPI.Roots()
-		if err != nil {
-			return ierrors.Wrap(err, "failed to get roots")
-		}
-
-		transactionIDs, err := commitmentAPI.TransactionIDs()
-		if err != nil {
-			return ierrors.Wrap(err, "failed to get transaction ids")
-		}
-
-		w.protocol.Network.SendWarpSyncResponse(commitmentID, blockIDsBySlotCommitment, roots.TangleProof(), transactionIDs, roots.MutationProof(), from)
+		w.protocol.Network.SendWarpSyncResponse(commitmentID, blocks, blocksProof, transactionIDs, transactionIDsProof, from)
 
 		return nil
 	}, w, "commitmentID", commitmentID, "fromPeer", from)
