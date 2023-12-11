@@ -335,7 +335,7 @@ func (e *Engine) CommitmentAPI(commitmentID iotago.CommitmentID) (*CommitmentAPI
 		return nil, ierrors.Errorf("slot %d is not committed yet", commitmentID.Slot())
 	}
 
-	return NewCommittedSlotAPI(e, commitmentID), nil
+	return NewCommitmentAPI(e, commitmentID), nil
 }
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {

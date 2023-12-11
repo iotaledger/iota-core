@@ -17,8 +17,8 @@ type CommitmentAPI struct {
 	CommitmentID iotago.CommitmentID
 }
 
-// NewCommittedSlotAPI creates a new CommitmentAPI.
-func NewCommittedSlotAPI(engine *Engine, commitmentID iotago.CommitmentID) *CommitmentAPI {
+// NewCommitmentAPI creates a new CommitmentAPI.
+func NewCommitmentAPI(engine *Engine, commitmentID iotago.CommitmentID) *CommitmentAPI {
 	return &CommitmentAPI{
 		engine:       engine,
 		CommitmentID: commitmentID,
