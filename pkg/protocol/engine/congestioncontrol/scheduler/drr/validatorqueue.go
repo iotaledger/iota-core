@@ -176,7 +176,7 @@ func (q *ValidatorQueue) deductTokens(tokens float64) {
 
 type ValidatorBuffer struct {
 	buffer *shrinkingmap.ShrinkingMap[iotago.AccountID, *ValidatorQueue]
-	size   int
+	size   atomic.Int64
 }
 
 func NewValidatorBuffer() *ValidatorBuffer {
@@ -190,7 +190,7 @@ func (b *ValidatorBuffer) Size() int {
 		return 0
 	}
 
-	return b.size
+	return int(b.size.Load())
 }
 
 func (b *ValidatorBuffer) Get(accountID iotago.AccountID) (*ValidatorQueue, bool) {
@@ -208,10 +208,10 @@ func (b *ValidatorBuffer) Submit(block *blocks.Block, maxBuffer int) (*blocks.Bl
 	}
 	droppedBlock, submitted := validatorQueue.Submit(block, maxBuffer)
 	if submitted {
-		b.size++
+		b.size.Inc()
 	}
 	if droppedBlock != nil {
-		b.size--
+		b.size.Dec()
 	}
 
 	return droppedBlock, submitted
@@ -222,7 +222,7 @@ func (b *ValidatorBuffer) Delete(accountID iotago.AccountID) {
 	if !exists {
 		return
 	}
-	b.size -= validatorQueue.Size()
+	b.size.Sub(int64(validatorQueue.Size()))
 
 	b.buffer.Delete(accountID)
 }
