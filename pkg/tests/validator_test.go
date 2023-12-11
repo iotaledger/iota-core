@@ -74,7 +74,7 @@ func setupValidatorTestsuite(t *testing.T, walletOpts ...options.Option[testsuit
 	vnode2.Protocol.SetLogLevel(log.LevelError)
 	node3.Protocol.SetLogLevel(log.LevelError)
 
-	ts.SetCurrentSlot(1)
+	ts.SetCurrentSlot(ts.API.ProtocolParameters().GenesisSlot() + 1)
 
 	return ts
 }
@@ -84,8 +84,10 @@ type ValidatorTest struct {
 	ts *testsuite.TestSuite
 
 	// How many validation blocks per slot the validator test nodes are supposed to issue.
-	// Can be set to a different value than the protocol parameter to model under- or overissuance.
-	validationBlocksPerSlot uint8
+	// Can be set to a different value than validationBlocksPerSlot to model under- or overissuance.
+	issuancePerSlot uint8
+	// The expected performance factor for each epoch.
+	// The length of the map determines how many epochs the validators issue blocks.
 	epochPerformanceFactors EpochPerformanceMap
 }
 
@@ -97,8 +99,8 @@ func Test_Validator_PerfectIssuance(t *testing.T) {
 	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
 
 	test := ValidatorTest{
-		ts:                      ts,
-		validationBlocksPerSlot: validationBlocksPerSlot,
+		ts:              ts,
+		issuancePerSlot: validationBlocksPerSlot,
 		epochPerformanceFactors: EpochPerformanceMap{
 			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
 			0: (uint64(validationBlocksPerSlot) * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
@@ -118,8 +120,8 @@ func Test_Validator_PerfectIssuanceWithNonZeroFixedCost(t *testing.T) {
 	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
 
 	test := ValidatorTest{
-		ts:                      ts,
-		validationBlocksPerSlot: validationBlocksPerSlot,
+		ts:              ts,
+		issuancePerSlot: validationBlocksPerSlot,
 		epochPerformanceFactors: EpochPerformanceMap{
 			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
 			0: (uint64(validationBlocksPerSlot) * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
@@ -141,8 +143,8 @@ func Test_Validator_PerfectIssuanceWithHugeStake(t *testing.T) {
 	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
 
 	test := ValidatorTest{
-		ts:                      ts,
-		validationBlocksPerSlot: validationBlocksPerSlot,
+		ts:              ts,
+		issuancePerSlot: validationBlocksPerSlot,
 		epochPerformanceFactors: EpochPerformanceMap{
 			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
 			0: (uint64(validationBlocksPerSlot) * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
@@ -161,7 +163,7 @@ func Test_Validator_OverIssuance(t *testing.T) {
 	test := ValidatorTest{
 		ts: ts,
 		// Issue one more block than supposed to.
-		validationBlocksPerSlot: ts.API.ProtocolParameters().ValidationBlocksPerSlot() + 1,
+		issuancePerSlot: ts.API.ProtocolParameters().ValidationBlocksPerSlot() + 1,
 		epochPerformanceFactors: EpochPerformanceMap{
 			// We expect 0 rewards for overissuance.
 			// We model that in this test by setting performance factor to 0.
@@ -183,8 +185,8 @@ func Test_Validator_UnderIssuance(t *testing.T) {
 	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
 
 	test := ValidatorTest{
-		ts:                      ts,
-		validationBlocksPerSlot: validationBlocksPerSlot,
+		ts:              ts,
+		issuancePerSlot: validationBlocksPerSlot,
 		epochPerformanceFactors: EpochPerformanceMap{
 			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
 			0: (uint64(validationBlocksPerSlot) * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
@@ -203,8 +205,8 @@ func Test_Validator_FixedCostExceedsRewards(t *testing.T) {
 	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot()
 
 	test := ValidatorTest{
-		ts:                      ts,
-		validationBlocksPerSlot: validationBlocksPerSlot,
+		ts:              ts,
+		issuancePerSlot: validationBlocksPerSlot,
 		epochPerformanceFactors: EpochPerformanceMap{
 			0: 0,
 			1: 0,
@@ -223,7 +225,8 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	endEpoch := iotago.EpochIndex(len(test.epochPerformanceFactors) - 1)
 	fmt.Printf("ValidatorTest: startEpoch=%d, endEpoch=%d\n", startEpoch, endEpoch)
 
-	subslotDuration := time.Duration(ts.API.ProtocolParameters().SlotDurationInSeconds()/test.validationBlocksPerSlot) * time.Second
+	// Calculate the period in which the validator will issue blocks.
+	issuancePeriod := time.Duration(ts.API.ProtocolParameters().SlotDurationInSeconds()/test.issuancePerSlot) * time.Second
 	// Validate until the last slot of the epoch is definitely committed.
 	var endEpochSlot iotago.SlotIndex = ts.API.TimeProvider().EpochEnd(endEpoch) + ts.API.ProtocolParameters().MaxCommittableAge()
 	// Needed to increase the block timestamp monotonically relative to the parent.
@@ -233,13 +236,13 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 		ts.SetCurrentSlot(slot)
 
 		slotStartTime := ts.API.TimeProvider().SlotStartTime(ts.CurrentSlot()).UTC()
-		for subslotIdx := uint8(0); subslotIdx < test.validationBlocksPerSlot; subslotIdx++ {
+		for subslotIdx := uint8(0); subslotIdx < test.issuancePerSlot; subslotIdx++ {
 			for _, node := range ts.Validators() {
 				blockName := fmt.Sprintf("block-%s-%d/%d", node.Name, ts.CurrentSlot(), subslotIdx)
 				latestCommitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
 
 				issuingTime := slotStartTime.
-					Add(subslotDuration * time.Duration(subslotIdx)).
+					Add(issuancePeriod * time.Duration(subslotIdx)).
 					Add(time.Duration(subSlotBlockCounter))
 
 				validationBlock := ts.IssueValidationBlockWithHeaderOptions(blockName, node,
@@ -292,11 +295,11 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 
 	for accountID, actualReward := range actualRewards {
 		lastRewardEpoch := iotago.EpochIndex(len(test.epochPerformanceFactors))
-		rewards := make([]reward, 0, lastRewardEpoch)
+		rewards := make([]epochReward, 0, lastRewardEpoch)
 		for epoch := iotago.EpochIndex(0); epoch < lastRewardEpoch; epoch++ {
 			epochPerformanceFactor := test.epochPerformanceFactors[epoch]
-			reward := calculateEpochReward(t, ts, accountID, epoch, epochPerformanceFactor, totalStake, totalValidatorStake)
-			rewards = append(rewards, reward)
+			epochReward := calculateEpochReward(t, ts, accountID, epoch, epochPerformanceFactor, totalStake, totalValidatorStake)
+			rewards = append(rewards, epochReward)
 		}
 
 		expectedReward := calculateValidatorReward(t, ts, accountID, rewards, startEpoch, claimingEpoch)
@@ -305,7 +308,7 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	}
 }
 
-type reward struct {
+type epochReward struct {
 	Mana         iotago.Mana
 	ProfitMargin uint64
 }
@@ -315,7 +318,7 @@ type reward struct {
 //
 // For testing purposes, assumes that the account's staking data is the same in the latest committed slot
 // as in the epoch for which to calculate rewards.
-func calculateEpochReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, epoch iotago.EpochIndex, epochPerformanceFactor uint64, totalStake iotago.BaseToken, totalValidatorStake iotago.BaseToken) reward {
+func calculateEpochReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, epoch iotago.EpochIndex, epochPerformanceFactor uint64, totalStake iotago.BaseToken, totalValidatorStake iotago.BaseToken) epochReward {
 
 	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
 	targetReward := lo.PanicOnErr(ts.API.ProtocolParameters().RewardsParameters().TargetReward(epoch, ts.API))
@@ -335,7 +338,7 @@ func calculateEpochReward(t *testing.T, ts *testsuite.TestSuite, accountID iotag
 
 	profitMargin := (totalValidatorStake << iotago.BaseToken(ts.API.ProtocolParameters().RewardsParameters().ProfitMarginExponent)) / (totalValidatorStake + totalStake)
 
-	return reward{Mana: poolReward, ProfitMargin: uint64(profitMargin)}
+	return epochReward{Mana: poolReward, ProfitMargin: uint64(profitMargin)}
 }
 
 // Calculates a validator's reward according to
@@ -343,7 +346,7 @@ func calculateEpochReward(t *testing.T, ts *testsuite.TestSuite, accountID iotag
 //
 // For testing purposes, assumes that the account's staking data is the same in the latest committed slot
 // as in the epoch for which to calculate rewards.
-func calculateValidatorReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, rewards []reward, startEpoch iotago.EpochIndex, claimingEpoch iotago.EpochIndex) iotago.Mana {
+func calculateValidatorReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, epochRewards []epochReward, startEpoch iotago.EpochIndex, claimingEpoch iotago.EpochIndex) iotago.Mana {
 	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
 	accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil || !exists {
@@ -357,7 +360,7 @@ func calculateValidatorReward(t *testing.T, ts *testsuite.TestSuite, accountID i
 	rewardEpoch := startEpoch
 	decayedRewards := iotago.Mana(0)
 
-	for _, reward := range rewards {
+	for _, reward := range epochRewards {
 		if reward.Mana >= fixedCost {
 			rewardWithoutFixedCost := uint64(reward.Mana) - uint64(fixedCost)
 
