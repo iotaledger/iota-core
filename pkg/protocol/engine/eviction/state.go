@@ -329,7 +329,7 @@ func (s *State) activeIndexRange(targetSlot iotago.SlotIndex) (startSlot iotago.
 		return genesisSlot, targetSlot
 	}
 
-	rootBlocksWindowStart := targetSlot - maxCommittableAge
+	rootBlocksWindowStart := targetSlot - maxCommittableAge + 1
 
 	if latestNonEmptySlot := s.settings.LatestNonEmptySlot(); rootBlocksWindowStart > latestNonEmptySlot {
 		rootBlocksWindowStart = latestNonEmptySlot

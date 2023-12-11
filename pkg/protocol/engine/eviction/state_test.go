@@ -21,7 +21,7 @@ func TestState_RootBlocks(t *testing.T) {
 	TestAPISmallMCA := iotago.V3API(iotago.NewV3SnapshotProtocolParameters(
 		iotago.WithStorageOptions(0, 0, 0, 0, 0, 0),               // zero storage score
 		iotago.WithWorkScoreOptions(0, 1, 0, 0, 0, 0, 0, 0, 0, 0), // all blocks workscore = 1
-		iotago.WithLivenessOptions(5, 9, 1, 2, 4),
+		iotago.WithLivenessOptions(5, 9, 1, 3, 4),
 	))
 
 	prunableStorage := prunable.New(database.Config{
