@@ -6,10 +6,10 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -20,25 +20,21 @@ const latestNonEmptySlotKey = 1
 type State struct {
 	Events *Events
 
+	apiProvider          iotago.APIProvider
 	rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error)
 	lastEvictedSlot      iotago.SlotIndex
 	latestNonEmptyStore  kvstore.KVStore
 	evictionMutex        syncutils.RWMutex
-
-	genesisRootBlockFunc func() iotago.BlockID
-
-	optsRootBlocksEvictionDelay iotago.SlotIndex
 }
 
 // NewState creates a new eviction State.
-func NewState(latestNonEmptyStore kvstore.KVStore, rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error), genesisRootBlockFunc func() iotago.BlockID, opts ...options.Option[State]) (state *State) {
-	return options.Apply(&State{
-		Events:                      NewEvents(),
-		rootBlockStorageFunc:        rootBlockStorageFunc,
-		latestNonEmptyStore:         latestNonEmptyStore,
-		genesisRootBlockFunc:        genesisRootBlockFunc,
-		optsRootBlocksEvictionDelay: 3,
-	}, opts)
+func NewState(engine *engine.Engine, latestNonEmptyStore kvstore.KVStore, rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error)) (state *State) {
+	return &State{
+		apiProvider:          engine,
+		Events:               NewEvents(),
+		rootBlockStorageFunc: rootBlockStorageFunc,
+		latestNonEmptyStore:  latestNonEmptyStore,
+	}
 }
 
 func (s *State) Initialize(lastCommittedSlot iotago.SlotIndex) {
@@ -48,18 +44,24 @@ func (s *State) Initialize(lastCommittedSlot iotago.SlotIndex) {
 
 func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 	s.evictionMutex.Lock()
-	s.lastEvictedSlot = slot
 
-	if delayedIndex, shouldEvictRootBlocks := s.delayedBlockEvictionThreshold(slot); shouldEvictRootBlocks {
-		// Remember the last slot outside our cache window that has root blocks.
-		if storage, err := s.rootBlockStorageFunc(delayedIndex); err != nil {
-			_ = storage.StreamKeys(func(_ iotago.BlockID) error {
-				s.setLatestNonEmptySlot(delayedIndex)
+	protocolParams := s.apiProvider.APIForSlot(slot).ProtocolParameters()
+	genesisSlot := protocolParams.GenesisSlot()
+	maxCommittableAge := protocolParams.MaxCommittableAge()
 
-				return ierrors.New("stop iteration")
-			})
-		}
+	if slot < maxCommittableAge+genesisSlot {
+		return
 	}
+
+	// We allow a maxCommittableAge window of available root blocks.
+	evictionSlot := slot - maxCommittableAge
+
+	// We do not evict slots that are empty
+	if evictionSlot >= s.latestNonEmptySlot() {
+		return
+	}
+
+	s.lastEvictedSlot = slot
 
 	s.evictionMutex.Unlock()
 
@@ -118,6 +120,8 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 	if err := lo.PanicOnErr(s.rootBlockStorageFunc(id.Slot())).Store(id, commitmentID); err != nil {
 		panic(ierrors.Wrapf(err, "failed to store root block %s", id))
 	}
+
+	s.setLatestNonEmptySlot(id.Slot())
 }
 
 // RemoveRootBlock removes a solid entry points from the map.
@@ -373,11 +377,4 @@ func (s *State) delayedBlockEvictionThreshold(slot iotago.SlotIndex) (thresholdS
 	}
 
 	return genesisSlot, false
-}
-
-// WithRootBlocksEvictionDelay sets the time since confirmation threshold.
-func WithRootBlocksEvictionDelay(evictionDelay iotago.SlotIndex) options.Option[State] {
-	return func(s *State) {
-		s.optsRootBlocksEvictionDelay = evictionDelay
-	}
 }

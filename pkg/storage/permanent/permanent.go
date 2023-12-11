@@ -82,14 +82,6 @@ func (p *Permanent) Accounts(optRealm ...byte) kvstore.KVStore {
 	return lo.PanicOnErr(p.accounts.WithExtendedRealm(optRealm))
 }
 
-func (p *Permanent) LatestNonEmptySlot(optRealm ...byte) kvstore.KVStore {
-	if len(optRealm) == 0 {
-		return p.latestNonEmptySlot
-	}
-
-	return lo.PanicOnErr(p.latestNonEmptySlot.WithExtendedRealm(optRealm))
-}
-
 func (p *Permanent) UTXOLedger() *utxoledger.Manager {
 	return p.utxoLedger
 }

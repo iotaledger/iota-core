@@ -33,8 +33,9 @@ type Settings struct {
 	store                            kvstore.KVStore
 	storeSnapshotImported            *kvstore.TypedValue[bool]
 	storeLatestCommitment            *kvstore.TypedValue[*model.Commitment]
+	storeLatestNonEmptySlot          *kvstore.TypedValue[iotago.SlotIndex]
 	storeLatestFinalizedSlot         *kvstore.TypedValue[iotago.SlotIndex]
-	storeLatestProcessedSlot         *kvstore.TypedValue[iotago.SlotIndex]
+	storeLatestStoredSlot            *kvstore.TypedValue[iotago.SlotIndex]
 	storeLatestIssuedValidationBlock *kvstore.TypedValue[*model.Block]
 
 	mutex                            syncutils.RWMutex
@@ -77,7 +78,7 @@ func NewSettings(store kvstore.KVStore, opts ...options.Option[iotago.EpochBased
 			iotago.SlotIndex.Bytes,
 			iotago.SlotIndexFromBytes,
 		),
-		storeLatestProcessedSlot: kvstore.NewTypedValue(
+		storeLatestStoredSlot: kvstore.NewTypedValue(
 			store,
 			[]byte{latestStoredSlotKey},
 			iotago.SlotIndex.Bytes,
@@ -258,7 +259,6 @@ func (s *Settings) SetLatestCommitment(latestCommitment *model.Commitment) (err 
 
 func (s *Settings) latestCommitment() *model.Commitment {
 	commitment, err := s.storeLatestCommitment.Get()
-
 	if err != nil {
 		if ierrors.Is(err, kvstore.ErrKeyNotFound) {
 			return model.NewEmptyCommitment(s.apiProvider.CommittedAPI())
@@ -289,11 +289,11 @@ func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 }
 
 func (s *Settings) LatestStoredSlot() iotago.SlotIndex {
-	return read(s.storeLatestProcessedSlot)
+	return read(s.storeLatestStoredSlot)
 }
 
 func (s *Settings) SetLatestStoredSlot(slot iotago.SlotIndex) (err error) {
-	return s.storeLatestProcessedSlot.Set(slot)
+	return s.storeLatestStoredSlot.Set(slot)
 }
 
 func (s *Settings) AdvanceLatestStoredSlot(slot iotago.SlotIndex) (err error) {
@@ -303,7 +303,7 @@ func (s *Settings) AdvanceLatestStoredSlot(slot iotago.SlotIndex) (err error) {
 		return nil
 	}
 
-	if _, err = s.storeLatestProcessedSlot.Compute(func(latestStoredSlot iotago.SlotIndex, _ bool) (newValue iotago.SlotIndex, err error) {
+	if _, err = s.storeLatestStoredSlot.Compute(func(latestStoredSlot iotago.SlotIndex, _ bool) (newValue iotago.SlotIndex, err error) {
 		if latestStoredSlot >= slot {
 			return latestStoredSlot, kvstore.ErrTypedValueNotChanged
 		}
