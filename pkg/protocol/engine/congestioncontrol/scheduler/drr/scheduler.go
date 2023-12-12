@@ -171,25 +171,16 @@ func (s *Scheduler) Start() {
 
 // IssuerQueueBlockCount returns the number of blocks in the queue of the given issuer.
 func (s *Scheduler) IssuerQueueBlockCount(issuerID iotago.AccountID) int {
-	s.bufferMutex.RLock()
-	defer s.bufferMutex.RUnlock()
-
 	return s.basicBuffer.IssuerQueueBlockCount(issuerID)
 }
 
 // IssuerQueueWork returns the queue size of the given issuer in work units.
 func (s *Scheduler) IssuerQueueWork(issuerID iotago.AccountID) iotago.WorkScore {
-	s.bufferMutex.RLock()
-	defer s.bufferMutex.RUnlock()
-
 	return s.basicBuffer.IssuerQueueWork(issuerID)
 }
 
 // ValidatorQueueBlockCount returns the number of validation blocks in the validator queue of the given issuer.
 func (s *Scheduler) ValidatorQueueBlockCount(issuerID iotago.AccountID) int {
-	s.bufferMutex.RLock()
-	defer s.bufferMutex.RUnlock()
-
 	validatorQueue, exists := s.validatorBuffer.Get(issuerID)
 	if !exists {
 		return 0
@@ -198,18 +189,12 @@ func (s *Scheduler) ValidatorQueueBlockCount(issuerID iotago.AccountID) int {
 	return validatorQueue.Size()
 }
 
-// BufferSize returns the current buffer size of the Scheduler as block count.
+// BasicBufferSize returns the current buffer size of the Scheduler as block count.
 func (s *Scheduler) BasicBufferSize() int {
-	s.bufferMutex.RLock()
-	defer s.bufferMutex.RUnlock()
-
 	return s.basicBuffer.Size()
 }
 
 func (s *Scheduler) ValidatorBufferSize() int {
-	s.bufferMutex.RLock()
-	defer s.bufferMutex.RUnlock()
-
 	return s.validatorBuffer.Size()
 }
 
@@ -418,7 +403,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 
 	s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 		if s.selectValidationBlockWithoutLocking(validatorQueue) {
-			s.validatorBuffer.size--
+			s.validatorBuffer.size.Dec()
 		}
 
 		return true

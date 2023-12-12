@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -32,6 +33,8 @@ type Tracker struct {
 
 	performanceFactorsMutex syncutils.RWMutex
 	mutex                   syncutils.RWMutex
+
+	log.Logger
 }
 
 func NewTracker(
@@ -43,6 +46,7 @@ func NewTracker(
 	latestAppliedEpoch iotago.EpochIndex,
 	apiProvider iotago.APIProvider,
 	errHandler func(error),
+	logger log.Logger,
 ) *Tracker {
 	return &Tracker{
 		nextEpochCommitteeCandidates:   shrinkingmap.New[iotago.AccountID, iotago.SlotIndex](),
@@ -54,6 +58,7 @@ func NewTracker(
 		latestAppliedEpoch:             latestAppliedEpoch,
 		apiProvider:                    apiProvider,
 		errHandler:                     errHandler,
+		Logger:                         logger,
 	}
 }
 
@@ -212,12 +217,12 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	}
 
 	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
-		validatorPerformances := make([]*model.ValidatorPerformance, timeProvider.EpochDurationSlots())
+		validatorPerformances := make([]*model.ValidatorPerformance, 0, timeProvider.EpochDurationSlots())
+
 		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
 			validatorSlotPerformances, err := t.validatorPerformancesFunc(slot)
 			if err != nil {
 				validatorPerformances = append(validatorPerformances, nil)
-
 				continue
 			}
 
@@ -233,8 +238,11 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 			validatorPerformances = append(validatorPerformances, validatorPerformance)
 		}
-		pf := t.aggregatePerformanceFactors(validatorPerformances, epoch)
-		if pf == 0 {
+
+		// Aggregate the performance factor of the epoch which approximates the average of the slot's performance factor.
+		epochPerformanceFactor := t.aggregatePerformanceFactors(validatorPerformances, epoch)
+
+		if epochPerformanceFactor == 0 {
 			// no rewards for this pool, we do not set pool rewards at all,
 			// to differientiate between situation when poolReward == fixedCost (no reward for delegators)
 
@@ -247,11 +255,14 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			committee.TotalStake(),
 			pool.PoolStake,
 			pool.ValidatorStake,
-			pf,
+			epochPerformanceFactor,
 		)
 		if err != nil {
 			panic(ierrors.Wrapf(err, "failed to calculate pool rewards for account %s", accountID))
 		}
+
+		t.LogDebug("PerformanceFactor", "accountID", accountID, "epochPerformanceFactor", epochPerformanceFactor, "poolReward", poolReward)
+
 		if err = rewardsMap.Set(accountID, &model.PoolRewards{
 			PoolStake:   pool.PoolStake,
 			PoolRewards: poolReward,
@@ -286,6 +297,7 @@ func (t *Tracker) aggregatePerformanceFactors(slotActivityVector []*model.Valida
 		if pf == nil {
 			continue
 		}
+
 		// each one bit represents at least one block issued in that subslot,
 		// we reward not only total number of blocks issued, but also regularity based on block timestamp
 		slotPerformanceFactor := bits.OnesCount32(pf.SlotActivityVector)

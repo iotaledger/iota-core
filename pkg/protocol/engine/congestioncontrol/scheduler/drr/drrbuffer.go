@@ -5,6 +5,8 @@ import (
 	"math"
 	"time"
 
+	"go.uber.org/atomic"
+
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -19,7 +21,7 @@ type BufferQueue struct {
 	activeIssuers *shrinkingmap.ShrinkingMap[iotago.AccountID, *ring.Ring]
 	ring          *ring.Ring
 	// size is the number of blocks in the buffer.
-	size int
+	size atomic.Int64
 
 	tokenBucket      float64
 	lastScheduleTime time.Time
@@ -57,7 +59,7 @@ func (b *BufferQueue) Clear() {
 
 // Size returns the total number of blocks in BufferQueue.
 func (b *BufferQueue) Size() int {
-	return b.size
+	return int(b.size.Load())
 }
 
 // IssuerQueue returns the queue for the corresponding issuer.
@@ -125,7 +127,7 @@ func (b *BufferQueue) RemoveIssuerQueue(issuerID iotago.AccountID) {
 	if !isIQ {
 		panic("buffer contains elements that are not issuer queues")
 	}
-	b.size -= issuerQueue.Size()
+	b.size.Sub(int64(issuerQueue.Size()))
 
 	b.ringRemove(element)
 	b.activeIssuers.Delete(issuerID)
@@ -156,7 +158,7 @@ func (b *BufferQueue) Submit(blk *blocks.Block, issuerQueue *IssuerQueue, quantu
 		return nil, false
 	}
 
-	b.size++
+	b.size.Inc()
 
 	// if max buffer size exceeded, drop from tail of the longest mana-scaled queue
 	if b.Size() > maxBuffer {
@@ -180,7 +182,7 @@ func (b *BufferQueue) Unsubmit(block *blocks.Block) bool {
 		return false
 	}
 
-	b.size--
+	b.size.Dec()
 
 	return true
 }
@@ -268,7 +270,7 @@ func (b *BufferQueue) PopFront() *blocks.Block {
 
 	}
 
-	b.size--
+	b.size.Dec()
 
 	return block
 }
@@ -298,7 +300,7 @@ func (b *BufferQueue) dropTail(quantumFunc func(iotago.AccountID) Deficit, maxBu
 		maxIssuerID := b.longestQueueIssuerID(quantumFunc)
 		if longestQueue := b.IssuerQueue(maxIssuerID); longestQueue != nil {
 			if tail := longestQueue.RemoveTail(); tail != nil {
-				b.size--
+				b.size.Dec()
 				droppedBlocks = append(droppedBlocks, tail)
 			}
 		}

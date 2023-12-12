@@ -14,7 +14,6 @@ func (t *TestSuite) AssertAccountStake(accountID iotago.AccountID, validatorStak
 	nodes ...*mock.Node) {
 	for _, node := range nodes {
 		t.Eventually(func() error {
-
 			actualAccountData, exists, err := node.Protocol.Engines.Main.Get().Ledger.Account(accountID, node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot())
 			if err != nil {
 				return ierrors.Wrap(err, "AssertAccountData: failed to load account data")

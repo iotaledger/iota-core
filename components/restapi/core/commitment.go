@@ -76,3 +76,33 @@ func getUTXOChanges(commitmentID iotago.CommitmentID) (*api.UTXOChangesResponse,
 		ConsumedOutputs: consumedOutputs,
 	}, nil
 }
+
+func getUTXOChangesFull(commitmentID iotago.CommitmentID) (*api.UTXOChangesFullResponse, error) {
+	diffs, err := deps.Protocol.Engines.Main.Get().Ledger.SlotDiffs(commitmentID.Slot())
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get slot diffs, commitmentID: %s, slot: %d, error: %w", commitmentID, commitmentID.Slot(), err)
+	}
+
+	createdOutputs := make([]*api.OutputWithID, len(diffs.Outputs))
+	consumedOutputs := make([]*api.OutputWithID, len(diffs.Spents))
+
+	for i, output := range diffs.Outputs {
+		createdOutputs[i] = &api.OutputWithID{
+			OutputID: output.OutputID(),
+			Output:   output.Output(),
+		}
+	}
+
+	for i, output := range diffs.Spents {
+		consumedOutputs[i] = &api.OutputWithID{
+			OutputID: output.OutputID(),
+			Output:   output.Output().Output(),
+		}
+	}
+
+	return &api.UTXOChangesFullResponse{
+		CommitmentID:    commitmentID,
+		CreatedOutputs:  createdOutputs,
+		ConsumedOutputs: consumedOutputs,
+	}, nil
+}
