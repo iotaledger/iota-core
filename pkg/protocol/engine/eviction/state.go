@@ -10,8 +10,6 @@ import (
 	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 
-	// "github.com/iotaledger/hive.go/serializer/v2"
-	// "github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
@@ -67,8 +65,9 @@ func (s *State) LastEvictedSlot() iotago.SlotIndex {
 	return s.lastCommittedSlot
 }
 
-// InRootBlockSlot checks if the Block associated with the given id is too old.
-func (s *State) InRootBlockSlot(id iotago.BlockID) bool {
+// InActiveRootBlockRange checks if the Block associated with the given id is within the active root block range with
+// respect to the latest committed slot.
+func (s *State) InActiveRootBlockRange(id iotago.BlockID) bool {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
@@ -165,8 +164,8 @@ func (s *State) RemoveRootBlock(id iotago.BlockID) {
 	}
 }
 
-// IsRootBlock returns true if the given block is a root block.
-func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
+// IsActiveRootBlock returns true if the given block is an _active_ root block.
+func (s *State) IsActiveRootBlock(id iotago.BlockID) (has bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
 
@@ -182,14 +181,10 @@ func (s *State) IsRootBlock(id iotago.BlockID) (has bool) {
 	return lo.PanicOnErr(storage.Has(id))
 }
 
-// RootBlockCommitmentID returns the commitmentID if it is a known root block.
+// RootBlockCommitmentID returns the commitmentID if it is a known root block, _no matter if active or not_.
 func (s *State) RootBlockCommitmentID(id iotago.BlockID) (commitmentID iotago.CommitmentID, exists bool) {
 	s.evictionMutex.RLock()
 	defer s.evictionMutex.RUnlock()
-
-	if !s.withinActiveIndexRange(id.Slot()) {
-		return iotago.CommitmentID{}, false
-	}
 
 	storage, err := s.rootBlockStorageFunc(id.Slot())
 	if err != nil {
@@ -214,6 +209,7 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 	defer s.evictionMutex.RUnlock()
 
 	start, _ := s.activeIndexRange(lowerTarget)
+
 	latestNonEmptySlot := s.settings.APIProvider().APIForSlot(targetSlot).ProtocolParameters().GenesisSlot()
 
 	if err := stream.WriteCollection(writer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
@@ -233,12 +229,12 @@ func (s *State) Export(writer io.WriteSeeker, lowerTarget iotago.SlotIndex, targ
 
 				elementsCount++
 
+				latestNonEmptySlot = currentSlot
+
 				return
 			}); err != nil {
 				return 0, ierrors.Wrap(err, "failed to stream root blocks")
 			}
-
-			latestNonEmptySlot = currentSlot
 		}
 
 		return elementsCount, nil
