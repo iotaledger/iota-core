@@ -1,7 +1,6 @@
 package eviction
 
 import (
-	"errors"
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -15,8 +14,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
-
-const latestNonEmptySlotKey = 1
 
 // State represents the state of the eviction and keeps track of the root blocks.
 type State struct {
@@ -54,7 +51,7 @@ func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 
 	s.evictionMutex.Unlock()
 
-	// We only delay eviction in the Eviction State, but components evict on committment, which in this context is slot.
+	// We only delay eviction in the Eviction State, but components evict on commitment, which in this context is slot.
 	s.Events.SlotEvicted.Trigger(slot)
 }
 
@@ -124,7 +121,7 @@ func (s *State) LatestActiveRootBlock() (iotago.BlockID, iotago.CommitmentID) {
 			latestSlotCommitmentID = commitmentID
 
 			// We want the newest rootblock.
-			return errors.New("stop iteration")
+			return ierrors.New("stop iteration")
 		})
 
 		// We found the most recent root block in this slot.
@@ -151,7 +148,9 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 		panic(ierrors.Wrapf(err, "failed to store root block %s", id))
 	}
 
-	s.settings.AdvanceLatestNonEmptySlot(id.Slot())
+	if err := s.settings.AdvanceLatestNonEmptySlot(id.Slot()); err != nil {
+		panic(ierrors.Wrapf(err, "failed to advance latest non empty slot to %d", id.Slot()))
+	}
 }
 
 // RemoveRootBlock removes a solid entry points from the map.
@@ -276,7 +275,9 @@ func (s *State) Import(reader io.ReadSeeker) error {
 		return ierrors.Wrap(err, "failed to read latest non empty slot")
 	}
 
-	s.settings.SetLatestNonEmptySlot(latestNonEmptySlot)
+	if err := s.settings.SetLatestNonEmptySlot(latestNonEmptySlot); err != nil {
+		return ierrors.Wrapf(err, "failed to set latest non empty slot to %d", latestNonEmptySlot)
+	}
 
 	return nil
 }
@@ -297,7 +298,9 @@ func (s *State) Rollback(lowerTarget iotago.SlotIndex, targetSlot iotago.SlotInd
 		latestNonEmptySlot = currentSlot
 	}
 
-	s.settings.SetLatestNonEmptySlot(latestNonEmptySlot)
+	if err := s.settings.SetLatestNonEmptySlot(latestNonEmptySlot); err != nil {
+		return ierrors.Wrapf(err, "failed to set latest non empty slot to %d", latestNonEmptySlot)
+	}
 
 	return nil
 }
