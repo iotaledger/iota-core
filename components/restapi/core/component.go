@@ -51,7 +51,7 @@ type dependencies struct {
 func configure() error {
 	// check if RestAPI plugin is disabled
 	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
+		Component.LogFatalf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
 	}
 
 	routeGroup := deps.RestRouteManager.AddRoute(api.CorePluginName)

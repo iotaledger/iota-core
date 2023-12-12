@@ -13,7 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/discovery/util"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 )
@@ -21,7 +21,7 @@ import (
 type Manager struct {
 	networkID        string
 	p2pManager       *p2p.Manager
-	log              *logger.Logger
+	logger           log.Logger
 	host             host.Host
 	peerDB           *network.DB
 	startOnce        sync.Once
@@ -33,13 +33,13 @@ type Manager struct {
 }
 
 // NewManager creates a new autopeering manager.
-func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *network.DB, log *logger.Logger) *Manager {
+func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *network.DB, logger log.Logger) *Manager {
 	return &Manager{
 		networkID:  networkID,
 		p2pManager: p2pManager,
 		host:       host,
 		peerDB:     peerDB,
-		log:        log,
+		logger:     logger,
 	}
 }
 
@@ -64,16 +64,16 @@ func (m *Manager) Start(ctx context.Context) (err error) {
 		for _, seedPeer := range m.peerDB.SeedPeers() {
 			addrInfo := seedPeer.ToAddrInfo()
 			if innerErr := m.host.Connect(ctx, *addrInfo); innerErr != nil {
-				m.log.Infoln("Failed to connect to bootstrap node:", seedPeer, innerErr)
+				m.logger.LogInfof("Failed to connect to bootstrap node, peer: %s, error: %s", seedPeer, innerErr)
 				continue
 			}
 
 			if _, innerErr := kademliaDHT.RoutingTable().TryAddPeer(addrInfo.ID, true, true); innerErr != nil {
-				m.log.Warnln("Failed to add bootstrap node to routing table:", innerErr)
+				m.logger.LogWarnf("Failed to add bootstrap node to routing table, error: %s", innerErr)
 				continue
 			}
 
-			m.log.Debugln("Connected to bootstrap node:", seedPeer)
+			m.logger.LogDebugf("Connected to bootstrap node, peer: %s", seedPeer)
 		}
 
 		m.routingDiscovery = routing.NewRoutingDiscovery(kademliaDHT)
@@ -119,10 +119,10 @@ func (m *Manager) discoverAndDialPeers() {
 	tctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
 	defer cancel()
 
-	m.log.Debugf("Discovering peers for network ID %s", m.networkID)
+	m.logger.LogDebugf("Discovering peers for network ID %s", m.networkID)
 	peerChan, err := m.routingDiscovery.FindPeers(tctx, m.networkID)
 	if err != nil {
-		m.log.Warnf("Failed to find peers: %s", err)
+		m.logger.LogWarnf("Failed to find peers: %s", err)
 	}
 
 	for peerAddrInfo := range peerChan {
@@ -131,15 +131,15 @@ func (m *Manager) discoverAndDialPeers() {
 			continue
 		}
 
-		m.log.Debugf("Found peer: %s", peerAddrInfo)
+		m.logger.LogDebugf("Found peer: %s", peerAddrInfo)
 
 		peer := network.NewPeerFromAddrInfo(&peerAddrInfo)
 		if err := m.p2pManager.DialPeer(m.ctx, peer); err != nil {
 			if ierrors.Is(err, p2p.ErrDuplicateNeighbor) {
-				m.log.Debugf("Already connected to peer %s", peer)
+				m.logger.LogDebugf("Already connected to peer %s", peer)
 				continue
 			}
-			m.log.Warnf("Failed to dial peer %s: %s", peer, err)
+			m.logger.LogWarnf("Failed to dial peer %s: %s", peer, err)
 		}
 	}
 }

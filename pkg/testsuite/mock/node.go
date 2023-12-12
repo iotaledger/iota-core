@@ -3,7 +3,6 @@ package mock
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -51,7 +50,9 @@ type InvalidSignedTransactionEvent struct {
 }
 
 type Node struct {
-	Testing *testing.T
+	Testing        *testing.T
+	logger         log.Logger
+	loggerShutdown func()
 
 	Name       string
 	Validator  *BlockIssuer
@@ -74,7 +75,6 @@ type Node struct {
 	candidateEngineActivatedCount atomic.Uint32
 	mainEngineSwitchedCount       atomic.Uint32
 
-	logHandler          slog.Handler
 	enableEngineLogging bool
 
 	mutex                    syncutils.RWMutex
@@ -84,7 +84,7 @@ type Node struct {
 	invalidTransactionEvents map[iotago.SignedTransactionID]InvalidSignedTransactionEvent
 }
 
-func NewNode(t *testing.T, net *Network, partition string, name string, validator bool, logHandler slog.Handler) *Node {
+func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition string, name string, validator bool) *Node {
 	keyManager := lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath))
 	priv, pub := keyManager.KeyPair()
 
@@ -101,8 +101,12 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		validatorBlockIssuer = nil
 	}
 
+	logger, loggerShutdown := parentLogger.NewChildLogger(name)
+
 	return &Node{
-		Testing: t,
+		Testing:        t,
+		logger:         logger,
+		loggerShutdown: loggerShutdown,
 
 		Name: name,
 
@@ -115,7 +119,6 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		Endpoint:  net.JoinWithEndpointID(peerID, partition),
 		Workers:   workerpool.NewGroup(name),
 
-		logHandler:          logHandler,
 		enableEngineLogging: true,
 
 		attachedBlocks:           make([]*blocks.Block, 0),
@@ -133,7 +136,7 @@ func (n *Node) IsValidator() bool {
 
 func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[protocol.Protocol]) {
 	n.Protocol = protocol.New(
-		log.NewLogger(n.Name, n.logHandler),
+		n.logger,
 		n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
@@ -483,6 +486,7 @@ func (n *Node) Shutdown() {
 	}
 
 	<-stopped
+	n.loggerShutdown()
 }
 
 func (n *Node) ProtocolParametersHash() iotago.Identifier {

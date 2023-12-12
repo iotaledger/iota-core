@@ -104,7 +104,7 @@ func initConfigParams(c *dig.Container) error {
 	if err := c.Provide(func() cfgResult {
 		dbEngine, err := hivedb.EngineFromStringAllowed(ParamsDatabase.Engine, database.AllowedEnginesDefault)
 		if err != nil {
-			Component.LogPanic(err)
+			Component.LogFatal(err.Error())
 		}
 
 		return cfgResult{
@@ -113,7 +113,7 @@ func initConfigParams(c *dig.Container) error {
 			ProtocolParameters: readProtocolParameters(),
 		}
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogFatal(err.Error())
 	}
 
 	return nil
@@ -132,15 +132,15 @@ func provide(c *dig.Container) error {
 		pruningSizeEnabled := ParamsDatabase.Size.Enabled
 		pruningTargetDatabaseSizeBytes, err := bytes.Parse(ParamsDatabase.Size.TargetSize)
 		if err != nil {
-			Component.LogPanicf("parameter %s invalid", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)))
+			Component.LogFatalf("parameter %s invalid", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)))
 		}
 
 		if pruningSizeEnabled && pruningTargetDatabaseSizeBytes == 0 {
-			Component.LogPanicf("%s has to be specified if %s is enabled", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)), Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.Enabled)))
+			Component.LogFatalf("%s has to be specified if %s is enabled", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)), Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.Enabled)))
 		}
 
 		return protocol.New(
-			log.NewLogger("node"),
+			log.NewLogger(log.WithName("node")),
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
@@ -309,7 +309,7 @@ func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		if err := deps.Protocol.Run(ctx); err != nil {
 			if !ierrors.Is(err, context.Canceled) {
-				Component.LogErrorfAndExit("Error running the Protocol: %s", err.Error())
+				Component.LogFatal("Error running the Protocol: %s", err.Error())
 			}
 		}
 

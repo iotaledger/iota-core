@@ -2,8 +2,6 @@ package testsuite
 
 import (
 	"fmt"
-	"log/slog"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -76,7 +74,7 @@ type TestSuite struct {
 	optsSnapshotOptions []options.Option[snapshotcreator.Options]
 	optsWaitFor         time.Duration
 	optsTick            time.Duration
-	optsLogHandler      slog.Handler
+	optsLogger          log.Logger
 
 	uniqueBlockTimeCounter              atomic.Int64
 	automaticTransactionIssuingCounters shrinkingmap.ShrinkingMap[string, int]
@@ -98,9 +96,9 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 		blocks:                              shrinkingmap.New[string, *blocks.Block](),
 		automaticTransactionIssuingCounters: *shrinkingmap.New[string, int](),
 
-		optsWaitFor:    durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
-		optsTick:       durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
-		optsLogHandler: log.NewTextHandler(os.Stdout),
+		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
+		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
+		optsLogger:  log.NewLogger(log.WithName("TestSuite")),
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 
@@ -339,7 +337,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 		panic(fmt.Sprintf("cannot add validator node %s to partition %s: framework already running", name, partition))
 	}
 
-	node := mock.NewNode(t.Testing, t.network, partition, name, validator, t.optsLogHandler)
+	node := mock.NewNode(t.Testing, t.optsLogger, t.network, partition, name, validator)
 	t.nodes.Set(name, node)
 	node.SetCurrentSlot(t.currentSlot)
 

@@ -91,7 +91,7 @@ func (t *TestSuite) InitPerformanceTracker() {
 		t.latestCommittedEpoch,
 		iotago.SingleVersionProvider(t.api),
 		func(err error) {},
-		log.NewLogger("PerfTestsuite"),
+		log.NewLogger(log.WithName("PerfTestsuite")),
 	)
 }
 

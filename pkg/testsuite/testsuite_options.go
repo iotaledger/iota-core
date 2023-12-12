@@ -1,10 +1,10 @@
 package testsuite
 
 import (
-	"log/slog"
 	"os"
 	"time"
 
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -40,9 +40,9 @@ func WithProtocolParametersOptions(protocolParameterOptions ...options.Option[io
 	}
 }
 
-func WithLogHandler(logHandler slog.Handler) options.Option[TestSuite] {
+func WithLogger(logger log.Logger) options.Option[TestSuite] {
 	return func(t *TestSuite) {
-		t.optsLogHandler = logHandler
+		t.optsLogger = logger
 	}
 }
 

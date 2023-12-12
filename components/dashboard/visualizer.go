@@ -109,7 +109,7 @@ func runVisualizer(component *app.Component) {
 		unhook()
 		component.LogInfo("Stopping Dashboard[Visualizer] ... done")
 	}, daemon.PriorityDashboard); err != nil {
-		component.LogPanicf("Failed to start as daemon: %s", err)
+		component.LogFatalf("Failed to start as daemon: %s", err)
 	}
 }
 

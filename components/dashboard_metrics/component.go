@@ -65,7 +65,7 @@ type dependencies struct {
 func configure() error {
 	// check if RestAPI plugin is disabled
 	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogPanicf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
+		Component.LogFatalf("RestAPI plugin needs to be enabled to use the %s plugin", Component.Name)
 	}
 	configureComponentCountersEvents()
 
@@ -88,7 +88,7 @@ func configure() error {
 }
 
 func run() error {
-	Component.Logger().Infof("Starting %s ...", Component.Name)
+	Component.Logger().LogInfof("Starting %s ...", Component.Name)
 	if err := Component.Daemon().BackgroundWorker("DashboardMetricsUpdater", func(ctx context.Context) {
 		// Do not block until the Ticker is shutdown because we might want to start multiple Tickers and we can
 		// safely ignore the last execution when shutting down.
@@ -99,7 +99,7 @@ func run() error {
 		// Wait before terminating so we get correct log blocks from the daemon regarding the shutdown order.
 		<-ctx.Done()
 	}, daemon.PriorityDashboardMetrics); err != nil {
-		Component.LogPanicf("failed to start worker: %s", err)
+		Component.LogFatalf("failed to start worker: %s", err)
 	}
 
 	return nil

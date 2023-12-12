@@ -25,7 +25,7 @@ func runSlotsLiveFeed(component *app.Component) {
 		hook.Unhook()
 		component.LogInfo("Stopping Dashboard[SlotsLiveFeed] ... done")
 	}, daemon.PriorityDashboard); err != nil {
-		component.LogPanicf("Failed to start as daemon: %s", err)
+		component.LogFatalf("Failed to start as daemon: %s", err)
 	}
 }
 

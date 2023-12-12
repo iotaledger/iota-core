@@ -3,7 +3,7 @@ package management
 import (
 	"github.com/labstack/echo/v4"
 
-	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
@@ -89,7 +89,7 @@ func listPeers(_ echo.Context) (*api.PeersResponse, error) {
 	return nil, nil
 }
 
-func addPeer(_ echo.Context, _ *logger.Logger) (*api.PeerInfo, error) {
+func addPeer(_ echo.Context, _ log.Logger) (*api.PeerInfo, error) {
 	/*
 
 		request := &addPeerRequest{}
