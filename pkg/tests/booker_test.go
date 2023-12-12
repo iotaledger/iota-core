@@ -820,7 +820,7 @@ func Test_RootBlockShallowLike(t *testing.T) {
 
 	ts.IssueBlocksAtSlots("", []iotago.SlotIndex{2, 3, 4}, 2, "block", ts.Nodes(), true, false)
 
-	ts.AssertActiveRootBlocks(ts.Blocks("Genesis", "block1", "block2", "2.1-node1"), ts.Nodes()...)
+	ts.AssertActiveRootBlocks(append(ts.Blocks("Genesis", "block1", "block2"), ts.BlocksWithPrefix("2.")...), ts.Nodes()...)
 
 	ts.IssueBasicBlockWithOptions("block-shallow-like-valid", wallet, &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("4.1-node1")), mock.WithShallowLikeParents(ts.BlockID("block1")), mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(5)))
 	ts.AssertBlocksInCacheBooked(ts.Blocks("block-shallow-like-valid"), true, node1)

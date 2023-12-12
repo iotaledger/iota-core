@@ -68,7 +68,7 @@ func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expecte
 				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error loading commitment for slot: %d", node.Name, slot)
 			}
 
-			committedSlot, err := node.Protocol.Engines.Main.Get().CommittedSlot(storedCommitment.ID())
+			committedSlot, err := node.Protocol.Engines.Main.Get().CommitmentAPI(storedCommitment.ID())
 			if err != nil {
 				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error getting committed slot for commitment: %s", node.Name, storedCommitment.ID())
 			}

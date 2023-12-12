@@ -18,7 +18,6 @@ const (
 	commitmentsPrefix
 	ledgerPrefix
 	accountsPrefix
-	latestNonEmptySlotPrefix
 )
 
 type Permanent struct {
@@ -29,9 +28,8 @@ type Permanent struct {
 	settings    *Settings
 	commitments *Commitments
 
-	utxoLedger         *utxoledger.Manager
-	accounts           kvstore.KVStore
-	latestNonEmptySlot kvstore.KVStore
+	utxoLedger *utxoledger.Manager
+	accounts   kvstore.KVStore
 
 	optsEpochBasedProvider []options.Option[iotago.EpochBasedProvider]
 }
@@ -48,7 +46,6 @@ func New(dbConfig database.Config, errorHandler func(error), opts ...options.Opt
 		p.commitments = NewCommitments(lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{commitmentsPrefix})), p.settings.APIProvider())
 		p.utxoLedger = utxoledger.New(lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{ledgerPrefix})), p.settings.APIProvider())
 		p.accounts = lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{accountsPrefix}))
-		p.latestNonEmptySlot = lo.PanicOnErr(p.store.KVStore().WithExtendedRealm(kvstore.Realm{latestNonEmptySlotPrefix}))
 	})
 }
 
@@ -80,14 +77,6 @@ func (p *Permanent) Accounts(optRealm ...byte) kvstore.KVStore {
 	}
 
 	return lo.PanicOnErr(p.accounts.WithExtendedRealm(optRealm))
-}
-
-func (p *Permanent) LatestNonEmptySlot(optRealm ...byte) kvstore.KVStore {
-	if len(optRealm) == 0 {
-		return p.latestNonEmptySlot
-	}
-
-	return lo.PanicOnErr(p.latestNonEmptySlot.WithExtendedRealm(optRealm))
 }
 
 func (p *Permanent) UTXOLedger() *utxoledger.Manager {

@@ -26,7 +26,7 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20231207181026-f482ac139305
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231206124511-b78dc962031f
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231206124145-f773dfe3927e
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231212145358-c1ab7e90922b
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231211160706-492c65d5e3f5
 	github.com/labstack/echo/v4 v4.11.3
 	github.com/labstack/gommon v0.4.1
 	github.com/libp2p/go-libp2p v0.32.0
@@ -42,7 +42,6 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.1
 	golang.org/x/crypto v0.16.0
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
 )
@@ -169,6 +168,7 @@ require (
 	go.uber.org/mock v0.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/image v0.13.0 // indirect
 	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/net v0.19.0 // indirect

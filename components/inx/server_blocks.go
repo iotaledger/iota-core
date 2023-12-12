@@ -19,9 +19,12 @@ import (
 )
 
 func (s *Server) ReadActiveRootBlocks(_ context.Context, _ *inx.NoParams) (*inx.RootBlocksResponse, error) {
-	activeRootBlocks := deps.Protocol.Engines.Main.Get().EvictionState.ActiveRootBlocks()
+	latestRootBlockID, latestRootBlockSlotCommitmentID := deps.Protocol.Engines.Main.Get().EvictionState.LatestActiveRootBlock()
 
-	return inx.WrapRootBlocks(activeRootBlocks), nil
+	// TODO: we should maybe change the INX API to return only the latest rootblock instead of the whole active set.
+	return inx.WrapRootBlocks(map[iotago.BlockID]iotago.CommitmentID{
+		latestRootBlockID: latestRootBlockSlotCommitmentID,
+	}), nil
 }
 
 func (s *Server) ReadBlock(_ context.Context, blockID *inx.BlockId) (*inx.RawBlock, error) {

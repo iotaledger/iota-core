@@ -54,8 +54,8 @@ github.com/iotaledger/hive.go/stringify v0.0.0-20231207181026-f482ac139305 h1:Kj
 github.com/iotaledger/hive.go/stringify v0.0.0-20231207181026-f482ac139305/go.mod h1:FTo/UWzNYgnQ082GI9QVM9HFDERqf9rw9RivNpqrnTs=
 github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00 h1:j5udgLtSN6wQgFI9vnhkdJsqsVdJmwtoc0yOmT/Ila4=
 github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00/go.mod h1:gt+URx7DZu414nZME7jtGgxR4DVTSnNa1jF2trTUTZ0=
-github.com/iotaledger/iota.go/v4 v4.0.0-20231212145358-c1ab7e90922b h1:7PY2gZIi6D0DeKTLdtz6ECWip8Z9KTUQvxN3GP0QMm8=
-github.com/iotaledger/iota.go/v4 v4.0.0-20231212145358-c1ab7e90922b/go.mod h1:jU3Jlnhwv4KWlpft84lu9/M0QkCykESl29bL4oCenKs=
+github.com/iotaledger/iota.go/v4 v4.0.0-20231211160706-492c65d5e3f5 h1:2iQUEuYvuyeYtZBr6bRoM4xFLxRiQ66aBPgKuJTirh0=
+github.com/iotaledger/iota.go/v4 v4.0.0-20231211160706-492c65d5e3f5/go.mod h1:jU3Jlnhwv4KWlpft84lu9/M0QkCykESl29bL4oCenKs=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
 github.com/ipfs/go-cid v0.4.1/go.mod h1:uQHwDeX4c6CtyrFwdqyhpNcxVewur1M7l7fNU7LKwZk=
 github.com/klauspost/cpuid/v2 v2.2.5 h1:0E5MSMDEoAulmXNFquVs//DdoomxaoTY1kUhbc/qbZg=

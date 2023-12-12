@@ -38,18 +38,14 @@ type Protocol struct {
 	// Chains contains the chains that are managed by the protocol.
 	Chains *Chains
 
-	// BlocksProtocol contains the subcomponent that is responsible for handling block requests and responses.
-	BlocksProtocol *BlocksProtocol
+	// Blocks contains the subcomponent that is responsible for handling block requests and responses.
+	Blocks *Blocks
 
-	// CommitmentsProtocol contains the subcomponent that is responsible for handling commitment requests and responses.
-	CommitmentsProtocol *CommitmentsProtocol
+	// Attestations contains the subcomponent that is responsible for handling attestation requests and responses.
+	Attestations *Attestations
 
-	// AttestationsProtocol contains the subcomponent that is responsible for handling attestation requests and
-	// responses.
-	AttestationsProtocol *AttestationsProtocol
-
-	// WarpSyncProtocol contains the subcomponent that is responsible for handling warp sync requests and responses.
-	WarpSyncProtocol *WarpSyncProtocol
+	// WarpSync contains the subcomponent that is responsible for handling warp sync requests and responses.
+	WarpSync *WarpSync
 
 	// Engines contains the engines that are managed by the protocol.
 	Engines *Engines
@@ -149,19 +145,16 @@ func (p *Protocol) LatestAPI() iotago.API {
 // initSubcomponents initializes the subcomponents of the protocol and returns a function that shuts them down.
 func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown func()) {
 	p.Network = core.NewProtocol(networkEndpoint, p.Workers.CreatePool("NetworkProtocol"), p)
-	p.BlocksProtocol = newBlocksProtocol(p)
-	p.CommitmentsProtocol = newCommitmentsProtocol(p)
-	p.AttestationsProtocol = newAttestationsProtocol(p)
-	p.WarpSyncProtocol = newWarpSyncProtocol(p)
+	p.Blocks = newBlocks(p)
+	p.Attestations = newAttestations(p)
+	p.WarpSync = newWarpSync(p)
 	p.Commitments = newCommitments(p)
 	p.Chains = newChains(p)
 	p.Engines = newEngines(p)
 
 	return func() {
-		p.BlocksProtocol.Shutdown()
-		p.CommitmentsProtocol.Shutdown()
-		p.AttestationsProtocol.Shutdown()
-		p.WarpSyncProtocol.Shutdown()
+		p.Blocks.Shutdown()
+		p.WarpSync.Shutdown()
 		p.Network.Shutdown()
 		p.Workers.WaitChildren()
 		p.Engines.Shutdown.Trigger()
@@ -172,8 +165,9 @@ func (p *Protocol) initSubcomponents(networkEndpoint network.Endpoint) (shutdown
 // initEviction initializes the eviction of old data when the engine advances and returns a function that shuts it down.
 func (p *Protocol) initEviction() (shutdown func()) {
 	return p.Commitments.Root.OnUpdate(func(_ *Commitment, rootCommitment *Commitment) {
-		// TODO: DECIDE ON DATA AVAILABILITY TIMESPAN / EVICTION STRATEGY
-		// p.Evict(rootCommitment.Slot() - 1)
+		if rootSlot := rootCommitment.Slot(); rootSlot > 0 {
+			p.Evict(rootSlot - 1)
+		}
 	})
 }
 
@@ -193,14 +187,14 @@ func (p *Protocol) initGlobalEventsRedirection() (shutdown func()) {
 func (p *Protocol) initNetwork() (shutdown func()) {
 	return lo.Batch(
 		p.Network.OnError(func(err error, peer peer.ID) { p.LogError("network error", "peer", peer, "error", err) }),
-		p.Network.OnBlockReceived(p.BlocksProtocol.ProcessResponse),
-		p.Network.OnBlockRequestReceived(p.BlocksProtocol.ProcessRequest),
-		p.Network.OnCommitmentReceived(p.CommitmentsProtocol.ProcessResponse),
-		p.Network.OnCommitmentRequestReceived(p.CommitmentsProtocol.ProcessRequest),
-		p.Network.OnAttestationsReceived(p.AttestationsProtocol.ProcessResponse),
-		p.Network.OnAttestationsRequestReceived(p.AttestationsProtocol.ProcessRequest),
-		p.Network.OnWarpSyncResponseReceived(p.WarpSyncProtocol.ProcessResponse),
-		p.Network.OnWarpSyncRequestReceived(p.WarpSyncProtocol.ProcessRequest),
+		p.Network.OnBlockReceived(p.Blocks.ProcessResponse),
+		p.Network.OnBlockRequestReceived(p.Blocks.ProcessRequest),
+		p.Network.OnCommitmentReceived(p.Commitments.processResponse),
+		p.Network.OnCommitmentRequestReceived(p.Commitments.processRequest),
+		p.Network.OnAttestationsReceived(p.Attestations.processResponse),
+		p.Network.OnAttestationsRequestReceived(p.Attestations.processRequest),
+		p.Network.OnWarpSyncResponseReceived(p.WarpSync.ProcessResponse),
+		p.Network.OnWarpSyncRequestReceived(p.WarpSync.ProcessRequest),
 	)
 }
 
