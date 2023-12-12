@@ -377,17 +377,21 @@ func (c *Chain) attestedWeight() reactive.Variable[uint64] {
 // winsTieBreak returns true if this chain wins the tie-break against the other chain (by comparing the IDs of the
 // commitments where both chains diverged), which is only used when two chains have exactly the same weight.
 func (c *Chain) winsTieBreak(other *Chain) bool {
+	// sanity check: if both chains are the same, then this chain does not win the tie-break
 	if c == other {
 		return false
 	}
 
+	// iterate over the chains ancestors until we find where they diverged
 	for chainA, chainB := c, other; ; {
+		// sanity check: if one of the chains is nil, the other one wins the tie-break
 		if chainA == nil {
 			return false
 		} else if chainB == nil {
 			return true
 		}
 
+		// sanity check: if one of the chains has no forking point, the other one wins the tie-break
 		forkingPointA, forkingPointB := chainA.ForkingPoint.Get(), chainB.ForkingPoint.Get()
 		if forkingPointA == nil {
 			return false
@@ -395,23 +399,19 @@ func (c *Chain) winsTieBreak(other *Chain) bool {
 			return true
 		}
 
+		// iterate by traversing the parent of the chain with the higher forking point until we reach the other chain
+		// and then compare the IDs of the commitments where both chains diverged
 		if forkingPointA.Slot() > forkingPointB.Slot() {
 			if chainA = chainA.ParentChain.Get(); chainA == chainB {
-				divergencePointB, exists := chainB.Commitment(forkingPointA.Slot())
-				if !exists {
-					return true
-				}
+				divergencePointB, divergencePointBExists := chainB.Commitment(forkingPointA.Slot())
 
-				return bytes.Compare(lo.PanicOnErr(forkingPointA.ID().Bytes()), lo.PanicOnErr(divergencePointB.ID().Bytes())) > 0
+				return !divergencePointBExists || bytes.Compare(lo.PanicOnErr(forkingPointA.ID().Bytes()), lo.PanicOnErr(divergencePointB.ID().Bytes())) > 0
 			}
 		} else {
 			if chainB = chainB.ParentChain.Get(); chainB == chainA {
-				divergencePointA, exists := chainA.Commitment(forkingPointB.Slot())
-				if !exists {
-					return false
-				}
+				divergencePointA, divergencePointAExists := chainA.Commitment(forkingPointB.Slot())
 
-				return bytes.Compare(lo.PanicOnErr(divergencePointA.ID().Bytes()), lo.PanicOnErr(forkingPointB.ID().Bytes())) > 0
+				return divergencePointAExists && bytes.Compare(lo.PanicOnErr(divergencePointA.ID().Bytes()), lo.PanicOnErr(forkingPointB.ID().Bytes())) > 0
 			}
 		}
 	}
