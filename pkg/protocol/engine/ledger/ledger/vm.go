@@ -28,7 +28,6 @@ func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []mempool.
 	}
 
 	for _, input := range stardustTransaction.TransactionEssence.Inputs {
-
 		switch input.Type() {
 		case iotago.InputUTXO:
 			//nolint:forcetypeassert // we can safely assume that this is a UTXOInput
@@ -47,11 +46,13 @@ func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []mempool.
 			inputReferences = append(inputReferences, mempool.CommitmentInputStateRefFromInput(
 				contextInput.(*iotago.CommitmentInput),
 			))
-		case iotago.ContextInputBlockIssuanceCredit | iotago.ContextInputReward:
-			// These context inputs do not need to be resolved.
+		// These context inputs do not need to be resolved.
+		case iotago.ContextInputBlockIssuanceCredit:
+			continue
+		case iotago.ContextInputReward:
 			continue
 		default:
-			return nil, ierrors.Errorf("unrecognized input type %d", contextInput.Type())
+			return nil, ierrors.Errorf("unrecognized context input type %d", contextInput.Type())
 		}
 	}
 

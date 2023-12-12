@@ -715,7 +715,7 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 	switch stateRef.Type() {
 	case utxoledger.StateTypeUTXOInput:
 		//nolint:forcetypeassert // we can safely assume that this is a UTXOInputStateRef
-		utxoInput := stateRef.(*mempool.UTXOInputStateRef).Input
+		utxoInput := stateRef.(mempool.UTXOInputStateRef).Input
 		isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(utxoInput.OutputID())
 		if err != nil {
 			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "error while retrieving output %s: %w", utxoInput.OutputID(), err))
@@ -734,7 +734,7 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 		return p.Resolve(output)
 	case utxoledger.StateTypeCommitment:
 		//nolint:forcetypeassert // we can safely assume that this is a CommitmentInputStateRef
-		commitment := stateRef.(*mempool.CommitmentInputStateRef).Input
+		commitment := stateRef.(mempool.CommitmentInputStateRef).Input
 		loadedCommitment, err := l.loadCommitment(commitment.CommitmentID)
 		if err != nil {
 			return p.Reject(ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.Wrapf(err, "failed to load commitment %s", commitment.CommitmentID)))
