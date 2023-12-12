@@ -1,8 +1,6 @@
 package testsuite
 
 import (
-	"fmt"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -20,7 +18,6 @@ func (t *TestSuite) AssertBlock(block *blocks.Block, node *mock.Node) *model.Blo
 		var exists bool
 		loadedBlock, exists = node.Protocol.Engines.Main.Get().Block(block.ID())
 		if !exists {
-			fmt.Println("loadedBlock ", block.ID())
 			return ierrors.Errorf("AssertBlock: %s: block %s does not exist", node.Name, block.ID())
 		}
 

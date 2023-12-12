@@ -332,12 +332,6 @@ func (s *Settings) SetLatestNonEmptySlot(slot iotago.SlotIndex) (err error) {
 }
 
 func (s *Settings) AdvanceLatestNonEmptySlot(slot iotago.SlotIndex) (err error) {
-	// We don't need to advance the latest stored slot if it's already ahead of the given slot.
-	// We check this before Compute to avoid contention inside the TypedValue.
-	if s.LatestNonEmptySlot() >= slot {
-		return nil
-	}
-
 	if _, err = s.storeLatestNonEmptySlot.Compute(func(latestNonEmptySlot iotago.SlotIndex, _ bool) (newValue iotago.SlotIndex, err error) {
 		if latestNonEmptySlot >= slot {
 			return latestNonEmptySlot, kvstore.ErrTypedValueNotChanged

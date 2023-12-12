@@ -723,7 +723,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block2.1"):           {"tx1"},
 			ts.Block("n2-pending-genesis"): {"tx1"},
-			// ts.Block("n2-pending-commit1"): {}, // no conflits inherited as the block merges orphaned conflicts.
+			ts.Block("n2-pending-commit1"): {}, // no conflits inherited as the block merges orphaned conflicts.
 		}, node2)
 	}
 
@@ -753,7 +753,7 @@ func Test_SpendPendingCommittedRace(t *testing.T) {
 		ts.AssertBlocksInCacheConflicts(map[*blocks.Block][]string{
 			ts.Block("block2.1"):           {"tx1"},
 			ts.Block("n2-pending-genesis"): {"tx1"},
-			// ts.Block("n2-pending-commit1"): {}, // no conflits inherited as the block merges orphaned conflicts.
+			ts.Block("n2-pending-commit1"): {}, // no conflits inherited as the block merges orphaned conflicts.
 		}, node1, node2)
 
 		ts.AssertTransactionsInCachePending(wallet.Transactions("tx1", "tx2"), true, node1, node2)

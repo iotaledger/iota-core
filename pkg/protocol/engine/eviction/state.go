@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/serializer/v2"
@@ -92,11 +93,6 @@ func (s *State) AllActiveRootBlocks() map[iotago.BlockID]iotago.CommitmentID {
 		})
 	}
 
-	// We include genesis as a root block if the start of our active window is the genesis slot.
-	if startSlot == s.settings.APIProvider().APIForSlot(s.lastCommittedSlot).ProtocolParameters().GenesisSlot() {
-		activeRootBlocks[s.settings.APIProvider().CommittedAPI().ProtocolParameters().GenesisBlockID()] = model.NewEmptyCommitment(s.settings.APIProvider().CommittedAPI()).ID()
-	}
-
 	return activeRootBlocks
 }
 
@@ -148,7 +144,7 @@ func (s *State) AddRootBlock(id iotago.BlockID, commitmentID iotago.CommitmentID
 		panic(ierrors.Wrapf(err, "failed to store root block %s", id))
 	}
 
-	if err := s.settings.AdvanceLatestNonEmptySlot(id.Slot()); err != nil {
+	if err := s.settings.AdvanceLatestNonEmptySlot(id.Slot()); err != nil && !ierrors.Is(err, kvstore.ErrTypedValueNotChanged) {
 		panic(ierrors.Wrapf(err, "failed to advance latest non empty slot to %d", id.Slot()))
 	}
 }
@@ -316,7 +312,7 @@ func (s *State) activeIndexRange(targetSlot iotago.SlotIndex) (startSlot iotago.
 		return genesisSlot, targetSlot
 	}
 
-	rootBlocksWindowStart := targetSlot - maxCommittableAge + 1
+	rootBlocksWindowStart := (targetSlot - maxCommittableAge) + 1
 
 	if latestNonEmptySlot := s.settings.LatestNonEmptySlot(); rootBlocksWindowStart > latestNonEmptySlot {
 		rootBlocksWindowStart = latestNonEmptySlot

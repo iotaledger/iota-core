@@ -28,7 +28,7 @@ type TipSelection struct {
 	// spendDAG is the SpendDAG that is used to track spenders.
 	spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
 
-	// rootBlock is a function that returns the current root blocks.
+	// rootBlock is a function that returns the latest root block.
 	rootBlock func() iotago.BlockID
 
 	// livenessThreshold is a function that is used to determine the liveness threshold for a tip.
@@ -83,11 +83,11 @@ func New(opts ...options.Option[TipSelection]) *TipSelection {
 //
 // This method is separated from the constructor so the TipSelection can be initialized lazily after all dependencies
 // are available.
-func (t *TipSelection) Construct(tipManager tipmanager.TipManager, spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlocksRetriever func() iotago.BlockID, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
+func (t *TipSelection) Construct(tipManager tipmanager.TipManager, spendDAG spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank], transactionMetadataRetriever func(iotago.TransactionID) (mempool.TransactionMetadata, bool), rootBlockRetriever func() iotago.BlockID, livenessThresholdFunc func(tipmanager.TipMetadata) time.Duration) *TipSelection {
 	t.tipManager = tipManager
 	t.spendDAG = spendDAG
 	t.transactionMetadata = transactionMetadataRetriever
-	t.rootBlock = rootBlocksRetriever
+	t.rootBlock = rootBlockRetriever
 	t.livenessThreshold = livenessThresholdFunc
 
 	t.TriggerConstructed()
