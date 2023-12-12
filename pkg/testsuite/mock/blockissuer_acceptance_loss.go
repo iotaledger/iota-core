@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -12,18 +13,7 @@ func (i *BlockIssuer) reviveChain(issuingTime time.Time, node *Node) (*iotago.Co
 	apiForSlot := node.Protocol.APIForSlot(lastCommittedSlot)
 
 	// Get a rootblock as recent as possible for the parent.
-	parentBlockID := iotago.EmptyBlockID
-	for rootBlock := range node.Protocol.Engines.Main.Get().EvictionState.ActiveRootBlocks() {
-		if rootBlock.Slot() > parentBlockID.Slot() {
-			parentBlockID = rootBlock
-		}
-
-		// Exit the loop if we found a rootblock in the last committed slot (which is the highest we can get).
-		if parentBlockID.Slot() == lastCommittedSlot {
-			break
-		}
-	}
-
+	parentBlockID := lo.Return1(node.Protocol.Engines.Main.Get().EvictionState.LatestActiveRootBlock())
 	issuingSlot := apiForSlot.TimeProvider().SlotFromTime(issuingTime)
 
 	// Force commitments until minCommittableAge relative to the block's issuing time. We basically "pretend" that

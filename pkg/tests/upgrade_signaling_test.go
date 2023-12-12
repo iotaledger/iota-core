@@ -239,8 +239,8 @@ func Test_Upgrade_Signaling(t *testing.T) {
 
 	{
 		var expectedRootBlocks []*blocks.Block
-		for _, slot := range []iotago.SlotIndex{39, 40, 41} {
-			expectedRootBlocks = append(expectedRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+		for _, slot := range []iotago.SlotIndex{38, 39, 40, 41} {
+			expectedRootBlocks = append(expectedRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.", slot))...)
 		}
 
 		ts.AssertNodeState(ts.Nodes(),
@@ -297,8 +297,8 @@ func Test_Upgrade_Signaling(t *testing.T) {
 	// Restart node (and add protocol parameters) and add another node from snapshot (also with protocol parameters already set).
 	{
 		var expectedRootBlocks []*blocks.Block
-		for _, slot := range []iotago.SlotIndex{59, 60, 61} {
-			expectedRootBlocks = append(expectedRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+		for _, slot := range []iotago.SlotIndex{58, 59, 60, 61} {
+			expectedRootBlocks = append(expectedRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.", slot))...)
 		}
 
 		ts.AssertNodeState(ts.Nodes(),

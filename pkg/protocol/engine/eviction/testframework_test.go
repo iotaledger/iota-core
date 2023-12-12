@@ -81,7 +81,7 @@ func (t *TestFramework) RootBlocks(aliases ...string) map[iotago.BlockID]iotago.
 
 func (t *TestFramework) RequireActiveRootBlocks(expected ...string) {
 	expectedRootBlocks := t.RootBlocks(expected...)
-	gotActiveRootBlocks := t.Instance.ActiveRootBlocks()
+	gotActiveRootBlocks := t.Instance.AllActiveRootBlocks()
 	require.Equalf(t.Testing, expectedRootBlocks, gotActiveRootBlocks, "active root blocks do not match, expected: %v, got: %v", expectedRootBlocks, gotActiveRootBlocks)
 }
 
@@ -99,7 +99,7 @@ func (t *TestFramework) RequireStorageRootBlocks(expected ...string) {
 
 		loadedCommitmentID, exists, err := rootBlockStorage.Load(blockID)
 		require.NoError(t.Testing, err)
-		require.True(t.Testing, exists)
+		require.True(t.Testing, exists, "expected blockID %s to exist in rootBlockStorage", blockID)
 		require.Equal(t.Testing, commitmentID, loadedCommitmentID)
 	}
 }

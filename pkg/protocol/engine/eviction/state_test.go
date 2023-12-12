@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
+	"github.com/iotaledger/iota-core/pkg/storage/permanent"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -16,15 +17,24 @@ func TestState_RootBlocks(t *testing.T) {
 	errorHandler := func(err error) {
 		t.Error(err)
 	}
+
+	TestAPISmallMCA := iotago.V3API(iotago.NewV3SnapshotProtocolParameters(
+		iotago.WithStorageOptions(0, 0, 0, 0, 0, 0),               // zero storage score
+		iotago.WithWorkScoreOptions(0, 1, 0, 0, 0, 0, 0, 0, 0, 0), // all blocks workscore = 1
+		iotago.WithLivenessOptions(5, 9, 1, 3, 4),
+	))
+
 	prunableStorage := prunable.New(database.Config{
 		Engine:    hivedb.EngineMapDB,
 		Directory: t.TempDir(),
 	}, iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), errorHandler)
 
-	ts := NewTestFramework(t, prunableStorage, eviction.NewState(mapdb.NewMapDB(), prunableStorage.RootBlocks, func() iotago.BlockID {
-		return tpkg.ZeroCostTestAPI.ProtocolParameters().GenesisBlockID()
-	}, eviction.WithRootBlocksEvictionDelay(3)))
-	ts.CreateAndAddRootBlock("Genesis", 0, iotago.NewEmptyCommitment(tpkg.ZeroCostTestAPI).MustID())
+	newSettings := permanent.NewSettings(mapdb.NewMapDB())
+	newSettings.StoreProtocolParametersForStartEpoch(TestAPISmallMCA.ProtocolParameters(), 0)
+
+	ts := NewTestFramework(t, prunableStorage, eviction.NewState(newSettings, prunableStorage.RootBlocks))
+
+	ts.CreateAndAddRootBlock("Genesis", 0, iotago.NewEmptyCommitment(TestAPISmallMCA).MustID())
 	ts.RequireActiveRootBlocks("Genesis")
 	ts.RequireLastEvictedSlot(0)
 
