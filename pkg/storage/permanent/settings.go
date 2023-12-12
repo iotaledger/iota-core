@@ -332,6 +332,11 @@ func (s *Settings) SetLatestNonEmptySlot(slot iotago.SlotIndex) (err error) {
 }
 
 func (s *Settings) AdvanceLatestNonEmptySlot(slot iotago.SlotIndex) (err error) {
+	// Avoid write-locking within the Compute with an early check.
+	if s.LatestNonEmptySlot() >= slot {
+		return nil
+	}
+
 	if _, err = s.storeLatestNonEmptySlot.Compute(func(latestNonEmptySlot iotago.SlotIndex, _ bool) (newValue iotago.SlotIndex, err error) {
 		if latestNonEmptySlot >= slot {
 			return latestNonEmptySlot, kvstore.ErrTypedValueNotChanged
