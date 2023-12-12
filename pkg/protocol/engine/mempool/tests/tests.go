@@ -8,6 +8,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -63,14 +64,14 @@ func TestProcessTransaction(t *testing.T, tf *TestFramework) {
 }
 
 func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
-	tf.InjectState("readOnlyInput", &iotago.Commitment{
+	tf.InjectState("readOnlyInput", mempool.CommitmentInputStateFromCommitment(&iotago.Commitment{
 		ProtocolVersion:      0,
 		Slot:                 0,
 		PreviousCommitmentID: iotago.CommitmentID{},
 		RootsID:              iotago.Identifier{},
 		CumulativeWeight:     0,
 		ReferenceManaCost:    0,
-	})
+	}))
 
 	tf.CreateTransaction("tx1", []string{"genesis", "readOnlyInput"}, 1)
 	tf.CreateTransaction("tx2", []string{"tx1:0", "readOnlyInput"}, 1)
@@ -85,7 +86,7 @@ func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
-		if state.State().Type() == iotago.InputUTXO {
+		if state.State().Type() == utxoledger.StateTypeUTXOInput {
 			require.False(t, state.IsAccepted())
 			require.Equal(t, 1, state.PendingSpenderCount())
 		}
@@ -97,12 +98,12 @@ func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
-		if state.State().Type() == iotago.InputUTXO {
+		if state.State().Type() == utxoledger.StateTypeUTXOInput {
 			require.False(t, state.IsAccepted())
 			require.Equal(t, 0, state.PendingSpenderCount())
 		}
 
-		if state.State().Type() == iotago.InputCommitment {
+		if state.State().Type() == utxoledger.StateTypeCommitment {
 			require.False(t, state.IsAccepted())
 			require.Equal(t, 2, state.PendingSpenderCount())
 		}

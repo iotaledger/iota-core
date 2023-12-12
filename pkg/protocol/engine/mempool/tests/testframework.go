@@ -15,6 +15,7 @@ import (
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -95,10 +96,10 @@ func (t *TestFramework) CreateTransaction(alias string, referencedStates []strin
 
 	// register the aliases for the generated output IDs
 	for i := uint16(0); i < transaction.outputCount; i++ {
-		t.referencesByAlias[alias+":"+strconv.Itoa(int(i))] = &iotago.UTXOInput{
+		t.referencesByAlias[alias+":"+strconv.Itoa(int(i))] = mempool.UTXOInputStateRefFromInput(&iotago.UTXOInput{
 			TransactionID:          transactionID,
 			TransactionOutputIndex: i,
-		}
+		})
 
 		t.stateIDByAlias[alias+":"+strconv.Itoa(int(i))] = t.referencesByAlias[alias+":"+strconv.Itoa(int(i))].ReferencedStateID()
 	}
@@ -181,7 +182,7 @@ func (t *TestFramework) OutputStateMetadata(alias string) (mempool.StateMetadata
 
 func (t *TestFramework) StateID(alias string) mempool.StateID {
 	if alias == "genesis" {
-		return (&iotago.UTXOInput{}).ReferencedStateID()
+		return (&iotago.UTXOInput{}).OutputID().Identifier()
 	}
 
 	stateID, exists := t.stateIDByAlias[alias]
@@ -324,7 +325,7 @@ func (t *TestFramework) setupHookedEvents() {
 
 func (t *TestFramework) stateReference(alias string) mempool.StateReference {
 	if alias == "genesis" {
-		return &iotago.UTXOInput{}
+		return mempool.UTXOInputStateRefFromInput(&iotago.UTXOInput{})
 	}
 
 	reference, exists := t.referencesByAlias[alias]
@@ -414,10 +415,10 @@ func (t *TestFramework) Cleanup() {
 
 type genericReference struct {
 	referencedStateID iotago.Identifier
-	stateType         iotago.StateType
+	stateType         utxoledger.StateType
 }
 
-func NewStateReference(referencedStateID iotago.Identifier, stateType iotago.StateType) mempool.StateReference {
+func NewStateReference(referencedStateID iotago.Identifier, stateType utxoledger.StateType) mempool.StateReference {
 	return &genericReference{
 		referencedStateID: referencedStateID,
 		stateType:         stateType,
@@ -428,6 +429,6 @@ func (g *genericReference) ReferencedStateID() iotago.Identifier {
 	return g.referencedStateID
 }
 
-func (g *genericReference) Type() iotago.StateType {
+func (g *genericReference) Type() utxoledger.StateType {
 	return g.stateType
 }

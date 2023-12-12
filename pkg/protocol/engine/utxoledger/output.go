@@ -47,8 +47,8 @@ func (o *Output) StateID() iotago.Identifier {
 	return iotago.IdentifierFromData(lo.PanicOnErr(o.outputID.Bytes()))
 }
 
-func (o *Output) Type() iotago.StateType {
-	return iotago.InputUTXO
+func (o *Output) Type() StateType {
+	return StateTypeUTXOInput
 }
 
 func (o *Output) IsReadOnly() bool {

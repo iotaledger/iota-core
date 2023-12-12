@@ -1,11 +1,41 @@
 package mempool
 
-import iotago "github.com/iotaledger/iota.go/v4"
+import (
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	iotago "github.com/iotaledger/iota.go/v4"
+)
 
+// A generic interface over a state (like an output or a commitment).
 type State interface {
+	// The identifier of the state.
 	StateID() StateID
 
-	Type() iotago.StateType
+	// The type of state.
+	Type() utxoledger.StateType
 
+	// Whether the state is read only.
 	IsReadOnly() bool
+}
+
+// A thin wrapper around a resolved commitment.
+type CommitmentInputState struct {
+	Commitment *iotago.Commitment
+}
+
+func (s CommitmentInputState) StateID() StateID {
+	return s.Commitment.MustID().Identifier()
+}
+
+func (s CommitmentInputState) Type() utxoledger.StateType {
+	return utxoledger.StateTypeCommitment
+}
+
+func (s CommitmentInputState) IsReadOnly() bool {
+	return true
+}
+
+func CommitmentInputStateFromCommitment(commitment *iotago.Commitment) CommitmentInputState {
+	return CommitmentInputState{
+		Commitment: commitment,
+	}
 }

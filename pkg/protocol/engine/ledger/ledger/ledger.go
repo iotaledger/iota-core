@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
@@ -266,7 +267,8 @@ func (l *Ledger) Output(outputID iotago.OutputID) (*utxoledger.Output, error) {
 }
 
 func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *utxoledger.Spent, error) {
-	stateWithMetadata, err := l.memPool.StateMetadata(outputID.UTXOInput())
+	stateRef := mempool.UTXOInputStateRefFromInput(outputID.UTXOInput())
+	stateWithMetadata, err := l.memPool.StateMetadata(stateRef)
 	if err != nil {
 		if ierrors.Is(iotago.ErrInputAlreadySpent, err) {
 			l.utxoLedger.ReadLockLedger()
@@ -613,7 +615,7 @@ func (l *Ledger) processStateDiffTransactions(stateDiff mempool.StateDiff) (spen
 		// process outputs
 		{
 			// input side
-			for _, inputRef := range inputRefs {
+			for _, inputRef := range lo.Map(inputRefs, mempool.UTXOInputStateRefFromInput) {
 				stateWithMetadata, stateError := l.memPool.StateMetadata(inputRef)
 				if stateError != nil {
 					err = ierrors.Errorf("failed to retrieve outputs of %s: %w", txID, errInput)
@@ -711,39 +713,36 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 	defer l.utxoLedger.ReadUnlockLedger()
 
 	switch stateRef.Type() {
-	case iotago.InputUTXO:
-		//nolint:forcetypeassert // we can safely assume that this is an UTXOInput
-		concreteStateRef := stateRef.(*iotago.UTXOInput)
-		isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(concreteStateRef.OutputID())
+	case utxoledger.StateTypeUTXOInput:
+		//nolint:forcetypeassert // we can safely assume that this is a UTXOInputStateRef
+		utxoInput := stateRef.(*mempool.UTXOInputStateRef).Input
+		isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(utxoInput.OutputID())
 		if err != nil {
-			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "error while retrieving output %s: %w", concreteStateRef.OutputID(), err))
+			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "error while retrieving output %s: %w", utxoInput.OutputID(), err))
 		}
 
 		if !isUnspent {
-			return p.Reject(ierrors.Join(iotago.ErrInputAlreadySpent, ierrors.Wrapf(mempool.ErrStateNotFound, "unspent output %s not found", concreteStateRef.OutputID())))
+			return p.Reject(ierrors.Join(iotago.ErrInputAlreadySpent, ierrors.Wrapf(mempool.ErrStateNotFound, "unspent output %s not found", utxoInput.OutputID())))
 		}
 
 		// possible to cast `stateRef` to more specialized interfaces here, e.g. for DustOutput
-		output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(concreteStateRef.OutputID())
+		output, err := l.utxoLedger.ReadOutputByOutputIDWithoutLocking(utxoInput.OutputID())
 		if err != nil {
-			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "output %s not found: %w", concreteStateRef.OutputID(), mempool.ErrStateNotFound))
+			return p.Reject(ierrors.Wrapf(iotago.ErrUTXOInputInvalid, "output %s not found: %w", utxoInput.OutputID(), mempool.ErrStateNotFound))
 		}
 
 		return p.Resolve(output)
-	case iotago.InputCommitment:
-		//nolint:forcetypeassert // we can safely assume that this is an CommitmentInput
-		concreteStateRef := stateRef.(*iotago.CommitmentInput)
-		loadedCommitment, err := l.loadCommitment(concreteStateRef.CommitmentID)
+	case utxoledger.StateTypeCommitment:
+		//nolint:forcetypeassert // we can safely assume that this is a CommitmentInputStateRef
+		commitment := stateRef.(*mempool.CommitmentInputStateRef).Input
+		loadedCommitment, err := l.loadCommitment(commitment.CommitmentID)
 		if err != nil {
-			return p.Reject(ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.Wrapf(err, "failed to load commitment %s", concreteStateRef.CommitmentID)))
+			return p.Reject(ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.Wrapf(err, "failed to load commitment %s", commitment.CommitmentID)))
 		}
 
-		return p.Resolve(loadedCommitment)
-	case iotago.InputBlockIssuanceCredit, iotago.InputReward:
-		//nolint:forcetypeassert
-		return p.Resolve(stateRef.(mempool.State))
+		return p.Resolve(mempool.CommitmentInputStateFromCommitment(loadedCommitment))
 	default:
-		return p.Reject(ierrors.Errorf("unsupported input type %s", stateRef.Type()))
+		return p.Reject(ierrors.Errorf("unsupported input type %d", stateRef.Type()))
 	}
 }
 
