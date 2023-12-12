@@ -5,12 +5,12 @@ go 1.21
 replace github.com/iotaledger/iota-core => ../../
 
 require (
-	github.com/iotaledger/hive.go/crypto v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/lo v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231206114953-6a65a82e30ad
+	github.com/iotaledger/hive.go/crypto v0.0.0-20231207181026-f482ac139305
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20231207181026-f482ac139305
+	github.com/iotaledger/hive.go/lo v0.0.0-20231207181026-f482ac139305
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231207181026-f482ac139305
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231206123921-2af411eef0b5
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231211160706-492c65d5e3f5
 	github.com/mr-tron/base58 v1.2.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.16.0
@@ -27,13 +27,14 @@ require (
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
 	github.com/iotaledger/hive.go/ads v0.0.0-20231205131244-472357435a39 // indirect
-	github.com/iotaledger/hive.go/constraints v0.0.0-20231206114953-6a65a82e30ad // indirect
+	github.com/iotaledger/hive.go/constraints v0.0.0-20231207181026-f482ac139305 // indirect
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231206114953-6a65a82e30ad // indirect
 	github.com/iotaledger/hive.go/ds v0.0.0-20231206114953-6a65a82e30ad // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20231205131244-472357435a39 // indirect
 	github.com/iotaledger/hive.go/log v0.0.0-20231206113509-4b4ff95ac61c // indirect
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231206114953-6a65a82e30ad // indirect
-	github.com/iotaledger/hive.go/stringify v0.0.0-20231206114953-6a65a82e30ad // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20231207181026-f482ac139305 // indirect
+	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/kr/text v0.2.0 // indirect
@@ -56,7 +57,6 @@ require (
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
-	github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
