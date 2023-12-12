@@ -138,15 +138,25 @@ func (c *Chains) initChainSwitching() (shutdown func()) {
 // initHeaviestCandidateTracking initializes the tracking of the heaviest candidates according to the given parameters.
 func (c *Chains) initHeaviestCandidateTracking(candidateVar reactive.Variable[*Chain], weightVar func(*Chain) reactive.Variable[uint64], newCandidate *Chain) (unsubscribe func()) {
 	return weightVar(newCandidate).OnUpdate(func(_ uint64, newWeight uint64) {
-		// abort if the candidate is not heavier than the main chain.
-		if mainChain := c.Main.Get(); newCandidate == mainChain || newWeight <= mainChain.VerifiedWeight.Get() {
+		// abort if the new candidate is already the main chain
+		mainChain := c.Main.Get()
+		if newCandidate == mainChain {
 			return
 		}
 
-		// atomically replace the existing candidate if the new one is heavier.
+		// abort if the new candidate is not heavier than the main chain
+		mainChainWeight := mainChain.VerifiedWeight.Get()
+		if newWeight < mainChainWeight || (newWeight == mainChainWeight && !newCandidate.winsTieBreak(mainChain)) {
+			return
+		}
+
+		// replace the existing candidate if the new candidate is still heavier (atomic operation)
 		candidateVar.Compute(func(currentCandidate *Chain) *Chain {
-			if currentCandidate != nil && !currentCandidate.IsEvicted.WasTriggered() && newWeight <= weightVar(currentCandidate).Get() {
-				return currentCandidate
+			if currentCandidate != nil && !currentCandidate.IsEvicted.WasTriggered() {
+				currentCandidateWeight := weightVar(currentCandidate).Get()
+				if newWeight < currentCandidateWeight || (newWeight == currentCandidateWeight && !newCandidate.winsTieBreak(currentCandidate)) {
+					return currentCandidate
+				}
 			}
 
 			return newCandidate

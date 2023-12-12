@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"bytes"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
@@ -370,4 +372,47 @@ func (c *Chain) verifiedWeight() reactive.Variable[uint64] {
 // "address" the variable across multiple chains in a generic way.
 func (c *Chain) attestedWeight() reactive.Variable[uint64] {
 	return c.AttestedWeight
+}
+
+// winsTieBreak returns true if this chain wins the tie-break against the other chain (by comparing the IDs of the
+// commitments where both chains diverged), which is only used when two chains have exactly the same weight.
+func (c *Chain) winsTieBreak(other *Chain) bool {
+	if c == other {
+		return false
+	}
+
+	for chainA, chainB := c, other; ; {
+		if chainA == nil {
+			return false
+		} else if chainB == nil {
+			return true
+		}
+
+		forkingPointA, forkingPointB := chainA.ForkingPoint.Get(), chainB.ForkingPoint.Get()
+		if forkingPointA == nil {
+			return false
+		} else if forkingPointB == nil {
+			return true
+		}
+
+		if forkingPointA.Slot() > forkingPointB.Slot() {
+			if chainA = chainA.ParentChain.Get(); chainA == chainB {
+				divergencePointB, exists := chainB.Commitment(forkingPointA.Slot())
+				if !exists {
+					return true
+				}
+
+				return bytes.Compare(lo.PanicOnErr(forkingPointA.ID().Bytes()), lo.PanicOnErr(divergencePointB.ID().Bytes())) > 0
+			}
+		} else {
+			if chainB = chainB.ParentChain.Get(); chainB == chainA {
+				divergencePointA, exists := chainA.Commitment(forkingPointB.Slot())
+				if !exists {
+					return false
+				}
+
+				return bytes.Compare(lo.PanicOnErr(divergencePointA.ID().Bytes()), lo.PanicOnErr(forkingPointB.ID().Bytes())) > 0
+			}
+		}
+	}
 }
