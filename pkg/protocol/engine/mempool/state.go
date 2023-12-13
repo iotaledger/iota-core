@@ -1,6 +1,7 @@
 package mempool
 
 import (
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -23,7 +24,7 @@ type CommitmentInputState struct {
 }
 
 func (s CommitmentInputState) StateID() StateID {
-	return s.Commitment.MustID().Identifier()
+	return iotago.IdentifierFromData(lo.PanicOnErr(s.Commitment.MustID().Bytes()))
 }
 
 func (s CommitmentInputState) Type() utxoledger.StateType {
