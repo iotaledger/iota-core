@@ -67,7 +67,7 @@ func initConfigParams(c *dig.Container) error {
 			RestAPILimitsMaxResults: ParamsRestAPI.Limits.MaxResults,
 		}
 	}); err != nil {
-		Component.LogFatal(err.Error())
+		Component.LogPanic(err.Error())
 	}
 
 	return nil
@@ -86,7 +86,7 @@ func provide(c *dig.Container) error {
 
 		return e
 	}); err != nil {
-		Component.LogFatal(err.Error())
+		Component.LogPanic(err.Error())
 	}
 
 	type proxyDeps struct {
@@ -97,13 +97,13 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func(deps proxyDeps) *restapi.RestRouteManager {
 		return restapi.NewRestRouteManager(deps.Echo)
 	}); err != nil {
-		Component.LogFatal(err.Error())
+		Component.LogPanic(err.Error())
 	}
 
 	if err := c.Provide(func(deps dependencies) *blockhandler.BlockHandler {
 		return blockhandler.New(deps.Protocol)
 	}); err != nil {
-		Component.LogFatal(err.Error())
+		Component.LogPanic(err.Error())
 	}
 
 	return nil
@@ -149,7 +149,7 @@ func run() error {
 
 		Component.LogInfo("Stopping REST-API server ... done")
 	}, daemon.PriorityRestAPI); err != nil {
-		Component.LogFatalf("failed to start worker: %s", err)
+		Component.LogPanicf("failed to start worker: %s", err)
 	}
 
 	return nil
