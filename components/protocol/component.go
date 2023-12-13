@@ -104,7 +104,7 @@ func initConfigParams(c *dig.Container) error {
 	if err := c.Provide(func() cfgResult {
 		dbEngine, err := hivedb.EngineFromStringAllowed(ParamsDatabase.Engine, database.AllowedEnginesDefault)
 		if err != nil {
-			Component.LogFatal(err.Error())
+			Component.LogPanic(err.Error())
 		}
 
 		return cfgResult{
@@ -113,7 +113,7 @@ func initConfigParams(c *dig.Container) error {
 			ProtocolParameters: readProtocolParameters(),
 		}
 	}); err != nil {
-		Component.LogFatal(err.Error())
+		Component.LogPanic(err.Error())
 	}
 
 	return nil
@@ -132,11 +132,11 @@ func provide(c *dig.Container) error {
 		pruningSizeEnabled := ParamsDatabase.Size.Enabled
 		pruningTargetDatabaseSizeBytes, err := bytes.Parse(ParamsDatabase.Size.TargetSize)
 		if err != nil {
-			Component.LogFatalf("parameter %s invalid", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)))
+			Component.LogPanicf("parameter %s invalid", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)))
 		}
 
 		if pruningSizeEnabled && pruningTargetDatabaseSizeBytes == 0 {
-			Component.LogFatalf("%s has to be specified if %s is enabled", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)), Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.Enabled)))
+			Component.LogPanicf("%s has to be specified if %s is enabled", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)), Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.Enabled)))
 		}
 
 		return protocol.New(
