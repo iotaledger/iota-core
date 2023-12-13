@@ -58,7 +58,7 @@ func apiMiddleware() echo.MiddlewareFunc {
 		deps.NodePrivateKey,
 	)
 	if err != nil {
-		Component.LogFatalf("JWT auth initialization failed: %w", err)
+		Component.LogPanicf("JWT auth initialization failed: %w", err)
 	}
 
 	jwtAllow := func(c echo.Context, subject string, claims *jwt.AuthClaims) bool {
