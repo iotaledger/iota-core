@@ -98,7 +98,7 @@ func NewTestSuite(testingT *testing.T, opts ...options.Option[TestSuite]) *TestS
 
 		optsWaitFor: durationFromEnvOrDefault(5*time.Second, "CI_UNIT_TESTS_WAIT_FOR"),
 		optsTick:    durationFromEnvOrDefault(2*time.Millisecond, "CI_UNIT_TESTS_TICK"),
-		optsLogger:  log.NewLogger(log.WithName("TestSuite")),
+		optsLogger:  log.NewLogger(),
 	}, opts, func(t *TestSuite) {
 		fmt.Println("Setup TestSuite -", testingT.Name(), " @ ", time.Now())
 
