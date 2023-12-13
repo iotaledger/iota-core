@@ -182,7 +182,7 @@ func (t *TestFramework) OutputStateMetadata(alias string) (mempool.StateMetadata
 
 func (t *TestFramework) StateID(alias string) mempool.StateID {
 	if alias == "genesis" {
-		return (&iotago.UTXOInput{}).OutputID().Identifier()
+		return iotago.IdentifierFromData(lo.PanicOnErr((&iotago.UTXOInput{}).OutputID().Bytes()))
 	}
 
 	stateID, exists := t.stateIDByAlias[alias]
