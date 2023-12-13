@@ -103,13 +103,13 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func(deps autoPeeringDeps) *autopeering.Manager {
 		peersMultiAddresses, err := getMultiAddrsFromString(ParamsPeers.BootstrapPeers)
 		if err != nil {
-			Component.LogPanic("Failed to parse bootstrapPeers param: %s", err)
+			Component.LogFatalf("Failed to parse bootstrapPeers param: %s", err)
 		}
 
 		for _, multiAddr := range peersMultiAddresses {
 			bootstrapPeer, err := network.NewPeerFromMultiAddr(multiAddr)
 			if err != nil {
-				Component.LogPanic("Failed to parse bootstrap peer multiaddress: %s", err)
+				Component.LogFatalf("Failed to parse bootstrap peer multiaddress: %s", err)
 			}
 
 			if err := deps.PeerDB.UpdatePeer(bootstrapPeer); err != nil {
@@ -132,7 +132,7 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func() peerDatabaseResult {
 		peerDB, peerDBKVStore, err := initPeerDB()
 		if err != nil {
-			Component.LogPanic(err.Error())
+			Component.LogFatalf(err.Error())
 		}
 
 		return peerDatabaseResult{
