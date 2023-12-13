@@ -132,7 +132,7 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func() peerDatabaseResult {
 		peerDB, peerDBKVStore, err := initPeerDB()
 		if err != nil {
-			Component.LogFatalf(err.Error())
+			Component.LogFatal(err.Error())
 		}
 
 		return peerDatabaseResult{
@@ -336,7 +336,7 @@ func run() error {
 	if err := Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		deps.ManualPeeringMgr.Start()
 		if err := deps.AutoPeeringMgr.Start(ctx); err != nil {
-			Component.LogFatal("Failed to start autopeering manager: %s", err)
+			Component.LogFatalf("Failed to start autopeering manager: %s", err)
 		}
 
 		defer func() {
@@ -348,20 +348,20 @@ func run() error {
 		connectConfigKnownPeers()
 		<-ctx.Done()
 	}, daemon.PriorityManualPeering); err != nil {
-		Component.LogFatal("Failed to start as daemon: %s", err)
+		Component.LogFatalf("Failed to start as daemon: %s", err)
 	}
 
 	if err := Component.Daemon().BackgroundWorker(fmt.Sprintf("%s-P2PManager", Component.Name), func(ctx context.Context) {
 		defer deps.P2PManager.Shutdown()
 		defer func() {
 			if err := deps.P2PManager.P2PHost().Close(); err != nil {
-				Component.LogWarn("Failed to close libp2p host: %+v", err)
+				Component.LogWarnf("Failed to close libp2p host: %+v", err)
 			}
 		}()
 
 		<-ctx.Done()
 	}, daemon.PriorityP2P); err != nil {
-		Component.LogFatal("Failed to start as daemon: %s", err)
+		Component.LogFatalf("Failed to start as daemon: %s", err)
 	}
 
 	return nil
