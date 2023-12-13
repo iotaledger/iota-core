@@ -72,7 +72,7 @@ func initConfigParams(c *dig.Container) error {
 			P2PBindMultiAddresses: ParamsP2P.BindMultiAddresses,
 		}
 	}); err != nil {
-		Component.LogFatal(err.Error())
+		Component.LogPanic(err.Error())
 	}
 
 	return nil
@@ -103,13 +103,13 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func(deps autoPeeringDeps) *autopeering.Manager {
 		peersMultiAddresses, err := getMultiAddrsFromString(ParamsPeers.BootstrapPeers)
 		if err != nil {
-			Component.LogFatal("Failed to parse bootstrapPeers param: %s", err)
+			Component.LogPanic("Failed to parse bootstrapPeers param: %s", err)
 		}
 
 		for _, multiAddr := range peersMultiAddresses {
 			bootstrapPeer, err := network.NewPeerFromMultiAddr(multiAddr)
 			if err != nil {
-				Component.LogFatal("Failed to parse bootstrap peer multiaddress: %s", err)
+				Component.LogPanic("Failed to parse bootstrap peer multiaddress: %s", err)
 			}
 
 			if err := deps.PeerDB.UpdatePeer(bootstrapPeer); err != nil {
@@ -132,7 +132,7 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func() peerDatabaseResult {
 		peerDB, peerDBKVStore, err := initPeerDB()
 		if err != nil {
-			Component.LogFatal(err.Error())
+			Component.LogPanic(err.Error())
 		}
 
 		return peerDatabaseResult{
@@ -161,13 +161,13 @@ func provide(c *dig.Container) error {
 		// peers from peering config
 		var peers []*p2p.PeerConfig
 		if err := deps.PeeringConfig.Unmarshal(CfgPeers, &peers); err != nil {
-			Component.LogFatalf("invalid peer config: %s", err)
+			Component.LogPanicf("invalid peer config: %s", err)
 		}
 
 		for i, p := range peers {
 			multiAddr, err := multiaddr.NewMultiaddr(p.MultiAddress)
 			if err != nil {
-				Component.LogFatalf("invalid config peer address at pos %d: %s", i, err)
+				Component.LogPanicf("invalid config peer address at pos %d: %s", i, err)
 			}
 
 			if err = p2pConfigManager.AddPeer(multiAddr, p.Alias); err != nil {
@@ -211,7 +211,7 @@ func provide(c *dig.Container) error {
 
 		return p2pConfigManager
 	}); err != nil {
-		Component.LogFatal(err.Error())
+		Component.LogPanic(err.Error())
 	}
 
 	type p2pDeps struct {
@@ -238,7 +238,7 @@ func provide(c *dig.Container) error {
 		// load up the previously generated identity or create a new one
 		nodePrivateKey, newlyCreated, err := hivep2p.LoadOrCreateIdentityPrivateKey(privKeyFilePath, ParamsP2P.IdentityPrivateKey)
 		if err != nil {
-			Component.LogFatal(err.Error())
+			Component.LogPanic(err.Error())
 		}
 		res.NodePrivateKey = nodePrivateKey
 
@@ -254,7 +254,7 @@ func provide(c *dig.Container) error {
 			connmgr.WithGracePeriod(time.Minute),
 		)
 		if err != nil {
-			Component.LogFatalf("unable to initialize connection manager: %s", err)
+			Component.LogPanicf("unable to initialize connection manager: %s", err)
 		}
 
 		createdHost, err := libp2p.New(
@@ -270,7 +270,7 @@ func provide(c *dig.Container) error {
 					for _, externalMultiAddress := range ParamsP2P.ExternalMultiAddresses {
 						addr, err := multiaddr.NewMultiaddr(externalMultiAddress)
 						if err != nil {
-							Component.LogFatalf("unable to parse external multi address %s: %s", externalMultiAddress, err)
+							Component.LogPanicf("unable to parse external multi address %s: %s", externalMultiAddress, err)
 						}
 
 						externalMultiAddrs = append(externalMultiAddrs, addr)
@@ -291,7 +291,7 @@ func provide(c *dig.Container) error {
 
 		return res
 	}); err != nil {
-		Component.LogFatal(err.Error())
+		Component.LogPanic(err.Error())
 	}
 
 	return c.Provide(func(host host.Host, peerDB *network.DB) *p2p.Manager {
@@ -313,11 +313,11 @@ func configure() error {
 
 		Component.LogInfo("Syncing p2p peer database to disk ...")
 		if err := closeDatabases(); err != nil {
-			Component.LogFatalf("Syncing p2p peer database to disk ... failed: %s", err)
+			Component.LogPanicf("Syncing p2p peer database to disk ... failed: %s", err)
 		}
 		Component.LogInfo("Syncing p2p peer database to disk ... done")
 	}, daemon.PriorityCloseDatabase); err != nil {
-		Component.LogFatalf("failed to start worker: %s", err)
+		Component.LogPanicf("failed to start worker: %s", err)
 	}
 
 	// log the p2p events
@@ -386,13 +386,13 @@ func connectConfigKnownPeers() {
 	for _, p := range deps.PeeringConfigManager.Peers() {
 		multiAddr, err := multiaddr.NewMultiaddr(p.MultiAddress)
 		if err != nil {
-			Component.LogFatalf("invalid peer address: %s", err)
+			Component.LogPanicf("invalid peer address: %s", err)
 		}
 
 		// we try to parse the multi address and check if there is a "/p2p" part with ID
 		_, err = peer.AddrInfoFromP2pAddr(multiAddr)
 		if err != nil {
-			Component.LogFatalf("invalid peer address info: %s", err)
+			Component.LogPanicf("invalid peer address info: %s", err)
 		}
 
 		if err := deps.ManualPeeringMgr.AddPeers(multiAddr); err != nil {

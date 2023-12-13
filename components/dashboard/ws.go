@@ -82,7 +82,7 @@ func runWebSocketStreams(component *app.Component) {
 		unhook()
 		Component.LogInfo("Stopping Dashboard[StatusUpdate] ... done")
 	}, daemon.PriorityDashboard); err != nil {
-		Component.LogFatalf("Failed to start as daemon: %s", err)
+		Component.LogPanicf("Failed to start as daemon: %s", err)
 	}
 }
 

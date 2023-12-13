@@ -73,7 +73,7 @@ type dependencies struct {
 func configure() error {
 	// check if RestAPI plugin is disabled
 	if !Component.App().IsComponentEnabled(restapi.Component.Identifier()) {
-		Component.LogFatal("RestAPI plugin needs to be enabled to use the DebugAPIV3 plugin")
+		Component.LogPanic("RestAPI plugin needs to be enabled to use the DebugAPIV3 plugin")
 	}
 
 	blocksPerSlot = shrinkingmap.New[iotago.SlotIndex, []*blocks.Block]()

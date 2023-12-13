@@ -46,7 +46,7 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func() *Server {
 		return newServer()
 	}); err != nil {
-		Component.LogFatal(err.Error())
+		Component.LogPanic(err.Error())
 	}
 
 	return nil
@@ -61,7 +61,7 @@ func run() error {
 		deps.INXServer.Stop()
 		Component.LogInfo("Stopping INX ... done")
 	}, daemon.PriorityINX); err != nil {
-		Component.LogFatalf("failed to start worker: %s", err)
+		Component.LogPanicf("failed to start worker: %s", err)
 	}
 
 	return nil

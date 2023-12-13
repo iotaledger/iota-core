@@ -99,7 +99,7 @@ func run() error {
 
 		Component.LogInfo("Stopping Dashboard ... done")
 	}, daemon.PriorityDashboard); err != nil {
-		Component.LogFatalf("failed to start worker: %s", err)
+		Component.LogPanicf("failed to start worker: %s", err)
 	}
 
 	return nil

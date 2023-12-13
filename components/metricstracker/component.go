@@ -50,7 +50,7 @@ func provide(c *dig.Container) error {
 
 		return m
 	}); err != nil {
-		Component.LogFatal(err.Error())
+		Component.LogPanic(err.Error())
 	}
 
 	return nil
@@ -80,7 +80,7 @@ func run() error {
 		unhook()
 		Component.LogInfo("Stopping Metrics Tracker ... done")
 	}, daemon.PriorityDashboardMetrics); err != nil {
-		Component.LogFatalf("failed to start worker: %s", err)
+		Component.LogPanicf("failed to start worker: %s", err)
 	}
 
 	return nil
