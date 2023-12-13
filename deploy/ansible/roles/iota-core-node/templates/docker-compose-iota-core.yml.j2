@@ -129,6 +129,9 @@ services:
     command: >
       --inx.address=iota-core:9029
       --faucet.bindAddress=0.0.0.0:8091
+      --faucet.manaAmount=100000000
+      --faucet.baseTokenAmount=1000000000000
+      --faucet.baseTokenAmountMaxTarget=100000000000000
 {% endif %}
 
 {% if 'node-01' in inventory_hostname or 'node-02' in inventory_hostname or 'node-03' in inventory_hostname %}
