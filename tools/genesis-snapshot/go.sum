@@ -52,8 +52,10 @@ github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231213110054-d23a4fe
 github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231213110054-d23a4fe8000b/go.mod h1:hKgf+fskky588HbpPjxUvs9KPAqxG+ptPUOzm423RB0=
 github.com/iotaledger/hive.go/stringify v0.0.0-20231213110054-d23a4fe8000b h1:uyDK/pKr/ZwWRx8jwbJVKmDOWDbwF/oagRk+C7BeEVc=
 github.com/iotaledger/hive.go/stringify v0.0.0-20231213110054-d23a4fe8000b/go.mod h1:FTo/UWzNYgnQ082GI9QVM9HFDERqf9rw9RivNpqrnTs=
-github.com/iotaledger/iota.go/v4 v4.0.0-20231206123921-2af411eef0b5 h1:0KgQFpVRnKd6CdCwXo3Kg/SL27xkeKh2SMoU5G1TkZk=
-github.com/iotaledger/iota.go/v4 v4.0.0-20231206123921-2af411eef0b5/go.mod h1:tiswk1O1wSAi9GE6tD1j43+bLmWU9Je07aZLaJ0+Ha0=
+github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00 h1:j5udgLtSN6wQgFI9vnhkdJsqsVdJmwtoc0yOmT/Ila4=
+github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00/go.mod h1:gt+URx7DZu414nZME7jtGgxR4DVTSnNa1jF2trTUTZ0=
+github.com/iotaledger/iota.go/v4 v4.0.0-20231211160706-492c65d5e3f5 h1:2iQUEuYvuyeYtZBr6bRoM4xFLxRiQ66aBPgKuJTirh0=
+github.com/iotaledger/iota.go/v4 v4.0.0-20231211160706-492c65d5e3f5/go.mod h1:jU3Jlnhwv4KWlpft84lu9/M0QkCykESl29bL4oCenKs=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
 github.com/ipfs/go-cid v0.4.1/go.mod h1:uQHwDeX4c6CtyrFwdqyhpNcxVewur1M7l7fNU7LKwZk=
 github.com/klauspost/cpuid/v2 v2.2.5 h1:0E5MSMDEoAulmXNFquVs//DdoomxaoTY1kUhbc/qbZg=
@@ -116,8 +118,6 @@ github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
-github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98 h1:i7k63xHOX2ntuHrhHewfKro67c834jug2DIk599fqAA=
-github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98/go.mod h1:Knu2XMRWe8SkwTlHc/+ghP+O9DEaZRQQEyTjvLJ5Cck=
 github.com/zyedidia/generic v1.2.1 h1:Zv5KS/N2m0XZZiuLS82qheRG4X1o5gsWreGb0hR7XDc=
 github.com/zyedidia/generic v1.2.1/go.mod h1:ly2RBz4mnz1yeuVbQA/VFwGjK3mnHGRj1JuoG336Bis=
 go.uber.org/atomic v1.11.0 h1:ZvwS0R+56ePWxUNi+Atn9dWONBPp/AUETXlHW0DxSjE=

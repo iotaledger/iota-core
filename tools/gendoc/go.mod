@@ -70,7 +70,8 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20231213110054-d23a4fe8000b // indirect
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231212163412-89a451fd5f1d // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231206124145-f773dfe3927e // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231206123921-2af411eef0b5 // indirect
+	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231211160706-492c65d5e3f5 // indirect
 	github.com/ipfs/boxo v0.13.1 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
@@ -151,7 +152,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
-	github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel v1.19.0 // indirect
