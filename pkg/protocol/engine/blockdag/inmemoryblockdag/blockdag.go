@@ -191,7 +191,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 
 // canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
 func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
-	if b.evictionState.InRootBlockSlot(data.ID()) && !b.evictionState.IsRootBlock(data.ID()) {
+	if b.evictionState.InActiveRootBlockRange(data.ID()) && !b.evictionState.IsActiveRootBlock(data.ID()) {
 		b.retainBlockFailure(data.ID(), api.BlockFailureIsTooOld)
 		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().Header.IssuingTime)
 	}
@@ -218,7 +218,7 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 // this condition but exists as a missing entry, we mark it as invalid.
 func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid bool, err error) {
 	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
-		if b.evictionState.InRootBlockSlot(parentID) && !b.evictionState.IsRootBlock(parentID) {
+		if b.evictionState.InActiveRootBlockRange(parentID) && !b.evictionState.IsActiveRootBlock(parentID) {
 			b.retainBlockFailure(modelBlock.ID(), api.BlockFailureParentIsTooOld)
 			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
 		}
@@ -230,7 +230,7 @@ func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid boo
 // registerChild registers the given Block as a child of the parent. It triggers a BlockMissing event if the referenced
 // Block does not exist, yet.
 func (b *BlockDAG) registerChild(child *blocks.Block, parent iotago.Parent) {
-	if b.evictionState.IsRootBlock(parent.ID) {
+	if b.evictionState.IsActiveRootBlock(parent.ID) {
 		return
 	}
 

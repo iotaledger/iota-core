@@ -18,7 +18,7 @@ services:
     image: {{iota_core_docker_image_repo}}:{{iota_core_docker_image_tag}}
     container_name: iota-core
     stop_grace_period: 1m
-    restart: unless-stopped
+    restart: no
     ulimits:
       nofile:
         soft: 16384
@@ -63,7 +63,7 @@ services:
     container_name: inx-indexer
     image: iotaledger/inx-indexer:2.0-alpha
     stop_grace_period: 1m
-    restart: unless-stopped
+    restart: no
     depends_on:
       iota-core:
         condition: service_healthy
@@ -82,7 +82,7 @@ services:
     container_name: inx-mqtt
     image: iotaledger/inx-mqtt:2.0-alpha
     stop_grace_period: 1m
-    restart: unless-stopped
+    restart: no
     depends_on:
       iota-core:
         condition: service_healthy
@@ -135,7 +135,7 @@ services:
     container_name: inx-validator
     image: iotaledger/inx-validator:1.0-alpha
     stop_grace_period: 1m
-    restart: unless-stopped
+    restart: no
     depends_on:
       iota-core:
         condition: service_started

@@ -39,16 +39,17 @@ func (b *Blocks) Block(id iotago.BlockID) (block *Block, exists bool) {
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
+	if storage := b.blocks.Get(id.Slot()); storage != nil {
+		if block, exists = storage.Get(id); exists {
+			return block, true
+		}
+	}
+
 	if commitmentID, isRootBlock := b.evictionState.RootBlockCommitmentID(id); isRootBlock {
 		return NewRootBlock(id, commitmentID, b.apiProvider.APIForSlot(id.Slot()).TimeProvider().SlotEndTime(id.Slot())), true
 	}
 
-	storage := b.blocks.Get(id.Slot(), false)
-	if storage == nil {
-		return nil, false
-	}
-
-	return storage.Get(id)
+	return nil, false
 }
 
 func (b *Blocks) StoreOrUpdate(data *model.Block) (storedBlock *Block, evicted bool, updated bool) {

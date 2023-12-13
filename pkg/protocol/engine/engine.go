@@ -122,7 +122,7 @@ func New(
 		&Engine{
 			Events:           NewEvents(),
 			Storage:          storageInstance,
-			EvictionState:    eviction.NewState(storageInstance.LatestNonEmptySlot(), storageInstance.RootBlocks, storageInstance.GenesisRootBlockID),
+			EvictionState:    eviction.NewState(storageInstance.Settings(), storageInstance.RootBlocks),
 			RootCommitment:   reactive.NewVariable[*model.Commitment](),
 			LatestCommitment: reactive.NewVariable[*model.Commitment](),
 			Workers:          workers,
@@ -325,13 +325,17 @@ func (e *Engine) LatestAPI() iotago.API {
 	return e.Storage.Settings().APIProvider().LatestAPI()
 }
 
-// CommittedSlot returns the committed slot for the given slot index.
-func (e *Engine) CommittedSlot(commitmentID iotago.CommitmentID) (*CommittedSlotAPI, error) {
+// CommitmentAPI returns the committed slot for the given slot index.
+func (e *Engine) CommitmentAPI(commitmentID iotago.CommitmentID) (*CommitmentAPI, error) {
+	if e == nil {
+		return nil, ierrors.New("engine is nil")
+	}
+
 	if e.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
 		return nil, ierrors.Errorf("slot %d is not committed yet", commitmentID.Slot())
 	}
 
-	return NewCommittedSlotAPI(e, commitmentID), nil
+	return NewCommitmentAPI(e, commitmentID), nil
 }
 
 func (e *Engine) WriteSnapshot(filePath string, targetSlot ...iotago.SlotIndex) (err error) {
@@ -462,16 +466,7 @@ func (e *Engine) setupEvictionState() {
 	wp := e.Workers.CreatePool("EvictionState", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
-		block.ForEachParent(func(parent iotago.Parent) {
-			if parent.ID.Slot() < block.ID().Slot() && !e.EvictionState.IsRootBlock(parent.ID) {
-				parentBlock, exists := e.Block(parent.ID)
-				if !exists {
-					e.errorHandler(ierrors.Errorf("cannot store root block (%s) because it is missing", parent.ID))
-					return
-				}
-				e.EvictionState.AddRootBlock(parentBlock.ID(), parentBlock.ProtocolBlock().Header.SlotCommitmentID)
-			}
-		})
+		e.EvictionState.AddRootBlock(block.ID(), block.SlotCommitmentID())
 	}, event.WithWorkerPool(wp))
 
 	e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {

@@ -20,7 +20,7 @@ func (t *TestSuite) AssertActiveRootBlocks(expectedBlocks []*blocks.Block, nodes
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			activeRootBlocks := node.Protocol.Engines.Main.Get().EvictionState.ActiveRootBlocks()
+			activeRootBlocks := node.Protocol.Engines.Main.Get().EvictionState.AllActiveRootBlocks()
 
 			if !assert.Equal(t.fakeTesting, expectedRootBlocks, activeRootBlocks) {
 				return ierrors.Errorf("AssertActiveRootBlocks: %s: expected %v, got %v", node.Name, expectedRootBlocks, activeRootBlocks)

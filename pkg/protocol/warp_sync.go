@@ -19,8 +19,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/merklehasher"
 )
 
-// WarpSyncProtocol is a subcomponent of the protocol that is responsible for handling warp sync requests and responses.
-type WarpSyncProtocol struct {
+// WarpSync is a subcomponent of the protocol that is responsible for handling warp sync requests and responses.
+type WarpSync struct {
 	// protocol contains a reference to the Protocol instance that this component belongs to.
 	protocol *Protocol
 
@@ -34,9 +34,9 @@ type WarpSyncProtocol struct {
 	log.Logger
 }
 
-// newWarpSyncProtocol creates a new warp sync protocol instance for the given protocol.
-func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
-	c := &WarpSyncProtocol{
+// newWarpSync creates a new warp sync protocol instance for the given protocol.
+func newWarpSync(protocol *Protocol) *WarpSync {
+	c := &WarpSync{
 		Logger:     lo.Return1(protocol.Logger.NewChildLogger("WarpSync")),
 		protocol:   protocol,
 		workerPool: protocol.Workers.CreatePool("WarpSync", workerpool.WithWorkerCount(1)),
@@ -70,18 +70,16 @@ func newWarpSyncProtocol(protocol *Protocol) *WarpSyncProtocol {
 }
 
 // SendRequest sends a warp sync request for the given commitment ID to all peers.
-func (w *WarpSyncProtocol) SendRequest(commitmentID iotago.CommitmentID) {
+func (w *WarpSync) SendRequest(commitmentID iotago.CommitmentID) {
 	w.workerPool.Submit(func() {
-		if commitment, err := w.protocol.Commitments.Get(commitmentID, false); err == nil {
-			w.protocol.Network.SendWarpSyncRequest(commitmentID)
+		w.protocol.Network.SendWarpSyncRequest(commitmentID)
 
-			w.LogDebug("request", "commitment", commitment.LogName())
-		}
+		w.LogDebug("request", "commitmentID", commitmentID)
 	})
 }
 
 // SendResponse sends a warp sync response for the given commitment ID to the given peer.
-func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, roots *iotago.Roots, transactionIDs iotago.TransactionIDs, to peer.ID) {
+func (w *WarpSync) SendResponse(commitment *Commitment, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, roots *iotago.Roots, transactionIDs iotago.TransactionIDs, to peer.ID) {
 	w.workerPool.Submit(func() {
 		w.protocol.Network.SendWarpSyncResponse(commitment.ID(), blockIDsBySlotCommitment, roots.TangleProof(), transactionIDs, roots.MutationProof(), to)
 
@@ -90,7 +88,7 @@ func (w *WarpSyncProtocol) SendResponse(commitment *Commitment, blockIDsBySlotCo
 }
 
 // ProcessResponse processes the given warp sync response.
-func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
+func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsBySlotCommitment map[iotago.CommitmentID]iotago.BlockIDs, proof *merklehasher.Proof[iotago.Identifier], transactionIDs iotago.TransactionIDs, mutationProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	w.workerPool.Submit(func() {
 		commitment, err := w.protocol.Commitments.Get(commitmentID)
 		if err != nil {
@@ -290,67 +288,25 @@ func (w *WarpSyncProtocol) ProcessResponse(commitmentID iotago.CommitmentID, blo
 }
 
 // ProcessRequest processes the given warp sync request.
-func (w *WarpSyncProtocol) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
-	w.workerPool.Submit(func() {
-		commitment, err := w.protocol.Commitments.Get(commitmentID)
+func (w *WarpSync) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+	loggedWorkerPoolTask(w.workerPool, func() (err error) {
+		commitmentAPI, err := w.protocol.Commitments.API(commitmentID)
 		if err != nil {
-			if !ierrors.Is(err, ErrorCommitmentNotFound) {
-				w.LogError("failed to load commitment for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
-			} else {
-				w.LogTrace("failed to load commitment for warp-sync request", "commitmentID", commitmentID, "fromPeer", from, "err", err)
-			}
-
-			return
+			return ierrors.Wrap(err, "failed to load slot api")
 		}
 
-		chain := commitment.Chain.Get()
-		if chain == nil {
-			w.LogTrace("warp-sync request for unsolid commitment", "commitment", commitment.LogName(), "fromPeer", from)
-
-			return
-		}
-
-		targetEngine := commitment.TargetEngine()
-		if targetEngine == nil {
-			w.LogTrace("warp-sync request for chain without engine", "chain", chain.LogName(), "fromPeer", from)
-
-			return
-		}
-
-		committedSlot, err := targetEngine.CommittedSlot(commitmentID)
+		blocks, blocksProof, transactionIDs, transactionIDsProof, err := commitmentAPI.Mutations()
 		if err != nil {
-			w.LogTrace("warp-sync request for uncommitted slot", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from)
-
-			return
+			return ierrors.Wrap(err, "failed to get mutations")
 		}
 
-		blockIDsBySlotCommitment, err := committedSlot.BlocksIDsBySlotCommitmentID()
-		if err != nil {
-			w.LogTrace("failed to get block ids for warp-sync request", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from, "err", err)
+		w.protocol.Network.SendWarpSyncResponse(commitmentID, blocks, blocksProof, transactionIDs, transactionIDsProof, from)
 
-			return
-		}
-
-		roots, err := committedSlot.Roots()
-		if err != nil {
-			w.LogTrace("failed to get roots for warp-sync request", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from, "err", err)
-
-			return
-		}
-
-		transactionIDs, err := committedSlot.TransactionIDs()
-		if err != nil {
-			w.LogTrace("failed to get transaction ids for warp-sync request", "chain", chain.LogName(), "commitment", commitment.LogName(), "fromPeer", from, "err", err)
-
-			return
-		}
-
-		w.SendResponse(commitment, blockIDsBySlotCommitment, roots, transactionIDs, from)
-	})
+		return nil
+	}, w, "commitmentID", commitmentID, "fromPeer", from)
 }
 
 // Shutdown shuts down the warp sync protocol.
-func (w *WarpSyncProtocol) Shutdown() {
+func (w *WarpSync) Shutdown() {
 	w.ticker.Shutdown()
-	w.workerPool.Shutdown().ShutdownComplete.Wait()
 }
