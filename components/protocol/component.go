@@ -139,7 +139,7 @@ func provide(c *dig.Container) error {
 		}
 
 		return protocol.New(
-			Component.Logger(),
+			Component.Logger,
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Path),

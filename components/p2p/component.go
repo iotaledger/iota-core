@@ -86,7 +86,7 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps manualPeeringDeps) *manualpeering.Manager {
-		return manualpeering.NewManager(deps.P2PManager, Component.WorkerPool, Component.Logger())
+		return manualpeering.NewManager(deps.P2PManager, Component.WorkerPool, Component.Logger)
 	}); err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func provide(c *dig.Container) error {
 			}
 		}
 
-		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger())
+		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger)
 	}); err != nil {
 		return err
 	}
@@ -295,7 +295,7 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(host host.Host, peerDB *network.DB) *p2p.Manager {
-		return p2p.NewManager(host, peerDB, Component.Logger())
+		return p2p.NewManager(host, peerDB, Component.Logger)
 	})
 }
 

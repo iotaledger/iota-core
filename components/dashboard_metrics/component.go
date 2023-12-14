@@ -88,7 +88,7 @@ func configure() error {
 }
 
 func run() error {
-	Component.Logger().LogInfof("Starting %s ...", Component.Name)
+	Component.Logger.LogInfof("Starting %s ...", Component.Name)
 	if err := Component.Daemon().BackgroundWorker("DashboardMetricsUpdater", func(ctx context.Context) {
 		// Do not block until the Ticker is shutdown because we might want to start multiple Tickers and we can
 		// safely ignore the last execution when shutting down.
