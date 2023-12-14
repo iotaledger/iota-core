@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -52,9 +51,9 @@ type Neighbor struct {
 func NewNeighbor(parentLogger log.Logger, p *network.Peer, stream *PacketsStream, packetReceivedCallback PacketReceivedFunc, disconnectedCallback NeighborDisconnectedFunc) *Neighbor {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &Neighbor{
+	n := &Neighbor{
 		Peer:               p,
-		logger:             parentLogger.NewChildLogger(fmt.Sprintf("peers.%s", p.ID.String()[:6])),
+		logger:             parentLogger.NewChildLogger("peer", true),
 		packetReceivedFunc: packetReceivedCallback,
 		disconnectedFunc:   disconnectedCallback,
 		loopCtx:            ctx,
@@ -62,6 +61,10 @@ func NewNeighbor(parentLogger log.Logger, p *network.Peer, stream *PacketsStream
 		stream:             stream,
 		sendQueue:          make(chan *queuedPacket, NeighborsSendQueueSize),
 	}
+
+	n.logger.LogInfo("created", "ID", n.ID)
+
+	return n
 }
 
 func (n *Neighbor) Enqueue(packet proto.Message, protocolID protocol.ID) {

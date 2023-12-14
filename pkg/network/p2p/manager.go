@@ -357,7 +357,7 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 	}
 	nbr.readLoop()
 	nbr.writeLoop()
-	nbr.logger.LogInfo("Connection established")
+	nbr.logger.LogInfo("Connection established to %s")
 	m.Events.NeighborAdded.Trigger(nbr)
 
 	return nil
