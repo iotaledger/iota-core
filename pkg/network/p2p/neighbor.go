@@ -32,8 +32,7 @@ type (
 type Neighbor struct {
 	*network.Peer
 
-	logger         log.Logger
-	loggerShutdown func()
+	logger log.Logger
 
 	packetReceivedFunc PacketReceivedFunc
 	disconnectedFunc   NeighborDisconnectedFunc
@@ -51,13 +50,11 @@ type Neighbor struct {
 
 // NewNeighbor creates a new neighbor from the provided peer and connection.
 func NewNeighbor(logger log.Logger, p *network.Peer, stream *PacketsStream, packetReceivedCallback PacketReceivedFunc, disconnectedCallback NeighborDisconnectedFunc) *Neighbor {
-	neighborLog, neighborLogShutdown := logger.NewChildLogger(fmt.Sprintf("peer_%s", p.ID.ShortString()))
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Neighbor{
 		Peer:               p,
-		logger:             neighborLog,
-		loggerShutdown:     neighborLogShutdown,
+		logger:             logger.NewChildLogger(fmt.Sprintf("peer_%s", p.ID.ShortString())),
 		packetReceivedFunc: packetReceivedCallback,
 		disconnectedFunc:   disconnectedCallback,
 		loopCtx:            ctx,
@@ -158,7 +155,7 @@ func (n *Neighbor) Close() {
 		n.logger.LogErrorf("Failed to disconnect the neighbor, error: %s", err)
 	}
 	n.wg.Wait()
-	n.loggerShutdown()
+	n.logger.UnsubscribeFromParentLogger()
 }
 
 func (n *Neighbor) disconnect() (err error) {
