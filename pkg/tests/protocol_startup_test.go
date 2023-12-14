@@ -91,12 +91,12 @@ func Test_BookInCommittedSlot(t *testing.T) {
 		ts.AssertBlocksInCachePreAccepted(ts.BlocksWithPrefixes("7.3"), true, ts.Nodes()...)
 
 		var expectedActiveRootBlocks []*blocks.Block
-		for _, slot := range []iotago.SlotIndex{3, 4, 5} {
-			expectedActiveRootBlocks = append(expectedActiveRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+		for _, slot := range []iotago.SlotIndex{2, 3, 4, 5} {
+			expectedActiveRootBlocks = append(expectedActiveRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.", slot))...)
 		}
 
 		for _, slot := range []iotago.SlotIndex{1, 2, 3, 4, 5, 6} {
-			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, ts.BlocksWithPrefix(fmt.Sprintf("%d.", slot))...)
 		}
 
 		ts.AssertNodeState(ts.Nodes(),
@@ -211,12 +211,12 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.BlocksWithPrefixes("6", "7.0", "7.1"), true, ts.Nodes()...)
 
 		var expectedActiveRootBlocks []*blocks.Block
-		for _, slot := range []iotago.SlotIndex{3, 4, 5} {
-			expectedActiveRootBlocks = append(expectedActiveRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+		for _, slot := range []iotago.SlotIndex{2, 3, 4, 5} {
+			expectedActiveRootBlocks = append(expectedActiveRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.", slot))...)
 		}
 
 		for _, slot := range []iotago.SlotIndex{1, 2, 3, 4, 5, 6} {
-			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, ts.BlocksWithPrefix(fmt.Sprintf("%d.", slot))...)
 		}
 
 		ts.AssertNodeState(ts.Nodes(),
@@ -257,14 +257,14 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertBlocksInCacheConfirmed(ts.BlocksWithPrefixes("12", "13.0", "13.1", "13.2", "13.3"), true, ts.Nodes()...)
 
 		var expectedActiveRootBlocks []*blocks.Block
-		for _, slot := range []iotago.SlotIndex{9, 11} {
-			b := ts.BlocksWithPrefix(fmt.Sprintf("%d.5-", slot))
+		for _, slot := range []iotago.SlotIndex{8, 9, 11} {
+			b := ts.BlocksWithPrefix(fmt.Sprintf("%d.", slot))
 			expectedActiveRootBlocks = append(expectedActiveRootBlocks, b...)
 			expectedStorageRootBlocksFrom9 = append(expectedStorageRootBlocksFrom9, b...)
 		}
 
 		for _, slot := range []iotago.SlotIndex{8, 9, 11} {
-			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, ts.BlocksWithPrefix(fmt.Sprintf("%d.5-", slot))...)
+			expectedStorageRootBlocksFrom0 = append(expectedStorageRootBlocksFrom0, ts.BlocksWithPrefix(fmt.Sprintf("%d.", slot))...)
 		}
 
 		ts.AssertNodeState(ts.Nodes(),
@@ -404,8 +404,8 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.IssueBlocksAtEpoch("", 4, 4, "31.3", ts.Nodes(), true, false)
 
 		var expectedActiveRootBlocks []*blocks.Block
-		for _, slot := range []iotago.SlotIndex{35, 36, 37} {
-			expectedActiveRootBlocks = append(expectedActiveRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.3-", slot))...)
+		for _, slot := range []iotago.SlotIndex{34, 35, 36, 37} {
+			expectedActiveRootBlocks = append(expectedActiveRootBlocks, ts.BlocksWithPrefix(fmt.Sprintf("%d.", slot))...)
 		}
 
 		ts.AssertNodeState(ts.Nodes(),

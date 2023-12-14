@@ -184,7 +184,7 @@ func (c *Chain) LatestEngine() *engine.Engine {
 
 // initLogger initializes the Logger of this chain.
 func (c *Chain) initLogger() (shutdown func()) {
-	c.Logger, shutdown = c.chains.NewEntityLogger("")
+	c.Logger = c.chains.NewChildLogger("", true)
 
 	return lo.Batch(
 		c.WarpSyncMode.LogUpdates(c, log.LevelTrace, "WarpSyncMode"),
@@ -202,7 +202,7 @@ func (c *Chain) initLogger() (shutdown func()) {
 		c.Engine.LogUpdates(c, log.LevelTrace, "Engine", (*engine.Engine).LogName),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 
-		shutdown,
+		c.Logger.UnsubscribeFromParentLogger,
 	)
 }
 

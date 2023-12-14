@@ -78,7 +78,7 @@ func (c *Chains) WithInitializedEngines(callback func(chain *Chain, engine *engi
 }
 
 // initLogger initializes the logger for this component.
-func (c *Chains) initLogger(logger log.Logger, shutdownLogger func()) (shutdown func()) {
+func (c *Chains) initLogger(logger log.Logger) (shutdown func()) {
 	c.Logger = logger
 
 	return lo.Batch(
@@ -87,7 +87,7 @@ func (c *Chains) initLogger(logger log.Logger, shutdownLogger func()) (shutdown 
 		c.HeaviestAttestedCandidate.LogUpdates(c, log.LevelTrace, "HeaviestAttestedCandidate", (*Chain).LogName),
 		c.HeaviestVerifiedCandidate.LogUpdates(c, log.LevelTrace, "HeaviestVerifiedCandidate", (*Chain).LogName),
 
-		shutdownLogger,
+		logger.UnsubscribeFromParentLogger,
 	)
 }
 

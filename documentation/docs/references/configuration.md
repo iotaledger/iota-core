@@ -69,40 +69,24 @@ Example:
 
 ## <a id="logger"></a> 2. Logger
 
-| Name                                     | Description                                                                 | Type    | Default value |
-| ---------------------------------------- | --------------------------------------------------------------------------- | ------- | ------------- |
-| level                                    | The minimum enabled logging level                                           | string  | "info"        |
-| disableCaller                            | Stops annotating logs with the calling function's file name and line number | boolean | true          |
-| disableStacktrace                        | Disables automatic stacktrace capturing                                     | boolean | false         |
-| stacktraceLevel                          | The level stacktraces are captured and above                                | string  | "panic"       |
-| encoding                                 | The logger's encoding (options: "json", "console")                          | string  | "console"     |
-| [encodingConfig](#logger_encodingconfig) | Configuration for encodingConfig                                            | object  |               |
-| outputPaths                              | A list of URLs, file paths or stdout/stderr to write logging output to      | array   | stdout        |
-| disableEvents                            | Prevents log messages from being raced as events                            | boolean | true          |
-
-### <a id="logger_encodingconfig"></a> EncodingConfig
-
-| Name        | Description                                                                                                | Type   | Default value |
-| ----------- | ---------------------------------------------------------------------------------------------------------- | ------ | ------------- |
-| timeEncoder | Sets the logger's timestamp encoding. (options: "nanos", "millis", "iso8601", "rfc3339" and "rfc3339nano") | string | "rfc3339"     |
+| Name        | Description                                                                                                    | Type   | Default value |
+| ----------- | -------------------------------------------------------------------------------------------------------------- | ------ | ------------- |
+| name        | The optional name of the logger instance. All log messages are prefixed with that name.                        | string | ""            |
+| level       | The minimum enabled logging level                                                                              | string | "info"        |
+| timeFormat  | Sets the logger's timestamp format. (options: "rfc3339", "rfc3339nano", "datetime", "timeonly", and "iso8601") | string | "rfc3339"     |
+| outputPaths | A list of file paths or stdout/stderr to write logging output to                                               | array  | stdout        |
 
 Example:
 
 ```json
   {
     "logger": {
+      "name": "",
       "level": "info",
-      "disableCaller": true,
-      "disableStacktrace": false,
-      "stacktraceLevel": "panic",
-      "encoding": "console",
-      "encodingConfig": {
-        "timeEncoder": "rfc3339"
-      },
+      "timeFormat": "rfc3339",
       "outputPaths": [
         "stdout"
-      ],
-      "disableEvents": true
+      ]
     }
   }
 ```

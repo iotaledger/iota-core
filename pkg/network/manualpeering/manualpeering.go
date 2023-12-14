@@ -10,7 +10,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
@@ -28,7 +28,7 @@ import (
 // Manager also subscribes to the gossip events and in case the connection with a manual peer fails it will reconnect.
 type Manager struct {
 	p2pm              *p2p.Manager
-	log               *logger.Logger
+	logger            log.Logger
 	startOnce         sync.Once
 	isStarted         atomic.Bool
 	stopOnce          sync.Once
@@ -44,10 +44,10 @@ type Manager struct {
 }
 
 // NewManager initializes a new Manager instance.
-func NewManager(p2pm *p2p.Manager, workerPool *workerpool.WorkerPool, log *logger.Logger) *Manager {
+func NewManager(p2pm *p2p.Manager, workerPool *workerpool.WorkerPool, logger log.Logger) *Manager {
 	m := &Manager{
 		p2pm:              p2pm,
-		log:               log,
+		logger:            logger,
 		reconnectInterval: network.DefaultReconnectInterval,
 		knownPeers:        make(map[peer.ID]*network.Peer),
 		workerPool:        workerPool,
@@ -203,7 +203,7 @@ func (m *Manager) addPeer(peerAddr multiaddr.Multiaddr) error {
 	if _, exists := m.knownPeers[p.ID]; exists {
 		return nil
 	}
-	m.log.Infof("Adding new peer to the list of known peers in manual peering %s", p)
+	m.logger.LogInfof("Adding new peer to the list of known peers in manual peering %s", p)
 	m.knownPeers[p.ID] = p
 	go func() {
 		defer close(p.DoneCh)
@@ -237,11 +237,11 @@ func (m *Manager) keepPeerConnected(peer *network.Peer) {
 
 	for {
 		if peer.GetConnStatus() == network.ConnStatusDisconnected {
-			m.log.Infow("Peer is disconnected, calling gossip layer to establish the connection", "peer", peer.ID)
+			m.logger.LogInfof("Peer is disconnected, calling gossip layer to establish the connection, peerID: %s", peer.ID)
 
 			var err error
 			if err = m.p2pm.DialPeer(ctx, peer); err != nil && !ierrors.Is(err, p2p.ErrDuplicateNeighbor) && !ierrors.Is(err, context.Canceled) {
-				m.log.Errorw("Failed to connect a neighbor in the gossip layer", "peerID", peer.ID, "err", err)
+				m.logger.LogErrorf("Failed to connect a neighbor in the gossip layer, peerID: %s, error: %s", peer.ID, err)
 			}
 		}
 		select {
@@ -259,7 +259,7 @@ func (m *Manager) onGossipNeighborRemoved(neighbor *p2p.Neighbor) {
 
 func (m *Manager) onGossipNeighborAdded(neighbor *p2p.Neighbor) {
 	m.changeNeighborStatus(neighbor, network.ConnStatusConnected)
-	m.log.Infow("Gossip layer successfully connected with the peer", "peer", neighbor.Peer)
+	m.logger.LogInfof("Gossip layer successfully connected with the peer %s", neighbor.Peer)
 }
 
 func (m *Manager) changeNeighborStatus(neighbor *p2p.Neighbor, connStatus network.ConnectionStatus) {

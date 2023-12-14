@@ -13,12 +13,12 @@ func apiMiddleware() echo.MiddlewareFunc {
 
 	publicRoutesRegEx, err := restapi.CompileRoutesAsRegexes(ParamsRestAPI.PublicRoutes)
 	if err != nil {
-		Component.LogErrorfAndExit(err.Error())
+		Component.LogFatal(err.Error())
 	}
 
 	protectedRoutesRegEx, err := restapi.CompileRoutesAsRegexes(ParamsRestAPI.ProtectedRoutes)
 	if err != nil {
-		Component.LogErrorfAndExit(err.Error())
+		Component.LogFatal(err.Error())
 	}
 
 	matchPublic := func(c echo.Context) bool {
@@ -48,7 +48,7 @@ func apiMiddleware() echo.MiddlewareFunc {
 	// configure JWT auth
 	salt := ParamsRestAPI.JWTAuth.Salt
 	if len(salt) == 0 {
-		Component.LogErrorfAndExit("'%s' should not be empty", Component.App().Config().GetParameterPath(&(ParamsRestAPI.JWTAuth.Salt)))
+		Component.LogFatalf("'%s' should not be empty", Component.App().Config().GetParameterPath(&(ParamsRestAPI.JWTAuth.Salt)))
 	}
 
 	// API tokens do not expire.

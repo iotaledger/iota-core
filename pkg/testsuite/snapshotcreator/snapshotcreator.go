@@ -96,7 +96,7 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	}
 
 	engineInstance := engine.New(
-		log.NewLogger("snapshot-creator"),
+		log.NewLogger(log.WithName("snapshot-creator")),
 		workers.CreateGroup("Engine"),
 		s,
 		presolidblockfilter.NewProvider(),

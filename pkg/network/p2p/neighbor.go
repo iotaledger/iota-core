@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/network"
 )
 
@@ -31,10 +31,11 @@ type (
 type Neighbor struct {
 	*network.Peer
 
+	logger log.Logger
+
 	packetReceivedFunc PacketReceivedFunc
 	disconnectedFunc   NeighborDisconnectedFunc
 
-	Log            *logger.Logger
 	disconnectOnce sync.Once
 	wg             sync.WaitGroup
 
@@ -47,38 +48,30 @@ type Neighbor struct {
 }
 
 // NewNeighbor creates a new neighbor from the provided peer and connection.
-func NewNeighbor(p *network.Peer, stream *PacketsStream, log *logger.Logger, packetReceivedCallback PacketReceivedFunc, disconnectedCallback NeighborDisconnectedFunc) *Neighbor {
+func NewNeighbor(parentLogger log.Logger, p *network.Peer, stream *PacketsStream, packetReceivedCallback PacketReceivedFunc, disconnectedCallback NeighborDisconnectedFunc) *Neighbor {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	neighbor := &Neighbor{
-		Peer: p,
-
+	n := &Neighbor{
+		Peer:               p,
+		logger:             parentLogger.NewChildLogger("peer", true),
 		packetReceivedFunc: packetReceivedCallback,
 		disconnectedFunc:   disconnectedCallback,
-
-		loopCtx:       ctx,
-		loopCtxCancel: cancel,
-
-		stream:    stream,
-		sendQueue: make(chan *queuedPacket, NeighborsSendQueueSize),
+		loopCtx:            ctx,
+		loopCtxCancel:      cancel,
+		stream:             stream,
+		sendQueue:          make(chan *queuedPacket, NeighborsSendQueueSize),
 	}
 
-	conn := neighbor.stream.Conn()
+	n.logger.LogInfo("created", "ID", n.ID)
 
-	neighbor.Log = log.With(
-		"id", p.ID,
-		"localAddr", conn.LocalMultiaddr(),
-		"remoteAddr", conn.RemoteMultiaddr(),
-	)
-
-	return neighbor
+	return n
 }
 
 func (n *Neighbor) Enqueue(packet proto.Message, protocolID protocol.ID) {
 	select {
 	case n.sendQueue <- &queuedPacket{protocolID: protocolID, packet: packet}:
 	default:
-		n.Log.Warn("Dropped packet due to SendQueue being full")
+		n.logger.LogWarn("Dropped packet due to SendQueue being full")
 	}
 }
 
@@ -103,7 +96,7 @@ func (n *Neighbor) readLoop() {
 		defer n.wg.Done()
 		for {
 			if n.loopCtx.Err() != nil {
-				n.Log.Infof("Exit %s readLoop due to canceled context")
+				n.logger.LogInfo("Exit readLoop due to canceled context")
 				return
 			}
 
@@ -116,9 +109,9 @@ func (n *Neighbor) readLoop() {
 			packet := stream.packetFactory()
 			err := stream.ReadPacket(packet)
 			if err != nil {
-				n.Log.Infow("Stream read packet error", "err", err)
+				n.logger.LogInfof("Stream read packet error: %s", err)
 				if disconnectErr := n.disconnect(); disconnectErr != nil {
-					n.Log.Warnw("Failed to disconnect", "err", disconnectErr)
+					n.logger.LogWarnf("Failed to disconnect, error: %s", disconnectErr)
 				}
 
 				return
@@ -135,21 +128,21 @@ func (n *Neighbor) writeLoop() {
 		for {
 			select {
 			case <-n.loopCtx.Done():
-				n.Log.Info("Exit writeLoop due to canceled context")
+				n.logger.LogInfo("Exit writeLoop due to canceled context")
 				return
 			case sendPacket := <-n.sendQueue:
 				if n.stream == nil {
-					n.Log.Warnw("send error, no stream for protocol", "peer-id", n.ID, "protocol", sendPacket.protocolID)
+					n.logger.LogWarnf("send error, no stream for protocol, peerID: %s, protocol: %s", n.ID, sendPacket.protocolID)
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
-						n.Log.Warnw("Failed to disconnect", "err", disconnectErr)
+						n.logger.LogWarnf("Failed to disconnect, error: %s", disconnectErr)
 					}
 
 					return
 				}
 				if err := n.stream.WritePacket(sendPacket.packet); err != nil {
-					n.Log.Warnw("send error", "peer-id", n.ID, "err", err)
+					n.logger.LogWarnf("send error, peerID: %s, error: %s", n.ID, err)
 					if disconnectErr := n.disconnect(); disconnectErr != nil {
-						n.Log.Warnw("Failed to disconnect", "err", disconnectErr)
+						n.logger.LogWarnf("Failed to disconnect, error: %s", disconnectErr)
 					}
 
 					return
@@ -162,9 +155,10 @@ func (n *Neighbor) writeLoop() {
 // Close closes the connection with the neighbor.
 func (n *Neighbor) Close() {
 	if err := n.disconnect(); err != nil {
-		n.Log.Errorw("Failed to disconnect the neighbor", "err", err)
+		n.logger.LogErrorf("Failed to disconnect the neighbor, error: %s", err)
 	}
 	n.wg.Wait()
+	n.logger.UnsubscribeFromParentLogger()
 }
 
 func (n *Neighbor) disconnect() (err error) {
@@ -176,8 +170,8 @@ func (n *Neighbor) disconnect() (err error) {
 		if streamErr := n.stream.Close(); streamErr != nil {
 			err = ierrors.WithStack(streamErr)
 		}
-		n.Log.Infow("Stream closed", "protocol", n.stream.Protocol())
-		n.Log.Info("Connection closed")
+		n.logger.LogInfof("Stream closed, protocol: %s", n.stream.Protocol())
+		n.logger.LogInfo("Connection closed")
 		n.disconnectedFunc(n)
 	})
 

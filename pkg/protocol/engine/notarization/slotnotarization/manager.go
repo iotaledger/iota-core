@@ -52,10 +52,10 @@ type Manager struct {
 
 func NewProvider() module.Provider[*engine.Engine, notarization.Notarization] {
 	return module.Provide(func(e *engine.Engine) notarization.Notarization {
-		logger, shutdownLogger := e.NewChildLogger("NotarizationManager")
+		logger := e.NewChildLogger("NotarizationManager")
 
 		m := NewManager(logger, e.Workers.CreateGroup("NotarizationManager"), e.ErrorHandler("notarization"))
-		m.HookShutdown(shutdownLogger)
+		m.HookShutdown(logger.UnsubscribeFromParentLogger)
 
 		m.apiProvider = e
 
