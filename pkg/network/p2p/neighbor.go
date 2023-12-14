@@ -49,12 +49,12 @@ type Neighbor struct {
 }
 
 // NewNeighbor creates a new neighbor from the provided peer and connection.
-func NewNeighbor(logger log.Logger, p *network.Peer, stream *PacketsStream, packetReceivedCallback PacketReceivedFunc, disconnectedCallback NeighborDisconnectedFunc) *Neighbor {
+func NewNeighbor(parentLogger log.Logger, p *network.Peer, stream *PacketsStream, packetReceivedCallback PacketReceivedFunc, disconnectedCallback NeighborDisconnectedFunc) *Neighbor {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Neighbor{
 		Peer:               p,
-		logger:             logger.NewChildLogger(fmt.Sprintf("peer_%s", p.ID.ShortString())),
+		logger:             parentLogger.NewChildLogger(fmt.Sprintf("peers.%s", p.ID.String()[:6])),
 		packetReceivedFunc: packetReceivedCallback,
 		disconnectedFunc:   disconnectedCallback,
 		loopCtx:            ctx,
