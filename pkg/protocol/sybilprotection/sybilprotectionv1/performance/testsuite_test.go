@@ -170,8 +170,9 @@ func (t *TestSuite) AssertEpochRewards(epoch iotago.EpochIndex, actions map[stri
 		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID,
 			&iotago.StakingFeature{
 				StakedAmount: actions[alias].ValidatorStake,
-				StartEpoch:   epoch,
-				EndEpoch:     epoch,
+				// Start Epoch of the Validator would have been before `epoch`.
+				StartEpoch: epoch - 1,
+				EndEpoch:   epoch,
 			},
 			epoch)
 		require.NoError(t.T, err)
@@ -364,8 +365,9 @@ func (t *TestSuite) AssertValidatorRewardGreaterThan(alias1 string, alias2 strin
 	actualValidatorReward1, _, _, err := t.Instance.ValidatorReward(accID1,
 		&iotago.StakingFeature{
 			StakedAmount: actions[alias1].ValidatorStake,
-			StartEpoch:   epoch,
-			EndEpoch:     epoch,
+			// Start Epoch of the Validator would have been before `epoch`.
+			StartEpoch: epoch - 1,
+			EndEpoch:   epoch,
 		},
 		epoch)
 	require.NoError(t.T, err)
@@ -374,8 +376,9 @@ func (t *TestSuite) AssertValidatorRewardGreaterThan(alias1 string, alias2 strin
 	actualValidatorReward2, _, _, err := t.Instance.ValidatorReward(accID2,
 		&iotago.StakingFeature{
 			StakedAmount: actions[alias2].ValidatorStake,
-			StartEpoch:   epoch,
-			EndEpoch:     epoch,
+			// Start Epoch of the Validator would have been before `epoch`.
+			StartEpoch: epoch - 1,
+			EndEpoch:   epoch,
 		},
 		epoch)
 	require.NoError(t.T, err)
