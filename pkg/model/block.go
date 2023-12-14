@@ -146,7 +146,6 @@ func (blk *Block) WorkScore() iotago.WorkScore {
 		return workScore
 	}
 
-	// else this is a validator block and should have workScore Zero
-	// TODO: deal with validator blocks with issue #236
+	// Otherwise this is a validation block and should have work score zero.
 	return iotago.WorkScore(0)
 }

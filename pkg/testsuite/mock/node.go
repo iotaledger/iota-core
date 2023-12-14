@@ -94,11 +94,11 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 	peerID := lo.PanicOnErr(peer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
 	RegisterIDAlias(peerID, name)
 
-	var validatorBlockIssuer *BlockIssuer
+	var validationBlockIssuer *BlockIssuer
 	if validator {
-		validatorBlockIssuer = NewBlockIssuer(t, name, keyManager, accountID, validator)
+		validationBlockIssuer = NewBlockIssuer(t, name, keyManager, accountID, validator)
 	} else {
-		validatorBlockIssuer = nil
+		validationBlockIssuer = nil
 	}
 
 	return &Node{
@@ -106,7 +106,7 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 
 		Name: name,
 
-		Validator:  validatorBlockIssuer,
+		Validator:  validationBlockIssuer,
 		KeyManager: keyManager,
 
 		PeerID: peerID,
@@ -543,7 +543,7 @@ func (n *Node) AttachedBlocks() []*blocks.Block {
 	return n.attachedBlocks
 }
 
-func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
+func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidationBlockParams]) *blocks.Block {
 	if n.Validator == nil {
 		panic("node is not a validator")
 	}

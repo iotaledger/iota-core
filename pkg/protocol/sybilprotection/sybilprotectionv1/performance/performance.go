@@ -71,7 +71,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	validatorBlock, isValidationBlock := block.ValidationBlock()
+	validationBlock, isValidationBlock := block.ValidationBlock()
 	if !isValidationBlock {
 		return
 	}
@@ -86,7 +86,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	}
 
 	if isCommitteeMember {
-		t.trackCommitteeMemberPerformance(validatorBlock, block)
+		t.trackCommitteeMemberPerformance(validationBlock, block)
 	}
 }
 
@@ -349,7 +349,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 
 	apiForSlot := t.apiProvider.APIForSlot(block.ID().Slot())
 
-	// we restrict the number up to ValidatorBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
+	// we restrict the number up to ValidationBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
 	// also it can fint into uint8
 	if validatorPerformance.BlocksIssuedCount < apiForSlot.ProtocolParameters().ValidationBlocksPerSlot()+1 {
 		validatorPerformance.BlocksIssuedCount++
@@ -365,7 +365,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	}
 }
 
-// subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validatorBlocksPerSlot equal parts.
+// subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validationBlocksPerSlot equal parts.
 func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int {
 	epochAPI := t.apiProvider.APIForEpoch(t.latestAppliedEpoch)
 	valBlocksNum := epochAPI.ProtocolParameters().ValidationBlocksPerSlot()

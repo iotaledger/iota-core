@@ -554,7 +554,7 @@ func (t *TestSuite) Validators() []*mock.Node {
 	return validators
 }
 
-// BlockIssersForNodes returns a map of block issuers for each node. If the node is a validator, its block issuer is the validator block issuer. Else, it is the block issuer for the test suite.
+// BlockIssersForNodes returns a map of block issuers for each node. If the node is a validator, its block issuer is the validation block issuer. Else, it is the block issuer for the test suite.
 func (t *TestSuite) BlockIssuersForNodes(nodes []*mock.Node) []*mock.BlockIssuer {
 	blockIssuers := make([]*mock.BlockIssuer, 0)
 	for _, node := range nodes {

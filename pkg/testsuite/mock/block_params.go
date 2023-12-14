@@ -23,7 +23,7 @@ type BasicBlockParams struct {
 	BlockHeader *BlockHeaderParams
 	Payload     iotago.Payload
 }
-type ValidatorBlockParams struct {
+type ValidationBlockParams struct {
 	BlockHeader             *BlockHeaderParams
 	HighestSupportedVersion *iotago.Version
 	ProtocolParametersHash  *iotago.Identifier
@@ -99,8 +99,8 @@ func WithSkipReferenceValidation(skipReferenceValidation bool) func(builder *Blo
 	}
 }
 
-func WithValidationBlockHeaderOptions(opts ...options.Option[BlockHeaderParams]) func(builder *ValidatorBlockParams) {
-	return func(builder *ValidatorBlockParams) {
+func WithValidationBlockHeaderOptions(opts ...options.Option[BlockHeaderParams]) func(builder *ValidationBlockParams) {
+	return func(builder *ValidationBlockParams) {
 		builder.BlockHeader = options.Apply(&BlockHeaderParams{}, opts)
 	}
 }
@@ -117,14 +117,14 @@ func WithPayload(payload iotago.Payload) func(builder *BasicBlockParams) {
 	}
 }
 
-func WithHighestSupportedVersion(highestSupportedVersion iotago.Version) func(builder *ValidatorBlockParams) {
-	return func(builder *ValidatorBlockParams) {
+func WithHighestSupportedVersion(highestSupportedVersion iotago.Version) func(builder *ValidationBlockParams) {
+	return func(builder *ValidationBlockParams) {
 		builder.HighestSupportedVersion = &highestSupportedVersion
 	}
 }
 
-func WithProtocolParametersHash(protocolParametersHash iotago.Identifier) func(builder *ValidatorBlockParams) {
-	return func(builder *ValidatorBlockParams) {
+func WithProtocolParametersHash(protocolParametersHash iotago.Identifier) func(builder *ValidationBlockParams) {
+	return func(builder *ValidationBlockParams) {
 		builder.ProtocolParametersHash = &protocolParametersHash
 	}
 }

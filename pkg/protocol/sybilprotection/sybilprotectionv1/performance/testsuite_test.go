@@ -392,7 +392,7 @@ type EpochActions struct {
 	ActiveSlotsCount uint64
 	// ValidationBlocksSentPerSlot is the number of validation blocks validator sent per slot.
 	ValidationBlocksSentPerSlot uint64
-	// SlotPerformance is the target slot performance factor, how many subslots were covered by validator blocks.
+	// SlotPerformance is the target slot performance factor, how many subslots were covered by validation blocks.
 	SlotPerformance uint64
 }
 

@@ -146,7 +146,7 @@ func (m *Manager) GetMap(slot iotago.SlotIndex) (ads.Map[iotago.Identifier, iota
 
 // AddAttestationFromValidationBlock adds an attestation from a block to the future attestations (beyond the attestation window).
 func (m *Manager) AddAttestationFromValidationBlock(block *blocks.Block) error {
-	// Only track validator blocks.
+	// Only track validation blocks.
 	if _, isValidationBlock := block.ValidationBlock(); !isValidationBlock {
 		return nil
 	}
