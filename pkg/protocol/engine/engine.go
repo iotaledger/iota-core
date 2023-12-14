@@ -561,7 +561,7 @@ func (e *Engine) initLatestCommitment() {
 }
 
 func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *module.ReactiveModule) {
-	logger, unsubscribeFromParentLogger := parentLogger.NewEntityLogger("Engine")
+	logger := parentLogger.NewChildLogger("Engine", true)
 	reactiveModule = module.NewReactiveModule(logger)
 
 	e.RootCommitment.LogUpdates(reactiveModule, log.LevelTrace, "RootCommitment")
@@ -570,7 +570,7 @@ func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *mo
 	reactiveModule.Shutdown.OnTrigger(func() {
 		reactiveModule.LogDebug("shutting down")
 
-		unsubscribeFromParentLogger()
+		logger.UnsubscribeFromParentLogger()
 
 		// Shutdown should be performed in the reverse dataflow order.
 		e.BlockRequester.Shutdown()

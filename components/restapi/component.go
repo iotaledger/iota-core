@@ -67,7 +67,7 @@ func initConfigParams(c *dig.Container) error {
 			RestAPILimitsMaxResults: ParamsRestAPI.Limits.MaxResults,
 		}
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogPanic(err.Error())
 	}
 
 	return nil
@@ -76,7 +76,7 @@ func initConfigParams(c *dig.Container) error {
 func provide(c *dig.Container) error {
 	if err := c.Provide(func() *echo.Echo {
 		e := httpserver.NewEcho(
-			Component.Logger(),
+			Component.Logger,
 			nil,
 			ParamsRestAPI.DebugRequestLoggerEnabled,
 		)
@@ -86,7 +86,7 @@ func provide(c *dig.Container) error {
 
 		return e
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogPanic(err.Error())
 	}
 
 	type proxyDeps struct {
@@ -97,13 +97,13 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func(deps proxyDeps) *restapi.RestRouteManager {
 		return restapi.NewRestRouteManager(deps.Echo)
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogPanic(err.Error())
 	}
 
 	if err := c.Provide(func(deps dependencies) *blockhandler.BlockHandler {
 		return blockhandler.New(deps.Protocol)
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogPanic(err.Error())
 	}
 
 	return nil
@@ -144,7 +144,7 @@ func run() error {
 
 		//nolint:contextcheck // false positive
 		if err := deps.Echo.Shutdown(shutdownCtx); err != nil {
-			Component.LogWarn(err)
+			Component.LogWarn(err.Error())
 		}
 
 		Component.LogInfo("Stopping REST-API server ... done")

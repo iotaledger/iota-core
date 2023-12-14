@@ -13,7 +13,6 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/daemon"
@@ -104,7 +103,7 @@ func initConfigParams(c *dig.Container) error {
 	if err := c.Provide(func() cfgResult {
 		dbEngine, err := hivedb.EngineFromStringAllowed(ParamsDatabase.Engine, database.AllowedEnginesDefault)
 		if err != nil {
-			Component.LogPanic(err)
+			Component.LogPanic(err.Error())
 		}
 
 		return cfgResult{
@@ -113,7 +112,7 @@ func initConfigParams(c *dig.Container) error {
 			ProtocolParameters: readProtocolParameters(),
 		}
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogPanic(err.Error())
 	}
 
 	return nil
@@ -140,7 +139,7 @@ func provide(c *dig.Container) error {
 		}
 
 		return protocol.New(
-			log.NewLogger("node"),
+			Component.Logger,
 			workerpool.NewGroup("Protocol"),
 			deps.P2PManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
@@ -309,7 +308,7 @@ func run() error {
 	return Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		if err := deps.Protocol.Run(ctx); err != nil {
 			if !ierrors.Is(err, context.Canceled) {
-				Component.LogErrorfAndExit("Error running the Protocol: %s", err.Error())
+				Component.LogFatal("Error running the Protocol: %s", err.Error())
 			}
 		}
 
