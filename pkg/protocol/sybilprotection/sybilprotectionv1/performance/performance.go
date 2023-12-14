@@ -339,18 +339,19 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 		return
 	}
 
-	// key not found
+	// No validator performance for this slot yet.
 	if !exists {
 		validatorPerformance = model.NewValidatorPerformance()
 	}
 
-	// set a bit at subslotIndex to 1 to indicate activity in that subslot
+	// Set a bit at subslotIndex to 1 to indicate activity in that subslot.
 	validatorPerformance.SlotActivityVector = validatorPerformance.SlotActivityVector | (1 << t.subslotIndex(block.ID().Slot(), block.ProtocolBlock().Header.IssuingTime))
 
 	apiForSlot := t.apiProvider.APIForSlot(block.ID().Slot())
 
-	// we restrict the number up to ValidationBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
-	// also it can fint into uint8
+	// We restrict the number up to ValidationBlocksPerSlot + 1 to know later if the validator issued
+	// more blocks than allowed and be able to punish for it.
+	// Also it can fit into uint8.
 	if validatorPerformance.BlocksIssuedCount < apiForSlot.ProtocolParameters().ValidationBlocksPerSlot()+1 {
 		validatorPerformance.BlocksIssuedCount++
 	}
