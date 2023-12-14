@@ -50,9 +50,8 @@ type InvalidSignedTransactionEvent struct {
 }
 
 type Node struct {
-	Testing        *testing.T
-	logger         log.Logger
-	loggerShutdown func()
+	Testing *testing.T
+	logger  log.Logger
 
 	Name       string
 	Validator  *BlockIssuer
@@ -101,12 +100,9 @@ func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition stri
 		validatorBlockIssuer = nil
 	}
 
-	logger, loggerShutdown := parentLogger.NewChildLogger(name)
-
 	return &Node{
-		Testing:        t,
-		logger:         logger,
-		loggerShutdown: loggerShutdown,
+		Testing: t,
+		logger:  parentLogger.NewChildLogger(name),
 
 		Name: name,
 
@@ -486,7 +482,7 @@ func (n *Node) Shutdown() {
 	}
 
 	<-stopped
-	n.loggerShutdown()
+	n.logger.UnsubscribeFromParentLogger()
 }
 
 func (n *Node) ProtocolParametersHash() iotago.Identifier {
