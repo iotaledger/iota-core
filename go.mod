@@ -10,23 +10,22 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20231205131244-472357435a39
-	github.com/iotaledger/hive.go/app v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/constraints v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/crypto v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/ds v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20231205131244-472357435a39
-	github.com/iotaledger/hive.go/lo v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/log v0.0.0-20231206113509-4b4ff95ac61c
-	github.com/iotaledger/hive.go/logger v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231206114953-6a65a82e30ad
-	github.com/iotaledger/hive.go/stringify v0.0.0-20231206114953-6a65a82e30ad
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231206124511-b78dc962031f
+	github.com/iotaledger/hive.go/ads v0.0.0-20231214025533-67add6c5091b
+	github.com/iotaledger/hive.go/app v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/constraints v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/crypto v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/ds v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20231214025533-67add6c5091b
+	github.com/iotaledger/hive.go/lo v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/log v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/stringify v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231214122225-f510ea9b00b5
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231206124145-f773dfe3927e
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231206123921-2af411eef0b5
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231211160706-492c65d5e3f5
 	github.com/labstack/echo/v4 v4.11.3
 	github.com/labstack/gommon v0.4.1
 	github.com/libp2p/go-libp2p v0.32.0
@@ -42,7 +41,6 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/dig v1.17.1
 	golang.org/x/crypto v0.16.0
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
 )
@@ -89,6 +87,7 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
+	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00 // indirect
 	github.com/ipfs/boxo v0.13.1 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
@@ -139,8 +138,8 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pasztorpisti/qs v0.0.0-20171216220353-8d6c33ee906c // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
-	github.com/pelletier/go-toml/v2 v2.1.0 // indirect
-	github.com/petermattis/goid v0.0.0-20231126143041-f558c26febf5 // indirect
+	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
+	github.com/petermattis/goid v0.0.0-20231207134359-e60b3f734c67 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pokt-network/smt v0.6.1 // indirect
@@ -160,7 +159,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
-	github.com/wollac/iota-crypto-demo v0.0.0-20221117162917-b10619eccb98 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel v1.19.0 // indirect
 	go.opentelemetry.io/otel/metric v1.19.0 // indirect
@@ -169,6 +167,7 @@ require (
 	go.uber.org/mock v0.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/image v0.13.0 // indirect
 	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/net v0.19.0 // indirect

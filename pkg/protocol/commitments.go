@@ -1,11 +1,15 @@
 package protocol
 
 import (
+	"github.com/libp2p/go-libp2p/core/peer"
+
+	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/promise"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
@@ -28,6 +32,12 @@ type Commitments struct {
 	// It acts as a cache and a way to address commitments generically even if they are still unsolid.
 	cachedRequests *shrinkingmap.ShrinkingMap[iotago.CommitmentID, *promise.Promise[*Commitment]]
 
+	// workerPool contains the worker pool that is used to process commitment requests and responses asynchronously.
+	workerPool *workerpool.WorkerPool
+
+	// requester contains the ticker that is used to send commitment requests.
+	requester *eventticker.EventTicker[iotago.SlotIndex, iotago.CommitmentID]
+
 	// Logger contains a reference to the logger that is used by this component.
 	log.Logger
 }
@@ -39,11 +49,14 @@ func newCommitments(protocol *Protocol) *Commitments {
 		Root:           reactive.NewVariable[*Commitment](),
 		protocol:       protocol,
 		cachedRequests: shrinkingmap.New[iotago.CommitmentID, *promise.Promise[*Commitment]](),
+		workerPool:     protocol.Workers.CreatePool("Commitments"),
+		requester:      eventticker.New[iotago.SlotIndex, iotago.CommitmentID](protocol.Options.CommitmentRequesterOptions...),
 	}
 
 	shutdown := lo.Batch(
 		c.initLogger(),
 		c.initEngineCommitmentSynchronization(),
+		c.initRequester(),
 	)
 
 	protocol.Shutdown.OnTrigger(shutdown)
@@ -69,14 +82,29 @@ func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...
 	return cachedRequest.Result(), cachedRequest.Err()
 }
 
+// API returns the CommitmentAPI for the given commitmentID. If the Commitment is not available, it will return
+// ErrorCommitmentNotFound.
+func (c *Commitments) API(commitmentID iotago.CommitmentID) (commitmentAPI *engine.CommitmentAPI, err error) {
+	if commitmentID.Slot() <= c.Root.Get().Slot() {
+		return c.protocol.Engines.Main.Get().CommitmentAPI(commitmentID)
+	}
+
+	commitment, err := c.Get(commitmentID)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to load commitment")
+	}
+
+	return commitment.TargetEngine().CommitmentAPI(commitmentID)
+}
+
 // initLogger initializes the logger for this component.
 func (c *Commitments) initLogger() (shutdown func()) {
-	c.Logger, shutdown = c.protocol.NewChildLogger("Commitments")
+	c.Logger = c.protocol.NewChildLogger("Commitments")
 
 	return lo.Batch(
 		c.Root.LogUpdates(c, log.LevelTrace, "Root", (*Commitment).LogName),
 
-		shutdown,
+		c.Logger.UnsubscribeFromParentLogger,
 	)
 }
 
@@ -99,25 +127,36 @@ func (c *Commitments) initEngineCommitmentSynchronization() func() {
 	})
 }
 
+// initRequester initializes the requester that is used to request commitments from the network.
+func (c *Commitments) initRequester() (shutdown func()) {
+	unsubscribeFromTicker := c.requester.Events.Tick.Hook(c.sendRequest).Unhook
+
+	return func() {
+		unsubscribeFromTicker()
+
+		c.requester.Shutdown()
+	}
+}
+
 // publishRootCommitment publishes the root commitment of the main engine.
 func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine.Engine) func() {
-	return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, newRootCommitmentModel *model.Commitment) {
-		newRootCommitment, published, err := c.publishCommitmentModel(newRootCommitmentModel)
+	return mainEngine.RootCommitment.OnUpdate(func(_ *model.Commitment, rootCommitment *model.Commitment) {
+		publishedCommitment, published, err := c.publishCommitment(rootCommitment)
 		if err != nil {
-			c.LogError("failed to publish new root commitment", "id", newRootCommitmentModel.ID(), "error", err)
+			c.LogError("failed to publish new root commitment", "id", rootCommitment.ID(), "error", err)
 
 			return
 		}
 
-		newRootCommitment.IsRoot.Set(true)
+		publishedCommitment.IsRoot.Set(true)
 		if published {
-			newRootCommitment.Chain.Set(mainChain)
+			publishedCommitment.Chain.Set(mainChain)
 		}
 
 		// TODO: USE SET HERE (debug eviction issues)
-		mainChain.ForkingPoint.DefaultTo(newRootCommitment)
+		mainChain.ForkingPoint.DefaultTo(publishedCommitment)
 
-		c.Root.Set(newRootCommitment)
+		c.Root.Set(publishedCommitment)
 	})
 }
 
@@ -126,7 +165,7 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 	latestPublishedSlot := chain.LastCommonSlot()
 
 	return engine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {
-		loadModel := func(slot iotago.SlotIndex) (*model.Commitment, error) {
+		loadCommitment := func(slot iotago.SlotIndex) (*model.Commitment, error) {
 			// prevent disk access if possible
 			if slot == latestCommitment.Slot() {
 				return latestCommitment, nil
@@ -136,18 +175,18 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 		}
 
 		for ; latestPublishedSlot < latestCommitment.Slot(); latestPublishedSlot++ {
-			// retrieve the model to publish
-			modelToPublish, err := loadModel(latestPublishedSlot + 1)
+			// retrieve the commitment to publish
+			commitment, err := loadCommitment(latestPublishedSlot + 1)
 			if err != nil {
 				c.LogError("failed to load commitment to publish from engine", "slot", latestPublishedSlot+1, "err", err)
 
 				return
 			}
 
-			// publish the model
-			publishedCommitment, _, err := c.publishCommitmentModel(modelToPublish)
+			// publish the commitment
+			publishedCommitment, _, err := c.publishCommitment(commitment)
 			if err != nil {
-				c.LogError("failed to publish commitment from engine", "engine", engine.LogName(), "commitment", modelToPublish, "err", err)
+				c.LogError("failed to publish commitment from engine", "engine", engine.LogName(), "commitment", commitment, "err", err)
 
 				return
 			}
@@ -161,25 +200,25 @@ func (c *Commitments) publishEngineCommitments(chain *Chain, engine *engine.Engi
 	})
 }
 
-// publishCommitmentModel publishes the given commitment model as a Commitment instance. If the Commitment was already
-// published, it will return the existing Commitment instance. Otherwise, it will create a new Commitment instance and
-// resolve the Promise that was created for it.
-func (c *Commitments) publishCommitmentModel(model *model.Commitment) (commitment *Commitment, published bool, err error) {
+// publishCommitment publishes the given commitment and returns the singleton Commitment instance that is used to
+// represent it in our data structure (together with a boolean that indicates if we were the first goroutine to publish
+// the commitment).
+func (c *Commitments) publishCommitment(commitment *model.Commitment) (publishedCommitment *Commitment, published bool, err error) {
 	// retrieve promise and abort if it was already rejected
-	cachedRequest := c.cachedRequest(model.ID())
+	cachedRequest := c.cachedRequest(commitment.ID())
 	if cachedRequest.WasRejected() {
-		return nil, false, ierrors.Wrapf(cachedRequest.Err(), "failed to request commitment %s", model.ID())
+		return nil, false, ierrors.Wrapf(cachedRequest.Err(), "failed to request commitment %s", commitment.ID())
 	}
 
-	// otherwise try to provideCommitment it and determine if we were the goroutine that resolved it
-	commitment = newCommitment(c, model)
-	cachedRequest.Resolve(commitment).OnSuccess(func(resolvedCommitment *Commitment) {
-		if published = resolvedCommitment == commitment; !published {
-			commitment = resolvedCommitment
+	// otherwise try to publish it and determine if we were the goroutine that published it
+	publishedCommitment = newCommitment(c, commitment)
+	cachedRequest.Resolve(publishedCommitment).OnSuccess(func(resolvedCommitment *Commitment) {
+		if published = resolvedCommitment == publishedCommitment; !published {
+			publishedCommitment = resolvedCommitment
 		}
 	})
 
-	return commitment, published, nil
+	return publishedCommitment, published, nil
 }
 
 // cachedRequest returns a singleton Promise for the given commitmentID. If the Promise does not exist yet, it will be
@@ -200,7 +239,11 @@ func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, requestIfM
 
 	// start ticker if requested
 	if lo.First(requestIfMissing) {
-		c.protocol.CommitmentsProtocol.StartTicker(cachedRequest, commitmentID)
+		c.requester.StartTicker(commitmentID)
+
+		cachedRequest.OnComplete(func() {
+			c.requester.StopTicker(commitmentID)
+		})
 	}
 
 	// handle successful resolutions
@@ -223,7 +266,7 @@ func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, requestIfM
 	return cachedRequest
 }
 
-// initCommitment initializes the given commitment.
+// initCommitment initializes the given commitment in the protocol.
 func (c *Commitments) initCommitment(commitment *Commitment, slotEvicted reactive.Event) {
 	commitment.LogDebug("created", "id", commitment.ID())
 
@@ -240,5 +283,61 @@ func (c *Commitments) initCommitment(commitment *Commitment, slotEvicted reactiv
 		c.Delete(commitment)
 
 		commitment.IsEvicted.Trigger()
+	})
+}
+
+// sendRequest sends a commitment request for the given commitment ID to all peers.
+func (c *Commitments) sendRequest(commitmentID iotago.CommitmentID) {
+	c.workerPool.Submit(func() {
+		c.protocol.Network.RequestSlotCommitment(commitmentID)
+
+		c.LogDebug("request", "commitment", commitmentID)
+	})
+}
+
+// processRequest processes the given commitment request.
+func (c *Commitments) processRequest(commitmentID iotago.CommitmentID, from peer.ID) {
+	loadCommitment := func() (*model.Commitment, error) {
+		if commitment, err := c.Get(commitmentID); err == nil {
+			return commitment.Commitment, nil
+		} else if !ierrors.Is(err, ErrorCommitmentNotFound) || commitmentID.Slot() > c.Root.Get().Slot() {
+			return nil, ierrors.Wrap(err, "failed to load commitment metadata")
+		}
+
+		commitmentAPI, err := c.protocol.Engines.Main.Get().CommitmentAPI(commitmentID)
+		if err != nil {
+			return nil, ierrors.Wrap(err, "failed to load engine API")
+		}
+
+		return commitmentAPI.Commitment()
+	}
+
+	loggedWorkerPoolTask(c.workerPool, func() error {
+		commitment, err := loadCommitment()
+		if err != nil {
+			return ierrors.Wrap(err, "failed to load commitment")
+		}
+
+		c.protocol.Network.SendSlotCommitment(commitment, from)
+
+		return nil
+	}, c, "commitmentID", commitmentID, "fromPeer", from)
+}
+
+// processResponse processes the given commitment response.
+func (c *Commitments) processResponse(commitment *model.Commitment, from peer.ID) {
+	c.workerPool.Submit(func() {
+		// verify the commitment's version corresponds to the protocol version for the slot.
+		if apiForSlot := c.protocol.APIForSlot(commitment.Slot()); apiForSlot.Version() != commitment.Commitment().ProtocolVersion {
+			c.LogDebug("received commitment with invalid protocol version", "commitment", commitment.ID(), "version", commitment.Commitment().ProtocolVersion, "expectedVersion", apiForSlot.Version(), "fromPeer", from)
+
+			return
+		}
+
+		if publishedCommitment, published, err := c.protocol.Commitments.publishCommitment(commitment); err != nil {
+			c.LogError("failed to process commitment", "fromPeer", from, "err", err)
+		} else if published {
+			c.LogTrace("received response", "commitment", publishedCommitment.LogName(), "fromPeer", from)
+		}
 	})
 }

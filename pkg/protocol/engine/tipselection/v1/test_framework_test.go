@@ -41,8 +41,8 @@ func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) *T
 			return nil, false
 		}
 
-		rootBlocksRetriever := func() iotago.BlockIDs {
-			return iotago.BlockIDs{iotago.EmptyBlockID}
+		rootBlockRetriever := func() iotago.BlockID {
+			return iotago.EmptyBlockID
 		}
 
 		t.TipManager = tipmanagertests.NewTestFramework(test)
@@ -51,7 +51,7 @@ func NewTestFramework(test *testing.T, opts ...options.Option[TestFramework]) *T
 			t.TipManager.Instance,
 			spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](t.CommitteeSize),
 			transactionMetadataRetriever,
-			rootBlocksRetriever,
+			rootBlockRetriever,
 			t.expectedLivenessDuration,
 		)
 	})

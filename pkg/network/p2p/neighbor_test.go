@@ -16,14 +16,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/network"
 	p2pproto "github.com/iotaledger/iota-core/pkg/network/p2p/proto"
 )
 
 var (
 	testPacket1 = &p2pproto.Negotiation{}
-	log         = logger.NewExampleLogger("p2p_test")
+	testLogger  = log.NewLogger(log.WithName("p2p_test"))
 )
 
 func TestNeighborClose(t *testing.T) {
@@ -82,7 +83,7 @@ func newTestNeighbor(name string, stream p2pnetwork.Stream, packetReceivedFunc .
 		packetReceived = func(neighbor *Neighbor, packet proto.Message) {}
 	}
 
-	return NewNeighbor(newTestPeer(name), NewPacketsStream(stream, packetFactory), log.Named(name), packetReceived, func(neighbor *Neighbor) {})
+	return NewNeighbor(lo.Return1(testLogger.NewChildLogger(name)), newTestPeer(name), NewPacketsStream(stream, packetFactory), packetReceived, func(neighbor *Neighbor) {})
 }
 
 func packetFactory() proto.Message {

@@ -45,12 +45,12 @@ func (s *Server) Start() {
 	go func() {
 		listener, err := net.Listen("tcp", ParamsINX.BindAddress)
 		if err != nil {
-			Component.LogFatalfAndExit("failed to listen: %v", err)
+			Component.LogFatalf("failed to listen: %v", err)
 		}
 		defer listener.Close()
 
 		if err := s.grpcServer.Serve(listener); err != nil {
-			Component.LogFatalfAndExit("failed to serve: %v", err)
+			Component.LogFatalf("failed to serve: %v", err)
 		}
 	}()
 }

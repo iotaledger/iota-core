@@ -8,6 +8,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	inx "github.com/iotaledger/inx/go"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -142,7 +143,7 @@ func (s *Server) ListenToCommitments(req *inx.SlotRangeRequest, srv inx.INX_List
 		case done:
 			cancel()
 		}
-	}).Unhook
+	}, event.WithWorkerPool(wp)).Unhook
 
 	<-ctx.Done()
 	unhook()

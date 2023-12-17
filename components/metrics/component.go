@@ -114,7 +114,7 @@ func run() error {
 		//nolint:contextcheck // false positive
 		err := server.Shutdown(shutdownCtx)
 		if err != nil {
-			Component.LogWarn(err)
+			Component.LogWarn(err.Error())
 		}
 
 		Component.LogInfo("Stopping Prometheus exporter ... done")

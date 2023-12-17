@@ -72,7 +72,7 @@ func initConfigParams(c *dig.Container) error {
 			P2PBindMultiAddresses: ParamsP2P.BindMultiAddresses,
 		}
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogPanic(err.Error())
 	}
 
 	return nil
@@ -86,7 +86,7 @@ func provide(c *dig.Container) error {
 	}
 
 	if err := c.Provide(func(deps manualPeeringDeps) *manualpeering.Manager {
-		return manualpeering.NewManager(deps.P2PManager, Component.WorkerPool, Component.Logger())
+		return manualpeering.NewManager(deps.P2PManager, Component.WorkerPool, Component.Logger)
 	}); err != nil {
 		return err
 	}
@@ -103,13 +103,13 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func(deps autoPeeringDeps) *autopeering.Manager {
 		peersMultiAddresses, err := getMultiAddrsFromString(ParamsPeers.BootstrapPeers)
 		if err != nil {
-			Component.LogErrorfAndExit("Failed to parse bootstrapPeers param: %s", err)
+			Component.LogFatalf("Failed to parse bootstrapPeers param: %s", err)
 		}
 
 		for _, multiAddr := range peersMultiAddresses {
 			bootstrapPeer, err := network.NewPeerFromMultiAddr(multiAddr)
 			if err != nil {
-				Component.LogErrorfAndExit("Failed to parse bootstrap peer multiaddress: %s", err)
+				Component.LogFatalf("Failed to parse bootstrap peer multiaddress: %s", err)
 			}
 
 			if err := deps.PeerDB.UpdatePeer(bootstrapPeer); err != nil {
@@ -117,7 +117,7 @@ func provide(c *dig.Container) error {
 			}
 		}
 
-		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger())
+		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger)
 	}); err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func() peerDatabaseResult {
 		peerDB, peerDBKVStore, err := initPeerDB()
 		if err != nil {
-			Component.LogFatalAndExit(err)
+			Component.LogFatal(err.Error())
 		}
 
 		return peerDatabaseResult{
@@ -184,7 +184,7 @@ func provide(c *dig.Container) error {
 
 		peersMultiAddresses, err := getMultiAddrsFromString(ParamsPeers.Peers)
 		if err != nil {
-			Component.LogErrorAndExit(err)
+			Component.LogFatal(err.Error())
 		}
 
 		peerAdded := false
@@ -211,7 +211,7 @@ func provide(c *dig.Container) error {
 
 		return p2pConfigManager
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogPanic(err.Error())
 	}
 
 	type p2pDeps struct {
@@ -238,7 +238,7 @@ func provide(c *dig.Container) error {
 		// load up the previously generated identity or create a new one
 		nodePrivateKey, newlyCreated, err := hivep2p.LoadOrCreateIdentityPrivateKey(privKeyFilePath, ParamsP2P.IdentityPrivateKey)
 		if err != nil {
-			Component.LogPanic(err)
+			Component.LogPanic(err.Error())
 		}
 		res.NodePrivateKey = nodePrivateKey
 
@@ -283,7 +283,7 @@ func provide(c *dig.Container) error {
 			}()),
 		)
 		if err != nil {
-			Component.LogFatalfAndExit("unable to initialize libp2p host: %s", err)
+			Component.LogFatalf("unable to initialize libp2p host: %s", err)
 		}
 		res.Host = createdHost
 
@@ -291,11 +291,11 @@ func provide(c *dig.Container) error {
 
 		return res
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogPanic(err.Error())
 	}
 
 	return c.Provide(func(host host.Host, peerDB *network.DB) *p2p.Manager {
-		return p2p.NewManager(host, peerDB, Component.Logger())
+		return p2p.NewManager(host, peerDB, Component.Logger)
 	})
 }
 
@@ -336,7 +336,7 @@ func run() error {
 	if err := Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		deps.ManualPeeringMgr.Start()
 		if err := deps.AutoPeeringMgr.Start(ctx); err != nil {
-			Component.LogErrorAndExit("Failed to start autopeering manager: %s", err)
+			Component.LogFatalf("Failed to start autopeering manager: %s", err)
 		}
 
 		defer func() {
@@ -348,20 +348,20 @@ func run() error {
 		connectConfigKnownPeers()
 		<-ctx.Done()
 	}, daemon.PriorityManualPeering); err != nil {
-		Component.LogErrorfAndExit("Failed to start as daemon: %s", err)
+		Component.LogFatalf("Failed to start as daemon: %s", err)
 	}
 
 	if err := Component.Daemon().BackgroundWorker(fmt.Sprintf("%s-P2PManager", Component.Name), func(ctx context.Context) {
 		defer deps.P2PManager.Shutdown()
 		defer func() {
 			if err := deps.P2PManager.P2PHost().Close(); err != nil {
-				Component.LogWarn("Failed to close libp2p host: %+v", err)
+				Component.LogWarnf("Failed to close libp2p host: %+v", err)
 			}
 		}()
 
 		<-ctx.Done()
 	}, daemon.PriorityP2P); err != nil {
-		Component.LogErrorfAndExit("Failed to start as daemon: %s", err)
+		Component.LogFatalf("Failed to start as daemon: %s", err)
 	}
 
 	return nil

@@ -130,7 +130,7 @@ func (c *Commitment) TargetEngine() *engine.Engine {
 
 // initLogger initializes the Logger of this Commitment.
 func (c *Commitment) initLogger() (shutdown func()) {
-	c.Logger, shutdown = c.commitments.NewEntityLogger(fmt.Sprintf("Slot%d.", c.Slot()))
+	c.Logger = c.commitments.NewChildLogger(fmt.Sprintf("Slot%d.", c.Slot()), true)
 
 	return lo.Batch(
 		c.Parent.LogUpdates(c, log.LevelTrace, "Parent", (*Commitment).LogName),
@@ -149,7 +149,7 @@ func (c *Commitment) initLogger() (shutdown func()) {
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
 
-		shutdown,
+		c.Logger.UnsubscribeFromParentLogger,
 	)
 }
 

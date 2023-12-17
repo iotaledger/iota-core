@@ -50,7 +50,7 @@ func provide(c *dig.Container) error {
 
 		return m
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogPanic(err.Error())
 	}
 
 	return nil

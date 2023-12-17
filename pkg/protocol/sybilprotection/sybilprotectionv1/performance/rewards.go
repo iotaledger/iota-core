@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/model"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -20,18 +21,23 @@ func (t *Tracker) RewardsRoot(epoch iotago.EpochIndex) (iotago.Identifier, error
 	return m.Root(), nil
 }
 
-func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
+func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *iotago.StakingFeature, claimingEpoch iotago.EpochIndex) (validatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
-	var validatorReward iotago.Mana
+	validatorReward = 0
+	stakedAmount := stakingFeature.StakedAmount
+	firstRewardEpoch = stakingFeature.StartEpoch
+	lastRewardEpoch = stakingFeature.EndEpoch
 
-	// limit looping to committed epochs
-	if epochEnd > t.latestAppliedEpoch {
-		epochEnd = t.latestAppliedEpoch
+	// Limit reward fetching only to committed epochs.
+	if lastRewardEpoch > t.latestAppliedEpoch {
+		lastRewardEpoch = t.latestAppliedEpoch
 	}
 
-	for epoch := epochStart; epoch <= epochEnd; epoch++ {
+	decayEndEpoch := t.decayEndEpoch(claimingEpoch, lastRewardEpoch)
+
+	for epoch := firstRewardEpoch; epoch <= lastRewardEpoch; epoch++ {
 		rewardsForAccountInEpoch, exists, err := t.rewardsForAccount(validatorID, epoch)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to get rewards for account %s in epoch %d", validatorID, epoch)
@@ -39,8 +45,8 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 
 		if !exists || rewardsForAccountInEpoch.PoolStake == 0 {
 			// updating epoch start for beginning epochs without the reward
-			if epoch < epochEnd && epochStart == epoch {
-				epochStart = epoch + 1
+			if epoch < lastRewardEpoch && firstRewardEpoch == epoch {
+				firstRewardEpoch = epoch + 1
 			}
 
 			continue
@@ -55,7 +61,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			return 0, 0, 0, ierrors.Errorf("pool stats for epoch %d and validator accountID %s are nil", epoch, validatorID)
 		}
 
-		// if validator's fixed cost is greater than earned reward, all reward goes for delegators
+		// If a validator's fixed cost is greater than the earned reward, all rewards go to the delegators.
 		if rewardsForAccountInEpoch.PoolRewards < rewardsForAccountInEpoch.FixedCost {
 			continue
 		}
@@ -79,7 +85,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate profit margin factor due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
 
-		residualValidatorFactor, err := safemath.Safe64MulDiv(result>>profitMarginExponent, uint64(stakeAmount), uint64(rewardsForAccountInEpoch.PoolStake))
+		residualValidatorFactor, err := safemath.Safe64MulDiv(result>>profitMarginExponent, uint64(stakedAmount), uint64(rewardsForAccountInEpoch.PoolStake))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate residual validator factor due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
@@ -89,13 +95,13 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate un-decayed epoch reward due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
 
-		unDecayedEpochRewards, err := safemath.SafeAdd(result, residualValidatorFactor)
+		undecayedEpochRewards, err := safemath.SafeAdd(result, residualValidatorFactor)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate un-decayed epoch rewards due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
 
 		decayProvider := t.apiProvider.APIForEpoch(epoch).ManaDecayProvider()
-		decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(unDecayedEpochRewards), epoch, epochEnd)
+		decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(undecayedEpochRewards), epoch, decayEndEpoch)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epoch, validatorID)
 		}
@@ -106,21 +112,26 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakeAmount iota
 		}
 	}
 
-	return validatorReward, epochStart, epochEnd, nil
+	return validatorReward, firstRewardEpoch, lastRewardEpoch, nil
 }
 
-func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex) (iotago.Mana, iotago.EpochIndex, iotago.EpochIndex, error) {
+func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex, claimingEpoch iotago.EpochIndex) (delegatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
 	var delegatorsReward iotago.Mana
 
+	firstRewardEpoch = epochStart
+	lastRewardEpoch = epochEnd
+
 	// limit looping to committed epochs
-	if epochEnd > t.latestAppliedEpoch {
-		epochEnd = t.latestAppliedEpoch
+	if lastRewardEpoch > t.latestAppliedEpoch {
+		lastRewardEpoch = t.latestAppliedEpoch
 	}
 
-	for epoch := epochStart; epoch <= epochEnd; epoch++ {
+	decayEndEpoch := t.decayEndEpoch(claimingEpoch, lastRewardEpoch)
+
+	for epoch := firstRewardEpoch; epoch <= lastRewardEpoch; epoch++ {
 		rewardsForAccountInEpoch, exists, err := t.rewardsForAccount(validatorID, epoch)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to get rewards for account %s in epoch %d", validatorID, epoch)
@@ -128,8 +139,8 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 
 		if !exists || rewardsForAccountInEpoch.PoolStake == 0 {
 			// updating epoch start for beginning epochs without the reward
-			if epochStart == epoch {
-				epochStart = epoch + 1
+			if firstRewardEpoch == epoch {
+				firstRewardEpoch = epoch + 1
 			}
 
 			continue
@@ -166,13 +177,13 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
 
-		unDecayedEpochRewards, err := safemath.SafeDiv(result, uint64(rewardsForAccountInEpoch.PoolStake))
+		undecayedEpochRewards, err := safemath.SafeDiv(result, uint64(rewardsForAccountInEpoch.PoolStake))
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate unDecayedEpochRewards due to overflow for epoch %d and validator accountID %s", epoch, validatorID)
 		}
 
 		decayProvider := t.apiProvider.APIForEpoch(epoch).ManaDecayProvider()
-		decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(unDecayedEpochRewards), epoch, epochEnd)
+		decayedEpochRewards, err := decayProvider.DecayManaByEpochs(iotago.Mana(undecayedEpochRewards), epoch, decayEndEpoch)
 		if err != nil {
 			return 0, 0, 0, ierrors.Wrapf(err, "failed to calculate rewards with decay for epoch %d and validator accountID %s", epoch, validatorID)
 		}
@@ -180,7 +191,24 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 		delegatorsReward += decayedEpochRewards
 	}
 
-	return delegatorsReward, epochStart, epochEnd, nil
+	return delegatorsReward, firstRewardEpoch, lastRewardEpoch, nil
+}
+
+// Returns the epoch until which rewards are decayed.
+//
+// When claiming rewards in epoch X for epoch X-1, decay of X-(X-1) = 1 would be applied. Since epoch X is the
+// very first epoch in which one can claim those rewards, decaying by 1 is odd, as one could never claim the full reward then.
+// Hence, one epoch worth of decay is deducted in general.
+//
+// The decay end epoch must however be greater or equal than the last epoch for which rewards are claimed, otherwise
+// the decay operation would fail since the amount of epochs to decay would be negative.
+// Hence, the smallest returned decay end epoch will be the lastRewardEpoch.
+func (t *Tracker) decayEndEpoch(claimingEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex) iotago.EpochIndex {
+	if claimingEpoch >= 1 {
+		claimingEpoch = claimingEpoch - 1
+	}
+
+	return lo.Max(claimingEpoch, lastRewardEpoch)
 }
 
 func (t *Tracker) rewardsMap(epoch iotago.EpochIndex) (ads.Map[iotago.Identifier, iotago.AccountID, *model.PoolRewards], error) {
