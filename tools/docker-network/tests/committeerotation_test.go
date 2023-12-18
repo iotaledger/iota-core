@@ -190,8 +190,7 @@ func Test_Staking(t *testing.T) {
 	err = d.WaitUntilSync()
 	require.NoError(t, err)
 
-	accountAddr := d.CreateAndStakeAccount()
-	fmt.Println("Account address: ", accountAddr.Bech32("rms"))
+	accountAddr := d.CreateAccount(WithStakingFeature(100, 1, 0))
 
 	d.AssertValidatorExists(accountAddr)
 }

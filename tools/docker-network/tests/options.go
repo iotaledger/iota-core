@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
@@ -174,5 +175,12 @@ func WithWaitFor(waitFor time.Duration) options.Option[DockerTestFramework] {
 func WithTick(tick time.Duration) options.Option[DockerTestFramework] {
 	return func(d *DockerTestFramework) {
 		d.optsTick = tick
+	}
+}
+
+// ///// Account Output options
+func WithStakingFeature(amount iotago.BaseToken, fixedCost iotago.Mana, startEpoch iotago.EpochIndex, optEndEpoch ...iotago.EpochIndex) options.Option[builder.AccountOutputBuilder] {
+	return func(accountBuilder *builder.AccountOutputBuilder) {
+		accountBuilder.Staking(amount, fixedCost, startEpoch, optEndEpoch...)
 	}
 }

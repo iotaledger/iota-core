@@ -267,8 +267,8 @@ func (d *DockerTestFramework) StartIssueCandidacyPayload(nodes ...*Node) {
 	}
 }
 
-func (d *DockerTestFramework) CreateAndStakeAccount() *iotago.AccountAddress {
-	// request faucet funds
+func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *iotago.AccountAddress {
+	// create implicit account by requesting faucet funds
 	ctx := context.TODO()
 	receiverAddr, implicitPrivateKey := d.getAddress(iotago.AddressImplicitAccountCreation)
 	implicitOutputID, implicitAccountOutput := d.RequestFaucetFunds(ctx, receiverAddr)
@@ -283,20 +283,24 @@ func (d *DockerTestFramework) CreateAndStakeAccount() *iotago.AccountAddress {
 	// transition to full account with new Ed25519 address and staking feature
 	accEd25519Addr, accPrivateKey := d.getAddress(iotago.AddressEd25519)
 	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(accPrivateKey.Public().(ed25519.PublicKey))
-	accountOutput := builder.NewAccountOutputBuilder(accEd25519Addr, implicitAccountOutput.BaseTokenAmount()).
-		AccountID(accountID).
-		BlockIssuer(iotago.NewBlockIssuerKeys(accBlockIssuerKey), iotago.MaxSlotIndex).
-		Staking(implicitAccountOutput.BaseTokenAmount(), 1, 1).
-		MustBuild()
+	accountOutput := options.Apply(builder.NewAccountOutputBuilder(accEd25519Addr, implicitAccountOutput.BaseTokenAmount()),
+		opts, func(b *builder.AccountOutputBuilder) {
+			b.AccountID(accountID).
+				BlockIssuer(iotago.NewBlockIssuerKeys(accBlockIssuerKey), iotago.MaxSlotIndex)
+		}).MustBuild()
 
 	clt := d.Node("V1").Client
-	issuerResp, err := clt.BlockIssuance(ctx)
-	require.NoError(d.Testing, err)
-
 	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
 	apiForSlot := clt.APIForSlot(currentSlot)
 
-	txBuilder := builder.NewTransactionBuilder(apiForSlot).
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	congestionResp, err := clt.Congestion(ctx, accountAddress, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
+
+	implicitAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForImplicitAccountCreationAddress(receiverAddr.(*iotago.ImplicitAccountCreationAddress), implicitPrivateKey))
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
 		AddInput(&builder.TxInput{
 			UnlockTarget: receiverAddr,
 			InputID:      implicitOutputID,
@@ -307,23 +311,15 @@ func (d *DockerTestFramework) CreateAndStakeAccount() *iotago.AccountAddress {
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: accountID}).
 		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
-		AllotAllMana(currentSlot, accountID)
-
-	implicitAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForImplicitAccountCreationAddress(receiverAddr.(*iotago.ImplicitAccountCreationAddress), implicitPrivateKey))
-	signedTx, err := txBuilder.Build(implicitAddrSigner)
+		AllotAllMana(currentSlot, accountID).
+		Build(implicitAddrSigner)
 	require.NoError(d.Testing, err)
 
-	// submit block to inx-blockIssuer
-	blkIssuerClt, err := clt.BlockIssuer(ctx)
-	require.NoError(d.Testing, err)
-
-	resp, err := blkIssuerClt.SendPayload(ctx, signedTx, issuerResp.LatestCommitment.MustID())
-	require.NoError(d.Testing, err)
-	fmt.Printf("send account staking in block %s of account %s\n\n", resp.BlockID.ToHex(), accountID.String())
+	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(accountID, implicitPrivateKey), congestionResp, issuerResp)
 
 	// check if the account is committed
 	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	d.CheckAccountStatus(ctx, resp.BlockID, lo.PanicOnErr(signedTx.Transaction.ID()), accOutputID, accountAddress, true)
+	d.CheckAccountStatus(ctx, blkID, lo.PanicOnErr(signedTx.Transaction.ID()), accOutputID, accountAddress, true)
 
 	return accountAddress
 }
@@ -352,10 +348,8 @@ func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iota
 		indexerClt, err := d.Node("V1").Client.Indexer(ctx)
 		require.NoError(d.Testing, err)
 
-		outputID, accountOutput, _, err := indexerClt.Account(ctx, accountAddress)
+		_, _, _, err = indexerClt.Account(ctx, accountAddress)
 		require.NoError(d.Testing, err)
-
-		fmt.Printf("Indexer returned: outputID %s, account %s, slot %d", outputID.String(), accountOutput.AccountID.ToAddress().Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), slot)
 	}
 
 	// check if the creation output exists
@@ -498,4 +492,33 @@ func (d *DockerTestFramework) GetContainersConfigs() {
 		node.ContainerConfigs = configs
 		d.nodes[node.Name] = node
 	}
+}
+
+func (d *DockerTestFramework) SubmitPayload(ctx context.Context, payload iotago.Payload, issuer wallet.Account, congestionResp *api.CongestionResponse, issuerResp *api.IssuanceBlockHeaderResponse) iotago.BlockID {
+	clt := d.Node("V1").Client
+	issuingTime := time.Now()
+	apiForSlot := clt.APIForSlot(clt.LatestAPI().TimeProvider().SlotFromTime(issuingTime))
+	blockBuilder := builder.NewBasicBlockBuilder(apiForSlot)
+
+	commitmentID, err := issuerResp.LatestCommitment.ID()
+	require.NoError(d.Testing, err)
+
+	blockBuilder.ProtocolVersion(apiForSlot.Version()).
+		SlotCommitmentID(commitmentID).
+		LatestFinalizedSlot(issuerResp.LatestFinalizedSlot).
+		IssuingTime(issuingTime).
+		StrongParents(issuerResp.StrongParents).
+		WeakParents(issuerResp.WeakParents).
+		ShallowLikeParents(issuerResp.ShallowLikeParents).
+		Payload(payload).
+		CalculateAndSetMaxBurnedMana(congestionResp.ReferenceManaCost).
+		Sign(issuer.Address().AccountID(), issuer.PrivateKey())
+
+	blk, err := blockBuilder.Build()
+	require.NoError(d.Testing, err)
+
+	blkID, err := clt.SubmitBlock(ctx, blk)
+	require.NoError(d.Testing, err)
+
+	return blkID
 }
