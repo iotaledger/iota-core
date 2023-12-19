@@ -28,6 +28,11 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *
 	validatorReward = 0
 	stakedAmount := stakingFeature.StakedAmount
 	firstRewardEpoch = stakingFeature.StartEpoch
+	// Start Epoch = 0 is unmodified as a special case for the initial validators that bootstrap the network to get their rewards.
+	// Otherwise, the earliest rewards can be in the epoch for which a validator could have been selected, which is start epoch + 1.
+	if firstRewardEpoch != 0 {
+		firstRewardEpoch = stakingFeature.StartEpoch + 1
+	}
 	lastRewardEpoch = stakingFeature.EndEpoch
 
 	// Limit reward fetching only to committed epochs.
