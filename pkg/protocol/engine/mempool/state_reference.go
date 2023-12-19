@@ -2,7 +2,6 @@ package mempool
 
 import (
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -12,7 +11,7 @@ type StateReference interface {
 	ReferencedStateID() iotago.Identifier
 
 	// The type of state.
-	Type() utxoledger.StateType
+	Type() StateType
 }
 
 // A thin wrapper around a UTXO input.
@@ -24,8 +23,8 @@ func (r UTXOInputStateRef) ReferencedStateID() iotago.Identifier {
 	return iotago.IdentifierFromData(lo.PanicOnErr(r.Input.OutputID().Bytes()))
 }
 
-func (r UTXOInputStateRef) Type() utxoledger.StateType {
-	return utxoledger.StateTypeUTXOInput
+func (r UTXOInputStateRef) Type() StateType {
+	return StateTypeUTXOInput
 }
 
 func UTXOInputStateRefFromInput(input *iotago.UTXOInput) UTXOInputStateRef {
@@ -43,8 +42,8 @@ func (r CommitmentInputStateRef) ReferencedStateID() iotago.Identifier {
 	return iotago.IdentifierFromData(lo.PanicOnErr(r.Input.CommitmentID.Bytes()))
 }
 
-func (r CommitmentInputStateRef) Type() utxoledger.StateType {
-	return utxoledger.StateTypeCommitment
+func (r CommitmentInputStateRef) Type() StateType {
+	return StateTypeCommitment
 }
 
 func CommitmentInputStateRefFromInput(input *iotago.CommitmentInput) CommitmentInputStateRef {

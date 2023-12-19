@@ -2,7 +2,6 @@ package mempool
 
 import (
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -12,7 +11,7 @@ type State interface {
 	StateID() StateID
 
 	// The type of state.
-	Type() utxoledger.StateType
+	Type() StateType
 
 	// Whether the state is read only.
 	IsReadOnly() bool
@@ -27,8 +26,8 @@ func (s CommitmentInputState) StateID() StateID {
 	return iotago.IdentifierFromData(lo.PanicOnErr(s.Commitment.MustID().Bytes()))
 }
 
-func (s CommitmentInputState) Type() utxoledger.StateType {
-	return utxoledger.StateTypeCommitment
+func (s CommitmentInputState) Type() StateType {
+	return StateTypeCommitment
 }
 
 func (s CommitmentInputState) IsReadOnly() bool {

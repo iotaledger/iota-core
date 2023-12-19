@@ -15,7 +15,6 @@ import (
 	ledgertests "github.com/iotaledger/iota-core/pkg/protocol/engine/ledger/tests"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -415,10 +414,10 @@ func (t *TestFramework) Cleanup() {
 
 type genericReference struct {
 	referencedStateID iotago.Identifier
-	stateType         utxoledger.StateType
+	stateType         mempool.StateType
 }
 
-func NewStateReference(referencedStateID iotago.Identifier, stateType utxoledger.StateType) mempool.StateReference {
+func NewStateReference(referencedStateID iotago.Identifier, stateType mempool.StateType) mempool.StateReference {
 	return &genericReference{
 		referencedStateID: referencedStateID,
 		stateType:         stateType,
@@ -429,6 +428,6 @@ func (g *genericReference) ReferencedStateID() iotago.Identifier {
 	return g.referencedStateID
 }
 
-func (g *genericReference) Type() utxoledger.StateType {
+func (g *genericReference) Type() mempool.StateType {
 	return g.stateType
 }

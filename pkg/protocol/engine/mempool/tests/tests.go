@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/debug"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -86,7 +85,7 @@ func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
 	tx1Metadata, exists := tf.TransactionMetadata("tx1")
 	require.True(t, exists)
 	_ = tx1Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
-		if state.State().Type() == utxoledger.StateTypeUTXOInput {
+		if state.State().Type() == mempool.StateTypeUTXOInput {
 			require.False(t, state.IsAccepted())
 			require.Equal(t, 1, state.PendingSpenderCount())
 		}
@@ -98,12 +97,12 @@ func TestProcessTransactionWithReadOnlyInputs(t *testing.T, tf *TestFramework) {
 	require.True(t, exists)
 
 	_ = tx2Metadata.Outputs().ForEach(func(state mempool.StateMetadata) error {
-		if state.State().Type() == utxoledger.StateTypeUTXOInput {
+		if state.State().Type() == mempool.StateTypeUTXOInput {
 			require.False(t, state.IsAccepted())
 			require.Equal(t, 0, state.PendingSpenderCount())
 		}
 
-		if state.State().Type() == utxoledger.StateTypeCommitment {
+		if state.State().Type() == mempool.StateTypeCommitment {
 			require.False(t, state.IsAccepted())
 			require.Equal(t, 2, state.PendingSpenderCount())
 		}

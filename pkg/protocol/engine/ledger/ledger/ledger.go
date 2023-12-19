@@ -713,7 +713,7 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 	defer l.utxoLedger.ReadUnlockLedger()
 
 	switch stateRef.Type() {
-	case utxoledger.StateTypeUTXOInput:
+	case mempool.StateTypeUTXOInput:
 		//nolint:forcetypeassert // we can safely assume that this is a UTXOInputStateRef
 		utxoInput := stateRef.(mempool.UTXOInputStateRef).Input
 		isUnspent, err := l.utxoLedger.IsOutputIDUnspentWithoutLocking(utxoInput.OutputID())
@@ -732,7 +732,7 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 		}
 
 		return p.Resolve(output)
-	case utxoledger.StateTypeCommitment:
+	case mempool.StateTypeCommitment:
 		//nolint:forcetypeassert // we can safely assume that this is a CommitmentInputStateRef
 		commitment := stateRef.(mempool.CommitmentInputStateRef).Input
 		loadedCommitment, err := l.loadCommitment(commitment.CommitmentID)
