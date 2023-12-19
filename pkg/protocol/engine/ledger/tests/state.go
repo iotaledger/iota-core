@@ -2,6 +2,7 @@ package ledgertests
 
 import (
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -23,8 +24,8 @@ func (m *MockedState) StateID() iotago.Identifier {
 	return iotago.IdentifierFromData(lo.PanicOnErr(m.id.Bytes()))
 }
 
-func (m *MockedState) Type() iotago.StateType {
-	return iotago.InputUTXO
+func (m *MockedState) Type() mempool.StateType {
+	return mempool.StateTypeUTXOInput
 }
 
 func (m *MockedState) IsReadOnly() bool {

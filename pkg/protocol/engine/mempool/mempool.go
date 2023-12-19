@@ -32,3 +32,11 @@ type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] interface {
 	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset()
 }
+
+// Denotes the type of state.
+type StateType byte
+
+const (
+	StateTypeUTXOInput StateType = iota
+	StateTypeCommitment
+)
