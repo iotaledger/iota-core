@@ -46,7 +46,7 @@ func provide(c *dig.Container) error {
 	if err := c.Provide(func() *Server {
 		return newServer()
 	}); err != nil {
-		Component.LogPanic(err)
+		Component.LogPanic(err.Error())
 	}
 
 	return nil

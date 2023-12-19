@@ -99,12 +99,12 @@ func (c *Commitments) API(commitmentID iotago.CommitmentID) (commitmentAPI *engi
 
 // initLogger initializes the logger for this component.
 func (c *Commitments) initLogger() (shutdown func()) {
-	c.Logger, shutdown = c.protocol.NewChildLogger("Commitments")
+	c.Logger = c.protocol.NewChildLogger("Commitments")
 
 	return lo.Batch(
 		c.Root.LogUpdates(c, log.LevelTrace, "Root", (*Commitment).LogName),
 
-		shutdown,
+		c.Logger.UnsubscribeFromParentLogger,
 	)
 }
 

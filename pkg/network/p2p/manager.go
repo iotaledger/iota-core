@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/logger"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/network"
 )
@@ -71,7 +71,7 @@ type Manager struct {
 	libp2pHost host.Host
 	peerDB     *network.DB
 
-	log *logger.Logger
+	logger log.Logger
 
 	shutdownMutex syncutils.RWMutex
 	isShutdown    bool
@@ -84,11 +84,11 @@ type Manager struct {
 }
 
 // NewManager creates a new Manager.
-func NewManager(libp2pHost host.Host, peerDB *network.DB, log *logger.Logger) *Manager {
+func NewManager(libp2pHost host.Host, peerDB *network.DB, logger log.Logger) *Manager {
 	m := &Manager{
 		libp2pHost: libp2pHost,
 		peerDB:     peerDB,
-		log:        log,
+		logger:     logger,
 		Events:     NewNeighborEvents(),
 		neighbors:  make(map[peer.ID]*Neighbor),
 	}
@@ -154,11 +154,7 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 		return ierrors.Wrapf(err, "dial %s / %s failed to send negotiation for proto %s", peer.PeerAddresses, peer.ID, protocolID)
 	}
 
-	m.log.Debugw("outgoing stream negotiated",
-		"id", peer.ID,
-		"addr", ps.Conn().RemoteMultiaddr(),
-		"proto", protocolID,
-	)
+	m.logger.LogDebugf("outgoing stream negotiated, id: %s, addr: %s, proto: %s", peer.ID, ps.Conn().RemoteMultiaddr(), protocolID)
 
 	if err := m.peerDB.UpdatePeer(peer); err != nil {
 		m.closeStream(stream)
@@ -270,7 +266,7 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 	defer m.protocolHandlerMutex.RUnlock()
 
 	if m.protocolHandler == nil {
-		m.log.Error("no protocol handler registered")
+		m.logger.LogError("no protocol handler registered")
 		stream.Close()
 
 		return
@@ -278,7 +274,7 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 
 	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
 	if err := ps.receiveNegotiation(); err != nil {
-		m.log.Errorw("failed to receive negotiation message")
+		m.logger.LogError("failed to receive negotiation message")
 		m.closeStream(stream)
 
 		return
@@ -290,14 +286,14 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 	}
 	peer := network.NewPeerFromAddrInfo(peerAddrInfo)
 	if err := m.peerDB.UpdatePeer(peer); err != nil {
-		m.log.Errorf("failed to update peer %s in peer database: %s", peer.ID, err)
+		m.logger.LogErrorf("failed to update peer in peer database, peerID: %s, error: %s", peer.ID, err)
 		m.closeStream(stream)
 
 		return
 	}
 
 	if err := m.addNeighbor(peer, ps); err != nil {
-		m.log.Errorf("failed to add neighbor %s: %s", peer.ID, err)
+		m.logger.LogErrorf("failed to add neighbor, peerID: %s, error: %s", peer.ID, err)
 		m.closeStream(stream)
 
 		return
@@ -306,7 +302,7 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 
 func (m *Manager) closeStream(s p2pnetwork.Stream) {
 	if err := s.Close(); err != nil {
-		m.log.Warnw("close error", "err", err)
+		m.logger.LogWarnf("close error, error: %s", err)
 	}
 }
 
@@ -337,16 +333,16 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 	}
 
 	// create and add the neighbor
-	nbr := NewNeighbor(peer, ps, m.log, func(nbr *Neighbor, packet proto.Message) {
+	nbr := NewNeighbor(m.logger, peer, ps, func(nbr *Neighbor, packet proto.Message) {
 		m.protocolHandlerMutex.RLock()
 		defer m.protocolHandlerMutex.RUnlock()
 
 		if m.protocolHandler == nil {
-			nbr.Log.Errorw("Can't handle packet as no protocol is registered")
+			nbr.logger.LogError("Can't handle packet as no protocol is registered")
 			return
 		}
 		if err := m.protocolHandler.PacketHandler(nbr.ID, packet); err != nil {
-			nbr.Log.Debugw("Can't handle packet", "err", err)
+			nbr.logger.LogDebugf("Can't handle packet, error: %s", err)
 		}
 	}, func(nbr *Neighbor) {
 		m.deleteNeighbor(nbr)
@@ -354,14 +350,14 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 	})
 	if err := m.setNeighbor(nbr); err != nil {
 		if resetErr := ps.Close(); resetErr != nil {
-			nbr.Log.Errorw("error closing stream", "err", resetErr)
+			nbr.logger.LogErrorf("error closing stream, error: %s", resetErr)
 		}
 
 		return ierrors.WithStack(err)
 	}
 	nbr.readLoop()
 	nbr.writeLoop()
-	nbr.Log.Info("Connection established")
+	nbr.logger.LogInfo("Connection established to %s")
 	m.Events.NeighborAdded.Trigger(nbr)
 
 	return nil

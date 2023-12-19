@@ -40,7 +40,7 @@ func (t *TestSuite) AssertLatestCommitment(commitment *iotago.Commitment, nodes 
 	for _, node := range nodes {
 		t.Eventually(func() error {
 			if !commitment.Equals(node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()) {
-				return ierrors.Errorf("AssertLatestCommitment: %s: expected %s, got %s", node.Name, commitment, node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment())
+				return ierrors.Errorf("AssertLatestCommitment: %s: expected %s, got %s", node.Name, commitment, node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment())
 			}
 
 			return nil

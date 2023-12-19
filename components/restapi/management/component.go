@@ -72,7 +72,7 @@ func configure() error {
 	})
 
 	routeGroup.POST(api.ManagementEndpointPeers, func(c echo.Context) error {
-		resp, err := addPeer(c, Component.Logger())
+		resp, err := addPeer(c, Component.Logger)
 		if err != nil {
 			return err
 		}

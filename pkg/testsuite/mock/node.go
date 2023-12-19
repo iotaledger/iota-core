@@ -3,7 +3,6 @@ package mock
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -52,6 +51,7 @@ type InvalidSignedTransactionEvent struct {
 
 type Node struct {
 	Testing *testing.T
+	logger  log.Logger
 
 	Name       string
 	Validator  *BlockIssuer
@@ -74,7 +74,6 @@ type Node struct {
 	candidateEngineActivatedCount atomic.Uint32
 	mainEngineSwitchedCount       atomic.Uint32
 
-	logHandler          slog.Handler
 	enableEngineLogging bool
 
 	mutex                    syncutils.RWMutex
@@ -84,7 +83,7 @@ type Node struct {
 	invalidTransactionEvents map[iotago.SignedTransactionID]InvalidSignedTransactionEvent
 }
 
-func NewNode(t *testing.T, net *Network, partition string, name string, validator bool, logHandler slog.Handler) *Node {
+func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition string, name string, validator bool) *Node {
 	keyManager := lo.PanicOnErr(wallet.NewKeyManagerFromRandom(wallet.DefaultIOTAPath))
 	priv, pub := keyManager.KeyPair()
 
@@ -94,19 +93,20 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 	peerID := lo.PanicOnErr(peer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
 	RegisterIDAlias(peerID, name)
 
-	var validatorBlockIssuer *BlockIssuer
+	var validationBlockIssuer *BlockIssuer
 	if validator {
-		validatorBlockIssuer = NewBlockIssuer(t, name, keyManager, accountID, validator)
+		validationBlockIssuer = NewBlockIssuer(t, name, keyManager, accountID, validator)
 	} else {
-		validatorBlockIssuer = nil
+		validationBlockIssuer = nil
 	}
 
 	return &Node{
 		Testing: t,
+		logger:  parentLogger.NewChildLogger(name),
 
 		Name: name,
 
-		Validator:  validatorBlockIssuer,
+		Validator:  validationBlockIssuer,
 		KeyManager: keyManager,
 
 		PeerID: peerID,
@@ -115,7 +115,6 @@ func NewNode(t *testing.T, net *Network, partition string, name string, validato
 		Endpoint:  net.JoinWithEndpointID(peerID, partition),
 		Workers:   workerpool.NewGroup(name),
 
-		logHandler:          logHandler,
 		enableEngineLogging: true,
 
 		attachedBlocks:           make([]*blocks.Block, 0),
@@ -133,7 +132,7 @@ func (n *Node) IsValidator() bool {
 
 func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[protocol.Protocol]) {
 	n.Protocol = protocol.New(
-		log.NewLogger(n.Name, n.logHandler),
+		n.logger,
 		n.Workers.CreateGroup("Protocol"),
 		n.Endpoint,
 		opts...,
@@ -483,6 +482,7 @@ func (n *Node) Shutdown() {
 	}
 
 	<-stopped
+	n.logger.UnsubscribeFromParentLogger()
 }
 
 func (n *Node) ProtocolParametersHash() iotago.Identifier {
@@ -543,7 +543,7 @@ func (n *Node) AttachedBlocks() []*blocks.Block {
 	return n.attachedBlocks
 }
 
-func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
+func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidationBlockParams]) *blocks.Block {
 	if n.Validator == nil {
 		panic("node is not a validator")
 	}
