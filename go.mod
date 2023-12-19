@@ -12,20 +12,20 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/iotaledger/hive.go/ads v0.0.0-20231214025533-67add6c5091b
 	github.com/iotaledger/hive.go/app v0.0.0-20231214121634-8b23c68d408d
-	github.com/iotaledger/hive.go/constraints v0.0.0-20231214121634-8b23c68d408d
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231214121634-8b23c68d408d
-	github.com/iotaledger/hive.go/crypto v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/constraints v0.0.0-20231219095137-dd4674b3226e
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231219095137-dd4674b3226e
+	github.com/iotaledger/hive.go/crypto v0.0.0-20231219095137-dd4674b3226e
 	github.com/iotaledger/hive.go/ds v0.0.0-20231214121634-8b23c68d408d
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20231219095137-dd4674b3226e
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20231214025533-67add6c5091b
-	github.com/iotaledger/hive.go/lo v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/lo v0.0.0-20231219095137-dd4674b3226e
 	github.com/iotaledger/hive.go/log v0.0.0-20231214121634-8b23c68d408d
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231214121634-8b23c68d408d
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231214121634-8b23c68d408d
-	github.com/iotaledger/hive.go/stringify v0.0.0-20231214121634-8b23c68d408d
+	github.com/iotaledger/hive.go/runtime v0.0.0-20231219095137-dd4674b3226e
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231219095137-dd4674b3226e
+	github.com/iotaledger/hive.go/stringify v0.0.0-20231219095137-dd4674b3226e
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20231214122225-f510ea9b00b5
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20231206124145-f773dfe3927e
-	github.com/iotaledger/iota.go/v4 v4.0.0-20231212151746-1198742b97ef
+	github.com/iotaledger/iota.go/v4 v4.0.0-20231219123706-e55ccb867441
 	github.com/labstack/echo/v4 v4.11.3
 	github.com/labstack/gommon v0.4.1
 	github.com/libp2p/go-libp2p v0.32.0
