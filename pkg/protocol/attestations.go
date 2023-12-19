@@ -194,7 +194,7 @@ func (a *Attestations) processResponse(commitment *model.Commitment, attestation
 			}
 
 			return actualWeight
-		}) > 0 {
+		}) == 0 {
 			publishedCommitment.IsAttested.Set(true)
 		}
 	})

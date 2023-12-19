@@ -3,7 +3,10 @@ package inmemoryblockdag
 import (
 	"sync/atomic"
 
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -37,25 +40,34 @@ type BlockDAG struct {
 	errorHandler func(error)
 
 	module.Module
+
+	log.Logger
 }
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
+		b := New(e.Logger, e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.Constructed.OnTrigger(func() {
 			wp := b.workers.CreatePool("BlockDAG.Attach", workerpool.WithWorkerCount(2))
 
 			e.Events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
-					b.errorHandler(ierrors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.ProtocolBlock().Header.IssuerID))
+					b.LogError("failed to attach block", "blockID", block.ID(), "issuer", block.ID(), block.ProtocolBlock().Header.IssuerID, "err", err)
 				}
 			}, event.WithWorkerPool(wp))
 
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-				for _, block := range b.uncommittedSlotBlocks.GetValuesAndEvict(commitment.ID()) {
-					b.setupBlock(block)
+				if uncommittedSlotBlocks := b.uncommittedSlotBlocks.GetValuesAndEvict(commitment.ID()); len(uncommittedSlotBlocks) != 0 {
+					b.LogTrace("commitment available", "commitmentID", commitment.ID())
+
+					for _, block := range uncommittedSlotBlocks {
+						b.LogTrace("replaying block", "blockID", block.ID(), "commitmentID", commitment.ID())
+
+						b.setupBlock(block)
+					}
 				}
+
 			}, event.WithWorkerPool(wp))
 
 			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
@@ -74,7 +86,15 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 	var unsolidParentsCount atomic.Int32
 	unsolidParentsCount.Store(int32(len(block.Parents())))
 
+	unsolidParents := ds.NewSet[iotago.BlockID]()
+
 	block.ForEachParent(func(parent iotago.Parent) {
+		if unsolidParents.Add(parent.ID) {
+			b.LogTrace("unsolid parents", "blockID", block.ID(), "parents", unsolidParents.ToSlice())
+		}
+
+		b.LogTrace("waiting for parent", "parent", parent.ID, "blockID", block.ID())
+
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
 			b.errorHandler(ierrors.Errorf("failed to setup block %s, parent %s is missing", block.ID(), parent.ID))
@@ -83,8 +103,16 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 		}
 
 		parentBlock.Solid().OnUpdateOnce(func(_ bool, _ bool) {
+			b.LogTrace("parent solid", "parent", parent.ID, "blockID", block.ID())
+
+			if unsolidParents.Delete(parent.ID) {
+				b.LogTrace("unsolid parents", "blockID", block.ID(), "parents", unsolidParents.ToSlice())
+			}
+
 			if unsolidParentsCount.Add(-1) == 0 {
 				if block.SetSolid() {
+					b.LogError("block solid", "blockID", block.ID())
+
 					b.events.BlockSolid.Trigger(block)
 				}
 			}
@@ -99,8 +127,9 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(parentLogger log.Logger, workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
+		Logger:                parentLogger.NewChildLogger("BlockDAG"),
 		events:                blockdag.NewEvents(),
 		evictionState:         evictionState,
 		blockCache:            blockCache,
@@ -115,8 +144,6 @@ var _ blockdag.BlockDAG = new(BlockDAG)
 // Attach is used to attach new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
 func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached bool, err error) {
 	if block, wasAttached, err = b.attach(data); wasAttached {
-		b.events.BlockAttached.Trigger(block)
-
 		// We add blocks that commit to a commitment we haven't committed ourselves yet to this limited size buffer and
 		// only let them become solid once we committed said slot ourselves (to the same commitment).
 		// This is necessary in order to make sure that all necessary state is available after a block is solid (specifically
@@ -128,8 +155,14 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 		if b.uncommittedSlotBlocks.AddWithFunc(block.SlotCommitmentID(), block, func() bool {
 			return block.SlotCommitmentID().Slot() > b.latestCommitmentFunc().Commitment().Slot
 		}) {
+			b.LogError("unsolid commitment", "blockID", block.ID(), "commitmentID", block.SlotCommitmentID(), "latestCommitment", lo.PanicOnErr(b.latestCommitmentFunc().Commitment().ID()))
+
 			return
 		}
+
+		b.LogTrace("block attached", "blockID", block.ID())
+
+		b.events.BlockAttached.Trigger(block)
 
 		b.setupBlock(block)
 	}
@@ -142,6 +175,8 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 // creating it.
 func (b *BlockDAG) GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Block, requested bool) {
 	return b.blockCache.GetOrCreate(blockID, func() (newBlock *blocks.Block) {
+		b.LogTrace("block missing", "blockID", blockID)
+
 		newBlock = blocks.NewMissingBlock(blockID)
 		b.events.BlockMissing.Trigger(newBlock)
 
@@ -179,6 +214,8 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	}
 
 	if updated {
+		b.LogTrace("received missing block", "blockID", block.ID())
+
 		b.events.MissingBlockAttached.Trigger(block)
 	}
 
