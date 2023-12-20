@@ -199,6 +199,19 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 	return delegatorsReward, firstRewardEpoch, lastRewardEpoch, nil
 }
 
+func (t *Tracker) PoolRewardsForAccount(accountID iotago.AccountID) (
+	poolRewardsForAccount iotago.Mana,
+	exists bool,
+	err error,
+) {
+	rewards, exists, err := t.rewardsForAccount(accountID, t.latestAppliedEpoch)
+	if err != nil || !exists {
+		return 0, exists, err
+	}
+
+	return rewards.PoolRewards, exists, err
+}
+
 // Returns the epoch until which rewards are decayed.
 //
 // When claiming rewards in epoch X for epoch X-1, decay of X-(X-1) = 1 would be applied. Since epoch X is the

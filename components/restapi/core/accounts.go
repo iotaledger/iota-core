@@ -184,8 +184,12 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get output %s from ledger: %s", outputID.ToHex(), err)
 	}
 
+	var stakingPoolValidatorAccountID iotago.AccountID
 	var reward iotago.Mana
 	var firstRewardEpoch, lastRewardEpoch iotago.EpochIndex
+
+	apiForSlot := deps.Protocol.APIForSlot(slotIndex)
+
 	switch utxoOutput.OutputType() {
 	case iotago.OutputAccount:
 		//nolint:forcetypeassert
@@ -198,13 +202,13 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 		//nolint:forcetypeassert
 		stakingFeature := feature.(*iotago.StakingFeature)
 
-		apiForSlot := deps.Protocol.APIForSlot(slotIndex)
 		futureBoundedSlotIndex := slotIndex + apiForSlot.ProtocolParameters().MinCommittableAge()
 		claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
 
+		stakingPoolValidatorAccountID = accountOutput.AccountID
 		// check if the account is a validator
 		reward, firstRewardEpoch, lastRewardEpoch, err = deps.Protocol.Engines.Main.Get().SybilProtection.ValidatorReward(
-			accountOutput.AccountID,
+			stakingPoolValidatorAccountID,
 			stakingFeature,
 			claimingEpoch,
 		)
@@ -213,7 +217,6 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 		//nolint:forcetypeassert
 		delegationOutput := utxoOutput.Output().(*iotago.DelegationOutput)
 		delegationEnd := delegationOutput.EndEpoch
-		apiForSlot := deps.Protocol.APIForSlot(slotIndex)
 		futureBoundedSlotIndex := slotIndex + apiForSlot.ProtocolParameters().MinCommittableAge()
 		claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
 		// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
@@ -224,8 +227,10 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 			delegationEnd = claimingEpoch - iotago.EpochIndex(1)
 		}
 
+		stakingPoolValidatorAccountID = delegationOutput.ValidatorAddress.AccountID()
+
 		reward, firstRewardEpoch, lastRewardEpoch, err = deps.Protocol.Engines.Main.Get().SybilProtection.DelegatorReward(
-			delegationOutput.ValidatorAddress.AccountID(),
+			stakingPoolValidatorAccountID,
 			delegationOutput.DelegatedAmount,
 			delegationOutput.StartEpoch,
 			delegationEnd,
@@ -236,10 +241,20 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to calculate reward for output %s: %s", outputID.ToHex(), err)
 	}
 
+	latestCommittedEpochPoolRewards, poolRewardExists, err := deps.Protocol.Engines.Main.Get().SybilProtection.PoolRewardsForAccount(stakingPoolValidatorAccountID)
+
+	if err != nil {
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to retrieve pool rewards for account %s: %s", stakingPoolValidatorAccountID.ToHex(), err)
+	}
+	if !poolRewardExists {
+		latestCommittedEpochPoolRewards = 0
+	}
+
 	return &api.ManaRewardsResponse{
-		StartEpoch: firstRewardEpoch,
-		EndEpoch:   lastRewardEpoch,
-		Rewards:    reward,
+		StartEpoch:                    firstRewardEpoch,
+		EndEpoch:                      lastRewardEpoch,
+		Rewards:                       reward,
+		LatestCommittedEpochPoolRewards: latestCommittedEpochPoolRewards,
 	}, nil
 }
 

@@ -28,6 +28,9 @@ type SybilProtection interface {
 	// Since the Delegation Output's EndEpoch might be unset due to an ongoing delegation, the epoch until which rewards were calculated is also returned (lastRewardEpoch).
 	// The rewards are decayed until claimingEpoch, which should be set to the epoch in which the rewards would be claimed.
 	DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex, claimingEpoch iotago.EpochIndex) (delegatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error)
+	// PoolRewardsForAccount returns the pool rewards of the account identified by accountID in the last committed epoch.
+	PoolRewardsForAccount(accountID iotago.AccountID) (
+		poolRewardsForAccount iotago.Mana, exists bool, err error)
 	SeatManager() seatmanager.SeatManager
 	CommitSlot(iotago.SlotIndex) (iotago.Identifier, iotago.Identifier, error)
 	Import(io.ReadSeeker) error
