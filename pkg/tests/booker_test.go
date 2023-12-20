@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
@@ -829,4 +830,32 @@ func Test_RootBlockShallowLike(t *testing.T) {
 	ts.IssueBasicBlockWithOptions("block-shallow-like-invalid", wallet, &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("4.1-node1")), mock.WithShallowLikeParents(ts.BlockID("block2")), mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(5)))
 	ts.AssertBlocksInCacheBooked(ts.Blocks("block-shallow-like-invalid"), false, node1)
 	ts.AssertBlocksInCacheInvalid(ts.Blocks("block-shallow-like-invalid"), true, node1)
+}
+
+func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
+	ts := testsuite.NewTestSuite(t)
+
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddNode("node2")
+	ts.AddDefaultWallet(node1)
+
+	ts.Run(true)
+	defer ts.Shutdown()
+
+	// CREATE NFT FROM BASIC UTXO
+	var block1Slot iotago.SlotIndex = ts.API.ProtocolParameters().GenesisSlot() + 1
+	ts.SetCurrentSlot(block1Slot)
+
+	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", "Genesis:0",
+		func(nftBuilder *builder.NFTOutputBuilder) {
+			// Set an issuer ID that is not unlocked in the TX which will cause the TX to be invalid.
+			nftBuilder.ImmutableIssuer(&iotago.Ed25519Address{})
+		},
+	)
+	ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+
+	ts.Wait(node1, node2)
+
+	ts.AssertTransactionsExist([]*iotago.Transaction{tx1.Transaction}, true, node1, node2)
+	ts.AssertTransactionFailure(lo.PanicOnErr(tx1.ID()), iotago.ErrIssuerFeatureNotUnlocked, node1, node2)
 }

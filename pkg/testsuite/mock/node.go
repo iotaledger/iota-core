@@ -408,7 +408,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 	instance.Ledger.MemPool().OnSignedTransactionAttached(
 		func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
 			signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
-				instance.LogTrace("MemPool.SignedTransactionSignaturesInvalid", "tx", signedTransactionMetadata.ID(), "err", err)
+				instance.LogTrace("MemPool.SignedTransactionSignaturesInvalid", "signedTx", signedTransactionMetadata.ID(), "tx", signedTransactionMetadata.TransactionMetadata().ID(), "err", err)
 			})
 		},
 	)
