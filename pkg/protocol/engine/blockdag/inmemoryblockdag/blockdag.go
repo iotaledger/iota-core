@@ -53,7 +53,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 
 			e.Events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
-					b.LogError("failed to attach block", "blockID", block.ID(), "issuer", block.ID(), block.ProtocolBlock().Header.IssuerID, "err", err)
+					b.LogError("failed to attach block", "blockID", block.ID(), "issuer", block.ProtocolBlock().Header.IssuerID, "err", err)
 				}
 			}, event.WithWorkerPool(wp))
 
@@ -257,7 +257,7 @@ func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid boo
 	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
 		if b.evictionState.InActiveRootBlockRange(parentID) && !b.evictionState.IsActiveRootBlock(parentID) {
 			b.retainBlockFailure(modelBlock.ID(), api.BlockFailureParentIsTooOld)
-			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
+			return false, ierrors.Errorf("parent %s of block %s is too old %v %v", parentID, modelBlock.ID(), b.evictionState.InActiveRootBlockRange(parentID), b.evictionState.IsActiveRootBlock(parentID))
 		}
 	}
 

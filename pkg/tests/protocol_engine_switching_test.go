@@ -8,7 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/core/eventticker"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -645,10 +648,16 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 }
 
 func TestProtocol_EngineSwitching_Tie(t *testing.T) {
+	var (
+		genesisSlot       iotago.SlotIndex = 0
+		minCommittableAge iotago.SlotIndex = 2
+		maxCommittableAge iotago.SlotIndex = 4
+	)
+
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(
-				0,
+				genesisSlot,
 				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
 				testsuite.DefaultSlotDurationInSeconds,
 				3,
@@ -656,8 +665,8 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 			iotago.WithLivenessOptions(
 				10,
 				10,
-				2,
-				4,
+				minCommittableAge,
+				maxCommittableAge,
 				5,
 			),
 		),
@@ -672,56 +681,74 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		ts.AddValidatorNode("node2"),
 	}
 
+	validatorsByAccountID := map[iotago.AccountID]*mock.Node{
+		nodes[0].Validator.AccountID: nodes[0],
+		nodes[1].Validator.AccountID: nodes[1],
+		nodes[2].Validator.AccountID: nodes[2],
+	}
+
 	ts.AddDefaultWallet(nodes[0])
 
 	const expectedCommittedSlotAfterPartitionMerge = 18
 
-	nodeOptions := make(map[string][]options.Option[protocol.Protocol])
-	for _, node := range ts.Nodes() {
-		nodeOptions[node.Name] = []options.Option[protocol.Protocol]{
-			protocol.WithSybilProtectionProvider(
-				sybilprotectionv1.NewProvider(
-					sybilprotectionv1.WithSeatManagerProvider(module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
-						poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
-						for _, node := range lo.Filter(nodes, (*mock.Node).IsValidator) {
-							poa.AddAccount(node.Validator.AccountID, node.Name)
-						}
+	nodeOptions := []options.Option[protocol.Protocol]{
+		protocol.WithSybilProtectionProvider(
+			sybilprotectionv1.NewProvider(
+				sybilprotectionv1.WithSeatManagerProvider(module.Provide(func(e *engine.Engine) seatmanager.SeatManager {
+					poa := mock2.NewManualPOAProvider()(e).(*mock2.ManualPOA)
+					for _, node := range lo.Filter(nodes, (*mock.Node).IsValidator) {
+						poa.AddAccount(node.Validator.AccountID, node.Name)
+					}
 
-						poa.SetOnline(lo.Map(nodes, func(sourceType *mock.Node) string { return sourceType.Name })...)
+					onlineValidators := ds.NewSet[string]()
 
-						return poa
-					})),
-				),
+					e.Constructed.OnTrigger(func() {
+						e.Events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+							if node, exists := validatorsByAccountID[block.ModelBlock().ProtocolBlock().Header.IssuerID]; exists && onlineValidators.Add(node.Name) {
+								e.LogError("node online", "name", node.Name)
+								poa.SetOnline(onlineValidators.ToSlice()...)
+							}
+						})
+					})
+
+					return poa
+				})),
 			),
+		),
 
-			protocol.WithEngineOptions(
-				engine.WithBlockRequesterOptions(
-					eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
-					eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](500*time.Millisecond),
-				),
+		protocol.WithEngineOptions(
+			engine.WithBlockRequesterOptions(
+				eventticker.RetryInterval[iotago.SlotIndex, iotago.BlockID](1*time.Second),
+				eventticker.RetryJitter[iotago.SlotIndex, iotago.BlockID](500*time.Millisecond),
 			),
+		),
 
-			protocol.WithSyncManagerProvider(
-				trivialsyncmanager.NewProvider(
-					trivialsyncmanager.WithBootstrappedFunc(func(e *engine.Engine) bool {
-						return e.Storage.Settings().LatestCommitment().Slot() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
-					}),
-				),
+		protocol.WithSyncManagerProvider(
+			trivialsyncmanager.NewProvider(
+				trivialsyncmanager.WithBootstrappedFunc(func(e *engine.Engine) bool {
+					return e.Storage.Settings().LatestCommitment().Slot() >= expectedCommittedSlotAfterPartitionMerge && e.Notarization.IsBootstrapped()
+				}),
 			),
+		),
 
-			protocol.WithStorageOptions(
-				storage.WithPruningDelay(20),
-			),
-		}
+		protocol.WithStorageOptions(
+			storage.WithPruningDelay(20),
+		),
 	}
 
-	ts.Run(false, nodeOptions)
+	nodesOptions := make(map[string][]options.Option[protocol.Protocol])
+	for _, node := range ts.Nodes() {
+		nodesOptions[node.Name] = nodeOptions
+	}
 
-	nodes[0].Protocol.SetLogLevel(log.LevelPanic)
-	nodes[1].Protocol.SetLogLevel(log.LevelPanic)
-	nodes[2].Protocol.SetLogLevel(log.LevelPanic)
+	ts.Run(false, nodesOptions)
+
+	nodes[0].Protocol.SetLogLevel(log.LevelDebug)
+	nodes[1].Protocol.SetLogLevel(log.LevelDebug)
+	nodes[2].Protocol.SetLogLevel(log.LevelDebug)
+
 	nodes[2].Protocol.Chains.WithInitializedEngines(func(_ *protocol.Chain, engine *engine.Engine) (shutdown func()) {
-		engine.BlockDAG.SetLogLevel(log.LevelError)
+		engine.BlockDAG.SetLogLevel(log.LevelDebug)
 
 		return nil
 	})
@@ -757,66 +784,6 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 			testsuite.WithStorageRootBlocks(ts.Blocks("Genesis")),
 		)
 	}
-
-	// Issue up to slot 13 in P0 (main partition with all nodes) and verify that the nodes have the expected states.
-	{
-		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, 4, "Genesis", ts.Nodes(), true, false)
-
-		ts.AssertNodeState(ts.Nodes(),
-			testsuite.WithLatestFinalizedSlot(10),
-			testsuite.WithLatestCommitmentSlotIndex(11),
-			testsuite.WithEqualStoredCommitmentAtIndex(11),
-			testsuite.WithLatestCommitmentCumulativeWeight(24), // 4 for each slot starting from 4
-			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(11), expectedCommittee),
-			testsuite.WithSybilProtectionOnlineCommittee(seatIndexes...),
-			testsuite.WithEvictedSlot(11),
-		)
-
-		for _, slot := range []iotago.SlotIndex{4, 5, 6, 7, 8, 9, 10, 11} {
-			var attestationBlocks []*blocks.Block
-			for _, node := range ts.Nodes() {
-				if node.IsValidator() {
-					attestationBlocks = append(attestationBlocks, ts.Block(fmt.Sprintf("P0:%d.3-%s", slot, node.Name)))
-				}
-			}
-			ts.AssertAttestationsForSlot(slot, attestationBlocks, ts.Nodes()...)
-		}
-
-		// Make sure the tips are properly set.
-		var tipBlocks []*blocks.Block
-		for _, node := range ts.Nodes() {
-			tipBlocks = append(tipBlocks, ts.Block(fmt.Sprintf("P0:13.3-%s", node.Name)))
-		}
-		ts.AssertStrongTips(tipBlocks, ts.Nodes()...)
-
-		ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
-	}
-
-	// Split into partitions P1, P2 and P3.
-	ts.SplitIntoPartitions(map[string][]*mock.Node{
-		"P1": {nodes[0]},
-		"P2": {nodes[1]},
-		"P3": {nodes[2]},
-	})
-
-	// Set online committee for each partition.
-	for _, node := range ts.Nodes() {
-		manualPOA := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
-		if node.Partition == "P1" {
-			manualPOA.SetOnline("node0")
-			manualPOA.SetOffline("node1", "node2")
-		} else if node.Partition == "P2" {
-			manualPOA.SetOnline("node1")
-			manualPOA.SetOffline("node0", "node2")
-		} else {
-			manualPOA.SetOnline("node2")
-			manualPOA.SetOffline("node0", "node1")
-		}
-	}
-
-	ts.AssertSybilProtectionOnlineCommittee(seatIndexes[0:1], nodes[0])
-	ts.AssertSybilProtectionOnlineCommittee(seatIndexes[1:2], nodes[1])
-	ts.AssertSybilProtectionOnlineCommittee(seatIndexes[2:3], nodes[2])
 
 	nodesInPartition := func(partition int) []*mock.Node {
 		switch {
@@ -857,44 +824,51 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		}
 	}
 
+	lastCommonSlot := iotago.SlotIndex(13)
+
 	issueBlocks := func(partition int, slots []iotago.SlotIndex) {
 		parentSlot := slots[0] - 1
 		lastIssuedSlot := slots[len(slots)-1]
 		targetNodes := nodesInPartition(partition)
 		otherNodes := nodesOutsidePartition(partition)
+		lastCommittedSlot := lastIssuedSlot - minCommittableAge
 
-		ts.IssueBlocksAtSlots(slotPrefix(partition, slots[0]), slots, 4, slotPrefix(partition, parentSlot)+strconv.Itoa(int(parentSlot))+".3", targetNodes, true, false)
+		initialParentsPrefix := slotPrefix(partition, parentSlot) + strconv.Itoa(int(parentSlot)) + ".3"
+		if parentSlot == genesisSlot {
+			initialParentsPrefix = "Genesis"
+		}
+
+		ts.IssueBlocksAtSlots(slotPrefix(partition, slots[0]), slots, 4, initialParentsPrefix, targetNodes, true, false)
+
+		cumulativeAttestations := uint64(0)
+		for slot := genesisSlot + maxCommittableAge; slot <= lastCommittedSlot; slot++ {
+			var attestationBlocks Blocks
+			for _, node := range targetNodes {
+				attestationBlocks.Add(ts, node, partition, slot)
+
+				cumulativeAttestations++
+			}
+
+			for _, node := range otherNodes {
+				if slot <= lastCommonSlot+minCommittableAge {
+					attestationBlocks.Add(ts, node, partition, min(slot, lastCommonSlot)) // carry forward last known attestations
+
+					cumulativeAttestations++
+				}
+			}
+
+			ts.AssertAttestationsForSlot(slot, attestationBlocks, targetNodes...)
+		}
 
 		ts.AssertNodeState(targetNodes,
 			testsuite.WithLatestFinalizedSlot(10),
-			testsuite.WithLatestCommitmentSlotIndex(18),
-			testsuite.WithEqualStoredCommitmentAtIndex(18),
-			testsuite.WithLatestCommitmentCumulativeWeight(39),
-			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(18), expectedCommittee),
+			testsuite.WithLatestCommitmentSlotIndex(lastCommittedSlot),
+			testsuite.WithEqualStoredCommitmentAtIndex(lastCommittedSlot),
+			testsuite.WithLatestCommitmentCumulativeWeight(cumulativeAttestations),
+			testsuite.WithSybilProtectionCommittee(ts.API.TimeProvider().EpochFromSlot(lastCommittedSlot), expectedCommittee),
 			testsuite.WithSybilProtectionOnlineCommittee(onlineCommittee(partition)...),
-			testsuite.WithEvictedSlot(18),
+			testsuite.WithEvictedSlot(lastCommittedSlot),
 		)
-
-		for _, slot := range []iotago.SlotIndex{12, 13, 14, 15} {
-			var attestationBlocks Blocks
-			for _, node := range targetNodes {
-				attestationBlocks.Add(ts, node, partition, slot)
-			}
-			for _, node := range otherNodes {
-				attestationBlocks.Add(ts, node, partition, min(slot, 13)) // carry forward last known attestations
-			}
-
-			ts.AssertAttestationsForSlot(slot, attestationBlocks, targetNodes...)
-		}
-
-		for _, slot := range []iotago.SlotIndex{16, 17, 18} {
-			var attestationBlocks Blocks
-			for _, node := range targetNodes {
-				attestationBlocks.Add(ts, node, partition, slot)
-			}
-
-			ts.AssertAttestationsForSlot(slot, attestationBlocks, targetNodes...)
-		}
 
 		var tipBlocks Blocks
 		for _, node := range targetNodes {
@@ -903,6 +877,34 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 
 		ts.AssertStrongTips(tipBlocks, targetNodes...)
 	}
+
+	issueBlocks(0, []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13})
+
+	// Split into partitions P1, P2 and P3.
+	ts.SplitIntoPartitions(map[string][]*mock.Node{
+		"P1": {nodes[0]},
+		"P2": {nodes[1]},
+		"P3": {nodes[2]},
+	})
+
+	// Set online committee for each partition.
+	for _, node := range ts.Nodes() {
+		manualPOA := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
+		if node.Partition == "P1" {
+			manualPOA.SetOnline("node0")
+			manualPOA.SetOffline("node1", "node2")
+		} else if node.Partition == "P2" {
+			manualPOA.SetOnline("node1")
+			manualPOA.SetOffline("node0", "node2")
+		} else {
+			manualPOA.SetOnline("node2")
+			manualPOA.SetOffline("node0", "node1")
+		}
+	}
+
+	ts.AssertSybilProtectionOnlineCommittee(seatIndexes[0:1], nodes[0])
+	ts.AssertSybilProtectionOnlineCommittee(seatIndexes[1:2], nodes[1])
+	ts.AssertSybilProtectionOnlineCommittee(seatIndexes[2:3], nodes[2])
 
 	issueBlocks(1, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
 	issueBlocks(2, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
@@ -919,47 +921,141 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 
 		ts.MergePartitionsToMain()
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	ctxP1, ctxP1Cancel := context.WithCancel(ctx)
+	ctxP2, ctxP2Cancel := context.WithCancel(ctx)
+	ctxP3, ctxP3Cancel := context.WithCancel(ctx)
+
+	wg := &sync.WaitGroup{}
+
+	// Issue blocks on both partitions after merging the networks.
+	nodes[0].Validator.IssueActivity(ctxP1, wg, 21, nodes[0])
+	nodes[1].Validator.IssueActivity(ctxP2, wg, 21, nodes[1])
+	nodes[2].Validator.IssueActivity(ctxP3, wg, 21, nodes[2])
+
+	require.Eventually(t, func() bool {
+		mainEngineSwitchedCount := 0
+
+		for _, node := range nodes {
+			if node.MainEngineSwitchedCount() >= 1 {
+				mainEngineSwitchedCount++
+			}
+		}
+
+		return mainEngineSwitchedCount == 2
+	}, 30*time.Second, 100*time.Millisecond)
+
+	// P1 finalized until slot 18. We do not expect any forks here because our CW is higher than the other partition's.
+	ts.AssertForkDetectedCount(0, nodes[0])
+
+	//// P1's chain is heavier, they should not consider switching the chain.
+	//ts.AssertCandidateEngineActivatedCount(0, nodesP1...)
+	//ctxP2Cancel() // we can stop issuing on P2.
 	//
-	//	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	//	defer cancel()
+	//// Nodes from P2 should switch the chain.
+	//ts.AssertForkDetectedCount(1, nodesP2...)
+	//ts.AssertCandidateEngineActivatedCount(1, nodesP2...)
 	//
-	//	ctxP1, ctxP1Cancel := context.WithCancel(ctx)
-	//	ctxP2, ctxP2Cancel := context.WithCancel(ctx)
-	//	ctxP3, ctxP2Cancel := context.WithCancel(ctx)
-	//
-	//	wg := &sync.WaitGroup{}
-	//
-	//	// Issue blocks on both partitions after merging the networks.
-	//	node0.Validator.IssueActivity(ctxP1, wg, 21, node0)
-	//	node1.Validator.IssueActivity(ctxP2, wg, 21, node1)
-	//	node2.Validator.IssueActivity(ctxP3, wg, 21, node2)
-	//
-	//	// P1 finalized until slot 18. We do not expect any forks here because our CW is higher than the other partition's.
-	//	ts.AssertForkDetectedCount(0, nodesP1...)
-	//	// P1's chain is heavier, they should not consider switching the chain.
-	//	ts.AssertCandidateEngineActivatedCount(0, nodesP1...)
-	//	ctxP2Cancel() // we can stop issuing on P2.
-	//
-	//	// Nodes from P2 should switch the chain.
-	//	ts.AssertForkDetectedCount(1, nodesP2...)
-	//	ts.AssertCandidateEngineActivatedCount(1, nodesP2...)
-	//
-	//	// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
-	//	ts.AssertMainEngineSwitchedCount(1, nodesP2...)
-	//
-	//	ctxP1Cancel()
-	//	wg.Wait()
-	//}
-	//
-	//// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
-	//// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
-	//// This is to make sure that the storage was copied correctly during engine switching.
-	//ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
-	//ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
-	//ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
-	//
-	//ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
+	//// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
+	//ts.AssertMainEngineSwitchedCount(1, nodesP2...)
+
+	ctxP1Cancel()
+	ctxP2Cancel()
+	ctxP3Cancel()
+	wg.Wait()
+
+	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
+	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
+	// This is to make sure that the storage was copied correctly during engine switching.
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
+
+	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 }
+
+//
+//type ProtocolParameters struct {
+//	GenesisSlot       iotago.SlotIndex
+//	MinCommittableAge iotago.SlotIndex
+//	MaxCommittableAge iotago.SlotIndex
+//}
+//
+//type Partition struct {
+//	TestSuite          *testsuite.TestSuite
+//	ProtocolParameters *ProtocolParameters
+//	Parent             *Partition
+//	AllNodes           map[string]*mock.Node
+//	OnlineNodes        map[string]*mock.Node
+//	OfflineNodes       map[string]*mock.Node
+//	LastIssuedSlot     iotago.SlotIndex
+//}
+//
+//func (p *Partition) newlyOfflineNodes() map[string]*mock.Node {
+//	for nodeAlias := range p.Parent.OnlineNodes {
+//		if _, exists := p.OnlineNodes[nodeAlias]; !exists {
+//
+//		}
+//	}
+//}
+//
+//func (p *Partition) issueBlocks(partition int, slots []iotago.SlotIndex) {
+//	parentSlot := slots[0] - 1
+//	lastIssuedSlot := slots[len(slots)-1]
+//	targetNodes := lo.Values(p.OnlineNodes)
+//	otherNodes := p.OfflineNodes
+//	lastCommittedSlot := lastIssuedSlot - p.ProtocolParameters.MinCommittableAge
+//
+//	initialParentsPrefix := slotPrefix(partition, parentSlot) + strconv.Itoa(int(parentSlot)) + ".3"
+//	if parentSlot == p.ProtocolParameters.GenesisSlot {
+//		initialParentsPrefix = "Genesis"
+//	}
+//
+//	p.TestSuite.IssueBlocksAtSlots(slotPrefix(partition, slots[0]), slots, 4, initialParentsPrefix, targetNodes, true, false)
+//
+//	cumulativeAttestations := uint64(0)
+//	for slot := p.ProtocolParameters.GenesisSlot + p.ProtocolParameters.MaxCommittableAge; slot <= lastCommittedSlot; slot++ {
+//		var attestationBlocks Blocks
+//		for _, node := range targetNodes {
+//			attestationBlocks.Add(p.TestSuite, node, partition, slot)
+//
+//			cumulativeAttestations++
+//		}
+//
+//		// carry forward attestations from nodes that were online in the previous partition and that are no longer
+//		// online now
+//
+//		for _, node := range otherNodes {
+//			if slot <= lastCommonSlot+p.ProtocolParameters.MinCommittableAge {
+//				attestationBlocks.Add(p.TestSuite, node, partition, min(slot, lastCommonSlot)) // carry forward last known attestations
+//
+//				cumulativeAttestations++
+//			}
+//		}
+//
+//		p.TestSuite.AssertAttestationsForSlot(slot, attestationBlocks, targetNodes...)
+//	}
+//
+//	p.TestSuite.AssertNodeState(targetNodes,
+//		testsuite.WithLatestFinalizedSlot(10),
+//		testsuite.WithLatestCommitmentSlotIndex(lastCommittedSlot),
+//		testsuite.WithEqualStoredCommitmentAtIndex(lastCommittedSlot),
+//		testsuite.WithLatestCommitmentCumulativeWeight(cumulativeAttestations),
+//		testsuite.WithSybilProtectionCommittee(p.TestSuite.API.TimeProvider().EpochFromSlot(lastCommittedSlot), expectedCommittee),
+//		testsuite.WithSybilProtectionOnlineCommittee(onlineCommittee(partition)...),
+//		testsuite.WithEvictedSlot(lastCommittedSlot),
+//	)
+//
+//	var tipBlocks Blocks
+//	for _, node := range targetNodes {
+//		tipBlocks.Add(p.TestSuite, node, partition, lastIssuedSlot)
+//	}
+//
+//	p.TestSuite.AssertStrongTips(tipBlocks, targetNodes...)
+//}
 
 func slotPrefix(partition int, slot iotago.SlotIndex) string {
 	if slot <= 13 {
