@@ -251,9 +251,9 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 	}
 
 	return &api.ManaRewardsResponse{
-		StartEpoch:                    firstRewardEpoch,
-		EndEpoch:                      lastRewardEpoch,
-		Rewards:                       reward,
+		StartEpoch:                      firstRewardEpoch,
+		EndEpoch:                        lastRewardEpoch,
+		Rewards:                         reward,
 		LatestCommittedEpochPoolRewards: latestCommittedEpochPoolRewards,
 	}, nil
 }
