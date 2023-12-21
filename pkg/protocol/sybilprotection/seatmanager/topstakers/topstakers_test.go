@@ -213,7 +213,7 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 		newCommitteeMemberIDs := committeeInEpoch1Accounts.IDs()
 
 		// A new committee member appears online and makes the previously active committee seat inactive.
-		s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(newCommitteeMemberIDs[0])), newCommitteeMemberIDs[0], testAPI.TimeProvider().SlotEndTime(14))
+		s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(newCommitteeMemberIDs[0])), newCommitteeMemberIDs[0], testAPI.TimeProvider().SlotEndTime(2+2*testAPI.ProtocolParameters().MinCommittableAge()))
 		assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(newCommitteeMemberIDs[0])))
 
 		// Make sure that the committee retrieved from the committee store matches the expected.
