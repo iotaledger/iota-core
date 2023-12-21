@@ -261,7 +261,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			panic(ierrors.Wrapf(err, "failed to calculate pool rewards for account %s", accountID))
 		}
 
-		t.LogDebug("PerformanceFactor", "accountID", accountID, "epochPerformanceFactor", epochPerformanceFactor, "poolReward", poolReward)
+		t.LogInfo("PerformanceApplyEpoch", "accountID", accountID, "epochPerformanceFactor", epochPerformanceFactor, "poolReward", poolReward)
 
 		if err = rewardsMap.Set(accountID, &model.PoolRewards{
 			PoolStake:   pool.PoolStake,
