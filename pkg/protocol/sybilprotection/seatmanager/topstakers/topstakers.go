@@ -2,6 +2,7 @@ package topstakers
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 	"time"
 
@@ -31,7 +32,6 @@ type SeatManager struct {
 	committeeMutex  syncutils.RWMutex
 	activityTracker activitytracker.ActivityTracker
 
-	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID
 
 	module.Module
@@ -45,10 +45,8 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				apiProvider:    e,
 				events:         seatmanager.NewEvents(),
 				committeeStore: e.Storage.Committee(),
-
-				optsActivityWindow: time.Second * 30,
 			}, opts, func(s *SeatManager) {
-				activityTracker := activitytrackerv1.NewActivityTracker(s.optsActivityWindow)
+				activityTracker := activitytrackerv1.NewActivityTracker(e)
 				s.activityTracker = activityTracker
 				s.events.OnlineCommitteeSeatAdded.LinkTo(activityTracker.Events.OnlineCommitteeSeatAdded)
 				s.events.OnlineCommitteeSeatRemoved.LinkTo(activityTracker.Events.OnlineCommitteeSeatRemoved)
@@ -165,6 +163,7 @@ func (s *SeatManager) Shutdown() {
 func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime time.Time) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
+	fmt.Println("InitializeCommittee")
 
 	committeeAccounts, err := s.committeeStore.Load(epoch)
 	if err != nil {

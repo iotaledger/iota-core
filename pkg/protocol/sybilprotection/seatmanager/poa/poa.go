@@ -30,7 +30,6 @@ type SeatManager struct {
 
 	committeeMutex syncutils.RWMutex
 
-	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID
 
 	module.Module
@@ -44,10 +43,8 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				events:         seatmanager.NewEvents(),
 				apiProvider:    e,
 				committeeStore: e.Storage.Committee(),
-
-				optsActivityWindow: time.Second * 30,
 			}, opts, func(s *SeatManager) {
-				activityTracker := activitytrackerv1.NewActivityTracker(s.optsActivityWindow)
+				activityTracker := activitytrackerv1.NewActivityTracker(e)
 				s.activityTracker = activityTracker
 				s.events.OnlineCommitteeSeatAdded.LinkTo(activityTracker.Events.OnlineCommitteeSeatAdded)
 				s.events.OnlineCommitteeSeatRemoved.LinkTo(activityTracker.Events.OnlineCommitteeSeatRemoved)

@@ -27,14 +27,15 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 			iotago.WithTargetCommitteeSize(3),
 		),
 	)
+	testAPIProvider := iotago.SingleVersionProvider(testAPI)
 
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
 
 	topStakersSeatManager := &SeatManager{
-		apiProvider:     iotago.SingleVersionProvider(testAPI),
+		apiProvider:     testAPIProvider,
 		committeeStore:  committeeStore,
 		events:          seatmanager.NewEvents(),
-		activityTracker: activitytrackerv1.NewActivityTracker(time.Second * 30),
+		activityTracker: activitytrackerv1.NewActivityTracker(testAPIProvider),
 	}
 
 	// Try setting an empty committee.
@@ -79,14 +80,15 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 			iotago.WithTargetCommitteeSize(10),
 		),
 	)
+	testAPIProvider := iotago.SingleVersionProvider(testAPI)
 
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
 
 	s := &SeatManager{
-		apiProvider:     iotago.SingleVersionProvider(testAPI),
+		apiProvider:     testAPIProvider,
 		committeeStore:  committeeStore,
 		events:          seatmanager.NewEvents(),
-		activityTracker: activitytrackerv1.NewActivityTracker(time.Second * 30),
+		activityTracker: activitytrackerv1.NewActivityTracker(testAPIProvider),
 	}
 
 	// Committee should not exist because it was never set.
@@ -122,13 +124,14 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[0])))
 
 			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[1])), committeeInEpoch0IDs[1], testAPI.TimeProvider().SlotStartTime(2))
+			fmt.Println(s.activityTracker.OnlineCommittee().Size())
 			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[0])), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[1])))
 
 			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])), committeeInEpoch0IDs[2], testAPI.TimeProvider().SlotStartTime(3))
 			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[0])), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[1])), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])))
 
 			// Make sure that after a period of inactivity, the inactive seats are marked as offline.
-			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])), committeeInEpoch0IDs[2], testAPI.TimeProvider().SlotEndTime(7))
+			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])), committeeInEpoch0IDs[2], testAPI.TimeProvider().SlotEndTime(2+testAPI.ProtocolParameters().MaxCommittableAge()))
 			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])))
 		}
 
