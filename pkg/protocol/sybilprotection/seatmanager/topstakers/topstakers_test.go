@@ -124,14 +124,13 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[0])))
 
 			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[1])), committeeInEpoch0IDs[1], testAPI.TimeProvider().SlotStartTime(2))
-			fmt.Println(s.activityTracker.OnlineCommittee().Size())
 			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[0])), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[1])))
 
 			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])), committeeInEpoch0IDs[2], testAPI.TimeProvider().SlotStartTime(3))
 			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[0])), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[1])), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])))
 
 			// Make sure that after a period of inactivity, the inactive seats are marked as offline.
-			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])), committeeInEpoch0IDs[2], testAPI.TimeProvider().SlotEndTime(2+testAPI.ProtocolParameters().MaxCommittableAge()))
+			s.activityTracker.MarkSeatActive(lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])), committeeInEpoch0IDs[2], testAPI.TimeProvider().SlotEndTime(2+testAPI.ProtocolParameters().MinCommittableAge()))
 			assertOnlineCommittee(t, s.OnlineCommittee(), lo.Return1(committeeInEpoch0.GetSeat(committeeInEpoch0IDs[2])))
 		}
 
