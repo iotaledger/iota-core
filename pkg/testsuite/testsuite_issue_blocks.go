@@ -215,7 +215,6 @@ func (t *TestSuite) IssueBlocksAtSlots(prefix string, slots []iotago.SlotIndex, 
 
 		if waitForSlotsCommitted {
 			if slot > t.API.ProtocolParameters().MinCommittableAge() {
-				fmt.Printf("Node: %s, Slot index: %d, Online Committee: %v, Latest Commited Slot: %d\n", nodes[0].Name, slot, nodes[0].Protocol.Engines.Main.Get().SybilProtection.SeatManager().OnlineCommittee(), nodes[0].Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot())
 				if useCommitmentAtMinCommittableAge {
 					// Make sure that all nodes create blocks throughout the slot that commit to the same commitment at slot-minCommittableAge-1.
 					commitmentSlot := slot - t.API.ProtocolParameters().MinCommittableAge()

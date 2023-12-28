@@ -2,7 +2,6 @@ package topstakers
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"time"
 
@@ -163,7 +162,6 @@ func (s *SeatManager) Shutdown() {
 func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime time.Time) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
-	fmt.Println("InitializeCommittee")
 
 	committeeAccounts, err := s.committeeStore.Load(epoch)
 	if err != nil {
