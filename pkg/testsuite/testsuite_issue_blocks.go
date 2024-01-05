@@ -92,7 +92,7 @@ func (t *TestSuite) IssueExistingBlock(blockName string, wallet *mock.Wallet) {
 	require.NoError(t.Testing, wallet.BlockIssuer.IssueBlock(block.ModelBlock(), wallet.Node))
 }
 
-func (t *TestSuite) IssueValidationBlockWithOptions(blockName string, node *mock.Node, blockOpts ...options.Option[mock.ValidatorBlockParams]) *blocks.Block {
+func (t *TestSuite) IssueValidationBlockWithOptions(blockName string, node *mock.Node, blockOpts ...options.Option[mock.ValidationBlockParams]) *blocks.Block {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -149,7 +149,7 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 		issuingTime := timeProvider.SlotStartTime(t.currentSlot).Add(time.Duration(t.uniqueBlockTimeCounter.Add(1)))
 
 		var b *blocks.Block
-		// Only issue validator blocks if account has staking feature and is part of committee.
+		// Only issue validation blocks if account has staking feature and is part of committee.
 		if node.Validator != nil && lo.Return1(node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(t.currentSlot)).HasAccount(node.Validator.AccountID) {
 			blockHeaderOptions := append(issuingOptionsCopy[node.Name], mock.WithIssuingTime(issuingTime))
 			t.assertParentsCommitmentExistFromBlockOptions(blockHeaderOptions, node)

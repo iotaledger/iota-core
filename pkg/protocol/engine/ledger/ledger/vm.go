@@ -28,10 +28,32 @@ func (v *VM) Inputs(transaction mempool.Transaction) (inputReferences []mempool.
 	}
 
 	for _, input := range stardustTransaction.TransactionEssence.Inputs {
-		inputReferences = append(inputReferences, input)
+		switch input.Type() {
+		case iotago.InputUTXO:
+			//nolint:forcetypeassert // we can safely assume that this is a UTXOInput
+			inputReferences = append(inputReferences, mempool.UTXOInputStateRefFromInput(
+				input.(*iotago.UTXOInput),
+			))
+		default:
+			return nil, ierrors.Errorf("unrecognized input type %d", input.Type())
+		}
 	}
-	for _, input := range stardustTransaction.TransactionEssence.ContextInputs {
-		inputReferences = append(inputReferences, input)
+
+	for _, contextInput := range stardustTransaction.TransactionEssence.ContextInputs {
+		switch contextInput.Type() {
+		case iotago.ContextInputCommitment:
+			//nolint:forcetypeassert // we can safely assume that this is a CommitmentInput
+			inputReferences = append(inputReferences, mempool.CommitmentInputStateRefFromInput(
+				contextInput.(*iotago.CommitmentInput),
+			))
+		// These context inputs do not need to be resolved.
+		case iotago.ContextInputBlockIssuanceCredit:
+			continue
+		case iotago.ContextInputReward:
+			continue
+		default:
+			return nil, ierrors.Errorf("unrecognized context input type %d", contextInput.Type())
+		}
 	}
 
 	return inputReferences, nil
@@ -43,21 +65,31 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 		return nil, iotago.ErrTxTypeInvalid
 	}
 
+	contextInputs, err := signedStardustTransaction.Transaction.ContextInputs()
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "unable to retrieve context inputs from transaction")
+	}
+
 	utxoInputSet := iotagovm.InputSet{}
 	commitmentInput := (*iotago.Commitment)(nil)
 	bicInputs := make([]*iotago.BlockIssuanceCreditInput, 0)
 	rewardInputs := make([]*iotago.RewardInput, 0)
+
 	for _, resolvedInput := range resolvedInputStates {
-		resolvedInput.Type()
 		switch typedInput := resolvedInput.(type) {
-		case *iotago.Commitment:
-			commitmentInput = typedInput
+		case mempool.CommitmentInputState:
+			commitmentInput = typedInput.Commitment
+		case *utxoledger.Output:
+			utxoInputSet[typedInput.OutputID()] = typedInput.Output()
+		}
+	}
+
+	for _, contextInput := range contextInputs {
+		switch typedInput := contextInput.(type) {
 		case *iotago.BlockIssuanceCreditInput:
 			bicInputs = append(bicInputs, typedInput)
 		case *iotago.RewardInput:
 			rewardInputs = append(rewardInputs, typedInput)
-		case *utxoledger.Output:
-			utxoInputSet[typedInput.OutputID()] = typedInput.Output()
 		}
 	}
 
@@ -186,14 +218,16 @@ func (v *VM) Execute(executionContext context.Context, transaction mempool.Trans
 			return nil, err
 		}
 
-		outputs = append(outputs, utxoledger.CreateOutput(
+		output := utxoledger.CreateOutput(
 			v.ledger.apiProvider,
 			iotago.OutputIDFromTransactionIDAndIndex(transactionID, uint16(index)),
 			iotago.EmptyBlockID,
 			0,
 			output,
 			proof,
-		))
+		)
+
+		outputs = append(outputs, output)
 	}
 
 	return outputs, nil

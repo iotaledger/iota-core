@@ -28,6 +28,11 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *
 	validatorReward = 0
 	stakedAmount := stakingFeature.StakedAmount
 	firstRewardEpoch = stakingFeature.StartEpoch
+	// Start Epoch = 0 is unmodified as a special case for the initial validators that bootstrap the network to get their rewards.
+	// Otherwise, the earliest rewards can be in the epoch for which a validator could have been selected, which is start epoch + 1.
+	if firstRewardEpoch != 0 {
+		firstRewardEpoch = stakingFeature.StartEpoch + 1
+	}
 	lastRewardEpoch = stakingFeature.EndEpoch
 
 	// Limit reward fetching only to committed epochs.
@@ -192,6 +197,19 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 	}
 
 	return delegatorsReward, firstRewardEpoch, lastRewardEpoch, nil
+}
+
+func (t *Tracker) PoolRewardsForAccount(accountID iotago.AccountID) (
+	poolRewardsForAccount iotago.Mana,
+	exists bool,
+	err error,
+) {
+	rewards, exists, err := t.rewardsForAccount(accountID, t.latestAppliedEpoch)
+	if err != nil || !exists {
+		return 0, exists, err
+	}
+
+	return rewards.PoolRewards, exists, err
 }
 
 // Returns the epoch until which rewards are decayed.
