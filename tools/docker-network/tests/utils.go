@@ -192,7 +192,7 @@ func BIP32PathForIndex(index uint32) string {
 	}
 
 	// Set the index
-	path[4] = index
+	path[4] = index | (1 << 31)
 
 	return path.String()
 }
