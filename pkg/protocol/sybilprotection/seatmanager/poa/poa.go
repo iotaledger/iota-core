@@ -94,7 +94,7 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, validators accoun
 				return nil, ierrors.Wrapf(err, "error while setting committee for epoch %d for validator %s", epoch, validatorData.ID.String())
 			}
 		}
-		s.committee = committeeAccounts.SelectCommittee(committeeAccounts.IDs()...)
+		s.committee = committeeAccounts.SeatedAccounts(committeeAccounts.IDs()...)
 	}
 
 	accounts, err := s.committee.Accounts()
@@ -135,7 +135,7 @@ func (s *SeatManager) committeeInEpoch(epoch iotago.EpochIndex) (*account.Seated
 		return nil, false
 	}
 
-	return c.SelectCommittee(c.IDs()...), true
+	return c.SeatedAccounts(c.IDs()...), true
 }
 
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
@@ -171,7 +171,7 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 	}
 
 	committeeAccountsIDs := committeeAccounts.IDs()
-	s.committee = committeeAccounts.SelectCommittee(committeeAccountsIDs...)
+	s.committee = committeeAccounts.SeatedAccounts(committeeAccountsIDs...)
 
 	// Set validators that are part of the committee as active.
 	onlineValidators := committeeAccountsIDs
@@ -192,11 +192,11 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 	return nil
 }
 
-func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
+func (s *SeatManager) ReuseCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	s.committee = validators.SelectCommittee(validators.IDs()...)
+	s.committee = validators.SeatedAccounts(validators.IDs()...)
 
 	accounts, err := s.committee.Accounts()
 	if err != nil {

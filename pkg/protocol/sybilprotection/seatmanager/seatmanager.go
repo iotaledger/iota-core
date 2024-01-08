@@ -15,9 +15,8 @@ type SeatManager interface {
 	// RotateCommittee rotates the committee evaluating the given set of candidates to produce the new committee.
 	RotateCommittee(epoch iotago.EpochIndex, candidates accounts.AccountsData) (*account.SeatedAccounts, error)
 
-	// SetCommittee sets the committee for a given slot.
-	// This is used when re-using the same committee for consecutive epochs.
-	SetCommittee(epoch iotago.EpochIndex, committee *account.Accounts) error
+	// ReuseCommittee reuses the committee from a previous epoch epochs.
+	ReuseCommittee(epoch iotago.EpochIndex, committee *account.Accounts) error
 
 	// InitializeCommittee initializes the committee for the current slot by marking whole or a subset of the committee as active.
 	// This is used when initializing committee after node startup (loaded from snapshot or database).
