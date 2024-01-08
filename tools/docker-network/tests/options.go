@@ -42,7 +42,7 @@ func DefaultAccountOptions(protocolParams *iotago.V3ProtocolParameters) []option
 				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				StakingEndEpoch:      iotago.MaxEpochIndex,
 				FixedCost:            1,
-				StakedAmount:         mock.MinValidatorAccountAmount(protocolParams) + 10,
+				StakedAmount:         mock.MinValidatorAccountAmount(protocolParams) + 13,
 				Mana:                 iotago.Mana(mock.MinValidatorAccountAmount(protocolParams)),
 			},
 			snapshotcreator.AccountDetails{
@@ -62,7 +62,7 @@ func DefaultAccountOptions(protocolParams *iotago.V3ProtocolParameters) []option
 				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				StakingEndEpoch:      iotago.MaxEpochIndex,
 				FixedCost:            1,
-				StakedAmount:         mock.MinValidatorAccountAmount(protocolParams) + 10,
+				StakedAmount:         mock.MinValidatorAccountAmount(protocolParams) + 12,
 				Mana:                 iotago.Mana(mock.MinValidatorAccountAmount(protocolParams)),
 			},
 			snapshotcreator.AccountDetails{
@@ -82,7 +82,7 @@ func DefaultAccountOptions(protocolParams *iotago.V3ProtocolParameters) []option
 				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				StakingEndEpoch:      iotago.MaxEpochIndex,
 				FixedCost:            1,
-				StakedAmount:         mock.MinValidatorAccountAmount(protocolParams) + 10,
+				StakedAmount:         mock.MinValidatorAccountAmount(protocolParams) + 5,
 				Mana:                 iotago.Mana(mock.MinValidatorAccountAmount(protocolParams)),
 			},
 			snapshotcreator.AccountDetails{

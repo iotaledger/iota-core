@@ -56,6 +56,12 @@ type Node struct {
 	ContainerConfigs     string
 }
 
+type Account struct {
+	AccountID      iotago.AccountID
+	AccountAddress *iotago.AccountAddress
+	BlockIssuerKey ed25519.PrivateKey
+}
+
 type DockerTestFramework struct {
 	Testing *testing.T
 
@@ -267,7 +273,7 @@ func (d *DockerTestFramework) StartIssueCandidacyPayload(nodes ...*Node) {
 	}
 }
 
-func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *iotago.AccountAddress {
+func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *Account {
 	// create implicit account by requesting faucet funds
 	ctx := context.TODO()
 	receiverAddr, implicitPrivateKey := d.getAddress(iotago.AddressImplicitAccountCreation)
@@ -321,7 +327,55 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
 	d.CheckAccountStatus(ctx, blkID, lo.PanicOnErr(signedTx.Transaction.ID()), accOutputID, accountAddress, true)
 
-	return accountAddress
+	return &Account{
+		AccountID:      accountID,
+		AccountAddress: accountAddress,
+		BlockIssuerKey: accPrivateKey,
+	}
+}
+
+func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node) {
+	// requesting faucet funds as delegation input
+	ctx := context.TODO()
+	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
+	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
+	fundsAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), privateKey))
+
+	_, validatorAccountAddr, err := iotago.ParseBech32(validator.AccountAddressBech32)
+	require.NoError(d.Testing, err)
+
+	clt := validator.Client
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	// construct delegation output
+	delegationOutput := builder.NewDelegationOutputBuilder(validatorAccountAddr.(*iotago.AccountAddress), fundsAddr, fundsUTXOOutput.BaseTokenAmount()).
+		StartEpoch(getDelegationStartEpoch(apiForSlot, currentSlot)).
+		DelegatedAmount(fundsUTXOOutput.BaseTokenAmount()).MustBuild()
+
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: fundsAddr,
+			InputID:      fundsOutputID,
+			Input:        fundsUTXOOutput,
+		}).
+		AddOutput(delegationOutput).
+		SetCreationSlot(currentSlot).
+		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
+		AllotAllMana(currentSlot, from.AccountID).
+		Build(fundsAddrSigner)
+	require.NoError(d.Testing, err)
+
+	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
+
+	d.AwaitTransactionPayloadAccepted(ctx, blkID)
 }
 
 func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iotago.BlockID, txID iotago.TransactionID, creationOutputID iotago.OutputID, accountAddress *iotago.AccountAddress, checkIndexer ...bool) {
