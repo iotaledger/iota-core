@@ -45,7 +45,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		T:      test,
 		blocks: shrinkingmap.New[string, *blocks.Block](),
 
-		SeatManager: mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)),
+		SeatManager: mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI), epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), func(_ iotago.EpochIndex) iotago.EpochIndex { return 0 }, (*account.Accounts).Bytes, account.AccountsFromBytes)),
 	}
 
 	prunableStorage := prunable.New(database.Config{

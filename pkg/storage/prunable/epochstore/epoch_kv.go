@@ -10,19 +10,19 @@ import (
 )
 
 type EpochKVStore struct {
-	realm        kvstore.Realm
-	kv           kvstore.KVStore
-	pruningDelay iotago.EpochIndex
+	realm            kvstore.Realm
+	kv               kvstore.KVStore
+	prunginDelayFunc func(iotago.EpochIndex) iotago.EpochIndex
 
 	lastAccessedEpoch *kvstore.TypedValue[iotago.EpochIndex]
 	lastPrunedEpoch   *model.PruningIndex
 }
 
-func NewEpochKVStore(storeRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex) *EpochKVStore {
+func NewEpochKVStore(storeRealm kvstore.Realm, kv kvstore.KVStore, prunginDelayFunc func(iotago.EpochIndex) iotago.EpochIndex) *EpochKVStore {
 	return &EpochKVStore{
 		realm:             storeRealm,
 		kv:                lo.PanicOnErr(kv.WithExtendedRealm(append(storeRealm, entriesKey))),
-		pruningDelay:      pruningDelay,
+		prunginDelayFunc:  prunginDelayFunc,
 		lastAccessedEpoch: kvstore.NewTypedValue(kv, append(storeRealm, lastAccessedEpochKey), iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes),
 		lastPrunedEpoch:   model.NewPruningIndex(lo.PanicOnErr(kv.WithExtendedRealm(storeRealm)), kvstore.Realm{lastPrunedEpochKey}),
 	}
@@ -75,13 +75,15 @@ func (e *EpochKVStore) DeleteEpoch(epoch iotago.EpochIndex) error {
 }
 
 func (e *EpochKVStore) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) error {
+	minPruningDelay := e.prunginDelayFunc(epoch)
+
 	// The epoch we're trying to prune already takes into account the defaultPruningDelay.
 	// Therefore, we don't need to do anything if it is greater equal e.pruningDelay and take the difference otherwise.
 	var pruningDelay iotago.EpochIndex
-	if defaultPruningDelay >= e.pruningDelay {
+	if defaultPruningDelay >= minPruningDelay {
 		pruningDelay = 0
 	} else {
-		pruningDelay = e.pruningDelay - defaultPruningDelay
+		pruningDelay = minPruningDelay - defaultPruningDelay
 	}
 
 	// No need to prune.

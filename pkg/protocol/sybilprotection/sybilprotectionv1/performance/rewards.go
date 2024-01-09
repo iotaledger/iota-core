@@ -42,6 +42,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *
 
 	decayEndEpoch := t.decayEndEpoch(claimingEpoch, lastRewardEpoch)
 
+	// Start from max(firstRewardEpoch, currentEpoch-rewardsRetentionPeriod).
 	for epoch := firstRewardEpoch; epoch <= lastRewardEpoch; epoch++ {
 		rewardsForAccountInEpoch, exists, err := t.rewardsForAccount(validatorID, epoch)
 		if err != nil {
