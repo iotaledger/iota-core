@@ -33,7 +33,7 @@ type TestSuite struct {
 	api iotago.API
 
 	Instance             *Tracker
-	perforanceFactorFunc func(iotago.SlotIndex) *model.ValidatorPerformance
+	performanceFactorFunc func(iotago.SlotIndex) *model.ValidatorPerformance
 }
 
 func NewTestSuite(t *testing.T) *TestSuite {
@@ -46,7 +46,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 			iotago.NewV3SnapshotProtocolParameters(
 				iotago.WithTimeProviderOptions(0, time.Now().Unix(), 10, 3),
 				iotago.WithLivenessOptions(5, 5, 1, 2, 3),
-				iotago.WithRewardsOptions(8, 8, 11, 2, 1, 384),
+				iotago.WithRewardsOptions(8, 8, 11, 2, 1, 5),
 			),
 		),
 	}
@@ -184,7 +184,7 @@ func (t *TestSuite) AssertEpochRewards(epoch iotago.EpochIndex, actions map[stri
 
 		for delegatedAmount := range action.Delegators {
 			expectedDelegatorReward := t.delegatorReward(epoch, t.epochStats[epoch].ProfitMargin, uint64(poolRewards), uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost), action)
-			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
+			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch, epochsInAYear)
 			require.NoError(t.T, err)
 			require.Equal(t.T, expectedDelegatorReward, actualDelegatorReward)
 		}
@@ -206,7 +206,7 @@ func (t *TestSuite) AssertNoReward(alias string, epoch iotago.EpochIndex, action
 	action, exists := actions[alias]
 	require.True(t.T, exists)
 	for delegatedAmount := range action.Delegators {
-		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
+		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch, epochsInAYear)
 		require.NoError(t.T, err)
 		require.Equal(t.T, iotago.Mana(0), actualDelegatorReward)
 	}
@@ -227,7 +227,7 @@ func (t *TestSuite) AssertRewardForDelegatorsOnly(alias string, epoch iotago.Epo
 	require.True(t.T, exists)
 
 	for delegatedAmount := range action.Delegators {
-		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
+		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch, epochsInAYear)
 		expectedDelegatorReward := t.delegatorReward(epoch, t.epochStats[epoch].ProfitMargin, uint64(t.poolRewards[epoch][alias].PoolRewards), uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost), action)
 
 		require.NoError(t.T, err)
@@ -345,7 +345,7 @@ func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[s
 		delegatorRewardPerAccount[epoch] = make(map[string]iotago.Mana)
 		validatorRewardPerAccount[epoch] = make(map[string]iotago.Mana)
 		for aliasAccount := range epochActions {
-			reward, _, _, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epoch, epoch, epoch)
+			reward, _, _, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epoch, epoch, epoch, epochsInAYear)
 			require.NoError(t.T, err)
 			delegatorRewardPerAccount[epoch][aliasAccount] = reward
 		}

@@ -148,6 +148,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 			apiForSlot := v.ledger.apiProvider.APIForSlot(commitmentInput.Slot)
 			futureBoundedSlotIndex := commitmentInput.Slot + apiForSlot.ProtocolParameters().MinCommittableAge()
 			claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+			retentionPeriod := apiForSlot.ProtocolParameters().RewardsParameters().RetentionPeriod
 
 			if delegationID.Empty() {
 				delegationID = iotago.DelegationIDFromOutputID(outputID)
@@ -157,7 +158,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 				delegationEnd = claimingEpoch - iotago.EpochIndex(1)
 			}
 
-			reward, _, _, rewardErr := v.ledger.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd, claimingEpoch)
+			reward, _, _, rewardErr := v.ledger.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd, claimingEpoch, retentionPeriod)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimDelegationReward, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}

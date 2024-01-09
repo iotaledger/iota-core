@@ -561,6 +561,7 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 		inputDelegation.StartEpoch,
 		delegationEnd,
 		claimingEpoch,
+		apiForSlot.ProtocolParameters().RewardsParameters().RetentionPeriod,
 	)
 
 	if err != nil {
