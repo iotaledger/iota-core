@@ -132,8 +132,9 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 			apiForSlot := v.ledger.apiProvider.APIForSlot(commitmentInput.Slot)
 			futureBoundedSlotIndex := commitmentInput.Slot + apiForSlot.ProtocolParameters().MinCommittableAge()
 			claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+			retentionPeriod := apiForSlot.ProtocolParameters().RewardsParameters().RetentionPeriod
 
-			reward, _, _, rewardErr := v.ledger.sybilProtection.ValidatorReward(accountID, stakingFeature, claimingEpoch)
+			reward, _, _, rewardErr := v.ledger.sybilProtection.ValidatorReward(accountID, stakingFeature, claimingEpoch, retentionPeriod)
 			if rewardErr != nil {
 				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimStakingReward, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d, claimingEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch, claimingEpoch)
 			}

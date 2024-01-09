@@ -462,6 +462,7 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 		inputAccount.AccountID,
 		inputAccount.FeatureSet().Staking(),
 		claimingEpoch,
+		apiForSlot.ProtocolParameters().RewardsParameters().RetentionPeriod,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to calculate reward for output %s: %s", inputName, err))

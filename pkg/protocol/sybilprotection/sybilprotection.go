@@ -21,7 +21,7 @@ type SybilProtection interface {
 	// The first epoch in which rewards existed is returned (firstRewardEpoch).
 	// Since the validator may still be active and the EndEpoch might be in the future, the epoch until which rewards were calculated is returned in addition to the first epoch in which rewards existed (lastRewardEpoch).
 	// The rewards are decayed until claimingEpoch, which should be set to the epoch in which the rewards would be claimed.
-	ValidatorReward(validatorID iotago.AccountID, stakingFeature *iotago.StakingFeature, claimingEpoch iotago.EpochIndex) (validatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error)
+	ValidatorReward(validatorID iotago.AccountID, stakingFeature *iotago.StakingFeature, claimingEpoch iotago.EpochIndex, retentionPeriod iotago.EpochIndex) (validatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error)
 	// DelegatorReward returns the amount of mana that a delegator has earned in a given epoch range.
 	//
 	// The first epoch in which rewards existed is returned (firstRewardEpoch).

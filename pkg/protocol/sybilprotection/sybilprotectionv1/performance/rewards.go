@@ -21,7 +21,7 @@ func (t *Tracker) RewardsRoot(epoch iotago.EpochIndex) (iotago.Identifier, error
 	return m.Root(), nil
 }
 
-func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *iotago.StakingFeature, claimingEpoch iotago.EpochIndex) (validatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
+func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *iotago.StakingFeature, claimingEpoch iotago.EpochIndex, retentionPeriod iotago.EpochIndex) (validatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
@@ -42,7 +42,13 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *
 
 	decayEndEpoch := t.decayEndEpoch(claimingEpoch, lastRewardEpoch)
 
-	// Start from max(firstRewardEpoch, currentEpoch-rewardsRetentionPeriod).
+	// Determine the earliest epoch for which rewards are retained and only attempt to fetch those.
+	var earliestRetainedRewardEpoch iotago.EpochIndex
+	if retentionPeriod < claimingEpoch {
+		earliestRetainedRewardEpoch = claimingEpoch - retentionPeriod
+	}
+	firstRewardEpoch = lo.Max(earliestRetainedRewardEpoch, firstRewardEpoch)
+
 	for epoch := firstRewardEpoch; epoch <= lastRewardEpoch; epoch++ {
 		rewardsForAccountInEpoch, exists, err := t.rewardsForAccount(validatorID, epoch)
 		if err != nil {

@@ -20,6 +20,8 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
+const epochsInAYear = 384
+
 type TestSuite struct {
 	T                    *testing.T
 	stores               map[iotago.SlotIndex]kvstore.KVStore
@@ -176,7 +178,7 @@ func (t *TestSuite) AssertEpochRewards(epoch iotago.EpochIndex, actions map[stri
 				StartEpoch: epoch - 1,
 				EndEpoch:   epoch,
 			},
-			epoch)
+			epoch, epochsInAYear)
 		require.NoError(t.T, err)
 		require.Equal(t.T, expectedValidatorReward, actualValidatorReward)
 
@@ -198,7 +200,7 @@ func (t *TestSuite) AssertNoReward(alias string, epoch iotago.EpochIndex, action
 			StartEpoch:   epoch,
 			EndEpoch:     epoch,
 		},
-		epoch)
+		epoch, epochsInAYear)
 	require.NoError(t.T, err)
 	require.Equal(t.T, iotago.Mana(0), actualValidatorReward)
 	action, exists := actions[alias]
@@ -218,7 +220,7 @@ func (t *TestSuite) AssertRewardForDelegatorsOnly(alias string, epoch iotago.Epo
 			StartEpoch:   epoch,
 			EndEpoch:     epoch,
 		},
-		epoch)
+		epoch, epochsInAYear)
 	require.NoError(t.T, err)
 	require.Equal(t.T, iotago.Mana(0), actualValidatorReward)
 	action, exists := actions[alias]
@@ -354,7 +356,7 @@ func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[s
 					StartEpoch:   epoch,
 					EndEpoch:     epoch,
 				},
-				epoch)
+				epoch, epochsInAYear)
 			require.NoError(t.T, err)
 			validatorRewardPerAccount[epoch][aliasAccount] = reward
 		}
@@ -371,7 +373,7 @@ func (t *TestSuite) AssertValidatorRewardGreaterThan(alias1 string, alias2 strin
 			StartEpoch: epoch - 1,
 			EndEpoch:   epoch,
 		},
-		epoch)
+		epoch, epochsInAYear)
 	require.NoError(t.T, err)
 
 	accID2 := t.Account(alias2, false)
@@ -382,7 +384,7 @@ func (t *TestSuite) AssertValidatorRewardGreaterThan(alias1 string, alias2 strin
 			StartEpoch: epoch - 1,
 			EndEpoch:   epoch,
 		},
-		epoch)
+		epoch, epochsInAYear)
 	require.NoError(t.T, err)
 
 	require.Greater(t.T, actualValidatorReward1, actualValidatorReward2)

@@ -204,6 +204,7 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 
 		futureBoundedSlotIndex := slotIndex + apiForSlot.ProtocolParameters().MinCommittableAge()
 		claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+		retentionPeriod := apiForSlot.ProtocolParameters().RewardsParameters().RetentionPeriod
 
 		stakingPoolValidatorAccountID = accountOutput.AccountID
 		// check if the account is a validator
@@ -211,6 +212,7 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 			stakingPoolValidatorAccountID,
 			stakingFeature,
 			claimingEpoch,
+			retentionPeriod,
 		)
 
 	case iotago.OutputDelegation:
