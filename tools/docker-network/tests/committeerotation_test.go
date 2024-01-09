@@ -218,10 +218,10 @@ func Test_Delegation(t *testing.T) {
 	account := d.CreateAccount()
 
 	// delegate all faucet funds to V4, V4 should replace V3
-	d.DelegateToValidator(account, d.Node("V4"))
-	d.AssertCommittee(3, d.AccountsFromNodes(d.Nodes("V1", "V2", "V4")...))
+	delegationStartEpoch := d.DelegateToValidator(account, d.Node("V4"))
+	d.AssertCommittee(delegationStartEpoch+1, d.AccountsFromNodes(d.Nodes("V1", "V2", "V4")...))
 
 	// delegate all faucet funds to V3, V3 should replace V2
-	d.DelegateToValidator(account, d.Node("V3"))
-	d.AssertCommittee(7, d.AccountsFromNodes(d.Nodes("V1", "V3", "V4")...))
+	delegationStartEpoch = d.DelegateToValidator(account, d.Node("V3"))
+	d.AssertCommittee(delegationStartEpoch+1, d.AccountsFromNodes(d.Nodes("V1", "V3", "V4")...))
 }

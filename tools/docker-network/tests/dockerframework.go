@@ -334,7 +334,8 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	}
 }
 
-func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node) {
+// DelegateToValidator requests faucet funds and delegate the UTXO output to the validator.
+func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node) iotago.EpochIndex {
 	// requesting faucet funds as delegation input
 	ctx := context.TODO()
 	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
@@ -348,16 +349,16 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
 	apiForSlot := clt.APIForSlot(currentSlot)
 
-	// construct delegation output
-	delegationOutput := builder.NewDelegationOutputBuilder(validatorAccountAddr.(*iotago.AccountAddress), fundsAddr, fundsUTXOOutput.BaseTokenAmount()).
-		StartEpoch(getDelegationStartEpoch(apiForSlot, currentSlot)).
-		DelegatedAmount(fundsUTXOOutput.BaseTokenAmount()).MustBuild()
-
+	// construct delegation transaction
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
 
 	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
+
+	delegationOutput := builder.NewDelegationOutputBuilder(validatorAccountAddr.(*iotago.AccountAddress), fundsAddr, fundsUTXOOutput.BaseTokenAmount()).
+		StartEpoch(getDelegationStartEpoch(apiForSlot, issuerResp.LatestCommitment.Slot)).
+		DelegatedAmount(fundsUTXOOutput.BaseTokenAmount()).MustBuild()
 
 	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
 		AddInput(&builder.TxInput{
@@ -376,6 +377,8 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
 
 	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+
+	return delegationOutput.StartEpoch
 }
 
 func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iotago.BlockID, txID iotago.TransactionID, creationOutputID iotago.OutputID, accountAddress *iotago.AccountAddress, checkIndexer ...bool) {
