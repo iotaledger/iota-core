@@ -239,7 +239,7 @@ func (t *Tracker) decayEndEpoch(claimingEpoch iotago.EpochIndex, lastRewardEpoch
 
 // Returns the earliest epoch for which rewards are retained or available, whichever is later.
 func (t *Tracker) earliestRewardEpoch(firstRewardEpoch iotago.EpochIndex, claimingEpoch iotago.EpochIndex) iotago.EpochIndex {
-	retentionPeriod := t.apiProvider.APIForEpoch(claimingEpoch).ProtocolParameters().RewardsParameters().RetentionPeriod
+	retentionPeriod := iotago.EpochIndex(t.apiProvider.APIForEpoch(claimingEpoch).ProtocolParameters().RewardsParameters().RetentionPeriod)
 	var earliestRetainedRewardEpoch iotago.EpochIndex
 	if retentionPeriod < claimingEpoch {
 		earliestRetainedRewardEpoch = claimingEpoch - retentionPeriod

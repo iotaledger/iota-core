@@ -304,7 +304,7 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	// Determine the rewards the validators actually got.
 	actualRewards := make(map[iotago.AccountID]iotago.Mana, len(ts.Validators()))
 	claimingEpoch := ts.API.TimeProvider().EpochFromSlot(ts.CurrentSlot())
-	retentionPeriod := ts.API.ProtocolParameters().RewardsParameters().RetentionPeriod
+	retentionPeriod := iotago.EpochIndex(ts.API.ProtocolParameters().RewardsParameters().RetentionPeriod)
 
 	for _, validatorAccount := range []string{"Genesis:1", "Genesis:2"} {
 		output := ts.DefaultWallet().Output(validatorAccount)

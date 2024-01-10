@@ -36,7 +36,7 @@ func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler 
 	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig, nil)
 
 	rewardPruningDelayFunc := func(epochToPrune iotago.EpochIndex) iotago.EpochIndex {
-		return apiProvider.APIForEpoch(epochToPrune).ProtocolParameters().RewardsParameters().RetentionPeriod
+		return iotago.EpochIndex(apiProvider.APIForEpoch(epochToPrune).ProtocolParameters().RewardsParameters().RetentionPeriod)
 	}
 
 	return &Prunable{
