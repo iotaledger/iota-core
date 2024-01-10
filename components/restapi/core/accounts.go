@@ -204,7 +204,6 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 
 		futureBoundedSlotIndex := slotIndex + apiForSlot.ProtocolParameters().MinCommittableAge()
 		claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
-		retentionPeriod := apiForSlot.ProtocolParameters().RewardsParameters().RetentionPeriod
 
 		stakingPoolValidatorAccountID = accountOutput.AccountID
 		// check if the account is a validator
@@ -212,7 +211,6 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 			stakingPoolValidatorAccountID,
 			stakingFeature,
 			claimingEpoch,
-			retentionPeriod,
 		)
 
 	case iotago.OutputDelegation:
@@ -221,7 +219,6 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 		delegationEnd := delegationOutput.EndEpoch
 		futureBoundedSlotIndex := slotIndex + apiForSlot.ProtocolParameters().MinCommittableAge()
 		claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
-		retentionPeriod := apiForSlot.ProtocolParameters().RewardsParameters().RetentionPeriod
 
 		// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
 		// "last epoch" for the rewards calculation.
@@ -239,7 +236,6 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 			delegationOutput.StartEpoch,
 			delegationEnd,
 			claimingEpoch,
-			retentionPeriod,
 		)
 	}
 	if err != nil {

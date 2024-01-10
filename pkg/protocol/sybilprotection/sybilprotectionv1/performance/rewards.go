@@ -21,7 +21,7 @@ func (t *Tracker) RewardsRoot(epoch iotago.EpochIndex) (iotago.Identifier, error
 	return m.Root(), nil
 }
 
-func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *iotago.StakingFeature, claimingEpoch iotago.EpochIndex, retentionPeriod iotago.EpochIndex) (validatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
+func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *iotago.StakingFeature, claimingEpoch iotago.EpochIndex) (validatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
@@ -42,12 +42,9 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *
 
 	decayEndEpoch := t.decayEndEpoch(claimingEpoch, lastRewardEpoch)
 
-	// Determine the earliest epoch for which rewards are retained and only attempt to fetch those.
-	var earliestRetainedRewardEpoch iotago.EpochIndex
-	if retentionPeriod < claimingEpoch {
-		earliestRetainedRewardEpoch = claimingEpoch - retentionPeriod
-	}
-	firstRewardEpoch = lo.Max(earliestRetainedRewardEpoch, firstRewardEpoch)
+	// Only fetch unexpired rewards from epochs by determining the earliest epoch
+	// for which rewards are still retained or available.
+	firstRewardEpoch = t.earliestRewardEpoch(firstRewardEpoch, claimingEpoch)
 
 	for epoch := firstRewardEpoch; epoch <= lastRewardEpoch; epoch++ {
 		rewardsForAccountInEpoch, exists, err := t.rewardsForAccount(validatorID, epoch)
@@ -127,7 +124,7 @@ func (t *Tracker) ValidatorReward(validatorID iotago.AccountID, stakingFeature *
 	return validatorReward, firstRewardEpoch, lastRewardEpoch, nil
 }
 
-func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex, claimingEpoch iotago.EpochIndex, retentionPeriod iotago.EpochIndex) (delegatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
+func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex, claimingEpoch iotago.EpochIndex) (delegatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 
@@ -143,12 +140,9 @@ func (t *Tracker) DelegatorReward(validatorID iotago.AccountID, delegatedAmount 
 
 	decayEndEpoch := t.decayEndEpoch(claimingEpoch, lastRewardEpoch)
 
-	// Determine the earliest epoch for which rewards are retained and only attempt to fetch those.
-	var earliestRetainedRewardEpoch iotago.EpochIndex
-	if retentionPeriod < claimingEpoch {
-		earliestRetainedRewardEpoch = claimingEpoch - retentionPeriod
-	}
-	firstRewardEpoch = lo.Max(earliestRetainedRewardEpoch, firstRewardEpoch)
+	// Only fetch unexpired rewards from epochs by determining the earliest epoch
+	// for which rewards are still retained or available.
+	firstRewardEpoch = t.earliestRewardEpoch(firstRewardEpoch, claimingEpoch)
 
 	for epoch := firstRewardEpoch; epoch <= lastRewardEpoch; epoch++ {
 		rewardsForAccountInEpoch, exists, err := t.rewardsForAccount(validatorID, epoch)
@@ -241,6 +235,17 @@ func (t *Tracker) decayEndEpoch(claimingEpoch iotago.EpochIndex, lastRewardEpoch
 	}
 
 	return lo.Max(claimingEpoch, lastRewardEpoch)
+}
+
+// Returns the earliest epoch for which rewards are retained or available, whichever is later.
+func (t *Tracker) earliestRewardEpoch(firstRewardEpoch iotago.EpochIndex, claimingEpoch iotago.EpochIndex) iotago.EpochIndex {
+	retentionPeriod := t.apiProvider.APIForEpoch(claimingEpoch).ProtocolParameters().RewardsParameters().RetentionPeriod
+	var earliestRetainedRewardEpoch iotago.EpochIndex
+	if retentionPeriod < claimingEpoch {
+		earliestRetainedRewardEpoch = claimingEpoch - retentionPeriod
+	}
+
+	return lo.Max(earliestRetainedRewardEpoch, firstRewardEpoch)
 }
 
 func (t *Tracker) rewardsMap(epoch iotago.EpochIndex) (ads.Map[iotago.Identifier, iotago.AccountID, *model.PoolRewards], error) {

@@ -314,7 +314,6 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 			accountID,
 			output.Output().FeatureSet().Staking(),
 			claimingEpoch,
-			retentionPeriod,
 		)
 		if err != nil {
 			panic(err)

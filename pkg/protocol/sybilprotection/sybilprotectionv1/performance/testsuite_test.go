@@ -20,8 +20,6 @@ import (
 	"github.com/iotaledger/iota.go/v4/tpkg"
 )
 
-const epochsInAYear = 384
-
 type TestSuite struct {
 	T                    *testing.T
 	stores               map[iotago.SlotIndex]kvstore.KVStore
@@ -32,7 +30,7 @@ type TestSuite struct {
 
 	api iotago.API
 
-	Instance             *Tracker
+	Instance              *Tracker
 	performanceFactorFunc func(iotago.SlotIndex) *model.ValidatorPerformance
 }
 
@@ -178,13 +176,13 @@ func (t *TestSuite) AssertEpochRewards(epoch iotago.EpochIndex, actions map[stri
 				StartEpoch: epoch - 1,
 				EndEpoch:   epoch,
 			},
-			epoch, epochsInAYear)
+			epoch)
 		require.NoError(t.T, err)
 		require.Equal(t.T, expectedValidatorReward, actualValidatorReward)
 
 		for delegatedAmount := range action.Delegators {
 			expectedDelegatorReward := t.delegatorReward(epoch, t.epochStats[epoch].ProfitMargin, uint64(poolRewards), uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost), action)
-			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch, epochsInAYear)
+			actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accountID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
 			require.NoError(t.T, err)
 			require.Equal(t.T, expectedDelegatorReward, actualDelegatorReward)
 		}
@@ -200,13 +198,13 @@ func (t *TestSuite) AssertNoReward(alias string, epoch iotago.EpochIndex, action
 			StartEpoch:   epoch,
 			EndEpoch:     epoch,
 		},
-		epoch, epochsInAYear)
+		epoch)
 	require.NoError(t.T, err)
 	require.Equal(t.T, iotago.Mana(0), actualValidatorReward)
 	action, exists := actions[alias]
 	require.True(t.T, exists)
 	for delegatedAmount := range action.Delegators {
-		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch, epochsInAYear)
+		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
 		require.NoError(t.T, err)
 		require.Equal(t.T, iotago.Mana(0), actualDelegatorReward)
 	}
@@ -220,14 +218,14 @@ func (t *TestSuite) AssertRewardForDelegatorsOnly(alias string, epoch iotago.Epo
 			StartEpoch:   epoch,
 			EndEpoch:     epoch,
 		},
-		epoch, epochsInAYear)
+		epoch)
 	require.NoError(t.T, err)
 	require.Equal(t.T, iotago.Mana(0), actualValidatorReward)
 	action, exists := actions[alias]
 	require.True(t.T, exists)
 
 	for delegatedAmount := range action.Delegators {
-		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch, epochsInAYear)
+		actualDelegatorReward, _, _, err := t.Instance.DelegatorReward(accID, iotago.BaseToken(delegatedAmount), epoch, epoch, epoch)
 		expectedDelegatorReward := t.delegatorReward(epoch, t.epochStats[epoch].ProfitMargin, uint64(t.poolRewards[epoch][alias].PoolRewards), uint64(delegatedAmount), uint64(action.PoolStake), uint64(action.FixedCost), action)
 
 		require.NoError(t.T, err)
@@ -345,7 +343,7 @@ func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[s
 		delegatorRewardPerAccount[epoch] = make(map[string]iotago.Mana)
 		validatorRewardPerAccount[epoch] = make(map[string]iotago.Mana)
 		for aliasAccount := range epochActions {
-			reward, _, _, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epoch, epoch, epoch, epochsInAYear)
+			reward, _, _, err := t.Instance.DelegatorReward(t.Account(aliasAccount, false), 1, epoch, epoch, epoch)
 			require.NoError(t.T, err)
 			delegatorRewardPerAccount[epoch][aliasAccount] = reward
 		}
@@ -356,7 +354,7 @@ func (t *TestSuite) calculateExpectedRewards(epochsCount int, epochActions map[s
 					StartEpoch:   epoch,
 					EndEpoch:     epoch,
 				},
-				epoch, epochsInAYear)
+				epoch)
 			require.NoError(t.T, err)
 			validatorRewardPerAccount[epoch][aliasAccount] = reward
 		}
@@ -373,7 +371,7 @@ func (t *TestSuite) AssertValidatorRewardGreaterThan(alias1 string, alias2 strin
 			StartEpoch: epoch - 1,
 			EndEpoch:   epoch,
 		},
-		epoch, epochsInAYear)
+		epoch)
 	require.NoError(t.T, err)
 
 	accID2 := t.Account(alias2, false)
@@ -384,7 +382,7 @@ func (t *TestSuite) AssertValidatorRewardGreaterThan(alias1 string, alias2 strin
 			StartEpoch: epoch - 1,
 			EndEpoch:   epoch,
 		},
-		epoch, epochsInAYear)
+		epoch)
 	require.NoError(t.T, err)
 
 	require.Greater(t.T, actualValidatorReward1, actualValidatorReward2)

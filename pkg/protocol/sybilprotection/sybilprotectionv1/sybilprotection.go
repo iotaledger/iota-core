@@ -246,12 +246,12 @@ func (o *SybilProtection) SeatManager() seatmanager.SeatManager {
 	return o.seatManager
 }
 
-func (o *SybilProtection) ValidatorReward(validatorID iotago.AccountID, stakingFeature *iotago.StakingFeature, claimingEpoch iotago.EpochIndex, retentionPeriod iotago.EpochIndex) (validatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
-	return o.performanceTracker.ValidatorReward(validatorID, stakingFeature, claimingEpoch, retentionPeriod)
+func (o *SybilProtection) ValidatorReward(validatorID iotago.AccountID, stakingFeature *iotago.StakingFeature, claimingEpoch iotago.EpochIndex) (validatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
+	return o.performanceTracker.ValidatorReward(validatorID, stakingFeature, claimingEpoch)
 }
 
-func (o *SybilProtection) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex, claimingEpoch iotago.EpochIndex, retentionPeriod iotago.EpochIndex) (delegatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
-	return o.performanceTracker.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd, claimingEpoch, retentionPeriod)
+func (o *SybilProtection) DelegatorReward(validatorID iotago.AccountID, delegatedAmount iotago.BaseToken, epochStart iotago.EpochIndex, epochEnd iotago.EpochIndex, claimingEpoch iotago.EpochIndex) (delegatorReward iotago.Mana, firstRewardEpoch iotago.EpochIndex, lastRewardEpoch iotago.EpochIndex, err error) {
+	return o.performanceTracker.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd, claimingEpoch)
 }
 
 func (o *SybilProtection) PoolRewardsForAccount(accountID iotago.AccountID) (
