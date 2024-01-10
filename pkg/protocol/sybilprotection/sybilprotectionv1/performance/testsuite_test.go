@@ -30,8 +30,8 @@ type TestSuite struct {
 
 	api iotago.API
 
-	Instance             *Tracker
-	perforanceFactorFunc func(iotago.SlotIndex) *model.ValidatorPerformance
+	Instance              *Tracker
+	performanceFactorFunc func(iotago.SlotIndex) *model.ValidatorPerformance
 }
 
 func NewTestSuite(t *testing.T) *TestSuite {
@@ -44,7 +44,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 			iotago.NewV3SnapshotProtocolParameters(
 				iotago.WithTimeProviderOptions(0, time.Now().Unix(), 10, 3),
 				iotago.WithLivenessOptions(5, 5, 1, 2, 3),
-				iotago.WithRewardsOptions(8, 8, 11, 2, 1),
+				iotago.WithRewardsOptions(8, 8, 11, 2, 1, 5),
 			),
 		),
 	}
@@ -70,10 +70,12 @@ func (t *TestSuite) InitPerformanceTracker() {
 		return p, nil
 	}
 
-	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), 0)
-	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
-	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
-	committeeCandidatesStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), 0)
+	pruningDelayFunc := func(_ iotago.EpochIndex) iotago.EpochIndex { return 0 }
+
+	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc)
+	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
+	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc, (*account.Accounts).Bytes, account.AccountsFromBytes)
+	committeeCandidatesStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc)
 
 	t.Instance = NewTracker(
 		rewardsStore.GetEpoch,

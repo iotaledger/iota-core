@@ -29,7 +29,8 @@ func setupValidatorTestsuite(t *testing.T, walletOpts ...options.Option[testsuit
 			iotago.WithSupplyOptions(MAX_SUPPLY, 63, 1, 17, 32, 21, 70),
 			iotago.WithStakingOptions(1, validationBlocksPerSlot, 1),
 			// Pick larger values for ManaShareCoefficient and DecayBalancingConstant for more precision in the calculations.
-			iotago.WithRewardsOptions(8, 8, 11, 200, 200),
+			// Pick a small retention period so we can test rewards expiry.
+			iotago.WithRewardsOptions(8, 8, 11, 200, 200, 5),
 			// Pick Increase/Decrease threshold in accordance with sanity checks (necessary because we changed slot duration).
 			iotago.WithCongestionControlOptions(1, 0, 0, 400_000, 300_000, 100_000, 1000, 100),
 			iotago.WithTimeProviderOptions(
@@ -156,6 +157,33 @@ func Test_Validator_PerfectIssuanceWithHugeStake(t *testing.T) {
 	validatorTest(t, test)
 }
 
+func Test_Validator_PerfectIssuanceWithExpiredRewards(t *testing.T) {
+	ts := setupValidatorTestsuite(t)
+	defer ts.Shutdown()
+
+	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot()
+	epochDurationSlots := uint64(ts.API.TimeProvider().EpochDurationSlots())
+
+	test := ValidatorTest{
+		ts:              ts,
+		issuancePerSlot: validationBlocksPerSlot,
+		// The retention period is 5, so the sum of rewards should be those from epochs 3 to 7 (= 5 epochs).
+		epochPerformanceFactors: EpochPerformanceMap{
+			// A validator cannot issue blocks in the genesis slot, so we deduct one slot worth of blocks.
+			0: (uint64(validationBlocksPerSlot) * (epochDurationSlots - 1)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			1: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			2: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			3: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			4: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			5: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			6: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+			7: (uint64(validationBlocksPerSlot) * (epochDurationSlots)) >> uint64(ts.API.ProtocolParameters().SlotsPerEpochExponent()),
+		},
+	}
+
+	validatorTest(t, test)
+}
+
 func Test_Validator_OverIssuance(t *testing.T) {
 	ts := setupValidatorTestsuite(t)
 	defer ts.Shutdown()
@@ -276,6 +304,7 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	// Determine the rewards the validators actually got.
 	actualRewards := make(map[iotago.AccountID]iotago.Mana, len(ts.Validators()))
 	claimingEpoch := ts.API.TimeProvider().EpochFromSlot(ts.CurrentSlot())
+	retentionPeriod := iotago.EpochIndex(ts.API.ProtocolParameters().RewardsParameters().RetentionPeriod)
 
 	for _, validatorAccount := range []string{"Genesis:1", "Genesis:2"} {
 		output := ts.DefaultWallet().Output(validatorAccount)
@@ -296,13 +325,21 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	for accountID, actualReward := range actualRewards {
 		lastRewardEpoch := iotago.EpochIndex(len(test.epochPerformanceFactors))
 		rewards := make([]epochReward, 0, lastRewardEpoch)
-		for epoch := iotago.EpochIndex(0); epoch < lastRewardEpoch; epoch++ {
+
+		var firstRewardEpoch iotago.EpochIndex
+		if retentionPeriod < lastRewardEpoch {
+			firstRewardEpoch = lastRewardEpoch - retentionPeriod
+		} else {
+			firstRewardEpoch = 0
+		}
+
+		for epoch := firstRewardEpoch; epoch < lastRewardEpoch; epoch++ {
 			epochPerformanceFactor := test.epochPerformanceFactors[epoch]
 			epochReward := calculateEpochReward(t, ts, accountID, epoch, epochPerformanceFactor, totalStake, totalValidatorStake)
 			rewards = append(rewards, epochReward)
 		}
 
-		expectedReward := calculateValidatorReward(t, ts, accountID, rewards, startEpoch, claimingEpoch)
+		expectedReward := calculateValidatorReward(t, ts, accountID, rewards, firstRewardEpoch, claimingEpoch)
 
 		require.Equal(t, expectedReward, actualReward, "expected reward for account %s to be %d, was %d", accountID, expectedReward, actualReward)
 	}

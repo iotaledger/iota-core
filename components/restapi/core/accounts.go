@@ -219,6 +219,7 @@ func rewardsByOutputID(c echo.Context) (*api.ManaRewardsResponse, error) {
 		delegationEnd := delegationOutput.EndEpoch
 		futureBoundedSlotIndex := slotIndex + apiForSlot.ProtocolParameters().MinCommittableAge()
 		claimingEpoch := apiForSlot.TimeProvider().EpochFromSlot(futureBoundedSlotIndex)
+
 		// If Delegation ID is zeroed, the output is in delegating state, which means its End Epoch is not set and we must use the
 		// "last epoch" for the rewards calculation.
 		// In this case the calculation must be consistent with the rewards calculation at execution time, so a client can specify
