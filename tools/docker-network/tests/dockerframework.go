@@ -54,6 +54,7 @@ type Node struct {
 	Client               *nodeclient.Client
 	AccountAddressBech32 string
 	ContainerConfigs     string
+	PrivateKey           string
 }
 
 type Account struct {
@@ -247,7 +248,7 @@ func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
 
 		// start a new inx-validator that does not issue candidacy payload
 		newContainerName := fmt.Sprintf("%s-1", node.ContainerName)
-		cmd := fmt.Sprintf("docker run --network docker-network_iota-core --name %s %s %s --validator.issueCandidacyPayload=false &", newContainerName, newImageName, node.ContainerConfigs)
+		cmd := fmt.Sprintf("docker run --network docker-network_iota-core --env %s --name %s  %s %s --validator.issueCandidacyPayload=false &", node.PrivateKey, newContainerName, newImageName, node.ContainerConfigs)
 		err = exec.Command("bash", "-c", cmd).Run()
 		require.NoError(d.Testing, err)
 	}
@@ -546,7 +547,16 @@ func (d *DockerTestFramework) GetContainersConfigs() {
 		// remove "[" and "]"
 		configs = configs[1 : len(configs)-2]
 
+		// get validator private key
+		cmd = fmt.Sprintf("docker inspect --format='{{.Config.Env}}' %s", node.ContainerName)
+		envBytes, err := exec.Command("bash", "-c", cmd).Output()
+		require.NoError(d.Testing, err)
+
+		envs := string(envBytes)
+		envs = strings.Split(envs[1:len(envs)-2], " ")[0]
+
 		node.ContainerConfigs = configs
+		node.PrivateKey = envs
 		d.nodes[node.Name] = node
 	}
 }

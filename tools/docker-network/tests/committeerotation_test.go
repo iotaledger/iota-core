@@ -151,13 +151,12 @@ func Test_NoCandidacyPayload(t *testing.T) {
 	d.AssertCommittee(currentEpoch+2, d.AccountsFromNodes(d.Nodes()...))
 
 	// check if finalization continues
-	fmt.Println("Second finalized slot: ", status.LatestFinalizedSlot)
 	d.AssertFinalizedSlot(func(newFinalizedSlot iotago.SlotIndex) error {
 		if prevFinalizedSlot < newFinalizedSlot {
 			return nil
 		}
 
-		return ierrors.Errorf("Finalization should happened, First finalized slot: %d, Second finalized slot: %d", prevFinalizedSlot, status.LatestFinalizedSlot)
+		return ierrors.Errorf("Finalization should happened, First finalized slot: %d, Second finalized slot: %d", prevFinalizedSlot, newFinalizedSlot)
 	})
 
 	// Start issuing candidacy payloads for 3 validators, and check if committee size is 3
