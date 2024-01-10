@@ -78,7 +78,7 @@ func (e *EpochKVStore) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago
 	minPruningDelay := e.prunginDelayFunc(epoch)
 
 	// The epoch we're trying to prune already takes into account the defaultPruningDelay.
-	// Therefore, we don't need to do anything if it is greater equal e.pruningDelay and take the difference otherwise.
+	// Therefore, we don't need to do anything if it is greater equal minPruningDelay and take the difference otherwise.
 	var pruningDelay iotago.EpochIndex
 	if defaultPruningDelay >= minPruningDelay {
 		pruningDelay = 0
