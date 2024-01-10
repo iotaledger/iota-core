@@ -197,7 +197,8 @@ func BIP32PathForIndex(index uint32) string {
 	return path.String()
 }
 
-func getDelegationStartEpoch(api iotago.API, pastBoundedSlot iotago.SlotIndex) iotago.EpochIndex {
+func getDelegationStartEpoch(api iotago.API, commitmentSlot iotago.SlotIndex) iotago.EpochIndex {
+	pastBoundedSlot := commitmentSlot + api.ProtocolParameters().MaxCommittableAge()
 	pastBoundedEpoch := api.TimeProvider().EpochFromSlot(pastBoundedSlot)
 	pastBoundedEpochEnd := api.TimeProvider().EpochEnd(pastBoundedEpoch)
 	registrationSlot := pastBoundedEpochEnd - api.ProtocolParameters().EpochNearingThreshold()
