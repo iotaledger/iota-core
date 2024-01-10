@@ -116,29 +116,72 @@ func NewDockerTestFramework(t *testing.T, opts ...options.Option[DockerTestFrame
 }
 
 func (d *DockerTestFramework) Run() error {
+	ch := make(chan error)
+	stopCh := make(chan struct{})
+	defer close(ch)
+	defer close(stopCh)
+
 	go func() {
-		exec.Command("docker", "compose", "up").Run()
+		cmd := exec.Command("docker", "compose", "up")
+		var out strings.Builder
+		cmd.Stderr = &out
+		err := cmd.Run()
+
+		if err != nil {
+			fmt.Println("Docker compose up failed with error:", err, ":", out.String())
+		}
+
+		// make sure that the channel is not already closed
+		select {
+		case <-stopCh:
+			return
+		default:
+		}
+
+		ch <- err
 	}()
 
-	// first wait until the nodes are available
-	for _, node := range d.Nodes() {
-		for {
-			client, err := nodeclient.New(node.ClientURL)
-			if err == nil {
-				node.Client = client
-				d.nodes[node.Name] = node
+	timer := time.NewTimer(d.optsWaitForSync)
+	defer timer.Stop()
 
-				break
+	ticker := time.NewTicker(d.optsTick)
+	defer ticker.Stop()
+
+loop:
+	for {
+		select {
+		case <-timer.C:
+			require.FailNow(d.Testing, "Docker network did not start in time")
+		case err := <-ch:
+			if err != nil {
+				require.FailNow(d.Testing, "failed to start Docker network", err)
 			}
-
-			time.Sleep(d.optsTick)
-			fmt.Printf("Waiting for node %s to be available...\n", node.Name)
+		case <-ticker.C:
+			fmt.Println("Waiting for nodes to become available...")
+			if d.waitForNodesAndGetClients() == nil {
+				break loop
+			}
 		}
 	}
 
 	d.GetContainersConfigs()
+
 	// make sure all nodes are up then we can start dumping logs
 	d.DumpContainerLogsToFiles()
+
+	return nil
+}
+
+func (d *DockerTestFramework) waitForNodesAndGetClients() error {
+	for _, node := range d.Nodes() {
+		client, err := nodeclient.New(node.ClientURL)
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to create node client for node %s", node.Name)
+		}
+
+		node.Client = client
+		d.nodes[node.Name] = node
+	}
 
 	return nil
 }
@@ -494,8 +537,8 @@ func (d *DockerTestFramework) Stop() {
 	fmt.Println("Stop the network...")
 	defer fmt.Println("Stop the network.....done")
 
-	exec.Command("docker", "compose", "down").Run()
-	exec.Command("rm", d.snapshotPath).Run()
+	_ = exec.Command("docker", "compose", "down").Run()
+	_ = exec.Command("rm", d.snapshotPath).Run()
 }
 
 func (d *DockerTestFramework) StopContainer(containerName ...string) error {
