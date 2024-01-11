@@ -298,7 +298,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		instance.LogTrace("PreSolidFilter.BlockPreFiltered", "block", event.Block.ID(), "err", event.Reason)
 
 		if failOnBlockFiltered {
-			n.Testing.Fatal("no blocks should be prefiltered")
+			n.Testing.Fatal("no blocks should be prefiltered", "block", event.Block.ID(), "err", event.Reason)
 		}
 	})
 
