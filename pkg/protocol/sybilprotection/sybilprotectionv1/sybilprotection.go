@@ -254,6 +254,14 @@ func (o *SybilProtection) DelegatorReward(validatorID iotago.AccountID, delegate
 	return o.performanceTracker.DelegatorReward(validatorID, delegatedAmount, epochStart, epochEnd, claimingEpoch)
 }
 
+func (o *SybilProtection) PoolRewardsForAccount(accountID iotago.AccountID) (
+	poolRewardsForAccount iotago.Mana,
+	exists bool,
+	err error,
+) {
+	return o.performanceTracker.PoolRewardsForAccount(accountID)
+}
+
 func (o *SybilProtection) Import(reader io.ReadSeeker) error {
 	return o.performanceTracker.Import(reader)
 }

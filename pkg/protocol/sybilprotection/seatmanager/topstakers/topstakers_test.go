@@ -28,7 +28,9 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 		),
 	)
 
-	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
+	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(),
+		func(_ iotago.EpochIndex) iotago.EpochIndex { return 0 },
+		(*account.Accounts).Bytes, account.AccountsFromBytes)
 
 	topStakersSeatManager := &SeatManager{
 		apiProvider:     iotago.SingleVersionProvider(testAPI),
@@ -80,7 +82,9 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 		),
 	)
 
-	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
+	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(),
+		func(_ iotago.EpochIndex) iotago.EpochIndex { return 0 },
+		(*account.Accounts).Bytes, account.AccountsFromBytes)
 
 	s := &SeatManager{
 		apiProvider:     iotago.SingleVersionProvider(testAPI),

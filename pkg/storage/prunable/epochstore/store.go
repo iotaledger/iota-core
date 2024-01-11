@@ -10,19 +10,19 @@ import (
 )
 
 type Store[V any] struct {
-	realm        kvstore.Realm
-	kv           *kvstore.TypedStore[iotago.EpochIndex, V]
-	pruningDelay iotago.EpochIndex
+	realm            kvstore.Realm
+	kv               *kvstore.TypedStore[iotago.EpochIndex, V]
+	prunginDelayFunc func(iotago.EpochIndex) iotago.EpochIndex
 
 	lastAccessedEpoch *kvstore.TypedValue[iotago.EpochIndex]
 	lastPrunedEpoch   *model.PruningIndex
 }
 
-func NewStore[V any](storeRealm kvstore.Realm, kv kvstore.KVStore, pruningDelay iotago.EpochIndex, vToBytes kvstore.ObjectToBytes[V], bytesToV kvstore.BytesToObject[V]) *Store[V] {
+func NewStore[V any](storeRealm kvstore.Realm, kv kvstore.KVStore, prunginDelayFunc func(iotago.EpochIndex) iotago.EpochIndex, vToBytes kvstore.ObjectToBytes[V], bytesToV kvstore.BytesToObject[V]) *Store[V] {
 	return &Store[V]{
 		realm:             storeRealm,
 		kv:                kvstore.NewTypedStore(lo.PanicOnErr(kv.WithExtendedRealm(append(storeRealm, entriesKey))), iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes, vToBytes, bytesToV),
-		pruningDelay:      pruningDelay,
+		prunginDelayFunc:  prunginDelayFunc,
 		lastAccessedEpoch: kvstore.NewTypedValue(kv, append(storeRealm, lastAccessedEpochKey), iotago.EpochIndex.Bytes, iotago.EpochIndexFromBytes),
 		lastPrunedEpoch:   model.NewPruningIndex(lo.PanicOnErr(kv.WithExtendedRealm(storeRealm)), kvstore.Realm{lastPrunedEpochKey}),
 	}
@@ -122,13 +122,15 @@ func (s *Store[V]) DeleteEpoch(epoch iotago.EpochIndex) error {
 }
 
 func (s *Store[V]) Prune(epoch iotago.EpochIndex, defaultPruningDelay iotago.EpochIndex) error {
+	minPruningDelay := s.prunginDelayFunc(epoch)
+
 	// The epoch we're trying to prune already takes into account the defaultPruningDelay.
-	// Therefore, we don't need to do anything if it is greater equal s.pruningDelay and take the difference otherwise.
+	// Therefore, we don't need to do anything if it is greater equal minPruningDelay and take the difference otherwise.
 	var pruningDelay iotago.EpochIndex
-	if defaultPruningDelay >= s.pruningDelay {
+	if defaultPruningDelay >= minPruningDelay {
 		pruningDelay = 0
 	} else {
-		pruningDelay = s.pruningDelay - defaultPruningDelay
+		pruningDelay = minPruningDelay - defaultPruningDelay
 	}
 
 	// No need to prune.
