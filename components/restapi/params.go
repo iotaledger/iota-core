@@ -52,7 +52,6 @@ var ParamsRestAPI = &ParametersRestAPI{
 		"/api/debug/v2/*",
 		"/api/indexer/v2/*",
 		"/api/mqtt/v2",
-		"/api/blockissuer/v1/*",
 	},
 	ProtectedRoutes: []string{
 		"/api/*",
