@@ -115,13 +115,11 @@ func (b *Booker) Queue(block *blocks.Block) error {
 		})
 
 		transactionMetadata.OnInvalid(func(err error) {
-			// TODO: Do we need to set spender IDs?
 			b.setupBlock(block)
 		})
 	})
 
 	signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
-		// TODO: Do we need to set spender IDs?
 		b.setupBlock(block)
 	})
 

@@ -244,8 +244,6 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 
 	ts.Wait(node1, node2)
 
-	// TODO: Assertions do not pass for node2 because the block does not get forwarded from node1.
-	// node2 should be added in the assertion when issue iotaledger/iota-core#580 is fixed.
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
 	signedTx2ID := lo.PanicOnErr(tx2.ID())
 	ts.AssertTransactionFailure(signedTx2ID, iotago.ErrRewardInputInvalid, node1, node2)
