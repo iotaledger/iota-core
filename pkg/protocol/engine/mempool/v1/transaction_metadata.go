@@ -300,9 +300,12 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		}
 	})
 
-	t.OnEarliestIncludedAttachmentUpdated(func(previousIndex iotago.BlockID, newIndex iotago.BlockID) {
-		if isIncluded, wasIncluded := newIndex.Slot() != 0, previousIndex.Slot() != 0; isIncluded != wasIncluded {
-			t.accepted.Set(isIncluded && t.AllInputsAccepted() && t.IsConflictAccepted())
+	t.OnEarliestIncludedAttachmentUpdated(func(previousBlockID iotago.BlockID, newBlockID iotago.BlockID) {
+		if previousBlockID.Empty() && !newBlockID.Empty() {
+			if t.invalid.Get() != nil || !t.IsConflictAccepted() || !t.AllInputsAccepted() {
+				return
+			}
+			t.accepted.Set(true)
 		}
 	})
 
