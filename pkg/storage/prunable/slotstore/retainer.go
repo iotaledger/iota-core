@@ -17,6 +17,7 @@ const (
 type BlockRetainerData struct {
 	State         api.BlockState
 	FailureReason api.BlockFailureReason
+	TransactionID iotago.TransactionID
 }
 
 func (b *BlockRetainerData) Bytes() ([]byte, error) {
@@ -29,10 +30,14 @@ func (b *BlockRetainerData) Bytes() ([]byte, error) {
 		return nil, ierrors.Wrap(err, "failed to write block failure reason")
 	}
 
+	if err := stream.Write(byteBuffer, b.TransactionID); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write transaction ID")
+	}
+
 	return byteBuffer.Bytes()
 }
 
-func BlockRetainerDataFromBytes(bytes []byte) (*BlockRetainerData, int, error) {
+func blockRetainerDataFromBytes(bytes []byte) (*BlockRetainerData, int, error) {
 	byteReader := stream.NewByteReader(bytes)
 
 	var err error
@@ -44,12 +49,14 @@ func BlockRetainerDataFromBytes(bytes []byte) (*BlockRetainerData, int, error) {
 	if b.FailureReason, err = stream.Read[api.BlockFailureReason](byteReader); err != nil {
 		return nil, 0, ierrors.Wrap(err, "failed to read block failure reason")
 	}
+	if b.TransactionID, err = stream.Read[iotago.TransactionID](byteReader); err != nil {
+		return nil, 0, ierrors.Wrap(err, "failed to read transaction ID")
+	}
 
 	return b, byteReader.BytesRead(), nil
 }
 
 type TransactionRetainerData struct {
-	TransactionID iotago.TransactionID
 	State         api.TransactionState
 	FailureReason api.TransactionFailureReason
 }
@@ -57,9 +64,6 @@ type TransactionRetainerData struct {
 func (t *TransactionRetainerData) Bytes() ([]byte, error) {
 	byteBuffer := stream.NewByteBuffer(2)
 
-	if err := stream.Write(byteBuffer, t.TransactionID); err != nil {
-		return nil, ierrors.Wrap(err, "failed to write transaction ID")
-	}
 	if err := stream.Write(byteBuffer, t.State); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write transaction state")
 	}
@@ -70,15 +74,12 @@ func (t *TransactionRetainerData) Bytes() ([]byte, error) {
 	return byteBuffer.Bytes()
 }
 
-func TransactionRetainerDataFromBytes(bytes []byte) (*TransactionRetainerData, int, error) {
+func transactionRetainerDataFromBytes(bytes []byte) (*TransactionRetainerData, int, error) {
 	byteReader := stream.NewByteReader(bytes)
 
 	var err error
 	t := new(TransactionRetainerData)
 
-	if t.TransactionID, err = stream.Read[iotago.TransactionID](byteReader); err != nil {
-		return nil, 0, ierrors.Wrap(err, "failed to read transaction ID")
-	}
 	if t.State, err = stream.Read[api.TransactionState](byteReader); err != nil {
 		return nil, 0, ierrors.Wrap(err, "failed to read transaction state")
 	}
@@ -93,7 +94,7 @@ type Retainer struct {
 	slot       iotago.SlotIndex
 	blockStore *kvstore.TypedStore[iotago.BlockID, *BlockRetainerData]
 	// we store transaction metadata per blockID as in API requests we always request by blockID
-	transactionStore *kvstore.TypedStore[iotago.BlockID, *TransactionRetainerData]
+	transactionStore *kvstore.TypedStore[iotago.TransactionID, *TransactionRetainerData]
 }
 
 func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Retainer) {
@@ -103,13 +104,13 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 			iotago.BlockID.Bytes,
 			iotago.BlockIDFromBytes,
 			(*BlockRetainerData).Bytes,
-			BlockRetainerDataFromBytes,
+			blockRetainerDataFromBytes,
 		),
 		transactionStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{transactionStorePrefix})),
-			iotago.BlockID.Bytes,
-			iotago.BlockIDFromBytes,
+			iotago.TransactionID.Bytes,
+			iotago.TransactionIDFromBytes,
 			(*TransactionRetainerData).Bytes,
-			TransactionRetainerDataFromBytes,
+			transactionRetainerDataFromBytes,
 		),
 	}
 }
