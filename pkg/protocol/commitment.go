@@ -299,3 +299,7 @@ func (c *Commitment) forceChain(targetChain *Chain) {
 		}
 	}
 }
+
+func (c *Commitment) weightAddr() reactive.Variable[uint64] {
+	return c.Weight
+}
