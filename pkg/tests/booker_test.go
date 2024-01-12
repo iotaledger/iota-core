@@ -845,7 +845,7 @@ func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
 	)
 
 	node1 := ts.AddValidatorNode("node1")
-	node2 := ts.AddNode("node2")
+	ts.AddNode("node2")
 	ts.AddDefaultWallet(node1)
 
 	ts.Run(true)
@@ -855,8 +855,6 @@ func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
 	var block1Slot iotago.SlotIndex = ts.API.ProtocolParameters().GenesisSlot() + 1
 	ts.SetCurrentSlot(block1Slot)
 
-	tip := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().TipSelection.SelectTips(1)[iotago.StrongParentType][0]
-
 	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", "Genesis:0",
 		func(nftBuilder *builder.NFTOutputBuilder) {
 			// Set an issuer ID that is not unlocked in the TX which will cause the TX to be invalid.
@@ -865,15 +863,15 @@ func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
 	)
 	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
 
-	vblock1 := ts.IssueValidationBlockWithHeaderOptions("vblock1", ts.DefaultWallet().Node, mock.WithWeakParents(block1.ID()), mock.WithStrongParents(tip))
+	vblock1 := ts.IssueValidationBlockWithHeaderOptions("vblock1", ts.DefaultWallet().Node, mock.WithWeakParents(block1.ID()), mock.WithStrongParents(ts.Block("Genesis").ID()))
 	vblock2 := ts.IssueValidationBlockWithHeaderOptions("vblock2", ts.DefaultWallet().Node, mock.WithStrongParents(vblock1.ID()))
 	vblock3 := ts.IssueValidationBlockWithHeaderOptions("vblock3", ts.DefaultWallet().Node, mock.WithStrongParents(vblock2.ID()))
 
 	ts.AssertBlocksInCacheAccepted(ts.Blocks("block1"), true, ts.Nodes()...)
 	ts.AssertBlocksInCacheConfirmed(ts.Blocks("block1"), true, ts.Nodes()...)
 
-	ts.AssertTransactionsExist([]*iotago.Transaction{tx1.Transaction}, true, node1, node2)
-	ts.AssertTransactionFailure(lo.PanicOnErr(tx1.ID()), iotago.ErrIssuerFeatureNotUnlocked, node1, node2)
+	ts.AssertTransactionsExist([]*iotago.Transaction{tx1.Transaction}, true, ts.Nodes()...)
+	ts.AssertTransactionFailure(lo.PanicOnErr(tx1.ID()), iotago.ErrIssuerFeatureNotUnlocked, ts.Nodes()...)
 	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx1.Transaction}, false, ts.Nodes()...)
 
 	ts.CommitUntilSlot(block1Slot, vblock3.ID())
