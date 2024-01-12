@@ -298,7 +298,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		instance.LogTrace("PreSolidFilter.BlockPreFiltered", "block", event.Block.ID(), "err", event.Reason)
 
 		if failOnBlockFiltered {
-			n.Testing.Fatal("no blocks should be prefiltered")
+			n.Testing.Fatal("no blocks should be prefiltered", "block", event.Block.ID(), "err", event.Reason)
 		}
 	})
 
@@ -408,7 +408,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 	instance.Ledger.MemPool().OnSignedTransactionAttached(
 		func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
 			signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
-				instance.LogTrace("MemPool.SignedTransactionSignaturesInvalid", "tx", signedTransactionMetadata.ID(), "err", err)
+				instance.LogTrace("MemPool.SignedTransactionSignaturesInvalid", "signedTx", signedTransactionMetadata.ID(), "tx", signedTransactionMetadata.TransactionMetadata().ID(), "err", err)
 			})
 		},
 	)

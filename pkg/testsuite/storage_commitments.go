@@ -94,3 +94,85 @@ func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expecte
 		})
 	}
 }
+
+// Asserts that the given block ID has the expected containment status in the commitment identified by the given slot.
+func (t *TestSuite) AssertStorageCommitmentBlockAccepted(slot iotago.SlotIndex, blockID iotago.BlockID, expectedContains bool, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			storedCommitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentBlockAccepted: %s: error loading commitment for slot: %d", node.Name, slot)
+			}
+
+			committedSlot, err := node.Protocol.Engines.Main.Get().CommitmentAPI(storedCommitment.ID())
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentBlockAccepted: %s: error getting committed slot for commitment: %s", node.Name, storedCommitment.ID())
+			}
+
+			acceptedBlocksBySlotCommitment, err := committedSlot.BlocksIDsBySlotCommitmentID()
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentBlockAccepted: %s: error getting BlocksIDsBySlotCommitmentID for commitment: %s", node.Name, storedCommitment.ID())
+			}
+
+			// Check if the Block ID is anywhere in the map.
+			var actualContains bool
+			for _, blockIDs := range acceptedBlocksBySlotCommitment {
+				for _, innerBlockID := range blockIDs {
+					if innerBlockID == blockID {
+						actualContains = true
+						break
+					}
+				}
+			}
+
+			if actualContains != expectedContains {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentBlockAccepted: %s: commitment %s's actual and expected containment of block id %s do not match; actual contained status: %t, expected: %t", node.Name, storedCommitment.ID(), blockID, actualContains, expectedContains)
+			}
+
+			return nil
+		})
+	}
+}
+
+// Asserts that the given transaction ID has the expected containment status in the commitment identified by the given slot.
+func (t *TestSuite) AssertStorageCommitmentTransactionAccepted(slot iotago.SlotIndex, transactionID iotago.TransactionID, expectedContains bool, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			storedCommitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentTransactionAccepted: %s: error loading commitment for slot: %d", node.Name, slot)
+			}
+
+			committedSlot, err := node.Protocol.Engines.Main.Get().CommitmentAPI(storedCommitment.ID())
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentTransactionAccepted: %s: error getting committed slot for commitment: %s", node.Name, storedCommitment.ID())
+			}
+
+			acceptedTransactions, err := committedSlot.TransactionIDs()
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentTransactionAccepted: %s: error getting BlocksIDsBySlotCommitmentID for commitment: %s", node.Name, storedCommitment.ID())
+			}
+
+			actualContains := contains(acceptedTransactions, transactionID)
+			if actualContains != expectedContains {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentTransactionAccepted: %s: commitment %s's actual and expected containment of transaction id %s do not match; actual contained status: %t, expected: %t", node.Name, storedCommitment.ID(), transactionID, actualContains, expectedContains)
+			}
+
+			return nil
+		})
+	}
+}
+
+func contains[T comparable](collection []T, elem T) bool {
+	for _, item := range collection {
+		if item == elem {
+			return true
+		}
+	}
+
+	return false
+}
