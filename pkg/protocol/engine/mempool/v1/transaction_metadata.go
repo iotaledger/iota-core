@@ -240,7 +240,7 @@ func (t *TransactionMetadata) AllInputsAccepted() bool {
 
 func (t *TransactionMetadata) setConflictAccepted() {
 	if t.conflictAccepted.Trigger() {
-		if t.invalid.Get() != nil && t.AllInputsAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
+		if t.invalid.Get() == nil && t.AllInputsAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
 			t.accepted.Set(true)
 		}
 	}
@@ -256,7 +256,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
-				if t.invalid.Get() != nil && t.IsConflictAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
+				if t.invalid.Get() == nil && t.IsConflictAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
 					t.accepted.Set(true)
 				}
 			}
