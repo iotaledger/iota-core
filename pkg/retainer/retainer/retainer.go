@@ -113,22 +113,8 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 					})
 
 					transactionMetadata.OnAccepted(func() {
-						attachmentID := transactionMetadata.EarliestIncludedAttachment()
-						if slot := attachmentID.Slot(); slot > 0 {
-							if err := r.onTransactionAccepted(attachmentID); err != nil {
-								r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAccepted in retainer"))
-							}
-						}
-					})
-
-					transactionMetadata.OnEarliestIncludedAttachmentUpdated(func(prevBlock iotago.BlockID, newBlock iotago.BlockID) {
-						// if prevBlock is genesis, we do not need to update anything, bc the tx is included in the block we attached to at start.
-						if prevBlock.Slot() == 0 {
-							return
-						}
-
-						if err := r.onAttachmentUpdated(prevBlock, newBlock, transactionMetadata.IsAccepted()); err != nil {
-							r.errorHandler(ierrors.Wrap(err, "failed to delete/store on AttachmentUpdated in retainer"))
+						if err := r.onTransactionAccepted(txID); err != nil {
+							r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAccepted in retainer"))
 						}
 					})
 				})
@@ -310,26 +296,4 @@ func (r *Retainer) onTransactionAccepted(blockID iotago.BlockID) error {
 	}
 
 	return store.StoreTransactionNoFailureStatus(blockID, api.TransactionStateAccepted)
-}
-
-func (r *Retainer) onAttachmentUpdated(prevID iotago.BlockID, newID iotago.BlockID, accepted bool) error {
-	store, err := r.store(prevID.Slot())
-	if err != nil {
-		return ierrors.Wrapf(err, "could not get retainer store for slot %d", prevID.Slot())
-	}
-
-	if err := store.DeleteTransactionData(prevID); err != nil {
-		return err
-	}
-
-	store, err = r.store(newID.Slot())
-	if err != nil {
-		return ierrors.Wrapf(err, "could not get retainer store for slot %d", newID.Slot())
-	}
-
-	if accepted {
-		return store.StoreTransactionNoFailureStatus(newID, api.TransactionStateAccepted)
-	}
-
-	return store.StoreTransactionNoFailureStatus(newID, api.TransactionStatePending)
 }
