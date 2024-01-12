@@ -60,7 +60,7 @@ var (
 				Amount:               mock.MinValidatorAccountAmount(protocolParamsDocker),
 				IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b")))),
 				ExpirySlot:           iotago.MaxSlotIndex,
-				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				StakingEndEpoch:      iotago.MaxEpochIndex,
 				FixedCost:            1,
 				StakedAmount:         mock.MinValidatorAccountAmount(protocolParamsDocker),
@@ -80,7 +80,7 @@ var (
 				Amount:               mock.MinValidatorAccountAmount(protocolParamsDocker),
 				IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064")))),
 				ExpirySlot:           iotago.MaxSlotIndex,
-				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				StakingEndEpoch:      iotago.MaxEpochIndex,
 				FixedCost:            1,
 				StakedAmount:         mock.MinValidatorAccountAmount(protocolParamsDocker),
@@ -100,7 +100,28 @@ var (
 				Amount:               mock.MinValidatorAccountAmount(protocolParamsDocker),
 				IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648")))),
 				ExpirySlot:           iotago.MaxSlotIndex,
-				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
+				StakingEndEpoch:      iotago.MaxEpochIndex,
+				FixedCost:            1,
+				StakedAmount:         mock.MinValidatorAccountAmount(protocolParamsDocker),
+				Mana:                 iotago.Mana(mock.MinValidatorAccountAmount(protocolParamsDocker)),
+			},
+			snapshotcreator.AccountDetails{
+				/*
+					node-04-validator
+
+					Ed25519 Public Key:   c9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe
+					Private Key: 5cceed8ca18146639330177ab4f61ab1a71e2d3fea3d4389f9e2e43f34ec8b33c9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe
+					Account Address:      rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw
+					Ed25519 Address:      rms1qr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvts0unx0s
+					Restricted Address:   rms1xqyvnn4vxlffx92627pcr2338mn5ahar43e7aycdq32kf2h8wu0gllspqgz9eyua, Capabilities: mana
+				*/
+				AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xc9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe"))),
+				Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xc9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe"))),
+				Amount:               mock.MinValidatorAccountAmount(protocolParamsDocker),
+				IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0xc9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe")))),
+				ExpirySlot:           iotago.MaxSlotIndex,
+				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				StakingEndEpoch:      iotago.MaxEpochIndex,
 				FixedCost:            1,
 				StakedAmount:         mock.MinValidatorAccountAmount(protocolParamsDocker),
@@ -121,7 +142,7 @@ var (
 				Amount:               mock.MinIssuerAccountAmount(protocolParamsDocker),
 				IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x997be92a22b1933f36e26fba5f721756f95811d6b4ae21564197c2bfa4f28270")))),
 				ExpirySlot:           iotago.MaxSlotIndex,
-				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				Mana:                 iotago.Mana(mock.MinIssuerAccountAmount(protocolParamsDocker)),
 			},
 		),
@@ -161,7 +182,7 @@ var (
 				Amount:               mock.MinValidatorAccountAmount(protocolParamsFeature),
 				IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x01fb6b9db5d96240aef00bc950d1c67a6494513f6d7cf784e57b4972b96ab2fe")))),
 				ExpirySlot:           iotago.MaxSlotIndex,
-				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				StakingEndEpoch:      iotago.MaxEpochIndex,
 				FixedCost:            1,
 				StakedAmount:         mock.MinValidatorAccountAmount(protocolParamsFeature),
@@ -181,7 +202,7 @@ var (
 				Amount:               mock.MinValidatorAccountAmount(protocolParamsFeature),
 				IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x83e7f71a440afd48981a8b4684ddae24434b7182ce5c47cfb56ac528525fd4b6")))),
 				ExpirySlot:           iotago.MaxSlotIndex,
-				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				StakingEndEpoch:      iotago.MaxEpochIndex,
 				FixedCost:            1,
 				StakedAmount:         mock.MinValidatorAccountAmount(protocolParamsFeature),
@@ -201,7 +222,28 @@ var (
 				Amount:               mock.MinValidatorAccountAmount(protocolParamsFeature),
 				IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0xac628986b2ef52a1679f2289fcd7b4198476976dea4c30ae34ff04ae52e14805")))),
 				ExpirySlot:           iotago.MaxSlotIndex,
-				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
+				StakingEndEpoch:      iotago.MaxEpochIndex,
+				FixedCost:            1,
+				StakedAmount:         mock.MinValidatorAccountAmount(protocolParamsFeature),
+				Mana:                 iotago.Mana(mock.MinValidatorAccountAmount(protocolParamsFeature)),
+			},
+			snapshotcreator.AccountDetails{
+				/*
+					node-04-validator
+
+					Ed25519 Public Key:   c9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe
+					Private Key: 5cceed8ca18146639330177ab4f61ab1a71e2d3fea3d4389f9e2e43f34ec8b33c9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe
+					Account Address:      rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw
+					Ed25519 Address:      rms1qr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvts0unx0s
+					Restricted Address:   rms1xqyvnn4vxlffx92627pcr2338mn5ahar43e7aycdq32kf2h8wu0gllspqgz9eyua, Capabilities: mana
+				*/
+				AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex("0xc9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe"))),
+				Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex("0xc9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe"))),
+				Amount:               mock.MinValidatorAccountAmount(protocolParamsFeature),
+				IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0xc9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe")))),
+				ExpirySlot:           iotago.MaxSlotIndex,
+				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				StakingEndEpoch:      iotago.MaxEpochIndex,
 				FixedCost:            1,
 				StakedAmount:         mock.MinValidatorAccountAmount(protocolParamsFeature),
@@ -221,7 +263,7 @@ var (
 				Amount:               mock.MinIssuerAccountAmount(protocolParamsFeature),
 				IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex("0x670a1a20ddb02a6cec53ec3196bc7d5bd26df2f5a6ca90b5fffd71364f104b25")))),
 				ExpirySlot:           iotago.MaxSlotIndex,
-				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
+				BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 5,
 				Mana:                 iotago.Mana(mock.MinIssuerAccountAmount(protocolParamsFeature)),
 			},
 		),
