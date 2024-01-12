@@ -43,7 +43,7 @@ type Ledger struct {
 	commitmentLoader         func(iotago.SlotIndex) (*model.Commitment, error)
 	memPool                  mempool.MemPool[ledger.BlockVoteRank]
 	spendDAG                 spenddag.SpendDAG[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank]
-	retainTransactionFailure func(iotago.BlockID, error)
+	retainTransactionFailure func(iotago.TransactionID, error)
 	errorHandler             func(error)
 
 	module.Module
@@ -115,7 +115,7 @@ func New(
 	}
 }
 
-func (l *Ledger) setRetainTransactionFailureFunc(retainTransactionFailure func(iotago.BlockID, error)) {
+func (l *Ledger) setRetainTransactionFailureFunc(retainTransactionFailure func(iotago.TransactionID, error)) {
 	l.retainTransactionFailure = retainTransactionFailure
 }
 
@@ -127,7 +127,13 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (attachedTransaction mem
 	if signedTransaction, hasTransaction := block.SignedTransaction(); hasTransaction {
 		signedTransactionMetadata, err := l.memPool.AttachSignedTransaction(signedTransaction, signedTransaction.Transaction, block.ID())
 		if err != nil {
-			l.retainTransactionFailure(block.ID(), err)
+			transactionID, txIDErr := signedTransaction.Transaction.ID()
+			if txIDErr != nil {
+				l.errorHandler(err)
+				return nil, true
+			}
+
+			l.retainTransactionFailure(transactionID, err)
 			l.errorHandler(err)
 
 			return nil, true

@@ -29,7 +29,7 @@ type Booker struct {
 	ledger ledger.Ledger
 
 	loadBlockFromStorage func(id iotago.BlockID) (*model.Block, bool)
-	retainBlockFailure   func(id iotago.BlockID, reason api.BlockFailureReason)
+	retainBlockFailure   func(blockID iotago.BlockID, reason api.BlockFailureReason, transactionID ...iotago.TransactionID)
 
 	errorHandler func(error)
 	apiProvider  iotago.APIProvider
@@ -155,7 +155,7 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 	})
 }
 
-func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockID, api.BlockFailureReason)) {
+func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockID, api.BlockFailureReason, ...iotago.TransactionID)) {
 	b.retainBlockFailure = retainBlockFailure
 }
 

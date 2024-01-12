@@ -13,8 +13,8 @@ type Retainer interface {
 	RegisteredValidatorsCache(uint32) ([]*api.ValidatorResponse, bool)
 	RetainRegisteredValidatorsCache(uint32, []*api.ValidatorResponse)
 
-	RetainBlockFailure(iotago.BlockID, api.BlockFailureReason)
-	RetainTransactionFailure(iotago.BlockID, error)
+	RetainBlockFailure(iotago.BlockID, api.BlockFailureReason, ...iotago.TransactionID)
+	RetainTransactionFailure(iotago.TransactionID, error)
 
 	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset()

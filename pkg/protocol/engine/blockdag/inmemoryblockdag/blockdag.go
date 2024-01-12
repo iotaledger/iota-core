@@ -29,7 +29,7 @@ type BlockDAG struct {
 	latestCommitmentFunc  func() *model.Commitment
 	uncommittedSlotBlocks *buffer.UnsolidCommitmentBuffer[*blocks.Block]
 
-	retainBlockFailure func(blockID iotago.BlockID, failureReason api.BlockFailureReason)
+	retainBlockFailure func(blockID iotago.BlockID, failureReason api.BlockFailureReason, txID ...iotago.TransactionID)
 
 	blockCache *blocks.Blocks
 
@@ -159,7 +159,7 @@ func (b *BlockDAG) Shutdown() {
 	b.workers.Shutdown()
 }
 
-func (b *BlockDAG) setRetainBlockFailureFunc(retainBlockFailure func(blockID iotago.BlockID, failureReason api.BlockFailureReason)) {
+func (b *BlockDAG) setRetainBlockFailureFunc(retainBlockFailure func(blockID iotago.BlockID, failureReason api.BlockFailureReason, transactionID ...iotago.TransactionID)) {
 	b.retainBlockFailure = retainBlockFailure
 }
 
