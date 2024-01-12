@@ -18,16 +18,16 @@ import (
 
 type (
 	//nolint:revive
-	RetainerFunc            func(iotago.SlotIndex) (*slotstore.Retainer, error)
+	StoreFunc               func(iotago.SlotIndex) (*slotstore.Retainer, error)
 	LatestCommittedSlotFunc func() iotago.SlotIndex
 	FinalizedSlotFunc       func() iotago.SlotIndex
 )
 
-const MaxStakersResponsesCacheNum = 10
+const maxStakersResponsesCacheNum = 10
 
 // Retainer keeps and resolves all the information needed in the API and INX.
 type Retainer struct {
-	store                   RetainerFunc
+	store                   StoreFunc
 	latestCommittedSlotFunc LatestCommittedSlotFunc
 	finalizedSlotFunc       FinalizedSlotFunc
 	errorHandler            func(error)
@@ -39,10 +39,10 @@ type Retainer struct {
 	module.Module
 }
 
-func New(workersGroup *workerpool.Group, retainerFunc RetainerFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
+func New(workersGroup *workerpool.Group, retainerStoreFunc StoreFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
 	return &Retainer{
 		workerPool:              workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
-		store:                   retainerFunc,
+		store:                   retainerStoreFunc,
 		stakersResponses:        shrinkingmap.New[uint32, []*api.ValidatorResponse](),
 		latestCommittedSlotFunc: latestCommittedSlotFunc,
 		finalizedSlotFunc:       finalizedSlotFunc,
@@ -203,7 +203,7 @@ func (r *Retainer) RegisteredValidatorsCache(index uint32) ([]*api.ValidatorResp
 
 func (r *Retainer) RetainRegisteredValidatorsCache(index uint32, resp []*api.ValidatorResponse) {
 	r.stakersResponses.Set(index, resp)
-	if r.stakersResponses.Size() > MaxStakersResponsesCacheNum {
+	if r.stakersResponses.Size() > maxStakersResponsesCacheNum {
 		keys := r.stakersResponses.Keys()
 		minKey := index + 1
 		for _, key := range keys {
