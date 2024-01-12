@@ -7,8 +7,6 @@ import (
 )
 
 type ChainWeights struct {
-	LatestSlot reactive.Variable[iotago.SlotIndex]
-
 	WeightReference reactive.Variable[iotago.SlotIndex]
 
 	Claimed *shrinkingmap.ShrinkingMap[iotago.SlotIndex, reactive.SortedSet[*Commitment]]
@@ -22,16 +20,11 @@ type ChainWeights struct {
 
 func NewChainWeights() *ChainWeights {
 	c := &ChainWeights{
-		LatestSlot:      reactive.NewVariable[iotago.SlotIndex](increasing[iotago.SlotIndex]),
 		WeightReference: reactive.NewVariable[iotago.SlotIndex](increasing[iotago.SlotIndex]),
 		Claimed:         shrinkingmap.New[iotago.SlotIndex, reactive.SortedSet[*Commitment]](),
 		Attested:        shrinkingmap.New[iotago.SlotIndex, reactive.SortedSet[*Commitment]](),
 		Verified:        shrinkingmap.New[iotago.SlotIndex, reactive.SortedSet[*Commitment]](),
 	}
-
-	c.WeightReference.DeriveValueFrom(reactive.NewDerivedVariable(func(_ iotago.SlotIndex, latestSlot iotago.SlotIndex) iotago.SlotIndex {
-		return latestSlot - 1
-	}, c.LatestSlot))
 
 	return c
 }
@@ -43,8 +36,8 @@ func (c *ChainWeights) Track(chain *Chain) (teardown func()) {
 			c.weightedCommitments(c.Attested, targetSlot).Add(latestCommitment)
 			c.weightedCommitments(c.Verified, targetSlot).Add(latestCommitment)
 
-			c.LatestSlot.Compute(func(currentValue iotago.SlotIndex) iotago.SlotIndex {
-				return max(currentValue, targetSlot)
+			c.WeightReference.Compute(func(currentValue iotago.SlotIndex) iotago.SlotIndex {
+				return max(currentValue, targetSlot-1)
 			})
 		}
 	})
