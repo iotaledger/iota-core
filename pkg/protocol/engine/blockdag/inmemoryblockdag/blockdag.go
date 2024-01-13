@@ -29,7 +29,7 @@ type BlockDAG struct {
 	latestCommitmentFunc  func() *model.Commitment
 	uncommittedSlotBlocks *buffer.UnsolidCommitmentBuffer[*blocks.Block]
 
-	retainBlockFailure func(blockID iotago.BlockID, failureReason api.BlockFailureReason, txID ...iotago.TransactionID)
+	retainBlockFailure func(block *model.Block, failureReason api.BlockFailureReason)
 
 	blockCache *blocks.Blocks
 
@@ -58,7 +58,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 				}
 			}, event.WithWorkerPool(wp))
 
-			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
+			b.setRetainBlockFailureFunc(e.Retainer.RetainModelBlockFailure)
 			b.latestCommitmentFunc = e.Storage.Settings().LatestCommitment
 
 			e.Events.BlockDAG.LinkTo(b.events)
@@ -159,7 +159,7 @@ func (b *BlockDAG) Shutdown() {
 	b.workers.Shutdown()
 }
 
-func (b *BlockDAG) setRetainBlockFailureFunc(retainBlockFailure func(blockID iotago.BlockID, failureReason api.BlockFailureReason, transactionID ...iotago.TransactionID)) {
+func (b *BlockDAG) setRetainBlockFailureFunc(retainBlockFailure func(block *model.Block, failureReason api.BlockFailureReason)) {
 	b.retainBlockFailure = retainBlockFailure
 }
 
@@ -174,7 +174,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	block, evicted, updated := b.blockCache.StoreOrUpdate(data)
 
 	if evicted {
-		b.retainBlockFailure(data.ID(), api.BlockFailureIsTooOld)
+		b.retainBlockFailure(data, api.BlockFailureIsTooOld)
 		return block, false, ierrors.New("cannot attach, block is too old, it was already evicted from the cache")
 	}
 
@@ -192,7 +192,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 // canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
 func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
 	if b.evictionState.InActiveRootBlockRange(data.ID()) && !b.evictionState.IsActiveRootBlock(data.ID()) {
-		b.retainBlockFailure(data.ID(), api.BlockFailureIsTooOld)
+		b.retainBlockFailure(data, api.BlockFailureIsTooOld)
 		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().Header.IssuingTime)
 	}
 
@@ -219,7 +219,7 @@ func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error
 func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid bool, err error) {
 	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
 		if b.evictionState.InActiveRootBlockRange(parentID) && !b.evictionState.IsActiveRootBlock(parentID) {
-			b.retainBlockFailure(modelBlock.ID(), api.BlockFailureParentIsTooOld)
+			b.retainBlockFailure(modelBlock, api.BlockFailureParentIsTooOld)
 			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
 		}
 	}

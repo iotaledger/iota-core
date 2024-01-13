@@ -29,7 +29,7 @@ type Booker struct {
 	ledger ledger.Ledger
 
 	loadBlockFromStorage func(id iotago.BlockID) (*model.Block, bool)
-	retainBlockFailure   func(blockID iotago.BlockID, reason api.BlockFailureReason, transactionID ...iotago.TransactionID)
+	retainBlockFailure   func(block *blocks.Block, reason api.BlockFailureReason)
 
 	errorHandler func(error)
 	apiProvider  iotago.APIProvider
@@ -94,7 +94,7 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	}
 
 	if signedTransactionMetadata == nil {
-		b.retainBlockFailure(block.ID(), api.BlockFailurePayloadInvalid)
+		b.retainBlockFailure(block, api.BlockFailurePayloadInvalid)
 
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
@@ -155,7 +155,7 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 	})
 }
 
-func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(iotago.BlockID, api.BlockFailureReason, ...iotago.TransactionID)) {
+func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(*blocks.Block, api.BlockFailureReason)) {
 	b.retainBlockFailure = retainBlockFailure
 }
 
@@ -194,7 +194,7 @@ func (b *Booker) inheritSpenders(block *blocks.Block) (spenderIDs ds.Set[iotago.
 	for _, parent := range block.ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
-			b.retainBlockFailure(block.ID(), api.BlockFailureParentNotFound)
+			b.retainBlockFailure(block, api.BlockFailureParentNotFound)
 
 			return nil, ierrors.Errorf("parent %s does not exist", parent.ID)
 		}
