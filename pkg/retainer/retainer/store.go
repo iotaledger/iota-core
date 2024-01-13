@@ -36,7 +36,7 @@ func (m *metadataStore) storeBlockData(blockID iotago.BlockID, failureReason api
 		return err
 	}
 
-	if failureReason != api.BlockFailureNone {
+	if failureReason == api.BlockFailureNone {
 		return store.StoreBlockAttached(blockID, transactionID)
 	}
 
