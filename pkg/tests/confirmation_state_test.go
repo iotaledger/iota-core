@@ -3,7 +3,6 @@ package tests
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -59,7 +58,6 @@ func TestConfirmationFlags(t *testing.T) {
 				sybilprotectionv1.WithSeatManagerProvider(
 					topstakers.NewProvider(
 						topstakers.WithOnlineCommitteeStartup(nodeA.Validator.AccountID),
-						topstakers.WithActivityWindow(2*time.Minute),
 					),
 				),
 			),

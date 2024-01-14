@@ -400,7 +400,7 @@ func (o *SybilProtection) reuseCommittee(currentEpoch iotago.EpochIndex, targetE
 	}
 
 	committeeAccounts.SetReused()
-	if err = o.seatManager.SetCommittee(targetEpoch, committeeAccounts); err != nil {
+	if err = o.seatManager.ReuseCommittee(targetEpoch, committeeAccounts); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to set committee for epoch %d", targetEpoch)
 	}
 

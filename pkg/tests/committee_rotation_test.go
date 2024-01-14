@@ -2,7 +2,6 @@ package tests
 
 import (
 	"testing"
-	"time"
 
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -51,10 +50,7 @@ func Test_TopStakersRotation(t *testing.T) {
 		protocol.WithSybilProtectionProvider(
 			sybilprotectionv1.NewProvider(
 				sybilprotectionv1.WithSeatManagerProvider(
-					topstakers.NewProvider(
-						// We need to make sure that inactive nodes are evicted from the committee to continue acceptance.
-						topstakers.WithActivityWindow(15 * time.Second),
-					),
+					topstakers.NewProvider(),
 				),
 			),
 		),

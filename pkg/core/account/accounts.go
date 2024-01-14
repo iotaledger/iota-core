@@ -125,8 +125,8 @@ func (a *Accounts) ForEach(callback func(id iotago.AccountID, pool *Pool) bool) 
 	a.accountPools.ForEach(callback)
 }
 
-// SelectCommittee creates a new SeatedAccounts instance, that maintains the seats of the given members.
-func (a *Accounts) SelectCommittee(members ...iotago.AccountID) *SeatedAccounts {
+// SeatedAccounts creates a new SeatedAccounts instance, that maintains the seats of the given members.
+func (a *Accounts) SeatedAccounts(members ...iotago.AccountID) *SeatedAccounts {
 	return NewSeatedAccounts(a, members...)
 }
 

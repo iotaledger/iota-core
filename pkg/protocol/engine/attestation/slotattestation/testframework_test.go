@@ -66,7 +66,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 			members = append(members, issuer.accountID)
 			return true
 		})
-		return accounts.SelectCommittee(members...), true
+		return accounts.SeatedAccounts(members...), true
 	}
 
 	t.testAPI = iotago.V3API(
