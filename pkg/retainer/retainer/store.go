@@ -101,7 +101,7 @@ func (m *metadataStore) moveTransactionMetadataToTheLatestAttachmentSlot(txID io
 	return nil
 }
 
-func (m *metadataStore) moveTransactionData(txID iotago.TransactionID, prevSlot, newSlot iotago.SlotIndex) (bool, error) {
+func (m *metadataStore) moveTransactionData(txID iotago.TransactionID, prevSlot iotago.SlotIndex, newSlot iotago.SlotIndex) (bool, error) {
 	store, err := m.store(prevSlot)
 	if err != nil {
 		return false, ierrors.Wrapf(err, "could not get retainer store for slot %d", prevSlot)
