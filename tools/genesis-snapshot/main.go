@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strings"
 
 	"github.com/mr-tron/base58"
 	flag "github.com/spf13/pflag"
@@ -16,13 +17,21 @@ import (
 func main() {
 	parsedOpts, configSelected := parseFlags()
 	opts := presets.Base
-	switch configSelected {
-	case "docker":
-		opts = append(opts, presets.Docker...)
-	case "feature":
-		opts = append(opts, presets.Feature...)
-	default:
-		configSelected = "default"
+	if strings.Contains(configSelected, ".yml") {
+		if yamlOpts, err := presets.GenerateFromYaml(configSelected); err != nil {
+			panic(err)
+		} else {
+			opts = append(opts, yamlOpts...)
+		}
+	} else {
+		switch configSelected {
+		case "docker":
+			opts = append(opts, presets.Docker...)
+		case "feature":
+			opts = append(opts, presets.Feature...)
+		default:
+			configSelected = "default"
+		}
 	}
 	opts = append(opts, parsedOpts...)
 	info := snapshotcreator.NewOptions(opts...)

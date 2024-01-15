@@ -113,6 +113,14 @@ func (b *Booker) Queue(block *blocks.Block) error {
 			block.SetPayloadSpenderIDs(transactionMetadata.SpenderIDs())
 			b.setupBlock(block)
 		})
+
+		transactionMetadata.OnInvalid(func(err error) {
+			b.setupBlock(block)
+		})
+	})
+
+	signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
+		b.setupBlock(block)
 	})
 
 	return nil
