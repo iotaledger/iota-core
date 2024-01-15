@@ -240,7 +240,7 @@ func (t *TransactionMetadata) AllInputsAccepted() bool {
 
 func (t *TransactionMetadata) setConflictAccepted() {
 	if t.conflictAccepted.Trigger() {
-		if t.AllInputsAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
+		if t.invalid.Get() == nil && t.AllInputsAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
 			t.accepted.Set(true)
 		}
 	}
@@ -256,7 +256,7 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 	input.OnAccepted(func() {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
-				if t.IsConflictAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
+				if t.invalid.Get() == nil && t.IsConflictAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
 					t.accepted.Set(true)
 				}
 			}
@@ -300,9 +300,12 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 		}
 	})
 
-	t.OnEarliestIncludedAttachmentUpdated(func(previousIndex iotago.BlockID, newIndex iotago.BlockID) {
-		if isIncluded, wasIncluded := newIndex.Slot() != 0, previousIndex.Slot() != 0; isIncluded != wasIncluded {
-			t.accepted.Set(isIncluded && t.AllInputsAccepted() && t.IsConflictAccepted())
+	t.OnEarliestIncludedAttachmentUpdated(func(previousBlockID iotago.BlockID, newBlockID iotago.BlockID) {
+		if previousBlockID.Empty() && !newBlockID.Empty() {
+			if t.invalid.Get() != nil || !t.IsConflictAccepted() || !t.AllInputsAccepted() {
+				return
+			}
+			t.accepted.Set(true)
 		}
 	})
 

@@ -9,6 +9,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -47,8 +48,8 @@ func (o *Output) StateID() iotago.Identifier {
 	return iotago.IdentifierFromData(lo.PanicOnErr(o.outputID.Bytes()))
 }
 
-func (o *Output) Type() iotago.StateType {
-	return iotago.InputUTXO
+func (o *Output) Type() mempool.StateType {
+	return mempool.StateTypeUTXOInput
 }
 
 func (o *Output) IsReadOnly() bool {

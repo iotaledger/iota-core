@@ -67,9 +67,7 @@ func newHeaviestCandidate(weightVariable func(element *Commitment) reactive.Vari
 		Variable:                  reactive.NewVariable[*Chain](),
 		weightedCommitmentsBySlot: shrinkingmap.New[iotago.SlotIndex, reactive.SortedSet[*Commitment]](),
 		sortedSetFactory: func() reactive.SortedSet[*Commitment] {
-			return reactive.NewSortedSet(weightVariable, func(left, right *Commitment) int {
-				return left.Chain.Get().winsTieBreak(right.Chain.Get())
-			})
+			return reactive.NewSortedSet(weightVariable)
 		},
 	}
 }

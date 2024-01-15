@@ -108,11 +108,11 @@ func TestAccounts(t *testing.T) {
 	// check "SelectCommittee"
 
 	// get 1 issuer
-	seated := accounts.SelectCommittee(accountIDs[0])
+	seated := accounts.SeatedAccounts(accountIDs[0])
 	require.Equal(t, 1, seated.SeatCount())
 
 	// get all issuers
-	seated = accounts.SelectCommittee(accountIDs...)
+	seated = accounts.SeatedAccounts(accountIDs...)
 	require.Equal(t, len(accountIDs), seated.SeatCount())
 
 	/*

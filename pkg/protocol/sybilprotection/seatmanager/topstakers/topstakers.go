@@ -31,7 +31,6 @@ type SeatManager struct {
 	committeeMutex  syncutils.RWMutex
 	activityTracker activitytracker.ActivityTracker
 
-	optsActivityWindow         time.Duration
 	optsOnlineCommitteeStartup []iotago.AccountID
 
 	module.Module
@@ -45,10 +44,8 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 				apiProvider:    e,
 				events:         seatmanager.NewEvents(),
 				committeeStore: e.Storage.Committee(),
-
-				optsActivityWindow: time.Second * 30,
 			}, opts, func(s *SeatManager) {
-				activityTracker := activitytrackerv1.NewActivityTracker(s.optsActivityWindow)
+				activityTracker := activitytrackerv1.NewActivityTracker(e)
 				s.activityTracker = activityTracker
 				s.events.OnlineCommitteeSeatAdded.LinkTo(activityTracker.Events.OnlineCommitteeSeatAdded)
 				s.events.OnlineCommitteeSeatRemoved.LinkTo(activityTracker.Events.OnlineCommitteeSeatRemoved)
@@ -132,7 +129,7 @@ func (s *SeatManager) committeeInEpoch(epoch iotago.EpochIndex) (*account.Seated
 		return nil, false
 	}
 
-	return c.SelectCommittee(c.IDs()...), true
+	return c.SeatedAccounts(c.IDs()...), true
 }
 
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
@@ -171,7 +168,7 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 		return ierrors.Wrapf(err, "failed to load PoA committee for epoch %d", epoch)
 	}
 
-	committee := committeeAccounts.SelectCommittee(committeeAccounts.IDs()...)
+	committee := committeeAccounts.SeatedAccounts(committeeAccounts.IDs()...)
 
 	onlineValidators := committeeAccounts.IDs()
 	if len(s.optsOnlineCommitteeStartup) > 0 {
@@ -191,7 +188,7 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 	return nil
 }
 
-func (s *SeatManager) SetCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
+func (s *SeatManager) ReuseCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
@@ -249,7 +246,7 @@ func (s *SeatManager) selectNewCommittee(epoch iotago.EpochIndex, candidates acc
 			return nil, ierrors.Wrapf(err, "error while setting pool for committee candidate %s", candidateData.ID.String())
 		}
 	}
-	committee := newCommitteeAccounts.SelectCommittee(newCommitteeAccounts.IDs()...)
+	committee := newCommitteeAccounts.SeatedAccounts(newCommitteeAccounts.IDs()...)
 
 	return committee, nil
 }

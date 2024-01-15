@@ -21,7 +21,7 @@ type AccountsTestFramework struct {
 func NewAccountsTestFramework(test *testing.T, instance *account.Accounts) *AccountsTestFramework {
 	return &AccountsTestFramework{
 		Instance:  instance,
-		Committee: instance.SelectCommittee(),
+		Committee: instance.SeatedAccounts(),
 
 		test:              test,
 		identitiesByAlias: make(map[string]iotago.AccountID),

@@ -30,8 +30,8 @@ type TestSuite struct {
 
 	api iotago.API
 
-	Instance             *Tracker
-	perforanceFactorFunc func(iotago.SlotIndex) *model.ValidatorPerformance
+	Instance              *Tracker
+	performanceFactorFunc func(iotago.SlotIndex) *model.ValidatorPerformance
 }
 
 func NewTestSuite(t *testing.T) *TestSuite {
@@ -44,7 +44,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 			iotago.NewV3SnapshotProtocolParameters(
 				iotago.WithTimeProviderOptions(0, time.Now().Unix(), 10, 3),
 				iotago.WithLivenessOptions(5, 5, 1, 2, 3),
-				iotago.WithRewardsOptions(8, 8, 11, 2, 1),
+				iotago.WithRewardsOptions(8, 8, 11, 2, 1, 5),
 			),
 		),
 	}
@@ -70,10 +70,12 @@ func (t *TestSuite) InitPerformanceTracker() {
 		return p, nil
 	}
 
-	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), 0)
-	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
-	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), 0, (*account.Accounts).Bytes, account.AccountsFromBytes)
-	committeeCandidatesStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), 0)
+	pruningDelayFunc := func(_ iotago.EpochIndex) iotago.EpochIndex { return 0 }
+
+	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc)
+	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
+	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc, (*account.Accounts).Bytes, account.AccountsFromBytes)
+	committeeCandidatesStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc)
 
 	t.Instance = NewTracker(
 		rewardsStore.GetEpoch,
@@ -153,11 +155,14 @@ func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[strin
 	for alias, action := range actions {
 		epochPerformanceFactor := action.SlotPerformance * action.ActiveSlotsCount >> t.api.ProtocolParameters().SlotsPerEpochExponent()
 		poolRewards := t.calculatePoolReward(epoch, totalValidatorsStake, totalStake, action.PoolStake, action.ValidatorStake, epochPerformanceFactor)
+		poolRewardsFloat := t.calculatePoolRewardFloat(epoch, totalValidatorsStake, totalStake, action.PoolStake, action.ValidatorStake, epochPerformanceFactor)
 		t.poolRewards[epoch][alias] = &model.PoolRewards{
 			PoolStake:   action.PoolStake,
 			PoolRewards: iotago.Mana(poolRewards),
 			FixedCost:   action.FixedCost,
 		}
+
+		require.InEpsilon(t.T, poolRewards, poolRewardsFloat, 0.01)
 	}
 }
 
@@ -170,8 +175,9 @@ func (t *TestSuite) AssertEpochRewards(epoch iotago.EpochIndex, actions map[stri
 		actualValidatorReward, _, _, err := t.Instance.ValidatorReward(accountID,
 			&iotago.StakingFeature{
 				StakedAmount: actions[alias].ValidatorStake,
-				StartEpoch:   epoch,
-				EndEpoch:     epoch,
+				// Start Epoch of the Validator would have been before `epoch`.
+				StartEpoch: epoch - 1,
+				EndEpoch:   epoch,
 			},
 			epoch)
 		require.NoError(t.T, err)
@@ -281,12 +287,27 @@ func (t *TestSuite) calculatePoolReward(epoch iotago.EpochIndex, totalValidators
 	params := t.api.ProtocolParameters()
 	targetReward, err := params.RewardsParameters().TargetReward(epoch, t.api)
 	require.NoError(t.T, err)
-
 	poolCoefficient := t.calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorsStake)
 	scaledPoolReward := poolCoefficient * uint64(targetReward) * performanceFactor
 	poolRewardNoFixedCost := scaledPoolReward / uint64(params.ValidationBlocksPerSlot()) >> (params.RewardsParameters().PoolCoefficientExponent + 1)
 
 	return poolRewardNoFixedCost
+}
+
+func (t *TestSuite) calculatePoolRewardFloat(epoch iotago.EpochIndex, totalValidatorsStake, totalStake, poolStake, validatorStake iotago.BaseToken, performanceFactor uint64) float64 {
+	params := t.api.ProtocolParameters()
+	totalValidatorsStakeFloat := float64(totalValidatorsStake)
+	totalStakeFloat := float64(totalStake)
+	poolStakeFloat := float64(poolStake)
+	validatorStakeFloat := float64(validatorStake)
+	performanceFactorFloat := float64(performanceFactor) / float64(params.ValidationBlocksPerSlot())
+
+	targetReward, _ := params.RewardsParameters().TargetReward(epoch, t.api)
+	targetRewardFloat := float64(targetReward)
+
+	poolCoefficientFloat := (poolStakeFloat/totalStakeFloat + validatorStakeFloat/totalValidatorsStakeFloat) / 2.0
+	PoolRewardFloat := poolCoefficientFloat * targetRewardFloat * performanceFactorFloat
+	return PoolRewardFloat
 }
 
 func (t *TestSuite) calculatePoolCoefficient(poolStake, totalStake, validatorStake, totalValidatorStake iotago.BaseToken) uint64 {
@@ -364,8 +385,9 @@ func (t *TestSuite) AssertValidatorRewardGreaterThan(alias1 string, alias2 strin
 	actualValidatorReward1, _, _, err := t.Instance.ValidatorReward(accID1,
 		&iotago.StakingFeature{
 			StakedAmount: actions[alias1].ValidatorStake,
-			StartEpoch:   epoch,
-			EndEpoch:     epoch,
+			// Start Epoch of the Validator would have been before `epoch`.
+			StartEpoch: epoch - 1,
+			EndEpoch:   epoch,
 		},
 		epoch)
 	require.NoError(t.T, err)
@@ -374,8 +396,9 @@ func (t *TestSuite) AssertValidatorRewardGreaterThan(alias1 string, alias2 strin
 	actualValidatorReward2, _, _, err := t.Instance.ValidatorReward(accID2,
 		&iotago.StakingFeature{
 			StakedAmount: actions[alias2].ValidatorStake,
-			StartEpoch:   epoch,
-			EndEpoch:     epoch,
+			// Start Epoch of the Validator would have been before `epoch`.
+			StartEpoch: epoch - 1,
+			EndEpoch:   epoch,
 		},
 		epoch)
 	require.NoError(t.T, err)
@@ -392,7 +415,7 @@ type EpochActions struct {
 	ActiveSlotsCount uint64
 	// ValidationBlocksSentPerSlot is the number of validation blocks validator sent per slot.
 	ValidationBlocksSentPerSlot uint64
-	// SlotPerformance is the target slot performance factor, how many subslots were covered by validator blocks.
+	// SlotPerformance is the target slot performance factor, how many subslots were covered by validation blocks.
 	SlotPerformance uint64
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/builder"
 )
 
 func Test_IssuingTransactionsOutOfOrder(t *testing.T) {
@@ -120,7 +121,7 @@ func Test_WeightPropagation(t *testing.T) {
 		ts.AssertBlocksInCachePreAccepted(ts.Blocks("block3-basic", "block4-basic", "block5-basic", "block6-basic"), false, ts.Nodes()...)
 	}
 
-	// Issue validator blocks that are subjectively invalid, but accept the basic blocks.
+	// Issue validation blocks that are subjectively invalid, but accept the basic blocks.
 	// Make sure that the pre-accepted basic blocks do not apply approval weight - the conflicts should remain unresolved.
 	// If basic blocks carry approval or witness weight, then the test will fail.
 	{
@@ -829,4 +830,52 @@ func Test_RootBlockShallowLike(t *testing.T) {
 	ts.IssueBasicBlockWithOptions("block-shallow-like-invalid", wallet, &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("4.1-node1")), mock.WithShallowLikeParents(ts.BlockID("block2")), mock.WithIssuingTime(ts.API.TimeProvider().SlotStartTime(5)))
 	ts.AssertBlocksInCacheBooked(ts.Blocks("block-shallow-like-invalid"), false, node1)
 	ts.AssertBlocksInCacheInvalid(ts.Blocks("block-shallow-like-invalid"), true, node1)
+}
+
+func Test_BlockWithInvalidTransactionGetsBooked(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				13,
+			),
+		),
+	)
+
+	node1 := ts.AddValidatorNode("node1")
+	ts.AddNode("node2")
+	ts.AddDefaultWallet(node1)
+
+	ts.Run(true)
+	defer ts.Shutdown()
+
+	// CREATE NFT FROM BASIC UTXO
+	var block1Slot iotago.SlotIndex = ts.API.ProtocolParameters().GenesisSlot() + 1
+	ts.SetCurrentSlot(block1Slot)
+
+	tx1 := ts.DefaultWallet().CreateNFTFromInput("TX1", "Genesis:0",
+		func(nftBuilder *builder.NFTOutputBuilder) {
+			// Set an issuer ID that is not unlocked in the TX which will cause the TX to be invalid.
+			nftBuilder.ImmutableIssuer(&iotago.Ed25519Address{})
+		},
+	)
+	block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1)
+
+	vblock1 := ts.IssueValidationBlockWithHeaderOptions("vblock1", ts.DefaultWallet().Node, mock.WithWeakParents(block1.ID()), mock.WithStrongParents(ts.Block("Genesis").ID()))
+	vblock2 := ts.IssueValidationBlockWithHeaderOptions("vblock2", ts.DefaultWallet().Node, mock.WithStrongParents(vblock1.ID()))
+	vblock3 := ts.IssueValidationBlockWithHeaderOptions("vblock3", ts.DefaultWallet().Node, mock.WithStrongParents(vblock2.ID()))
+
+	ts.AssertBlocksInCacheAccepted(ts.Blocks("block1"), true, ts.Nodes()...)
+	ts.AssertBlocksInCacheConfirmed(ts.Blocks("block1"), true, ts.Nodes()...)
+
+	ts.AssertTransactionsExist([]*iotago.Transaction{tx1.Transaction}, true, ts.Nodes()...)
+	ts.AssertTransactionFailure(lo.PanicOnErr(tx1.ID()), iotago.ErrIssuerFeatureNotUnlocked, ts.Nodes()...)
+	ts.AssertTransactionsInCacheAccepted([]*iotago.Transaction{tx1.Transaction}, false, ts.Nodes()...)
+
+	ts.CommitUntilSlot(block1Slot, vblock3.ID())
+
+	ts.AssertStorageCommitmentBlockAccepted(block1Slot, block1.ID(), true, ts.Nodes()...)
+	ts.AssertStorageCommitmentTransactionAccepted(block1Slot, lo.PanicOnErr(tx1.Transaction.ID()), false, ts.Nodes()...)
 }

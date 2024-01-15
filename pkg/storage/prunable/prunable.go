@@ -35,6 +35,10 @@ func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler 
 	// openedCallback is nil because we don't need to do anything when reopening the store.
 	semiPermanentDB := database.NewDBInstance(semiPermanentDBConfig, nil)
 
+	rewardPruningDelayFunc := func(epochToPrune iotago.EpochIndex) iotago.EpochIndex {
+		return iotago.EpochIndex(apiProvider.APIForEpoch(epochToPrune).ProtocolParameters().RewardsParameters().RetentionPeriod)
+	}
+
 	return &Prunable{
 		apiProvider:       apiProvider,
 		errorHandler:      errorHandler,
@@ -42,10 +46,32 @@ func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler 
 
 		semiPermanentDBConfig: semiPermanentDBConfig,
 		semiPermanentDB:       semiPermanentDB,
-		decidedUpgradeSignals: epochstore.NewStore(kvstore.Realm{epochPrefixDecidedUpgradeSignals}, semiPermanentDB.KVStore(), pruningDelayDecidedUpgradeSignals, model.VersionAndHash.Bytes, model.VersionAndHashFromBytes),
-		poolRewards:           epochstore.NewEpochKVStore(kvstore.Realm{epochPrefixPoolRewards}, semiPermanentDB.KVStore(), pruningDelayPoolRewards),
-		poolStats:             epochstore.NewStore(kvstore.Realm{epochPrefixPoolStats}, semiPermanentDB.KVStore(), pruningDelayPoolStats, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes),
-		committee:             epochstore.NewStore(kvstore.Realm{epochPrefixCommittee}, semiPermanentDB.KVStore(), pruningDelayCommittee, (*account.Accounts).Bytes, account.AccountsFromBytes),
+		decidedUpgradeSignals: epochstore.NewStore(
+			kvstore.Realm{epochPrefixDecidedUpgradeSignals},
+			semiPermanentDB.KVStore(),
+			func(_ iotago.EpochIndex) iotago.EpochIndex { return pruningDelayDecidedUpgradeSignals },
+			model.VersionAndHash.Bytes,
+			model.VersionAndHashFromBytes,
+		),
+		poolRewards: epochstore.NewEpochKVStore(
+			kvstore.Realm{epochPrefixPoolRewards},
+			semiPermanentDB.KVStore(),
+			rewardPruningDelayFunc,
+		),
+		poolStats: epochstore.NewStore(
+			kvstore.Realm{epochPrefixPoolStats},
+			semiPermanentDB.KVStore(),
+			rewardPruningDelayFunc,
+			(*model.PoolsStats).Bytes,
+			model.PoolsStatsFromBytes,
+		),
+		committee: epochstore.NewStore(
+			kvstore.Realm{epochPrefixCommittee},
+			semiPermanentDB.KVStore(),
+			rewardPruningDelayFunc,
+			(*account.Accounts).Bytes,
+			account.AccountsFromBytes,
+		),
 	}
 }
 

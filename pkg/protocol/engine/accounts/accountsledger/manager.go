@@ -83,7 +83,7 @@ func (m *Manager) SetLatestCommittedSlot(slot iotago.SlotIndex) {
 	m.latestCommittedSlot = slot
 }
 
-// TrackBlock adds the block to the blockBurns set to deduct the burn from credits upon slot commitment and updates latest supported version of a validator block.
+// TrackBlock adds the block to the blockBurns set to deduct the burn from credits upon slot commitment and updates latest supported version of a validation block.
 func (m *Manager) TrackBlock(block *blocks.Block) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()

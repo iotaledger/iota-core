@@ -40,7 +40,7 @@ func NewManualPOA(e iotago.APIProvider, committeeStore *epochstore.Store[*accoun
 		online:         ds.NewSet[account.SeatIndex](),
 		aliases:        shrinkingmap.New[string, iotago.AccountID](),
 	}
-	m.committee = m.accounts.SelectCommittee()
+	m.committee = m.accounts.SeatedAccounts()
 
 	return m
 }
@@ -71,7 +71,7 @@ func (m *ManualPOA) AddRandomAccount(alias string) iotago.AccountID {
 
 	m.aliases.Set(alias, id)
 
-	m.committee = m.accounts.SelectCommittee(m.accounts.IDs()...)
+	m.committee = m.accounts.SeatedAccounts(m.accounts.IDs()...)
 
 	if err := m.committeeStore.Store(0, m.accounts); err != nil {
 		panic(err)
@@ -90,7 +90,7 @@ func (m *ManualPOA) AddAccount(id iotago.AccountID, alias string) iotago.Account
 	}
 	m.aliases.Set(alias, id)
 
-	m.committee = m.accounts.SelectCommittee(m.accounts.IDs()...)
+	m.committee = m.accounts.SeatedAccounts(m.accounts.IDs()...)
 
 	if err := m.committeeStore.Store(0, m.accounts); err != nil {
 		panic(err)
@@ -152,7 +152,7 @@ func (m *ManualPOA) committeeInEpoch(epoch iotago.EpochIndex) (*account.SeatedAc
 		return nil, false
 	}
 
-	return c.SelectCommittee(c.IDs()...), true
+	return c.SeatedAccounts(c.IDs()...), true
 }
 
 func (m *ManualPOA) OnlineCommittee() ds.Set[account.SeatIndex] {
@@ -179,7 +179,7 @@ func (m *ManualPOA) RotateCommittee(epoch iotago.EpochIndex, validators accounts
 				return nil, ierrors.Wrapf(err, "error while setting pool for epoch %d for validator %s", epoch, validatorData.ID.String())
 			}
 		}
-		m.committee = m.accounts.SelectCommittee(m.accounts.IDs()...)
+		m.committee = m.accounts.SeatedAccounts(m.accounts.IDs()...)
 	}
 
 	if err := m.committeeStore.Store(epoch, m.accounts); err != nil {
@@ -189,10 +189,10 @@ func (m *ManualPOA) RotateCommittee(epoch iotago.EpochIndex, validators accounts
 	return m.committee, nil
 }
 
-func (m *ManualPOA) SetCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
+func (m *ManualPOA) ReuseCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
 	if m.committee == nil || m.accounts.Size() == 0 {
 		m.accounts = validators
-		m.committee = m.accounts.SelectCommittee(validators.IDs()...)
+		m.committee = m.accounts.SeatedAccounts(validators.IDs()...)
 	}
 
 	if err := m.committeeStore.Store(epoch, validators); err != nil {

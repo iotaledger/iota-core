@@ -141,7 +141,7 @@ func newTestFramework(t *testing.T) *mempooltests.TestFramework {
 	workers := workerpool.NewGroup(t.Name())
 
 	ledgerState := ledgertests.New(ledgertests.NewMockedState(iotago.EmptyTransactionID, 0))
-	spendDAG := spenddagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SelectCommittee().SeatCount)
+	spendDAG := spenddagv1.New[iotago.TransactionID, mempool.StateID, vote.MockedRank](account.NewAccounts().SeatedAccounts().SeatCount)
 
 	mutationsFunc := func(index iotago.SlotIndex) (kvstore.KVStore, error) {
 		return mapdb.NewMapDB(), nil

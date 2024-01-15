@@ -22,17 +22,17 @@ type ActivityTracker struct {
 	lastActivityTime time.Time
 	activityMutex    syncutils.RWMutex
 
-	activityWindow time.Duration
+	apiProvider iotago.APIProvider
 }
 
-func NewActivityTracker(activityWindow time.Duration) *ActivityTracker {
+func NewActivityTracker(apiProvider iotago.APIProvider) *ActivityTracker {
 	return &ActivityTracker{
 		Events:          activitytracker.NewEvents(),
 		onlineCommittee: ds.NewSet[account.SeatIndex](),
 		inactivityQueue: timed.NewPriorityQueue[account.SeatIndex](true),
 		lastActivities:  shrinkingmap.New[account.SeatIndex, time.Time](),
 
-		activityWindow: activityWindow,
+		apiProvider: apiProvider,
 	}
 }
 
@@ -48,7 +48,10 @@ func (a *ActivityTracker) MarkSeatActive(seat account.SeatIndex, id iotago.Accou
 	a.activityMutex.Lock()
 	defer a.activityMutex.Unlock()
 
-	if lastActivity, exists := a.lastActivities.Get(seat); (exists && lastActivity.After(seatActivityTime)) || seatActivityTime.Before(a.lastActivityTime.Add(-a.activityWindow)) {
+	// activity window is given by min committable age in seconds from the protocol parameters
+	protocolParams := a.apiProvider.APIForTime(seatActivityTime).ProtocolParameters()
+	activityWindow := time.Duration(protocolParams.MinCommittableAge()*iotago.SlotIndex(protocolParams.SlotDurationInSeconds())) * time.Second
+	if lastActivity, exists := a.lastActivities.Get(seat); (exists && lastActivity.After(seatActivityTime)) || seatActivityTime.Before(a.lastActivityTime.Add(-activityWindow)) {
 		return
 	} else if !exists {
 		a.onlineCommittee.Add(seat)
@@ -65,7 +68,7 @@ func (a *ActivityTracker) MarkSeatActive(seat account.SeatIndex, id iotago.Accou
 
 	a.lastActivityTime = seatActivityTime
 
-	activityThreshold := seatActivityTime.Add(-a.activityWindow)
+	activityThreshold := seatActivityTime.Add(-activityWindow)
 	for _, inactiveSeat := range a.inactivityQueue.PopUntil(activityThreshold) {
 		if lastActivityForInactiveSeat, exists := a.lastActivities.Get(inactiveSeat); exists && lastActivityForInactiveSeat.After(activityThreshold) {
 			continue

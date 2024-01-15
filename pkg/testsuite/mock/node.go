@@ -93,11 +93,11 @@ func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition stri
 	peerID := lo.PanicOnErr(peer.IDFromPrivateKey(lo.PanicOnErr(p2pcrypto.UnmarshalEd25519PrivateKey(priv))))
 	RegisterIDAlias(peerID, name)
 
-	var validatorBlockIssuer *BlockIssuer
+	var validationBlockIssuer *BlockIssuer
 	if validator {
-		validatorBlockIssuer = NewBlockIssuer(t, name, keyManager, accountID, validator)
+		validationBlockIssuer = NewBlockIssuer(t, name, keyManager, accountID, validator)
 	} else {
-		validatorBlockIssuer = nil
+		validationBlockIssuer = nil
 	}
 
 	return &Node{
@@ -106,7 +106,7 @@ func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition stri
 
 		Name: name,
 
-		Validator:  validatorBlockIssuer,
+		Validator:  validationBlockIssuer,
 		KeyManager: keyManager,
 
 		PeerID: peerID,
@@ -292,7 +292,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		instance.LogTrace("PreSolidFilter.BlockPreFiltered", "block", event.Block.ID(), "err", event.Reason)
 
 		if failOnBlockFiltered {
-			n.Testing.Fatal("no blocks should be prefiltered")
+			n.Testing.Fatal("no blocks should be prefiltered", "block", event.Block.ID(), "err", event.Reason)
 		}
 	})
 
@@ -402,7 +402,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 	instance.Ledger.MemPool().OnSignedTransactionAttached(
 		func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
 			signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
-				instance.LogTrace("MemPool.SignedTransactionSignaturesInvalid", "tx", signedTransactionMetadata.ID(), "err", err)
+				instance.LogTrace("MemPool.SignedTransactionSignaturesInvalid", "signedTx", signedTransactionMetadata.ID(), "tx", signedTransactionMetadata.TransactionMetadata().ID(), "err", err)
 			})
 		},
 	)
@@ -537,7 +537,7 @@ func (n *Node) AttachedBlocks() []*blocks.Block {
 	return n.attachedBlocks
 }
 
-func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidatorBlockParams]) *blocks.Block {
+func (n *Node) IssueValidationBlock(ctx context.Context, alias string, opts ...options.Option[ValidationBlockParams]) *blocks.Block {
 	if n.Validator == nil {
 		panic("node is not a validator")
 	}

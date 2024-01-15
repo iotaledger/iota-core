@@ -8,9 +8,9 @@ import (
 )
 
 type ValidatorPerformance struct {
-	// works if ValidatorBlocksPerSlot is less than 32 because we use it as bit vector
+	// works if ValidationBlocksPerSlot is less than 32 because we use it as bit vector
 	SlotActivityVector uint32
-	// can be uint8 because max count per slot is maximally ValidatorBlocksPerSlot + 1
+	// can be uint8 because max count per slot is maximally ValidationBlocksPerSlot + 1
 	BlocksIssuedCount              uint8
 	HighestSupportedVersionAndHash VersionAndHash
 }

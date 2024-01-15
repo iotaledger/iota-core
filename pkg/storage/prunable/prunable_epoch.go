@@ -17,9 +17,6 @@ const (
 
 const (
 	pruningDelayDecidedUpgradeSignals = 7
-	pruningDelayPoolRewards           = 365
-	pruningDelayPoolStats             = 365
-	pruningDelayCommittee             = 365
 )
 
 func (p *Prunable) RewardsForEpoch(epoch iotago.EpochIndex) (kvstore.KVStore, error) {

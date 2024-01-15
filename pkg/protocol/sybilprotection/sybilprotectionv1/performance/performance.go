@@ -71,7 +71,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	validatorBlock, isValidationBlock := block.ValidationBlock()
+	validationBlock, isValidationBlock := block.ValidationBlock()
 	if !isValidationBlock {
 		return
 	}
@@ -86,7 +86,7 @@ func (t *Tracker) TrackValidationBlock(block *blocks.Block) {
 	}
 
 	if isCommitteeMember {
-		t.trackCommitteeMemberPerformance(validatorBlock, block)
+		t.trackCommitteeMemberPerformance(validationBlock, block)
 	}
 }
 
@@ -261,7 +261,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 			panic(ierrors.Wrapf(err, "failed to calculate pool rewards for account %s", accountID))
 		}
 
-		t.LogDebug("PerformanceFactor", "accountID", accountID, "epochPerformanceFactor", epochPerformanceFactor, "poolReward", poolReward)
+		t.LogInfo("PerformanceApplyEpoch", "accountID", accountID, "epochPerformanceFactor", epochPerformanceFactor, "poolReward", poolReward)
 
 		if err = rewardsMap.Set(accountID, &model.PoolRewards{
 			PoolStake:   pool.PoolStake,
@@ -339,18 +339,19 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 		return
 	}
 
-	// key not found
+	// No validator performance for this slot yet.
 	if !exists {
 		validatorPerformance = model.NewValidatorPerformance()
 	}
 
-	// set a bit at subslotIndex to 1 to indicate activity in that subslot
+	// Set a bit at subslotIndex to 1 to indicate activity in that subslot.
 	validatorPerformance.SlotActivityVector = validatorPerformance.SlotActivityVector | (1 << t.subslotIndex(block.ID().Slot(), block.ProtocolBlock().Header.IssuingTime))
 
 	apiForSlot := t.apiProvider.APIForSlot(block.ID().Slot())
 
-	// we restrict the number up to ValidatorBlocksPerSlot + 1 to know later if the validator issued more blocks than allowed and be able to punish for it
-	// also it can fint into uint8
+	// We restrict the number up to ValidationBlocksPerSlot + 1 to know later if the validator issued
+	// more blocks than allowed and be able to punish for it.
+	// Also it can fit into uint8.
 	if validatorPerformance.BlocksIssuedCount < apiForSlot.ProtocolParameters().ValidationBlocksPerSlot()+1 {
 		validatorPerformance.BlocksIssuedCount++
 	}
@@ -365,7 +366,7 @@ func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.Valida
 	}
 }
 
-// subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validatorBlocksPerSlot equal parts.
+// subslotIndex returns the index for timestamp corresponding to subslot created dividing slot on validationBlocksPerSlot equal parts.
 func (t *Tracker) subslotIndex(slot iotago.SlotIndex, issuingTime time.Time) int {
 	epochAPI := t.apiProvider.APIForEpoch(t.latestAppliedEpoch)
 	valBlocksNum := epochAPI.ProtocolParameters().ValidationBlocksPerSlot()
