@@ -8,14 +8,20 @@ LABEL org.label-schema.name="iotaledger/iota-core"
 LABEL org.label-schema.schema-version="1.0"
 LABEL org.label-schema.vcs-url="https://github.com/iotaledger/iota-core"
 
-RUN mkdir /scratch /app
+# Ensure ca-certificates are up to date
+RUN update-ca-certificates
+
+# Set the current Working Directory inside the container
+RUN mkdir /scratch
+WORKDIR /scratch
+
+# Prepare the folder where we are putting all the files
+RUN mkdir /app
 
 WORKDIR /scratch
 
+# Copy everything from the current directory to the PWD(Present Working Directory) inside the container
 COPY . .
-
-# Ensure ca-certificates are up to date
-RUN update-ca-certificates
 
 # Download go modules
 RUN go mod download
