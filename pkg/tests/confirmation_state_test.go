@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
@@ -13,6 +14,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func TestConfirmationFlags(t *testing.T) {
@@ -243,5 +245,92 @@ func TestConfirmationFlags(t *testing.T) {
 			),
 			testsuite.WithEvictedSlot(3),
 		)
+	}
+}
+
+func TestConfirmationOverEpochBoundary(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(1000, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				3,
+				4,
+				5,
+			),
+		),
+	)
+	defer ts.Shutdown()
+
+	ts.AddValidatorNode("node0")
+	ts.AddValidatorNode("node1")
+	ts.AddValidatorNode("node2")
+	ts.AddValidatorNode("node3")
+	ts.AddNode("node4")
+
+	ts.Run(true)
+
+	ts.Node("node0").Protocol.SetLogLevel(log.LevelTrace)
+
+	// Issue blocks up until 1 slot more than the epoch.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9}, 4, "Genesis", ts.Nodes(), true, false)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithLatestFinalizedSlot(5),
+			testsuite.WithLatestCommitmentSlotIndex(6),
+			testsuite.WithEqualStoredCommitmentAtIndex(6),
+			testsuite.WithEvictedSlot(6),
+		)
+
+		// Verify propagation of witness weight over epoch boundaries (slot 7).
+		{
+			// We propagate witness weight for pre-acceptance and acceptance over epoch boundaries.
+			ts.AssertBlocksInCachePreAccepted(ts.BlocksWithPrefixes("7.0", "7.1", "7.2", "7.3"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefixes("7.0", "7.1", "7.2", "7.3"), true, ts.Nodes()...)
+
+			// We don't propagate pre-confirmation and confirmation over epoch boundaries:
+			// There's 4 rows in a slot, everything except the last row should be pre-confirmed.
+			ts.AssertBlocksInCachePreConfirmed(ts.BlocksWithPrefixes("7.0", "7.1", "7.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCachePreConfirmed(ts.BlocksWithPrefixes("7.3"), false, ts.Nodes()...)
+			// Accordingly, only the first 2 rows are confirmed.
+			ts.AssertBlocksInCacheConfirmed(ts.BlocksWithPrefixes("7.0", "7.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.BlocksWithPrefixes("7.2", "7.3"), false, ts.Nodes()...)
+
+		}
+
+		// Slot 8 and 9 behaves normally, as they are in the new epoch.
+		{
+			ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefixes("8.0", "8.1", "8.2", "8.3", "9.0", "9.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefixes("9.2", "9.3"), false, ts.Nodes()...)
+			ts.AssertBlocksInCachePreAccepted(ts.BlocksWithPrefixes("9.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCachePreAccepted(ts.BlocksWithPrefixes("9.3"), false, ts.Nodes()...)
+
+			ts.AssertBlocksInCacheConfirmed(ts.BlocksWithPrefixes("8.0", "8.1", "8.2", "8.3", "9.0", "9.1"), true, ts.Nodes()...)
+			ts.AssertBlocksInCacheConfirmed(ts.BlocksWithPrefixes("9.2", "9.3"), false, ts.Nodes()...)
+			ts.AssertBlocksInCachePreConfirmed(ts.BlocksWithPrefixes("9.2"), true, ts.Nodes()...)
+			ts.AssertBlocksInCachePreConfirmed(ts.BlocksWithPrefixes("9.3"), false, ts.Nodes()...)
+		}
+	}
+
+	// Issue more so that blocks at end of epoch become confirmed via finalization.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{10, 11, 12}, 4, "9.3", ts.Nodes(), true, false)
+
+		ts.AssertNodeState(ts.Nodes(),
+			testsuite.WithLatestFinalizedSlot(8),
+			testsuite.WithLatestCommitmentSlotIndex(9),
+			testsuite.WithEqualStoredCommitmentAtIndex(9),
+			testsuite.WithEvictedSlot(9),
+		)
+
+		ts.AssertRetainerBlocksState(ts.BlocksWithPrefixes("7", "8"), api.BlockStateFinalized, ts.Nodes()...)
+		ts.AssertRetainerBlocksState(ts.BlocksWithPrefixes("9", "10", "11"), api.BlockStateConfirmed, ts.Nodes()...)
 	}
 }
