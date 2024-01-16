@@ -305,12 +305,16 @@ github.com/iotaledger/hive.go/stringify v0.0.0-20231219105941-542b1b724494 h1:aa
 github.com/iotaledger/hive.go/stringify v0.0.0-20231219105941-542b1b724494/go.mod h1:FTo/UWzNYgnQ082GI9QVM9HFDERqf9rw9RivNpqrnTs=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240110125343-5c50e43b71fa h1:/Czrql6nqnvQfUd0JEwM7Pt11Z55ZpiCI1fNiQ4ZmX4=
 github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240110125343-5c50e43b71fa/go.mod h1:0QsQZN/hld/1Bi32QeHaDAtk8lTI/oSfE0G/8Aj8Znk=
+github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240116140934-2ca7a381e6a4 h1:flpHyAqF66k+Savcgk6gNBVytX8ecjsiS+5wJ0jxr00=
+github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240116140934-2ca7a381e6a4/go.mod h1:ao7ikqgAuGrOXfe4a8D7G0wnNQ9OJeljKoaPMy9XDSM=
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240110120225-05a4544ca1dd h1:Fg4lm/P7f9ctJZ4HOlZt/R47aTYPse7hby0BFkjcpjM=
 github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240110120225-05a4544ca1dd/go.mod h1:AI/DyXh10w2/ZxHb6pKAvtkkDR8AOpFJSjkmsBcc+5g=
+github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240116140821-25bc7acc397d/go.mod h1:Bu6QrMlmcSd13va6Ptm6zG6WmfoobEt4rl0aafuYJK0=
 github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00 h1:j5udgLtSN6wQgFI9vnhkdJsqsVdJmwtoc0yOmT/Ila4=
 github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00/go.mod h1:gt+URx7DZu414nZME7jtGgxR4DVTSnNa1jF2trTUTZ0=
 github.com/iotaledger/iota.go/v4 v4.0.0-20240110093746-74501e609f1c h1:hO/nIqPhSbeddwBd71Yci7zOrQK/ZmIJfKY9QWC44OM=
 github.com/iotaledger/iota.go/v4 v4.0.0-20240110093746-74501e609f1c/go.mod h1:66w9NjF5IDk4amUu+i54yPfSi3hLqpAOefotC0kZahs=
+github.com/iotaledger/iota.go/v4 v4.0.0-20240116140157-9e8010cb282d/go.mod h1:66w9NjF5IDk4amUu+i54yPfSi3hLqpAOefotC0kZahs=
 github.com/ipfs/boxo v0.13.1 h1:nQ5oQzcMZR3oL41REJDcTbrvDvuZh3J9ckc9+ILeRQI=
 github.com/ipfs/boxo v0.13.1/go.mod h1:btrtHy0lmO1ODMECbbEY1pxNtrLilvKSYLoGQt1yYCk=
 github.com/ipfs/go-cid v0.4.1 h1:A/T3qGvxi4kpKWWcPC/PgbvDA2bjVLO7n4UeVwnbs/s=
