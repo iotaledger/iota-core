@@ -3,6 +3,12 @@ name: Docker Network Tests
 on:
   schedule:
     - cron: '0 1 * * *' # Runs every day at 1 AM
+  workflow_dispatch:
+    inputs:
+      testCases:
+        description: 'Custom test cases to run:'
+        required: false
+        default: ""
 
 jobs:
   test:
@@ -24,4 +30,4 @@ jobs:
     - name: Run all tests
       run: |
         cd tools/docker-network/tests &&
-        ./run_tests.sh
+        ./run_tests.sh ${{ github.event.inputs.testCases }}
