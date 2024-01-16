@@ -128,14 +128,14 @@ func provide(c *dig.Container) error {
 	}
 
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
-		pruningSizeEnabled := ParamsDatabase.Size.Enabled
-		pruningTargetDatabaseSizeBytes, err := bytes.Parse(ParamsDatabase.Size.TargetSize)
+		pruningSizeEnabled := ParamsDatabase.Pruning.Size.Enabled
+		pruningTargetDatabaseSizeBytes, err := bytes.Parse(ParamsDatabase.Pruning.Size.TargetSize)
 		if err != nil {
-			Component.LogPanicf("parameter %s invalid", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)))
+			Component.LogPanicf("parameter %s invalid", Component.App().Config().GetParameterPath(&(ParamsDatabase.Pruning.Size.TargetSize)))
 		}
 
 		if pruningSizeEnabled && pruningTargetDatabaseSizeBytes == 0 {
-			Component.LogPanicf("%s has to be specified if %s is enabled", Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.TargetSize)), Component.App().Config().GetParameterPath(&(ParamsDatabase.Size.Enabled)))
+			Component.LogPanicf("%s has to be specified if %s is enabled", Component.App().Config().GetParameterPath(&(ParamsDatabase.Pruning.Size.TargetSize)), Component.App().Config().GetParameterPath(&(ParamsDatabase.Pruning.Size.Enabled)))
 		}
 
 		return protocol.New(
@@ -145,11 +145,11 @@ func provide(c *dig.Container) error {
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
 			protocol.WithStorageOptions(
 				storage.WithDBEngine(deps.DatabaseEngine),
-				storage.WithPruningDelay(iotago.EpochIndex(ParamsDatabase.PruningThreshold)),
-				storage.WithPruningSizeEnable(ParamsDatabase.Size.Enabled),
+				storage.WithPruningDelay(iotago.EpochIndex(ParamsDatabase.Pruning.Threshold)),
+				storage.WithPruningSizeEnable(ParamsDatabase.Pruning.Size.Enabled),
 				storage.WithPruningSizeMaxTargetSizeBytes(pruningTargetDatabaseSizeBytes),
-				storage.WithPruningSizeReductionPercentage(ParamsDatabase.Size.ReductionPercentage),
-				storage.WithPruningSizeCooldownTime(ParamsDatabase.Size.CooldownTime),
+				storage.WithPruningSizeReductionPercentage(ParamsDatabase.Pruning.Size.ReductionPercentage),
+				storage.WithPruningSizeCooldownTime(ParamsDatabase.Pruning.Size.CooldownTime),
 				storage.WithBucketManagerOptions(
 					prunable.WithMaxOpenDBs(ParamsDatabase.MaxOpenDBs),
 				),

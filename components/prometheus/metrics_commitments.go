@@ -1,11 +1,11 @@
-package metrics
+package prometheus
 
 import (
 	"strconv"
 	"time"
 
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/iota-core/components/metrics/collector"
+	"github.com/iotaledger/iota-core/components/prometheus/collector"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
