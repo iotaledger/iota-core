@@ -25,6 +25,7 @@ require (
 	github.com/iotaledger/hive.go/stringify v0.0.0-20231219105941-542b1b724494
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240110125343-5c50e43b71fa
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240110120225-05a4544ca1dd
+	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00
 	github.com/iotaledger/iota.go/v4 v4.0.0-20240110093746-74501e609f1c
 	github.com/labstack/echo/v4 v4.11.3
 	github.com/labstack/gommon v0.4.1
@@ -87,7 +88,6 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
-	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00 // indirect
 	github.com/ipfs/boxo v0.13.1 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
