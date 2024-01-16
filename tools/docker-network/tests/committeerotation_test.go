@@ -13,12 +13,19 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
+// Test_SmallerCommittee tests if the committee rotated to a smaller committee than targetCommitteeSize
+// if less than targetCommitteeSize validators issued candidacy payloads.
+// 1. Run docker network, targetCommitteeSize=4, with 4 validators running.
+// 2. Shut down inx-validator of V2.
+// 3. Check that committee of size 3 is selected in next epoch.
+// 4. Restart inx-validator of V2.
+// 5. Check that committee of size 4 is selected in next epoch.
 func Test_SmallerCommittee(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 5),
+			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
 			iotago.WithTargetCommitteeSize(4),
 		))
 	defer d.Stop()
@@ -40,25 +47,31 @@ func Test_SmallerCommittee(t *testing.T) {
 	clt := d.Node("V1").Client
 	currentEpoch := clt.CommittedAPI().TimeProvider().EpochFromSlot(status.LatestAcceptedBlockSlot)
 
-	// stop validator 2
+	// stop inx-validator plugin of validator 2
 	err = d.StopContainer(d.Node("V2").ContainerName)
 	require.NoError(t, err)
 
 	d.AssertCommittee(currentEpoch+2, d.AccountsFromNodes(d.Nodes("V1", "V3", "V4")...))
 
-	// restart validator 2
+	// restart inx-validator plugin of validator 2
 	err = d.RestartContainer(d.Node("V2").ContainerName)
 	require.NoError(t, err)
 
 	d.AssertCommittee(currentEpoch+3, d.AccountsFromNodes(d.Nodes()...))
 }
 
+// Test_ReuseDueToNoFinalization tests if the committee members are the same (reused) due to no slot finalization at epochNearingThreshold and recovery after finalization comes back.
+// 1. Run docker network, targetCommitteeSize=4, with 4 validators running.
+// 2. Shutdown inx-validator of V2 and V3.
+// 3. Check if finalization stops and committee is reused (remains 4 committee members) in next epoch due to no finalization.
+// 4. Restart inx-validator of V2.
+// 5. Check that committee of size 3 (V1, V2, V4) is selected in next epoch and finalization occurs again from that epoch.
 func Test_ReuseDueToNoFinalization(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 5),
+			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
 			iotago.WithTargetCommitteeSize(4),
 		))
 	defer d.Stop()
@@ -117,12 +130,18 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 	})
 }
 
+// Test_NoCandidacyPayload tests if committee is reused due to no candidates announced but slot finalized at epochNearingThreshold.
+// 1. Run docker network, targetCommitteeSize=4, with 4 validators running.
+// 2. Stop issuing candidacy payload on all validators.
+// 3. Check finalization advances and the committee is reused in next epoch due to no candidates.
+// 4. Start issuing candidacy payload on 3 validators only.
+// 5. Check finalization advances and the committee is changed to 3 committee members.
 func Test_NoCandidacyPayload(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 5),
+			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
 			iotago.WithTargetCommitteeSize(4),
 		))
 	defer d.Stop()
@@ -164,12 +183,16 @@ func Test_NoCandidacyPayload(t *testing.T) {
 	d.AssertCommittee(currentEpoch+4, d.AccountsFromNodes(d.Nodes("V1", "V2", "V3")...))
 }
 
+// Test_Staking tests if an newly created account becomes a staker with staking feature.
+// 1. Run docker network, targetCommitteeSize=3, with 4 validators running.
+// 2. Create an account with staking feature.
+// 3. Check if the account became a staker.
 func Test_Staking(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 5),
+			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
 			iotago.WithTargetCommitteeSize(3),
 		))
 	defer d.Stop()
@@ -191,12 +214,18 @@ func Test_Staking(t *testing.T) {
 	d.AssertValidatorExists(account.AccountAddress)
 }
 
+// Test_Delegation tests if committee changed due to delegation.
+// initial stake: V1 > V2 > V3 > V4
+// 1. Run docker network, targetCommitteeSize=3, with 4 validators running. Committee members are: V1, V2, V3
+// 2. Create an account for delegation.
+// 3. Delegate requested faucet funds to V4, V4 should replace V3 as a committee member. (V4 > V1 > V2 > V3)
+// 4. Delegate requested faucet funds to V3, V3 should replace V2 as a committee member. (V3 > V4 > V1 > V2)
 func Test_Delegation(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 5),
+			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
 			iotago.WithTargetCommitteeSize(3),
 		))
 	defer d.Stop()
