@@ -101,7 +101,7 @@ func newTestPeer(_ string) *network.Peer {
 		panic(err)
 	}
 
-	addrInfo, _ := peer.AddrInfoFromString("/ip4/0.0.0.0/udp/14666/p2p/" + p2pid.String())
+	addrInfo, _ := peer.AddrInfoFromString("/ip4/0.0.0.0/udp/15600/p2p/" + p2pid.String())
 	return network.NewPeerFromAddrInfo(addrInfo)
 }
 

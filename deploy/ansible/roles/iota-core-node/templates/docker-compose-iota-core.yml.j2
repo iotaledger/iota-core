@@ -3,7 +3,7 @@
 {% for interface in ansible_interfaces -%}
   {%- set interface_details = hostvars[inventory_hostname]['ansible_' + interface] %}
   {%- if interface_details.ipv4 is defined and 'address' in interface_details.ipv4 -%}
-    {%- set _ = ips.append("/ip4/" + interface_details.ipv4.address + "/tcp/14666") -%}
+    {%- set _ = ips.append("/ip4/" + interface_details.ipv4.address + "/tcp/15600") -%}
   {%- endif -%}
 {% endfor -%}
 version: '3.3'
@@ -24,7 +24,7 @@ services:
         soft: 16384
         hard: 16384
     ports:
-      - "14666:14666/tcp" # P2P
+      - "15600:15600/tcp" # P2P
       - "6061:6061/tcp"   # pprof
       - "8080:14265/tcp"  # REST-API
       - "8081:8081/tcp"   # Dashboard
@@ -39,7 +39,7 @@ services:
       -c
       config.json
       --logger.level=debug
-      --p2p.peers=/dns/node-01.feature/tcp/14666/p2p/12D3KooWCrjmh4dUCWfGVQT6ivzArieJB9Z3eKdy2mdEEN95NDPS
+      --p2p.peers=/dns/node-01.feature/tcp/15600/p2p/12D3KooWCrjmh4dUCWfGVQT6ivzArieJB9Z3eKdy2mdEEN95NDPS
       --p2p.externalMultiAddresses={{ ips | join(',') }}
       --p2p.identityPrivateKey={{p2pIdentityPrvKey}}
       --p2p.db.path=/app/data/peerdb
