@@ -62,7 +62,7 @@ func Test_SmallerCommittee(t *testing.T) {
 
 // Test_ReuseDueToNoFinalization tests if the committee members are the same (reused) due to no slot finalization at epochNearingThreshold and recovery after finalization comes back.
 // 1. Run docker network, targetCommitteeSize=4, with 4 validators running.
-// 2. Shut down inx-validator of V2 and V3.
+// 2. Shutdown inx-validator of V2 and V3.
 // 3. Check if finalization stops and committee is reused (remains 4 committee members) in next epoch due to no finalization.
 // 4. Restart inx-validator of V2.
 // 5. Check that committee of size 3 (V1, V2, V4) is selected in next epoch and finalization occurs again from that epoch.
@@ -134,7 +134,7 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 // 1. Run docker network, targetCommitteeSize=4, with 4 validators running.
 // 2. Stop issuing candidacy payload on all validators.
 // 3. Check finalization advances and the committee is reused in next epoch due to no candidates.
-// 4. Stop issuing candidacy payload on 3 validators only.
+// 4. Start issuing candidacy payload on 3 validators only.
 // 5. Check finalization advances and the committee is changed to 3 committee members.
 func Test_NoCandidacyPayload(t *testing.T) {
 	d := NewDockerTestFramework(t,
@@ -185,8 +185,8 @@ func Test_NoCandidacyPayload(t *testing.T) {
 
 // Test_Staking tests if an newly created account becomes a staker with staking feature.
 // 1. Run docker network, targetCommitteeSize=3, with 4 validators running.
-// 2. Create an account with staking feature
-// 3. Check if the account becomes a staker
+// 2. Create an account with staking feature.
+// 3. Check if the account became a staker.
 func Test_Staking(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
