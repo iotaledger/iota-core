@@ -111,6 +111,8 @@ func Test_TopStakersRotation(t *testing.T) {
 			ts.Node("node4").Validator.AccountID,
 			ts.Node("node5").Validator.AccountID,
 		}, ts.Nodes()...)
+
+		ts.AssertReelectedCommitteeSeatIndices(0, 1, ts.Nodes()...)
 	}
 
 	// Do not announce new candidacies for epoch 2 but finalize slots. The committee should be the reused.
@@ -149,6 +151,8 @@ func Test_TopStakersRotation(t *testing.T) {
 			ts.Node("node4").Validator.AccountID,
 			ts.Node("node5").Validator.AccountID,
 		}, ts.Nodes()...)
+
+		ts.AssertReelectedCommitteeSeatIndices(1, 2, ts.Nodes()...)
 	}
 
 	// Rotate committee to smaller committee due to too few candidates available.
@@ -168,5 +172,8 @@ func Test_TopStakersRotation(t *testing.T) {
 		ts.AssertSybilProtectionCommittee(4, []iotago.AccountID{
 			ts.Node("node3").Validator.AccountID,
 		}, ts.Nodes()...)
+
+		ts.AssertReelectedCommitteeSeatIndices(2, 3, ts.Nodes()...)
+
 	}
 }

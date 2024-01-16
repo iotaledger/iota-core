@@ -58,15 +58,13 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	committeeFunc := func(index iotago.SlotIndex) (*account.SeatedAccounts, bool) {
 		accounts := account.NewAccounts()
-		var members []iotago.AccountID
 		t.issuerByAlias.ForEach(func(alias string, issuer *issuer) bool {
 			if err := accounts.Set(issuer.accountID, &account.Pool{}); err != nil { // we don't care about pools with PoA
 				test.Fatal(err)
 			}
-			members = append(members, issuer.accountID)
 			return true
 		})
-		return accounts.SeatedAccounts(members...), true
+		return accounts.SeatedAccounts(), true
 	}
 
 	t.testAPI = iotago.V3API(

@@ -128,16 +128,15 @@ func (a *Accounts) ForEach(callback func(id iotago.AccountID, pool *Pool) bool) 
 	a.accountPools.ForEach(callback)
 }
 
-// SeatedAccounts creates a new SeatedAccounts instance, that maintains the seats of the given members.
-func (a *Accounts) SeatedAccounts(members ...iotago.AccountID) *SeatedAccounts {
-	return NewSeatedAccounts(a, members...)
-}
+// SeatedAccounts creates a new SeatedAccounts instance,
+// that maintains the seat indices of re-elected members from the previous committee, if provided.
+func (a *Accounts) SeatedAccounts(optPrevCommittee ...*SeatedAccounts) *SeatedAccounts {
+	// If optPrevCommittee not given, use empty SeatedAccounts instance as default to skip the behavior to handle re-elected members.
+	prevCommittee := NewSeatedAccounts(NewAccounts())
+	if len(optPrevCommittee) > 0 {
+		prevCommittee = optPrevCommittee[0]
+	}
 
-// TODO:make the above and below method into one
-
-// SelectCommitteeRetainSeats creates a new SeatedAccounts instance,
-// that maintains the seat indices of re-elected members from the previous committee.
-func (a *Accounts) SelectCommitteeRetainSeats(prevCommittee *SeatedAccounts) *SeatedAccounts {
 	newCommittee := NewSeatedAccounts(a)
 
 	// If previous committee exists the seats need to be assigned and re-elected committee members must retain their SeatIndex.

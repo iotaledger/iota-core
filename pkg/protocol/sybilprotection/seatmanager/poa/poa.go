@@ -94,7 +94,7 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, validators accoun
 				return nil, ierrors.Wrapf(err, "error while setting committee for epoch %d for validator %s", epoch, validatorData.ID.String())
 			}
 		}
-		s.committee = committeeAccounts.SeatedAccounts(committeeAccounts.IDs()...)
+		s.committee = committeeAccounts.SeatedAccounts()
 	}
 
 	if err := s.committeeStore.Store(epoch, s.committee); err != nil {

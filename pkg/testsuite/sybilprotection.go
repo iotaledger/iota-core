@@ -41,6 +41,39 @@ func (t *TestSuite) AssertSybilProtectionCommittee(epoch iotago.EpochIndex, expe
 	}
 }
 
+func (t *TestSuite) AssertReelectedCommitteeSeatIndices(prevEpoch iotago.EpochIndex, newEpoch iotago.EpochIndex, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			committeeInPrevEpoch, exists := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInEpoch(prevEpoch)
+			if !exists {
+				return ierrors.Errorf("AssertReelectedCommitteeSeatIndices: %s: failed to get committee in previous epoch %d", node.Name, prevEpoch)
+			}
+
+			committeeInNewEpoch, exists := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInEpoch(newEpoch)
+			if !exists {
+				return ierrors.Errorf("AssertReelectedCommitteeSeatIndices: %s: failed to get committee in new epoch %d", node.Name, newEpoch)
+			}
+
+			committeeInPrevEpochAccounts, err := committeeInPrevEpoch.Accounts()
+			if err != nil {
+				return ierrors.Errorf("AssertReelectedCommitteeSeatIndices: %s: failed to get accounts in committee in previous epoch %d: %w", node.Name, prevEpoch, err)
+			}
+
+			committeeInPrevEpochAccounts.ForEach(func(id iotago.AccountID, _ *account.Pool) bool {
+				if seatIndex, memberExists := committeeInNewEpoch.GetSeat(id); memberExists {
+					require.Equalf(t.Testing, seatIndex, lo.Return1(committeeInPrevEpoch.GetSeat(id)), "account %s must have the same SeatIndex in the previous and new epoch committee", id)
+				}
+
+				return true
+			})
+
+			return nil
+		})
+	}
+}
+
 func (t *TestSuite) AssertSybilProtectionCandidates(epoch iotago.EpochIndex, expectedAccounts []iotago.AccountID, nodes ...*mock.Node) {
 	mustNodes(nodes)
 

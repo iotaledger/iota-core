@@ -40,7 +40,7 @@ func NewManualPOA(e iotago.APIProvider, committeeStore *epochstore.Store[*accoun
 		online:         ds.NewSet[account.SeatIndex](),
 		aliases:        shrinkingmap.New[string, iotago.AccountID](),
 	}
-	m.committee = m.accounts.SeatedAccounts(m.accounts.IDs()...)
+	m.committee = m.accounts.SeatedAccounts()
 
 	return m
 }
@@ -71,7 +71,7 @@ func (m *ManualPOA) AddRandomAccount(alias string) iotago.AccountID {
 
 	m.aliases.Set(alias, id)
 
-	m.committee = m.accounts.SeatedAccounts(m.accounts.IDs()...)
+	m.committee = m.accounts.SeatedAccounts()
 
 	if err := m.committeeStore.Store(0, m.committee); err != nil {
 		panic(err)
@@ -90,7 +90,7 @@ func (m *ManualPOA) AddAccount(id iotago.AccountID, alias string) iotago.Account
 	}
 	m.aliases.Set(alias, id)
 
-	m.committee = m.accounts.SeatedAccounts(m.accounts.IDs()...)
+	m.committee = m.accounts.SeatedAccounts()
 
 	if err := m.committeeStore.Store(0, m.committee); err != nil {
 		panic(err)
@@ -179,7 +179,7 @@ func (m *ManualPOA) RotateCommittee(epoch iotago.EpochIndex, validators accounts
 				return nil, ierrors.Wrapf(err, "error while setting pool for epoch %d for validator %s", epoch, validatorData.ID.String())
 			}
 		}
-		m.committee = m.accounts.SeatedAccounts(m.accounts.IDs()...)
+		m.committee = m.accounts.SeatedAccounts()
 	}
 
 	if err := m.committeeStore.Store(epoch, m.committee); err != nil {

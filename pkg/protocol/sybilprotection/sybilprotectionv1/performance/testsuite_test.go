@@ -126,7 +126,7 @@ func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[strin
 	}
 
 	// Store directly on the committeeAccounts store, because in actual code the SeatManager is responsible for adding the storage entry.
-	err := t.Instance.committeeStore.Store(epoch, committeeAccounts.SeatedAccounts(committeeAccounts.IDs()...))
+	err := t.Instance.committeeStore.Store(epoch, committeeAccounts.SeatedAccounts())
 	require.NoError(t.T, err)
 	for accIDAlias, action := range actions {
 		accID := t.Account(accIDAlias, false)

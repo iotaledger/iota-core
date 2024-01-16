@@ -93,7 +93,7 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accoun
 
 	// If rotating committee for epoch 0, then we can do it by default as there is no previous committee.
 	if epoch == 0 {
-		newCommittee := committeeAccounts.SeatedAccounts(committeeAccounts.IDs()...)
+		newCommittee := committeeAccounts.SeatedAccounts()
 
 		if err := s.committeeStore.Store(epoch, newCommittee); err != nil {
 			return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
@@ -109,7 +109,7 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accoun
 
 	// If there is no previous committee, then we can assign seats by default.
 	if prevCommittee == nil {
-		newCommittee := committeeAccounts.SeatedAccounts(committeeAccounts.IDs()...)
+		newCommittee := committeeAccounts.SeatedAccounts()
 
 		if err := s.committeeStore.Store(epoch, newCommittee); err != nil {
 			return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
@@ -118,7 +118,7 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accoun
 		return newCommittee, nil
 	}
 
-	newCommittee := committeeAccounts.SelectCommitteeRetainSeats(prevCommittee)
+	newCommittee := committeeAccounts.SeatedAccounts(prevCommittee)
 
 	if err := s.committeeStore.Store(epoch, newCommittee); err != nil {
 		return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
