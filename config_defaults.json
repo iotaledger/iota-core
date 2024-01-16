@@ -121,7 +121,7 @@
       "maxCount": 100
     }
   },
-  "metrics": {
+  "prometheus": {
     "enabled": true,
     "bindAddress": "0.0.0.0:9311",
     "goMetrics": false,

@@ -399,7 +399,7 @@ Example:
   }
 ```
 
-## <a id="metrics"></a> 11. Metrics
+## <a id="prometheus"></a> 11. Prometheus
 
 | Name            | Description                                          | Type    | Default value  |
 | --------------- | ---------------------------------------------------- | ------- | -------------- |
@@ -413,7 +413,7 @@ Example:
 
 ```json
   {
-    "metrics": {
+    "prometheus": {
       "enabled": true,
       "bindAddress": "0.0.0.0:9311",
       "goMetrics": false,

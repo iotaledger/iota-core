@@ -1,6 +1,6 @@
-package metrics
+package prometheus
 
-// metrics is the plugin instance responsible for collection of prometheus metrics.
+// prometheus is the plugin instance responsible for collection of prometheus metrics.
 // All metrics should be defined in metrics_namespace.go files with different namespace for each new collection.
 // Metrics naming should follow the guidelines from: https://prometheus.io/docs/practices/naming/
 // In short:
@@ -22,14 +22,14 @@ import (
 
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/iota-core/components/metrics/collector"
+	"github.com/iotaledger/iota-core/components/prometheus/collector"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 )
 
 func init() {
 	Component = &app.Component{
-		Name:     "Metrics",
+		Name:     "Prometheus",
 		DepsFunc: func(cDeps dependencies) { deps = cDeps },
 		Params:   params,
 		Run:      run,

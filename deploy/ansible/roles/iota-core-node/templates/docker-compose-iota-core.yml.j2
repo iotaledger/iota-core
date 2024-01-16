@@ -49,11 +49,11 @@ services:
       --database.path=/app/data/database
       --protocol.snapshot.path=/app/data/snapshot.bin
       --dashboard.bindAddress=0.0.0.0:8081
-      --metrics.bindAddress=iota-core:9311
+      --prometheus.bindAddress=iota-core:9311
+      --prometheus.goMetrics=true
+      --prometheus.processMetrics=true
       --inx.enabled=true
       --inx.bindAddress=iota-core:9029
-      --metrics.goMetrics=true
-      --metrics.processMetrics=true
 
 ##################
 # INX Extensions #
