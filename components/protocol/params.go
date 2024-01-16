@@ -41,20 +41,22 @@ type BaseToken struct {
 
 // ParametersDatabase contains the definition of configuration parameters used by the storage layer.
 type ParametersDatabase struct {
-	Engine           string `default:"rocksdb" usage:"the used database engine (rocksdb/mapdb)"`
-	Path             string `default:"testnet/database" usage:"the path to the database folder"`
-	MaxOpenDBs       int    `default:"5" usage:"maximum number of open database instances"`
-	PruningThreshold uint64 `default:"30" usage:"how many finalized epochs should be retained"`
+	Engine     string `default:"rocksdb" usage:"the used database engine (rocksdb/mapdb)"`
+	Path       string `default:"testnet/database" usage:"the path to the database folder"`
+	MaxOpenDBs int    `default:"5" usage:"maximum number of open database instances"`
 
-	Size struct {
-		// Enabled defines whether to delete old block data from the database based on maximum database size
-		Enabled bool `default:"true" usage:"whether to delete old block data from the database based on maximum database size"`
-		// TargetSize defines the target size of the database
-		TargetSize string `default:"30GB" usage:"target size of the database"`
-		// ReductionPercentage defines the percentage the database size gets reduced if the target size is reached
-		ReductionPercentage float64 `default:"10.0" usage:"the percentage the database size gets reduced if the target size is reached"`
-		// CooldownTime defines the cooldown time between two pruning by database size events
-		CooldownTime time.Duration `default:"5m" usage:"cooldown time between two pruning by database size events"`
+	Pruning struct {
+		Threshold uint64 `default:"30" usage:"how many finalized epochs should be retained"`
+		Size      struct {
+			// Enabled defines whether to delete old block data from the database based on maximum database size
+			Enabled bool `default:"true" usage:"whether to delete old block data from the database based on maximum database size"`
+			// TargetSize defines the target size of the database
+			TargetSize string `default:"30GB" usage:"target size of the database"`
+			// ReductionPercentage defines the percentage the database size gets reduced if the target size is reached
+			ReductionPercentage float64 `default:"10.0" usage:"the percentage the database size gets reduced if the target size is reached"`
+			// CooldownTime defines the cooldown time between two pruning by database size events
+			CooldownTime time.Duration `default:"5m" usage:"cooldown time between two pruning by database size events"`
+		}
 	}
 }
 
@@ -67,6 +69,6 @@ var ParamsDatabase = &ParametersDatabase{}
 var params = &app.ComponentParams{
 	Params: map[string]any{
 		"protocol": ParamsProtocol,
-		"database": ParamsDatabase,
+		"db":       ParamsDatabase,
 	},
 }

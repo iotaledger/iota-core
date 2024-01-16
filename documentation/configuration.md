@@ -95,7 +95,7 @@ Example:
 
 | Name                                        | Description                                                   | Type   | Default value                                |
 | ------------------------------------------- | ------------------------------------------------------------- | ------ | -------------------------------------------- |
-| bindMultiAddresses                          | The bind multi addresses for p2p connections                  | array  | /ip4/0.0.0.0/tcp/14666<br/>/ip6/::/tcp/14666 |
+| bindMultiAddresses                          | The bind multi addresses for p2p connections                  | array  | /ip4/0.0.0.0/tcp/15600<br/>/ip6/::/tcp/15600 |
 | [connectionManager](#p2p_connectionmanager) | Configuration for connectionManager                           | object |                                              |
 | externalMultiAddresses                      | External reacheable multi addresses advertised to the network | array  |                                              |
 | identityPrivateKey                          | Private key used to derive the node identity (optional)       | string | ""                                           |
@@ -120,8 +120,8 @@ Example:
   {
     "p2p": {
       "bindMultiAddresses": [
-        "/ip4/0.0.0.0/tcp/14666",
-        "/ip6/::/tcp/14666"
+        "/ip4/0.0.0.0/tcp/15600",
+        "/ip6/::/tcp/15600"
       ],
       "connectionManager": {
         "highWatermark": 10,
@@ -225,13 +225,25 @@ Example:
 
 ## <a id="debugapi"></a> 6. DebugAPI
 
-| Name             | Description                                                | Type    | Default value   |
-| ---------------- | ---------------------------------------------------------- | ------- | --------------- |
-| enabled          | Whether the DebugAPI component is enabled                  | boolean | true            |
-| path             | The path to the database folder                            | string  | "testnet/debug" |
-| maxOpenDBs       | Maximum number of open database instances                  | int     | 2               |
-| pruningThreshold | How many epochs should be retained                         | uint    | 1               |
-| dbGranularity    | How many slots should be contained in a single DB instance | int     | 100             |
+| Name               | Description                               | Type    | Default value |
+| ------------------ | ----------------------------------------- | ------- | ------------- |
+| enabled            | Whether the DebugAPI component is enabled | boolean | true          |
+| [db](#debugapi_db) | Configuration for db                      | object  |               |
+
+### <a id="debugapi_db"></a> Db
+
+| Name                            | Description                                                | Type   | Default value   |
+| ------------------------------- | ---------------------------------------------------------- | ------ | --------------- |
+| path                            | The path to the database folder                            | string | "testnet/debug" |
+| maxOpenDBs                      | Maximum number of open database instances                  | int    | 2               |
+| granularity                     | How many slots should be contained in a single DB instance | int    | 100             |
+| [pruning](#debugapi_db_pruning) | Configuration for pruning                                  | object |                 |
+
+### <a id="debugapi_db_pruning"></a> Pruning
+
+| Name      | Description                        | Type | Default value |
+| --------- | ---------------------------------- | ---- | ------------- |
+| threshold | How many epochs should be retained | uint | 1             |
 
 Example:
 
@@ -239,10 +251,14 @@ Example:
   {
     "debugAPI": {
       "enabled": true,
-      "path": "testnet/debug",
-      "maxOpenDBs": 2,
-      "pruningThreshold": 1,
-      "dbGranularity": 100
+      "db": {
+        "path": "testnet/debug",
+        "maxOpenDBs": 2,
+        "granularity": 100,
+        "pruning": {
+          "threshold": 1
+        }
+      }
     }
   }
 ```
@@ -263,17 +279,23 @@ Example:
   }
 ```
 
-## <a id="database"></a> 8. Database
+## <a id="db"></a> 8. Db
 
-| Name                   | Description                                  | Type   | Default value      |
-| ---------------------- | -------------------------------------------- | ------ | ------------------ |
-| engine                 | The used database engine (rocksdb/mapdb)     | string | "rocksdb"          |
-| path                   | The path to the database folder              | string | "testnet/database" |
-| maxOpenDBs             | Maximum number of open database instances    | int    | 5                  |
-| pruningThreshold       | How many finalized epochs should be retained | uint   | 30                 |
-| [size](#database_size) | Configuration for size                       | object |                    |
+| Name                   | Description                               | Type   | Default value      |
+| ---------------------- | ----------------------------------------- | ------ | ------------------ |
+| engine                 | The used database engine (rocksdb/mapdb)  | string | "rocksdb"          |
+| path                   | The path to the database folder           | string | "testnet/database" |
+| maxOpenDBs             | Maximum number of open database instances | int    | 5                  |
+| [pruning](#db_pruning) | Configuration for pruning                 | object |                    |
 
-### <a id="database_size"></a> Size
+### <a id="db_pruning"></a> Pruning
+
+| Name                     | Description                                  | Type   | Default value |
+| ------------------------ | -------------------------------------------- | ------ | ------------- |
+| threshold                | How many finalized epochs should be retained | uint   | 30            |
+| [size](#db_pruning_size) | Configuration for size                       | object |               |
+
+### <a id="db_pruning_size"></a> Size
 
 | Name                | Description                                                                       | Type    | Default value |
 | ------------------- | --------------------------------------------------------------------------------- | ------- | ------------- |
@@ -286,16 +308,18 @@ Example:
 
 ```json
   {
-    "database": {
+    "db": {
       "engine": "rocksdb",
       "path": "testnet/database",
       "maxOpenDBs": 5,
-      "pruningThreshold": 30,
-      "size": {
-        "enabled": true,
-        "targetSize": "30GB",
-        "reductionPercentage": 10,
-        "cooldownTime": "5m"
+      "pruning": {
+        "threshold": 30,
+        "size": {
+          "enabled": true,
+          "targetSize": "30GB",
+          "reductionPercentage": 10,
+          "cooldownTime": "5m"
+        }
       }
     }
   }

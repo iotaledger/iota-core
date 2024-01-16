@@ -72,24 +72,30 @@
   },
   "debugAPI": {
     "enabled": true,
-    "path": "testnet/debug",
-    "maxOpenDBs": 2,
-    "pruningThreshold": 1,
-    "dbGranularity": 100
+    "db": {
+      "path": "testnet/debug",
+      "maxOpenDBs": 2,
+      "granularity": 100,
+      "pruning": {
+        "threshold": 1
+      }
+    }
   },
   "metricsTracker": {
     "enabled": true
   },
-  "database": {
+  "db": {
     "engine": "rocksdb",
     "path": "testnet/database",
     "maxOpenDBs": 5,
-    "pruningThreshold": 30,
-    "size": {
-      "enabled": true,
-      "targetSize": "30GB",
-      "reductionPercentage": 10,
-      "cooldownTime": "5m"
+    "pruning": {
+      "threshold": 30,
+      "size": {
+        "enabled": true,
+        "targetSize": "30GB",
+        "reductionPercentage": 10,
+        "cooldownTime": "5m"
+      }
     }
   },
   "protocol": {
