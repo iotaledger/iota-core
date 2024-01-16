@@ -4,11 +4,6 @@ on:
     branches:
       - develop
   workflow_dispatch:
-    inputs:
-      snapshotUrl:
-        description: 'Custom snapshot URL:'
-        required: false
-        default: ""
 
 concurrency:
   group: feature-network-deploy-group
