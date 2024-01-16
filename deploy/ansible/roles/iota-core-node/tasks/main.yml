@@ -19,7 +19,7 @@
 
 - name: Copy genesis snapshot
   copy:
-    src: ./tools/genesis-snapshot/genesis-snapshot.bin
+    src: ../../tools/genesis-snapshot/genesis-snapshot.bin
     dest: /opt/iota-core/snapshot.bin
     mode: '0644'
 
