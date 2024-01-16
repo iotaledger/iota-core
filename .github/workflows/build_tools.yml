@@ -4,8 +4,8 @@ on:
   pull_request:
     paths:
       - 'tools/genesis-snapshot/**'
-jobs:
 
+jobs:
   build:
     name: Import Check
     runs-on: self-hosted

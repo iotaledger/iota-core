@@ -1,4 +1,4 @@
-name: Run Docker Network and Check Health
+name: Docker Network Health Check
 
 on:
   workflow_dispatch:

@@ -24,7 +24,6 @@ jobs:
       - name: Run Tests
         run: go test ./... -tags rocksdb -count=1 -timeout 20m
 
-
   unit-tests-race:
     name: Unit tests -race
     runs-on: self-hosted

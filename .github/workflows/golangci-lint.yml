@@ -6,6 +6,7 @@ on:
       - 'documentation/**'
       - 'scripts/**'
       - 'tools/**'
+
 jobs:
   golangci-lint:
     name: GolangCI-Lint
