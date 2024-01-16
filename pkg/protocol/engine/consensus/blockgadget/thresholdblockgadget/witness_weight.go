@@ -16,6 +16,8 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 		return
 	}
 
+	votingBlockEpoch := votingBlock.ProtocolBlock().API.TimeProvider().EpochFromSlot(votingBlock.ID().Slot())
+
 	var toPreAccept []*blocks.Block
 	toPreAcceptByID := ds.NewSet[iotago.BlockID]()
 
@@ -32,7 +34,8 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 			propagateFurther = true
 		}
 
-		if !block.IsPreConfirmed() && (shouldPreConfirm || anyChildInSet(block, toPreConfirmByID)) {
+		blockEpoch := block.ProtocolBlock().API.TimeProvider().EpochFromSlot(block.ID().Slot())
+		if !block.IsPreConfirmed() && votingBlockEpoch == blockEpoch && (shouldPreConfirm || anyChildInSet(block, toPreConfirmByID)) {
 			toPreConfirm = append([]*blocks.Block{block}, toPreConfirm...)
 			toPreConfirmByID.Add(block.ID())
 			propagateFurther = true
