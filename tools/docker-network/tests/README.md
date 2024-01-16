@@ -24,3 +24,22 @@ go test ./... -tags rocksdb,dockertests -v -timeout=60m
 # or to run a specific test 
 go test -run=Test_Delegation -tags rocksdb,dockertests -v -timeout=60m
 ```
+
+## Run with script
+The script builds and pulls the images, then runs the tests.
+
+Available tests:
+* SmallerCommittee
+* ReuseDueToNoFinalization
+* NoCandidacyPayload
+* Staking
+* Delegation
+
+To run the tests, simply execute the following command:
+```bash
+# run all tests
+./run_test.sh
+
+# or to run a specific test 
+./run_test.sh SmallerCommittee
+```
