@@ -13,6 +13,7 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 	}
 
 	ratifierBlockIndex := votingBlock.ID().Slot()
+	ratifierBlockEpoch := votingBlock.ProtocolBlock().API.TimeProvider().EpochFromSlot(ratifierBlockIndex)
 
 	var toConfirm []*blocks.Block
 
@@ -21,6 +22,14 @@ func (g *Gadget) trackConfirmationRatifierWeight(votingBlock *blocks.Block) {
 		// This means that confirmations need to be achieved within g.optsConfirmationRatificationThreshold slots.
 		if ratifierBlockIndex >= g.optsConfirmationRatificationThreshold &&
 			block.ID().Slot() <= ratifierBlockIndex-g.optsConfirmationRatificationThreshold {
+			return false
+		}
+
+		// Skip propagation if the block is not in the same epoch as the ratifier. This might delay the confirmation
+		// of blocks at the end of the epoch but make sure that confirmation is safe in case where the minority of voters
+		// got different seats for the next epoch.
+		blockEpoch := block.ProtocolBlock().API.TimeProvider().EpochFromSlot(block.ID().Slot())
+		if ratifierBlockEpoch != blockEpoch {
 			return false
 		}
 
