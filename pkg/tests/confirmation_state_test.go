@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization/slotnotarization"
@@ -275,8 +274,6 @@ func TestConfirmationOverEpochBoundary(t *testing.T) {
 	ts.AddNode("node4")
 
 	ts.Run(true)
-
-	ts.Node("node0").Protocol.SetLogLevel(log.LevelTrace)
 
 	// Issue blocks up until 1 slot more than the epoch.
 	{
