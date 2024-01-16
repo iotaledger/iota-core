@@ -22,10 +22,10 @@ jobs:
       DOCKER_BUILDKIT: 1
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Cache Docker layers
         uses: actions/cache@v3
@@ -36,13 +36,13 @@ jobs:
             ${{ runner.os }}-buildx-
 
       - name: Login to DockerHub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: '${{ secrets.IOTALEDGER_DOCKER_USERNAME }}'
           password: '${{ secrets.IOTALEDGER_DOCKER_PASSWORD }}'
 
       - name: Publish to Docker Hub
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           tags: iotaledger/iota-core:feature
           push: true
@@ -50,7 +50,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: 'tools/genesis-snapshot/go.mod'
           cache: false

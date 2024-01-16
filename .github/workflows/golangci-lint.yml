@@ -12,16 +12,16 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Checkout custom linter
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: karimodm/typegroupingcheck
           path: typegroupingcheck 
 
       - name: Setup go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version-file: './typegroupingcheck/go.mod'
 
