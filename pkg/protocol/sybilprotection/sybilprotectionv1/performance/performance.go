@@ -21,7 +21,7 @@ import (
 type Tracker struct {
 	rewardsStorePerEpochFunc       func(epoch iotago.EpochIndex) (kvstore.KVStore, error)
 	poolStatsStore                 *epochstore.Store[*model.PoolsStats]
-	committeeStore                 *epochstore.Store[*account.Accounts]
+	committeeStore                 *epochstore.Store[*account.SeatedAccounts]
 	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error)
 	nextEpochCommitteeCandidates   *shrinkingmap.ShrinkingMap[iotago.AccountID, iotago.SlotIndex]
 	validatorPerformancesFunc      func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
@@ -40,7 +40,7 @@ type Tracker struct {
 func NewTracker(
 	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error),
 	poolStatsStore *epochstore.Store[*model.PoolsStats],
-	committeeStore *epochstore.Store[*account.Accounts],
+	committeeStore *epochstore.Store[*account.SeatedAccounts],
 	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error),
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
 	latestAppliedEpoch iotago.EpochIndex,
@@ -184,7 +184,12 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 		return nil, false
 	}
 
-	return c, true
+	committeeAccounts, err := c.Accounts()
+	if err != nil {
+		panic(ierrors.Wrapf(err, "failed to extract committee accounts for epoch %d", epoch))
+	}
+
+	return committeeAccounts, true
 }
 
 // ApplyEpoch calculates and stores pool stats and rewards for the given epoch.

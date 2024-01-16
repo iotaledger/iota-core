@@ -74,7 +74,7 @@ func (t *TestSuite) InitPerformanceTracker() {
 
 	rewardsStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc)
 	poolStatsStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc, (*model.PoolsStats).Bytes, model.PoolsStatsFromBytes)
-	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc, (*account.Accounts).Bytes, account.AccountsFromBytes)
+	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc, (*account.SeatedAccounts).Bytes, account.SeatedAccountsFromBytes)
 	committeeCandidatesStore := epochstore.NewEpochKVStore(kvstore.Realm{}, mapdb.NewMapDB(), pruningDelayFunc)
 
 	t.Instance = NewTracker(
@@ -111,12 +111,12 @@ func (t *TestSuite) Account(alias string, createIfNotExists bool) iotago.Account
 }
 
 func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[string]*EpochActions) {
-	committee := account.NewAccounts()
+	committeeAccounts := account.NewAccounts()
 	for alias, action := range actions {
 		action.validate(t.T, t.api)
 
 		accountID := t.Account(alias, true)
-		if err := committee.Set(accountID, &account.Pool{
+		if err := committeeAccounts.Set(accountID, &account.Pool{
 			PoolStake:      action.PoolStake,
 			ValidatorStake: action.ValidatorStake,
 			FixedCost:      action.FixedCost,
@@ -125,15 +125,15 @@ func (t *TestSuite) ApplyEpochActions(epoch iotago.EpochIndex, actions map[strin
 		}
 	}
 
-	// Store directly on the committee store, because in actual code the SeatManager is responsible for adding the storage entry.
-	err := t.Instance.committeeStore.Store(epoch, committee)
+	// Store directly on the committeeAccounts store, because in actual code the SeatManager is responsible for adding the storage entry.
+	err := t.Instance.committeeStore.Store(epoch, committeeAccounts.SeatedAccounts(committeeAccounts.IDs()...))
 	require.NoError(t.T, err)
 	for accIDAlias, action := range actions {
 		accID := t.Account(accIDAlias, false)
 		t.applyPerformanceFactor(accID, epoch, action.ActiveSlotsCount, action.ValidationBlocksSentPerSlot, action.SlotPerformance)
 	}
 
-	err = t.Instance.ApplyEpoch(epoch, committee)
+	err = t.Instance.ApplyEpoch(epoch, committeeAccounts)
 	require.NoError(t.T, err)
 
 	t.latestCommittedEpoch = epoch

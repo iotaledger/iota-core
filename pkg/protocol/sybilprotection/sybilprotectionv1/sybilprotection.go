@@ -66,6 +66,7 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 					o.lastCommittedSlot = latestCommittedSlot
 
 					if o.optsInitialCommittee != nil {
+						// TODO: this should be dervived from genesis slot, not always 0
 						if _, err := o.seatManager.RotateCommittee(0, o.optsInitialCommittee); err != nil {
 							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
 						}
@@ -400,7 +401,18 @@ func (o *SybilProtection) reuseCommittee(currentEpoch iotago.EpochIndex, targetE
 	}
 
 	committeeAccounts.SetReused()
-	if err = o.seatManager.ReuseCommittee(targetEpoch, committeeAccounts); err != nil {
+
+	// seat accounts on the same seats as in the previous epoch
+	newCommittee := account.NewSeatedAccounts(committeeAccounts)
+	committeeAccounts.ForEach(func(id iotago.AccountID, _ *account.Pool) bool {
+		if seatIndex, seatExists := committee.GetSeat(id); seatExists {
+			newCommittee.Set(seatIndex, id)
+		}
+
+		return true
+	})
+
+	if err = o.seatManager.ReuseCommittee(targetEpoch, newCommittee); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to set committee for epoch %d", targetEpoch)
 	}
 

@@ -31,7 +31,7 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(),
 		func(_ iotago.EpochIndex) iotago.EpochIndex { return 0 },
-		(*account.Accounts).Bytes, account.AccountsFromBytes)
+		(*account.SeatedAccounts).Bytes, account.SeatedAccountsFromBytes)
 
 	topStakersSeatManager := &SeatManager{
 		apiProvider:     testAPIProvider,
@@ -41,7 +41,7 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 	}
 
 	// Try setting an empty committee.
-	err := topStakersSeatManager.ReuseCommittee(0, account.NewAccounts())
+	err := topStakersSeatManager.ReuseCommittee(0, account.NewAccounts().SeatedAccounts())
 	require.Error(t, err)
 
 	// Create committee for epoch 0
@@ -57,7 +57,7 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 	}
 
 	// Set committee for epoch 0.
-	err = topStakersSeatManager.ReuseCommittee(0, initialCommittee)
+	err = topStakersSeatManager.ReuseCommittee(0, initialCommittee.SeatedAccounts(initialCommittee.IDs()...))
 	require.NoError(t, err)
 	weightedSeats, exists := topStakersSeatManager.CommitteeInEpoch(0)
 	require.True(t, exists)
@@ -86,7 +86,7 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 
 	committeeStore := epochstore.NewStore(kvstore.Realm{}, mapdb.NewMapDB(),
 		func(_ iotago.EpochIndex) iotago.EpochIndex { return 0 },
-		(*account.Accounts).Bytes, account.AccountsFromBytes)
+		(*account.SeatedAccounts).Bytes, account.SeatedAccountsFromBytes)
 
 	s := &SeatManager{
 		apiProvider:     testAPIProvider,
@@ -113,7 +113,7 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 		addCommitteeMember(t, expectedCommitteeInEpoch0, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11})
 
 		// We should be able to set a committee with only 3 members for epoch 0 (this could be set e.g. via the snapshot).
-		err := s.ReuseCommittee(0, expectedCommitteeInEpoch0)
+		err := s.ReuseCommittee(0, expectedCommitteeInEpoch0.SeatedAccounts(expectedCommitteeInEpoch0.IDs()...))
 		require.NoError(t, err)
 
 		// Make sure that the online committee is handled correctly.
@@ -273,7 +273,7 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 
 		// Set reuse of committee manually.
 		expectedCommitteeInEpoch2.SetReused()
-		err = s.ReuseCommittee(epoch, expectedCommitteeInEpoch2)
+		err = s.ReuseCommittee(epoch, expectedCommitteeInEpoch2.SeatedAccounts(expectedCommitteeInEpoch2.IDs()...))
 		require.NoError(t, err)
 
 		assertCommitteeInEpoch(t, s, testAPI, 3, expectedCommitteeInEpoch2)
@@ -285,8 +285,9 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 		// Make sure that the committee retrieved from the committee store matches the expected (with reused flag set).
 		loadedCommittee, err := s.committeeStore.Load(epoch)
 		require.NoError(t, err)
+
 		require.True(t, loadedCommittee.IsReused())
-		assertCommittee(t, expectedCommitteeInEpoch2, loadedCommittee.SeatedAccounts(loadedCommittee.IDs()...))
+		assertCommittee(t, expectedCommitteeInEpoch2, loadedCommittee)
 	}
 }
 

@@ -3,10 +3,13 @@ package account
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/hive.go/stringify"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -78,6 +81,10 @@ func (s *SeatedAccounts) SeatCount() int {
 	return s.seatsByAccount.Size()
 }
 
+func (s *SeatedAccounts) IsReused() bool {
+	return s.accounts.IsReused()
+}
+
 func (s *SeatedAccounts) Accounts() (*Accounts, error) {
 	accounts := NewAccounts()
 	var err error
@@ -104,4 +111,81 @@ func (s *SeatedAccounts) String() string {
 	}
 
 	return builder.String()
+}
+
+func SeatedAccountsFromBytes(b []byte) (*SeatedAccounts, int, error) {
+	reader := stream.NewByteReader(b)
+
+	s, err := SeatedAccountsFromReader(reader)
+	if err != nil {
+		return nil, 0, ierrors.Wrap(err, "unable to read accounts from bytes")
+	}
+
+	return s, reader.BytesRead(), nil
+}
+
+func SeatedAccountsFromReader(reader io.Reader) (*SeatedAccounts, error) {
+	accounts, err := AccountsFromReader(reader)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "unable to read accounts from bytes")
+	}
+
+	seatsByAccount := shrinkingmap.New[iotago.AccountID, SeatIndex]()
+
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
+		accountID, err := stream.Read[iotago.AccountID](reader)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to read accountID at index %d", i)
+		}
+
+		seatIndex, err := stream.Read[SeatIndex](reader)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to read seatIndex at index %d", i)
+		}
+
+		seatsByAccount.Set(accountID, seatIndex)
+
+		return nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read account data")
+	}
+
+	return &SeatedAccounts{accounts: accounts, seatsByAccount: seatsByAccount}, nil
+}
+
+func (s *SeatedAccounts) Bytes() ([]byte, error) {
+	byteBuffer := stream.NewByteBuffer()
+
+	accountsBytes, err := s.accounts.Bytes()
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to serialize committee accounts")
+	}
+
+	if err := stream.WriteBytes(byteBuffer, accountsBytes); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write account bytes")
+	}
+
+	if err := stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
+		var innerErr error
+		s.seatsByAccount.ForEach(func(id iotago.AccountID, seatIndex SeatIndex) bool {
+			if innerErr = stream.Write(byteBuffer, id); innerErr != nil {
+				return false
+			}
+
+			if innerErr = stream.Write(byteBuffer, seatIndex); innerErr != nil {
+				return false
+			}
+
+			return true
+		})
+		if innerErr != nil {
+			return 0, innerErr
+		}
+
+		return s.seatsByAccount.Size(), nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write seats by account map")
+	}
+
+	return byteBuffer.Bytes()
 }

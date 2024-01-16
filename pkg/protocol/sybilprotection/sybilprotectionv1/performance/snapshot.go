@@ -184,7 +184,7 @@ func (t *Tracker) importCommittees(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "unable to read epoch index")
 		}
 
-		committee, err := account.AccountsFromReader(reader)
+		committee, err := account.SeatedAccountsFromReader(reader)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to read committee for the epoch %d", epoch)
 		}
@@ -369,10 +369,11 @@ func (t *Tracker) exportCommittees(writer io.WriteSeeker, targetSlot iotago.Slot
 			// - we were able to rotate a committee, then we export it
 			// - we were not able to rotate a committee (reused), then we don't export it
 			if epoch > epochFromTargetSlot && targetSlot < pointOfNoReturn {
-				committee, _, err := account.AccountsFromBytes(committeeBytes)
+				committee, _, err := account.SeatedAccountsFromBytes(committeeBytes)
 				if err != nil {
 					return ierrors.Wrapf(err, "failed to parse committee bytes for epoch %d", epoch)
 				}
+
 				if committee.IsReused() {
 					return nil
 				}

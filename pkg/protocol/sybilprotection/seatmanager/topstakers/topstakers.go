@@ -27,7 +27,7 @@ type SeatManager struct {
 	apiProvider iotago.APIProvider
 	events      *seatmanager.Events
 
-	committeeStore  *epochstore.Store[*account.Accounts]
+	committeeStore  *epochstore.Store[*account.SeatedAccounts]
 	committeeMutex  syncutils.RWMutex
 	activityTracker activitytracker.ActivityTracker
 
@@ -86,21 +86,45 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accoun
 		return nil, ierrors.New("candidates must not be empty")
 	}
 
-	committee, err := s.selectNewCommittee(epoch, candidates)
+	committeeAccounts, err := s.selectNewCommitteeAccounts(epoch, candidates)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "error while selecting new committee")
 	}
 
-	committeeAccounts, err := committee.Accounts()
-	if err != nil {
-		return nil, ierrors.Wrapf(err, "error while getting committeeAccounts for newly selected committee for epoch %d", epoch)
+	// If rotating committee for epoch 0, then we can do it by default as there is no previous committee.
+	if epoch == 0 {
+		newCommittee := committeeAccounts.SeatedAccounts(committeeAccounts.IDs()...)
+
+		if err := s.committeeStore.Store(epoch, newCommittee); err != nil {
+			return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
+		}
+
+		return newCommittee, nil
 	}
 
-	if err := s.committeeStore.Store(epoch, committeeAccounts); err != nil {
+	prevCommittee, err := s.committeeStore.Load(epoch - 1)
+	if err != nil {
+		return nil, err
+	}
+
+	// If there is no previous committee, then we can assign seats by default.
+	if prevCommittee == nil {
+		newCommittee := committeeAccounts.SeatedAccounts(committeeAccounts.IDs()...)
+
+		if err := s.committeeStore.Store(epoch, newCommittee); err != nil {
+			return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
+		}
+
+		return newCommittee, nil
+	}
+
+	newCommittee := committeeAccounts.SelectCommitteeRetainSeats(prevCommittee)
+
+	if err := s.committeeStore.Store(epoch, newCommittee); err != nil {
 		return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
 	}
 
-	return committee, nil
+	return newCommittee, nil
 }
 
 // CommitteeInSlot returns the set of validators selected to be part of the committee in the given slot.
@@ -129,7 +153,7 @@ func (s *SeatManager) committeeInEpoch(epoch iotago.EpochIndex) (*account.Seated
 		return nil, false
 	}
 
-	return c.SeatedAccounts(c.IDs()...), true
+	return c, true
 }
 
 // OnlineCommittee returns the set of validators selected to be part of the committee that has been seen recently.
@@ -163,14 +187,18 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	committeeAccounts, err := s.committeeStore.Load(epoch)
+	committee, err := s.committeeStore.Load(epoch)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to load PoA committee for epoch %d", epoch)
 	}
 
-	committee := committeeAccounts.SeatedAccounts(committeeAccounts.IDs()...)
+	committeeAccounts, err := committee.Accounts()
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to retrieve accounts of the committee for epoch %d", epoch)
+	}
 
 	onlineValidators := committeeAccounts.IDs()
+
 	if len(s.optsOnlineCommitteeStartup) > 0 {
 		onlineValidators = s.optsOnlineCommitteeStartup
 	}
@@ -188,15 +216,15 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 	return nil
 }
 
-func (s *SeatManager) ReuseCommittee(epoch iotago.EpochIndex, validators *account.Accounts) error {
+func (s *SeatManager) ReuseCommittee(epoch iotago.EpochIndex, committee *account.SeatedAccounts) error {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	if validators.Size() == 0 {
+	if committee.SeatCount() == 0 {
 		return ierrors.New("committee must not be empty")
 	}
 
-	err := s.committeeStore.Store(epoch, validators)
+	err := s.committeeStore.Store(epoch, committee)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to set committee for epoch %d", epoch)
 	}
@@ -204,7 +232,7 @@ func (s *SeatManager) ReuseCommittee(epoch iotago.EpochIndex, validators *accoun
 	return nil
 }
 
-func (s *SeatManager) selectNewCommittee(epoch iotago.EpochIndex, candidates accounts.AccountsData) (*account.SeatedAccounts, error) {
+func (s *SeatManager) selectNewCommitteeAccounts(epoch iotago.EpochIndex, candidates accounts.AccountsData) (*account.Accounts, error) {
 	sort.Slice(candidates, func(i int, j int) bool {
 		// Prioritize the candidate that has a larger pool stake.
 		if candidates[i].ValidatorStake+candidates[i].DelegationStake != candidates[j].ValidatorStake+candidates[j].DelegationStake {
@@ -246,7 +274,6 @@ func (s *SeatManager) selectNewCommittee(epoch iotago.EpochIndex, candidates acc
 			return nil, ierrors.Wrapf(err, "error while setting pool for committee candidate %s", candidateData.ID.String())
 		}
 	}
-	committee := newCommitteeAccounts.SeatedAccounts(newCommitteeAccounts.IDs()...)
 
-	return committee, nil
+	return newCommitteeAccounts, nil
 }

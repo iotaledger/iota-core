@@ -1,10 +1,13 @@
 package account
 
 import (
+	"bytes"
 	"io"
+	"sort"
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/core/safemath"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -128,6 +131,53 @@ func (a *Accounts) ForEach(callback func(id iotago.AccountID, pool *Pool) bool) 
 // SeatedAccounts creates a new SeatedAccounts instance, that maintains the seats of the given members.
 func (a *Accounts) SeatedAccounts(members ...iotago.AccountID) *SeatedAccounts {
 	return NewSeatedAccounts(a, members...)
+}
+
+// TODO:make the above and below method into one
+
+// SelectCommitteeRetainSeats creates a new SeatedAccounts instance,
+// that maintains the seat indices of re-elected members from the previous committee.
+func (a *Accounts) SelectCommitteeRetainSeats(prevCommittee *SeatedAccounts) *SeatedAccounts {
+	newCommittee := NewSeatedAccounts(a)
+
+	// If previous committee exists the seats need to be assigned and re-elected committee members must retain their SeatIndex.
+	committeeAccountIDs := a.IDs()
+
+	// Keep track of re-elected members' seat indices.
+	takenSeatIndices := ds.NewSet[SeatIndex]()
+
+	// Assign re-elected members' SeatIndex.
+	a.ForEach(func(id iotago.AccountID, _ *Pool) bool {
+		if seatIndex, seatExists := prevCommittee.GetSeat(id); seatExists {
+			newCommittee.Set(seatIndex, id)
+			takenSeatIndices.Add(seatIndex)
+		}
+
+		return true
+	})
+
+	// Sort members lexicographically.
+	sort.Slice(committeeAccountIDs, func(i int, j int) bool {
+		return bytes.Compare(committeeAccountIDs[i][:], committeeAccountIDs[j][:]) < 0
+	})
+
+	// Assign SeatIndex to new committee members.
+	currentSeatIndex := SeatIndex(0)
+	for _, memberID := range committeeAccountIDs {
+		// If SeatIndex is taken by re-elected member, then increment it.
+		for takenSeatIndices.Has(currentSeatIndex) {
+			currentSeatIndex++
+		}
+
+		// Assign SeatIndex of a fresh committee member.
+		if _, seatExists := prevCommittee.GetSeat(memberID); !seatExists {
+			newCommittee.Set(currentSeatIndex, memberID)
+
+			currentSeatIndex++
+		}
+	}
+
+	return newCommittee
 }
 
 func AccountsFromBytes(b []byte) (*Accounts, int, error) {

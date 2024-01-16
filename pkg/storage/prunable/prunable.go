@@ -26,7 +26,7 @@ type Prunable struct {
 	decidedUpgradeSignals *epochstore.Store[model.VersionAndHash]
 	poolRewards           *epochstore.EpochKVStore
 	poolStats             *epochstore.Store[*model.PoolsStats]
-	committee             *epochstore.Store[*account.Accounts]
+	committee             *epochstore.Store[*account.SeatedAccounts]
 }
 
 func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler func(error), opts ...options.Option[BucketManager]) *Prunable {
@@ -69,8 +69,8 @@ func New(dbConfig database.Config, apiProvider iotago.APIProvider, errorHandler 
 			kvstore.Realm{epochPrefixCommittee},
 			semiPermanentDB.KVStore(),
 			rewardPruningDelayFunc,
-			(*account.Accounts).Bytes,
-			account.AccountsFromBytes,
+			(*account.SeatedAccounts).Bytes,
+			account.SeatedAccountsFromBytes,
 		),
 	}
 }

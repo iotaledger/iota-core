@@ -16,7 +16,7 @@ type SeatManager interface {
 	RotateCommittee(epoch iotago.EpochIndex, candidates accounts.AccountsData) (*account.SeatedAccounts, error)
 
 	// ReuseCommittee reuses the committee from a previous epoch.
-	ReuseCommittee(epoch iotago.EpochIndex, committee *account.Accounts) error
+	ReuseCommittee(epoch iotago.EpochIndex, committee *account.SeatedAccounts) error
 
 	// InitializeCommittee initializes the committee for the current slot by marking whole or a subset of the committee as active.
 	// This is used when initializing committee after node startup (loaded from snapshot or database).
@@ -31,9 +31,10 @@ type SeatManager interface {
 	// OnlineCommittee returns the set of online validators that is used to track acceptance.
 	OnlineCommittee() ds.Set[account.SeatIndex]
 
-	// SeatCount returns the number of seats in the SeatManager.
+	// SeatCountInSlot returns the number of seats in the SeatManager.
 	SeatCountInSlot(slot iotago.SlotIndex) int
 
+	// SeatCountInEpoch returns the number of seats in the SeatManager.
 	SeatCountInEpoch(epoch iotago.EpochIndex) int
 
 	// Interface embeds the required methods of the module.Interface.
