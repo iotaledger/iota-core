@@ -48,11 +48,21 @@ type TipMetadata struct {
 	// that is connected to the tips.
 	isReferencedByTips reactive.Variable[bool]
 
+	// isLatestValidatorBlock is true if the block is the latest block of a validator.
+	isLatestValidatorBlock reactive.Variable[bool]
+
+	// referencesLatestValidatorBlock is true if the block is the latest validator block or has parents that reference
+	// the latest validator block.
+	referencesLatestValidatorBlock reactive.Variable[bool]
+
 	// isStrongTip is true if the block is a strong tip pool member and is not strongly referenced by other tips.
 	isStrongTip reactive.Variable[bool]
 
 	// isWeakTip is true if the block is a weak tip pool member and is not referenced by other tips.
 	isWeakTip reactive.Variable[bool]
+
+	// isValidatorTip is true if the block is a strong tip and references the latest validator block.
+	isValidatorTip reactive.Variable[bool]
 
 	// isMarkedOrphaned is true if the liveness threshold has been reached and the block was not accepted.
 	isMarkedOrphaned reactive.Variable[bool]
@@ -85,20 +95,29 @@ type TipMetadata struct {
 
 	// weaklyOrphanedWeakParents holds the number of weak parents that are weakly orphaned.
 	weaklyOrphanedWeakParents reactive.Counter[bool]
+
+	// parentsReferencingLatestValidatorBlock holds the number of parents that reference the latest validator block.
+	parentsReferencingLatestValidatorBlock reactive.Counter[bool]
 }
 
 // NewBlockMetadata creates a new TipMetadata instance.
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
-		block:                           block,
-		tipPool:                         reactive.NewVariable[tipmanager.TipPool](tipmanager.TipPool.Max),
-		livenessThresholdReached:        reactive.NewEvent(),
-		evicted:                         reactive.NewEvent(),
-		stronglyConnectedStrongChildren: reactive.NewCounter[bool](),
-		connectedWeakChildren:           reactive.NewCounter[bool](),
-		stronglyOrphanedStrongParents:   reactive.NewCounter[bool](),
-		weaklyOrphanedWeakParents:       reactive.NewCounter[bool](),
+		block:                                  block,
+		tipPool:                                reactive.NewVariable[tipmanager.TipPool](tipmanager.TipPool.Max),
+		livenessThresholdReached:               reactive.NewEvent(),
+		evicted:                                reactive.NewEvent(),
+		isLatestValidatorBlock:                 reactive.NewVariable[bool](),
+		stronglyConnectedStrongChildren:        reactive.NewCounter[bool](),
+		connectedWeakChildren:                  reactive.NewCounter[bool](),
+		stronglyOrphanedStrongParents:          reactive.NewCounter[bool](),
+		weaklyOrphanedWeakParents:              reactive.NewCounter[bool](),
+		parentsReferencingLatestValidatorBlock: reactive.NewCounter[bool](),
 	}
+
+	t.referencesLatestValidatorBlock = reactive.NewDerivedVariable2(func(_ bool, isLatestValidatorBlock bool, parentsReferencingLatestValidatorBlock int) bool {
+		return isLatestValidatorBlock || parentsReferencingLatestValidatorBlock > 0
+	}, t.isLatestValidatorBlock, t.parentsReferencingLatestValidatorBlock)
 
 	t.isMarkedOrphaned = reactive.NewDerivedVariable2[bool, bool](func(_ bool, isLivenessThresholdReached bool, isAccepted bool) bool {
 		return isLivenessThresholdReached && !isAccepted
@@ -160,6 +179,10 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		return isWeakTipPoolMember && !isReferencedByTips
 	}, t.isWeakTipPoolMember, t.isReferencedByTips)
 
+	t.isValidatorTip = reactive.NewDerivedVariable2(func(_ bool, isStrongTip bool, referencesLatestValidatorBlock bool) bool {
+		return isStrongTip && referencesLatestValidatorBlock
+	}, t.isStrongTip, t.referencesLatestValidatorBlock)
+
 	return t
 }
 
@@ -206,6 +229,7 @@ func (t *TipMetadata) Evicted() reactive.Event {
 // connectStrongParent sets up the parent and children related properties for a strong parent.
 func (t *TipMetadata) connectStrongParent(strongParent *TipMetadata) {
 	t.stronglyOrphanedStrongParents.Monitor(strongParent.isStronglyOrphaned)
+	t.parentsReferencingLatestValidatorBlock.Monitor(strongParent.referencesLatestValidatorBlock)
 
 	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
 	unsubscribe := strongParent.stronglyConnectedStrongChildren.Monitor(t.isStronglyConnectedToTips)

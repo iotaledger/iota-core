@@ -22,6 +22,9 @@ type TipManager struct {
 	// tipMetadataStorage contains the TipMetadata of all Blocks that are managed by the TipManager.
 	tipMetadataStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]
 
+	// validatorTipSet contains the subset of blocks from the strong tip set that reference the latest validator block.
+	validatorTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
+
 	// strongTipSet contains the blocks of the strong tip pool that have no referencing children.
 	strongTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
 
@@ -123,6 +126,14 @@ func (t *TipManager) Shutdown() {
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
+	tipMetadata.isValidatorTip.OnUpdate(func(_ bool, isValidatorTip bool) {
+		if isValidatorTip {
+			t.validatorTipSet.Set(tipMetadata.ID(), tipMetadata)
+		} else {
+			t.validatorTipSet.Delete(tipMetadata.ID())
+		}
+	})
+
 	tipMetadata.isStrongTip.OnUpdate(func(_ bool, isStrongTip bool) {
 		if isStrongTip {
 			t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
