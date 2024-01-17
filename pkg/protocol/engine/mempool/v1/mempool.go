@@ -461,6 +461,9 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 func (m *MemPool[VoteRank]) setup() {
 	m.spendDAG.Events().SpenderAccepted.Hook(func(id iotago.TransactionID) {
 		if transaction, exists := m.cachedTransactions.Get(id); exists {
+			m.evictionMutex.RLock()
+			defer m.evictionMutex.RUnlock()
+
 			transaction.setConflictAccepted()
 		}
 	})
@@ -470,9 +473,6 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
 		// Transactions can only become accepted if there is at least one attachment included.
 		if slot := transaction.EarliestIncludedAttachment().Slot(); slot != 0 {
-			m.evictionMutex.RLock()
-			defer m.evictionMutex.RUnlock()
-
 			stateDiff, err := m.stateDiff(slot)
 			if err != nil {
 				m.errorHandler(ierrors.Wrapf(err, "failed to get state diff for slot %d", slot))
