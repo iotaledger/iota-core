@@ -171,8 +171,4 @@ func increasing[T cmp.Ordered](currentValue T, newValue T) T {
 	return max(currentValue, newValue)
 }
 
-const (
-	chainSwitchingThreshold iotago.SlotIndex = 3
-
-	chainSwitchingMeasurementOffset iotago.SlotIndex = 1
-)
+const chainSwitchingMeasurementOffset iotago.SlotIndex = 1
