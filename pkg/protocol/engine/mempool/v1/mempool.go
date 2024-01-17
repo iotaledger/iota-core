@@ -176,13 +176,13 @@ func (m *MemPool[VoteRank]) TransactionMetadataByAttachment(blockID iotago.Block
 
 // StateDiff returns the state diff for the given slot.
 func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) (mempool.StateDiff, error) {
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
 	return m.stateDiff(slot)
 }
 
 func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error) {
-	m.evictionMutex.RLock()
-	defer m.evictionMutex.RUnlock()
-
 	if m.lastEvictedSlot >= slot {
 		return nil, ierrors.Errorf("slot %d is older than last evicted slot %d", slot, m.lastEvictedSlot)
 	}
@@ -470,6 +470,9 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 	transaction.OnAccepted(func() {
 		// Transactions can only become accepted if there is at least one attachment included.
 		if slot := transaction.EarliestIncludedAttachment().Slot(); slot != 0 {
+			m.evictionMutex.RLock()
+			defer m.evictionMutex.RUnlock()
+
 			stateDiff, err := m.stateDiff(slot)
 			if err != nil {
 				m.errorHandler(ierrors.Wrapf(err, "failed to get state diff for slot %d", slot))
