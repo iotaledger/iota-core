@@ -58,7 +58,7 @@ func (w *Wallet) SetBlockIssuer(accountID iotago.AccountID) {
 
 func (w *Wallet) BlockIssuerKey() iotago.BlockIssuerKey {
 	if w.BlockIssuer != nil {
-		return w.BlockIssuerKey()
+		return w.BlockIssuer.BlockIssuerKey()
 	}
 	_, pub := w.keyManager.KeyPair()
 
