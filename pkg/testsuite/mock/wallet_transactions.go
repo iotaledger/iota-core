@@ -398,7 +398,7 @@ func (w *Wallet) SendFundsToWallet(transactionName string, receiverWallet *Walle
 	)
 
 	receiverWallet.registerOutputs(transactionName, signedTransaction.Transaction)
-	fmt.Println("here:", lo.Keys(w.outputs))
+	fmt.Println(lo.Keys(w.outputs))
 
 	return signedTransaction
 }
@@ -665,31 +665,31 @@ func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, op
 	)
 }
 
-func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName string, accountOutput *utxoledger.Output, opts ...options.Option[builder.FoundryOutputBuilder]) *iotago.SignedTransaction {
+func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName string, accountOutputName string) *iotago.SignedTransaction {
 	input := w.Output(inputName)
+	accountOutput := w.AccountOutput(accountOutputName)
 	mintedAmount := input.BaseTokenAmount()
 
-	// transition account output
+	// transition account output, increase foundry counter by 1, the amount of account stays the same
 	accID := accountOutput.Output().(*iotago.AccountOutput).AccountID
 	accAddr := accID.ToAddress().(*iotago.AccountAddress)
 	accTransitionOutput := builder.NewAccountOutputBuilderFromPrevious(accountOutput.Output().(*iotago.AccountOutput)).
 		FoundriesToGenerate(1).MustBuild()
 
-	// foundry output
+	// build foundry output, consume all amount from the UTXO output
 	foundryID, _ := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(accAddr, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
 	tokenScheme := &iotago.SimpleTokenScheme{
 		MintedTokens:  big.NewInt(int64(mintedAmount)),
-		MaximumSupply: big.NewInt(int64(input.BaseTokenAmount())),
+		MaximumSupply: big.NewInt(int64(mintedAmount)),
 		MeltedTokens:  big.NewInt(0),
 	}
 
-	foundryOutput := options.Apply(builder.NewFoundryOutputBuilder(accAddr, tokenScheme, mintedAmount).
+	foundryOutput := builder.NewFoundryOutputBuilder(accAddr, tokenScheme, mintedAmount).
 		NativeToken(&iotago.NativeTokenFeature{
 			ID:     foundryID,
 			Amount: big.NewInt(int64(mintedAmount)),
-		}),
-		opts).MustBuild()
-	foundryOutput.SerialNumber = accTransitionOutput.FoundryCounter
+		}).
+		SerialNumber(accTransitionOutput.FoundryCounter).MustBuild()
 
 	return w.createSignedTransactionWithOptions(
 		transactionName,
