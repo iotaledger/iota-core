@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"sort"
-	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/ds"
@@ -22,7 +21,6 @@ type Accounts struct {
 
 	totalStake          iotago.BaseToken
 	totalValidatorStake iotago.BaseToken
-	reused              atomic.Bool
 
 	mutex syncutils.RWMutex
 }
@@ -53,14 +51,6 @@ func (a *Accounts) IDs() []iotago.AccountID {
 	})
 
 	return ids
-}
-
-func (a *Accounts) IsReused() bool {
-	return a.reused.Load()
-}
-
-func (a *Accounts) SetReused() {
-	a.reused.Store(true)
 }
 
 // Get returns the weight of the given identity.
@@ -213,13 +203,6 @@ func AccountsFromReader(reader io.Reader) (*Accounts, error) {
 		return nil, ierrors.Wrap(err, "failed to read account data")
 	}
 
-	reused, err := stream.Read[bool](reader)
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to read reused flag")
-	}
-
-	a.reused.Store(reused)
-
 	return a, nil
 }
 
@@ -249,10 +232,6 @@ func (a *Accounts) Bytes() ([]byte, error) {
 		return a.accountPools.Size(), nil
 	}); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write accounts")
-	}
-
-	if err := stream.Write(byteBuffer, a.reused.Load()); err != nil {
-		return nil, ierrors.Wrap(err, "failed to write reused flag")
 	}
 
 	return byteBuffer.Bytes()

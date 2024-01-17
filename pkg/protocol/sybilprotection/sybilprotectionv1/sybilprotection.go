@@ -1,7 +1,6 @@
 package sybilprotectionv1
 
 import (
-	"fmt"
 	"io"
 	"sort"
 
@@ -66,7 +65,6 @@ func NewProvider(opts ...options.Option[SybilProtection]) module.Provider[*engin
 					o.lastCommittedSlot = latestCommittedSlot
 
 					if o.optsInitialCommittee != nil {
-						// TODO: this should be dervived from genesis slot, not always 0
 						if _, err := o.seatManager.RotateCommittee(0, o.optsInitialCommittee); err != nil {
 							panic(ierrors.Wrap(err, "error while registering initial committee for epoch 0"))
 						}
@@ -388,40 +386,18 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 	return validatorResp, nil
 }
 
-func (o *SybilProtection) reuseCommittee(currentEpoch iotago.EpochIndex, targetEpoch iotago.EpochIndex) (*account.Accounts, error) {
-	committee, exists := o.seatManager.CommitteeInEpoch(currentEpoch)
-	if !exists {
-		// that should never happen as it is already the fallback strategy
-		panic(fmt.Sprintf("committee for current epoch %d not found", currentEpoch))
-	}
-
-	committeeAccounts, err := committee.Accounts()
+func (o *SybilProtection) reuseCommittee(currentEpoch iotago.EpochIndex, targetEpoch iotago.EpochIndex) (*account.SeatedAccounts, error) {
+	committee, err := o.seatManager.ReuseCommittee(currentEpoch, targetEpoch)
 	if err != nil {
-		return nil, ierrors.Wrapf(err, "failed to get accounts from committee for epoch %d", currentEpoch)
-	}
-
-	committeeAccounts.SetReused()
-
-	// seat accounts on the same seats as in the previous epoch
-	newCommittee := account.NewSeatedAccounts(committeeAccounts)
-	committeeAccounts.ForEach(func(id iotago.AccountID, _ *account.Pool) bool {
-		if seatIndex, seatExists := committee.GetSeat(id); seatExists {
-			newCommittee.Set(seatIndex, id)
-		}
-
-		return true
-	})
-
-	if err = o.seatManager.ReuseCommittee(targetEpoch, newCommittee); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to set committee for epoch %d", targetEpoch)
 	}
 
 	o.performanceTracker.ClearCandidates()
 
-	return committeeAccounts, nil
+	return committee, nil
 }
 
-func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Accounts, error) {
+func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.SeatedAccounts, error) {
 	timeProvider := o.apiProvider.APIForSlot(slot).TimeProvider()
 	currentEpoch := timeProvider.EpochFromSlot(slot)
 	nextEpoch := currentEpoch + 1
@@ -434,12 +410,12 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Ac
 
 	// If there's no candidate, reuse the current committee.
 	if candidates.Size() == 0 {
-		committeeAccounts, err := o.reuseCommittee(currentEpoch, nextEpoch)
+		committee, err := o.reuseCommittee(currentEpoch, nextEpoch)
 		if err != nil {
 			return nil, ierrors.Wrapf(err, "failed to reuse committee (due to no candidates) for epoch %d", nextEpoch)
 		}
 
-		return committeeAccounts, nil
+		return committee, nil
 	}
 
 	candidateAccounts := make(accounts.AccountsData, 0)
@@ -466,7 +442,7 @@ func (o *SybilProtection) selectNewCommittee(slot iotago.SlotIndex) (*account.Ac
 
 	o.performanceTracker.ClearCandidates()
 
-	return newCommittee.Accounts()
+	return newCommittee, nil
 }
 
 // WithInitialCommittee registers the passed committee on a given slot.

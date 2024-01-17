@@ -91,23 +91,16 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, candidates accoun
 		return nil, ierrors.Wrap(err, "error while selecting new committee")
 	}
 
-	// If rotating committee for epoch 0, then we can do it by default as there is no previous committee.
-	if epoch == 0 {
-		newCommittee := committeeAccounts.SeatedAccounts()
-
-		if err := s.committeeStore.Store(epoch, newCommittee); err != nil {
-			return nil, ierrors.Wrapf(err, "error while storing committee for epoch %d", epoch)
+	// Load previous committee only if target epoch is not zero.
+	var prevCommittee *account.SeatedAccounts
+	if epoch > 0 {
+		prevCommittee, err = s.committeeStore.Load(epoch - 1)
+		if err != nil {
+			return nil, err
 		}
-
-		return newCommittee, nil
 	}
 
-	prevCommittee, err := s.committeeStore.Load(epoch - 1)
-	if err != nil {
-		return nil, err
-	}
-
-	// If there is no previous committee, then we can assign seats by default.
+	// If there is no previous committee , then we can assign seats by default.
 	if prevCommittee == nil {
 		newCommittee := committeeAccounts.SeatedAccounts()
 
@@ -216,20 +209,31 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 	return nil
 }
 
-func (s *SeatManager) ReuseCommittee(epoch iotago.EpochIndex, committee *account.SeatedAccounts) error {
+func (s *SeatManager) ReuseCommittee(currentEpoch iotago.EpochIndex, targetEpoch iotago.EpochIndex) (*account.SeatedAccounts, error) {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	if committee.SeatCount() == 0 {
-		return ierrors.New("committee must not be empty")
+	currentCommittee, exists := s.committeeInEpoch(currentEpoch)
+	if !exists {
+		// that should never happen as it is already the fallback strategy
+		panic(ierrors.Errorf("committee for current epoch %d not found", currentEpoch))
 	}
 
-	err := s.committeeStore.Store(epoch, committee)
+	if currentCommittee.SeatCount() == 0 {
+		return nil, ierrors.New("committee must not be empty")
+	}
+
+	newCommittee, err := currentCommittee.Reuse()
 	if err != nil {
-		return ierrors.Wrapf(err, "failed to set committee for epoch %d", epoch)
+		return nil, ierrors.Wrapf(err, "failed to reuse committee from epoch %d", currentEpoch)
 	}
 
-	return nil
+	err = s.committeeStore.Store(targetEpoch, newCommittee)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to set committee for epoch %d", targetEpoch)
+	}
+
+	return newCommittee, nil
 }
 
 func (s *SeatManager) selectNewCommitteeAccounts(epoch iotago.EpochIndex, candidates accounts.AccountsData) (*account.Accounts, error) {

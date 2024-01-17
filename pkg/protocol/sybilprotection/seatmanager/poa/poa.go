@@ -77,11 +77,13 @@ func NewProvider(opts ...options.Option[SeatManager]) module.Provider[*engine.En
 
 var _ seatmanager.SeatManager = &SeatManager{}
 
+// RotateCommittee sets a Proof-of-Authority committee for a given epoch.
+// Given validators are only used if the committee has not been set before, otherwise it's ignored.
 func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, validators accounts.AccountsData) (*account.SeatedAccounts, error) {
 	s.committeeMutex.RLock()
 	defer s.committeeMutex.RUnlock()
 
-	// if committee is not set, then set it according to passed validators (used for creating a snapshot)
+	// If the committee is not set, then set it according to passed validators (used for creating a snapshot).
 	if s.committee == nil {
 		committeeAccounts := account.NewAccounts()
 
@@ -94,6 +96,7 @@ func (s *SeatManager) RotateCommittee(epoch iotago.EpochIndex, validators accoun
 				return nil, ierrors.Wrapf(err, "error while setting committee for epoch %d for validator %s", epoch, validatorData.ID.String())
 			}
 		}
+
 		s.committee = committeeAccounts.SeatedAccounts()
 	}
 
@@ -192,15 +195,30 @@ func (s *SeatManager) InitializeCommittee(epoch iotago.EpochIndex, activityTime 
 	return nil
 }
 
-func (s *SeatManager) ReuseCommittee(epoch iotago.EpochIndex, committee *account.SeatedAccounts) error {
+func (s *SeatManager) ReuseCommittee(currentEpoch iotago.EpochIndex, targetEpoch iotago.EpochIndex) (*account.SeatedAccounts, error) {
 	s.committeeMutex.Lock()
 	defer s.committeeMutex.Unlock()
 
-	s.committee = committee
-
-	if err := s.committeeStore.Store(epoch, s.committee); err != nil {
-		return ierrors.Wrapf(err, "failed to set committee for epoch %d", epoch)
+	currentCommittee, exists := s.committeeInEpoch(currentEpoch)
+	if !exists {
+		// that should never happen as it is already the fallback strategy
+		panic(ierrors.Errorf("committee for current epoch %d not found", currentEpoch))
 	}
 
-	return nil
+	if currentCommittee.SeatCount() == 0 {
+		return nil, ierrors.New("committee must not be empty")
+	}
+
+	newCommittee, err := currentCommittee.Reuse()
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to reuse committee from epoch %d", currentEpoch)
+	}
+
+	s.committee = newCommittee
+
+	if err := s.committeeStore.Store(targetEpoch, s.committee); err != nil {
+		return nil, ierrors.Wrapf(err, "failed to set committee for epoch %d", targetEpoch)
+	}
+
+	return s.committee, nil
 }

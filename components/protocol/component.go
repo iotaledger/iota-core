@@ -277,7 +277,7 @@ func configure() error {
 		Component.LogDebugf("SlotCommitmentReceived: %s", commitment.ID())
 	})
 
-	deps.Protocol.Events.Engine.SybilProtection.CommitteeSelected.Hook(func(committee *account.Accounts, epoch iotago.EpochIndex) {
+	deps.Protocol.Events.Engine.SybilProtection.CommitteeSelected.Hook(func(committee *account.SeatedAccounts, epoch iotago.EpochIndex) {
 		Component.LogInfof("CommitteeSelected, epoch: %d, committeeIDs: %s, reused: %t", epoch, committee.IDs(), committee.IsReused())
 	})
 

@@ -41,27 +41,25 @@ func TestTopStakers_InitializeCommittee(t *testing.T) {
 	}
 
 	// Try setting an empty committee.
-	err := topStakersSeatManager.ReuseCommittee(0, account.NewAccounts().SeatedAccounts())
+	_, err := topStakersSeatManager.RotateCommittee(0, accounts.AccountsData{})
 	require.Error(t, err)
 
-	// Create committee for epoch 0
-	initialCommittee := account.NewAccounts()
+	accountsData := accounts.AccountsData{}
+	var initialCommitteeAccountIDs []iotago.AccountID
 	for i := 0; i < 3; i++ {
-		if err := initialCommittee.Set(tpkg.RandAccountID(), &account.Pool{
-			PoolStake:      1900,
-			ValidatorStake: 900,
-			FixedCost:      11,
-		}); err != nil {
-			t.Fatal(err)
-		}
+		accountID := tpkg.RandAccountID()
+		initialCommitteeAccountIDs = append(initialCommitteeAccountIDs, accountID)
+
+		accountsData = append(accountsData, accounts.NewAccountData(accountID, accounts.WithValidatorStake(900), accounts.WithDelegationStake(1000), accounts.WithFixedCost(11)))
+
 	}
 
 	// Set committee for epoch 0.
-	err = topStakersSeatManager.ReuseCommittee(0, initialCommittee.SeatedAccounts())
+
+	_, err = topStakersSeatManager.RotateCommittee(0, accountsData)
 	require.NoError(t, err)
 	weightedSeats, exists := topStakersSeatManager.CommitteeInEpoch(0)
 	require.True(t, exists)
-	initialCommitteeAccountIDs := initialCommittee.IDs()
 
 	// Online committee should be empty.
 	require.True(t, topStakersSeatManager.OnlineCommittee().IsEmpty())
@@ -105,15 +103,20 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 	var committeeInEpoch0 *account.SeatedAccounts
 	var committeeInEpoch0IDs []iotago.AccountID
 	expectedCommitteeInEpoch0 := account.NewAccounts()
-
+	accountsData := accounts.AccountsData{}
 	// Create committee for epoch 0
 	{
-		addCommitteeMember(t, expectedCommitteeInEpoch0, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11})
-		addCommitteeMember(t, expectedCommitteeInEpoch0, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11})
-		addCommitteeMember(t, expectedCommitteeInEpoch0, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11})
+		accountID := addCommitteeMember(t, expectedCommitteeInEpoch0, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11})
+		accountsData = append(accountsData, accounts.NewAccountData(accountID, accounts.WithValidatorStake(900), accounts.WithDelegationStake(1000), accounts.WithFixedCost(11)))
+
+		accountID = addCommitteeMember(t, expectedCommitteeInEpoch0, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11})
+		accountsData = append(accountsData, accounts.NewAccountData(accountID, accounts.WithValidatorStake(900), accounts.WithDelegationStake(1000), accounts.WithFixedCost(11)))
+
+		accountID = addCommitteeMember(t, expectedCommitteeInEpoch0, &account.Pool{PoolStake: 1900, ValidatorStake: 900, FixedCost: 11})
+		accountsData = append(accountsData, accounts.NewAccountData(accountID, accounts.WithValidatorStake(900), accounts.WithDelegationStake(1000), accounts.WithFixedCost(11)))
 
 		// We should be able to set a committee with only 3 members for epoch 0 (this could be set e.g. via the snapshot).
-		err := s.ReuseCommittee(0, expectedCommitteeInEpoch0.SeatedAccounts())
+		_, err := s.RotateCommittee(0, accountsData)
 		require.NoError(t, err)
 
 		// Make sure that the online committee is handled correctly.
@@ -271,9 +274,8 @@ func TestTopStakers_RotateCommittee(t *testing.T) {
 		_, err := s.RotateCommittee(epoch, accountsData)
 		require.Error(t, err)
 
-		// Set reuse of committee manually.
-		expectedCommitteeInEpoch2.SetReused()
-		err = s.ReuseCommittee(epoch, expectedCommitteeInEpoch2.SeatedAccounts())
+		// Reuse committee.
+		_, err = s.ReuseCommittee(epoch-1, epoch)
 		require.NoError(t, err)
 
 		assertCommitteeInEpoch(t, s, testAPI, 3, expectedCommitteeInEpoch2)

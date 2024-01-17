@@ -189,22 +189,37 @@ func (m *ManualPOA) RotateCommittee(epoch iotago.EpochIndex, validators accounts
 	return m.committee, nil
 }
 
-func (m *ManualPOA) ReuseCommittee(epoch iotago.EpochIndex, committee *account.SeatedAccounts) error {
+func (m *ManualPOA) ReuseCommittee(currentEpoch iotago.EpochIndex, targetEpoch iotago.EpochIndex) (*account.SeatedAccounts, error) {
+	currentCommittee, exists := m.committeeInEpoch(currentEpoch)
+	if !exists {
+		// that should never happen as it is already the fallback strategy
+		panic(fmt.Sprintf("committee for current epoch %d not found", currentEpoch))
+	}
+
+	if currentCommittee.SeatCount() == 0 {
+		return nil, ierrors.New("committee must not be empty")
+	}
+
+	committee, err := currentCommittee.Reuse()
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to reuse committee from epoch %d", currentEpoch)
+	}
+
 	if m.committee == nil || m.accounts.Size() == 0 {
 		committeeAccounts, err := committee.Accounts()
 		if err != nil {
-			return ierrors.Wrapf(err, "failed to set manual PoA committee for epoch %d", epoch)
+			return nil, ierrors.Wrapf(err, "failed to set manual PoA committee for epoch %d", targetEpoch)
 		}
 
 		m.accounts = committeeAccounts
 		m.committee = committee
 	}
 
-	if err := m.committeeStore.Store(epoch, committee); err != nil {
+	if err := m.committeeStore.Store(targetEpoch, committee); err != nil {
 		panic(err)
 	}
 
-	return nil
+	return committee, nil
 }
 
 func (m *ManualPOA) InitializeCommittee(_ iotago.EpochIndex, _ time.Time) error {
