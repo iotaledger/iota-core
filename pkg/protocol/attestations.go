@@ -78,7 +78,7 @@ func (a *Attestations) initRequester() (shutdown func()) {
 	unsubscribeFromTicker := lo.Batch(
 		a.protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
 			return commitment.RequestAttestations.WithNonEmptyValue(func(_ bool) (teardown func()) {
-				if commitment.CumulativeWeight() == 0 {
+				if commitment.CumulativeWeight.Get() == 0 {
 					commitment.IsAttested.Set(true)
 
 					return nil

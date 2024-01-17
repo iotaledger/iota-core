@@ -10,17 +10,17 @@ import (
 type HeaviestChainCandidate struct {
 	reactive.Variable[*Chain]
 
-	weightVariable func(element *Commitment) reactive.Variable[uint64]
+	chains *Chains
 
-	mainChain reactive.ReadableVariable[*Chain]
+	weightVariable func(element *Commitment) reactive.Variable[uint64]
 
 	weightedCommitmentsBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, reactive.SortedSet[*Commitment]]
 }
 
-func newHeaviestChainCandidate(weightVariable func(element *Commitment) reactive.Variable[uint64], mainChain reactive.ReadableVariable[*Chain]) *HeaviestChainCandidate {
+func newHeaviestChainCandidate(chains *Chains, weightVariable func(element *Commitment) reactive.Variable[uint64]) *HeaviestChainCandidate {
 	return &HeaviestChainCandidate{
 		Variable:                  reactive.NewVariable[*Chain](),
-		mainChain:                 mainChain,
+		chains:                    chains,
 		weightedCommitmentsBySlot: shrinkingmap.New[iotago.SlotIndex, reactive.SortedSet[*Commitment]](),
 		weightVariable:            weightVariable,
 	}
@@ -39,10 +39,16 @@ func (h *HeaviestChainCandidate) measureAt(slot iotago.SlotIndex) (teardown func
 	return commitments.HeaviestElement().WithNonEmptyValue(func(heaviestCommitment *Commitment) func() {
 		var teardownFunctions []func()
 
-		if heaviestChain := heaviestCommitment.Chain.Get(); heaviestChain != h.mainChain.Get() {
+		if heaviestChain := heaviestCommitment.Chain.Get(); heaviestChain != h.chains.Main.Get() {
 			slotsWithHeaviestChain := reactive.NewCounter[*Commitment](func(commitment *Commitment) bool {
 				return commitment.Chain.Get() == heaviestChain
 			})
+
+			for i := iotago.SlotIndex(1); i < chainSwitchingThreshold; i++ {
+				if earlierCommitments, earlierCommitmentsExist := h.weightedCommitmentsBySlot.Get(slot - i); earlierCommitmentsExist {
+					teardownFunctions = append(teardownFunctions, slotsWithHeaviestChain.Monitor(earlierCommitments.HeaviestElement()))
+				}
+			}
 
 			teardownFunctions = append(teardownFunctions, slotsWithHeaviestChain.OnUpdate(func(_ int, slotsWithHeaviestChain int) {
 				if iotago.SlotIndex(slotsWithHeaviestChain) >= chainSwitchingThreshold-1 {
@@ -51,12 +57,6 @@ func (h *HeaviestChainCandidate) measureAt(slot iotago.SlotIndex) (teardown func
 					h.Set(nil)
 				}
 			}))
-
-			for i := iotago.SlotIndex(1); i < chainSwitchingThreshold; i++ {
-				if earlierCommitments, earlierCommitmentsExist := h.weightedCommitmentsBySlot.Get(slot - i); earlierCommitmentsExist {
-					teardownFunctions = append(teardownFunctions, slotsWithHeaviestChain.Monitor(earlierCommitments.HeaviestElement()))
-				}
-			}
 		}
 
 		return lo.Batch(teardownFunctions...)

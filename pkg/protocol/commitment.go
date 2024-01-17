@@ -44,11 +44,17 @@ type Commitment struct {
 	// and its parent).
 	Weight reactive.Variable[uint64]
 
+	// CumulativeWeight contains the cumulative weight of all Commitments up to this point.
+	CumulativeWeight reactive.Variable[uint64]
+
 	// AttestedWeight contains the weight of the Commitment that was attested by other nodes.
 	AttestedWeight reactive.Variable[uint64]
 
 	// CumulativeAttestedWeight contains the cumulative weight of all attested Commitments up to this point.
 	CumulativeAttestedWeight reactive.Variable[uint64]
+
+	// CumulativeVerifiedWeight contains the cumulative weight of all verified Commitments up to this point.
+	CumulativeVerifiedWeight reactive.Variable[uint64]
 
 	// IsRoot contains a flag indicating if this Commitment is the root of the Chain.
 	IsRoot reactive.Event
@@ -96,8 +102,10 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		WarpSyncBlocks:                  reactive.NewVariable[bool](),
 		BlocksToWarpSync:                reactive.NewVariable[ds.Set[iotago.BlockID]](),
 		Weight:                          reactive.NewVariable[uint64](),
+		CumulativeWeight:                reactive.NewVariable[uint64](),
 		AttestedWeight:                  reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
+		CumulativeVerifiedWeight:        reactive.NewVariable[uint64](),
 		IsRoot:                          reactive.NewEvent(),
 		IsAttested:                      reactive.NewEvent(),
 		IsSynced:                        reactive.NewEvent(),
@@ -163,11 +171,14 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 		c.IsAttested.InheritFrom(c.IsVerified),
 		c.IsSynced.InheritFrom(c.IsVerified),
 
+		c.deriveCumulativeVerifiedWeight(),
+
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
 			// the weight can be fixed as a one time operation (it only relies on static information)
-			if parent.CumulativeWeight() < c.CumulativeWeight() {
-				c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
-			}
+			//if parent.CumulativeWeight.Get() < c.CumulativeWeight.Get() {
+			c.Weight.Set(c.Commitment.CumulativeWeight() - parent.Commitment.CumulativeWeight())
+			c.CumulativeWeight.Set(c.Commitment.CumulativeWeight())
+			//}
 
 			return lo.Batch(
 				parent.deriveChildren(c),
@@ -258,6 +269,14 @@ func (c *Commitment) deriveCumulativeAttestedWeight(parent *Commitment) func() {
 	}, parent.CumulativeAttestedWeight, c.AttestedWeight))
 }
 
+// deriveCumulativeVerifiedWeight derives the CumulativeVerifiedWeight of this Commitment which is the same as the
+// CumulativeWeight of the underlying model.Commitment if this Commitment is verified.
+func (c *Commitment) deriveCumulativeVerifiedWeight() func() {
+	return c.IsVerified.OnTrigger(func() {
+		c.CumulativeVerifiedWeight.Set(c.CumulativeWeight.Get())
+	})
+}
+
 // deriveIsAboveLatestVerifiedCommitment derives the IsAboveLatestVerifiedCommitment flag of this Commitment which is
 // true if the parent is already above the latest verified Commitment or if the parent is verified and we are not.
 func (c *Commitment) deriveIsAboveLatestVerifiedCommitment(parent *Commitment) func() {
@@ -300,6 +319,14 @@ func (c *Commitment) forceChain(targetChain *Chain) {
 	}
 }
 
-func (c *Commitment) weightAddr() reactive.Variable[uint64] {
-	return c.Weight
+func (c *Commitment) cumulativeWeightAddr() reactive.Variable[uint64] {
+	return c.CumulativeWeight
+}
+
+func (c *Commitment) cumulativeAttestedWeightAddr() reactive.Variable[uint64] {
+	return c.CumulativeAttestedWeight
+}
+
+func (c *Commitment) cumulativeVerifiedWeightAddr() reactive.Variable[uint64] {
+	return c.CumulativeVerifiedWeight
 }

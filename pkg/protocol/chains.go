@@ -50,9 +50,9 @@ func newChains(protocol *Protocol) *Chains {
 		protocol:       protocol,
 	}
 
-	c.HeaviestClaimedCandidate = newHeaviestChainCandidate((*Commitment).weightAddr, c.Main)
-	c.HeaviestAttestedCandidate = newHeaviestChainCandidate((*Commitment).weightAddr, c.Main)
-	c.HeaviestVerifiedCandidate = newHeaviestChainCandidate((*Commitment).weightAddr, c.Main)
+	c.HeaviestClaimedCandidate = newHeaviestChainCandidate(c, (*Commitment).cumulativeWeightAddr)
+	c.HeaviestAttestedCandidate = newHeaviestChainCandidate(c, (*Commitment).cumulativeAttestedWeightAddr)
+	c.HeaviestVerifiedCandidate = newHeaviestChainCandidate(c, (*Commitment).cumulativeVerifiedWeightAddr)
 
 	shutdown := lo.Batch(
 		c.initLogger(protocol.NewChildLogger("Chains")),
@@ -143,8 +143,10 @@ func (c *Chains) updateMeasuredSlot(latestSeenSlot iotago.SlotIndex) (teardown f
 func (c *Chains) deriveLatestSeenSlot(protocol *Protocol) func() {
 	return protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (shutdown func()) {
 		return lo.Batch(
-			mainEngine.Initialized.OnTrigger(func() {
-				c.LatestSeenSlot.Set(mainEngine.LatestCommitment.Get().Slot())
+			c.WithInitializedEngines(func(_ *Chain, engine *engine.Engine) (shutdown func()) {
+				return engine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {
+					c.LatestSeenSlot.Set(latestCommitment.Slot())
+				})
 			}),
 
 			protocol.Network.OnBlockReceived(func(block *model.Block, src peer.ID) {
@@ -170,7 +172,7 @@ func increasing[T cmp.Ordered](currentValue T, newValue T) T {
 }
 
 const (
-	chainSwitchingThreshold iotago.SlotIndex = 10
+	chainSwitchingThreshold iotago.SlotIndex = 3
 
 	chainSwitchingMeasurementOffset iotago.SlotIndex = 1
 )
