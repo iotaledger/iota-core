@@ -1,11 +1,11 @@
-package metrics
+package prometheus
 
 import (
 	"runtime"
 	"strconv"
 	"time"
 
-	"github.com/iotaledger/iota-core/components/metrics/collector"
+	"github.com/iotaledger/iota-core/components/prometheus/collector"
 )
 
 const (
