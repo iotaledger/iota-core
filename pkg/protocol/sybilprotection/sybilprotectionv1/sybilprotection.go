@@ -225,17 +225,10 @@ func (o *SybilProtection) committeeRoot(targetCommitteeEpoch iotago.EpochIndex) 
 		iotago.AccountIDFromBytes,
 	)
 
-	var innerErr error
-	committee.ForEach(func(accountID iotago.AccountID, _ *account.Pool) bool {
-		if err := committeeTree.Add(accountID); err != nil {
-			innerErr = ierrors.Wrapf(err, "failed to add account %s to committee tree", accountID)
-			return false
+	for _, accountID := range committee.IDs() {
+		if err = committeeTree.Add(accountID); err != nil {
+			return iotago.Identifier{}, ierrors.Wrapf(err, "failed to add account %s to committee tree", accountID)
 		}
-
-		return true
-	})
-	if innerErr != nil {
-		return iotago.Identifier{}, innerErr
 	}
 
 	return committeeTree.Root(), nil

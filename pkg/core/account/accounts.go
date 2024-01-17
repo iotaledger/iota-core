@@ -130,8 +130,6 @@ func (a *Accounts) SeatedAccounts(optPrevCommittee ...*SeatedAccounts) *SeatedAc
 	newCommittee := NewSeatedAccounts(a)
 
 	// If previous committee exists the seats need to be assigned and re-elected committee members must retain their SeatIndex.
-	committeeAccountIDs := a.IDs()
-
 	// Keep track of re-elected members' seat indices.
 	takenSeatIndices := ds.NewSet[SeatIndex]()
 
@@ -146,6 +144,7 @@ func (a *Accounts) SeatedAccounts(optPrevCommittee ...*SeatedAccounts) *SeatedAc
 	})
 
 	// Sort members lexicographically.
+	committeeAccountIDs := a.IDs()
 	sort.Slice(committeeAccountIDs, func(i int, j int) bool {
 		return bytes.Compare(committeeAccountIDs[i][:], committeeAccountIDs[j][:]) < 0
 	})
