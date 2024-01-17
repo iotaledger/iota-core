@@ -176,13 +176,13 @@ func (m *MemPool[VoteRank]) TransactionMetadataByAttachment(blockID iotago.Block
 
 // StateDiff returns the state diff for the given slot.
 func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) (mempool.StateDiff, error) {
-	m.evictionMutex.RLock()
-	defer m.evictionMutex.RUnlock()
-
 	return m.stateDiff(slot)
 }
 
 func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error) {
+	m.evictionMutex.RLock()
+	defer m.evictionMutex.RUnlock()
+
 	if m.lastEvictedSlot >= slot {
 		return nil, ierrors.Errorf("slot %d is older than last evicted slot %d", slot, m.lastEvictedSlot)
 	}
