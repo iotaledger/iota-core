@@ -2,6 +2,7 @@ package mock
 
 import (
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/iotaledger/hive.go/core/safemath"
@@ -369,6 +370,39 @@ func (w *Wallet) RemoveFeatureFromAccount(featureType iotago.FeatureType, transa
 
 	return signedTransaction
 }
+
+func (w *Wallet) SendFundsToWallet(transactionName string, receiverWallet *Wallet, inputNames ...string) *iotago.SignedTransaction {
+	inputStates := make([]*utxoledger.Output, 0, len(inputNames))
+	totalInputAmounts := iotago.BaseToken(0)
+	totalInputStoredMana := iotago.Mana(0)
+	for _, inputName := range inputNames {
+		output := w.Output(inputName)
+		inputStates = append(inputStates, output)
+		totalInputAmounts += output.BaseTokenAmount()
+		totalInputStoredMana += output.StoredMana()
+	}
+
+	targetOutput := &iotago.BasicOutput{
+		Amount: totalInputAmounts,
+		Mana:   totalInputStoredMana,
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: receiverWallet.Address()},
+		},
+		Features: iotago.BasicOutputFeatures{},
+	}
+
+	signedTransaction := w.createSignedTransactionWithOptions(
+		transactionName,
+		WithInputs(inputStates),
+		WithOutputs(iotago.Outputs[iotago.Output]{targetOutput}),
+	)
+
+	receiverWallet.registerOutputs(transactionName, signedTransaction.Transaction)
+	fmt.Println("here:", lo.Keys(w.outputs))
+
+	return signedTransaction
+}
+
 func (w *Wallet) SendFundsToAccount(transactionName string, accountID iotago.AccountID, inputNames ...string) *iotago.SignedTransaction {
 	inputStates := make([]*utxoledger.Output, 0, len(inputNames))
 	totalInputAmounts := iotago.BaseToken(0)
@@ -628,6 +662,46 @@ func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, op
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
 		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID),
+	)
+}
+
+func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName string, accountOutput *utxoledger.Output, opts ...options.Option[builder.FoundryOutputBuilder]) *iotago.SignedTransaction {
+	input := w.Output(inputName)
+	mintedAmount := input.BaseTokenAmount()
+
+	// transition account output
+	accID := accountOutput.Output().(*iotago.AccountOutput).AccountID
+	accAddr := accID.ToAddress().(*iotago.AccountAddress)
+	accTransitionOutput := builder.NewAccountOutputBuilderFromPrevious(accountOutput.Output().(*iotago.AccountOutput)).
+		FoundriesToGenerate(1).MustBuild()
+
+	// foundry output
+	foundryID, _ := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(accAddr, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
+	tokenScheme := &iotago.SimpleTokenScheme{
+		MintedTokens:  big.NewInt(int64(mintedAmount)),
+		MaximumSupply: big.NewInt(int64(input.BaseTokenAmount())),
+		MeltedTokens:  big.NewInt(0),
+	}
+
+	foundryOutput := options.Apply(builder.NewFoundryOutputBuilder(accAddr, tokenScheme, mintedAmount).
+		NativeToken(&iotago.NativeTokenFeature{
+			ID:     foundryID,
+			Amount: big.NewInt(int64(mintedAmount)),
+		}),
+		opts).MustBuild()
+	foundryOutput.SerialNumber = accTransitionOutput.FoundryCounter
+
+	return w.createSignedTransactionWithOptions(
+		transactionName,
+		WithInputs(utxoledger.Outputs{accountOutput, input}),
+		WithOutputs(iotago.Outputs[iotago.Output]{accTransitionOutput, foundryOutput}),
+		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
+			AccountID: accID,
+		}),
+		WithCommitmentInput(&iotago.CommitmentInput{
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+		}),
+		WithAllotAllManaToAccount(w.currentSlot, accID),
 	)
 }
 
