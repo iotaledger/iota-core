@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "Dockerfile"
+  push:
+    branches:
+      - develop
 
 jobs:
   build:
@@ -11,7 +14,7 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Build Docker image
         run: DOCKER_BUILDKIT=1 docker build . --file Dockerfile --tag iota-core:latest

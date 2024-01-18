@@ -8,9 +8,7 @@ ARGS=("$@")
 ansible-playbook -u root -i deploy/ansible/hosts/"${1:-feature.yml}" \
   --forks 20 --ssh-common-args "-o ControlMaster=auto -o ControlPersist=5m" \
   --extra-vars \
-"customSnapshotUrl=$CUSTOM_SNAPSHOT_URL
-defaultSnapshotUrl=$DEFAULT_SNAPSHOT_URL
-iota_core_docker_image_repo=$IOTA_CORE_DOCKER_IMAGE_REPO
+"iota_core_docker_image_repo=$IOTA_CORE_DOCKER_IMAGE_REPO
 iota_core_docker_image_tag=$IOTA_CORE_DOCKER_IMAGE_TAG
 wireguard_server_private_key=$WIREGUARD_SERVER_PRIVKEY
 elkElasticUser=$ELASTIC_USER

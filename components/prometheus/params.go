@@ -1,4 +1,4 @@
-package metrics
+package prometheus
 
 import (
 	"github.com/iotaledger/hive.go/app"
@@ -23,6 +23,6 @@ var ParamsMetrics = &ParametersMetrics{}
 
 var params = &app.ComponentParams{
 	Params: map[string]any{
-		"metrics": ParamsMetrics,
+		"prometheus": ParamsMetrics,
 	},
 }

@@ -16,6 +16,8 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 		return
 	}
 
+	votingBlockEpoch := votingBlock.ProtocolBlock().API.TimeProvider().EpochFromSlot(votingBlock.ID().Slot())
+
 	var toPreAccept []*blocks.Block
 	toPreAcceptByID := ds.NewSet[iotago.BlockID]()
 
@@ -32,7 +34,11 @@ func (g *Gadget) TrackWitnessWeight(votingBlock *blocks.Block) {
 			propagateFurther = true
 		}
 
-		if !block.IsPreConfirmed() && (shouldPreConfirm || anyChildInSet(block, toPreConfirmByID)) {
+		// Skip propagation of pre-confirmation if the block is not in the same epoch as the votingBlock.
+		// This might delay the (pre-)confirmation of blocks at the end of the epoch but make sure that (pre-)confirmation
+		// is safe in case where the minority of voters got different seats for the next epoch.
+		blockEpoch := block.ProtocolBlock().API.TimeProvider().EpochFromSlot(block.ID().Slot())
+		if !block.IsPreConfirmed() && votingBlockEpoch == blockEpoch && (shouldPreConfirm || anyChildInSet(block, toPreConfirmByID)) {
 			toPreConfirm = append([]*blocks.Block{block}, toPreConfirm...)
 			toPreConfirmByID.Add(block.ID())
 			propagateFurther = true
