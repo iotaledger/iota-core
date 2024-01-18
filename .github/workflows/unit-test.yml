@@ -4,6 +4,9 @@ on:
   pull_request:
     paths-ignore:
       - 'documentation/**'
+  push:
+    branches:
+      - develop
 
 jobs:
   unit-tests:
