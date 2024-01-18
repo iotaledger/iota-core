@@ -13,7 +13,7 @@ const (
 // ParametersP2P contains the definition of configuration parameters used by the p2p plugin.
 type ParametersP2P struct {
 	// BindAddress defines on which multi addresses the p2p service should listen on.
-	BindMultiAddresses []string `default:"/ip4/0.0.0.0/tcp/14666,/ip6/::/tcp/14666" usage:"the bind multi addresses for p2p connections"`
+	BindMultiAddresses []string `default:"/ip4/0.0.0.0/tcp/15600,/ip6/::/tcp/15600" usage:"the bind multi addresses for p2p connections"`
 
 	ConnectionManager struct {
 		// Defines the high watermark to use within the connection manager.
