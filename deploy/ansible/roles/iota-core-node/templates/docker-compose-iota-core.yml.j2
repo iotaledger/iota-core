@@ -27,7 +27,6 @@ services:
       - "15600:15600/tcp" # P2P
       - "6061:6061/tcp"   # pprof
       - "8080:14265/tcp"  # REST-API
-      - "8081:8081/tcp"   # Dashboard
       - "9311:9311/tcp"   # Prometheus
       - "9029:9029/tcp"   # INX
     volumes:
@@ -48,7 +47,6 @@ services:
       --restAPI.bindAddress=0.0.0.0:14265
       --db.path=/app/data/database
       --protocol.snapshot.path=/app/data/snapshot.bin
-      --dashboard.bindAddress=0.0.0.0:8081
       --prometheus.bindAddress=iota-core:9311
       --prometheus.goMetrics=true
       --prometheus.processMetrics=true
