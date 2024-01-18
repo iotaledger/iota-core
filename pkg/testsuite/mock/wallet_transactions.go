@@ -665,6 +665,7 @@ func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, op
 	)
 }
 
+//nolint:forcetypeassert
 func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName string, accountOutputName string) *iotago.SignedTransaction {
 	input := w.Output(inputName)
 	accountOutput := w.AccountOutput(accountOutputName)
