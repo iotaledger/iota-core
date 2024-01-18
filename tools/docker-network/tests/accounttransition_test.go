@@ -4,6 +4,7 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -36,17 +37,23 @@ func Test_AccountTransitions(t *testing.T) {
 	require.NoError(t, err)
 
 	// create account1
+	fmt.Println("Creating account1")
 	account1 := d.CreateAccount()
+
 	// create account2
+	fmt.Println("\nCreating account2")
 	account2 := d.CreateAccount()
 
 	// request faucet funds
+	fmt.Println("\nRequestng faucet funds")
 	fundsAddr, _ := d.getAddress(iotago.AddressEd25519)
 	d.RequestFaucetFunds(context.TODO(), fundsAddr)
 
 	// allot 1000 mana from account1 to account2
+	fmt.Println("\nAlloting mana from account1 to account2")
 	d.AllotManaTo(account1, account2, 1000)
 
 	// create native token
+	fmt.Println("\nCreating native token")
 	account2 = d.CreateNativeToken(account2)
 }

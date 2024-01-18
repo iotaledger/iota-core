@@ -374,6 +374,8 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
 	d.CheckAccountStatus(ctx, blkID, lo.PanicOnErr(signedTx.Transaction.ID()), accOutputID, accountAddress, true)
 
+	fmt.Printf("Account created, Bech addr: %s, in txID: %s, slot: %d\n", accountAddress.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), blkID.Slot())
+
 	return &Account{
 		AccountID:      accountID,
 		AccountAddress: accountAddress,
@@ -477,6 +479,8 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
 
+	fmt.Println("Allot mana transaction sent, blkID:", blkID.ToHex(), ", txID:", lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), ", slot:", blkID.Slot())
+
 	d.AwaitTransactionPayloadAccepted(ctx, blkID)
 }
 
@@ -554,6 +558,8 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account) (updatedAccount *
 
 	d.AwaitTransactionPayloadAccepted(ctx, blkID)
 
+	fmt.Println("Create native tokens transaction sent, blkID:", blkID.ToHex(), ", txID:", lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), ", slot:", blkID.Slot())
+
 	// wait for the account to be committed
 	d.AwaitCommitment(blkID.Slot())
 
@@ -594,8 +600,6 @@ func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iota
 	// check if the creation output exists
 	_, err := clt.OutputByID(ctx, creationOutputID)
 	require.NoError(d.Testing, err)
-
-	fmt.Printf("Account created, Bech addr: %s, slot: %d\n", accountAddress.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), slot)
 }
 
 func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, receiveAddr iotago.Address) (iotago.OutputID, iotago.Output) {
@@ -603,6 +607,8 @@ func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, receiveAdd
 
 	outputID, output, err := d.AwaitAddressUnspentOutputAccepted(ctx, receiveAddr)
 	require.NoError(d.Testing, err)
+
+	fmt.Println("Faucet funds received, txID:", outputID.TransactionID().ToHex())
 
 	return outputID, output
 }
