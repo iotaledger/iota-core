@@ -166,9 +166,6 @@ loop:
 
 	d.GetContainersConfigs()
 
-	// make sure all nodes are up then we can start dumping logs
-	d.DumpContainerLogsToFiles()
-
 	return nil
 }
 
@@ -207,6 +204,9 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 
 		return nil
 	}, true)
+
+	// make sure all nodes are up then we can start dumping logs
+	d.DumpContainerLogsToFiles()
 
 	return nil
 }
