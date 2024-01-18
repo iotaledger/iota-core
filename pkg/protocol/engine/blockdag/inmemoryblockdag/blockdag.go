@@ -111,8 +111,6 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 
 			if unsolidParentsCount.Add(-1) == 0 {
 				if block.SetSolid() {
-					b.LogError("block solid", "blockID", block.ID())
-
 					b.events.BlockSolid.Trigger(block)
 				}
 			}
