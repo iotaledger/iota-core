@@ -430,7 +430,7 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 	return delegationOutput.StartEpoch
 }
 
-// AllotManaTo allots amount of mana from one account to another.
+// AllotManaTo requests faucet funds then uses it to allots mana from one account to another.
 func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllot iotago.Mana) {
 	// requesting faucet funds for allotment
 	ctx := context.TODO()
@@ -480,6 +480,7 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 	d.AwaitTransactionPayloadAccepted(ctx, blkID)
 }
 
+// CreateNativeToken request faucet funds then use it to create native token for the account, and returns the updated Account.
 func (d *DockerTestFramework) CreateNativeToken(from *Account) (updatedAccount *Account) {
 	// requesting faucet funds for native token creation
 	ctx := context.TODO()
@@ -553,6 +554,10 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account) (updatedAccount *
 	}
 
 	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+
+	// wait for the account to be committed
+	d.AwaitCommitment(blkID.Slot())
+
 	d.AssertIndexerAccount(updatedAccount)
 	d.AssertIndexerFoundry(foundryID)
 
