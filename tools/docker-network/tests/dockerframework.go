@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"log"
+	"math/big"
 	"os/exec"
 	"sort"
 	"strings"
@@ -61,6 +62,8 @@ type Account struct {
 	AccountID      iotago.AccountID
 	AccountAddress *iotago.AccountAddress
 	BlockIssuerKey ed25519.PrivateKey
+	AccountOutput  *iotago.AccountOutput
+	OutputID       iotago.OutputID
 }
 
 type DockerTestFramework struct {
@@ -375,6 +378,8 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 		AccountID:      accountID,
 		AccountAddress: accountAddress,
 		BlockIssuerKey: accPrivateKey,
+		AccountOutput:  accountOutput,
+		OutputID:       accOutputID,
 	}
 }
 
@@ -425,6 +430,135 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 	return delegationOutput.StartEpoch
 }
 
+// AllotManaTo allots amount of mana from one account to another.
+func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllot iotago.Mana) {
+	// requesting faucet funds for allotment
+	ctx := context.TODO()
+	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
+	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
+	fundsAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), privateKey))
+
+	clt := d.Node("V1").Client
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	basicOutput, ok := fundsUTXOOutput.(*iotago.BasicOutput)
+	require.True(d.Testing, ok)
+
+	// Subtract stored mana from source outputs to fund Allotment.
+	outputBuilder := builder.NewBasicOutputBuilderFromPrevious(basicOutput)
+	actualAllottedMana := manaToAllot
+	if manaToAllot >= basicOutput.StoredMana() {
+		actualAllottedMana = basicOutput.StoredMana()
+		outputBuilder.Mana(0)
+	} else {
+		outputBuilder.Mana(basicOutput.StoredMana() - manaToAllot)
+	}
+
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: fundsAddr,
+			InputID:      fundsOutputID,
+			Input:        fundsUTXOOutput,
+		}).
+		IncreaseAllotment(to.AccountID, actualAllottedMana).
+		AddOutput(basicOutput).
+		SetCreationSlot(currentSlot).
+		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
+		Build(fundsAddrSigner)
+	require.NoError(d.Testing, err)
+
+	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
+
+	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+}
+
+func (d *DockerTestFramework) CreateNativeToken(from *Account) (updatedAccount *Account) {
+	// requesting faucet funds for native token creation
+	ctx := context.TODO()
+	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
+	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
+
+	mintedAmount := fundsUTXOOutput.BaseTokenAmount()
+
+	clt := d.Node("V1").Client
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	// increase foundry counter
+	accTransitionOutput := builder.NewAccountOutputBuilderFromPrevious(from.AccountOutput).
+		FoundriesToGenerate(1).MustBuild()
+
+	// build foundry output, consume all amount from the UTXO output
+	foundryID, _ := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(from.AccountAddress, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
+	tokenScheme := &iotago.SimpleTokenScheme{
+		MintedTokens:  big.NewInt(int64(mintedAmount)),
+		MaximumSupply: big.NewInt(int64(mintedAmount)),
+		MeltedTokens:  big.NewInt(0),
+	}
+
+	foundryOutput := builder.NewFoundryOutputBuilder(from.AccountAddress, tokenScheme, mintedAmount).
+		NativeToken(&iotago.NativeTokenFeature{
+			ID:     foundryID,
+			Amount: big.NewInt(int64(mintedAmount)),
+		}).
+		SerialNumber(accTransitionOutput.FoundryCounter).MustBuild()
+
+	// prepare transaction
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
+
+	signer := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), privateKey),
+		iotago.NewAddressKeysForEd25519Address(from.AccountOutput.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address), from.BlockIssuerKey))
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: fundsAddr,
+			InputID:      fundsOutputID,
+			Input:        fundsUTXOOutput,
+		}).
+		AddInput(&builder.TxInput{
+			UnlockTarget: from.AccountOutput.UnlockConditionSet().Address().Address,
+			InputID:      from.OutputID,
+			Input:        from.AccountOutput,
+		}).
+		AddOutput(accTransitionOutput).
+		AddOutput(foundryOutput).
+		SetCreationSlot(currentSlot).
+		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: from.AccountID}).
+		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
+		AllotAllMana(currentSlot, from.AccountID).
+		Build(signer)
+	require.NoError(d.Testing, err)
+
+	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
+
+	updatedAccount = &Account{
+		AccountID:      from.AccountID,
+		AccountAddress: from.AccountAddress,
+		BlockIssuerKey: from.BlockIssuerKey,
+		AccountOutput:  accTransitionOutput,
+		OutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
+	}
+
+	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+	d.AssertIndexerAccount(updatedAccount)
+	d.AssertIndexerFoundry(foundryID)
+
+	return updatedAccount
+}
+
 func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iotago.BlockID, txID iotago.TransactionID, creationOutputID iotago.OutputID, accountAddress *iotago.AccountAddress, checkIndexer ...bool) {
 	// request by blockID if provided, otherwise use txID
 	// we take the slot from the blockID in case the tx is created earlier than the block.
@@ -467,6 +601,43 @@ func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, receiveAdd
 	require.NoError(d.Testing, err)
 
 	return outputID, output
+}
+
+func (d *DockerTestFramework) AssertIndexerAccount(account *Account) {
+	d.Eventually(func() error {
+		ctx := context.TODO()
+		indexerClt, err := d.Node("V1").Client.Indexer(ctx)
+		if err != nil {
+			return err
+		}
+
+		outputID, output, _, err := indexerClt.Account(ctx, account.AccountAddress)
+		if err != nil {
+			return err
+		}
+
+		require.EqualValues(d.Testing, account.OutputID, outputID)
+		require.EqualValues(d.Testing, account.AccountOutput, output)
+
+		return nil
+	})
+}
+
+func (d *DockerTestFramework) AssertIndexerFoundry(foundryID iotago.FoundryID) {
+	d.Eventually(func() error {
+		ctx := context.TODO()
+		indexerClt, err := d.Node("V1").Client.Indexer(ctx)
+		if err != nil {
+			return err
+		}
+
+		_, _, _, err = indexerClt.Foundry(ctx, foundryID)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (d *DockerTestFramework) AssertValidatorExists(accountAddr *iotago.AccountAddress) {
