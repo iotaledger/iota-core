@@ -134,7 +134,7 @@ func NewLedgerUpdateBatchOperationConsumed(spent *utxoledger.Spent) (*inx.Ledger
 func (s *Server) ReadOutput(_ context.Context, id *inx.OutputId) (*inx.OutputResponse, error) {
 	engine := deps.Protocol.Engines.Main.Get()
 
-	latestCommitment := engine.Storage.Settings().LatestCommitment()
+	latestCommitment := engine.SyncManager.LatestCommitment()
 
 	outputID := id.Unwrap()
 
@@ -172,7 +172,7 @@ func (s *Server) ReadOutput(_ context.Context, id *inx.OutputId) (*inx.OutputRes
 
 func (s *Server) ReadUnspentOutputs(_ *inx.NoParams, srv inx.INX_ReadUnspentOutputsServer) error {
 	engine := deps.Protocol.Engines.Main.Get()
-	latestCommitment := engine.Storage.Settings().LatestCommitment()
+	latestCommitment := engine.SyncManager.LatestCommitment()
 
 	var innerErr error
 	err := engine.Ledger.ForEachUnspentOutput(func(output *utxoledger.Output) bool {
