@@ -54,6 +54,7 @@ func New(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exist
 		retrieveBlock:         blockRetriever,
 		tipMetadataStorage:    shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
 		latestValidatorBlocks: shrinkingmap.New[iotago.AccountID, reactive.Variable[*TipMetadata]](),
+		validatorTipSet:       randommap.New[iotago.BlockID, *TipMetadata](),
 		strongTipSet:          randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:            randommap.New[iotago.BlockID, *TipMetadata](),
 		blockAdded:            event.New1[tipmanager.TipMetadata](),
@@ -105,6 +106,10 @@ func (t *TipManager) RemoveValidator(accountID iotago.AccountID) (removed bool) 
 	}
 
 	return removed
+}
+
+func (t *TipManager) ValidationTips(optAmount ...int) []tipmanager.TipMetadata {
+	return t.selectTips(t.validatorTipSet, optAmount...)
 }
 
 // StrongTips returns the strong tips of the TipManager (with an optional limit).
