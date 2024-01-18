@@ -505,12 +505,11 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account) (updatedAccount *
 		MeltedTokens:  big.NewInt(0),
 	}
 
-	foundryOutput := builder.NewFoundryOutputBuilder(from.AccountAddress, tokenScheme, mintedAmount).
+	foundryOutput := builder.NewFoundryOutputBuilder(from.AccountAddress, mintedAmount, accTransitionOutput.FoundryCounter, tokenScheme).
 		NativeToken(&iotago.NativeTokenFeature{
 			ID:     foundryID,
 			Amount: big.NewInt(int64(mintedAmount)),
-		}).
-		SerialNumber(accTransitionOutput.FoundryCounter).MustBuild()
+		}).MustBuild()
 
 	// prepare transaction
 	issuerResp, err := clt.BlockIssuance(ctx)

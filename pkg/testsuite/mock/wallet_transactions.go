@@ -684,12 +684,11 @@ func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName st
 		MeltedTokens:  big.NewInt(0),
 	}
 
-	foundryOutput := builder.NewFoundryOutputBuilder(accAddr, tokenScheme, mintedAmount).
+	foundryOutput := builder.NewFoundryOutputBuilder(accAddr, mintedAmount, accTransitionOutput.FoundryCounter, tokenScheme).
 		NativeToken(&iotago.NativeTokenFeature{
 			ID:     foundryID,
 			Amount: big.NewInt(int64(mintedAmount)),
-		}).
-		SerialNumber(accTransitionOutput.FoundryCounter).MustBuild()
+		}).MustBuild()
 
 	return w.createSignedTransactionWithOptions(
 		transactionName,
