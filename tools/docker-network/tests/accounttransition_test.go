@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test_AccountTransitions follows the account state transition flow described in:
+// https://github.com/iotaledger/iota-core/issues/660#issuecomment-1892596243
 func Test_AccountTransitions(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
