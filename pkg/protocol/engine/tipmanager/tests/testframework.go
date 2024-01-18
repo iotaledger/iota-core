@@ -53,7 +53,7 @@ func (t *TestFramework) AddBlock(alias string) tipmanager.TipMetadata {
 	return t.tipMetadataByAlias[alias]
 }
 
-func (t *TestFramework) CreateBlock(alias string, parents map[iotago.ParentsType][]string, optBlockBuilder ...func(*builder.BasicBlockBuilder)) *blocks.Block {
+func (t *TestFramework) CreateBasicBlock(alias string, parents map[iotago.ParentsType][]string, optBlockBuilder ...func(*builder.BasicBlockBuilder)) *blocks.Block {
 	blockBuilder := builder.NewBasicBlockBuilder(t.API)
 	blockBuilder.IssuingTime(time.Now())
 

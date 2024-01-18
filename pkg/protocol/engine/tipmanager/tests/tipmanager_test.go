@@ -10,13 +10,13 @@ import (
 func TestTipManager(t *testing.T) {
 	tf := NewTestFramework(t)
 
-	tf.CreateBlock("Bernd", map[iotago.ParentsType][]string{
+	tf.CreateBasicBlock("Bernd", map[iotago.ParentsType][]string{
 		iotago.StrongParentType: {"Genesis"},
 	})
-	tf.CreateBlock("Bernd1", map[iotago.ParentsType][]string{
+	tf.CreateBasicBlock("Bernd1", map[iotago.ParentsType][]string{
 		iotago.StrongParentType: {"Bernd"},
 	})
-	tf.CreateBlock("Bernd1.1", map[iotago.ParentsType][]string{
+	tf.CreateBasicBlock("Bernd1.1", map[iotago.ParentsType][]string{
 		iotago.StrongParentType: {"Bernd"},
 	})
 
@@ -33,13 +33,13 @@ func TestTipManager(t *testing.T) {
 func Test_Orphanage(t *testing.T) {
 	tf := NewTestFramework(t)
 
-	tf.CreateBlock("A", map[iotago.ParentsType][]string{
+	tf.CreateBasicBlock("A", map[iotago.ParentsType][]string{
 		iotago.StrongParentType: {"Genesis"},
 	})
-	tf.CreateBlock("B", map[iotago.ParentsType][]string{
+	tf.CreateBasicBlock("B", map[iotago.ParentsType][]string{
 		iotago.StrongParentType: {"Genesis"},
 	})
-	tf.CreateBlock("C", map[iotago.ParentsType][]string{
+	tf.CreateBasicBlock("C", map[iotago.ParentsType][]string{
 		iotago.StrongParentType: {"A", "B"},
 	})
 
