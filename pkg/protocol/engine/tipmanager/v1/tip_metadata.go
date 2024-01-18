@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -224,6 +225,31 @@ func (t *TipMetadata) IsOrphaned() reactive.ReadableVariable[bool] {
 // Evicted exposes an event that is triggered when the block is evicted.
 func (t *TipMetadata) Evicted() reactive.Event {
 	return t.evicted
+}
+
+// registerAsLatestValidatorBlock registers the TipMetadata as the latest validator block if it is newer than the
+// currently registered block and sets the isLatestValidatorBlock variable accordingly. The function returns true if the
+// operation was successful.
+func (t *TipMetadata) registerAsLatestValidatorBlock(latestValidatorBlock reactive.Variable[*TipMetadata]) (registered bool) {
+	latestValidatorBlock.Compute(func(currentLatestValidatorBlock *TipMetadata) *TipMetadata {
+		registered = currentLatestValidatorBlock == nil || currentLatestValidatorBlock.block.IssuingTime().Before(t.block.IssuingTime())
+
+		return lo.Cond(registered, t, currentLatestValidatorBlock)
+	})
+
+	if registered {
+		t.isLatestValidatorBlock.Set(true)
+
+		ifLatestValidatorBlockChanged := func(_ *TipMetadata, latestValidatorBlock *TipMetadata) bool {
+			return latestValidatorBlock != t
+		}
+
+		latestValidatorBlock.OnUpdateOnce(func(_ *TipMetadata, _ *TipMetadata) {
+			t.isLatestValidatorBlock.Set(false)
+		}, ifLatestValidatorBlockChanged)
+	}
+
+	return registered
 }
 
 // connectStrongParent sets up the parent and children related properties for a strong parent.

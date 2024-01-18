@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/iotaledger/hive.go/ds/randommap"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
@@ -21,6 +22,9 @@ type TipManager struct {
 
 	// tipMetadataStorage contains the TipMetadata of all Blocks that are managed by the TipManager.
 	tipMetadataStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]
+
+	// latestValidatorBlocks contains a Variable for each validator that stores the latest validator block.
+	latestValidatorBlocks *shrinkingmap.ShrinkingMap[iotago.AccountID, reactive.Variable[*TipMetadata]]
 
 	// validatorTipSet contains the subset of blocks from the strong tip set that reference the latest validator block.
 	validatorTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
@@ -47,11 +51,12 @@ type TipManager struct {
 // New creates a new TipManager.
 func New(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool)) *TipManager {
 	t := &TipManager{
-		retrieveBlock:      blockRetriever,
-		tipMetadataStorage: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
-		strongTipSet:       randommap.New[iotago.BlockID, *TipMetadata](),
-		weakTipSet:         randommap.New[iotago.BlockID, *TipMetadata](),
-		blockAdded:         event.New1[tipmanager.TipMetadata](),
+		retrieveBlock:         blockRetriever,
+		tipMetadataStorage:    shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
+		latestValidatorBlocks: shrinkingmap.New[iotago.AccountID, reactive.Variable[*TipMetadata]](),
+		strongTipSet:          randommap.New[iotago.BlockID, *TipMetadata](),
+		weakTipSet:            randommap.New[iotago.BlockID, *TipMetadata](),
+		blockAdded:            event.New1[tipmanager.TipMetadata](),
 	}
 
 	t.TriggerConstructed()
@@ -81,6 +86,25 @@ func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
 // OnBlockAdded registers a callback that is triggered whenever a new Block was added to the TipManager.
 func (t *TipManager) OnBlockAdded(handler func(block tipmanager.TipMetadata)) (unsubscribe func()) {
 	return t.blockAdded.Hook(handler).Unhook
+}
+
+// AddValidator adds a validator to the tracking of the TipManager.
+func (t *TipManager) AddValidator(accountID iotago.AccountID) (added bool) {
+	_, added = t.latestValidatorBlocks.GetOrCreate(accountID, func() reactive.Variable[*TipMetadata] {
+		return reactive.NewVariable[*TipMetadata]()
+	})
+
+	return added
+}
+
+// RemoveValidator removes a validator from the tracking of the TipManager.
+func (t *TipManager) RemoveValidator(accountID iotago.AccountID) (removed bool) {
+	latestValidatorBlock, removed := t.latestValidatorBlocks.DeleteAndReturn(accountID)
+	if removed {
+		latestValidatorBlock.Set(nil)
+	}
+
+	return removed
 }
 
 // StrongTips returns the strong tips of the TipManager (with an optional limit).
@@ -126,6 +150,10 @@ func (t *TipManager) Shutdown() {
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
+	tipMetadata.isStrongTipPoolMember.WithNonEmptyValue(func(_ bool) func() {
+		return t.trackLatestValidatorBlock(tipMetadata)
+	})
+
 	tipMetadata.isValidatorTip.OnUpdate(func(_ bool, isValidatorTip bool) {
 		if isValidatorTip {
 			t.validatorTipSet.Set(tipMetadata.ID(), tipMetadata)
@@ -159,6 +187,21 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	})
 
 	t.blockAdded.Trigger(tipMetadata)
+}
+
+// trackLatestValidatorBlock tracks the latest validator block and takes care of marking the corresponding TipMetadata.
+func (t *TipManager) trackLatestValidatorBlock(tipMetadata *TipMetadata) (teardown func()) {
+	latestValidatorBlock, exists := t.latestValidatorBlocks.Get(tipMetadata.Block().ProtocolBlock().Header.IssuerID)
+	if !exists || !tipMetadata.registerAsLatestValidatorBlock(latestValidatorBlock) {
+		return
+	}
+
+	// reset the latest validator block to nil if we are still the latest one during teardown
+	return func() {
+		latestValidatorBlock.Compute(func(latestValidatorBlock *TipMetadata) *TipMetadata {
+			return lo.Cond(latestValidatorBlock == tipMetadata, nil, latestValidatorBlock)
+		})
+	}
 }
 
 // forEachParentByType iterates through the parents of the given block and calls the consumer for each parent.

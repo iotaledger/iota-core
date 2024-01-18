@@ -27,6 +27,12 @@ type TipManager interface {
 	// OnBlockAdded registers a callback that is triggered whenever a new Block was added to the TipManager.
 	OnBlockAdded(handler func(block TipMetadata)) (unsubscribe func())
 
+	// AddValidator adds a validator to the tracking of the TipManager.
+	AddValidator(accountID iotago.AccountID) (added bool)
+
+	// RemoveValidator removes a validator from the tracking of the TipManager.
+	RemoveValidator(accountID iotago.AccountID) (removed bool)
+
 	// StrongTips returns the strong tips of the TipManager (with an optional limit).
 	StrongTips(optAmount ...int) []TipMetadata
 
