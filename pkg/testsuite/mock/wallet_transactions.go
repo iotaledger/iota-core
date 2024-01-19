@@ -677,7 +677,7 @@ func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName st
 	accTransitionOutput := builder.NewAccountOutputBuilderFromPrevious(accountOutput.Output().(*iotago.AccountOutput)).
 		FoundriesToGenerate(1).MustBuild()
 
-	// build foundry output, consume all amount from the UTXO output
+	// build foundry output
 	foundryID, _ := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(accAddr, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
 	tokenScheme := &iotago.SimpleTokenScheme{
 		MintedTokens:  big.NewInt(int64(mintedAmount)),

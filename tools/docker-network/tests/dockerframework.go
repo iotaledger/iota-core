@@ -501,7 +501,8 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account) (updatedAccount *
 		FoundriesToGenerate(1).MustBuild()
 
 	// build foundry output, consume all amount from the UTXO output
-	foundryID, _ := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(from.AccountAddress, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
+	foundryID, err := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(from.AccountAddress, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
+	require.NoError(d.Testing, err)
 	tokenScheme := &iotago.SimpleTokenScheme{
 		MintedTokens:  big.NewInt(int64(mintedAmount)),
 		MaximumSupply: big.NewInt(int64(mintedAmount)),

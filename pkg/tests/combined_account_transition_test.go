@@ -56,15 +56,15 @@ func Test_AccountStateTransition(t *testing.T) {
 	// create the account2, from implicit to full account from TX1:1 with wallet "second"
 	// generated (block2, TX3), (block3, TX4)
 	ts.AddWallet("second", node1, iotago.EmptyAccountID)
-	implicitAccID := createImplicitToFullAccount(ts)
+	account2ID := createImplicitToFullAccount(ts)
 
 	// send funds to account2, with TX1:2
 	// generated (block4, TX5)
-	sendfunds(ts)
+	sendFunds(ts)
 
 	// allot 1000 mana to account2 with TX1:3
 	// generated (block5, TX6)
-	allotManaTo(ts, implicitAccID)
+	allotManaTo(ts, account2ID)
 
 	// create native token from "TX5:0" and account2 (TX4:0)
 	// generated (block6, TX7)
@@ -200,7 +200,7 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 	return implicitAccountID
 }
 
-func sendfunds(ts *testsuite.TestSuite) {
+func sendFunds(ts *testsuite.TestSuite) {
 	node1 := ts.Node("node1")
 	node2 := ts.Node("node2")
 	wallet := ts.DefaultWallet()
