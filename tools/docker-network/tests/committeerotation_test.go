@@ -152,7 +152,7 @@ func Test_NoCandidacyPayload(t *testing.T) {
 	d.AddValidatorNode("V4", "docker-network-inx-validator-4-1", "http://localhost:8040", "rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw")
 	d.AddNode("node5", "docker-network-node-5-1", "http://localhost:8090")
 
-	err := d.Run()
+	err := d.Run(map[string]bool{"V1": false, "V2": false, "V3": false, "V4": false})
 	require.NoError(t, err)
 
 	err = d.WaitUntilSync()
@@ -164,7 +164,7 @@ func Test_NoCandidacyPayload(t *testing.T) {
 	fmt.Println("First finalized slot: ", prevFinalizedSlot)
 	currentEpoch := clt.CommittedAPI().TimeProvider().EpochFromSlot(status.LatestAcceptedBlockSlot)
 
-	d.StopIssueCandidacyPayload(d.Nodes()...)
+	d.AssertCommittee(currentEpoch+1, d.AccountsFromNodes(d.Nodes()...))
 
 	// Due to no candidacy payloads, committee should be reused, remain 4 validators
 	d.AssertCommittee(currentEpoch+2, d.AccountsFromNodes(d.Nodes()...))
@@ -179,7 +179,7 @@ func Test_NoCandidacyPayload(t *testing.T) {
 	})
 
 	// Start issuing candidacy payloads for 3 validators, and check if committee size is 3
-	d.StartIssueCandidacyPayload(d.Nodes("V1", "V2", "V3")...)
+	d.SetIssueCandidacyPayload(map[string]bool{"V1": true, "V2": true, "V3": true, "V4": false})
 	d.AssertCommittee(currentEpoch+4, d.AccountsFromNodes(d.Nodes("V1", "V2", "V3")...))
 }
 

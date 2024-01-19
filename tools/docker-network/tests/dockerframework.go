@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -115,14 +116,24 @@ func NewDockerTestFramework(t *testing.T, opts ...options.Option[DockerTestFrame
 	})
 }
 
-func (d *DockerTestFramework) Run() error {
+func (d *DockerTestFramework) Run(optIssueCandidacyPayloadMap ...map[string]bool) error {
 	ch := make(chan error)
 	stopCh := make(chan struct{})
 	defer close(ch)
 	defer close(stopCh)
 
+	issueCandidacyPayloadMap := make(map[string]bool)
+	if len(optIssueCandidacyPayloadMap) > 0 {
+		issueCandidacyPayloadMap = optIssueCandidacyPayloadMap[0]
+	}
+
 	go func() {
 		cmd := exec.Command("docker", "compose", "up")
+		cmd.Env = os.Environ()
+		for nodeName, issueCandidacyPayload := range issueCandidacyPayloadMap {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("ISSUE_CANDIDACY_PAYLOAD_%s=%t", nodeName, issueCandidacyPayload))
+		}
+
 		var out strings.Builder
 		cmd.Stderr = &out
 		err := cmd.Run()
@@ -273,47 +284,18 @@ func (d *DockerTestFramework) AccountsFromNodes(nodes ...*Node) []string {
 	return accounts
 }
 
-func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
-	// build a new image from the current one so we could set IssueCandidacyPayload to false,
-	// the committed image will not remember the container configs, so it's fine to commit the first validator of the nodes
-	newImageName := "no-candidacy-payload-image"
-	err := exec.Command("docker", "commit", nodes[0].ContainerName, newImageName).Run()
-	require.NoError(d.Testing, err)
+func (d *DockerTestFramework) SetIssueCandidacyPayload(issueCandidacyPayloadMap map[string]bool) {
+	cmd := exec.Command("docker", "compose", "up", "-d")
 
-	for _, node := range nodes {
-		if node.AccountAddressBech32 == "" {
-			continue
-		}
+	cmd.Env = os.Environ()
 
-		// stop the inx-validator that issues candidacy payload
-		err = d.StopContainer(node.ContainerName)
-		require.NoError(d.Testing, err)
-
-		// start a new inx-validator that does not issue candidacy payload
-		newContainerName := fmt.Sprintf("%s-1", node.ContainerName)
-		cmd := fmt.Sprintf("docker run --network docker-network_iota-core --env %s --name %s  %s %s --validator.issueCandidacyPayload=false &", node.PrivateKey, newContainerName, newImageName, node.ContainerConfigs)
-		err = exec.Command("bash", "-c", cmd).Run()
-		require.NoError(d.Testing, err)
+	for nodeName, issueCandidacyPayload := range issueCandidacyPayloadMap {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("ISSUE_CANDIDACY_PAYLOAD_%s=%t", nodeName, issueCandidacyPayload))
 	}
-}
 
-func (d *DockerTestFramework) StartIssueCandidacyPayload(nodes ...*Node) {
-	for _, node := range nodes {
-		if node.AccountAddressBech32 == "" {
-			continue
-		}
-
-		// stop and remove the inx-validator that does not issue candidacy payload
-		newContainerName := fmt.Sprintf("%s-1", node.ContainerName)
-		err := d.StopContainer(newContainerName)
-		require.NoError(d.Testing, err)
-
-		err = exec.Command("docker", "rm", newContainerName).Run()
-		require.NoError(d.Testing, err)
-
-		// start the inx-validator that issues candidacy payload
-		err = d.RestartContainer(node.ContainerName)
-		require.NoError(d.Testing, err)
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println("Docker compose up failed with error:", err)
 	}
 }
 
