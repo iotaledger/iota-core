@@ -49,12 +49,12 @@ type TipMetadata struct {
 	// that is connected to the tips.
 	isReferencedByTips reactive.Variable[bool]
 
-	// isLatestValidatorBlock is true if the block is the latest block of a validator.
-	isLatestValidatorBlock reactive.Variable[bool]
+	// isLatestValidationBlock is true if the block is the latest block of a validator.
+	isLatestValidationBlock reactive.Variable[bool]
 
-	// referencesLatestValidatorBlock is true if the block is the latest validator block or has parents that reference
+	// referencesLatestValidationBlock is true if the block is the latest validator block or has parents that reference
 	// the latest validator block.
-	referencesLatestValidatorBlock reactive.Variable[bool]
+	referencesLatestValidationBlock reactive.Variable[bool]
 
 	// isStrongTip is true if the block is a strong tip pool member and is not strongly referenced by other tips.
 	isStrongTip reactive.Variable[bool]
@@ -62,8 +62,8 @@ type TipMetadata struct {
 	// isWeakTip is true if the block is a weak tip pool member and is not referenced by other tips.
 	isWeakTip reactive.Variable[bool]
 
-	// isValidatorTip is true if the block is a strong tip and references the latest validator block.
-	isValidatorTip reactive.Variable[bool]
+	// isValidationTip is true if the block is a strong tip and references the latest validator block.
+	isValidationTip reactive.Variable[bool]
 
 	// isMarkedOrphaned is true if the liveness threshold has been reached and the block was not accepted.
 	isMarkedOrphaned reactive.Variable[bool]
@@ -97,28 +97,28 @@ type TipMetadata struct {
 	// weaklyOrphanedWeakParents holds the number of weak parents that are weakly orphaned.
 	weaklyOrphanedWeakParents reactive.Counter[bool]
 
-	// parentsReferencingLatestValidatorBlock holds the number of parents that reference the latest validator block.
-	parentsReferencingLatestValidatorBlock reactive.Counter[bool]
+	// parentsReferencingLatestValidationBlock holds the number of parents that reference the latest validator block.
+	parentsReferencingLatestValidationBlock reactive.Counter[bool]
 }
 
 // NewBlockMetadata creates a new TipMetadata instance.
 func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 	t := &TipMetadata{
-		block:                                  block,
-		tipPool:                                reactive.NewVariable[tipmanager.TipPool](tipmanager.TipPool.Max),
-		livenessThresholdReached:               reactive.NewEvent(),
-		evicted:                                reactive.NewEvent(),
-		isLatestValidatorBlock:                 reactive.NewVariable[bool](),
-		stronglyConnectedStrongChildren:        reactive.NewCounter[bool](),
-		connectedWeakChildren:                  reactive.NewCounter[bool](),
-		stronglyOrphanedStrongParents:          reactive.NewCounter[bool](),
-		weaklyOrphanedWeakParents:              reactive.NewCounter[bool](),
-		parentsReferencingLatestValidatorBlock: reactive.NewCounter[bool](),
+		block:                                   block,
+		tipPool:                                 reactive.NewVariable[tipmanager.TipPool](tipmanager.TipPool.Max),
+		livenessThresholdReached:                reactive.NewEvent(),
+		evicted:                                 reactive.NewEvent(),
+		isLatestValidationBlock:                 reactive.NewVariable[bool](),
+		stronglyConnectedStrongChildren:         reactive.NewCounter[bool](),
+		connectedWeakChildren:                   reactive.NewCounter[bool](),
+		stronglyOrphanedStrongParents:           reactive.NewCounter[bool](),
+		weaklyOrphanedWeakParents:               reactive.NewCounter[bool](),
+		parentsReferencingLatestValidationBlock: reactive.NewCounter[bool](),
 	}
 
-	t.referencesLatestValidatorBlock = reactive.NewDerivedVariable2(func(_ bool, isLatestValidatorBlock bool, parentsReferencingLatestValidatorBlock int) bool {
-		return isLatestValidatorBlock || parentsReferencingLatestValidatorBlock > 0
-	}, t.isLatestValidatorBlock, t.parentsReferencingLatestValidatorBlock)
+	t.referencesLatestValidationBlock = reactive.NewDerivedVariable2(func(_ bool, isLatestValidationBlock bool, parentsReferencingLatestValidationBlock int) bool {
+		return isLatestValidationBlock || parentsReferencingLatestValidationBlock > 0
+	}, t.isLatestValidationBlock, t.parentsReferencingLatestValidationBlock)
 
 	t.isMarkedOrphaned = reactive.NewDerivedVariable2[bool, bool](func(_ bool, isLivenessThresholdReached bool, isAccepted bool) bool {
 		return isLivenessThresholdReached && !isAccepted
@@ -180,9 +180,9 @@ func NewBlockMetadata(block *blocks.Block) *TipMetadata {
 		return isWeakTipPoolMember && !isReferencedByTips
 	}, t.isWeakTipPoolMember, t.isReferencedByTips)
 
-	t.isValidatorTip = reactive.NewDerivedVariable2(func(_ bool, isStrongTip bool, referencesLatestValidatorBlock bool) bool {
-		return isStrongTip && referencesLatestValidatorBlock
-	}, t.isStrongTip, t.referencesLatestValidatorBlock)
+	t.isValidationTip = reactive.NewDerivedVariable2(func(_ bool, isStrongTip bool, referencesLatestValidationBlock bool) bool {
+		return isStrongTip && referencesLatestValidationBlock
+	}, t.isStrongTip, t.referencesLatestValidationBlock)
 
 	return t
 }
@@ -227,25 +227,25 @@ func (t *TipMetadata) Evicted() reactive.Event {
 	return t.evicted
 }
 
-// registerAsLatestValidatorBlock registers the TipMetadata as the latest validator block if it is newer than the
-// currently registered block and sets the isLatestValidatorBlock variable accordingly. The function returns true if the
+// registerAsLatestValidationBlock registers the TipMetadata as the latest validation block if it is newer than the
+// currently registered block and sets the isLatestValidationBlock variable accordingly. The function returns true if the
 // operation was successful.
-func (t *TipMetadata) registerAsLatestValidatorBlock(latestValidatorBlock reactive.Variable[*TipMetadata]) (registered bool) {
-	latestValidatorBlock.Compute(func(currentLatestValidatorBlock *TipMetadata) *TipMetadata {
-		registered = currentLatestValidatorBlock == nil || currentLatestValidatorBlock.block.IssuingTime().Before(t.block.IssuingTime())
+func (t *TipMetadata) registerAsLatestValidationBlock(latestValidationBlock reactive.Variable[*TipMetadata]) (registered bool) {
+	latestValidationBlock.Compute(func(currentLatestValidationBlock *TipMetadata) *TipMetadata {
+		registered = currentLatestValidationBlock == nil || currentLatestValidationBlock.block.IssuingTime().Before(t.block.IssuingTime())
 
-		return lo.Cond(registered, t, currentLatestValidatorBlock)
+		return lo.Cond(registered, t, currentLatestValidationBlock)
 	})
 
 	if registered {
-		t.isLatestValidatorBlock.Set(true)
+		t.isLatestValidationBlock.Set(true)
 
-		// Once the latestValidatorBlock is updated again (by another block), we need to reset the isLatestValidatorBlock
+		// Once the latestValidationBlock is updated again (by another block), we need to reset the isLatestValidationBlock
 		// variable.
-		latestValidatorBlock.OnUpdateOnce(func(_ *TipMetadata, _ *TipMetadata) {
-			t.isLatestValidatorBlock.Set(false)
-		}, func(_ *TipMetadata, latestValidatorBlock *TipMetadata) bool {
-			return latestValidatorBlock != t
+		latestValidationBlock.OnUpdateOnce(func(_ *TipMetadata, _ *TipMetadata) {
+			t.isLatestValidationBlock.Set(false)
+		}, func(_ *TipMetadata, latestValidationBlock *TipMetadata) bool {
+			return latestValidationBlock != t
 		})
 	}
 
@@ -255,7 +255,7 @@ func (t *TipMetadata) registerAsLatestValidatorBlock(latestValidatorBlock reacti
 // connectStrongParent sets up the parent and children related properties for a strong parent.
 func (t *TipMetadata) connectStrongParent(strongParent *TipMetadata) {
 	t.stronglyOrphanedStrongParents.Monitor(strongParent.isStronglyOrphaned)
-	t.parentsReferencingLatestValidatorBlock.Monitor(strongParent.referencesLatestValidatorBlock)
+	t.parentsReferencingLatestValidationBlock.Monitor(strongParent.referencesLatestValidationBlock)
 
 	// unsubscribe when the parent is evicted, since we otherwise continue to hold a reference to it.
 	unsubscribe := strongParent.stronglyConnectedStrongChildren.Monitor(t.isStronglyConnectedToTips)

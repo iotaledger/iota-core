@@ -27,11 +27,11 @@ type TipManager struct {
 	// tipMetadataStorage contains the TipMetadata of all Blocks that are managed by the TipManager.
 	tipMetadataStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]
 
-	// latestValidatorBlocks contains a Variable for each validator that stores the latest validator block.
-	latestValidatorBlocks *shrinkingmap.ShrinkingMap[account.SeatIndex, reactive.Variable[*TipMetadata]]
+	// latestValidationBlocks contains a Variable for each validator that stores the latest validation block.
+	latestValidationBlocks *shrinkingmap.ShrinkingMap[account.SeatIndex, reactive.Variable[*TipMetadata]]
 
-	// validatorTipSet contains the subset of blocks from the strong tip set that reference the latest validator block.
-	validatorTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
+	// validationTipSet contains the subset of blocks from the strong tip set that reference the latest validation block.
+	validationTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
 
 	// strongTipSet contains the blocks of the strong tip pool that have no referencing children.
 	strongTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
@@ -61,8 +61,8 @@ func New(
 		retrieveBlock:           blockRetriever,
 		retrieveCommitteeInSlot: retrieveCommitteeInSlot,
 		tipMetadataStorage:      shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
-		latestValidatorBlocks:   shrinkingmap.New[account.SeatIndex, reactive.Variable[*TipMetadata]](),
-		validatorTipSet:         randommap.New[iotago.BlockID, *TipMetadata](),
+		latestValidationBlocks:  shrinkingmap.New[account.SeatIndex, reactive.Variable[*TipMetadata]](),
+		validationTipSet:        randommap.New[iotago.BlockID, *TipMetadata](),
 		strongTipSet:            randommap.New[iotago.BlockID, *TipMetadata](),
 		weakTipSet:              randommap.New[iotago.BlockID, *TipMetadata](),
 		blockAdded:              event.New1[tipmanager.TipMetadata](),
@@ -99,22 +99,22 @@ func (t *TipManager) OnBlockAdded(handler func(block tipmanager.TipMetadata)) (u
 
 // AddSeat adds a validator to the tracking of the TipManager.
 func (t *TipManager) AddSeat(seat account.SeatIndex) {
-	t.latestValidatorBlocks.GetOrCreate(seat, func() reactive.Variable[*TipMetadata] {
+	t.latestValidationBlocks.GetOrCreate(seat, func() reactive.Variable[*TipMetadata] {
 		return reactive.NewVariable[*TipMetadata]()
 	})
 }
 
 // RemoveSeat removes a validator from the tracking of the TipManager.
 func (t *TipManager) RemoveSeat(seat account.SeatIndex) {
-	latestValidatorBlock, removed := t.latestValidatorBlocks.DeleteAndReturn(seat)
+	latestValidationBlock, removed := t.latestValidationBlocks.DeleteAndReturn(seat)
 	if removed {
-		latestValidatorBlock.Set(nil)
+		latestValidationBlock.Set(nil)
 	}
 
 }
 
 func (t *TipManager) ValidationTips(optAmount ...int) []tipmanager.TipMetadata {
-	return t.selectTips(t.validatorTipSet, optAmount...)
+	return t.selectTips(t.validationTipSet, optAmount...)
 }
 
 // StrongTips returns the strong tips of the TipManager (with an optional limit).
@@ -161,14 +161,14 @@ func (t *TipManager) Shutdown() {
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	tipMetadata.isStrongTipPoolMember.WithNonEmptyValue(func(_ bool) func() {
-		return t.trackLatestValidatorBlock(tipMetadata)
+		return t.trackLatestValidationBlock(tipMetadata)
 	})
 
-	tipMetadata.isValidatorTip.OnUpdate(func(_ bool, isValidatorTip bool) {
-		if isValidatorTip {
-			t.validatorTipSet.Set(tipMetadata.ID(), tipMetadata)
+	tipMetadata.isValidationTip.OnUpdate(func(_ bool, isValidationTip bool) {
+		if isValidationTip {
+			t.validationTipSet.Set(tipMetadata.ID(), tipMetadata)
 		} else {
-			t.validatorTipSet.Delete(tipMetadata.ID())
+			t.validationTipSet.Delete(tipMetadata.ID())
 		}
 	})
 
@@ -199,8 +199,8 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	t.blockAdded.Trigger(tipMetadata)
 }
 
-// trackLatestValidatorBlock tracks the latest validator block and takes care of marking the corresponding TipMetadata.
-func (t *TipManager) trackLatestValidatorBlock(tipMetadata *TipMetadata) (teardown func()) {
+// trackLatestValidationBlock tracks the latest validator block and takes care of marking the corresponding TipMetadata.
+func (t *TipManager) trackLatestValidationBlock(tipMetadata *TipMetadata) (teardown func()) {
 	if _, isValidationBlock := tipMetadata.Block().ValidationBlock(); !isValidationBlock {
 		return
 	}
@@ -216,19 +216,19 @@ func (t *TipManager) trackLatestValidatorBlock(tipMetadata *TipMetadata) (teardo
 	}
 
 	// We only track the validation blocks of validators that are tracked by the TipManager (via AddSeat).
-	latestValidatorBlock, exists := t.latestValidatorBlocks.Get(seat)
+	latestValidationBlock, exists := t.latestValidationBlocks.Get(seat)
 	if !exists {
 		return
 	}
 
-	if !tipMetadata.registerAsLatestValidatorBlock(latestValidatorBlock) {
+	if !tipMetadata.registerAsLatestValidationBlock(latestValidationBlock) {
 		return
 	}
 
 	// reset the latest validator block to nil if we are still the latest one during teardown
 	return func() {
-		latestValidatorBlock.Compute(func(latestValidatorBlock *TipMetadata) *TipMetadata {
-			return lo.Cond(latestValidatorBlock == tipMetadata, nil, latestValidatorBlock)
+		latestValidationBlock.Compute(func(latestValidationBlock *TipMetadata) *TipMetadata {
+			return lo.Cond(latestValidationBlock == tipMetadata, nil, latestValidationBlock)
 		})
 	}
 }
