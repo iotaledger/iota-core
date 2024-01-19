@@ -33,6 +33,9 @@ type TipManager interface {
 	// RemoveValidator removes a validator from the tracking of the TipManager.
 	RemoveValidator(accountID iotago.AccountID) (removed bool)
 
+	// ValidationTips returns the validation tips of the TipManager (with an optional limit).
+	ValidationTips(optAmount ...int) []TipMetadata
+
 	// StrongTips returns the strong tips of the TipManager (with an optional limit).
 	StrongTips(optAmount ...int) []TipMetadata
 
