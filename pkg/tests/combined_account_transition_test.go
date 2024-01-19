@@ -252,7 +252,7 @@ func createNativetoken(ts *testsuite.TestSuite) {
 	node1 := ts.Node("node1")
 	node2 := ts.Node("node2")
 
-	tx := wallet.CreateNativeTokenFromInput("TX7", "TX5:0", "TX4:0", 50_000, 100_000)
+	tx := wallet.CreateNativeTokenFromInput("TX7", "TX5:0", "TX4:0", 5_000_000, 10_000_000_000)
 	ts.IssueBasicBlockWithOptions("block6", wallet, tx)
 
 	ts.AssertTransactionsExist(wallet.Transactions("TX7"), true, node1)
