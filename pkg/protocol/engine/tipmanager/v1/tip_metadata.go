@@ -240,13 +240,13 @@ func (t *TipMetadata) registerAsLatestValidatorBlock(latestValidatorBlock reacti
 	if registered {
 		t.isLatestValidatorBlock.Set(true)
 
-		ifLatestValidatorBlockChanged := func(_ *TipMetadata, latestValidatorBlock *TipMetadata) bool {
-			return latestValidatorBlock != t
-		}
-
+		// Once the latestValidatorBlock is updated again (by another block), we need to reset the isLatestValidatorBlock
+		// variable.
 		latestValidatorBlock.OnUpdateOnce(func(_ *TipMetadata, _ *TipMetadata) {
 			t.isLatestValidatorBlock.Set(false)
-		}, ifLatestValidatorBlockChanged)
+		}, func(_ *TipMetadata, latestValidatorBlock *TipMetadata) bool {
+			return latestValidatorBlock != t
+		})
 	}
 
 	return registered

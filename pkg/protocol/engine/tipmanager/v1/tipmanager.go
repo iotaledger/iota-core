@@ -196,8 +196,17 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 
 // trackLatestValidatorBlock tracks the latest validator block and takes care of marking the corresponding TipMetadata.
 func (t *TipManager) trackLatestValidatorBlock(tipMetadata *TipMetadata) (teardown func()) {
+	if _, isValidationBlock := tipMetadata.Block().ValidationBlock(); !isValidationBlock {
+		return
+	}
+
+	// We only track the validation blocks of validators that are tracked by the TipManager (via AddValidator).
 	latestValidatorBlock, exists := t.latestValidatorBlocks.Get(tipMetadata.Block().ProtocolBlock().Header.IssuerID)
-	if !exists || !tipMetadata.registerAsLatestValidatorBlock(latestValidatorBlock) {
+	if !exists {
+		return
+	}
+
+	if !tipMetadata.registerAsLatestValidatorBlock(latestValidatorBlock) {
 		return
 	}
 
