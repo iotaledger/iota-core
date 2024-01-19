@@ -31,10 +31,10 @@ type SeatManager interface {
 	// OnlineCommittee returns the set of online validators that is used to track acceptance.
 	OnlineCommittee() ds.Set[account.SeatIndex]
 
-	// SeatCountInSlot returns the number of seats in the SeatManager.
+	// SeatCountInSlot returns the number of seats in the SeatManager for the given slot's epoch.
 	SeatCountInSlot(slot iotago.SlotIndex) int
 
-	// SeatCountInEpoch returns the number of seats in the SeatManager.
+	// SeatCountInEpoch returns the number of seats in the SeatManager for the given epoch.
 	SeatCountInEpoch(epoch iotago.EpochIndex) int
 
 	// Interface embeds the required methods of the module.Interface.

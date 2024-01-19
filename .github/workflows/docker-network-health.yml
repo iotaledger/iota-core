@@ -9,6 +9,9 @@ on:
       - '!scripts/**'
       - '!tools/**'
       - 'tools/genesis-snapshot/**'
+  push:
+    branches:
+      - develop
 
 concurrency: 
   group: run-and-check-group

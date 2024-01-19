@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "Dockerfile"
+  push:
+    branches:
+      - develop
 
 jobs:
   build:
