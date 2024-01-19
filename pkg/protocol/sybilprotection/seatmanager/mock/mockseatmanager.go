@@ -108,6 +108,10 @@ func (m *ManualPOA) AccountID(alias string) iotago.AccountID {
 	return id
 }
 
+func (m *ManualPOA) GetSeat(alias string) (account.SeatIndex, bool) {
+	return m.committee.GetSeat(m.AccountID(alias))
+}
+
 func (m *ManualPOA) SetOnline(aliases ...string) {
 	for _, alias := range aliases {
 		seat, exists := m.committee.GetSeat(m.AccountID(alias))

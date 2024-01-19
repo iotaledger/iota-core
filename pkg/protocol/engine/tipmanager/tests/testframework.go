@@ -7,11 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -23,9 +27,10 @@ type TestFramework struct {
 	blockIDsByAlias    map[string]iotago.BlockID
 	tipMetadataByAlias map[string]tipmanager.TipMetadata
 	blocksByID         map[iotago.BlockID]*blocks.Block
-	validatorByAlias   map[string]iotago.AccountID
 	test               *testing.T
 	time               time.Time
+
+	manualPOA mock.ManualPOA
 
 	API iotago.API
 }
@@ -35,10 +40,17 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		blockIDsByAlias:    make(map[string]iotago.BlockID),
 		tipMetadataByAlias: make(map[string]tipmanager.TipMetadata),
 		blocksByID:         make(map[iotago.BlockID]*blocks.Block),
-		validatorByAlias:   make(map[string]iotago.AccountID),
 		test:               test,
 		API:                tpkg.ZeroCostTestAPI,
 		time:               time.Now(),
+		manualPOA: *mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI),
+			epochstore.NewStore[*account.Accounts](
+				nil,
+				mapdb.NewMapDB(),
+				func(index iotago.EpochIndex) iotago.EpochIndex { return index },
+				(*account.Accounts).Bytes,
+				account.AccountsFromBytes),
+		),
 	}
 
 	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID
@@ -46,25 +58,24 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t.Instance = tipmanagerv1.New(func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]
 		return block, exists
-	})
+	}, t.manualPOA.CommitteeInSlot)
 
 	return t
 }
 
 func (t *TestFramework) Validator(alias string) iotago.AccountID {
-	validator, validatorExists := t.validatorByAlias[alias]
-	require.True(t.test, validatorExists)
-
-	return validator
+	return t.manualPOA.AccountID(alias)
 }
 
 func (t *TestFramework) AddValidator(alias string) {
-	accountID := iotago.AccountID(tpkg.Rand32ByteArray())
-	accountID.RegisterAlias(alias)
+	t.manualPOA.AddRandomAccount(alias)
 
-	t.validatorByAlias[alias] = accountID
+	seat, exists := t.manualPOA.GetSeat(alias)
+	if !exists {
+		panic("seat does not exist")
+	}
 
-	t.Instance.AddValidator(accountID)
+	t.Instance.AddSeat(seat)
 }
 
 func (t *TestFramework) AddBlock(alias string) tipmanager.TipMetadata {
