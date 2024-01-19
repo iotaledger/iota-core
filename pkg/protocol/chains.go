@@ -105,11 +105,15 @@ func (c *Chains) initChainSwitching() (shutdown func()) {
 		}),
 
 		c.HeaviestAttestedCandidate.OnUpdate(func(_ *Chain, heaviestAttestedCandidate *Chain) {
-			heaviestAttestedCandidate.StartEngine.Set(true)
+			if heaviestAttestedCandidate != nil {
+				heaviestAttestedCandidate.StartEngine.Set(true)
+			}
 		}),
 
 		c.HeaviestVerifiedCandidate.OnUpdate(func(_ *Chain, heaviestVerifiedCandidate *Chain) {
-			c.Main.Set(heaviestVerifiedCandidate)
+			if heaviestVerifiedCandidate != nil {
+				c.Main.Set(heaviestVerifiedCandidate)
+			}
 		}),
 
 		c.WithElements(c.trackHeaviestCandidates),

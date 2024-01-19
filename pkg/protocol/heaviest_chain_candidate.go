@@ -53,6 +53,7 @@ func (h *HeaviestChainCandidate) measureAt(slot iotago.SlotIndex) (teardown func
 			}
 
 			teardownFunctions = append(teardownFunctions, slotsWithSameChain.OnUpdate(func(_ int, slotsWithSameChain int) {
+
 				if slotsWithSameChain >= int(chainSwitchingThreshold)-1 {
 					h.Set(heaviestChain)
 				} else {

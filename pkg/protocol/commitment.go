@@ -136,6 +136,10 @@ func (c *Commitment) TargetEngine() *engine.Engine {
 	return nil
 }
 
+func (c *Commitment) Less(other *Commitment) bool {
+	return other.Chain.Get().winsTieBreak(c.Chain.Get())
+}
+
 // initLogger initializes the Logger of this Commitment.
 func (c *Commitment) initLogger() (shutdown func()) {
 	c.Logger = c.commitments.NewChildLogger(fmt.Sprintf("Slot%d.", c.Slot()), true)

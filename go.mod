@@ -10,26 +10,26 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20231214025533-67add6c5091b
-	github.com/iotaledger/hive.go/app v0.0.0-20231219105941-542b1b724494
-	github.com/iotaledger/hive.go/constraints v0.0.0-20231219105941-542b1b724494
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231219095137-dd4674b3226e
-	github.com/iotaledger/hive.go/crypto v0.0.0-20231219105941-542b1b724494
-	github.com/iotaledger/hive.go/ds v0.0.0-20231219105941-542b1b724494
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20231219105941-542b1b724494
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20231214025533-67add6c5091b
-	github.com/iotaledger/hive.go/lo v0.0.0-20231219105941-542b1b724494
-	github.com/iotaledger/hive.go/log v0.0.0-20231219105941-542b1b724494
-	github.com/iotaledger/hive.go/runtime v0.0.0-20231219105941-542b1b724494
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231219095137-dd4674b3226e
-	github.com/iotaledger/hive.go/stringify v0.0.0-20231219105941-542b1b724494
+	github.com/iotaledger/hive.go/ads v0.0.0-20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/app v0.0.0-20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/constraints v0.0.0-20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/crypto v0.0.0-20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/ds v0.0.0-20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/lo v0.0.0-20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/log v0.0.0-20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/runtime v0.0.0-20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240117095736-623cd3fb800b
+	github.com/iotaledger/hive.go/stringify v0.0.0-20240117095736-623cd3fb800b
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240116140934-2ca7a381e6a4
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240116140821-25bc7acc397d
 	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00
 	github.com/iotaledger/iota.go/v4 v4.0.0-20240116140157-9e8010cb282d
 	github.com/labstack/echo/v4 v4.11.3
 	github.com/labstack/gommon v0.4.1
-	github.com/libp2p/go-libp2p v0.32.0
+	github.com/libp2p/go-libp2p v0.32.2
 	github.com/libp2p/go-libp2p-kad-dht v0.25.1
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.12.0
@@ -43,7 +43,7 @@ require (
 	go.uber.org/dig v1.17.1
 	golang.org/x/crypto v0.17.0
 	google.golang.org/grpc v1.60.1
-	google.golang.org/protobuf v1.31.0
+	google.golang.org/protobuf v1.32.0
 )
 
 require (
@@ -61,7 +61,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.4.3 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/ethereum/go-ethereum v1.13.6 // indirect
+	github.com/ethereum/go-ethereum v1.13.8 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/fjl/memsize v0.0.2 // indirect
@@ -79,7 +79,7 @@ require (
 	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20231023181126-ff6d637d2a7b // indirect
+	github.com/google/pprof v0.0.0-20231212022811-ec68065c825e // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
@@ -98,7 +98,7 @@ require (
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
 	github.com/klauspost/compress v1.17.2 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
 	github.com/knadh/koanf v1.5.0 // indirect
 	github.com/koron/go-ssdp v0.0.4 // indirect
 	github.com/kr/text v0.2.0 // indirect

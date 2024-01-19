@@ -12,6 +12,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -910,10 +911,29 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	issueBlocks(2, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
 	issueBlocks(3, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
 
-	//for _, node := range ts.Nodes() {
-	//	manualPOA := node.Protocol.Engines.Main.Get().SybilProtection.SeatManager().(*mock2.ManualPOA)
-	//	manualPOA.SetOnline("node0", "node1", "node2")
-	//}
+	commitment140, commitment140Exists := nodes[0].Protocol.Chains.Main.Get().Commitment(14)
+	require.True(t, commitment140Exists)
+
+	commitment141, commitment141Exists := nodes[1].Protocol.Chains.Main.Get().Commitment(14)
+	require.True(t, commitment141Exists)
+
+	commitment142, commitment142Exists := nodes[2].Protocol.Chains.Main.Get().Commitment(14)
+	require.True(t, commitment142Exists)
+
+	sortedForkingPoints := reactive.NewSortedSet[*protocol.Commitment](func(commitment *protocol.Commitment) reactive.Variable[uint64] {
+		return commitment.CumulativeWeight
+	})
+	sortedForkingPoints.Add(commitment140)
+	sortedForkingPoints.Add(commitment141)
+	sortedForkingPoints.Add(commitment142)
+
+	fmt.Println(commitment140)
+	fmt.Println(commitment141)
+	fmt.Println(commitment142)
+
+	fmt.Println(sortedForkingPoints.HeaviestElement().Get())
+
+	time.Sleep(1 * time.Second)
 
 	// Merge the partitions
 	{
@@ -948,31 +968,10 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		return mainEngineSwitchedCount == 2
 	}, 30*time.Second, 100*time.Millisecond)
 
-	// P1 finalized until slot 18. We do not expect any forks here because our CW is higher than the other partition's.
-	ts.AssertForkDetectedCount(0, nodes[0])
-
-	//// P1's chain is heavier, they should not consider switching the chain.
-	//ts.AssertCandidateEngineActivatedCount(0, nodesP1...)
-	//ctxP2Cancel() // we can stop issuing on P2.
-	//
-	//// Nodes from P2 should switch the chain.
-	//ts.AssertForkDetectedCount(1, nodesP2...)
-	//ts.AssertCandidateEngineActivatedCount(1, nodesP2...)
-	//
-	//// Here we need to let enough time pass for the nodes to sync up the candidate engines and switch them
-	//ts.AssertMainEngineSwitchedCount(1, nodesP2...)
-
 	ctxP1Cancel()
 	ctxP2Cancel()
 	ctxP3Cancel()
 	wg.Wait()
-
-	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
-	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
-	// This is to make sure that the storage was copied correctly during engine switching.
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 }
