@@ -472,7 +472,6 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 		IncreaseAllotment(to.AccountID, actualAllottedMana).
 		AddOutput(basicOutput).
 		SetCreationSlot(currentSlot).
-		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
 		Build(fundsAddrSigner)
 	require.NoError(d.Testing, err)
