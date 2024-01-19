@@ -47,8 +47,8 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
-		WithInputs(utxoledger.Outputs{input}),
-		WithOutputs(outputStates),
+		WithInputs(input),
+		WithOutputs(outputStates...),
 	)
 
 	// register the outputs in the recipient wallet (so wallet doesn't have to scan for outputs on its addresses)
@@ -93,8 +93,8 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
-		WithInputs(utxoledger.Outputs{input}),
-		WithOutputs(outputStates),
+		WithInputs(input),
+		WithOutputs(outputStates...),
 		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID),
 	)
 
@@ -165,8 +165,8 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
-		WithInputs(utxoledger.Outputs{input}),
-		WithOutputs(iotago.Outputs[iotago.Output]{delegationOutput}),
+		WithInputs(input),
+		WithOutputs(delegationOutput),
 	)
 
 	return signedTransaction
@@ -195,7 +195,7 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
-		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
+		WithOutputs(accountOutput),
 	)
 
 	return signedTransaction
@@ -226,7 +226,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string) *iotag
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
 		WithAccountInput(input),
-		WithOutputs(destructionOutputs),
+		WithOutputs(destructionOutputs...),
 	)
 
 	return signedTransaction
@@ -256,8 +256,8 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
-		WithInputs(utxoledger.Outputs{input}),
-		WithOutputs(iotago.Outputs[iotago.Output]{implicitAccountOutput, remainderBasicOutput}),
+		WithInputs(input),
+		WithOutputs(implicitAccountOutput, remainderBasicOutput),
 	)
 
 	// register the outputs in the recipient wallet (so wallet doesn't have to scan for outputs on its addresses)
@@ -294,8 +294,8 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
-		WithInputs(utxoledger.Outputs{input}),
-		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
+		WithInputs(input),
+		WithOutputs(accountOutput),
 		WithAllotAllManaToAccount(w.currentSlot, implicitAccountID),
 	)
 
@@ -339,8 +339,8 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outp
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
-		WithInputs(utxoledger.Outputs{inputState}),
-		WithOutputs(outputStates),
+		WithInputs(inputState),
+		WithOutputs(outputStates...),
 	)
 
 	return signedTransaction
@@ -365,7 +365,7 @@ func (w *Wallet) RemoveFeatureFromAccount(featureType iotago.FeatureType, transa
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
-		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
+		WithOutputs(accountOutput),
 	)
 
 	return signedTransaction
@@ -393,8 +393,8 @@ func (w *Wallet) SendFundsToWallet(transactionName string, receiverWallet *Walle
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
-		WithInputs(inputStates),
-		WithOutputs(iotago.Outputs[iotago.Output]{targetOutput}),
+		WithInputs(inputStates...),
+		WithOutputs(targetOutput),
 	)
 
 	receiverWallet.registerOutputs(transactionName, signedTransaction.Transaction)
@@ -425,8 +425,8 @@ func (w *Wallet) SendFundsToAccount(transactionName string, accountID iotago.Acc
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
-		WithInputs(inputStates),
-		WithOutputs(iotago.Outputs[iotago.Output]{targetOutput}),
+		WithInputs(inputStates...),
+		WithOutputs(targetOutput),
 	)
 
 	w.registerOutputs(transactionName, signedTransaction.Transaction)
@@ -465,14 +465,14 @@ func (w *Wallet) SendFundsFromAccount(transactionName string, accountOutputName 
 	}}
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
-		WithInputs(inputStates),
+		WithInputs(inputStates...),
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: commitmentID,
 		}),
 		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
 			AccountID: accountOutput.AccountID,
 		}),
-		WithOutputs(targetOutputs),
+		WithOutputs(targetOutputs...),
 	)
 
 	w.registerOutputs(transactionName, signedTransaction.Transaction)
@@ -522,7 +522,7 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
-		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
+		WithOutputs(accountOutput),
 	)
 
 	return signedTransaction
@@ -561,8 +561,8 @@ func (w *Wallet) AllotManaFromInputs(transactionName string, allotments iotago.A
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 		WithAllotments(allotments),
-		WithInputs(inputStates),
-		WithOutputs(outputStates),
+		WithInputs(inputStates...),
+		WithOutputs(outputStates...),
 	)
 
 	w.registerOutputs(transactionName, signedTransaction.Transaction)
@@ -614,7 +614,7 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
-		WithInputs(utxoledger.Outputs{input}),
+		WithInputs(input),
 		WithRewardInput(
 			&iotago.RewardInput{Index: 0},
 			rewardMana,
@@ -622,7 +622,7 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
 		}),
-		WithOutputs(outputStates),
+		WithOutputs(outputStates...),
 	)
 
 	return signedTransaction
@@ -643,7 +643,7 @@ func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, rec
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
-		WithInputs(utxoledger.Outputs{input}),
+		WithInputs(input),
 		WithAllotAllManaToAccount(w.currentSlot, recipientWallet.BlockIssuer.AccountID),
 	)
 
@@ -659,8 +659,8 @@ func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, op
 
 	return w.createSignedTransactionWithOptions(
 		transactionName,
-		WithInputs(utxoledger.Outputs{input}),
-		WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
+		WithInputs(input),
+		WithOutputs(nftOutput),
 		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID),
 	)
 }
@@ -696,8 +696,8 @@ func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName st
 
 	return w.createSignedTransactionWithOptions(
 		transactionName,
-		WithInputs(utxoledger.Outputs{accountOutput, input}),
-		WithOutputs(iotago.Outputs[iotago.Output]{accTransitionOutput, foundryOutput}),
+		WithInputs(accountOutput, input),
+		WithOutputs(accTransitionOutput, foundryOutput),
 		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
 			AccountID: accID,
 		}),
@@ -723,8 +723,9 @@ func (w *Wallet) TransitionNFTWithTransactionOpts(transactionName string, inputN
 
 	return w.createSignedTransactionWithOptions(
 		transactionName,
-		append(opts, WithInputs(utxoledger.Outputs{input}),
-			WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
+		append(opts,
+			WithInputs(input),
+			WithOutputs(nftOutput),
 			WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID))...,
 	)
 }
