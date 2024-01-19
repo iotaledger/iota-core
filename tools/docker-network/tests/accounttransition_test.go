@@ -55,5 +55,5 @@ func Test_AccountTransitions(t *testing.T) {
 
 	// create native token
 	fmt.Println("\nCreating native token")
-	account2 = d.CreateNativeToken(account2)
+	account2 = d.CreateNativeToken(account2, 5000, 10000)
 }

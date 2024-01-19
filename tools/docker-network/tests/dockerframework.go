@@ -22,6 +22,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/testsuite/depositcalculator"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -484,28 +485,35 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 }
 
 // CreateNativeToken request faucet funds then use it to create native token for the account, and returns the updated Account.
-func (d *DockerTestFramework) CreateNativeToken(from *Account) (updatedAccount *Account) {
+func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken) (updatedAccount *Account) {
 	// requesting faucet funds for native token creation
 	ctx := context.TODO()
 	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
 	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
 
-	mintedAmount := fundsUTXOOutput.BaseTokenAmount()
-
 	clt := d.Node("V1").Client
 	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
 	apiForSlot := clt.APIForSlot(currentSlot)
+
+	minMintedAmount, err := depositcalculator.MinDeposit(apiForSlot.ProtocolParameters(), iotago.OutputFoundry, depositcalculator.WithHasNativeToken())
+	require.NoError(d.Testing, err)
+
+	mintedAmount = lo.Max(minMintedAmount, mintedAmount)
+	require.GreaterOrEqual(d.Testing, mintedAmount, fundsUTXOOutput.BaseTokenAmount())
+	maxSupply = lo.Max(maxSupply, mintedAmount)
+
+	remainderAmount := fundsUTXOOutput.BaseTokenAmount() - mintedAmount
 
 	// increase foundry counter
 	accTransitionOutput := builder.NewAccountOutputBuilderFromPrevious(from.AccountOutput).
 		FoundriesToGenerate(1).MustBuild()
 
-	// build foundry output, consume all amount from the UTXO output
+	// build foundry output
 	foundryID, err := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(from.AccountAddress, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
 	require.NoError(d.Testing, err)
 	tokenScheme := &iotago.SimpleTokenScheme{
 		MintedTokens:  big.NewInt(int64(mintedAmount)),
-		MaximumSupply: big.NewInt(int64(mintedAmount)),
+		MaximumSupply: big.NewInt(int64(maxSupply)),
 		MeltedTokens:  big.NewInt(0),
 	}
 
@@ -515,17 +523,28 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account) (updatedAccount *
 			Amount: big.NewInt(int64(mintedAmount)),
 		}).MustBuild()
 
-	// prepare transaction
+	addressKeys := []iotago.AddressKeys{
+		iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), privateKey),
+		iotago.NewAddressKeysForEd25519Address(from.AccountOutput.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address), from.BlockIssuerKey),
+	}
+
+	signedTxBuilder := builder.NewTransactionBuilder(apiForSlot)
+
+	// prepare remainder output if needed
+	if remainderAmount > 0 {
+		receiveAddr, privKey := d.getAddress(iotago.AddressEd25519)
+		remainderOutput := builder.NewBasicOutputBuilder(receiveAddr, remainderAmount).MustBuild()
+		addressKeys = append(addressKeys, iotago.NewAddressKeysForEd25519Address(receiveAddr.(*iotago.Ed25519Address), privKey))
+		signedTxBuilder = signedTxBuilder.AddOutput(remainderOutput)
+	}
+
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
 
 	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	signer := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), privateKey),
-		iotago.NewAddressKeysForEd25519Address(from.AccountOutput.UnlockConditionSet().Address().Address.(*iotago.Ed25519Address), from.BlockIssuerKey))
-
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+	signedTx, err := signedTxBuilder.
 		AddInput(&builder.TxInput{
 			UnlockTarget: fundsAddr,
 			InputID:      fundsOutputID,
@@ -543,7 +562,7 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account) (updatedAccount *
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
 		AllotAllMana(currentSlot, from.AccountID).
-		Build(signer)
+		Build(iotago.NewInMemoryAddressSigner(addressKeys...))
 	require.NoError(d.Testing, err)
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)

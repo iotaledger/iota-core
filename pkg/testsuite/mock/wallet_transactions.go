@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/utxoledger"
+	"github.com/iotaledger/iota-core/pkg/testsuite/depositcalculator"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -666,10 +667,18 @@ func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, op
 }
 
 //nolint:forcetypeassert
-func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName string, accountOutputName string) *iotago.SignedTransaction {
+func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName string, accountOutputName string, mintedAmount iotago.BaseToken, maxSupply iotago.BaseToken) *iotago.SignedTransaction {
 	input := w.Output(inputName)
 	accountOutput := w.AccountOutput(accountOutputName)
-	mintedAmount := input.BaseTokenAmount()
+
+	minMintedAmount := lo.PanicOnErr(depositcalculator.MinDeposit(w.Node.Protocol.CommittedAPI().ProtocolParameters(), iotago.OutputFoundry, depositcalculator.WithHasNativeToken()))
+	mintedAmount = lo.Max(minMintedAmount, mintedAmount)
+	maxSupply = lo.Max(maxSupply, mintedAmount)
+
+	if mintedAmount > input.BaseTokenAmount() {
+		panic(fmt.Sprintf("input %s does not have enough funds to mint native token", inputName))
+	}
+	remainderAmount := input.BaseTokenAmount() - mintedAmount
 
 	// transition account output, increase foundry counter by 1, the amount of account stays the same
 	accID := accountOutput.Output().(*iotago.AccountOutput).AccountID
@@ -681,7 +690,7 @@ func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName st
 	foundryID, _ := iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(accAddr, accTransitionOutput.FoundryCounter, iotago.TokenSchemeSimple)
 	tokenScheme := &iotago.SimpleTokenScheme{
 		MintedTokens:  big.NewInt(int64(mintedAmount)),
-		MaximumSupply: big.NewInt(int64(mintedAmount)),
+		MaximumSupply: big.NewInt(int64(maxSupply)),
 		MeltedTokens:  big.NewInt(0),
 	}
 
@@ -691,10 +700,22 @@ func (w *Wallet) CreateNativeTokenFromInput(transactionName string, inputName st
 			Amount: big.NewInt(int64(mintedAmount)),
 		}).MustBuild()
 
+	outputStates := iotago.Outputs[iotago.Output]{accTransitionOutput, foundryOutput}
+	// prepare remainder output if needed
+	if remainderAmount > 0 {
+		outputStates = append(outputStates, &iotago.BasicOutput{
+			Amount: remainderAmount,
+			UnlockConditions: iotago.BasicOutputUnlockConditions{
+				&iotago.AddressUnlockCondition{Address: w.Address()},
+			},
+			Features: iotago.BasicOutputFeatures{},
+		})
+	}
+
 	return w.createSignedTransactionWithOptions(
 		transactionName,
 		WithInputs(utxoledger.Outputs{accountOutput, input}),
-		WithOutputs(iotago.Outputs[iotago.Output]{accTransitionOutput, foundryOutput}),
+		WithOutputs(outputStates),
 		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
 			AccountID: accID,
 		}),
