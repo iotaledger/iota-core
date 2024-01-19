@@ -44,11 +44,11 @@ type Commitment struct {
 	// and its parent).
 	Weight reactive.Variable[uint64]
 
-	// CumulativeWeight contains the cumulative weight of all Commitments up to this point.
-	CumulativeWeight reactive.Variable[uint64]
-
 	// AttestedWeight contains the weight of the Commitment that was attested by other nodes.
 	AttestedWeight reactive.Variable[uint64]
+
+	// CumulativeWeight contains the cumulative weight of all Commitments up to this point.
+	CumulativeWeight reactive.Variable[uint64]
 
 	// CumulativeAttestedWeight contains the cumulative weight of all attested Commitments up to this point.
 	CumulativeAttestedWeight reactive.Variable[uint64]
@@ -102,8 +102,8 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		WarpSyncBlocks:                  reactive.NewVariable[bool](),
 		BlocksToWarpSync:                reactive.NewVariable[ds.Set[iotago.BlockID]](),
 		Weight:                          reactive.NewVariable[uint64](),
-		CumulativeWeight:                reactive.NewVariable[uint64](),
 		AttestedWeight:                  reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
+		CumulativeWeight:                reactive.NewVariable[uint64](),
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
 		CumulativeVerifiedWeight:        reactive.NewVariable[uint64](),
 		IsRoot:                          reactive.NewEvent(),
@@ -136,6 +136,7 @@ func (c *Commitment) TargetEngine() *engine.Engine {
 	return nil
 }
 
+// Less returns true if this Commitment is smaller than the other Commitment (which is used as a tie-breaker).
 func (c *Commitment) Less(other *Commitment) bool {
 	return other.Chain.Get().winsTieBreak(c.Chain.Get())
 }
@@ -178,11 +179,11 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 		c.deriveCumulativeVerifiedWeight(),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
-			// the weight can be fixed as a one time operation (it only relies on static information)
-			//if parent.CumulativeWeight.Get() < c.CumulativeWeight.Get() {
-			c.Weight.Set(c.Commitment.CumulativeWeight() - parent.Commitment.CumulativeWeight())
-			c.CumulativeWeight.Set(c.Commitment.CumulativeWeight())
-			//}
+			// make sure malicious commitments can not create an overflow in the weights
+			if parent.CumulativeWeight.Get() < c.CumulativeWeight.Get() {
+				c.Weight.Set(c.Commitment.CumulativeWeight() - parent.Commitment.CumulativeWeight())
+				c.CumulativeWeight.Set(c.Commitment.CumulativeWeight())
+			}
 
 			return lo.Batch(
 				parent.deriveChildren(c),
@@ -323,14 +324,17 @@ func (c *Commitment) forceChain(targetChain *Chain) {
 	}
 }
 
-func (c *Commitment) cumulativeWeightAddr() reactive.Variable[uint64] {
+// cumulativeWeight returns the Variable that contains the cumulative weight of this Commitment.
+func (c *Commitment) cumulativeWeight() reactive.Variable[uint64] {
 	return c.CumulativeWeight
 }
 
-func (c *Commitment) cumulativeAttestedWeightAddr() reactive.Variable[uint64] {
+// cumulativeAttestedWeight returns the Variable that contains the cumulative attested weight of this Commitment.
+func (c *Commitment) cumulativeAttestedWeight() reactive.Variable[uint64] {
 	return c.CumulativeAttestedWeight
 }
 
-func (c *Commitment) cumulativeVerifiedWeightAddr() reactive.Variable[uint64] {
+// cumulativeVerifiedWeight returns the Variable that contains the cumulative verified weight of this Commitment.
+func (c *Commitment) cumulativeVerifiedWeight() reactive.Variable[uint64] {
 	return c.CumulativeVerifiedWeight
 }

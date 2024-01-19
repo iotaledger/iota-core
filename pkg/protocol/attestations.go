@@ -79,7 +79,9 @@ func (a *Attestations) initRequester() (shutdown func()) {
 		a.protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
 			return commitment.RequestAttestations.WithNonEmptyValue(func(_ bool) (teardown func()) {
 				if commitment.CumulativeWeight.Get() == 0 {
-					commitment.IsAttested.Set(true)
+					a.workerPool.Submit(func() {
+						commitment.IsAttested.Set(true)
+					})
 
 					return nil
 				}

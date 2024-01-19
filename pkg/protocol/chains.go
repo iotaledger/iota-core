@@ -50,9 +50,9 @@ func newChains(protocol *Protocol) *Chains {
 		protocol:       protocol,
 	}
 
-	c.HeaviestClaimedCandidate = newHeaviestChainCandidate(c, (*Commitment).cumulativeWeightAddr)
-	c.HeaviestAttestedCandidate = newHeaviestChainCandidate(c, (*Commitment).cumulativeAttestedWeightAddr)
-	c.HeaviestVerifiedCandidate = newHeaviestChainCandidate(c, (*Commitment).cumulativeVerifiedWeightAddr)
+	c.HeaviestClaimedCandidate = newHeaviestChainCandidate(c, (*Commitment).cumulativeWeight)
+	c.HeaviestAttestedCandidate = newHeaviestChainCandidate(c, (*Commitment).cumulativeAttestedWeight)
+	c.HeaviestVerifiedCandidate = newHeaviestChainCandidate(c, (*Commitment).cumulativeVerifiedWeight)
 
 	shutdown := lo.Batch(
 		c.initLogger(protocol.NewChildLogger("Chains")),
@@ -83,10 +83,10 @@ func (c *Chains) initLogger(logger log.Logger) (shutdown func()) {
 	c.Logger = logger
 
 	return lo.Batch(
-		c.Main.LogUpdates(c, log.LevelInfo, "Main", (*Chain).LogName),
-		c.HeaviestClaimedCandidate.LogUpdates(c, log.LevelInfo, "HeaviestClaimedCandidate", (*Chain).LogName),
-		c.HeaviestAttestedCandidate.LogUpdates(c, log.LevelInfo, "HeaviestAttestedCandidate", (*Chain).LogName),
-		c.HeaviestVerifiedCandidate.LogUpdates(c, log.LevelInfo, "HeaviestVerifiedCandidate", (*Chain).LogName),
+		c.Main.LogUpdates(c, log.LevelTrace, "Main", (*Chain).LogName),
+		c.HeaviestClaimedCandidate.LogUpdates(c, log.LevelTrace, "HeaviestClaimedCandidate", (*Chain).LogName),
+		c.HeaviestAttestedCandidate.LogUpdates(c, log.LevelTrace, "HeaviestAttestedCandidate", (*Chain).LogName),
+		c.HeaviestVerifiedCandidate.LogUpdates(c, log.LevelTrace, "HeaviestVerifiedCandidate", (*Chain).LogName),
 
 		logger.UnsubscribeFromParentLogger,
 	)

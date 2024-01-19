@@ -3,9 +3,7 @@ package inmemoryblockdag
 import (
 	"sync/atomic"
 
-	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ierrors"
-	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
@@ -86,15 +84,7 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 	var unsolidParentsCount atomic.Int32
 	unsolidParentsCount.Store(int32(len(block.Parents())))
 
-	unsolidParents := ds.NewSet[iotago.BlockID]()
-
 	block.ForEachParent(func(parent iotago.Parent) {
-		if unsolidParents.Add(parent.ID) {
-			b.LogTrace("unsolid parents", "blockID", block.ID(), "parents", unsolidParents.ToSlice())
-		}
-
-		b.LogTrace("waiting for parent", "parent", parent.ID, "blockID", block.ID())
-
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
 			b.errorHandler(ierrors.Errorf("failed to setup block %s, parent %s is missing", block.ID(), parent.ID))
@@ -103,12 +93,6 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 		}
 
 		parentBlock.Solid().OnUpdateOnce(func(_ bool, _ bool) {
-			b.LogTrace("parent solid", "parent", parent.ID, "blockID", block.ID())
-
-			if unsolidParents.Delete(parent.ID) {
-				b.LogTrace("unsolid parents", "blockID", block.ID(), "parents", unsolidParents.ToSlice())
-			}
-
 			if unsolidParentsCount.Add(-1) == 0 {
 				if block.SetSolid() {
 					b.events.BlockSolid.Trigger(block)
@@ -153,12 +137,8 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 		if b.uncommittedSlotBlocks.AddWithFunc(block.SlotCommitmentID(), block, func() bool {
 			return block.SlotCommitmentID().Slot() > b.latestCommitmentFunc().Commitment().Slot
 		}) {
-			b.LogError("unsolid commitment", "blockID", block.ID(), "commitmentID", block.SlotCommitmentID(), "latestCommitment", lo.PanicOnErr(b.latestCommitmentFunc().Commitment().ID()))
-
 			return
 		}
-
-		b.LogTrace("block attached", "blockID", block.ID())
 
 		b.events.BlockAttached.Trigger(block)
 
@@ -173,8 +153,6 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 // creating it.
 func (b *BlockDAG) GetOrRequestBlock(blockID iotago.BlockID) (block *blocks.Block, requested bool) {
 	return b.blockCache.GetOrCreate(blockID, func() (newBlock *blocks.Block) {
-		b.LogTrace("block missing", "blockID", blockID)
-
 		newBlock = blocks.NewMissingBlock(blockID)
 		b.events.BlockMissing.Trigger(newBlock)
 
