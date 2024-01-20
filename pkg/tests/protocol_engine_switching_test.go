@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/reactive"
@@ -744,16 +742,6 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 
 	ts.Run(false, nodesOptions)
 
-	nodes[0].Protocol.SetLogLevel(log.LevelDebug)
-	nodes[1].Protocol.SetLogLevel(log.LevelDebug)
-	nodes[2].Protocol.SetLogLevel(log.LevelDebug)
-
-	nodes[2].Protocol.Chains.WithInitializedEngines(func(_ *protocol.Chain, engine *engine.Engine) (shutdown func()) {
-		engine.BlockDAG.SetLogLevel(log.LevelDebug)
-
-		return nil
-	})
-
 	expectedCommittee := []iotago.AccountID{nodes[0].Validator.AccountID, nodes[1].Validator.AccountID, nodes[2].Validator.AccountID}
 
 	seatIndexes := []account.SeatIndex{
@@ -911,33 +899,46 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	issueBlocks(2, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
 	issueBlocks(3, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
 
-	commitment140, commitment140Exists := nodes[0].Protocol.Chains.Main.Get().Commitment(14)
-	require.True(t, commitment140Exists)
+	commitment140, _ := nodes[0].Protocol.Chains.Main.Get().Commitment(14)
+	commitment141, _ := nodes[1].Protocol.Chains.Main.Get().Commitment(14)
+	commitment142, _ := nodes[2].Protocol.Chains.Main.Get().Commitment(14)
 
-	commitment141, commitment141Exists := nodes[1].Protocol.Chains.Main.Get().Commitment(14)
-	require.True(t, commitment141Exists)
-
-	commitment142, commitment142Exists := nodes[2].Protocol.Chains.Main.Get().Commitment(14)
-	require.True(t, commitment142Exists)
-
-	sortedForkingPoints := reactive.NewSortedSet[*protocol.Commitment](func(commitment *protocol.Commitment) reactive.Variable[uint64] {
-		return commitment.CumulativeWeight
-	})
-	sortedForkingPoints.Add(commitment140)
-	sortedForkingPoints.Add(commitment141)
-	sortedForkingPoints.Add(commitment142)
-
-	fmt.Println(commitment140)
-	fmt.Println(commitment141)
-	fmt.Println(commitment142)
-
-	fmt.Println(sortedForkingPoints.HeaviestElement().Get())
+	var mainPartition []*mock.Node
+	var otherPartitions []*mock.Node
+	switch heaviestDivergencePoint(commitment140, commitment141, commitment142) {
+	case commitment140:
+		mainPartition = nodes[0:1]
+		otherPartitions = []*mock.Node{nodes[1], nodes[2]}
+	case commitment141:
+		mainPartition = nodes[1:2]
+		otherPartitions = []*mock.Node{nodes[0], nodes[2]}
+	case commitment142:
+		mainPartition = nodes[2:3]
+		otherPartitions = []*mock.Node{nodes[0], nodes[1]}
+	}
 
 	time.Sleep(1 * time.Second)
 
 	// Merge the partitions
 	{
-		fmt.Println("\n=========================\nMerging network partitions\n=========================")
+		fmt.Println("")
+		fmt.Println("==========================")
+		fmt.Println("Merging network partitions")
+		fmt.Println("--------------------------")
+		fmt.Println("Winner: ", mainPartition[0].Protocol.LogName())
+		fmt.Println("Losers: ", otherPartitions[0].Protocol.LogName(), otherPartitions[1].Protocol.LogName())
+		fmt.Println("==========================")
+		fmt.Println("")
+
+		for _, node := range otherPartitions {
+			node.Protocol.SetLogLevel(log.LevelDebug)
+
+			node.Protocol.Chains.WithInitializedEngines(func(_ *protocol.Chain, engine *engine.Engine) (shutdown func()) {
+				engine.BlockDAG.SetLogLevel(log.LevelDebug)
+
+				return nil
+			})
+		}
 
 		ts.MergePartitionsToMain()
 	}
@@ -956,17 +957,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	nodes[1].Validator.IssueActivity(ctxP2, wg, 21, nodes[1])
 	nodes[2].Validator.IssueActivity(ctxP3, wg, 21, nodes[2])
 
-	require.Eventually(t, func() bool {
-		mainEngineSwitchedCount := 0
-
-		for _, node := range nodes {
-			if node.MainEngineSwitchedCount() >= 1 {
-				mainEngineSwitchedCount++
-			}
-		}
-
-		return mainEngineSwitchedCount == 2
-	}, 30*time.Second, 100*time.Millisecond)
+	ts.AssertMainEngineSwitchedCount(1, otherPartitions...)
 
 	ctxP1Cancel()
 	ctxP2Cancel()
@@ -974,6 +965,18 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	wg.Wait()
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
+}
+
+func heaviestDivergencePoint(commitments ...*protocol.Commitment) *protocol.Commitment {
+	sortedDivergencePoints := reactive.NewSortedSet[*protocol.Commitment](func(commitment *protocol.Commitment) reactive.Variable[uint64] {
+		return commitment.CumulativeWeight
+	})
+
+	for _, commitment := range commitments {
+		sortedDivergencePoints.Add(commitment)
+	}
+
+	return sortedDivergencePoints.HeaviestElement().Get()
 }
 
 //

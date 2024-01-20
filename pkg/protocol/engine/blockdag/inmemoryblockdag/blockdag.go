@@ -57,10 +57,10 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 				if uncommittedSlotBlocks := b.uncommittedSlotBlocks.GetValuesAndEvict(commitment.ID()); len(uncommittedSlotBlocks) != 0 {
-					b.LogTrace("commitment available", "commitmentID", commitment.ID())
+					b.LogDebug("commitment available", "commitmentID", commitment.ID())
 
 					for _, block := range uncommittedSlotBlocks {
-						b.LogTrace("replaying block", "blockID", block.ID(), "commitmentID", commitment.ID())
+						b.LogDebug("replaying block", "blockID", block.ID(), "commitmentID", commitment.ID())
 
 						b.setupBlock(block)
 					}
@@ -190,7 +190,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	}
 
 	if updated {
-		b.LogTrace("received missing block", "blockID", block.ID())
+		b.LogDebug("received missing block", "blockID", block.ID())
 
 		b.events.MissingBlockAttached.Trigger(block)
 	}

@@ -153,7 +153,9 @@ func (c *Commitment) initLogger() (shutdown func()) {
 		c.WarpSyncBlocks.LogUpdates(c, log.LevelTrace, "WarpSyncBlocks"),
 		c.Weight.LogUpdates(c, log.LevelTrace, "Weight"),
 		c.AttestedWeight.LogUpdates(c, log.LevelTrace, "AttestedWeight"),
+		c.CumulativeWeight.LogUpdates(c, log.LevelTrace, "CumulativeWeight"),
 		c.CumulativeAttestedWeight.LogUpdates(c, log.LevelTrace, "CumulativeAttestedWeight"),
+		c.CumulativeVerifiedWeight.LogUpdates(c, log.LevelTrace, "CumulativeVerifiedWeight"),
 		c.IsRoot.LogUpdates(c, log.LevelTrace, "IsRoot"),
 		c.IsAttested.LogUpdates(c, log.LevelTrace, "IsAttested"),
 		c.IsSynced.LogUpdates(c, log.LevelTrace, "IsSynced"),
@@ -179,8 +181,7 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 		c.deriveCumulativeVerifiedWeight(),
 
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
-			// make sure malicious commitments can not create an overflow in the weights
-			if parent.CumulativeWeight.Get() < c.CumulativeWeight.Get() {
+			if parent.Commitment.CumulativeWeight() <= c.Commitment.CumulativeWeight() { // prevent overflow in uint64
 				c.Weight.Set(c.Commitment.CumulativeWeight() - parent.Commitment.CumulativeWeight())
 				c.CumulativeWeight.Set(c.Commitment.CumulativeWeight())
 			}
@@ -278,7 +279,7 @@ func (c *Commitment) deriveCumulativeAttestedWeight(parent *Commitment) func() {
 // CumulativeWeight of the underlying model.Commitment if this Commitment is verified.
 func (c *Commitment) deriveCumulativeVerifiedWeight() func() {
 	return c.IsVerified.OnTrigger(func() {
-		c.CumulativeVerifiedWeight.Set(c.CumulativeWeight.Get())
+		c.CumulativeVerifiedWeight.Set(c.Commitment.CumulativeWeight())
 	})
 }
 
