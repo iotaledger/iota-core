@@ -954,15 +954,10 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 }
 
-func commitmentWithLargestID(commitments ...*protocol.Commitment) *protocol.Commitment {
-	var largestCommitment *protocol.Commitment
-	for _, commitment := range commitments {
-		if largestCommitment == nil || bytes.Compare(lo.PanicOnErr(commitment.ID().Bytes()), lo.PanicOnErr(largestCommitment.ID().Bytes())) > 0 {
-			largestCommitment = commitment
-		}
-	}
+type Blocks []*blocks.Block
 
-	return largestCommitment
+func (a *Blocks) Add(ts *testsuite.TestSuite, node *mock.Node, partition int, slot iotago.SlotIndex) {
+	*a = append(*a, ts.Block(fmt.Sprintf("%s%d.3-%s", slotPrefix(partition, slot), slot, node.Name)))
 }
 
 func slotPrefix(partition int, slot iotago.SlotIndex) string {
@@ -973,8 +968,13 @@ func slotPrefix(partition int, slot iotago.SlotIndex) string {
 	return "P" + strconv.Itoa(partition) + ":"
 }
 
-type Blocks []*blocks.Block
+func commitmentWithLargestID(commitments ...*protocol.Commitment) *protocol.Commitment {
+	var largestCommitment *protocol.Commitment
+	for _, commitment := range commitments {
+		if largestCommitment == nil || bytes.Compare(lo.PanicOnErr(commitment.ID().Bytes()), lo.PanicOnErr(largestCommitment.ID().Bytes())) > 0 {
+			largestCommitment = commitment
+		}
+	}
 
-func (a *Blocks) Add(ts *testsuite.TestSuite, node *mock.Node, partition int, slot iotago.SlotIndex) {
-	*a = append(*a, ts.Block(fmt.Sprintf("%s%d.3-%s", slotPrefix(partition, slot), slot, node.Name)))
+	return largestCommitment
 }
