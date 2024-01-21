@@ -944,6 +944,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	nodes[1].Validator.IssueActivity(ctxP2, wg, 21, nodes[1])
 	nodes[2].Validator.IssueActivity(ctxP3, wg, 21, nodes[2])
 
+	ts.AssertMainEngineSwitchedCount(0, mainPartition...)
 	ts.AssertMainEngineSwitchedCount(1, otherPartitions...)
 
 	ctxP1Cancel()

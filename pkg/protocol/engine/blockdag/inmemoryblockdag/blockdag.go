@@ -133,6 +133,8 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 			return
 		}
 
+		b.LogTrace("block attached", "block", block.ID())
+
 		b.events.BlockAttached.Trigger(block)
 
 		b.setupBlock(block)
@@ -183,7 +185,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	}
 
 	if updated {
-		b.LogTrace("received missing block", "blockID", block.ID())
+		b.LogTrace("missing block attached", "block", block.ID())
 
 		b.events.MissingBlockAttached.Trigger(block)
 	}
