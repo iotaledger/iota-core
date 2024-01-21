@@ -56,16 +56,9 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 			}, event.WithWorkerPool(wp))
 
 			e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
-				if uncommittedSlotBlocks := b.uncommittedSlotBlocks.GetValuesAndEvict(commitment.ID()); len(uncommittedSlotBlocks) != 0 {
-					b.LogDebug("commitment available", "commitmentID", commitment.ID())
-
-					for _, block := range uncommittedSlotBlocks {
-						b.LogDebug("replaying block", "blockID", block.ID(), "commitmentID", commitment.ID())
-
-						b.setupBlock(block)
-					}
+				for _, block := range b.uncommittedSlotBlocks.GetValuesAndEvict(commitment.ID()) {
+					b.setupBlock(block)
 				}
-
 			}, event.WithWorkerPool(wp))
 
 			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
