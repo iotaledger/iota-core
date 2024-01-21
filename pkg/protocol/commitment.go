@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -136,9 +137,69 @@ func (c *Commitment) TargetEngine() *engine.Engine {
 	return nil
 }
 
-// Less returns true if this Commitment is smaller than the other Commitment (which is used as a tie-breaker).
+// Less is a function that is used to break ties between two Commitments that have the same cumulative weight by using
+// the ID of their divergence points (the first commitment that is different between their chains).
 func (c *Commitment) Less(other *Commitment) bool {
-	return other.Chain.Get().winsTieBreak(c.Chain.Get())
+	// trivial case where both commitments are the same or one of them is nil
+	if c == other {
+		return false
+	} else if c == nil {
+		return true
+	} else if other == nil {
+		return false
+	}
+
+	// trivial case where both commitments have the same chain
+	largerChain, smallerChain := other.Chain.Get(), c.Chain.Get()
+	if largerChain == smallerChain {
+		return false
+	}
+
+	// iterate until we find the divergence point of both chains
+	for {
+		// trivial case where one of the chains is nil
+		if largerChain == nil {
+			return false
+		} else if smallerChain == nil {
+			return true
+		}
+
+		// trivial case where one of the chains has no forking point, yet
+		forkingPointOfLargerChain, forkingPointOfSmallerChain := largerChain.ForkingPoint.Get(), smallerChain.ForkingPoint.Get()
+		if forkingPointOfLargerChain == nil {
+			return false
+		} else if forkingPointOfSmallerChain == nil {
+			return true
+		}
+
+		// if the forking points of both chains have the same parent, then the forking points are the divergence points
+		if forkingPointOfLargerChain.Slot() == forkingPointOfSmallerChain.Slot() && forkingPointOfLargerChain.Parent.Get() == forkingPointOfSmallerChain.Parent.Get() {
+			return bytes.Compare(lo.PanicOnErr(forkingPointOfLargerChain.ID().Bytes()), lo.PanicOnErr(forkingPointOfSmallerChain.ID().Bytes())) > 0
+		}
+
+		// iterate by traversing the parent of the chain with the higher forking point first
+		if forkingPointOfLargerChain.Slot() > forkingPointOfSmallerChain.Slot() {
+			// iterate to parent
+			largerChain = largerChain.ParentChain.Get()
+
+			// terminate if we reach a common chain
+			if largerChain == smallerChain {
+				divergencePointB, divergencePointBExists := smallerChain.Commitment(forkingPointOfLargerChain.Slot())
+
+				return !divergencePointBExists || bytes.Compare(lo.PanicOnErr(forkingPointOfLargerChain.ID().Bytes()), lo.PanicOnErr(divergencePointB.ID().Bytes())) > 0
+			}
+		} else {
+			// iterate to parent
+			smallerChain = smallerChain.ParentChain.Get()
+
+			// terminate if we reach a common chain
+			if smallerChain == largerChain {
+				divergencePointA, divergencePointAExists := largerChain.Commitment(forkingPointOfSmallerChain.Slot())
+
+				return divergencePointAExists && bytes.Compare(lo.PanicOnErr(divergencePointA.ID().Bytes()), lo.PanicOnErr(forkingPointOfSmallerChain.ID().Bytes())) > 0
+			}
+		}
+	}
 }
 
 // initLogger initializes the Logger of this Commitment.
