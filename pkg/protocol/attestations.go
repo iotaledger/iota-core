@@ -163,43 +163,50 @@ func (a *Attestations) processResponse(commitment *model.Commitment, attestation
 			return
 		}
 
-		if publishedCommitment.AttestedWeight.Compute(func(currentWeight uint64) uint64 {
-			if !publishedCommitment.RequestAttestations.Get() {
-				a.LogTrace("received attestations for previously attested commitment", "commitment", publishedCommitment.LogName())
-
-				return currentWeight
-			}
-
-			chain := publishedCommitment.Chain.Get()
-			if chain == nil {
-				a.LogDebug("failed to find chain for commitment when processing attestations", "commitment", publishedCommitment.LogName())
-
-				return currentWeight
-			}
-
-			commitmentVerifier, exists := a.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
-			if !exists || commitmentVerifier == nil {
-				a.LogDebug("failed to retrieve commitment verifier", "commitment", publishedCommitment.LogName())
-
-				return currentWeight
-			}
-
-			_, actualWeight, err := commitmentVerifier.verifyCommitment(publishedCommitment, attestations, merkleProof)
-			if err != nil {
-				a.LogError("failed to verify commitment", "commitment", publishedCommitment.LogName(), "error", err)
-
-				return currentWeight
-			}
-
-			if actualWeight > currentWeight {
-				a.LogDebug("received response", "commitment", publishedCommitment.LogName(), "fromPeer", from)
-			}
-
-			return actualWeight
-		}) == 0 {
+		if a.publishAttestations(publishedCommitment, attestations, merkleProof, from) {
 			publishedCommitment.IsAttested.Set(true)
 		}
 	})
+}
+
+// publishAttestations publishes the given attestations for the given commitment.
+func (a *Attestations) publishAttestations(commitment *Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) (attestationsPublished bool) {
+	commitment.AttestedWeight.Compute(func(currentWeight uint64) uint64 {
+		if !commitment.RequestAttestations.Get() {
+			a.LogTrace("received attestations for previously attested commitment", "commitment", commitment.LogName())
+
+			return currentWeight
+		}
+
+		chain := commitment.Chain.Get()
+		if chain == nil {
+			a.LogDebug("failed to find chain for commitment when processing attestations", "commitment", commitment.LogName())
+
+			return currentWeight
+		}
+
+		commitmentVerifier, exists := a.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
+		if !exists || commitmentVerifier == nil {
+			a.LogDebug("failed to retrieve commitment verifier", "commitment", commitment.LogName())
+
+			return currentWeight
+		}
+
+		_, actualWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
+		if err != nil {
+			a.LogError("failed to verify commitment", "commitment", commitment.LogName(), "error", err)
+
+			return currentWeight
+		}
+
+		if attestationsPublished = actualWeight > currentWeight; !attestationsPublished {
+			a.LogDebug("received response", "commitment", commitment.LogName(), "fromPeer", from)
+		}
+
+		return actualWeight
+	})
+
+	return attestationsPublished
 }
 
 // processRequest processes the given attestation request.
