@@ -190,7 +190,7 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	}
 
 	if updated {
-		b.LogDebug("received missing block", "blockID", block.ID())
+		b.LogTrace("received missing block", "blockID", block.ID())
 
 		b.events.MissingBlockAttached.Trigger(block)
 	}
@@ -233,7 +233,7 @@ func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid boo
 	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
 		if b.evictionState.InActiveRootBlockRange(parentID) && !b.evictionState.IsActiveRootBlock(parentID) {
 			b.retainBlockFailure(modelBlock.ID(), api.BlockFailureParentIsTooOld)
-			return false, ierrors.Errorf("parent %s of block %s is too old %v %v", parentID, modelBlock.ID(), b.evictionState.InActiveRootBlockRange(parentID), b.evictionState.IsActiveRootBlock(parentID))
+			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())
 		}
 	}
 
