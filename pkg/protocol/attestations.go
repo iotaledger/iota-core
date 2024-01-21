@@ -207,50 +207,6 @@ func (a *Attestations) processResponse(commitment *model.Commitment, attestation
 	})
 }
 
-// publishAttestations publishes the given attestations for the given commitment.
-func (a *Attestations) publishAttestations(commitment *Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) (firstAttestations bool) {
-	var wasAttested, attestationsUpdated bool
-
-	commitment.AttestedWeight.Compute(func(currentWeight uint64) uint64 {
-		wasAttested = currentWeight > 0
-
-		if !commitment.RequestAttestations.Get() {
-			a.LogTrace("received attestations for previously attested commitment", "commitment", commitment.LogName())
-
-			return currentWeight
-		}
-
-		chain := commitment.Chain.Get()
-		if chain == nil {
-			a.LogDebug("failed to find chain for commitment when processing attestations", "commitment", commitment.LogName())
-
-			return currentWeight
-		}
-
-		commitmentVerifier, exists := a.commitmentVerifiers.Get(chain.ForkingPoint.Get().ID())
-		if !exists || commitmentVerifier == nil {
-			a.LogDebug("failed to retrieve commitment verifier", "commitment", commitment.LogName())
-
-			return currentWeight
-		}
-
-		_, actualWeight, err := commitmentVerifier.verifyCommitment(commitment, attestations, merkleProof)
-		if err != nil {
-			a.LogError("failed to verify commitment", "commitment", commitment.LogName(), "error", err)
-
-			return currentWeight
-		}
-
-		if attestationsUpdated = actualWeight > currentWeight; attestationsUpdated {
-			a.LogDebug("received response", "commitment", commitment.LogName(), "weight", actualWeight, "fromPeer", from)
-		}
-
-		return actualWeight
-	})
-
-	return attestationsUpdated && !wasAttested
-}
-
 // processRequest processes the given attestation request.
 func (a *Attestations) processRequest(commitmentID iotago.CommitmentID, from peer.ID) {
 	loggedWorkerPoolTask(a.workerPool, func() error {
