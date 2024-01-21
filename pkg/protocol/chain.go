@@ -327,6 +327,10 @@ func (c *Chain) winsTieBreak(other *Chain) bool {
 			return true
 		}
 
+		if forkingPointA.Slot() == forkingPointB.Slot() && forkingPointA.Parent.Get() == forkingPointB.Parent.Get() {
+			return bytes.Compare(lo.PanicOnErr(forkingPointA.ID().Bytes()), lo.PanicOnErr(forkingPointB.ID().Bytes())) > 0
+		}
+
 		// iterate by traversing the parent of the chain with the higher forking point until we reach the other chain
 		// and then compare the IDs of the commitments where both chains diverged
 		if forkingPointA.Slot() > forkingPointB.Slot() {

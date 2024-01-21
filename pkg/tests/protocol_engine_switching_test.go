@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strconv"
@@ -10,9 +11,7 @@ import (
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
-	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -905,7 +904,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 
 	var mainPartition []*mock.Node
 	var otherPartitions []*mock.Node
-	switch heaviestDivergencePoint(commitment140, commitment141, commitment142) {
+	switch commitmentWithLargestID(commitment140, commitment141, commitment142) {
 	case commitment140:
 		mainPartition = nodes[0:1]
 		otherPartitions = []*mock.Node{nodes[1], nodes[2]}
@@ -917,8 +916,6 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		otherPartitions = []*mock.Node{nodes[0], nodes[1]}
 	}
 
-	time.Sleep(1 * time.Second)
-
 	// Merge the partitions
 	{
 		fmt.Println("")
@@ -929,16 +926,6 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		fmt.Println("Losers: ", otherPartitions[0].Protocol.LogName(), otherPartitions[1].Protocol.LogName())
 		fmt.Println("==========================")
 		fmt.Println("")
-
-		for _, node := range otherPartitions {
-			node.Protocol.SetLogLevel(log.LevelDebug)
-
-			node.Protocol.Chains.WithInitializedEngines(func(_ *protocol.Chain, engine *engine.Engine) (shutdown func()) {
-				engine.BlockDAG.SetLogLevel(log.LevelDebug)
-
-				return nil
-			})
-		}
 
 		ts.MergePartitionsToMain()
 	}
@@ -967,16 +954,15 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 }
 
-func heaviestDivergencePoint(commitments ...*protocol.Commitment) *protocol.Commitment {
-	sortedDivergencePoints := reactive.NewSortedSet[*protocol.Commitment](func(commitment *protocol.Commitment) reactive.Variable[uint64] {
-		return commitment.CumulativeWeight
-	})
-
+func commitmentWithLargestID(commitments ...*protocol.Commitment) *protocol.Commitment {
+	var largestCommitment *protocol.Commitment
 	for _, commitment := range commitments {
-		sortedDivergencePoints.Add(commitment)
+		if largestCommitment == nil || bytes.Compare(lo.PanicOnErr(commitment.ID().Bytes()), lo.PanicOnErr(largestCommitment.ID().Bytes())) > 0 {
+			largestCommitment = commitment
+		}
 	}
 
-	return sortedDivergencePoints.HeaviestElement().Get()
+	return largestCommitment
 }
 
 //
