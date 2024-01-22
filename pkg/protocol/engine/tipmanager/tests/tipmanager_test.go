@@ -62,6 +62,8 @@ func Test_Orphanage(t *testing.T) {
 func Test_ValidationTips(t *testing.T) {
 	tf := NewTestFramework(t)
 
+	tf.AddValidators("validatorA", "validatorB")
+
 	{
 		tf.CreateBasicBlock("1", map[iotago.ParentsType][]string{
 			iotago.StrongParentType: {"Genesis"},
@@ -78,8 +80,6 @@ func Test_ValidationTips(t *testing.T) {
 
 	// Add validation tip for validatorA.
 	{
-		tf.AddValidator("validatorA")
-
 		tf.CreateValidationBlock("3", map[iotago.ParentsType][]string{
 			iotago.StrongParentType: {"2"},
 		}, func(blockBuilder *builder.ValidationBlockBuilder) {
@@ -94,8 +94,6 @@ func Test_ValidationTips(t *testing.T) {
 
 	// Add validation tip for validatorB.
 	{
-		tf.AddValidator("validatorB")
-
 		tf.CreateValidationBlock("4", map[iotago.ParentsType][]string{
 			iotago.StrongParentType: {"1"},
 		}, func(blockBuilder *builder.ValidationBlockBuilder) {

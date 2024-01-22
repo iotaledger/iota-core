@@ -32,8 +32,7 @@ func TestBlockGadget(t *testing.T) {
 	tf.Events.BlockPreConfirmed.Hook(checkOrder(&expectedPreConfirmationOrder, "pre-confirmation"))
 	tf.Events.BlockConfirmed.Hook(checkOrder(&expectedConfirmationOrder, "confirmation"))
 
-	tf.SeatManager.AddRandomAccount("A")
-	tf.SeatManager.AddRandomAccount("B")
+	tf.SeatManager.AddRandomAccounts("A", "B")
 
 	tf.SeatManager.SetOnline("A")
 	tf.SeatManager.SetOnline("B")

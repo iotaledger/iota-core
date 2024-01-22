@@ -67,19 +67,22 @@ func (t *TestFramework) Validator(alias string) iotago.AccountID {
 	return t.manualPOA.AccountID(alias)
 }
 
-func (t *TestFramework) AddValidator(alias string) {
-	t.manualPOA.AddRandomAccount(alias)
+func (t *TestFramework) AddValidators(aliases ...string) {
+	t.manualPOA.AddRandomAccounts(aliases...)
 
-	seat, exists := t.manualPOA.GetSeat(alias)
-	if !exists {
-		panic("seat does not exist")
+	for _, alias := range aliases {
+		seat, exists := t.manualPOA.GetSeat(alias)
+		if !exists {
+			panic("seat does not exist")
+		}
+
+		t.Instance.AddSeat(seat)
 	}
-
-	t.Instance.AddSeat(seat)
 }
 
 func (t *TestFramework) AddBlock(alias string) tipmanager.TipMetadata {
 	t.tipMetadataByAlias[alias] = t.Instance.AddBlock(t.Block(alias))
+	t.tipMetadataByAlias[alias].ID().RegisterAlias(alias)
 
 	return t.tipMetadataByAlias[alias]
 }

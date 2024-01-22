@@ -58,18 +58,24 @@ func NewManualPOAProvider() module.Provider[*engine.Engine, seatmanager.SeatMana
 	})
 }
 
-func (m *ManualPOA) AddRandomAccount(alias string) iotago.AccountID {
-	id := iotago.AccountID(tpkg.Rand32ByteArray())
-	id.RegisterAlias(alias)
-	if err := m.accounts.Set(id, &account.Pool{ // We don't care about pools with PoA, but need to set something to avoid division by zero errors.
-		PoolStake:      1,
-		ValidatorStake: 1,
-		FixedCost:      1,
-	}); err != nil {
-		panic(err)
-	}
+func (m *ManualPOA) AddRandomAccounts(aliases ...string) (accountIDs []iotago.AccountID) {
+	accountIDs = make([]iotago.AccountID, len(aliases))
 
-	m.aliases.Set(alias, id)
+	for i, alias := range aliases {
+		id := iotago.AccountID(tpkg.Rand32ByteArray())
+		id.RegisterAlias(alias)
+		if err := m.accounts.Set(id, &account.Pool{ // We don't care about pools with PoA, but need to set something to avoid division by zero errors.
+			PoolStake:      1,
+			ValidatorStake: 1,
+			FixedCost:      1,
+		}); err != nil {
+			panic(err)
+		}
+
+		m.aliases.Set(alias, id)
+
+		accountIDs[i] = id
+	}
 
 	m.committee = m.accounts.SeatedAccounts(m.accounts.IDs()...)
 
@@ -77,7 +83,7 @@ func (m *ManualPOA) AddRandomAccount(alias string) iotago.AccountID {
 		panic(err)
 	}
 
-	return id
+	return accountIDs
 }
 
 func (m *ManualPOA) AddAccount(id iotago.AccountID, alias string) iotago.AccountID {
