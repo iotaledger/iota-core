@@ -15,18 +15,18 @@ require (
 	github.com/iotaledger/hive.go/constraints v0.0.0-20240115140343-94cb44b074ff
 	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231219095137-dd4674b3226e
 	github.com/iotaledger/hive.go/crypto v0.0.0-20240115140343-94cb44b074ff
-	github.com/iotaledger/hive.go/ds v0.0.0-20231223024336-954578715888
+	github.com/iotaledger/hive.go/ds v0.0.0-20231223025555-711c417a7ac7
 	github.com/iotaledger/hive.go/ierrors v0.0.0-20240115140343-94cb44b074ff
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20231214025533-67add6c5091b
 	github.com/iotaledger/hive.go/lo v0.0.0-20240115140343-94cb44b074ff
 	github.com/iotaledger/hive.go/log v0.0.0-20231223024336-954578715888
 	github.com/iotaledger/hive.go/runtime v0.0.0-20240115140343-94cb44b074ff
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231223024336-954578715888
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240122133908-45aa91232534
 	github.com/iotaledger/hive.go/stringify v0.0.0-20240115140343-94cb44b074ff
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240116140934-2ca7a381e6a4
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240116140821-25bc7acc397d
 	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240118165554-40daefc60634
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240122135714-22be7ab490c9
 	github.com/labstack/echo/v4 v4.11.3
 	github.com/labstack/gommon v0.4.1
 	github.com/libp2p/go-libp2p v0.32.2
@@ -170,8 +170,8 @@ require (
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/image v0.13.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
-	golang.org/x/net v0.19.0 // indirect
-	golang.org/x/sync v0.5.0 // indirect
+	golang.org/x/net v0.20.0 // indirect
+	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
