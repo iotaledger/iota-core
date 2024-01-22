@@ -56,6 +56,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 		r := New(e.Workers.CreateGroup("Retainer"),
 			e.Storage.Retainer,
 			func() iotago.SlotIndex {
+				// use settings in case SyncManager is not constructed yet.
 				if e.SyncManager == nil {
 					return e.Storage.Settings().LatestCommitment().Slot()
 				}
@@ -63,6 +64,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 				return e.SyncManager.LatestCommitment().Slot()
 			},
 			func() iotago.SlotIndex {
+				// use settings in case SyncManager is not constructed yet.
 				if e.SyncManager == nil {
 					return e.Storage.Settings().LatestFinalizedSlot()
 				}
