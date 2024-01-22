@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -169,6 +170,9 @@ loop:
 
 	d.GetContainersConfigs()
 
+	// make sure all nodes are up then we can start dumping logs
+	d.DumpContainerLogsToFiles()
+
 	return nil
 }
 
@@ -208,7 +212,6 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 		return nil
 	}, true)
 
-	// make sure all nodes are up then we can start dumping logs
 	d.DumpContainerLogsToFiles()
 
 	return nil
@@ -753,9 +756,14 @@ func (d *DockerTestFramework) DumpContainerLogsToFiles() {
 		}
 
 		filePath := fmt.Sprintf("%s/%s.log", d.logDirectoryPath, name)
-		logCmd := fmt.Sprintf("docker logs -f %s > %s 2>&1 &", name, filePath)
-		err := exec.Command("bash", "-c", logCmd).Run()
-		require.NoError(d.Testing, err)
+		// dump logs to file if the file does not exist, which means the container is just started.
+		// logs should exist for the already running containers.
+		_, err := os.Stat(filePath)
+		if os.IsNotExist(err) {
+			logCmd := fmt.Sprintf("docker logs -f %s > %s 2>&1 &", name, filePath)
+			err := exec.Command("bash", "-c", logCmd).Run()
+			require.NoError(d.Testing, err)
+		}
 	}
 }
 
