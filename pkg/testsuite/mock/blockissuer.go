@@ -267,8 +267,8 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *
 	rmc, err := node.Protocol.Engines.Main.Get().Ledger.RMCManager().RMC(rmcSlot)
 	require.NoError(i.Testing, err)
 
-	// only set the burned Mana as the last step before signing, so workscore calculation is correct.
-	blockBuilder.MaxBurnedMana(rmc)
+	// only calculate the burned Mana as the last step before signing, so workscore calculation is correct.
+	blockBuilder.CalculateAndSetMaxBurnedMana(rmc)
 
 	blockBuilder.Sign(i.AccountID, i.privateKey)
 
