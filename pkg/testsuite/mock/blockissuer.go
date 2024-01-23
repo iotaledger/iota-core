@@ -267,8 +267,8 @@ func (i *BlockIssuer) CreateBasicBlock(ctx context.Context, alias string, node *
 	rmc, err := node.Protocol.Engines.Main.Get().Ledger.RMCManager().RMC(rmcSlot)
 	require.NoError(i.Testing, err)
 
-	// only set the burned Mana as the last step before signing, so workscore calculation is correct.
-	blockBuilder.MaxBurnedMana(rmc)
+	// only calculate the burned Mana as the last step before signing, so workscore calculation is correct.
+	blockBuilder.CalculateAndSetMaxBurnedMana(rmc)
 
 	blockBuilder.Sign(i.AccountID, i.privateKey)
 
@@ -292,7 +292,12 @@ func (i *BlockIssuer) IssueBasicBlock(ctx context.Context, alias string, node *N
 
 	require.NoErrorf(i.Testing, i.IssueBlock(block.ModelBlock(), node), "%s > failed to issue block with alias %s", i.Name, alias)
 
-	node.Protocol.LogTrace("issued block", "blockID", block.ID(), "slot", block.ID().Slot(), "commitment", block.SlotCommitmentID(), "latestFinalizedSlot", block.ProtocolBlock().Header.LatestFinalizedSlot, "version", block.ProtocolBlock().Header.ProtocolVersion)
+	basicBlockBody, is := block.BasicBlock()
+	if !is {
+		panic("expected basic block")
+	}
+
+	node.Protocol.LogTrace("issued block", "blockID", block.ID(), "slot", block.ID().Slot(), "MaxBurnedMana", basicBlockBody.MaxBurnedMana, "commitment", block.SlotCommitmentID(), "latestFinalizedSlot", block.ProtocolBlock().Header.LatestFinalizedSlot, "version", block.ProtocolBlock().Header.ProtocolVersion)
 
 	return block
 }
@@ -451,10 +456,11 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 		}
 
 		// only set the burned Mana as the last step before signing, so workscore calculation is correct.
-		basicBlock.MaxBurnedMana, err = basicBlock.ManaCost(rmc, apiForVersion.ProtocolParameters().WorkScoreParameters())
+		basicBlock.MaxBurnedMana, err = iotaBlock.ManaCost(rmc)
 		if err != nil {
 			return iotago.EmptyBlockID, ierrors.Wrapf(err, "could not calculate Mana cost for block")
 		}
+
 		resign = true
 	}
 

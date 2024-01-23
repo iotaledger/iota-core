@@ -180,7 +180,7 @@ func getUnlockConditions[T iotago.UnlockCondition](outputType iotago.OutputType,
 }
 
 func getFeatures[T iotago.Feature](opts *Options) iotago.Features[T] {
-	features := iotago.Features[T]{}
+	features := iotago.Features[iotago.Feature]{}
 
 	if opts.SenderAddress != nil {
 		features = append(features, &iotago.SenderFeature{Address: opts.SenderAddress})
@@ -229,11 +229,17 @@ func getFeatures[T iotago.Feature](opts *Options) iotago.Features[T] {
 		features = append(features, &iotago.StakingFeature{StakedAmount: opts.StakedAmount})
 	}
 
-	return features
+	feats := iotago.Features[T]{}
+	for _, feat := range features {
+		//nolint:forcetypeassert
+		feats = append(feats, feat.(T))
+	}
+
+	return feats
 }
 
 func getImmutableFeatures[T iotago.Feature](opts *Options) iotago.Features[T] {
-	features := iotago.Features[T]{}
+	features := iotago.Features[iotago.Feature]{}
 
 	if opts.ImmutableIssuerAddress != nil {
 		features = append(features, &iotago.IssuerFeature{Address: opts.ImmutableIssuerAddress})
@@ -248,7 +254,13 @@ func getImmutableFeatures[T iotago.Feature](opts *Options) iotago.Features[T] {
 		})
 	}
 
-	return features
+	feats := iotago.Features[T]{}
+	for _, feat := range features {
+		//nolint:forcetypeassert
+		feats = append(feats, feat.(T))
+	}
+
+	return feats
 }
 
 func MinDeposit(protocolParams iotago.ProtocolParameters, outputType iotago.OutputType, opts ...options.Option[Options]) (iotago.BaseToken, error) {

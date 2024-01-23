@@ -423,7 +423,7 @@ func Test_ImplicitAccounts(t *testing.T) {
 	)
 	block2Commitment := node1.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 	block2 := ts.IssueBasicBlockWithOptions("block2", newUserWallet, tx2, mock.WithStrongParents(latestParents...))
-	latestParents = ts.CommitUntilSlot(block2Slot, block2.ID())
+	ts.CommitUntilSlot(block2Slot, block2.ID())
 
 	fullAccountOutputID := newUserWallet.Output("TX2:0").OutputID()
 	allotted := iotago.BlockIssuanceCredits(tx2.Transaction.Allotments.Get(implicitAccountID))
@@ -472,7 +472,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	node1 := ts.AddValidatorNode("node1")
 	node2 := ts.AddNode("node2")
 
-	wallet1BIC := iotago.BlockIssuanceCredits(100000)
+	wallet1BIC := iotago.BlockIssuanceCredits(100_000)
 	wallet2BIC := iotago.BlockIssuanceCredits(0)
 
 	wallet1 := ts.AddGenesisWallet("wallet 1", node2, testsuite.WithWalletBlockIssuanceCredits(wallet1BIC))
@@ -514,7 +514,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		block12 := ts.IssueBasicBlockWithOptions("block1.2", wallet2, &iotago.TaggedData{}, mock.WithStrongParents(block11.ID()), mock.WithSlotCommitment(block1Commitment))
 
 		// Commit BIC burns and check account states.
-		latestParents = ts.CommitUntilSlot(ts.BlockID("block1.2").Slot(), block12.ID())
+		ts.CommitUntilSlot(ts.BlockID("block1.2").Slot(), block12.ID())
 
 		burned := iotago.BlockIssuanceCredits(block11.WorkScore()) * iotago.BlockIssuanceCredits(ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost)
 
@@ -579,7 +579,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	// Allot some mana to the locked account to unlock it.
 	// The locked wallet 2 is preparing and signs the transaction, but it's issued by wallet 1 whose account is not locked.
 	{
-		allottedBIC := iotago.BlockIssuanceCredits(1000)
+		allottedBIC := iotago.BlockIssuanceCredits(10_000)
 		tx1 := wallet2.AllotManaFromInputs("TX1",
 			iotago.Allotments{&iotago.Allotment{
 				AccountID: wallet2.BlockIssuer.AccountID,
@@ -622,7 +622,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 
 		block4 := ts.IssueBasicBlockWithOptions("block4", wallet2, &iotago.TaggedData{}, mock.WithStrongParents(latestParents...), mock.WithSlotCommitment(block4Commitment))
 
-		latestParents = ts.CommitUntilSlot(ts.BlockID("block4").Slot(), block4.ID())
+		ts.CommitUntilSlot(ts.BlockID("block4").Slot(), block4.ID())
 
 		burned := iotago.BlockIssuanceCredits(block4.WorkScore()) * iotago.BlockIssuanceCredits(ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost)
 
