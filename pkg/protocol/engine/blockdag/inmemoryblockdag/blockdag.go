@@ -59,7 +59,7 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 			}, event.WithWorkerPool(wp))
 
 			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
-			b.latestCommitmentFunc = e.Storage.Settings().LatestCommitment
+			b.latestCommitmentFunc = e.SyncManager.LatestCommitment
 
 			e.Events.BlockDAG.LinkTo(b.events)
 
