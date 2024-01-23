@@ -387,8 +387,8 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 	}
 
 	if iotaBlock.Header.SlotCommitmentID == iotago.EmptyCommitmentID {
-		iotaBlock.Header.SlotCommitmentID = node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID()
-		iotaBlock.Header.LatestFinalizedSlot = node.Protocol.Engines.Main.Get().Storage.Settings().LatestFinalizedSlot()
+		iotaBlock.Header.SlotCommitmentID = node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID()
+		iotaBlock.Header.LatestFinalizedSlot = node.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot()
 		resign = true
 	}
 
@@ -511,7 +511,7 @@ func (i *BlockIssuer) setDefaultBlockParams(blockParams *BlockHeaderParams, node
 	}
 
 	if blockParams.LatestFinalizedSlot == nil {
-		latestFinalizedSlot := node.Protocol.Engines.Main.Get().Storage.Settings().LatestFinalizedSlot()
+		latestFinalizedSlot := node.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot()
 		blockParams.LatestFinalizedSlot = &latestFinalizedSlot
 	}
 
@@ -534,7 +534,7 @@ func (i *BlockIssuer) getAddressableCommitment(currentAPI iotago.API, blockIssui
 	protoParams := currentAPI.ProtocolParameters()
 	blockSlot := currentAPI.TimeProvider().SlotFromTime(blockIssuingTime)
 
-	commitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
+	commitment := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 
 	if blockSlot > commitment.Slot+protoParams.MaxCommittableAge() {
 		return nil, ierrors.Wrapf(ErrBlockTooRecent, "can't issue block: block slot %d is too far in the future, latest commitment is %d", blockSlot, commitment.Slot)

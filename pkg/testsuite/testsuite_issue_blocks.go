@@ -262,7 +262,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.Blo
 	// then issue one more block to accept the last in the chain which will trigger commitment of the second last in the chain
 	activeValidators := t.Validators()
 
-	latestCommittedSlot := activeValidators[0].Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
+	latestCommittedSlot := activeValidators[0].Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
 	if latestCommittedSlot >= slot {
 		return parents
 	}
@@ -283,7 +283,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.Blo
 
 			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
 				blockName := fmt.Sprintf("chain-%s-%d-%s", parents[0].Alias(), chainIndex, node.Name)
-				latestCommitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
+				latestCommitment := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 				tips = []iotago.BlockID{t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...)).ID()}
 			}
 		}
@@ -293,7 +293,7 @@ func (t *TestSuite) CommitUntilSlot(slot iotago.SlotIndex, parents ...iotago.Blo
 			require.True(t.Testing, exists, "node: %s: does not have committee selected for slot %d", node.Name, t.currentSlot)
 			if committeeAtBlockSlot.HasAccount(node.Validator.AccountID) {
 				blockName := fmt.Sprintf("chain-%s-%d-%s", parents[0].Alias(), chainIndex+1, node.Name)
-				latestCommitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
+				latestCommitment := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 				tips = []iotago.BlockID{t.IssueValidationBlockWithHeaderOptions(blockName, node, mock.WithSlotCommitment(latestCommitment), mock.WithStrongParents(tips...)).ID()}
 			}
 		}
