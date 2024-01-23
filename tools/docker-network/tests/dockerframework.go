@@ -366,7 +366,6 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 		SetCreationSlot(currentSlot).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: accountID}).
-		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
 		AllotAllMana(currentSlot, accountID).
 		Build(implicitAddrSigner)
 	require.NoError(d.Testing, err)
@@ -423,7 +422,6 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 		AddOutput(delegationOutput).
 		SetCreationSlot(currentSlot).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
-		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
 		AllotAllMana(currentSlot, from.AccountID).
 		Build(fundsAddrSigner)
 	require.NoError(d.Testing, err)
@@ -475,7 +473,7 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 		IncreaseAllotment(to.AccountID, actualAllottedMana).
 		AddOutput(basicOutput).
 		SetCreationSlot(currentSlot).
-		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
+		AllotAllMana(currentSlot, from.AccountID).
 		Build(fundsAddrSigner)
 	require.NoError(d.Testing, err)
 
@@ -543,7 +541,6 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iota
 		SetCreationSlot(currentSlot).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: from.AccountID}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
-		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
 		AllotAllMana(currentSlot, from.AccountID).
 		Build(signer)
 	require.NoError(d.Testing, err)
