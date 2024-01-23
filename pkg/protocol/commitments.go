@@ -330,7 +330,7 @@ func (c *Commitments) processResponse(commitment *model.Commitment, from peer.ID
 		// make sure the main engine is available to process the response
 		mainEngine := c.protocol.Engines.Main.Get()
 		if mainEngine == nil {
-			c.LogDebug("main engine unavailable for response", "commitment", commitment.ID(), "fromPeer", from)
+			c.LogError("main engine unavailable for response", "commitment", commitment.ID(), "fromPeer", from)
 
 			return
 		}
