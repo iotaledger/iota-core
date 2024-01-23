@@ -234,6 +234,7 @@ func getFeatures[T iotago.Feature](opts *Options) iotago.Features[T] {
 		//nolint:forcetypeassert
 		feats = append(feats, feat.(T))
 	}
+
 	return feats
 }
 
