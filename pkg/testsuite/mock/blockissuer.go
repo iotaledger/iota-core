@@ -451,10 +451,11 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 		}
 
 		// only set the burned Mana as the last step before signing, so workscore calculation is correct.
-		basicBlock.MaxBurnedMana, err = basicBlock.ManaCost(rmc, apiForVersion.ProtocolParameters().WorkScoreParameters())
+		basicBlock.MaxBurnedMana, err = iotaBlock.ManaCost(rmc)
 		if err != nil {
 			return iotago.EmptyBlockID, ierrors.Wrapf(err, "could not calculate Mana cost for block")
 		}
+
 		resign = true
 	}
 
