@@ -81,9 +81,13 @@ func (t *TestSuite) AssertLatestCommitmentSlotIndex(slot iotago.SlotIndex, nodes
 
 	for _, node := range nodes {
 		t.Eventually(func() error {
-			latestCommittedSlot := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
-			if slot != latestCommittedSlot {
-				return ierrors.Errorf("AssertLatestCommitmentSlotIndex: %s: expected %v, got %v", node.Name, slot, latestCommittedSlot)
+			latestCommittedSlotSettings := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
+			if slot != latestCommittedSlotSettings {
+				return ierrors.Errorf("AssertLatestCommitmentSlotIndex: %s: expected %v, got %v in settings", node.Name, slot, latestCommittedSlotSettings)
+			}
+			latestCommittedSlotSyncManager := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
+			if slot != latestCommittedSlotSyncManager {
+				return ierrors.Errorf("AssertLatestCommitmentSlotIndex: %s: expected %v, got %v in sync manager", node.Name, slot, latestCommittedSlotSyncManager)
 			}
 
 			return nil
@@ -112,6 +116,10 @@ func (t *TestSuite) AssertLatestFinalizedSlot(slot iotago.SlotIndex, nodes ...*m
 		t.Eventually(func() error {
 			if slot != node.Protocol.Engines.Main.Get().Storage.Settings().LatestFinalizedSlot() {
 				return ierrors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d from settings", node.Name, slot, node.Protocol.Engines.Main.Get().Storage.Settings().LatestFinalizedSlot())
+			}
+
+			if slot != node.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() {
+				return ierrors.Errorf("AssertLatestFinalizedSlot: %s: expected %d, got %d from from SyncManager", node.Name, slot, node.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot())
 			}
 
 			return nil
