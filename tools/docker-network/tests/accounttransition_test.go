@@ -3,13 +3,13 @@
 package tests
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/stretchr/testify/require"
+
+	iotago "github.com/iotaledger/iota.go/v4"
 )
 
 // Test_AccountTransitions follows the account state transition flow described in:
@@ -41,19 +41,14 @@ func Test_AccountTransitions(t *testing.T) {
 	account1 := d.CreateAccount()
 
 	// create account2
-	fmt.Println("\nCreating account2")
+	fmt.Println("Creating account2")
 	account2 := d.CreateAccount()
 
-	// request faucet funds
-	fmt.Println("\nRequestng faucet funds")
-	fundsAddr, _ := d.getAddress(iotago.AddressEd25519)
-	d.RequestFaucetFunds(context.TODO(), fundsAddr)
-
 	// allot 1000 mana from account1 to account2
-	fmt.Println("\nAlloting mana from account1 to account2")
+	fmt.Println("Allotting mana from account1 to account2")
 	d.AllotManaTo(account1, account2, 1000)
 
 	// create native token
-	fmt.Println("\nCreating native token")
+	fmt.Println("Creating native token")
 	account2 = d.CreateNativeToken(account2, 5_000_000, 10_000_000_000)
 }
