@@ -112,7 +112,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 				return
 			}
 			if basicBlock, isBasic := block.BasicBlock(); isBasic {
-				manaCost, err := basicBlock.ManaCost(rmc, block.ProtocolBlock().API.ProtocolParameters().WorkScoreParameters())
+				manaCost, err := block.ProtocolBlock().ManaCost(rmc)
 				if err != nil {
 					c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
 						Block:  block,

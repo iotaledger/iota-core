@@ -331,7 +331,7 @@ func (e *Engine) CommitmentAPI(commitmentID iotago.CommitmentID) (*CommitmentAPI
 		return nil, ierrors.New("engine is nil")
 	}
 
-	if e.Storage.Settings().LatestCommitment().Slot() < commitmentID.Slot() {
+	if e.SyncManager.LatestCommitment().Slot() < commitmentID.Slot() {
 		return nil, ierrors.Errorf("slot %d is not committed yet", commitmentID.Slot())
 	}
 

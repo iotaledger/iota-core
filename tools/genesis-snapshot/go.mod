@@ -5,12 +5,12 @@ go 1.21
 replace github.com/iotaledger/iota-core => ../../
 
 require (
-	github.com/iotaledger/hive.go/crypto v0.0.0-20240115140343-94cb44b074ff
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20240115140343-94cb44b074ff
-	github.com/iotaledger/hive.go/lo v0.0.0-20240115140343-94cb44b074ff
-	github.com/iotaledger/hive.go/runtime v0.0.0-20240115140343-94cb44b074ff
+	github.com/iotaledger/hive.go/crypto v0.0.0-20240123132714-180e65c33a1d
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20240123132714-180e65c33a1d
+	github.com/iotaledger/hive.go/lo v0.0.0-20240123132714-180e65c33a1d
+	github.com/iotaledger/hive.go/runtime v0.0.0-20240123132714-180e65c33a1d
 	github.com/iotaledger/iota-core v0.0.0-00010101000000-000000000000
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240118091636-1adea89035bb
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240123170900-42c1479d3f30
 	github.com/mr-tron/base58 v1.2.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/crypto v0.18.0
@@ -28,13 +28,13 @@ require (
 	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iotaledger/grocksdb v1.7.5-0.20230220105546-5162e18885c7 // indirect
 	github.com/iotaledger/hive.go/ads v0.0.0-20231214025533-67add6c5091b // indirect
-	github.com/iotaledger/hive.go/constraints v0.0.0-20240115140343-94cb44b074ff // indirect
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20231219095137-dd4674b3226e // indirect
-	github.com/iotaledger/hive.go/ds v0.0.0-20231223024336-954578715888 // indirect
+	github.com/iotaledger/hive.go/constraints v0.0.0-20240123132714-180e65c33a1d // indirect
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240123132714-180e65c33a1d // indirect
+	github.com/iotaledger/hive.go/ds v0.0.0-20240123132714-180e65c33a1d // indirect
 	github.com/iotaledger/hive.go/kvstore v0.0.0-20231214025533-67add6c5091b // indirect
-	github.com/iotaledger/hive.go/log v0.0.0-20231223024336-954578715888 // indirect
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20231223024336-954578715888 // indirect
-	github.com/iotaledger/hive.go/stringify v0.0.0-20240115140343-94cb44b074ff // indirect
+	github.com/iotaledger/hive.go/log v0.0.0-20240123132714-180e65c33a1d // indirect
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240123132714-180e65c33a1d // indirect
+	github.com/iotaledger/hive.go/stringify v0.0.0-20240123132714-180e65c33a1d // indirect
 	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
@@ -60,8 +60,8 @@ require (
 	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
-	golang.org/x/sync v0.5.0 // indirect
+	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a // indirect
+	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect

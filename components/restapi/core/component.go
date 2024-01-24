@@ -2,7 +2,6 @@ package core
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/labstack/echo/v4"
 	"go.uber.org/dig"
@@ -33,8 +32,6 @@ func init() {
 var (
 	Component *app.Component
 	deps      dependencies
-
-	features = []string{}
 )
 
 type dependencies struct {
@@ -314,11 +311,6 @@ func configure() error {
 	}, checkNodeSynced())
 
 	return nil
-}
-
-// AddFeature adds a feature to the RouteInfo endpoint.
-func AddFeature(feature string) {
-	features = append(features, strings.ToLower(feature))
 }
 
 func checkNodeSynced() echo.MiddlewareFunc {

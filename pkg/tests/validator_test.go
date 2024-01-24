@@ -5,13 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/core/safemath"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
-	"github.com/stretchr/testify/require"
 
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -267,7 +268,7 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 		for subslotIdx := uint8(0); subslotIdx < test.issuancePerSlot; subslotIdx++ {
 			for _, node := range ts.Validators() {
 				blockName := fmt.Sprintf("block-%s-%d/%d", node.Name, ts.CurrentSlot(), subslotIdx)
-				latestCommitment := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment()
+				latestCommitment := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment()
 
 				issuingTime := slotStartTime.
 					Add(issuancePeriod * time.Duration(subslotIdx)).
@@ -291,7 +292,7 @@ func validatorTest(t *testing.T, test ValidatorTest) {
 	var totalStake iotago.BaseToken = 0
 	var totalValidatorStake iotago.BaseToken = 0
 	lo.ForEach(ts.Validators(), func(n *mock.Node) {
-		latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
+		latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
 		accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(n.Validator.AccountID, latestCommittedSlot)
 		if err != nil || !exists {
 			t.Fatal(exists, err)
@@ -357,7 +358,7 @@ type epochReward struct {
 // as in the epoch for which to calculate rewards.
 func calculateEpochReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, epoch iotago.EpochIndex, epochPerformanceFactor uint64, totalStake iotago.BaseToken, totalValidatorStake iotago.BaseToken) epochReward {
 
-	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
+	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
 	targetReward := lo.PanicOnErr(ts.API.ProtocolParameters().RewardsParameters().TargetReward(epoch, ts.API))
 	accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil || !exists {
@@ -384,7 +385,7 @@ func calculateEpochReward(t *testing.T, ts *testsuite.TestSuite, accountID iotag
 // For testing purposes, assumes that the account's staking data is the same in the latest committed slot
 // as in the epoch for which to calculate rewards.
 func calculateValidatorReward(t *testing.T, ts *testsuite.TestSuite, accountID iotago.AccountID, epochRewards []epochReward, startEpoch iotago.EpochIndex, claimingEpoch iotago.EpochIndex) iotago.Mana {
-	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
+	latestCommittedSlot := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
 	accountData, exists, err := ts.DefaultWallet().Node.Protocol.Engines.Main.Get().Ledger.Account(accountID, latestCommittedSlot)
 	if err != nil || !exists {
 		t.Fatal(exists, err)
