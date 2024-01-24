@@ -146,13 +146,13 @@ func Test_NoCandidacyPayload(t *testing.T) {
 		))
 	defer d.Stop()
 
-	d.AddValidatorNode("V1", "docker-network-inx-validator-1-1", "http://localhost:8050", "rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6")
-	d.AddValidatorNode("V2", "docker-network-inx-validator-2-1", "http://localhost:8060", "rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl")
-	d.AddValidatorNode("V3", "docker-network-inx-validator-3-1", "http://localhost:8070", "rms1pp4wuuz0y42caz48vv876qfpmffswsvg40zz8v79sy8cp0jfxm4kunflcgt")
-	d.AddValidatorNode("V4", "docker-network-inx-validator-4-1", "http://localhost:8040", "rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw")
+	d.AddValidatorNode("V1", "docker-network-inx-validator-1-1", "http://localhost:8050", "rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6", false)
+	d.AddValidatorNode("V2", "docker-network-inx-validator-2-1", "http://localhost:8060", "rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl", false)
+	d.AddValidatorNode("V3", "docker-network-inx-validator-3-1", "http://localhost:8070", "rms1pp4wuuz0y42caz48vv876qfpmffswsvg40zz8v79sy8cp0jfxm4kunflcgt", false)
+	d.AddValidatorNode("V4", "docker-network-inx-validator-4-1", "http://localhost:8040", "rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw", false)
 	d.AddNode("node5", "docker-network-node-5-1", "http://localhost:8090")
 
-	err := d.Run(map[string]bool{"V1": false, "V2": false, "V3": false, "V4": false})
+	err := d.Run()
 	require.NoError(t, err)
 
 	err = d.WaitUntilSync()
@@ -179,7 +179,7 @@ func Test_NoCandidacyPayload(t *testing.T) {
 	})
 
 	// Start issuing candidacy payloads for 3 validators, and check if committee size is 3
-	d.SetIssueCandidacyPayload(map[string]bool{"V1": true, "V2": true, "V3": true, "V4": false})
+	d.StartIssueCandidacyPayload("V1", "V2", "V3")
 	d.AssertCommittee(currentEpoch+4, d.AccountsFromNodes(d.Nodes("V1", "V2", "V3")...))
 }
 

@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -49,13 +50,14 @@ var (
 )
 
 type Node struct {
-	Name                 string
-	ContainerName        string
-	ClientURL            string
-	Client               *nodeclient.Client
-	AccountAddressBech32 string
-	ContainerConfigs     string
-	PrivateKey           string
+	Name                  string
+	ContainerName         string
+	ClientURL             string
+	Client                *nodeclient.Client
+	AccountAddressBech32  string
+	ContainerConfigs      string
+	PrivateKey            string
+	IssueCandidacyPayload bool
 }
 
 type Account struct {
@@ -116,31 +118,36 @@ func NewDockerTestFramework(t *testing.T, opts ...options.Option[DockerTestFrame
 	})
 }
 
-func (d *DockerTestFramework) Run(optIssueCandidacyPayloadMap ...map[string]bool) error {
+func (d *DockerTestFramework) DockerComposeUp(detach ...bool) error {
+	cmd := exec.Command("docker", "compose", "up")
+
+	if len(detach) > 0 && detach[0] {
+		cmd = exec.Command("docker", "compose", "up", "-d")
+	}
+
+	cmd.Env = os.Environ()
+	for _, node := range d.nodes {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("ISSUE_CANDIDACY_PAYLOAD_%s=%t", node.Name, node.IssueCandidacyPayload))
+	}
+
+	var out strings.Builder
+	cmd.Stderr = &out
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println("Docker compose up failed with error:", err, ":", out.String())
+	}
+
+	return err
+}
+
+func (d *DockerTestFramework) Run() error {
 	ch := make(chan error)
 	stopCh := make(chan struct{})
 	defer close(ch)
 	defer close(stopCh)
 
-	issueCandidacyPayloadMap := make(map[string]bool)
-	if len(optIssueCandidacyPayloadMap) > 0 {
-		issueCandidacyPayloadMap = optIssueCandidacyPayloadMap[0]
-	}
-
 	go func() {
-		cmd := exec.Command("docker", "compose", "up")
-		cmd.Env = os.Environ()
-		for nodeName, issueCandidacyPayload := range issueCandidacyPayloadMap {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("ISSUE_CANDIDACY_PAYLOAD_%s=%t", nodeName, issueCandidacyPayload))
-		}
-
-		var out strings.Builder
-		cmd.Stderr = &out
-		err := cmd.Run()
-
-		if err != nil {
-			fmt.Println("Docker compose up failed with error:", err, ":", out.String())
-		}
+		err := d.DockerComposeUp()
 
 		// make sure that the channel is not already closed
 		select {
@@ -222,12 +229,18 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 	return nil
 }
 
-func (d *DockerTestFramework) AddValidatorNode(name string, containerName string, clientURL string, accAddrBech32 string) {
+func (d *DockerTestFramework) AddValidatorNode(name string, containerName string, clientURL string, accAddrBech32 string, optIssueCandidacyPayload ...bool) {
+	issueCandidacyPayload := true
+	if len(optIssueCandidacyPayload) > 0 {
+		issueCandidacyPayload = optIssueCandidacyPayload[0]
+	}
+
 	d.nodes[name] = &Node{
-		Name:                 name,
-		ContainerName:        containerName,
-		ClientURL:            clientURL,
-		AccountAddressBech32: accAddrBech32,
+		Name:                  name,
+		ContainerName:         containerName,
+		ClientURL:             clientURL,
+		AccountAddressBech32:  accAddrBech32,
+		IssueCandidacyPayload: issueCandidacyPayload,
 	}
 }
 
@@ -284,23 +297,36 @@ func (d *DockerTestFramework) AccountsFromNodes(nodes ...*Node) []string {
 	return accounts
 }
 
-func (d *DockerTestFramework) SetIssueCandidacyPayload(issueCandidacyPayloadMap map[string]bool) {
-	cmd := exec.Command("docker", "compose", "up", "-d")
-
-	cmd.Env = os.Environ()
-
-	for nodeName, issueCandidacyPayload := range issueCandidacyPayloadMap {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("ISSUE_CANDIDACY_PAYLOAD_%s=%t", nodeName, issueCandidacyPayload))
+func (d *DockerTestFramework) StartIssueCandidacyPayload(nodeNames ...string) {
+	if len(nodeNames) == 0 {
+		return
 	}
 
-	err := cmd.Run()
-	if err != nil {
-		fmt.Println("Docker compose up failed with error:", err)
+	for _, node := range d.nodes {
+		if slices.Contains(nodeNames, node.Name) {
+			node.IssueCandidacyPayload = true
+		}
 	}
+
+	d.DockerComposeUp(true)
+}
+
+func (d *DockerTestFramework) StopIssueCandidacyPayload(nodeNames ...string) {
+	if len(nodeNames) == 0 {
+		return
+	}
+
+	for _, node := range d.nodes {
+		if slices.Contains(nodeNames, node.Name) {
+			node.IssueCandidacyPayload = false
+		}
+	}
+
+	d.DockerComposeUp(true)
 }
 
 func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *Account {
-	// create implicit account by requesting faucet funds
+	// create an implicit account by requesting faucet funds
 	ctx := context.TODO()
 	receiverAddr, implicitPrivateKey := d.getAddress(iotago.AddressImplicitAccountCreation)
 	implicitOutputID, implicitAccountOutput := d.RequestFaucetFunds(ctx, receiverAddr)
@@ -309,10 +335,10 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
 	require.True(d.Testing, ok)
 
-	// make sure implicit account is committed
+	// make sure an implicit account is committed
 	d.CheckAccountStatus(ctx, iotago.EmptyBlockID, implicitOutputID.TransactionID(), implicitOutputID, accountAddress)
 
-	// transition to full account with new Ed25519 address and staking feature
+	// transition to a full account with new Ed25519 address and staking feature
 	accEd25519Addr, accPrivateKey := d.getAddress(iotago.AddressEd25519)
 	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(accPrivateKey.Public().(ed25519.PublicKey))
 	accountOutput := options.Apply(builder.NewAccountOutputBuilder(accEd25519Addr, implicitAccountOutput.BaseTokenAmount()),
