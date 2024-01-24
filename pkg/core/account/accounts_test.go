@@ -130,7 +130,7 @@ func TestAccounts_SeatedAccounts(t *testing.T) {
 
 	idx := 0
 	for id, stake := range prevCommitteeIssuers {
-		// half of the accounts from previous committee should also be added to the new committee
+		// half of the accounts from the previous committee should also be added to the new committee
 		if idx%2 == 0 || idx == 1 {
 			require.NoError(t, newCommitteeAccounts.Set(id, &account.Pool{
 				PoolStake:      stake,
@@ -148,9 +148,9 @@ func TestAccounts_SeatedAccounts(t *testing.T) {
 		idx++
 	}
 
-	// Add remaining accounts to new commitee accounts.
+	// Add remaining accounts to new committee accounts.
 	for id, stake := range newCommitteeIssuers {
-		// half of the accounts from previous committee should also be added to the new committee
+		// half of the accounts from the previous committee should also be added to the new committee
 		require.NoError(t, newCommitteeAccounts.Set(id, &account.Pool{
 			PoolStake:      stake,
 			ValidatorStake: iotago.BaseToken(stake) * 2,
@@ -172,11 +172,15 @@ func TestAccounts_SeatedAccounts(t *testing.T) {
 		return true
 	})
 
-	// Make sure that size of the committee and SeatIndex values are sane.
+	// Make sure that the size of the committee and SeatIndex values are sane.
 	require.Equal(t, newCommittee.SeatCount(), committeeSize)
 
+	// Check that SeatIndices are within <0; committeeSize) range.
 	newCommitteeAccounts.ForEach(func(id iotago.AccountID, _ *account.Pool) bool {
+		// SeatIndex must be smaller than CommitteeSize.
 		require.Less(t, int(lo.Return1(newCommittee.GetSeat(id))), committeeSize)
+
+		// SeatIndex must be bigger or equal to 0.
 		require.GreaterOrEqual(t, int(lo.Return1(newCommittee.GetSeat(id))), 0)
 
 		return true

@@ -61,15 +61,20 @@ func (t *TestSuite) AssertReelectedCommitteeSeatIndices(prevEpoch iotago.EpochIn
 				return ierrors.Errorf("AssertReelectedCommitteeSeatIndices: %s: failed to get accounts in committee in previous epoch %d: %w", node.Name, prevEpoch, err)
 			}
 
+			var innerErr error
 			committeeInPrevEpochAccounts.ForEach(func(id iotago.AccountID, _ *account.Pool) bool {
 				if seatIndex, memberExists := committeeInNewEpoch.GetSeat(id); memberExists {
-					require.Equalf(t.Testing, seatIndex, lo.Return1(committeeInPrevEpoch.GetSeat(id)), "account %s must have the same SeatIndex in the previous and new epoch committee", id)
+					if seatIndex != lo.Return1(committeeInPrevEpoch.GetSeat(id)) {
+						innerErr = ierrors.Errorf("account %s must have the same SeatIndex in the previous and new epoch committee", id)
+
+						return false
+					}
 				}
 
 				return true
 			})
 
-			return nil
+			return innerErr
 		})
 	}
 }
