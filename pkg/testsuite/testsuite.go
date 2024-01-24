@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/blake2b"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
@@ -350,7 +349,7 @@ func (t *TestSuite) addNodeToPartition(name string, partition string, validator 
 			Address:              iotago.Ed25519AddressFromPubKey(node.Validator.PublicKey),
 			Amount:               walletOptions.Amount,
 			Mana:                 iotago.Mana(walletOptions.Amount),
-			IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.Validator.PublicKey)),
+			IssuerKey:            iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(node.Validator.PublicKey)),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 2,
 			StakedAmount:         walletOptions.Amount,
@@ -410,7 +409,7 @@ func (t *TestSuite) AddGenesisWallet(name string, node *mock.Node, walletOpts ..
 		Address:              iotago.Ed25519AddressFromPubKey(newWallet.BlockIssuer.PublicKey),
 		Amount:               walletOptions.Amount,
 		Mana:                 iotago.Mana(mock.MinIssuerAccountAmount(t.API.ProtocolParameters())),
-		IssuerKey:            iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newWallet.BlockIssuer.PublicKey)),
+		IssuerKey:            iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(newWallet.BlockIssuer.PublicKey)),
 		ExpirySlot:           iotago.MaxSlotIndex,
 		BlockIssuanceCredits: walletOptions.BlockIssuanceCredits,
 	}
@@ -486,12 +485,11 @@ func (t *TestSuite) Run(failOnBlockFiltered bool, nodesOptions ...map[string][]o
 			}
 
 			if accountDetails.AccountID.Empty() {
-				blockIssuerKeyEd25519, ok := accountDetails.IssuerKey.(*iotago.Ed25519PublicKeyBlockIssuerKey)
+				blockIssuerKeyEd25519, ok := accountDetails.IssuerKey.(*iotago.Ed25519PublicKeyHashBlockIssuerKey)
 				if !ok {
 					panic("block issuer key must be of type ed25519")
 				}
-				ed25519PubKey := blockIssuerKeyEd25519.ToEd25519PublicKey()
-				accountID := blake2b.Sum256(ed25519PubKey[:])
+				accountID := blockIssuerKeyEd25519.PublicKeyHash
 				accountDetails.AccountID = accountID
 			}
 
