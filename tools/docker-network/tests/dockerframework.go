@@ -628,7 +628,7 @@ func (d *DockerTestFramework) AssertIndexerAccount(account *Account) {
 			return err
 		}
 
-		require.EqualValues(d.Testing, account.OutputID, outputID)
+		require.EqualValues(d.Testing, account.OutputID, *outputID)
 		require.EqualValues(d.Testing, account.AccountOutput, output)
 
 		return nil
