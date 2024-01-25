@@ -88,7 +88,7 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, ac
 }
 
 func (i *BlockIssuer) BlockIssuerKey() iotago.BlockIssuerKey {
-	return iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(i.PublicKey))
+	return iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(i.PublicKey))
 }
 
 func (i *BlockIssuer) BlockIssuerKeys() iotago.BlockIssuerKeys {
