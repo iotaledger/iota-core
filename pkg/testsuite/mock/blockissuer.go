@@ -469,6 +469,7 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 			issuerAccount := optIssuerAccount[0]
 			iotaBlock.Header.IssuerID = issuerAccount.ID()
 
+			//nolint:forcetypeassert // we can safely assume that this is an Ed25519Account
 			ownerAddr := issuerAccount.OwnerAddress().(*iotago.Ed25519Address)
 			signer := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(ownerAddr, issuerAccount.PrivateKey()))
 
