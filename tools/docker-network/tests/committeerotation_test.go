@@ -179,7 +179,7 @@ func Test_NoCandidacyPayload(t *testing.T) {
 	})
 
 	// Start issuing candidacy payloads for 3 validators, and check if committee size is 3
-	d.StartIssueCandidacyPayload("V1", "V2", "V3")
+	d.StartIssueCandidacyPayload(d.Nodes("V1", "V2", "V3")...)
 	d.AssertCommittee(currentEpoch+4, d.AccountsFromNodes(d.Nodes("V1", "V2", "V3")...))
 }
 

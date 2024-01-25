@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -297,29 +296,25 @@ func (d *DockerTestFramework) AccountsFromNodes(nodes ...*Node) []string {
 	return accounts
 }
 
-func (d *DockerTestFramework) StartIssueCandidacyPayload(nodeNames ...string) {
-	if len(nodeNames) == 0 {
+func (d *DockerTestFramework) StartIssueCandidacyPayload(nodes ...*Node) {
+	if len(nodes) == 0 {
 		return
 	}
 
-	for _, node := range d.nodes {
-		if slices.Contains(nodeNames, node.Name) {
-			node.IssueCandidacyPayload = true
-		}
+	for _, node := range nodes {
+		node.IssueCandidacyPayload = true
 	}
 
 	d.DockerComposeUp(true)
 }
 
-func (d *DockerTestFramework) StopIssueCandidacyPayload(nodeNames ...string) {
-	if len(nodeNames) == 0 {
+func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
+	if len(nodes) == 0 {
 		return
 	}
 
-	for _, node := range d.nodes {
-		if slices.Contains(nodeNames, node.Name) {
-			node.IssueCandidacyPayload = false
-		}
+	for _, node := range nodes {
+		node.IssueCandidacyPayload = false
 	}
 
 	d.DockerComposeUp(true)
