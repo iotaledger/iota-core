@@ -66,6 +66,7 @@ func benchmarkOneIO(t *testing.T) (float64, []float64) {
 			node.Protocol.IssueBlock(modelBlock)
 			<-blockchan
 			b.StopTimer()
+			ts.Shutdown()
 		}
 	}
 	// get the ns/op of processing the block
@@ -108,6 +109,7 @@ func benchmarkOneIMaxO(t *testing.T) (float64, []float64) {
 			node.Protocol.IssueBlock(modelBlock)
 			<-blockchan
 			b.StopTimer()
+			ts.Shutdown()
 		}
 	}
 	// get the ns/op of processing the block
@@ -154,6 +156,7 @@ func benchmarkOneAccountOutputStaking(t *testing.T) (float64, []float64) {
 			node.Protocol.IssueBlock(modelBlock)
 			<-blockchan
 			b.StopTimer()
+			ts.Shutdown()
 		}
 	}
 	// get the ns/op of processing the block
