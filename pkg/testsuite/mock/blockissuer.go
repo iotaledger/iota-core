@@ -469,7 +469,10 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 			issuerAccount := optIssuerAccount[0]
 			iotaBlock.Header.IssuerID = issuerAccount.ID()
 
-			signature, signatureErr := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(issuerAccount.OwnerAddress().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
+			ownerAddr := issuerAccount.OwnerAddress().(*iotago.Ed25519Address)
+			signer := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(ownerAddr, issuerAccount.PrivateKey()))
+
+			signature, signatureErr := iotaBlock.Sign(signer, ownerAddr)
 			if signatureErr != nil {
 				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
 			}
