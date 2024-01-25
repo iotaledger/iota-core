@@ -140,7 +140,7 @@ func WithTaggedDataPayload(payload *iotago.TaggedData) options.Option[builder.Tr
 
 func WithAllotAllManaToAccount(slot iotago.SlotIndex, accountID iotago.AccountID) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
-		txBuilder.AllotAllMana(slot, accountID)
+		txBuilder.AllotAllMana(slot, accountID, 0)
 	}
 }
 

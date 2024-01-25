@@ -88,7 +88,7 @@ func NewBlockIssuer(t *testing.T, name string, keyManager *wallet.KeyManager, ac
 }
 
 func (i *BlockIssuer) BlockIssuerKey() iotago.BlockIssuerKey {
-	return iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(i.PublicKey))
+	return iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(i.PublicKey))
 }
 
 func (i *BlockIssuer) BlockIssuerKeys() iotago.BlockIssuerKeys {
@@ -469,7 +469,11 @@ func (i *BlockIssuer) AttachBlock(ctx context.Context, iotaBlock *iotago.Block, 
 			issuerAccount := optIssuerAccount[0]
 			iotaBlock.Header.IssuerID = issuerAccount.ID()
 
-			signature, signatureErr := iotaBlock.Sign(iotago.NewAddressKeysForEd25519Address(issuerAccount.OwnerAddress().(*iotago.Ed25519Address), issuerAccount.PrivateKey()))
+			//nolint:forcetypeassert // we can safely assume that this is an Ed25519Account
+			ownerAddr := issuerAccount.OwnerAddress().(*iotago.Ed25519Address)
+			signer := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(ownerAddr, issuerAccount.PrivateKey()))
+
+			signature, signatureErr := iotaBlock.Sign(signer, ownerAddr)
 			if signatureErr != nil {
 				return iotago.EmptyBlockID, ierrors.Wrapf(ErrBlockAttacherInvalidBlock, "%w", signatureErr)
 			}
