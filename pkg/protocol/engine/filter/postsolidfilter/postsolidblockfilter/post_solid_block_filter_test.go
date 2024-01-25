@@ -152,7 +152,7 @@ func TestPostSolidFilter_NoAccount(t *testing.T) {
 		accounts.NewAccountData(
 			accountID,
 			accounts.WithExpirySlot(iotago.MaxSlotIndex),
-			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPairAccount.PublicKey)),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(keyPairAccount.PublicKey)),
 		),
 	)
 	keyPairImplicitAccount := ed25519.GenerateKeyPair()
@@ -213,7 +213,7 @@ func TestPostSolidFilter_BurnedMana(t *testing.T) {
 		accounts.NewAccountData(
 			accountID,
 			accounts.WithExpirySlot(iotago.MaxSlotIndex),
-			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 
@@ -251,7 +251,7 @@ func TestPostSolidFilter_Expiry(t *testing.T) {
 		accounts.NewAccountData(
 			accountID,
 			accounts.WithExpirySlot(100),
-			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
+			accounts.WithBlockIssuerKeys(iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(keyPair.PublicKey)),
 		),
 	)
 

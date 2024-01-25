@@ -1,8 +1,5 @@
 name: Feature network deploy
 on:
-  push:
-    branches:
-      - develop
   workflow_dispatch:
 
 concurrency:
