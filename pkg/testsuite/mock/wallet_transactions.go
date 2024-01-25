@@ -44,7 +44,7 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(outputStates),
@@ -90,7 +90,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(outputStates),
@@ -101,7 +101,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 }
 
 func (w *Wallet) DelegationStartFromSlot(slot iotago.SlotIndex) iotago.EpochIndex {
-	latestCommitment := w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment()
+	latestCommitment := w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 	apiForSlot := w.Node.Protocol.APIForSlot(slot)
 
 	pastBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MaxCommittableAge()
@@ -117,7 +117,7 @@ func (w *Wallet) DelegationStartFromSlot(slot iotago.SlotIndex) iotago.EpochInde
 }
 
 func (w *Wallet) DelegationEndFromSlot(slot iotago.SlotIndex) iotago.EpochIndex {
-	latestCommitment := w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment()
+	latestCommitment := w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 	apiForSlot := w.Node.Protocol.APIForSlot(slot)
 
 	futureBoundedSlotIndex := latestCommitment.Slot() + apiForSlot.ProtocolParameters().MinCommittableAge()
@@ -162,7 +162,7 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(iotago.Outputs[iotago.Output]{delegationOutput}),
@@ -192,7 +192,7 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
 	)
@@ -222,7 +222,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string) *iotag
 			AccountID: inputAccount.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
 		WithAccountInput(input),
 		WithOutputs(destructionOutputs),
@@ -291,7 +291,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 			AccountID: implicitAccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
@@ -362,7 +362,7 @@ func (w *Wallet) RemoveFeatureFromAccount(featureType iotago.FeatureType, transa
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
 	)
@@ -486,7 +486,7 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
 	)
@@ -586,7 +586,7 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 			rewardMana,
 		),
 		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Commitment().MustID(),
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
 		WithOutputs(outputStates),
 	)

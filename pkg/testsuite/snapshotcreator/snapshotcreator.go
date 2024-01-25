@@ -3,8 +3,6 @@ package snapshotcreator
 import (
 	"os"
 
-	"golang.org/x/crypto/blake2b"
-
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
@@ -72,12 +70,11 @@ func CreateSnapshot(opts ...options.Option[Options]) error {
 	for _, snapshotAccountDetails := range opt.Accounts {
 		// Only add genesis validators if an account has both - StakedAmount and StakingEndEpoch - specified.
 		if snapshotAccountDetails.StakedAmount > 0 && snapshotAccountDetails.StakingEndEpoch > 0 {
-			blockIssuerKeyEd25519, ok := snapshotAccountDetails.IssuerKey.(*iotago.Ed25519PublicKeyBlockIssuerKey)
+			blockIssuerKeyEd25519, ok := snapshotAccountDetails.IssuerKey.(*iotago.Ed25519PublicKeyHashBlockIssuerKey)
 			if !ok {
 				panic("block issuer key must be of type ed25519")
 			}
-			ed25519PubKey := blockIssuerKeyEd25519.ToEd25519PublicKey()
-			accountID := blake2b.Sum256(ed25519PubKey[:])
+			accountID := blockIssuerKeyEd25519.PublicKeyHash
 			committeeAccountsData = append(committeeAccountsData, &accounts.AccountData{
 				ID:         accountID,
 				Credits:    &accounts.BlockIssuanceCredits{Value: snapshotAccountDetails.BlockIssuanceCredits, UpdateSlot: 0},
