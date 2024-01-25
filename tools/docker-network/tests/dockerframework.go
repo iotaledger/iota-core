@@ -18,6 +18,7 @@ import (
 	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
 
+	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -335,7 +336,7 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 
 	// transition to a full account with new Ed25519 address and staking feature
 	accEd25519Addr, accPrivateKey := d.getAddress(iotago.AddressEd25519)
-	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(accPrivateKey.Public().(ed25519.PublicKey))
+	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(accPrivateKey.Public().(ed25519.PublicKey)))
 	accountOutput := options.Apply(builder.NewAccountOutputBuilder(accEd25519Addr, implicitAccountOutput.BaseTokenAmount()),
 		opts, func(b *builder.AccountOutputBuilder) {
 			b.AccountID(accountID).
@@ -364,7 +365,7 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: accountID}).
 		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
-		AllotAllMana(currentSlot, accountID).
+		AllotAllMana(currentSlot, accountID, 0).
 		Build(implicitAddrSigner)
 	require.NoError(d.Testing, err)
 
@@ -417,7 +418,7 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 		SetCreationSlot(currentSlot).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
 		WithTransactionCapabilities(iotago.TransactionCapabilitiesBitMaskWithCapabilities(iotago.WithTransactionCanDoAnything())).
-		AllotAllMana(currentSlot, from.AccountID).
+		AllotAllMana(currentSlot, from.AccountID, 0).
 		Build(fundsAddrSigner)
 	require.NoError(d.Testing, err)
 
