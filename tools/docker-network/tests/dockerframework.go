@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -48,13 +49,14 @@ var (
 )
 
 type Node struct {
-	Name                 string
-	ContainerName        string
-	ClientURL            string
-	Client               *nodeclient.Client
-	AccountAddressBech32 string
-	ContainerConfigs     string
-	PrivateKey           string
+	Name                  string
+	ContainerName         string
+	ClientURL             string
+	Client                *nodeclient.Client
+	AccountAddressBech32  string
+	ContainerConfigs      string
+	PrivateKey            string
+	IssueCandidacyPayload bool
 }
 
 type Account struct {
@@ -115,6 +117,28 @@ func NewDockerTestFramework(t *testing.T, opts ...options.Option[DockerTestFrame
 	})
 }
 
+func (d *DockerTestFramework) DockerComposeUp(detach ...bool) error {
+	cmd := exec.Command("docker", "compose", "up")
+
+	if len(detach) > 0 && detach[0] {
+		cmd = exec.Command("docker", "compose", "up", "-d")
+	}
+
+	cmd.Env = os.Environ()
+	for _, node := range d.nodes {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("ISSUE_CANDIDACY_PAYLOAD_%s=%t", node.Name, node.IssueCandidacyPayload))
+	}
+
+	var out strings.Builder
+	cmd.Stderr = &out
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println("Docker compose up failed with error:", err, ":", out.String())
+	}
+
+	return err
+}
+
 func (d *DockerTestFramework) Run() error {
 	ch := make(chan error)
 	stopCh := make(chan struct{})
@@ -122,14 +146,7 @@ func (d *DockerTestFramework) Run() error {
 	defer close(stopCh)
 
 	go func() {
-		cmd := exec.Command("docker", "compose", "up")
-		var out strings.Builder
-		cmd.Stderr = &out
-		err := cmd.Run()
-
-		if err != nil {
-			fmt.Println("Docker compose up failed with error:", err, ":", out.String())
-		}
+		err := d.DockerComposeUp()
 
 		// make sure that the channel is not already closed
 		select {
@@ -211,12 +228,18 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 	return nil
 }
 
-func (d *DockerTestFramework) AddValidatorNode(name string, containerName string, clientURL string, accAddrBech32 string) {
+func (d *DockerTestFramework) AddValidatorNode(name string, containerName string, clientURL string, accAddrBech32 string, optIssueCandidacyPayload ...bool) {
+	issueCandidacyPayload := true
+	if len(optIssueCandidacyPayload) > 0 {
+		issueCandidacyPayload = optIssueCandidacyPayload[0]
+	}
+
 	d.nodes[name] = &Node{
-		Name:                 name,
-		ContainerName:        containerName,
-		ClientURL:            clientURL,
-		AccountAddressBech32: accAddrBech32,
+		Name:                  name,
+		ContainerName:         containerName,
+		ClientURL:             clientURL,
+		AccountAddressBech32:  accAddrBech32,
+		IssueCandidacyPayload: issueCandidacyPayload,
 	}
 }
 
@@ -273,52 +296,32 @@ func (d *DockerTestFramework) AccountsFromNodes(nodes ...*Node) []string {
 	return accounts
 }
 
-func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
-	// build a new image from the current one so we could set IssueCandidacyPayload to false,
-	// the committed image will not remember the container configs, so it's fine to commit the first validator of the nodes
-	newImageName := "no-candidacy-payload-image"
-	err := exec.Command("docker", "commit", nodes[0].ContainerName, newImageName).Run()
-	require.NoError(d.Testing, err)
+func (d *DockerTestFramework) StartIssueCandidacyPayload(nodes ...*Node) {
+	if len(nodes) == 0 {
+		return
+	}
 
 	for _, node := range nodes {
-		if node.AccountAddressBech32 == "" {
-			continue
-		}
-
-		// stop the inx-validator that issues candidacy payload
-		err = d.StopContainer(node.ContainerName)
-		require.NoError(d.Testing, err)
-
-		// start a new inx-validator that does not issue candidacy payload
-		newContainerName := fmt.Sprintf("%s-1", node.ContainerName)
-		cmd := fmt.Sprintf("docker run --network docker-network_iota-core --env %s --name %s  %s %s --validator.issueCandidacyPayload=false &", node.PrivateKey, newContainerName, newImageName, node.ContainerConfigs)
-		err = exec.Command("bash", "-c", cmd).Run()
-		require.NoError(d.Testing, err)
+		node.IssueCandidacyPayload = true
 	}
+
+	d.DockerComposeUp(true)
 }
 
-func (d *DockerTestFramework) StartIssueCandidacyPayload(nodes ...*Node) {
-	for _, node := range nodes {
-		if node.AccountAddressBech32 == "" {
-			continue
-		}
-
-		// stop and remove the inx-validator that does not issue candidacy payload
-		newContainerName := fmt.Sprintf("%s-1", node.ContainerName)
-		err := d.StopContainer(newContainerName)
-		require.NoError(d.Testing, err)
-
-		err = exec.Command("docker", "rm", newContainerName).Run()
-		require.NoError(d.Testing, err)
-
-		// start the inx-validator that issues candidacy payload
-		err = d.RestartContainer(node.ContainerName)
-		require.NoError(d.Testing, err)
+func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
+	if len(nodes) == 0 {
+		return
 	}
+
+	for _, node := range nodes {
+		node.IssueCandidacyPayload = false
+	}
+
+	d.DockerComposeUp(true)
 }
 
 func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *Account {
-	// create implicit account by requesting faucet funds
+	// create an implicit account by requesting faucet funds
 	ctx := context.TODO()
 	receiverAddr, implicitPrivateKey := d.getAddress(iotago.AddressImplicitAccountCreation)
 	implicitOutputID, implicitAccountOutput := d.RequestFaucetFunds(ctx, receiverAddr)
@@ -327,10 +330,10 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
 	require.True(d.Testing, ok)
 
-	// make sure implicit account is committed
+	// make sure an implicit account is committed
 	d.CheckAccountStatus(ctx, iotago.EmptyBlockID, implicitOutputID.TransactionID(), implicitOutputID, accountAddress)
 
-	// transition to full account with new Ed25519 address and staking feature
+	// transition to a full account with new Ed25519 address and staking feature
 	accEd25519Addr, accPrivateKey := d.getAddress(iotago.AddressEd25519)
 	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(accPrivateKey.Public().(ed25519.PublicKey))
 	accountOutput := options.Apply(builder.NewAccountOutputBuilder(accEd25519Addr, implicitAccountOutput.BaseTokenAmount()),
