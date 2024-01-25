@@ -197,7 +197,15 @@ func (t *Tracker) importCommittees(reader io.ReadSeeker) error {
 			return ierrors.Wrapf(err, "unable to read committee for the epoch %d", epoch)
 		}
 
+		isReused, err := stream.Read[bool](reader)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to read reused flag for the epoch %d", epoch)
+		}
+
 		committee := committeeAccounts.SeatedAccounts()
+		if isReused {
+			committee.SetReused()
+		}
 
 		if err = t.committeeStore.Store(epoch, committee); err != nil {
 			return ierrors.Wrap(err, "unable to store committee")
@@ -407,6 +415,9 @@ func (t *Tracker) exportCommittees(writer io.WriteSeeker, targetSlot iotago.Slot
 			}
 			if err := stream.WriteBytes(writer, committeeAccountsBytes); err != nil {
 				return ierrors.Wrapf(err, "unable to write committee for epoch %d", epoch)
+			}
+			if err := stream.Write[bool](writer, committee.IsReused()); err != nil {
+				return ierrors.Wrapf(err, "unable to write reused flag for epoch %d", epoch)
 			}
 
 			epochCount++
