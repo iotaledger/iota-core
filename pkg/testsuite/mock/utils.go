@@ -253,9 +253,9 @@ func WithAccountImmutableFeatures(features iotago.AccountOutputImmFeatures) opti
 			case iotago.FeatureMetadata:
 				//nolint:forcetypeassert
 				accountBuilder.ImmutableMetadata(feature.(*iotago.MetadataFeature).Entries)
-			case iotago.FeatureSender:
+			case iotago.FeatureIssuer:
 				//nolint:forcetypeassert
-				accountBuilder.ImmutableSender(feature.(*iotago.SenderFeature).Address)
+				accountBuilder.ImmutableIssuer(feature.(*iotago.IssuerFeature).Address)
 			}
 		}
 	}

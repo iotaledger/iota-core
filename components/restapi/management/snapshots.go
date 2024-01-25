@@ -6,7 +6,7 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 )
 
-func createSnapshots(_ echo.Context) (*api.CreateSnapshotsResponse, error) {
+func createSnapshots(_ echo.Context) (*api.CreateSnapshotResponse, error) {
 	/*
 		if deps.SnapshotManager.IsSnapshotting() || deps.PruningManager.IsPruning() {
 			return nil, errors.WithMessage(echo.ErrServiceUnavailable, "node is already creating a snapshot or pruning is running")

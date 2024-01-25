@@ -9,7 +9,7 @@ import (
 )
 
 func (i *BlockIssuer) reviveChain(issuingTime time.Time, node *Node) (*iotago.Commitment, iotago.BlockID, error) {
-	lastCommittedSlot := node.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
+	lastCommittedSlot := node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
 	apiForSlot := node.Protocol.APIForSlot(lastCommittedSlot)
 
 	// Get a rootblock as recent as possible for the parent.
