@@ -1,0 +1,29 @@
+name: Unit tests nightly
+
+on:
+  schedule:
+    - cron: '0 5 * * *' # Runs every day at 5 AM
+
+jobs:
+  unit-tests:
+    name: Unit tests nightly
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      - name: Print Go version
+        run: go version
+
+      - name: Run unit tests with logger (level trace)
+        run: |
+            CI_UNIT_TESTS_LOG_LEVEL=trace go test ./... -tags rocksdb -count=10 -race -short -timeout 30m
+
+      - name: Run unit tests without logger 
+        run: |
+            CI_UNIT_NO_LOG=1 go test ./... -tags rocksdb -count=10 -race -short -timeout 30m
