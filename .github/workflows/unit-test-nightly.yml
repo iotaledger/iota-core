@@ -3,7 +3,8 @@ name: Unit tests nightly
 on:
   schedule:
     - cron: '0 5 * * *' # Runs every day at 5 AM
-
+  workflow_dispatch:
+  
 jobs:
   unit-tests-with-log:
     name: Unit tests with log nightly
