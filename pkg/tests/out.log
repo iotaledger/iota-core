@@ -1,0 +1,689 @@
+Setup TestSuite - Test_TransitionAndDestroyAccount  @  2024-01-17 15:49:35.582732 +0800 +08 m=+0.028464167
+2024-01-17 15:49:35	INFO   	node1.Chains	Main (set=0)
+h.registerCommitment SlotIndex(0) CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0)
+h.registerCommitment SlotIndex(0) CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0) done
+h.registerCommitment SlotIndex(0) CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0)
+h.registerCommitment SlotIndex(0) CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0) done
+h.registerCommitment SlotIndex(0) CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0)
+h.registerCommitment SlotIndex(0) CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0) done
+trackHeaviestCandidates CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments	Root (set=Slot0.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot0.0	Chain (set=0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot0.0	IsRoot (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot0.0	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot0.0	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot0.0	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0           	ForkingPoint (set=Slot0.0)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0           	LatestCommitment (set=Slot0.0)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0           	LatestAttestedCommitment (set=Slot0.0)
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0           	LatestProducedCommitment (set=Slot0.0)
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0           	StartEngine (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0           	Engine (set=Engine0)
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	RootCommitment (set=Commitment {
+    ID: CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 0,
+      "previousCommitmentId": "0x000000000000000000000000000000000000000000000000000000000000000000000000",
+      "rootsId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 0,
+      "previousCommitmentId": "0x000000000000000000000000000000000000000000000000000000000000000000000000",
+      "rootsId": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1                    	issued block (blockID=BlockID(block1:1) slot=SlotIndex(1) commitment=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0) latestFinalizedSlot=SlotIndex(0) version=3)
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	PreSolidFilter.BlockPreAllowed (block=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockProcessed (block=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Blocks             	received block (blockID=BlockID(block1:1) commitment=Slot0.0)
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	block attached (blockID=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	unsolid parents (blockID=BlockID(block1:1) parents=[BlockID(Genesis:0)])
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	waiting for parent (parent=BlockID(Genesis:0) blockID=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	parent solid (parent=BlockID(Genesis:0) blockID=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	unsolid parents (blockID=BlockID(block1:1) parents=[])
+2024-01-17 15:49:36	ERROR  	node1.Engine0.BlockDAG   	block solid (blockID=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Ledger.TransactionAttached (tx=TransactionID(TX1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	MemPool.TransactionSolid (tx=TransactionID(TX1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	SeatManager.BlockProcessed (block=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	PostSolidFilter.BlockAllowed (block=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	MemPool.TransactionExecuted (tx=TransactionID(TX1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	SpendDAG.SpenderCreated (conflictID=TransactionID(TX1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	MemPool.TransactionConflicting (tx=TransactionID(TX1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	MemPool.TransactionBooked (tx=TransactionID(TX1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Scheduler.BlockEnqueued (block=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Booker.BlockBooked (block=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Scheduler.BlockScheduled (block=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Blocks             	sent (blockID=BlockID(block1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	issued validation block (blockID=BlockID(chain-block1-0-node1:10) slot=SlotIndex(10) commitment=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0) latestFinalizedSlot=SlotIndex(0) version=3 highestSupportedVersion=3 hash=0xf2ecda2db5ebd5dc131cd7de03fca3ae75532ee39ec5d153b958001cae74ff55)
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	PreSolidFilter.BlockPreAllowed (block=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockProcessed (block=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Blocks             	received block (blockID=BlockID(chain-block1-0-node1:10) commitment=Slot0.0)
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	block attached (blockID=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	unsolid parents (blockID=BlockID(chain-block1-0-node1:10) parents=[BlockID(block1:1)])
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	waiting for parent (parent=BlockID(block1:1) blockID=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	parent solid (parent=BlockID(block1:1) blockID=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	unsolid parents (blockID=BlockID(chain-block1-0-node1:10) parents=[])
+2024-01-17 15:49:36	ERROR  	node1.Engine0.BlockDAG   	block solid (blockID=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Scheduler.BlockEnqueued (block=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Booker.BlockBooked (block=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	SeatManager.BlockProcessed (block=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	PostSolidFilter.BlockAllowed (block=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Scheduler.BlockScheduled (block=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockPreAccepted (block=BlockID(block1:1) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Blocks             	sent (blockID=BlockID(chain-block1-0-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	SpendDAG.SpenderAccepted (conflictID=TransactionID(TX1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockPreAccepted (block=BlockID(chain-block1-0-node1:10) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockPreConfirmed (block=BlockID(block1:1) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockPreConfirmed (block=BlockID(chain-block1-0-node1:10) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockAccepted (block=BlockID(block1:1) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Clock.AcceptedTimeUpdated (time=2024-01-17 07:16:10.000000001 +0000 UTC slot=SlotIndex(1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	MemPool.TransactionAccepted (tx=TransactionID(TX1:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	issued validation block (blockID=BlockID(chain-block1-1-node1:10) slot=SlotIndex(10) commitment=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0) latestFinalizedSlot=SlotIndex(0) version=3 highestSupportedVersion=3 hash=0xf2ecda2db5ebd5dc131cd7de03fca3ae75532ee39ec5d153b958001cae74ff55)
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	PreSolidFilter.BlockPreAllowed (block=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockProcessed (block=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Blocks             	received block (blockID=BlockID(chain-block1-1-node1:10) commitment=Slot0.0)
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	block attached (blockID=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	unsolid parents (blockID=BlockID(chain-block1-1-node1:10) parents=[BlockID(chain-block1-0-node1:10)])
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	waiting for parent (parent=BlockID(chain-block1-0-node1:10) blockID=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	parent solid (parent=BlockID(chain-block1-0-node1:10) blockID=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	unsolid parents (blockID=BlockID(chain-block1-1-node1:10) parents=[])
+2024-01-17 15:49:36	ERROR  	node1.Engine0.BlockDAG   	block solid (blockID=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Scheduler.BlockEnqueued (block=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Booker.BlockBooked (block=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	SeatManager.BlockProcessed (block=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Scheduler.BlockScheduled (block=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	PostSolidFilter.BlockAllowed (block=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Blocks             	sent (blockID=BlockID(chain-block1-1-node1:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockPreAccepted (block=BlockID(chain-block1-1-node1:10) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockPreConfirmed (block=BlockID(chain-block1-1-node1:10) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockAccepted (block=BlockID(chain-block1-0-node1:10) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockConfirmed (block=BlockID(chain-block1-0-node1:10) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Clock.AcceptedTimeUpdated (time=2024-01-17 07:17:40.000000002 +0000 UTC slot=SlotIndex(10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Clock.ConfirmedTimeUpdated (time=2024-01-17 07:17:40.000000002 +0000 UTC slot=SlotIndex(10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	issued validation block (blockID=BlockID(chain-block1-2-node1:11) slot=SlotIndex(11) commitment=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0) latestFinalizedSlot=SlotIndex(0) version=3 highestSupportedVersion=3 hash=0xf2ecda2db5ebd5dc131cd7de03fca3ae75532ee39ec5d153b958001cae74ff55)
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	PreSolidFilter.BlockPreAllowed (block=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockProcessed (block=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Blocks             	received block (blockID=BlockID(chain-block1-2-node1:11) commitment=Slot0.0)
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	block attached (blockID=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	unsolid parents (blockID=BlockID(chain-block1-2-node1:11) parents=[BlockID(chain-block1-1-node1:10)])
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	waiting for parent (parent=BlockID(chain-block1-1-node1:10) blockID=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	parent solid (parent=BlockID(chain-block1-1-node1:10) blockID=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	unsolid parents (blockID=BlockID(chain-block1-2-node1:11) parents=[])
+2024-01-17 15:49:36	ERROR  	node1.Engine0.BlockDAG   	block solid (blockID=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Scheduler.BlockEnqueued (block=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Booker.BlockBooked (block=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	SeatManager.BlockProcessed (block=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	PostSolidFilter.BlockAllowed (block=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Scheduler.BlockScheduled (block=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockPreAccepted (block=BlockID(chain-block1-2-node1:11) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockPreConfirmed (block=BlockID(chain-block1-2-node1:11) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Blocks             	sent (blockID=BlockID(chain-block1-2-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockAccepted (block=BlockID(chain-block1-1-node1:10) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockConfirmed (block=BlockID(chain-block1-1-node1:10) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Clock.AcceptedTimeUpdated (time=2024-01-17 07:17:40.000000003 +0000 UTC slot=SlotIndex(10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Clock.ConfirmedTimeUpdated (time=2024-01-17 07:17:40.000000003 +0000 UTC slot=SlotIndex(10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	issued validation block (blockID=BlockID(chain-block1-3-node1:11) slot=SlotIndex(11) commitment=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0) latestFinalizedSlot=SlotIndex(0) version=3 highestSupportedVersion=3 hash=0xf2ecda2db5ebd5dc131cd7de03fca3ae75532ee39ec5d153b958001cae74ff55)
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	PreSolidFilter.BlockPreAllowed (block=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockProcessed (block=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Blocks             	received block (blockID=BlockID(chain-block1-3-node1:11) commitment=Slot0.0)
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	block attached (blockID=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	unsolid parents (blockID=BlockID(chain-block1-3-node1:11) parents=[BlockID(chain-block1-2-node1:11)])
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	waiting for parent (parent=BlockID(chain-block1-2-node1:11) blockID=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	parent solid (parent=BlockID(chain-block1-2-node1:11) blockID=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG   	unsolid parents (blockID=BlockID(chain-block1-3-node1:11) parents=[])
+2024-01-17 15:49:36	ERROR  	node1.Engine0.BlockDAG   	block solid (blockID=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Scheduler.BlockEnqueued (block=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Booker.BlockBooked (block=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	SeatManager.BlockProcessed (block=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	PostSolidFilter.BlockAllowed (block=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockPreAccepted (block=BlockID(chain-block1-3-node1:11) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockPreConfirmed (block=BlockID(chain-block1-3-node1:11) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Scheduler.BlockScheduled (block=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Blocks             	sent (blockID=BlockID(chain-block1-3-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockAccepted (block=BlockID(chain-block1-2-node1:11) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	BlockGadget.BlockConfirmed (block=BlockID(chain-block1-2-node1:11) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Clock.AcceptedTimeUpdated (time=2024-01-17 07:17:50.000000004 +0000 UTC slot=SlotIndex(11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	Clock.ConfirmedTimeUpdated (time=2024-01-17 07:17:50.000000004 +0000 UTC slot=SlotIndex(11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0            	MemPool.TransactionCommittedSlotUpdated (tx=TransactionID(TX1:1) slot=SlotIndex(1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 1
+	PrevID: CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0)
+	RootsID: 0x634643f34846fb7351219ca8dcf220e9d23f604f74ab2f1200db822a97592aa0
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0x634643f34846fb7351219ca8dcf220e9d23f604f74ab2f1200db822a97592aa0): TangleRoot: 0x126f0eef1fcd59b4984df5fdd91559883d8a6989e1dd5a94c26d4b2b3e8a90db, StateMutationRoot: 0x68febbdc8b052b0277989a2f87a0acb0d52f84930237a9bd29e25395c92f8ce7, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1) acceptedBlocks=[BlockID(block1:1)] roots=Roots(0x634643f34846fb7351219ca8dcf220e9d23f604f74ab2f1200db822a97592aa0): TangleRoot: 0x126f0eef1fcd59b4984df5fdd91559883d8a6989e1dd5a94c26d4b2b3e8a90db, StateMutationRoot: 0x68febbdc8b052b0277989a2f87a0acb0d52f84930237a9bd29e25395c92f8ce7, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot1.0        	created (id=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot1.0        	Parent (set=Slot0.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot0.0        	MainChild (set=Slot1.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot1.0        	Chain (set=0)
+h.registerCommitment SlotIndex(1) CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1)
+h.registerCommitment SlotIndex(1) CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1) done
+h.registerCommitment SlotIndex(1) CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1)
+h.registerCommitment SlotIndex(1) CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1) done
+h.registerCommitment SlotIndex(1) CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1)
+h.registerCommitment SlotIndex(1) CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1) done
+trackHeaviestCandidates CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot1.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot1.0        	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot1.0        	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot1.0        	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot1.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot1.0        	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(1))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot1.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot1.0        	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 1,
+      "previousCommitmentId": "0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000",
+      "rootsId": "0x634643f34846fb7351219ca8dcf220e9d23f604f74ab2f1200db822a97592aa0",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+new expiry slot SlotIndex(21)
+updateMeasuredSlot SlotIndex(0)
+updateMeasuredSlot SlotIndex(0) done
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	issued validation block (blockID=BlockID(chain-chain-block1-3-node1-0-node1:11) slot=SlotIndex(11) commitment=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1) latestFinalizedSlot=SlotIndex(0) version=3 highestSupportedVersion=3 hash=0xf2ecda2db5ebd5dc131cd7de03fca3ae75532ee39ec5d153b958001cae74ff55)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	PreSolidFilter.BlockPreAllowed (block=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockProcessed (block=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Blocks                     	received block (blockID=BlockID(chain-chain-block1-3-node1-0-node1:11) commitment=Slot1.0)
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	block attached (blockID=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	unsolid parents (blockID=BlockID(chain-chain-block1-3-node1-0-node1:11) parents=[BlockID(chain-block1-3-node1:11)])
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	waiting for parent (parent=BlockID(chain-block1-3-node1:11) blockID=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	parent solid (parent=BlockID(chain-block1-3-node1:11) blockID=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	unsolid parents (blockID=BlockID(chain-chain-block1-3-node1-0-node1:11) parents=[])
+2024-01-17 15:49:36	ERROR  	node1.Engine0.BlockDAG           	block solid (blockID=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Scheduler.BlockEnqueued (block=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Booker.BlockBooked (block=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	SeatManager.BlockProcessed (block=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	PostSolidFilter.BlockAllowed (block=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Scheduler.BlockScheduled (block=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockPreAccepted (block=BlockID(chain-chain-block1-3-node1-0-node1:11) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Blocks                     	sent (blockID=BlockID(chain-chain-block1-3-node1-0-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockPreConfirmed (block=BlockID(chain-chain-block1-3-node1-0-node1:11) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockAccepted (block=BlockID(chain-block1-3-node1:11) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockConfirmed (block=BlockID(chain-block1-3-node1:11) slotCommitmentID=CommitmentID(0x7dedea299f519d970b0a8ba6af46f330bccf15dea7afe2d6ab901fa3df08b7fd00000000:0))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Clock.AcceptedTimeUpdated (time=2024-01-17 07:17:50.000000005 +0000 UTC slot=SlotIndex(11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Clock.ConfirmedTimeUpdated (time=2024-01-17 07:17:50.000000005 +0000 UTC slot=SlotIndex(11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	issued validation block (blockID=BlockID(chain-chain-block1-3-node1-1-node1:11) slot=SlotIndex(11) commitment=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1) latestFinalizedSlot=SlotIndex(0) version=3 highestSupportedVersion=3 hash=0xf2ecda2db5ebd5dc131cd7de03fca3ae75532ee39ec5d153b958001cae74ff55)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	PreSolidFilter.BlockPreAllowed (block=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockProcessed (block=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Blocks                     	received block (blockID=BlockID(chain-chain-block1-3-node1-1-node1:11) commitment=Slot1.0)
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	block attached (blockID=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	unsolid parents (blockID=BlockID(chain-chain-block1-3-node1-1-node1:11) parents=[BlockID(chain-chain-block1-3-node1-0-node1:11)])
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	waiting for parent (parent=BlockID(chain-chain-block1-3-node1-0-node1:11) blockID=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	parent solid (parent=BlockID(chain-chain-block1-3-node1-0-node1:11) blockID=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	unsolid parents (blockID=BlockID(chain-chain-block1-3-node1-1-node1:11) parents=[])
+2024-01-17 15:49:36	ERROR  	node1.Engine0.BlockDAG           	block solid (blockID=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Scheduler.BlockEnqueued (block=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Booker.BlockBooked (block=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	SeatManager.BlockProcessed (block=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	PostSolidFilter.BlockAllowed (block=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Scheduler.BlockScheduled (block=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Blocks                     	sent (blockID=BlockID(chain-chain-block1-3-node1-1-node1:11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockPreAccepted (block=BlockID(chain-chain-block1-3-node1-1-node1:11) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockPreConfirmed (block=BlockID(chain-chain-block1-3-node1-1-node1:11) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockAccepted (block=BlockID(chain-chain-block1-3-node1-0-node1:11) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Clock.AcceptedTimeUpdated (time=2024-01-17 07:17:50.000000006 +0000 UTC slot=SlotIndex(11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Clock.ConfirmedTimeUpdated (time=2024-01-17 07:17:50.000000006 +0000 UTC slot=SlotIndex(11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	SlotGadget.SlotFinalized (slot=SlotIndex(1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockConfirmed (block=BlockID(chain-chain-block1-3-node1-0-node1:11) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	issued validation block (blockID=BlockID(chain-chain-block1-3-node1-2-node1:21) slot=SlotIndex(21) commitment=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1) latestFinalizedSlot=SlotIndex(1) version=3 highestSupportedVersion=3 hash=0xf2ecda2db5ebd5dc131cd7de03fca3ae75532ee39ec5d153b958001cae74ff55)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	PreSolidFilter.BlockPreAllowed (block=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockProcessed (block=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Blocks                     	received block (blockID=BlockID(chain-chain-block1-3-node1-2-node1:21) commitment=Slot1.0)
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	block attached (blockID=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	unsolid parents (blockID=BlockID(chain-chain-block1-3-node1-2-node1:21) parents=[BlockID(chain-chain-block1-3-node1-1-node1:11)])
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	waiting for parent (parent=BlockID(chain-chain-block1-3-node1-1-node1:11) blockID=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	parent solid (parent=BlockID(chain-chain-block1-3-node1-1-node1:11) blockID=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	unsolid parents (blockID=BlockID(chain-chain-block1-3-node1-2-node1:21) parents=[])
+2024-01-17 15:49:36	ERROR  	node1.Engine0.BlockDAG           	block solid (blockID=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Scheduler.BlockEnqueued (block=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Booker.BlockBooked (block=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	SeatManager.BlockProcessed (block=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	PostSolidFilter.BlockAllowed (block=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Scheduler.BlockScheduled (block=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Blocks                     	sent (blockID=BlockID(chain-chain-block1-3-node1-2-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockPreAccepted (block=BlockID(chain-chain-block1-3-node1-2-node1:21) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockPreConfirmed (block=BlockID(chain-chain-block1-3-node1-2-node1:21) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockAccepted (block=BlockID(chain-chain-block1-3-node1-1-node1:11) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Clock.AcceptedTimeUpdated (time=2024-01-17 07:17:50.000000007 +0000 UTC slot=SlotIndex(11))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	issued validation block (blockID=BlockID(chain-chain-block1-3-node1-3-node1:21) slot=SlotIndex(21) commitment=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1) latestFinalizedSlot=SlotIndex(1) version=3 highestSupportedVersion=3 hash=0xf2ecda2db5ebd5dc131cd7de03fca3ae75532ee39ec5d153b958001cae74ff55)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	PreSolidFilter.BlockPreAllowed (block=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockProcessed (block=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Blocks                     	received block (blockID=BlockID(chain-chain-block1-3-node1-3-node1:21) commitment=Slot1.0)
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	block attached (blockID=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	unsolid parents (blockID=BlockID(chain-chain-block1-3-node1-3-node1:21) parents=[BlockID(chain-chain-block1-3-node1-2-node1:21)])
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	waiting for parent (parent=BlockID(chain-chain-block1-3-node1-2-node1:21) blockID=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	parent solid (parent=BlockID(chain-chain-block1-3-node1-2-node1:21) blockID=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.BlockDAG           	unsolid parents (blockID=BlockID(chain-chain-block1-3-node1-3-node1:21) parents=[])
+2024-01-17 15:49:36	ERROR  	node1.Engine0.BlockDAG           	block solid (blockID=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Scheduler.BlockEnqueued (block=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Booker.BlockBooked (block=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	SeatManager.BlockProcessed (block=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	PostSolidFilter.BlockAllowed (block=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Scheduler.BlockScheduled (block=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Blocks                     	sent (blockID=BlockID(chain-chain-block1-3-node1-3-node1:21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockPreAccepted (block=BlockID(chain-chain-block1-3-node1-3-node1:21) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockPreConfirmed (block=BlockID(chain-chain-block1-3-node1-3-node1:21) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockAccepted (block=BlockID(chain-chain-block1-3-node1-2-node1:21) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	BlockGadget.BlockConfirmed (block=BlockID(chain-chain-block1-3-node1-2-node1:21) slotCommitmentID=CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Clock.AcceptedTimeUpdated (time=2024-01-17 07:19:30.000000008 +0000 UTC slot=SlotIndex(21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	Clock.ConfirmedTimeUpdated (time=2024-01-17 07:19:30.000000008 +0000 UTC slot=SlotIndex(21))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 2
+	PrevID: CommitmentID(0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000:1)
+	RootsID: 0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2) acceptedBlocks=[] roots=Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot2.0        	created (id=CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot2.0        	Parent (set=Slot1.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot1.0        	MainChild (set=Slot2.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot2.0        	Chain (set=0)
+h.registerCommitment SlotIndex(2) CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2)
+h.registerCommitment SlotIndex(2) CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2) done
+h.registerCommitment SlotIndex(2) CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2)
+h.registerCommitment SlotIndex(2) CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2) done
+h.registerCommitment SlotIndex(2) CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2)
+h.registerCommitment SlotIndex(2) CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2) done
+trackHeaviestCandidates CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot2.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot2.0        	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot2.0        	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot2.0        	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot2.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot2.0        	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(2))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot2.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot2.0        	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 2,
+      "previousCommitmentId": "0x3e8c5887309a073da14aeef21d4a0b88ddd05da6cb7ded7e4def28de5821a56e01000000",
+      "rootsId": "0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 3
+	PrevID: CommitmentID(0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000:2)
+	RootsID: 0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3) acceptedBlocks=[] roots=Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot3.0        	created (id=CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot3.0        	Parent (set=Slot2.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot2.0        	MainChild (set=Slot3.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot3.0        	Chain (set=0)
+h.registerCommitment SlotIndex(3) CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3)
+h.registerCommitment SlotIndex(3) CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3) done
+h.registerCommitment SlotIndex(3) CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3)
+h.registerCommitment SlotIndex(3) CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3) done
+h.registerCommitment SlotIndex(3) CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3)
+h.registerCommitment SlotIndex(3) CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3) done
+trackHeaviestCandidates CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot3.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot3.0        	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot3.0        	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot3.0        	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot3.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot3.0        	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(3))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot3.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot3.0        	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 3,
+      "previousCommitmentId": "0xfa3095fa8b903498afd785c0c62033b1faa081dcb70368dd5caa8fcf315216ad02000000",
+      "rootsId": "0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 4
+	PrevID: CommitmentID(0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000:3)
+	RootsID: 0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4) acceptedBlocks=[] roots=Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot4.0        	created (id=CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot4.0        	Parent (set=Slot3.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot3.0        	MainChild (set=Slot4.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot4.0        	Chain (set=0)
+h.registerCommitment SlotIndex(4) CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4)
+h.registerCommitment SlotIndex(4) CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4) done
+h.registerCommitment SlotIndex(4) CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4)
+h.registerCommitment SlotIndex(4) CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4) done
+h.registerCommitment SlotIndex(4) CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4)
+h.registerCommitment SlotIndex(4) CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4) done
+trackHeaviestCandidates CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot4.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot4.0        	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot4.0        	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot4.0        	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot4.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot4.0        	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(4))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot4.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot4.0        	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 4,
+      "previousCommitmentId": "0xc2528a0bd1d5d5d25676379af31a781dfe6eea568db21c70c592ed93b0614f9f03000000",
+      "rootsId": "0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 5
+	PrevID: CommitmentID(0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000:4)
+	RootsID: 0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5) acceptedBlocks=[] roots=Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot5.0        	created (id=CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot5.0        	Parent (set=Slot4.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot4.0        	MainChild (set=Slot5.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot5.0        	Chain (set=0)
+h.registerCommitment SlotIndex(5) CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5)
+h.registerCommitment SlotIndex(5) CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5) done
+h.registerCommitment SlotIndex(5) CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5)
+h.registerCommitment SlotIndex(5) CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5) done
+h.registerCommitment SlotIndex(5) CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5)
+h.registerCommitment SlotIndex(5) CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5) done
+trackHeaviestCandidates CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot5.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot5.0        	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot5.0        	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot5.0        	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot5.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot5.0        	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(5))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot5.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot5.0        	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 5,
+      "previousCommitmentId": "0xf90d2302df4117aa842aa76acffb3dfefd3278527ccc80727e1a638982c18ceb04000000",
+      "rootsId": "0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 6
+	PrevID: CommitmentID(0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000:5)
+	RootsID: 0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6) acceptedBlocks=[] roots=Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot6.0        	created (id=CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot6.0        	Parent (set=Slot5.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot5.0        	MainChild (set=Slot6.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot6.0        	Chain (set=0)
+h.registerCommitment SlotIndex(6) CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6)
+h.registerCommitment SlotIndex(6) CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6) done
+h.registerCommitment SlotIndex(6) CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6)
+h.registerCommitment SlotIndex(6) CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6) done
+h.registerCommitment SlotIndex(6) CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6)
+h.registerCommitment SlotIndex(6) CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6) done
+trackHeaviestCandidates CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot6.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot6.0        	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot6.0        	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot6.0        	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot6.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot6.0        	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(6))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot6.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot6.0        	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 6,
+      "previousCommitmentId": "0x2d4bb74a78afdc7d8650e7e76d8320afd54032f9f4b72432bb283fed6f02fbc305000000",
+      "rootsId": "0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 7
+	PrevID: CommitmentID(0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000:6)
+	RootsID: 0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7) acceptedBlocks=[] roots=Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot7.0        	created (id=CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot7.0        	Parent (set=Slot6.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot6.0        	MainChild (set=Slot7.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot7.0        	Chain (set=0)
+h.registerCommitment SlotIndex(7) CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7)
+h.registerCommitment SlotIndex(7) CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7) done
+h.registerCommitment SlotIndex(7) CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7)
+h.registerCommitment SlotIndex(7) CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7) done
+h.registerCommitment SlotIndex(7) CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7)
+h.registerCommitment SlotIndex(7) CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7) done
+trackHeaviestCandidates CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot7.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot7.0        	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot7.0        	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot7.0        	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot7.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot7.0        	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(7))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot7.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot7.0        	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 7,
+      "previousCommitmentId": "0x73cff33033c3150c3f1c5eb9cf9c71fdd8ed4423cae2603e55299654d32c3a0e06000000",
+      "rootsId": "0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 8
+	PrevID: CommitmentID(0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000:7)
+	RootsID: 0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8) acceptedBlocks=[] roots=Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot8.0        	created (id=CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot8.0        	Parent (set=Slot7.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot7.0        	MainChild (set=Slot8.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot8.0        	Chain (set=0)
+h.registerCommitment SlotIndex(8) CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8)
+h.registerCommitment SlotIndex(8) CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8) done
+h.registerCommitment SlotIndex(8) CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8)
+h.registerCommitment SlotIndex(8) CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8) done
+h.registerCommitment SlotIndex(8) CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8)
+h.registerCommitment SlotIndex(8) CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8) done
+trackHeaviestCandidates CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot8.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot8.0        	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot8.0        	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot8.0        	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot8.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot8.0        	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(8))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot8.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot8.0        	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 8,
+      "previousCommitmentId": "0x6cd65b5e76517902c9841d6d877c0d356dee253c8d81f1617552f550ad3c0dd107000000",
+      "rootsId": "0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 9
+	PrevID: CommitmentID(0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000:8)
+	RootsID: 0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9) acceptedBlocks=[] roots=Roots(0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361): TangleRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x94ea6a72f5202880efec1c092e03fe3c8e9951ea3e26cbce2b388a3fcd6836ad, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot9.0        	created (id=CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot9.0        	Parent (set=Slot8.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot8.0        	MainChild (set=Slot9.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot9.0        	Chain (set=0)
+h.registerCommitment SlotIndex(9) CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9)
+h.registerCommitment SlotIndex(9) CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9) done
+h.registerCommitment SlotIndex(9) CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9)
+h.registerCommitment SlotIndex(9) CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9) done
+h.registerCommitment SlotIndex(9) CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9)
+h.registerCommitment SlotIndex(9) CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9) done
+trackHeaviestCandidates CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot9.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot9.0        	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot9.0        	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot9.0        	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot9.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot9.0        	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(9))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot9.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot9.0        	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 9,
+      "previousCommitmentId": "0x475ea41bcdc2b31c295b20c083e0cda6a7b7c63565d50c96724504cc066bcd3108000000",
+      "rootsId": "0xc52030a8d4d8c01a5729abd42cdf5a4aafa30b13e3ec9de5df5aef9c61811361",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 10
+	PrevID: CommitmentID(0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000:9)
+	RootsID: 0x319a45f0b7a900c83beb8a19943d5c3f73de1d9fae2392919c83b7da2bdac78f
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0x319a45f0b7a900c83beb8a19943d5c3f73de1d9fae2392919c83b7da2bdac78f): TangleRoot: 0xaa05a20993dd2dc022d92fd83db3426cfb1a05596e02d45ee0846ab5de92c08b, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x56e133fa233c33aa3daa065003c389ee26b4924affa4fcea69a947ac58aa8104, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10) acceptedBlocks=[BlockID(chain-block1-1-node1:10) BlockID(chain-block1-0-node1:10)] roots=Roots(0x319a45f0b7a900c83beb8a19943d5c3f73de1d9fae2392919c83b7da2bdac78f): TangleRoot: 0xaa05a20993dd2dc022d92fd83db3426cfb1a05596e02d45ee0846ab5de92c08b, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x56e133fa233c33aa3daa065003c389ee26b4924affa4fcea69a947ac58aa8104, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot10.0       	created (id=CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot10.0       	Parent (set=Slot9.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot9.0        	MainChild (set=Slot10.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot10.0       	Chain (set=0)
+h.registerCommitment SlotIndex(10) CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10)
+h.registerCommitment SlotIndex(10) CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10) done
+h.registerCommitment SlotIndex(10) CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10)
+h.registerCommitment SlotIndex(10) CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10) done
+h.registerCommitment SlotIndex(10) CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10)
+h.registerCommitment SlotIndex(10) CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10) done
+trackHeaviestCandidates CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot10.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot10.0       	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot10.0       	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot10.0       	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot10.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot10.0       	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(10))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot10.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot10.0       	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 10,
+      "previousCommitmentId": "0xfd1d4d9b24837f9f6f46f78ceafaf4054e8f2d2c94487c688a3cb8fb3fcad44209000000",
+      "rootsId": "0x319a45f0b7a900c83beb8a19943d5c3f73de1d9fae2392919c83b7da2bdac78f",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10))
+2024-01-17 15:49:36	TRACE  	node1.Engine0.NotarizationManager	Committing (commitment=Commitment{
+	Index: 11
+	PrevID: CommitmentID(0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000:10)
+	RootsID: 0xb230a8e3d8106343c938887e228398982a5881049ce8df91747d80e6b8c3161c
+	CumulativeWeight: 0
+	RMC: 1
+} roots =Roots(0xb230a8e3d8106343c938887e228398982a5881049ce8df91747d80e6b8c3161c): TangleRoot: 0xbc581e32af1a9fe1867bbf5bce744f2f2d446b8fbda778dc1022e37a4c9d99a8, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x56e133fa233c33aa3daa065003c389ee26b4924affa4fcea69a947ac58aa8104, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.SlotCommitted (commitment=CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11) acceptedBlocks=[BlockID(chain-block1-3-node1:11) BlockID(chain-chain-block1-3-node1-0-node1:11) BlockID(chain-chain-block1-3-node1-1-node1:11) BlockID(chain-block1-2-node1:11)] roots=Roots(0xb230a8e3d8106343c938887e228398982a5881049ce8df91747d80e6b8c3161c): TangleRoot: 0xbc581e32af1a9fe1867bbf5bce744f2f2d446b8fbda778dc1022e37a4c9d99a8, StateMutationRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, StateRoot: 0xd5f45207f9469bac786a7de68bbec6d2a72fc8190591f9705e240bf314537ff5, AccountRoot: 0x56e133fa233c33aa3daa065003c389ee26b4924affa4fcea69a947ac58aa8104, AttestationsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, CommitteeRoot: 0x57e35d84f101637360d994603c90c01f77a4bd4188a52790c6d537711b8cae5f, RewardsRoot: 0x0000000000000000000000000000000000000000000000000000000000000000, ProtocolParametersHash: 0xb65cb9cd13277d19979d10ef5243ed5d63a5c075fd255bcf67944e4efd60654a attestations=[])
+2024-01-17 15:49:36	DEBUG  	node1.Commitments.Slot11.0       	created (id=CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11))
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot11.0       	Parent (set=Slot10.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot10.0       	MainChild (set=Slot11.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot11.0       	Chain (set=0)
+h.registerCommitment SlotIndex(11) CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11)
+h.registerCommitment SlotIndex(11) CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11) done
+h.registerCommitment SlotIndex(11) CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11)
+h.registerCommitment SlotIndex(11) CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11) done
+h.registerCommitment SlotIndex(11) CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11)
+h.registerCommitment SlotIndex(11) CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11) done
+trackHeaviestCandidates CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestCommitment (set=Slot11.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot11.0       	ReplayDroppedBlocks (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot11.0       	IsVerified (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot11.0       	IsAttested (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestAttestedCommitment (set=Slot11.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot11.0       	IsSynced (set=true)
+2024-01-17 15:49:36	TRACE  	node1.Chains.0                   	LatestSyncedSlot (set=SlotIndex(11))
+2024-01-17 15:49:36	DEBUG  	node1.Chains.0                   	LatestProducedCommitment (set=Slot11.0)
+2024-01-17 15:49:36	TRACE  	node1.Commitments.Slot11.0       	ReplayDroppedBlocks (set=false)
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	LatestCommitment (set=Commitment {
+    ID: CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11)
+    Commitment: "{
+      "protocolVersion": 3,
+      "slot": 11,
+      "previousCommitmentId": "0x9d68b47db8183abfcbe60187f29c3c6e95ac044bf62feb420fa35688b9ce7b2f0a000000",
+      "rootsId": "0xb230a8e3d8106343c938887e228398982a5881049ce8df91747d80e6b8c3161c",
+      "cumulativeWeight": "0",
+      "referenceManaCost": "1"
+    }"
+})
+2024-01-17 15:49:36	TRACE  	node1.Engine0                    	NotarizationManager.LatestCommitmentUpdated (commitment=CommitmentID(0xd7983f2331d693616133dedf8e4b3bd29f80b882c014202ca38191294b50a20d0b000000:11))
+Shutting down node node1
+signal: interrupt
+FAIL	github.com/iotaledger/iota-core/pkg/tests	7.261s
