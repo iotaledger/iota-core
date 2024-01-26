@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -37,18 +38,20 @@ type BlockDAG struct {
 	errorHandler func(error)
 
 	module.Module
+
+	log.Logger
 }
 
 func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engine, blockdag.BlockDAG] {
 	return module.Provide(func(e *engine.Engine) blockdag.BlockDAG {
-		b := New(e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
+		b := New(e.Logger.NewChildLogger("BlockDAG"), e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.Constructed.OnTrigger(func() {
 			wp := b.workers.CreatePool("BlockDAG.Attach", workerpool.WithWorkerCount(2))
 
 			e.Events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
 				if _, _, err := b.Attach(block); err != nil {
-					b.errorHandler(ierrors.Wrapf(err, "failed to attach block with %s (issuerID: %s)", block.ID(), block.ProtocolBlock().Header.IssuerID))
+					b.LogError("failed to attach block", "blockID", block.ID(), "issuer", block.ProtocolBlock().Header.IssuerID, "err", err)
 				}
 			}, event.WithWorkerPool(wp))
 
@@ -99,8 +102,9 @@ func (b *BlockDAG) setupBlock(block *blocks.Block) {
 }
 
 // New is the constructor for the BlockDAG and creates a new BlockDAG instance.
-func New(workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
+func New(logger log.Logger, workers *workerpool.Group, unsolidCommitmentBufferSize int, evictionState *eviction.State, blockCache *blocks.Blocks, errorHandler func(error), opts ...options.Option[BlockDAG]) (newBlockDAG *BlockDAG) {
 	return options.Apply(&BlockDAG{
+		Logger:                logger,
 		events:                blockdag.NewEvents(),
 		evictionState:         evictionState,
 		blockCache:            blockCache,
@@ -115,8 +119,6 @@ var _ blockdag.BlockDAG = new(BlockDAG)
 // Attach is used to attach new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
 func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached bool, err error) {
 	if block, wasAttached, err = b.attach(data); wasAttached {
-		b.events.BlockAttached.Trigger(block)
-
 		// We add blocks that commit to a commitment we haven't committed ourselves yet to this limited size buffer and
 		// only let them become solid once we committed said slot ourselves (to the same commitment).
 		// This is necessary in order to make sure that all necessary state is available after a block is solid (specifically
@@ -130,6 +132,10 @@ func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached b
 		}) {
 			return
 		}
+
+		b.LogTrace("block attached", "block", block.ID())
+
+		b.events.BlockAttached.Trigger(block)
 
 		b.setupBlock(block)
 	}
@@ -179,6 +185,8 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 	}
 
 	if updated {
+		b.LogTrace("missing block attached", "block", block.ID())
+
 		b.events.MissingBlockAttached.Trigger(block)
 	}
 

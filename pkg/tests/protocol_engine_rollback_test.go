@@ -183,7 +183,7 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 		for epoch := 0; epoch <= 2; epoch++ {
 			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
-			require.Len(t, committeeEpoch.IDs(), 4)
+			require.Equal(t, 4, committeeEpoch.SeatCount())
 		}
 
 		// Commmittee for the future epoch does not exist.
@@ -377,7 +377,7 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 		for epoch := 0; epoch <= 2; epoch++ {
 			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
-			require.Len(t, committeeEpoch.IDs(), 4)
+			require.Equal(t, 4, committeeEpoch.SeatCount())
 		}
 
 		// Commmittee for the future epoch does not exist.
@@ -571,7 +571,7 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 		for epoch := 0; epoch <= 2; epoch++ {
 			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
-			require.Len(t, committeeEpoch.IDs(), 4)
+			require.Equal(t, 4, committeeEpoch.SeatCount())
 		}
 
 		// Commmittee for the future epoch does not exist.
@@ -765,7 +765,7 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 		for epoch := 0; epoch <= 1; epoch++ {
 			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
-			require.Len(t, committeeEpoch.IDs(), 4)
+			require.Equal(t, 4, committeeEpoch.SeatCount())
 		}
 
 		// Committee for the future epoch does not exist.

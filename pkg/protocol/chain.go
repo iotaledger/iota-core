@@ -33,18 +33,6 @@ type Chain struct {
 	// corresponding blocks in the Engine.
 	LatestProducedCommitment reactive.Variable[*Commitment]
 
-	// ClaimedWeight contains the claimed weight of this chain which is derived from the cumulative weight of the
-	// LatestCommitment.
-	ClaimedWeight reactive.Variable[uint64]
-
-	// AttestedWeight contains the attested weight of this chain which is derived from the cumulative weight of all
-	// attestations up to the LatestAttestedCommitment.
-	AttestedWeight reactive.Variable[uint64]
-
-	// VerifiedWeight contains the verified weight of this chain which is derived from the cumulative weight of the
-	// latest verified commitment.
-	VerifiedWeight reactive.Variable[uint64]
-
 	// WarpSyncMode contains a flag that indicates whether this chain is in warp sync mode.
 	WarpSyncMode reactive.Variable[bool]
 
@@ -88,9 +76,6 @@ func newChain(chains *Chains) *Chain {
 		LatestCommitment:         reactive.NewVariable[*Commitment](),
 		LatestAttestedCommitment: reactive.NewVariable[*Commitment](),
 		LatestProducedCommitment: reactive.NewVariable[*Commitment](),
-		ClaimedWeight:            reactive.NewVariable[uint64](),
-		AttestedWeight:           reactive.NewVariable[uint64](),
-		VerifiedWeight:           reactive.NewVariable[uint64](),
 		WarpSyncMode:             reactive.NewVariable[bool]().Init(true),
 		LatestSyncedSlot:         reactive.NewVariable[iotago.SlotIndex](),
 		OutOfSyncThreshold:       reactive.NewVariable[iotago.SlotIndex](),
@@ -189,9 +174,6 @@ func (c *Chain) initLogger() (shutdown func()) {
 		c.LatestSyncedSlot.LogUpdates(c, log.LevelTrace, "LatestSyncedSlot"),
 		c.OutOfSyncThreshold.LogUpdates(c, log.LevelTrace, "OutOfSyncThreshold"),
 		c.ForkingPoint.LogUpdates(c, log.LevelTrace, "ForkingPoint", (*Commitment).LogName),
-		c.ClaimedWeight.LogUpdates(c, log.LevelTrace, "ClaimedWeight"),
-		c.AttestedWeight.LogUpdates(c, log.LevelTrace, "AttestedWeight"),
-		c.VerifiedWeight.LogUpdates(c, log.LevelTrace, "VerifiedWeight"),
 		c.LatestCommitment.LogUpdates(c, log.LevelTrace, "LatestCommitment", (*Commitment).LogName),
 		c.LatestAttestedCommitment.LogUpdates(c, log.LevelTrace, "LatestAttestedCommitment", (*Commitment).LogName),
 		c.LatestProducedCommitment.LogUpdates(c, log.LevelDebug, "LatestProducedCommitment", (*Commitment).LogName),
@@ -207,9 +189,6 @@ func (c *Chain) initLogger() (shutdown func()) {
 // initDerivedProperties initializes the behavior of this chain by setting up the relations between its properties.
 func (c *Chain) initDerivedProperties() (shutdown func()) {
 	return lo.Batch(
-		c.deriveClaimedWeight(),
-		c.deriveVerifiedWeight(),
-		c.deriveLatestAttestedWeight(),
 		c.deriveWarpSyncMode(),
 
 		c.ForkingPoint.WithValue(c.deriveParentChain),
@@ -229,39 +208,6 @@ func (c *Chain) deriveWarpSyncMode() func() {
 		// if warp sync mode is disabled, enable it only if we fall below the out of sync threshold
 		return latestSyncedSlot < outOfSyncThreshold
 	}, c.LatestSyncedSlot, c.chains.LatestSeenSlot, c.OutOfSyncThreshold, c.WarpSyncMode.Get()))
-}
-
-// deriveClaimedWeight defines how a chain determines its claimed weight (by setting the cumulative weight of the
-// latest commitment).
-func (c *Chain) deriveClaimedWeight() (shutdown func()) {
-	return c.ClaimedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestCommitment *Commitment) uint64 {
-		if latestCommitment == nil {
-			return 0
-		}
-
-		return latestCommitment.CumulativeWeight()
-	}, c.LatestCommitment))
-}
-
-// deriveLatestAttestedWeight defines how a chain determines its attested weight (by inheriting the cumulative attested
-// weight of the latest attested commitment). It uses inheritance instead of simply setting the value as the cumulative
-// attested weight can change over time depending on the attestations that are received.
-func (c *Chain) deriveLatestAttestedWeight() func() {
-	return c.LatestAttestedCommitment.WithNonEmptyValue(func(latestAttestedCommitment *Commitment) (shutdown func()) {
-		return c.AttestedWeight.InheritFrom(latestAttestedCommitment.CumulativeAttestedWeight)
-	})
-}
-
-// deriveVerifiedWeight defines how a chain determines its verified weight (by setting the cumulative weight of the
-// latest produced commitment).
-func (c *Chain) deriveVerifiedWeight() func() {
-	return c.VerifiedWeight.DeriveValueFrom(reactive.NewDerivedVariable(func(_ uint64, latestProducedCommitment *Commitment) uint64 {
-		if latestProducedCommitment == nil {
-			return 0
-		}
-
-		return latestProducedCommitment.CumulativeWeight()
-	}, c.LatestProducedCommitment))
 }
 
 // deriveChildChains defines how a chain determines its ChildChains (by adding each child to the set).
@@ -352,22 +298,4 @@ func (c *Chain) dispatchBlockToSpawnedEngine(block *model.Block, src peer.ID) (d
 	engineInstance.ProcessBlockFromPeer(block, src)
 
 	return true
-}
-
-// claimedWeight is a getter for the ClaimedWeight variable of this chain, which is internally used to be able to
-// "address" the variable across multiple chains in a generic way.
-func (c *Chain) claimedWeight() reactive.Variable[uint64] {
-	return c.ClaimedWeight
-}
-
-// verifiedWeight is a getter for the VerifiedWeight variable of this chain, which is internally used to be able to
-// "address" the variable across multiple chains in a generic way.
-func (c *Chain) verifiedWeight() reactive.Variable[uint64] {
-	return c.VerifiedWeight
-}
-
-// attestedWeight is a getter for the AttestedWeight variable of this chain, which is internally used to be able to
-// "address" the variable across multiple chains in a generic way.
-func (c *Chain) attestedWeight() reactive.Variable[uint64] {
-	return c.AttestedWeight
 }
