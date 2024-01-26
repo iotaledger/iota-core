@@ -299,6 +299,7 @@ services:
       --inx.address=node-1-validator:9029
       --validator.ignoreBootstrapped=true
       --validator.accountAddress=rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6
+      --validator.issueCandidacyPayload=${ISSUE_CANDIDACY_PAYLOAD_V1:-true}
 
   inx-validator-2:
     image: iotaledger/inx-validator:1.0-alpha
@@ -315,6 +316,7 @@ services:
       --logger.level=debug
       --inx.address=node-2-validator:9029
       --validator.accountAddress=rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl
+      --validator.issueCandidacyPayload=${ISSUE_CANDIDACY_PAYLOAD_V2:-true}
 
   inx-validator-3:
     image: iotaledger/inx-validator:1.0-alpha
@@ -331,6 +333,7 @@ services:
       --logger.level=debug
       --inx.address=node-3-validator:9029
       --validator.accountAddress=rms1pp4wuuz0y42caz48vv876qfpmffswsvg40zz8v79sy8cp0jfxm4kunflcgt
+      --validator.issueCandidacyPayload=${ISSUE_CANDIDACY_PAYLOAD_V3:-true}
 
   inx-validator-4:
     image: iotaledger/inx-validator:1.0-alpha
@@ -347,7 +350,7 @@ services:
       --logger.level=debug
       --inx.address=node-4-validator:9029
       --validator.accountAddress=rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw
-      --logger.level=debug
+      --validator.issueCandidacyPayload=${ISSUE_CANDIDACY_PAYLOAD_V4:-true}
 
 # Create our own network
 networks:
