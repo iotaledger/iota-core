@@ -476,7 +476,7 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 		IncreaseAllotment(to.AccountID, actualAllottedMana).
 		AddOutput(basicOutput).
 		SetCreationSlot(currentSlot).
-		AllotAllMana(currentSlot, from.AccountID).
+		AllotAllMana(currentSlot, from.AccountID, 0).
 		Build(fundsAddrSigner)
 	require.NoError(d.Testing, err)
 
@@ -544,7 +544,7 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iota
 		SetCreationSlot(currentSlot).
 		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: from.AccountID}).
 		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
-		AllotAllMana(currentSlot, from.AccountID).
+		AllotAllMana(currentSlot, from.AccountID, 0).
 		Build(signer)
 	require.NoError(d.Testing, err)
 
