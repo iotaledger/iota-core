@@ -29,20 +29,19 @@ func determineBlockFailureReason(err error) api.BlockFailureReason {
 
 var txErrorsFailureReasonMap = map[error]api.TransactionFailureReason{
 	// unknown type / type casting errors
-	iotago.ErrTxTypeInvalid:               api.TxFailureTxTypeInvalid,
-	iotago.ErrUnknownInputType:            api.TxFailureUTXOInputInvalid,
-	iotago.ErrUTXOInputInvalid:            api.TxFailureUTXOInputInvalid,
-	iotago.ErrUnknownOutputType:           api.TxFailureUTXOInputInvalid,
-	iotago.ErrBICInputInvalid:             api.TxFailureBICInputInvalid,
-	iotago.ErrRewardInputInvalid:          api.TxFailureRewardInputInvalid,
-	iotago.ErrCommitmentInputMissing:      api.TxFailureCommitmentInputInvalid,
-	iotago.ErrCommitmentInputInvalid:      api.TxFailureCommitmentInputInvalid,
-	iotago.ErrUnlockBlockSignatureInvalid: api.TxFailureUnlockBlockSignatureInvalid,
+	iotago.ErrTxTypeInvalid:                   api.TxFailureTxTypeInvalid,
+	iotago.ErrUnknownInputType:                api.TxFailureUTXOInputInvalid,
+	iotago.ErrUTXOInputInvalid:                api.TxFailureUTXOInputInvalid,
+	iotago.ErrUnknownOutputType:               api.TxFailureUTXOInputInvalid,
+	iotago.ErrBICInputReferenceInvalid:        api.TxFailureBICInputInvalid,
+	iotago.ErrRewardInputReferenceInvalid:     api.TxFailureRewardInputInvalid,
+	iotago.ErrCommitmentInputMissing:          api.TxFailureCommitmentInputInvalid,
+	iotago.ErrCommitmentInputReferenceInvalid: api.TxFailureCommitmentInputInvalid,
+	iotago.ErrUnlockSignatureInvalid:          api.TxFailureUnlockBlockSignatureInvalid,
 
 	// context inputs errors
-	iotago.ErrNoStakingFeature:              api.TxFailureNoStakingFeature,
-	iotago.ErrFailedToClaimStakingReward:    api.TxFailureFailedToClaimStakingReward,
-	iotago.ErrFailedToClaimDelegationReward: api.TxFailureFailedToClaimDelegationReward,
+	iotago.ErrStakingRewardCalculation:    api.TxFailureFailedToClaimStakingReward,
+	iotago.ErrDelegationRewardCalculation: api.TxFailureFailedToClaimDelegationReward,
 
 	// UTXO errors
 	iotago.ErrTxConflicting:     api.TxFailureConflicting,
