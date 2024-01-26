@@ -153,15 +153,12 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 	}, ts.Nodes()...)
 
 	// TRANSITION IMPLICIT ACCOUNT TO ACCOUNT OUTPUT.
-	// USE IMPLICIT ACCOUNT AS BLOCK ISSUER.
-	fullAccountBlockIssuerKey := newUserWallet.BlockIssuerKey()
-
 	block3Slot := ts.CurrentSlot()
 	tx4 := newUserWallet.TransitionImplicitAccountToAccountOutput(
 		"TX4",
 		"TX3:0",
 		mock.WithBlockIssuerFeature(
-			iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
+			iotago.BlockIssuerKeys{implicitBlockIssuerKey},
 			iotago.MaxSlotIndex,
 		),
 		mock.WithAccountAmount(mock.MinIssuerAccountAmount(ts.API.ProtocolParameters())),
@@ -175,18 +172,16 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 	burned := iotago.BlockIssuanceCredits(block3.WorkScore()) * iotago.BlockIssuanceCredits(block2Commitment.ReferenceManaCost)
 	// the implicit account should now have been transitioned to a full account in the accounts ledger.
 	ts.AssertAccountDiff(implicitAccountID, block3Slot, &model.AccountDiff{
-		BICChange:              allotted - burned,
-		PreviousUpdatedSlot:    block2Slot,
-		NewOutputID:            fullAccountOutputID,
-		PreviousOutputID:       implicitAccountOutputID,
-		PreviousExpirySlot:     iotago.MaxSlotIndex,
-		NewExpirySlot:          iotago.MaxSlotIndex,
-		BlockIssuerKeysAdded:   iotago.BlockIssuerKeys{fullAccountBlockIssuerKey},
-		BlockIssuerKeysRemoved: iotago.BlockIssuerKeys{implicitBlockIssuerKey},
-		ValidatorStakeChange:   0,
-		StakeEndEpochChange:    0,
-		FixedCostChange:        0,
-		DelegationStakeChange:  0,
+		BICChange:             allotted - burned,
+		PreviousUpdatedSlot:   block2Slot,
+		NewOutputID:           fullAccountOutputID,
+		PreviousOutputID:      implicitAccountOutputID,
+		PreviousExpirySlot:    iotago.MaxSlotIndex,
+		NewExpirySlot:         iotago.MaxSlotIndex,
+		ValidatorStakeChange:  0,
+		StakeEndEpochChange:   0,
+		FixedCostChange:       0,
+		DelegationStakeChange: 0,
 	}, false, ts.Nodes()...)
 
 	ts.AssertAccountData(&accounts.AccountData{
@@ -194,7 +189,7 @@ func createImplicitToFullAccount(ts *testsuite.TestSuite) iotago.AccountID {
 		Credits:         accounts.NewBlockIssuanceCredits(allotted-burned, block3Slot),
 		ExpirySlot:      iotago.MaxSlotIndex,
 		OutputID:        fullAccountOutputID,
-		BlockIssuerKeys: iotago.NewBlockIssuerKeys(fullAccountBlockIssuerKey),
+		BlockIssuerKeys: iotago.NewBlockIssuerKeys(implicitBlockIssuerKey),
 	}, ts.Nodes()...)
 
 	return implicitAccountID
