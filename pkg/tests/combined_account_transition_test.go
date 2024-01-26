@@ -3,7 +3,6 @@ package tests
 import (
 	"testing"
 
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/accounts"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
@@ -32,8 +31,6 @@ func Test_AccountStateTransition(t *testing.T) {
 	wallet := ts.AddDefaultWallet(node1)
 
 	ts.Run(true)
-
-	node1.Protocol.SetLogLevel(log.LevelTrace)
 
 	// split genesis output into 4 outputs for the further usage.
 	tx1 := wallet.CreateBasicOutputsEquallyFromInput("TX1", 4, "Genesis:0")
