@@ -64,7 +64,7 @@ func durationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time
 	return d
 }
 
-func loggerLevelFromEnvOrDefault(level log.Level, envKey string) log.Logger {
+func loggerLevelFromEnvOrDefault(envKey string) log.Logger {
 	levelStr := os.Getenv(envKey)
 	if levelStr == "" {
 		return log.NewLogger()
