@@ -327,8 +327,16 @@ func (c *Commitments) processRequest(commitmentID iotago.CommitmentID, from peer
 // processResponse processes the given commitment response.
 func (c *Commitments) processResponse(commitment *model.Commitment, from peer.ID) {
 	c.workerPool.Submit(func() {
+		// make sure the main engine is available to process the response
+		mainEngine := c.protocol.Engines.Main.Get()
+		if mainEngine == nil {
+			c.LogError("main engine unavailable for response", "commitment", commitment.ID(), "fromPeer", from)
+
+			return
+		}
+
 		// verify the commitment's version corresponds to the protocol version for the slot.
-		if apiForSlot := c.protocol.APIForSlot(commitment.Slot()); apiForSlot.Version() != commitment.Commitment().ProtocolVersion {
+		if apiForSlot := mainEngine.APIForSlot(commitment.Slot()); apiForSlot.Version() != commitment.Commitment().ProtocolVersion {
 			c.LogDebug("received commitment with invalid protocol version", "commitment", commitment.ID(), "version", commitment.Commitment().ProtocolVersion, "expectedVersion", apiForSlot.Version(), "fromPeer", from)
 
 			return

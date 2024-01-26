@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -47,8 +48,14 @@ type Commitment struct {
 	// AttestedWeight contains the weight of the Commitment that was attested by other nodes.
 	AttestedWeight reactive.Variable[uint64]
 
+	// CumulativeWeight contains the cumulative weight of all Commitments up to this point.
+	CumulativeWeight reactive.Variable[uint64]
+
 	// CumulativeAttestedWeight contains the cumulative weight of all attested Commitments up to this point.
 	CumulativeAttestedWeight reactive.Variable[uint64]
+
+	// CumulativeVerifiedWeight contains the cumulative weight of all verified Commitments up to this point.
+	CumulativeVerifiedWeight reactive.Variable[uint64]
 
 	// IsRoot contains a flag indicating if this Commitment is the root of the Chain.
 	IsRoot reactive.Event
@@ -97,7 +104,9 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		BlocksToWarpSync:                reactive.NewVariable[ds.Set[iotago.BlockID]](),
 		Weight:                          reactive.NewVariable[uint64](),
 		AttestedWeight:                  reactive.NewVariable[uint64](func(currentValue uint64, newValue uint64) uint64 { return max(currentValue, newValue) }),
+		CumulativeWeight:                reactive.NewVariable[uint64](),
 		CumulativeAttestedWeight:        reactive.NewVariable[uint64](),
+		CumulativeVerifiedWeight:        reactive.NewVariable[uint64](),
 		IsRoot:                          reactive.NewEvent(),
 		IsAttested:                      reactive.NewEvent(),
 		IsSynced:                        reactive.NewEvent(),
@@ -128,6 +137,71 @@ func (c *Commitment) TargetEngine() *engine.Engine {
 	return nil
 }
 
+// Less is a function that is used to break ties between two Commitments that have the same cumulative weight by using
+// the ID of their divergence points (the first commitment that is different between their chains).
+func (c *Commitment) Less(other *Commitment) bool {
+	// trivial case where both commitments are the same or one of them is nil
+	if c == other {
+		return false
+	} else if c == nil {
+		return true
+	} else if other == nil {
+		return false
+	}
+
+	// trivial case where both commitments have the same chain
+	largerChain, smallerChain := other.Chain.Get(), c.Chain.Get()
+	if largerChain == smallerChain {
+		return false
+	}
+
+	// iterate until we find the divergence point of both chains
+	for {
+		// trivial case where one of the chains is nil
+		if largerChain == nil {
+			return false
+		} else if smallerChain == nil {
+			return true
+		}
+
+		// trivial case where one of the chains has no forking point, yet
+		forkingPointOfLargerChain, forkingPointOfSmallerChain := largerChain.ForkingPoint.Get(), smallerChain.ForkingPoint.Get()
+		if forkingPointOfLargerChain == nil {
+			return false
+		} else if forkingPointOfSmallerChain == nil {
+			return true
+		}
+
+		// if the forking points of both chains have the same parent, then the forking points are the divergence points
+		if forkingPointOfLargerChain.Slot() == forkingPointOfSmallerChain.Slot() && forkingPointOfLargerChain.Parent.Get() == forkingPointOfSmallerChain.Parent.Get() {
+			return bytes.Compare(lo.PanicOnErr(forkingPointOfLargerChain.ID().Bytes()), lo.PanicOnErr(forkingPointOfSmallerChain.ID().Bytes())) > 0
+		}
+
+		// iterate by traversing the parent of the chain with the higher forking point first
+		if forkingPointOfLargerChain.Slot() > forkingPointOfSmallerChain.Slot() {
+			// iterate to parent
+			largerChain = largerChain.ParentChain.Get()
+
+			// terminate if we reach a common chain
+			if largerChain == smallerChain {
+				divergencePointB, divergencePointBExists := smallerChain.Commitment(forkingPointOfLargerChain.Slot())
+
+				return !divergencePointBExists || bytes.Compare(lo.PanicOnErr(forkingPointOfLargerChain.ID().Bytes()), lo.PanicOnErr(divergencePointB.ID().Bytes())) > 0
+			}
+		} else {
+			// iterate to parent
+			smallerChain = smallerChain.ParentChain.Get()
+
+			// terminate if we reach a common chain
+			if smallerChain == largerChain {
+				divergencePointA, divergencePointAExists := largerChain.Commitment(forkingPointOfSmallerChain.Slot())
+
+				return divergencePointAExists && bytes.Compare(lo.PanicOnErr(divergencePointA.ID().Bytes()), lo.PanicOnErr(forkingPointOfSmallerChain.ID().Bytes())) > 0
+			}
+		}
+	}
+}
+
 // initLogger initializes the Logger of this Commitment.
 func (c *Commitment) initLogger() (shutdown func()) {
 	c.Logger = c.commitments.NewChildLogger(fmt.Sprintf("Slot%d.", c.Slot()), true)
@@ -140,7 +214,9 @@ func (c *Commitment) initLogger() (shutdown func()) {
 		c.WarpSyncBlocks.LogUpdates(c, log.LevelTrace, "WarpSyncBlocks"),
 		c.Weight.LogUpdates(c, log.LevelTrace, "Weight"),
 		c.AttestedWeight.LogUpdates(c, log.LevelTrace, "AttestedWeight"),
+		c.CumulativeWeight.LogUpdates(c, log.LevelTrace, "CumulativeWeight"),
 		c.CumulativeAttestedWeight.LogUpdates(c, log.LevelTrace, "CumulativeAttestedWeight"),
+		c.CumulativeVerifiedWeight.LogUpdates(c, log.LevelTrace, "CumulativeVerifiedWeight"),
 		c.IsRoot.LogUpdates(c, log.LevelTrace, "IsRoot"),
 		c.IsAttested.LogUpdates(c, log.LevelTrace, "IsAttested"),
 		c.IsSynced.LogUpdates(c, log.LevelTrace, "IsSynced"),
@@ -163,10 +239,12 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 		c.IsAttested.InheritFrom(c.IsVerified),
 		c.IsSynced.InheritFrom(c.IsVerified),
 
+		c.deriveCumulativeVerifiedWeight(),
+
 		c.Parent.WithNonEmptyValue(func(parent *Commitment) func() {
-			// the weight can be fixed as a one time operation (it only relies on static information)
-			if parent.CumulativeWeight() < c.CumulativeWeight() {
-				c.Weight.Set(c.CumulativeWeight() - parent.CumulativeWeight())
+			if parent.Commitment.CumulativeWeight() <= c.Commitment.CumulativeWeight() { // prevent overflow in uint64
+				c.Weight.Set(c.Commitment.CumulativeWeight() - parent.Commitment.CumulativeWeight())
+				c.CumulativeWeight.Set(c.Commitment.CumulativeWeight())
 			}
 
 			return lo.Batch(
@@ -258,6 +336,14 @@ func (c *Commitment) deriveCumulativeAttestedWeight(parent *Commitment) func() {
 	}, parent.CumulativeAttestedWeight, c.AttestedWeight))
 }
 
+// deriveCumulativeVerifiedWeight derives the CumulativeVerifiedWeight of this Commitment which is the same as the
+// CumulativeWeight of the underlying model.Commitment if this Commitment is verified.
+func (c *Commitment) deriveCumulativeVerifiedWeight() func() {
+	return c.IsVerified.OnTrigger(func() {
+		c.CumulativeVerifiedWeight.Set(c.Commitment.CumulativeWeight())
+	})
+}
+
 // deriveIsAboveLatestVerifiedCommitment derives the IsAboveLatestVerifiedCommitment flag of this Commitment which is
 // true if the parent is already above the latest verified Commitment or if the parent is verified and we are not.
 func (c *Commitment) deriveIsAboveLatestVerifiedCommitment(parent *Commitment) func() {
@@ -298,4 +384,19 @@ func (c *Commitment) forceChain(targetChain *Chain) {
 			parent.MainChild.Set(c)
 		}
 	}
+}
+
+// cumulativeWeight returns the Variable that contains the cumulative weight of this Commitment.
+func (c *Commitment) cumulativeWeight() reactive.Variable[uint64] {
+	return c.CumulativeWeight
+}
+
+// cumulativeAttestedWeight returns the Variable that contains the cumulative attested weight of this Commitment.
+func (c *Commitment) cumulativeAttestedWeight() reactive.Variable[uint64] {
+	return c.CumulativeAttestedWeight
+}
+
+// cumulativeVerifiedWeight returns the Variable that contains the cumulative verified weight of this Commitment.
+func (c *Commitment) cumulativeVerifiedWeight() reactive.Variable[uint64] {
+	return c.CumulativeVerifiedWeight
 }

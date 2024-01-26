@@ -26,7 +26,7 @@ func (s *Storage) DecidedUpgradeSignals() *epochstore.Store[model.VersionAndHash
 	return s.prunable.DecidedUpgradeSignals()
 }
 
-func (s *Storage) Committee() *epochstore.Store[*account.Accounts] {
+func (s *Storage) Committee() *epochstore.Store[*account.SeatedAccounts] {
 	return s.prunable.Committee()
 }
 

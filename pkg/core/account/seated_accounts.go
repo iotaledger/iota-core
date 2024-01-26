@@ -3,10 +3,14 @@ package account
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
+	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/serializer/v2"
+	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	"github.com/iotaledger/hive.go/stringify"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -28,6 +32,7 @@ func SeatIndexFromBytes(b []byte) (SeatIndex, int, error) {
 type SeatedAccounts struct {
 	accounts       *Accounts
 	seatsByAccount *shrinkingmap.ShrinkingMap[iotago.AccountID, SeatIndex]
+	reused         atomic.Bool
 }
 
 func NewSeatedAccounts(accounts *Accounts, optMembers ...iotago.AccountID) *SeatedAccounts {
@@ -35,6 +40,7 @@ func NewSeatedAccounts(accounts *Accounts, optMembers ...iotago.AccountID) *Seat
 		accounts:       accounts,
 		seatsByAccount: shrinkingmap.New[iotago.AccountID, SeatIndex](),
 	}
+
 	sort.Slice(optMembers, func(i int, j int) bool {
 		return bytes.Compare(optMembers[i][:], optMembers[j][:]) < 0
 	})
@@ -44,6 +50,14 @@ func NewSeatedAccounts(accounts *Accounts, optMembers ...iotago.AccountID) *Seat
 	}
 
 	return s
+}
+
+func (s *SeatedAccounts) IsReused() bool {
+	return s.reused.Load()
+}
+
+func (s *SeatedAccounts) SetReused() {
+	s.reused.Store(true)
 }
 
 func (s *SeatedAccounts) Set(seat SeatIndex, id iotago.AccountID) bool {
@@ -68,6 +82,10 @@ func (s *SeatedAccounts) Delete(id iotago.AccountID) bool {
 
 func (s *SeatedAccounts) GetSeat(id iotago.AccountID) (seat SeatIndex, exists bool) {
 	return s.seatsByAccount.Get(id)
+}
+
+func (s *SeatedAccounts) IDs() []iotago.AccountID {
+	return s.accounts.IDs()
 }
 
 func (s *SeatedAccounts) HasAccount(id iotago.AccountID) (has bool) {
@@ -96,6 +114,24 @@ func (s *SeatedAccounts) Accounts() (*Accounts, error) {
 	return accounts, err
 }
 
+func (s *SeatedAccounts) Reuse() (*SeatedAccounts, error) {
+	committeeAccounts, err := s.Accounts()
+	if err != nil {
+		return nil, err
+	}
+
+	newCommittee := NewSeatedAccounts(committeeAccounts)
+	newCommittee.SetReused()
+
+	s.seatsByAccount.ForEach(func(id iotago.AccountID, index SeatIndex) bool {
+		newCommittee.Set(index, id)
+
+		return true
+	})
+
+	return newCommittee, nil
+}
+
 func (s *SeatedAccounts) String() string {
 	builder := stringify.NewStructBuilder("SeatedAccounts")
 
@@ -104,4 +140,94 @@ func (s *SeatedAccounts) String() string {
 	}
 
 	return builder.String()
+}
+
+func SeatedAccountsFromBytes(b []byte) (*SeatedAccounts, int, error) {
+	reader := stream.NewByteReader(b)
+
+	s, err := SeatedAccountsFromReader(reader)
+	if err != nil {
+		return nil, 0, ierrors.Wrap(err, "unable to read accounts from bytes")
+	}
+
+	return s, reader.BytesRead(), nil
+}
+
+func SeatedAccountsFromReader(reader io.Reader) (*SeatedAccounts, error) {
+	accounts, err := AccountsFromReader(reader)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "unable to read accounts from bytes")
+	}
+
+	seatsByAccount := shrinkingmap.New[iotago.AccountID, SeatIndex]()
+
+	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
+		accountID, err := stream.Read[iotago.AccountID](reader)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to read accountID at index %d", i)
+		}
+
+		seatIndex, err := stream.Read[SeatIndex](reader)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to read seatIndex at index %d", i)
+		}
+
+		seatsByAccount.Set(accountID, seatIndex)
+
+		return nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to read account data")
+	}
+
+	reused, err := stream.Read[bool](reader)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to read reused flag")
+	}
+
+	committee := &SeatedAccounts{accounts: accounts, seatsByAccount: seatsByAccount}
+
+	committee.reused.Store(reused)
+
+	return committee, nil
+}
+
+func (s *SeatedAccounts) Bytes() ([]byte, error) {
+	byteBuffer := stream.NewByteBuffer()
+
+	accountsBytes, err := s.accounts.Bytes()
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to serialize committee accounts")
+	}
+
+	if err := stream.WriteBytes(byteBuffer, accountsBytes); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write account bytes")
+	}
+
+	if err := stream.WriteCollection(byteBuffer, serializer.SeriLengthPrefixTypeAsUint32, func() (elementsCount int, err error) {
+		var innerErr error
+		s.seatsByAccount.ForEach(func(id iotago.AccountID, seatIndex SeatIndex) bool {
+			if innerErr = stream.Write(byteBuffer, id); innerErr != nil {
+				return false
+			}
+
+			if innerErr = stream.Write(byteBuffer, seatIndex); innerErr != nil {
+				return false
+			}
+
+			return true
+		})
+		if innerErr != nil {
+			return 0, innerErr
+		}
+
+		return s.seatsByAccount.Size(), nil
+	}); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write seats by account map")
+	}
+
+	if err := stream.Write(byteBuffer, s.reused.Load()); err != nil {
+		return nil, ierrors.Wrap(err, "failed to write reused flag")
+	}
+
+	return byteBuffer.Bytes()
 }
