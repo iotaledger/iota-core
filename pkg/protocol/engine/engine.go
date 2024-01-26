@@ -229,7 +229,7 @@ func New(
 
 			e.Initialized.Trigger()
 
-			e.LogDebug("initialized", "settings", e.Storage.Settings().String())
+			e.LogTrace("initialized", "settings", e.Storage.Settings().String())
 		},
 	)
 }
