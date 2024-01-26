@@ -21,7 +21,7 @@ import (
 type Tracker struct {
 	rewardsStorePerEpochFunc       func(epoch iotago.EpochIndex) (kvstore.KVStore, error)
 	poolStatsStore                 *epochstore.Store[*model.PoolsStats]
-	committeeStore                 *epochstore.Store[*account.Accounts]
+	committeeStore                 *epochstore.Store[*account.SeatedAccounts]
 	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error)
 	nextEpochCommitteeCandidates   *shrinkingmap.ShrinkingMap[iotago.AccountID, iotago.SlotIndex]
 	validatorPerformancesFunc      func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error)
@@ -40,7 +40,7 @@ type Tracker struct {
 func NewTracker(
 	rewardsStorePerEpochFunc func(epoch iotago.EpochIndex) (kvstore.KVStore, error),
 	poolStatsStore *epochstore.Store[*model.PoolsStats],
-	committeeStore *epochstore.Store[*account.Accounts],
+	committeeStore *epochstore.Store[*account.SeatedAccounts],
 	committeeCandidatesInEpochFunc func(epoch iotago.EpochIndex) (*kvstore.TypedStore[iotago.AccountID, iotago.SlotIndex], error),
 	validatorPerformancesFunc func(slot iotago.SlotIndex) (*slotstore.Store[iotago.AccountID, *model.ValidatorPerformance], error),
 	latestAppliedEpoch iotago.EpochIndex,
@@ -174,7 +174,7 @@ func (t *Tracker) getValidatorCandidates(epoch iotago.EpochIndex) (ds.Set[iotago
 	return candidates, nil
 }
 
-func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.Accounts, exists bool) {
+func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *account.SeatedAccounts, exists bool) {
 	c, err := t.committeeStore.Load(epoch)
 	if err != nil {
 		panic(ierrors.Wrapf(err, "failed to load committee for epoch %d", epoch))
@@ -188,7 +188,7 @@ func (t *Tracker) LoadCommitteeForEpoch(epoch iotago.EpochIndex) (committee *acc
 }
 
 // ApplyEpoch calculates and stores pool stats and rewards for the given epoch.
-func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Accounts) error {
+func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.SeatedAccounts) error {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
@@ -196,14 +196,19 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 	epochStartSlot := timeProvider.EpochStart(epoch)
 	epochEndSlot := timeProvider.EpochEnd(epoch)
 
-	profitMargin, err := t.calculateProfitMargin(committee.TotalValidatorStake(), committee.TotalStake(), epoch)
+	committeeAccounts, err := committee.Accounts()
+	if err != nil {
+		return ierrors.Wrapf(err, "failed to retrieve accounts from committee for epoch %d", epoch)
+	}
+
+	profitMargin, err := t.calculateProfitMargin(committeeAccounts.TotalValidatorStake(), committeeAccounts.TotalStake(), epoch)
 	if err != nil {
 		return ierrors.Wrapf(err, "failed to calculate profit margin for epoch %d", epoch)
 	}
 
 	poolsStats := &model.PoolsStats{
-		TotalStake:          committee.TotalStake(),
-		TotalValidatorStake: committee.TotalValidatorStake(),
+		TotalStake:          committeeAccounts.TotalStake(),
+		TotalValidatorStake: committeeAccounts.TotalValidatorStake(),
 		ProfitMargin:        profitMargin,
 	}
 
@@ -216,7 +221,7 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 		panic(ierrors.Wrapf(err, "failed to create rewards tree for epoch %d", epoch))
 	}
 
-	committee.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
+	committeeAccounts.ForEach(func(accountID iotago.AccountID, pool *account.Pool) bool {
 		validatorPerformances := make([]*model.ValidatorPerformance, 0, timeProvider.EpochDurationSlots())
 
 		for slot := epochStartSlot; slot <= epochEndSlot; slot++ {
@@ -251,8 +256,8 @@ func (t *Tracker) ApplyEpoch(epoch iotago.EpochIndex, committee *account.Account
 
 		poolReward, err := t.poolReward(
 			epochEndSlot,
-			committee.TotalValidatorStake(),
-			committee.TotalStake(),
+			committeeAccounts.TotalValidatorStake(),
+			committeeAccounts.TotalStake(),
 			pool.PoolStake,
 			pool.ValidatorStake,
 			epochPerformanceFactor,
@@ -321,7 +326,7 @@ func (t *Tracker) isCommitteeMember(slot iotago.SlotIndex, accountID iotago.Acco
 		return false, ierrors.Errorf("committee for epoch %d not found", epoch)
 	}
 
-	return committee.Has(accountID), nil
+	return committee.HasAccount(accountID), nil
 }
 
 func (t *Tracker) trackCommitteeMemberPerformance(validationBlock *iotago.ValidationBlockBody, block *blocks.Block) {
