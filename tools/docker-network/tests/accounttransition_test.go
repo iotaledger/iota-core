@@ -13,7 +13,10 @@ import (
 )
 
 // Test_AccountTransitions follows the account state transition flow described in:
-// https://github.com/iotaledger/iota-core/issues/660#issuecomment-1892596243
+// 1. Create account1.
+// 2. Create account2.
+// 3. account1 requests faucet funds then allots 1000 mana to account2.
+// 4. account2 requests faucet funds then creates native tokens.
 func Test_AccountTransitions(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
