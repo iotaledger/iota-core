@@ -269,11 +269,9 @@ func selectedCommittee(c echo.Context) (*api.CommitteeResponse, error) {
 		// by default we return current epoch
 		slot = timeProvider.SlotFromTime(time.Now())
 		epoch = timeProvider.EpochFromSlot(slot)
-	} else {
-		slot = timeProvider.EpochEnd(epoch)
 	}
 
-	seatedAccounts, exists := deps.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInSlot(slot)
+	seatedAccounts, exists := deps.Protocol.Engines.Main.Get().SybilProtection.SeatManager().CommitteeInEpoch(epoch)
 	if !exists {
 		return &api.CommitteeResponse{
 			Epoch: epoch,

@@ -13,13 +13,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-crypto-demo/pkg/bip32path"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/wallet"
-	"github.com/stretchr/testify/require"
 )
 
 // Eventually asserts that given condition will be met in opts.waitFor time,
