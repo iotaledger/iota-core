@@ -341,7 +341,7 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 
 	// transition to a full account with new Ed25519 address and staking feature
 	accEd25519Addr, accPrivateKey := d.getAddress(iotago.AddressEd25519)
-	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(accPrivateKey.Public().(hiveEd25519.PublicKey)))
+	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(accPrivateKey.Public().(ed25519.PublicKey)))
 	accountOutput := options.Apply(builder.NewAccountOutputBuilder(accEd25519Addr, implicitAccountOutput.BaseTokenAmount()),
 		opts, func(b *builder.AccountOutputBuilder) {
 			b.AccountID(accountID).
