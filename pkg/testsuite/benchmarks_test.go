@@ -29,20 +29,22 @@ func Test_Regression(t *testing.T) {
 	r.SetVar(9, "SignatureEd25519")
 
 	r.Train(
-		regression.DataPoint(benchmarkOneIO(t)),
-		regression.DataPoint(benchmarkOneAccountOutputStaking(t)),
-		regression.DataPoint(benchmarkOneIMaxO(t)),
+		regression.DataPoint(maxInOneOut(t)),
+		regression.DataPoint(oneInOneOut(t)),
+		regression.DataPoint(oneInAccStakingRemOut(t)),
+		regression.DataPoint(oneInMaxOut(t)),
 	)
 	r.Run()
 }
 
-func benchmarkOneIO(t *testing.T) (float64, []float64) {
+func oneInOneOut(t *testing.T) (float64, []float64) {
 	blockchan := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 
 	// basic block with one input and one output
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
+			b.StopTimer()
 			ts := NewTestSuite(t)
 			node := ts.AddValidatorNode("node1")
 			ts.AddDefaultWallet(node)
@@ -79,13 +81,14 @@ func benchmarkOneIO(t *testing.T) (float64, []float64) {
 	return nsPerBlock, regressors
 }
 
-func benchmarkOneIMaxO(t *testing.T) (float64, []float64) {
+func oneInMaxOut(t *testing.T) (float64, []float64) {
 	blockchan := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 
 	// basic block with one input and one output
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
+			b.StopTimer()
 			ts := NewTestSuite(t)
 			node := ts.AddValidatorNode("node1")
 			ts.AddDefaultWallet(node)
@@ -122,13 +125,79 @@ func benchmarkOneIMaxO(t *testing.T) (float64, []float64) {
 	return nsPerBlock, regressors
 }
 
-func benchmarkOneAccountOutputStaking(t *testing.T) (float64, []float64) {
+func maxInOneOut(t *testing.T) (float64, []float64) {
+	blockchan := make(chan *blocks.Block, 1)
+	var block *iotago.Block
+
+	// basic block with one input and one output
+	fn := func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			ts := NewTestSuite(t)
+			node := ts.AddValidatorNode("node1")
+			ts.AddDefaultWallet(node)
+			ts.Run(true)
+			var addressIndexes []uint32
+			for i := 0; i < iotago.MaxInputsCount; i++ {
+				addressIndexes = append(addressIndexes, uint32(i))
+			}
+			// First, create 128 outputs
+			tx1 := ts.DefaultWallet().CreateBasicOutputsAtAddressesFromInput(
+				"tx1",
+				addressIndexes,
+				"Genesis:0",
+			)
+			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
+			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
+			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
+			block = block1.ProtocolBlock()
+			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
+			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+				blockchan <- block
+			})
+			node.Protocol.IssueBlock(modelBlock)
+			<-blockchan
+
+			inputNames := make([]string, iotago.MaxInputsCount)
+			for i := 0; i < iotago.MaxInputsCount; i++ {
+				inputNames[i] = fmt.Sprintf("tx1:%d", i)
+			}
+			// Then, create a transaction with 128 inputs
+			tx2 := ts.DefaultWallet().CreateBasicOutputFromInputs(
+				"tx2",
+				inputNames,
+				addressIndexes,
+			)
+			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
+			block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithSlotCommitment(genesisCommitment))
+			block = block2.ProtocolBlock()
+			modelBlock = lo.PanicOnErr(model.BlockFromBlock(block))
+			b.StartTimer()
+			// time from issuance of the block to when it is scheduled
+			node.Protocol.IssueBlock(modelBlock)
+			<-blockchan
+			b.StopTimer()
+			ts.Shutdown()
+		}
+	}
+	// get the ns/op of processing the block
+	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
+	fmt.Printf("Max inputs one output: %f ns/op\n", nsPerBlock)
+	// get the regressors
+	regressors := GetBlockWorkScoreRegressors(block)
+	printRegressors(regressors)
+
+	return nsPerBlock, regressors
+}
+
+func oneInAccStakingRemOut(t *testing.T) (float64, []float64) {
 	blockchan := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 
 	// basic block with one input, one account output with staking and a remainder
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
+			b.StopTimer()
 			ts := NewTestSuite(t)
 			node := ts.AddValidatorNode("node1")
 			ts.AddDefaultWallet(node)

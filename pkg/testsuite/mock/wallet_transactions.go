@@ -43,6 +43,7 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
@@ -89,6 +90,7 @@ func (w *Wallet) CreateDelegationFromInput(transactionName string, inputName str
 	// create the signed transaction
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
@@ -161,6 +163,7 @@ func (w *Wallet) DelayedClaimingTransition(transactionName string, inputName str
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
@@ -187,6 +190,7 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithAccountInput(input),
 		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
 			AccountID: accountOutput.AccountID,
@@ -218,6 +222,7 @@ func (w *Wallet) DestroyAccount(transactionName string, inputName string) *iotag
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
 			AccountID: inputAccount.AccountID,
 		}),
@@ -255,6 +260,7 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(iotago.Outputs[iotago.Output]{implicitAccountOutput, remainderBasicOutput}),
 	)
@@ -287,6 +293,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
 			AccountID: implicitAccountID,
 		}),
@@ -338,8 +345,92 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outp
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithInputs(utxoledger.Outputs{inputState}),
 		WithOutputs(outputStates),
+	)
+
+	return signedTransaction
+}
+
+func (w *Wallet) CreateBasicOutputsAtAddressesFromInput(transactionName string, addressIndexes []uint32, inputName string) *iotago.SignedTransaction {
+	outputCount := uint32(len(addressIndexes))
+	apiForSlot := w.Node.Protocol.Engines.Main.Get().APIForSlot(w.currentSlot)
+	manaDecayProvider := apiForSlot.ManaDecayProvider()
+	storageScoreStructure := apiForSlot.StorageScoreStructure()
+
+	inputState := w.Output(inputName)
+	inputAmount := inputState.BaseTokenAmount()
+
+	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{inputState.OutputID(): inputState.Output()}, vm.RewardsInputSet{}))
+
+	manaAmount := totalInputMana / iotago.Mana(outputCount)
+	remainderMana := totalInputMana
+
+	tokenAmount := inputAmount / iotago.BaseToken(outputCount)
+	remainderFunds := inputAmount
+
+	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
+	for _, i := range addressIndexes {
+		if i+1 == outputCount {
+			tokenAmount = remainderFunds
+			manaAmount = remainderMana
+		}
+		remainderFunds -= tokenAmount
+		remainderMana -= manaAmount
+
+		outputStates = append(outputStates, &iotago.BasicOutput{
+			Amount: tokenAmount,
+			Mana:   manaAmount,
+			UnlockConditions: iotago.BasicOutputUnlockConditions{
+				&iotago.AddressUnlockCondition{Address: w.Address(uint32(i))},
+			},
+			Features: iotago.BasicOutputFeatures{},
+		})
+	}
+
+	signedTransaction := w.createSignedTransactionWithOptions(
+		transactionName,
+		addressIndexes,
+		WithInputs(utxoledger.Outputs{inputState}),
+		WithOutputs(outputStates),
+	)
+
+	return signedTransaction
+}
+
+func (w *Wallet) CreateBasicOutputFromInputs(transactionName string, inputNames []string, addressIndexes []uint32) *iotago.SignedTransaction {
+	apiForSlot := w.Node.Protocol.Engines.Main.Get().APIForSlot(w.currentSlot)
+	manaDecayProvider := apiForSlot.ManaDecayProvider()
+	storageScoreStructure := apiForSlot.StorageScoreStructure()
+
+	inputStates := make([]*utxoledger.Output, 0, len(inputNames))
+	var totalInputMana iotago.Mana
+	var totalInputBaseToken iotago.BaseToken
+	for _, inputName := range inputNames {
+		inputState := w.Output(inputName)
+		inputStates = append(inputStates, inputState)
+		inputAmount := inputState.BaseTokenAmount()
+
+		totalInputMana += lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{inputState.OutputID(): inputState.Output()}, vm.RewardsInputSet{}))
+		totalInputBaseToken += inputAmount
+	}
+
+	outputState := make(iotago.Outputs[iotago.Output], 0)
+	outputState = append(outputState, &iotago.BasicOutput{
+		Amount: totalInputBaseToken,
+		Mana:   totalInputMana,
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: w.Address()},
+		},
+		Features: iotago.BasicOutputFeatures{},
+	})
+
+	signedTransaction := w.createSignedTransactionWithOptions(
+		transactionName,
+		addressIndexes,
+		WithInputs(inputStates),
+		WithOutputs(outputState),
 	)
 
 	return signedTransaction
@@ -357,6 +448,7 @@ func (w *Wallet) RemoveFeatureFromAccount(featureType iotago.FeatureType, transa
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithAccountInput(input),
 		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
 			AccountID: accountOutput.AccountID,
@@ -391,6 +483,7 @@ func (w *Wallet) SendFundsToAccount(transactionName string, accountID iotago.Acc
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithInputs(inputStates),
 		WithOutputs(iotago.Outputs[iotago.Output]{targetOutput}),
 	)
@@ -431,6 +524,7 @@ func (w *Wallet) SendFundsFromAccount(transactionName string, accountOutputName 
 	}}
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithInputs(inputStates),
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: commitmentID,
@@ -477,6 +571,7 @@ func (w *Wallet) ClaimValidatorRewards(transactionName string, inputName string)
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithAccountInput(input),
 		WithRewardInput(
 			&iotago.RewardInput{Index: 0},
@@ -526,6 +621,7 @@ func (w *Wallet) AllotManaFromInputs(transactionName string, allotments iotago.A
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithAllotments(allotments),
 		WithInputs(inputStates),
 		WithOutputs(outputStates),
@@ -580,6 +676,7 @@ func (w *Wallet) ClaimDelegatorRewards(transactionName string, inputName string)
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithInputs(utxoledger.Outputs{input}),
 		WithRewardInput(
 			&iotago.RewardInput{Index: 0},
@@ -609,6 +706,7 @@ func (w *Wallet) AllotManaToWallet(transactionName string, inputName string, rec
 
 	signedTransaction := w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithInputs(utxoledger.Outputs{input}),
 		WithAllotAllManaToAccount(w.currentSlot, recipientWallet.BlockIssuer.AccountID),
 	)
@@ -625,6 +723,7 @@ func (w *Wallet) CreateNFTFromInput(transactionName string, inputName string, op
 
 	return w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		WithInputs(utxoledger.Outputs{input}),
 		WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
 		WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID),
@@ -646,13 +745,14 @@ func (w *Wallet) TransitionNFTWithTransactionOpts(transactionName string, inputN
 
 	return w.createSignedTransactionWithOptions(
 		transactionName,
+		[]uint32{0},
 		append(opts, WithInputs(utxoledger.Outputs{input}),
 			WithOutputs(iotago.Outputs[iotago.Output]{nftOutput}),
 			WithAllotAllManaToAccount(w.currentSlot, w.BlockIssuer.AccountID))...,
 	)
 }
 
-func (w *Wallet) createSignedTransactionWithOptions(transactionName string, opts ...options.Option[builder.TransactionBuilder]) *iotago.SignedTransaction {
+func (w *Wallet) createSignedTransactionWithOptions(transactionName string, addressIndexes []uint32, opts ...options.Option[builder.TransactionBuilder]) *iotago.SignedTransaction {
 	currentAPI := w.Node.Protocol.CommittedAPI()
 
 	txBuilder := builder.NewTransactionBuilder(currentAPI)
@@ -664,15 +764,16 @@ func (w *Wallet) createSignedTransactionWithOptions(transactionName string, opts
 	randomPayload := tpkg.Rand12ByteArray()
 	txBuilder.AddTaggedDataPayload(&iotago.TaggedData{Tag: randomPayload[:], Data: randomPayload[:]})
 
-	signedTransaction := lo.PanicOnErr(options.Apply(txBuilder, opts).Build(w.AddressSigner()))
+	addressSigner := w.AddressSigner(addressIndexes...)
+	signedTransaction := lo.PanicOnErr(options.Apply(txBuilder, opts).Build(addressSigner))
 
 	// register the outputs in the wallet
-	w.registerOutputs(transactionName, signedTransaction.Transaction)
+	w.registerOutputs(transactionName, signedTransaction.Transaction, addressIndexes...)
 
 	return signedTransaction
 }
 
-func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Transaction) {
+func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Transaction, indexes ...uint32) {
 	currentAPI := w.Node.Protocol.CommittedAPI()
 	(lo.PanicOnErr(transaction.ID())).RegisterAlias(transactionName)
 	w.transactions[transactionName] = transaction
@@ -681,15 +782,18 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 		// register the output if it belongs to this wallet
 		addressUC := output.UnlockConditionSet().Address()
 		stateControllerUC := output.UnlockConditionSet().StateControllerAddress()
-		if addressUC != nil && (w.HasAddress(addressUC.Address) || addressUC.Address.Type() == iotago.AddressAccount && addressUC.Address.String() == w.BlockIssuer.AccountID.ToAddress().String()) || stateControllerUC != nil && w.HasAddress(stateControllerUC.Address) {
-			clonedOutput := output.Clone()
-			actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
-			if clonedOutput.Type() == iotago.OutputAccount {
-				if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID {
-					accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
+		for _, index := range indexes {
+			if addressUC != nil && (w.HasAddress(addressUC.Address, index) || addressUC.Address.Type() == iotago.AddressAccount && addressUC.Address.String() == w.BlockIssuer.AccountID.ToAddress().String()) || stateControllerUC != nil && w.HasAddress(stateControllerUC.Address, index) {
+				clonedOutput := output.Clone()
+				actualOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(transaction.ID()), outputID.Index())
+				if clonedOutput.Type() == iotago.OutputAccount {
+					if accountOutput, ok := clonedOutput.(*iotago.AccountOutput); ok && accountOutput.AccountID == iotago.EmptyAccountID {
+						accountOutput.AccountID = iotago.AccountIDFromOutputID(actualOutputID)
+					}
 				}
+				w.outputs[fmt.Sprintf("%s:%d", transactionName, outputID.Index())] = utxoledger.CreateOutput(w.Node.Protocol, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput, lo.PanicOnErr(iotago.OutputIDProofFromTransaction(transaction, outputID.Index())))
+				break
 			}
-			w.outputs[fmt.Sprintf("%s:%d", transactionName, outputID.Index())] = utxoledger.CreateOutput(w.Node.Protocol, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput, lo.PanicOnErr(iotago.OutputIDProofFromTransaction(transaction, outputID.Index())))
 		}
 	}
 }
