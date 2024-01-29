@@ -23,6 +23,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
+	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -72,7 +73,8 @@ type Account struct {
 type DockerTestFramework struct {
 	Testing *testing.T
 
-	nodes map[string]*Node
+	nodes     map[string]*Node
+	nodesLock syncutils.RWMutex
 
 	snapshotPath     string
 	logDirectoryPath string
@@ -129,7 +131,7 @@ func (d *DockerTestFramework) DockerComposeUp(detach ...bool) error {
 	}
 
 	cmd.Env = os.Environ()
-	for _, node := range d.nodes {
+	for _, node := range d.Nodes() {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("ISSUE_CANDIDACY_PAYLOAD_%s=%t", node.Name, node.IssueCandidacyPayload))
 	}
 
@@ -194,7 +196,11 @@ loop:
 }
 
 func (d *DockerTestFramework) waitForNodesAndGetClients() error {
-	for _, node := range d.Nodes() {
+	nodes := d.Nodes()
+
+	d.nodesLock.Lock()
+	defer d.nodesLock.Unlock()
+	for _, node := range nodes {
 		client, err := nodeclient.New(node.ClientURL)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to create node client for node %s", node.Name)
@@ -212,7 +218,7 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 	defer fmt.Println("Wait until the nodes are synced......done")
 
 	d.Eventually(func() error {
-		for _, node := range d.nodes {
+		for _, node := range d.Nodes() {
 			for {
 				synced, err := node.Client.Health(context.TODO())
 				if err != nil {
@@ -235,6 +241,9 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 }
 
 func (d *DockerTestFramework) AddValidatorNode(name string, containerName string, clientURL string, accAddrBech32 string, optIssueCandidacyPayload ...bool) {
+	d.nodesLock.Lock()
+	defer d.nodesLock.Unlock()
+
 	issueCandidacyPayload := true
 	if len(optIssueCandidacyPayload) > 0 {
 		issueCandidacyPayload = optIssueCandidacyPayload[0]
@@ -250,6 +259,9 @@ func (d *DockerTestFramework) AddValidatorNode(name string, containerName string
 }
 
 func (d *DockerTestFramework) AddNode(name string, containerName string, clientURL string) {
+	d.nodesLock.Lock()
+	defer d.nodesLock.Unlock()
+
 	d.nodes[name] = &Node{
 		Name:          name,
 		ContainerName: containerName,
@@ -258,6 +270,9 @@ func (d *DockerTestFramework) AddNode(name string, containerName string, clientU
 }
 
 func (d *DockerTestFramework) Nodes(names ...string) []*Node {
+	d.nodesLock.RLock()
+	defer d.nodesLock.RUnlock()
+
 	if len(names) == 0 {
 		nodes := make([]*Node, 0, len(d.nodes))
 		for _, node := range d.nodes {
@@ -276,6 +291,9 @@ func (d *DockerTestFramework) Nodes(names ...string) []*Node {
 }
 
 func (d *DockerTestFramework) Node(name string) *Node {
+	d.nodesLock.RLock()
+	defer d.nodesLock.RUnlock()
+
 	node, exist := d.nodes[name]
 	require.True(d.Testing, exist)
 
@@ -654,7 +672,7 @@ func (d *DockerTestFramework) AssertIndexerFoundry(foundryID iotago.FoundryID) {
 
 func (d *DockerTestFramework) AssertValidatorExists(accountAddr *iotago.AccountAddress) {
 	d.Eventually(func() error {
-		for _, node := range d.nodes {
+		for _, node := range d.Nodes() {
 			_, err := node.Client.StakingAccount(context.TODO(), accountAddr)
 			if err != nil {
 				return err
@@ -682,7 +700,7 @@ func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, e
 	time.Sleep(secToWait)
 
 	d.Eventually(func() error {
-		for _, node := range d.nodes {
+		for _, node := range d.Nodes() {
 			resp, err := node.Client.Committee(context.TODO())
 			if err != nil {
 				return err
@@ -708,7 +726,7 @@ func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, e
 }
 
 func (d *DockerTestFramework) AssertFinalizedSlot(condition func(iotago.SlotIndex) error) {
-	for _, node := range d.nodes {
+	for _, node := range d.Nodes() {
 		status := d.NodeStatus(node.Name)
 
 		err := condition(status.LatestFinalizedSlot)
@@ -769,7 +787,11 @@ func (d *DockerTestFramework) DumpContainerLogsToFiles() {
 
 func (d *DockerTestFramework) GetContainersConfigs() {
 	// get container configs
-	for _, node := range d.Nodes() {
+	nodes := d.Nodes()
+
+	d.nodesLock.Lock()
+	defer d.nodesLock.Unlock()
+	for _, node := range nodes {
 		cmd := fmt.Sprintf("docker inspect --format='{{.Config.Cmd}}' %s", node.ContainerName)
 		containerConfigsBytes, err := exec.Command("bash", "-c", cmd).Output()
 		require.NoError(d.Testing, err)
