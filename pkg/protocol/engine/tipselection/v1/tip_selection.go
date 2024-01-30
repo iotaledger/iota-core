@@ -125,6 +125,8 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 
 				previousLikedInsteadConflicts = updatedLikedInsteadConflicts
 			}
+		}, func() int {
+			return len(references[iotago.StrongParentType])
 		},
 			// We select one validation tip as a strong parent. This is a security step to ensure that the tangle maintains
 			// acceptance by stitching together validation blocks.
@@ -140,6 +142,8 @@ func (t *TipSelection) SelectTips(amount int) (references model.ParentReferences
 			} else if !shallowLikesParents.Has(tip.ID()) {
 				references[iotago.WeakParentType] = append(references[iotago.WeakParentType], tip.ID())
 			}
+		}, func() int {
+			return len(references[iotago.WeakParentType])
 		}, types.NewTuple[func(optAmount ...int) []tipmanager.TipMetadata, int](t.tipManager.WeakTips, t.optMaxWeakReferences))
 
 		return nil
@@ -216,17 +220,17 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.Trans
 
 // collectReferences collects tips from a tip selector (and calls the callback for each tip) until the number of
 // references of the given type is reached.
-func (t *TipSelection) collectReferences(callback func(tipmanager.TipMetadata), tipSelectorsAmount ...*types.Tuple[func(optAmount ...int) []tipmanager.TipMetadata, int]) {
+func (t *TipSelection) collectReferences(callback func(tipmanager.TipMetadata), referencesCountCallback func() int, tipSelectorsAmount ...*types.Tuple[func(optAmount ...int) []tipmanager.TipMetadata, int]) {
 	seenTips := ds.NewSet[iotago.BlockID]()
 
 	// selectUniqueTips selects 'amount' unique tips from the given tip selector.
-	selectUniqueTips := func(tipSelector func(optAmount ...int) []tipmanager.TipMetadata, amount int) (uniqueTips []tipmanager.TipMetadata) {
-		if amount > 0 {
-			for _, tip := range tipSelector(amount + seenTips.Size()) {
+	selectUniqueTips := func(tipSelector func(optAmount ...int) []tipmanager.TipMetadata, currentReferencesCount int, targetAmount int) (uniqueTips []tipmanager.TipMetadata) {
+		if targetAmount > 0 {
+			for _, tip := range tipSelector(targetAmount + seenTips.Size()) {
 				if seenTips.Add(tip.ID()) {
 					uniqueTips = append(uniqueTips, tip)
 
-					if len(uniqueTips) == amount {
+					if currentReferencesCount+len(uniqueTips) == targetAmount {
 						break
 					}
 				}
@@ -243,10 +247,22 @@ func (t *TipSelection) collectReferences(callback func(tipmanager.TipMetadata), 
 		// because of how selectUniqueTips works.
 		accumulatedTipAmount += tipSelectorAmount.B
 
-		for tipCandidates := selectUniqueTips(tipSelectorAmount.A, accumulatedTipAmount); len(tipCandidates) != 0; tipCandidates = selectUniqueTips(tipSelectorAmount.A, accumulatedTipAmount) {
+		tipCandidates := selectUniqueTips(tipSelectorAmount.A, referencesCountCallback(), accumulatedTipAmount)
+
+		// We exit the loop in two cases:
+		// 1. When we've seen all the tips and there are no more unique tips to process (len(tipCandidates) != 0).
+		// 2. When we've successfully selected the desired number of tips and added them to the references (referencesCountCallback() >= accumulatedTipAmount).
+		for len(tipCandidates) != 0 {
 			for _, tip := range tipCandidates {
 				callback(tip)
 			}
+
+			referencesCount := referencesCountCallback()
+			if referencesCount >= accumulatedTipAmount {
+				break
+			}
+
+			tipCandidates = selectUniqueTips(tipSelectorAmount.A, referencesCount, accumulatedTipAmount)
 		}
 	}
 }
