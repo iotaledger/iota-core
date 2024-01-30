@@ -214,7 +214,7 @@ func (t *TipSelection) likedInsteadReferences(likedConflicts ds.Set[iotago.Trans
 	return references, updatedLikedConflicts, nil
 }
 
-// collectReferences collects tips from a tip selector (and calls the callback for each tip) until the amount of
+// collectReferences collects tips from a tip selector (and calls the callback for each tip) until the number of
 // references of the given type is reached.
 func (t *TipSelection) collectReferences(callback func(tipmanager.TipMetadata), tipSelectorsAmount ...*types.Tuple[func(optAmount ...int) []tipmanager.TipMetadata, int]) {
 	seenTips := ds.NewSet[iotago.BlockID]()
@@ -236,9 +236,14 @@ func (t *TipSelection) collectReferences(callback func(tipmanager.TipMetadata), 
 		return uniqueTips
 	}
 
-	// We select the desired amount of tips from all given tip selectors, respectively.
+	accumulatedTipAmount := 0
+	// We select the desired number of tips from all given tip selectors, respectively.
 	for _, tipSelectorAmount := range tipSelectorsAmount {
-		for tipCandidates := selectUniqueTips(tipSelectorAmount.A, tipSelectorAmount.B); len(tipCandidates) != 0; tipCandidates = selectUniqueTips(tipSelectorAmount.A, tipSelectorAmount.B) {
+		// Make sure we select the total number of unique tips and not just the number of tips from the given tip pool,
+		// because of how selectUniqueTips works.
+		accumulatedTipAmount += tipSelectorAmount.B
+
+		for tipCandidates := selectUniqueTips(tipSelectorAmount.A, accumulatedTipAmount); len(tipCandidates) != 0; tipCandidates = selectUniqueTips(tipSelectorAmount.A, accumulatedTipAmount) {
 			for _, tip := range tipCandidates {
 				callback(tip)
 			}
