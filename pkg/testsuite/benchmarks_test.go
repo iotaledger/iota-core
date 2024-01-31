@@ -857,8 +857,6 @@ func GetBlockWorkScoreRegressors(block *iotago.Block) []float64 {
 	}
 	// add one to Allotments regressor for each allotment
 	regressors[8] += float64(len(signedTx.Transaction.TransactionEssence.Allotments))
-	// all blocks have an Ed25519 signature, so the SignatureEd25519 regressor is at least 1
-	regressors[9] = 1
 	for _, unlock := range signedTx.Unlocks {
 		if unlock.Type() == iotago.UnlockSignature {
 			// add one to the SignatureEd25519 regressor for each unlock block
