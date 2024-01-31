@@ -1,10 +1,12 @@
 package account
 
 import (
+	"bytes"
 	"io"
-	"sync/atomic"
+	"sort"
 
 	"github.com/iotaledger/hive.go/core/safemath"
+	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -19,7 +21,6 @@ type Accounts struct {
 
 	totalStake          iotago.BaseToken
 	totalValidatorStake iotago.BaseToken
-	reused              atomic.Bool
 
 	mutex syncutils.RWMutex
 }
@@ -50,14 +51,6 @@ func (a *Accounts) IDs() []iotago.AccountID {
 	})
 
 	return ids
-}
-
-func (a *Accounts) IsReused() bool {
-	return a.reused.Load()
-}
-
-func (a *Accounts) SetReused() {
-	a.reused.Store(true)
 }
 
 // Get returns the weight of the given identity.
@@ -125,9 +118,54 @@ func (a *Accounts) ForEach(callback func(id iotago.AccountID, pool *Pool) bool) 
 	a.accountPools.ForEach(callback)
 }
 
-// SeatedAccounts creates a new SeatedAccounts instance, that maintains the seats of the given members.
-func (a *Accounts) SeatedAccounts(members ...iotago.AccountID) *SeatedAccounts {
-	return NewSeatedAccounts(a, members...)
+// SeatedAccounts creates a new SeatedAccounts instance,
+// that maintains the seat indices of re-elected members from the previous committee, if provided.
+func (a *Accounts) SeatedAccounts(optPrevCommittee ...*SeatedAccounts) *SeatedAccounts {
+	// If optPrevCommittee not given, use empty SeatedAccounts instance as default to skip the behavior to handle re-elected members.
+	prevCommittee := NewSeatedAccounts(NewAccounts())
+	if len(optPrevCommittee) > 0 {
+		prevCommittee = optPrevCommittee[0]
+	}
+
+	newCommittee := NewSeatedAccounts(a)
+
+	// If previous committee exists the seats need to be assigned and re-elected committee members must retain their SeatIndex.
+	// Keep track of re-elected members' seat indices.
+	takenSeatIndices := ds.NewSet[SeatIndex]()
+
+	// Assign re-elected members' SeatIndex.
+	a.ForEach(func(id iotago.AccountID, _ *Pool) bool {
+		if seatIndex, seatExists := prevCommittee.GetSeat(id); seatExists {
+			newCommittee.Set(seatIndex, id)
+			takenSeatIndices.Add(seatIndex)
+		}
+
+		return true
+	})
+
+	// Sort members lexicographically.
+	committeeAccountIDs := a.IDs()
+	sort.Slice(committeeAccountIDs, func(i int, j int) bool {
+		return bytes.Compare(committeeAccountIDs[i][:], committeeAccountIDs[j][:]) < 0
+	})
+
+	// Assign SeatIndex to new committee members.
+	currentSeatIndex := SeatIndex(0)
+	for _, memberID := range committeeAccountIDs {
+		// If SeatIndex is taken by re-elected member, then increment it.
+		for takenSeatIndices.Has(currentSeatIndex) {
+			currentSeatIndex++
+		}
+
+		// Assign SeatIndex of a fresh committee member.
+		if _, seatExists := prevCommittee.GetSeat(memberID); !seatExists {
+			newCommittee.Set(currentSeatIndex, memberID)
+
+			currentSeatIndex++
+		}
+	}
+
+	return newCommittee
 }
 
 func AccountsFromBytes(b []byte) (*Accounts, int, error) {
@@ -164,13 +202,6 @@ func AccountsFromReader(reader io.Reader) (*Accounts, error) {
 		return nil, ierrors.Wrap(err, "failed to read account data")
 	}
 
-	reused, err := stream.Read[bool](reader)
-	if err != nil {
-		return nil, ierrors.Wrap(err, "failed to read reused flag")
-	}
-
-	a.reused.Store(reused)
-
 	return a, nil
 }
 
@@ -200,10 +231,6 @@ func (a *Accounts) Bytes() ([]byte, error) {
 		return a.accountPools.Size(), nil
 	}); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write accounts")
-	}
-
-	if err := stream.Write(byteBuffer, a.reused.Load()); err != nil {
-		return nil, ierrors.Wrap(err, "failed to write reused flag")
 	}
 
 	return byteBuffer.Bytes()

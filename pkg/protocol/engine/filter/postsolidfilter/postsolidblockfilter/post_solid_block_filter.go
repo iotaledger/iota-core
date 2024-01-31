@@ -10,6 +10,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/hexutil"
 )
 
 type PostSolidBlockFilter struct {
@@ -163,7 +164,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 				if !accountData.BlockIssuerKeys.Has(expectedBlockIssuerKey) {
 					c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
 						Block:  block,
-						Reason: ierrors.Wrapf(iotago.ErrInvalidSignature, "block issuer account %s does not have block issuer key corresponding to public key %s in slot %d", block.ProtocolBlock().Header.IssuerID, signature.PublicKey, block.ProtocolBlock().Header.SlotCommitmentID.Index()),
+						Reason: ierrors.Wrapf(iotago.ErrInvalidSignature, "block issuer account %s does not have block issuer key corresponding to public key %s in slot %d", block.ProtocolBlock().Header.IssuerID, hexutil.EncodeHex(signature.PublicKey[:]), block.ProtocolBlock().Header.SlotCommitmentID.Index()),
 					})
 
 					return

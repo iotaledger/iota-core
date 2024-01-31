@@ -461,6 +461,9 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 func (m *MemPool[VoteRank]) setup() {
 	m.spendDAG.Events().SpenderAccepted.Hook(func(id iotago.TransactionID) {
 		if transaction, exists := m.cachedTransactions.Get(id); exists {
+			m.evictionMutex.RLock()
+			defer m.evictionMutex.RUnlock()
+
 			transaction.setConflictAccepted()
 		}
 	})
