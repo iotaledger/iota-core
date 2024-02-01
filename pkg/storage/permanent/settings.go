@@ -251,6 +251,8 @@ func (s *Settings) SetSnapshotImported() (err error) {
 	return s.storeSnapshotImported.Set(true)
 }
 
+// LatestCommitment returns the last created commitment.
+// This method should not be called often as it reads data from the underlying KVStore. For frequent access, use SyncManager.
 func (s *Settings) LatestCommitment() *model.Commitment {
 	return s.latestCommitment()
 }
@@ -283,6 +285,8 @@ func (s *Settings) SetLatestFinalizedSlot(slot iotago.SlotIndex) (err error) {
 	return s.storeLatestFinalizedSlot.Set(slot)
 }
 
+// LatestFinalizedSlot returns the last finalized slot.
+// This method should not be called often as it reads data from the underlying KVStore. For frequent access, use SyncManager.
 func (s *Settings) LatestFinalizedSlot() iotago.SlotIndex {
 	latestFinalizedSlot, err := s.storeLatestFinalizedSlot.Get()
 	if err != nil {

@@ -337,7 +337,6 @@ func TestAnchorOutputSerialization(t *testing.T) {
 	stateController := iotago_tpkg.RandAnchorID()
 	governor := iotago_tpkg.RandAddress(iotago.AddressEd25519).(*iotago.Ed25519Address)
 	issuer := iotago_tpkg.RandNFTID()
-	sender := iotago_tpkg.RandAnchorID()
 	amount := iotago_tpkg.RandBaseToken(iotago.MaxBaseToken)
 	index := iotago_tpkg.RandSlot()
 
@@ -353,8 +352,10 @@ func TestAnchorOutputSerialization(t *testing.T) {
 			},
 		},
 		Features: iotago.AnchorOutputFeatures{
-			&iotago.SenderFeature{
-				Address: sender.ToAddress(),
+			&iotago.StateMetadataFeature{
+				Entries: iotago.StateMetadataFeatureEntries{
+					"test": []byte("value"),
+				},
 			},
 		},
 		ImmutableFeatures: iotago.AnchorOutputImmFeatures{

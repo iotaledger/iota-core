@@ -111,6 +111,8 @@ func Test_TopStakersRotation(t *testing.T) {
 			ts.Node("node4").Validator.AccountID,
 			ts.Node("node5").Validator.AccountID,
 		}, ts.Nodes()...)
+
+		ts.AssertReelectedCommitteeSeatIndices(0, 1, ts.Nodes()...)
 	}
 
 	// Do not announce new candidacies for epoch 2 but finalize slots. The committee should be the reused.
@@ -125,6 +127,8 @@ func Test_TopStakersRotation(t *testing.T) {
 			ts.Node("node4").Validator.AccountID,
 			ts.Node("node5").Validator.AccountID,
 		}, ts.Nodes()...)
+
+		ts.AssertReelectedCommitteeSeatIndices(1, 2, ts.Nodes()...)
 	}
 
 	// Do not finalize slots in time for epoch 3. The committee should be the reused. Even though there are candidates.
@@ -149,9 +153,12 @@ func Test_TopStakersRotation(t *testing.T) {
 			ts.Node("node4").Validator.AccountID,
 			ts.Node("node5").Validator.AccountID,
 		}, ts.Nodes()...)
+
+		ts.AssertReelectedCommitteeSeatIndices(2, 3, ts.Nodes()...)
 	}
 
 	// Rotate committee to smaller committee due to too few candidates available.
+	// node3 - SeatIndex(0) as it's the only one
 	{
 		ts.IssueBlocksAtSlots("wave-8:", []iotago.SlotIndex{46, 47, 48, 49, 50, 51, 52, 53, 54, 55}, 4, "wave-7:45.3", ts.Nodes(), true, false)
 
@@ -168,5 +175,51 @@ func Test_TopStakersRotation(t *testing.T) {
 		ts.AssertSybilProtectionCommittee(4, []iotago.AccountID{
 			ts.Node("node3").Validator.AccountID,
 		}, ts.Nodes()...)
+		ts.AssertReelectedCommitteeSeatIndices(3, 4, ts.Nodes()...)
+	}
+
+	// Rotate committee to bigger committee.
+	// node3 - SeatIndex(0) - seat should be retained
+	// node5 - SeatIndex(1)
+	{
+		ts.IssueBlocksAtSlots("wave-9:", []iotago.SlotIndex{62, 63, 64, 65, 66, 67, 68, 69, 70}, 4, "wave-8:61.3", ts.Nodes(), true, false)
+
+		ts.IssueCandidacyAnnouncementInSlot("node3-candidacy:3", 71, "wave-9:70.3", ts.Wallet("node3"))
+		ts.IssueCandidacyAnnouncementInSlot("node5-candidacy:3", 71, "node3-candidacy:3", ts.Wallet("node5"))
+
+		ts.IssueBlocksAtSlots("wave-9:", []iotago.SlotIndex{71, 72, 73, 74, 75, 76, 77, 78, 80}, 4, "node5-candidacy:3", ts.Nodes(), true, false)
+
+		ts.AssertLatestCommitmentSlotIndex(78, ts.Nodes()...)
+		ts.AssertLatestFinalizedSlot(76, ts.Nodes()...)
+		// We finalized at epochEnd-epochNearingThreshold, so the committee should be rotated even if there is just one candidate.
+		ts.AssertSybilProtectionCandidates(4, []iotago.AccountID{
+			ts.Node("node3").Validator.AccountID,
+			ts.Node("node5").Validator.AccountID,
+		}, ts.Nodes()...)
+		ts.AssertSybilProtectionCommittee(5, []iotago.AccountID{
+			ts.Node("node3").Validator.AccountID,
+			ts.Node("node5").Validator.AccountID,
+		}, ts.Nodes()...)
+		ts.AssertReelectedCommitteeSeatIndices(4, 5, ts.Nodes()...)
+	}
+
+	// Rotate committee to smaller committee, where the committee member is re-selected to make sure that the SeatIndex is retained.
+	// Node5 - SeatIndex(1) - it's the only committee member and needs to retain its seat index.
+	{
+		ts.IssueBlocksAtSlots("wave-10:", []iotago.SlotIndex{81, 82, 83, 84, 85, 86, 87}, 4, "wave-9:80.3", ts.Nodes(), true, false)
+
+		ts.IssueCandidacyAnnouncementInSlot("node5-candidacy:4", 88, "wave-10:87.3", ts.Wallet("node5"))
+
+		ts.IssueBlocksAtSlots("wave-10:", []iotago.SlotIndex{88, 89, 90, 91, 92, 93, 94}, 4, "node5-candidacy:4", ts.Nodes(), true, false)
+		ts.AssertLatestCommitmentSlotIndex(92, ts.Nodes()...)
+		ts.AssertLatestFinalizedSlot(91, ts.Nodes()...)
+		// We finalized at epochEnd-epochNearingThreshold, so the committee should be rotated even if there is just one candidate.
+		ts.AssertSybilProtectionCandidates(5, []iotago.AccountID{
+			ts.Node("node5").Validator.AccountID,
+		}, ts.Nodes()...)
+		ts.AssertSybilProtectionCommittee(6, []iotago.AccountID{
+			ts.Node("node5").Validator.AccountID,
+		}, ts.Nodes()...)
+		ts.AssertReelectedCommitteeSeatIndices(5, 6, ts.Nodes()...)
 	}
 }

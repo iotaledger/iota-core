@@ -53,6 +53,5 @@ func info() *api.InfoResponse {
 			Subunit:      deps.BaseToken.Subunit,
 			Decimals:     deps.BaseToken.Decimals,
 		},
-		Features: features,
 	}
 }

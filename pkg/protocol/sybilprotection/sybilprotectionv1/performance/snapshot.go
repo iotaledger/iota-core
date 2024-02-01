@@ -184,9 +184,27 @@ func (t *Tracker) importCommittees(reader io.ReadSeeker) error {
 			return ierrors.Wrap(err, "unable to read epoch index")
 		}
 
-		committee, err := account.AccountsFromReader(reader)
+		// A snapshot contains only the list of committee members.
+		// The committee for each epoch gets SeatIndices assigned.
+		// When the node is running, and a committee member is re-elected,
+		// the SeatIndex must be maintained across the two epochs
+		// to prevent a single Account from incorrectly inflating the number of active
+		// seats in the committee - active on seat X from the previous epoch, and on seat Y in the new epoch.
+		// However, when loading past committees from the snapshot, this SeatIndex continuity is not necessary, that's why
+		// SeatIndices are assigned for each epoch individually, without looking at committees from other epochs.
+		committeeAccounts, err := account.AccountsFromReader(reader)
 		if err != nil {
 			return ierrors.Wrapf(err, "unable to read committee for the epoch %d", epoch)
+		}
+
+		isReused, err := stream.Read[bool](reader)
+		if err != nil {
+			return ierrors.Wrapf(err, "unable to read reused flag for the epoch %d", epoch)
+		}
+
+		committee := committeeAccounts.SeatedAccounts()
+		if isReused {
+			committee.SetReused()
 		}
 
 		if err = t.committeeStore.Store(epoch, committee); err != nil {
@@ -360,29 +378,46 @@ func (t *Tracker) exportCommittees(writer io.WriteSeeker, targetSlot iotago.Slot
 		if err := t.committeeStore.StreamBytes(func(epochBytes []byte, committeeBytes []byte) error {
 			epoch, _, err := iotago.EpochIndexFromBytes(epochBytes)
 			if err != nil {
-				return err
+				return ierrors.Wrapf(err, "failed to parse epoch bytes")
+			}
+
+			committee, _, err := account.SeatedAccountsFromBytes(committeeBytes)
+			if err != nil {
+				return ierrors.Wrapf(err, "failed to parse committee bytes for epoch %d", epoch)
 			}
 
 			// We have a committee for an epoch higher than the targetSlot
-			// 1. we trust the point of no return, we export the committee for the next epoch
-			// 2. if we don't trust the point-of-no-return
+			// 1. We trust the point of no return, we export the committee for the next epoch
+			// 2. If we don't trust the point-of-no-return
 			// - we were able to rotate a committee, then we export it
 			// - we were not able to rotate a committee (reused), then we don't export it
-			if epoch > epochFromTargetSlot && targetSlot < pointOfNoReturn {
-				committee, _, err := account.AccountsFromBytes(committeeBytes)
-				if err != nil {
-					return ierrors.Wrapf(err, "failed to parse committee bytes for epoch %d", epoch)
-				}
-				if committee.IsReused() {
-					return nil
-				}
+			if epoch > epochFromTargetSlot && targetSlot < pointOfNoReturn && committee.IsReused() {
+				return nil
+			}
+
+			// Save only the list of committee accounts in the snapshot, so that snapshots generated on different nodes
+			// that assigned SeatIndices differently can still be compared and generate equal hashes.
+			// When reading the snapshot,
+			// nodes will assign SeatIndex to each committee member individually
+			// as this perception is completely subjective.
+			committeeAccounts, err := committee.Accounts()
+			if err != nil {
+				return ierrors.Wrapf(err, "failed to extract accounts from committee for epoch %d", epoch)
+			}
+
+			committeeAccountsBytes, err := committeeAccounts.Bytes()
+			if err != nil {
+				return ierrors.Wrapf(err, "failed to serialize committee accounts for epoch %d", epoch)
 			}
 
 			if err := stream.WriteBytes(writer, epochBytes); err != nil {
 				return ierrors.Wrapf(err, "unable to write epoch index %d", epoch)
 			}
-			if err := stream.WriteBytes(writer, committeeBytes); err != nil {
+			if err := stream.WriteBytes(writer, committeeAccountsBytes); err != nil {
 				return ierrors.Wrapf(err, "unable to write committee for epoch %d", epoch)
+			}
+			if err := stream.Write[bool](writer, committee.IsReused()); err != nil {
+				return ierrors.Wrapf(err, "unable to write reused flag for epoch %d", epoch)
 			}
 
 			epochCount++
