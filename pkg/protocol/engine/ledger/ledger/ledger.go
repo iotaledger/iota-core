@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/iotaledger/hive.go/core/safemath"
@@ -204,6 +205,8 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 		tx.Commit()
 		return true
 	})
+
+	fmt.Println(">> committing slot", slot, "stateDiff.ExecutedTransactions().Size(): ", stateDiff.ExecutedTransactions().Size(), "stateDiff.Mutations.Size()", stateDiff.Mutations().Size())
 
 	return l.utxoLedger.StateTreeRoot(), stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), outputs, spenders, nil
 }

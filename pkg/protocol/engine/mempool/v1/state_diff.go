@@ -1,6 +1,8 @@
 package mempoolv1
 
 import (
+	"fmt"
+
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ds/orderedmap"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
@@ -124,6 +126,9 @@ func (s *StateDiff) Reset() error {
 			return ierrors.Wrapf(err, "failed to delete transaction with %s from state diff", transactionID)
 		}
 	}
+	// TODO: maybe s.mutations.Commit() is missing?
+
+	fmt.Println(">> StateDiff.Reset()", s.slot, "deleted txs from mutations", len(transactionIDs))
 
 	return nil
 }

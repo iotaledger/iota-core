@@ -150,7 +150,7 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsByS
 			}
 
 			if !iotago.VerifyProof(mutationProof, acceptedTransactionIDs.Root(), commitment.RootsID()) {
-				w.LogError("failed to verify mutations proof", "commitment", commitment.LogName(), "transactionIDs", transactionIDs, "proof", mutationProof, "fromPeer", from)
+				w.LogError("failed to verify mutations proof", "commitment", commitment.ID(), commitment.Commitment.Commitment().String(), "acceptedTransactionIDsRoot", acceptedTransactionIDs.Root(), "transactionIDs len()", len(transactionIDs), "proof", mutationProof, "fromPeer", from)
 
 				return blocksToWarpSync
 			}

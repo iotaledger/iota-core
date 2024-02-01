@@ -1,6 +1,7 @@
 package slotnotarization
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/iotaledger/hive.go/ierrors"
@@ -279,6 +280,8 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 	if err = m.storage.Commitments().Store(newModelCommitment); err != nil {
 		return nil, ierrors.Wrapf(err, "failed to store latest commitment %s", newModelCommitment.ID())
 	}
+
+	fmt.Println("SlotCommitted", newCommitment.MustID(), newCommitment, "mutationRoot", mutationRoot)
 
 	m.events.SlotCommitted.Trigger(&notarization.SlotCommittedDetails{
 		Commitment:            newModelCommitment,
