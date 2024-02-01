@@ -211,7 +211,7 @@ func (s *Scheduler) ReadyBlocksCount() int {
 	return s.basicBuffer.ReadyBlocksCount()
 }
 
-func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*blocks.Block) bool {
+func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, workScores ...iotago.WorkScore) bool {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
@@ -220,14 +220,18 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 		return true
 	}
 	work := iotago.WorkScore(0)
-	// if no specific block(s) is provided, assume max block size
-	currentAPI := s.apiProvider.CommittedAPI()
-	if len(blocks) == 0 {
-		work = currentAPI.MaxBlockWork()
+	for _, workScore := range workScores {
+		work += workScore
 	}
-	for _, block := range blocks {
-		work += block.WorkScore()
+
+	// if no specific work score is provided, assume max block work score.
+	if work == 0 {
+		currentAPI := s.apiProvider.CommittedAPI()
+		if len(workScores) == 0 {
+			work = currentAPI.MaxBlockWork()
+		}
 	}
+
 	deficit, exists := s.deficits.Get(accountID)
 	if !exists {
 		return false
