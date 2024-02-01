@@ -309,48 +309,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 	return signedTransaction
 }
 
-func (w *Wallet) CreateFoundryFromInput(transactionName string, inputName string, accountName string) *iotago.SignedTransaction {
-	inputState := w.Output(inputName)
-	inputAccountState := w.AccountOutput(accountName)
-	inputAccount := inputAccountState.Output().(*iotago.AccountOutput)
-	accountAddr := inputAccount.AccountID.ToAddress().(*iotago.AccountAddress)
-	serialNumber := inputAccount.FoundryCounter + 1
-
-	tokenScheme := &iotago.SimpleTokenScheme{
-		MintedTokens:  big.NewInt(100),
-		MeltedTokens:  big.NewInt(0),
-		MaximumSupply: big.NewInt(1000),
-	}
-	nativeTokenFeature := &iotago.NativeTokenFeature{
-		ID:     lo.PanicOnErr(iotago.FoundryIDFromAddressAndSerialNumberAndTokenScheme(accountAddr, serialNumber, iotago.TokenSchemeSimple)),
-		Amount: big.NewInt(100),
-	}
-
-	foundryOutput := builder.NewFoundryOutputBuilder(accountAddr, inputState.BaseTokenAmount(), serialNumber, tokenScheme).
-		NativeToken(nativeTokenFeature).
-		MustBuild()
-
-	outputAccount := builder.NewAccountOutputBuilderFromPrevious(inputAccount).
-		FoundriesToGenerate(1).
-		MustBuild()
-
-	signedTransaction := w.createSignedTransactionWithOptions(
-		transactionName,
-		[]uint32{0},
-		WithInputs(utxoledger.Outputs{inputState, inputAccountState}),
-		WithOutputs(iotago.Outputs[iotago.Output]{foundryOutput, outputAccount}),
-		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
-			AccountID: outputAccount.AccountID,
-		}),
-		WithCommitmentInput(&iotago.CommitmentInput{
-			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
-		}),
-	)
-
-	return signedTransaction
-}
-
-func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, inputName string, accountName string, addressIndexes []uint32) *iotago.SignedTransaction {
+func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, inputName string, accountName string, addressIndexes ...uint32) *iotago.SignedTransaction {
 	nNativeTokens := len(addressIndexes)
 	if nNativeTokens > iotago.MaxOutputsCount-2 {
 		panic("too many address indexes provided")
@@ -583,7 +542,7 @@ func (w *Wallet) CreateBasicOutputsAtAddressesFromInput(transactionName string, 
 	return signedTransaction
 }
 
-func (w *Wallet) CreateBasicOutputFromInputs(transactionName string, inputNames []string, inputAddressIndexes []uint32) *iotago.SignedTransaction {
+func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, inputNames []string, inputAddressIndexes []uint32, outputsCount int) *iotago.SignedTransaction {
 	apiForSlot := w.Node.Protocol.Engines.Main.Get().APIForSlot(w.currentSlot)
 	manaDecayProvider := apiForSlot.ManaDecayProvider()
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
@@ -600,47 +559,22 @@ func (w *Wallet) CreateBasicOutputFromInputs(transactionName string, inputNames 
 		totalInputBaseToken += inputAmount
 	}
 
-	outputState := make(iotago.Outputs[iotago.Output], 0)
-	outputState = append(outputState, &iotago.BasicOutput{
-		Amount: totalInputBaseToken,
-		Mana:   totalInputMana,
-		UnlockConditions: iotago.BasicOutputUnlockConditions{
-			&iotago.AddressUnlockCondition{Address: w.Address()},
-		},
-		Features: iotago.BasicOutputFeatures{},
-	})
+	outputStates := make(iotago.Outputs[iotago.Output], 0, outputsCount)
+	outputAmount := totalInputBaseToken / iotago.BaseToken(outputsCount)
+	remainderAmount := totalInputBaseToken % iotago.BaseToken(outputsCount)
+	outputMana := totalInputMana / iotago.Mana(outputsCount)
+	remainderMana := totalInputMana % iotago.Mana(outputsCount)
 
-	signedTransaction := w.createSignedTransactionWithOptions(
-		transactionName,
-		inputAddressIndexes,
-		WithInputs(inputStates),
-		WithOutputs(outputState),
-	)
-
-	return signedTransaction
-}
-
-func (w *Wallet) CreateBasicOutputsFromInputs(transactionName string, inputNames []string, inputAddressIndexes []uint32) *iotago.SignedTransaction {
-	if len(inputNames) != len(inputAddressIndexes) {
-		panic("inputNames and addressIndexes must have the same length")
-	}
-	apiForSlot := w.Node.Protocol.Engines.Main.Get().APIForSlot(w.currentSlot)
-	manaDecayProvider := apiForSlot.ManaDecayProvider()
-	storageScoreStructure := apiForSlot.StorageScoreStructure()
-
-	inputStates := make([]*utxoledger.Output, 0, len(inputNames))
-	outputStates := make(iotago.Outputs[iotago.Output], 0, len(inputNames))
-	for i, inputName := range inputNames {
-		inputState := w.Output(inputName)
-		inputStates = append(inputStates, inputState)
-		inputAmount := inputState.BaseTokenAmount()
-		manaAmount := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{inputState.OutputID(): inputState.Output()}, vm.RewardsInputSet{}))
-
+	for i := 0; i < outputsCount; i++ {
+		if i+1 == outputsCount {
+			outputAmount = outputAmount + remainderAmount
+			outputMana = outputMana + remainderMana
+		}
 		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount: inputAmount,
-			Mana:   manaAmount,
+			Amount: outputAmount,
+			Mana:   outputMana,
 			UnlockConditions: iotago.BasicOutputUnlockConditions{
-				&iotago.AddressUnlockCondition{Address: w.Address(uint32(inputAddressIndexes[i]))},
+				&iotago.AddressUnlockCondition{Address: w.Address()},
 			},
 			Features: iotago.BasicOutputFeatures{},
 		})
