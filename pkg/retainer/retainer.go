@@ -3,7 +3,6 @@ package retainer
 import (
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -15,8 +14,7 @@ type Retainer interface {
 	RegisteredValidatorsCache(uint32) ([]*api.ValidatorResponse, bool)
 	RetainRegisteredValidatorsCache(uint32, []*api.ValidatorResponse)
 
-	RetainBlockFailure(*blocks.Block, api.BlockFailureReason)
-	RetainModelBlockFailure(*model.Block, api.BlockFailureReason)
+	RetainBlockFailure(*model.Block, api.BlockFailureReason)
 	RetainTransactionFailure(iotago.TransactionID, error)
 
 	// Reset resets the component to a clean state as if it was created at the last commitment.

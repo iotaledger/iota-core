@@ -85,12 +85,11 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 		}, asyncOpt)
 
 		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, err error) {
-			r.RetainBlockFailure(b, api.BlockFailureDroppedDueToCongestion)
+			r.RetainBlockFailure(b.ModelBlock(), api.BlockFailureDroppedDueToCongestion)
 		})
 
 		e.Initialized.OnTrigger(func() {
 			e.Ledger.MemPool().OnSignedTransactionAttached(func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
-				//attachment := signedTransactionMetadata.Attachments()[0]
 				txID := signedTransactionMetadata.TransactionMetadata().ID()
 				signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
 					r.RetainTransactionFailure(txID, err)
@@ -160,25 +159,9 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 	}, nil
 }
 
-// RetainBlockFailure stores the block failure in the retainer and determines if the block had a transaction attached.
-func (r *Retainer) RetainBlockFailure(block *blocks.Block, failureCode api.BlockFailureReason) {
+// RetainBlockFailure stores the block failure in the retainer and determines if the model block had a transaction attached.
+func (r *Retainer) RetainBlockFailure(block *model.Block, failureCode api.BlockFailureReason) {
 	if err := r.store.storeBlockData(block.ID(), failureCode, r.transactionID(block)); err != nil {
-		r.errorHandler(ierrors.Wrap(err, "failed to store block failure in retainer"))
-	}
-}
-
-// RetainModelBlockFailure stores the block failure in the retainer and determines if the model block had a transaction attached.
-func (r *Retainer) RetainModelBlockFailure(block *model.Block, failureCode api.BlockFailureReason) {
-	txID := iotago.EmptyTransactionID
-	var err error
-	tx, hasTx := block.SignedTransaction()
-	if hasTx {
-		txID, err = tx.Transaction.ID()
-		if err != nil {
-			r.errorHandler(ierrors.Wrap(err, "failed to get txID from attached block on RetainModelBlockFailure"))
-		}
-	}
-	if err = r.store.storeBlockData(block.ID(), failureCode, txID); err != nil {
 		r.errorHandler(ierrors.Wrap(err, "failed to store block failure in retainer"))
 	}
 }
@@ -211,7 +194,7 @@ func (r *Retainer) RetainRegisteredValidatorsCache(index uint32, resp []*api.Val
 	}
 }
 
-func (r *Retainer) transactionID(block *blocks.Block) iotago.TransactionID {
+func (r *Retainer) transactionID(block *model.Block) iotago.TransactionID {
 	tx, exists := block.SignedTransaction()
 	if !exists {
 		return iotago.EmptyTransactionID
@@ -277,11 +260,11 @@ func (r *Retainer) transactionStatus(blockID iotago.BlockID) (iotago.Transaction
 }
 
 func (r *Retainer) onBlockAttached(block *blocks.Block) error {
-	return r.store.storeBlockData(block.ID(), api.BlockFailureNone, r.transactionID(block))
+	return r.store.storeBlockData(block.ID(), api.BlockFailureNone, r.transactionID(block.ModelBlock()))
 }
 
 func (r *Retainer) onBlockFilter(block *blocks.Block, reason error) {
-	r.RetainBlockFailure(block, determineBlockFailureReason(reason))
+	r.RetainBlockFailure(block.ModelBlock(), determineBlockFailureReason(reason))
 }
 
 func (r *Retainer) onBlockAccepted(blockID iotago.BlockID) error {
