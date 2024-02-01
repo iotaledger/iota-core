@@ -79,6 +79,7 @@ func (s *StateDiff) updateCompactedStateChanges(transaction *TransactionMetadata
 
 func (s *StateDiff) AddTransaction(transaction *TransactionMetadata, errorHandler func(error)) error {
 	if _, exists := s.executedTransactions.Set(transaction.ID(), transaction); !exists {
+		fmt.Println(">> add transaction to mutations of slot", s.slot, "transaction.ID()", transaction.ID())
 		if err := s.mutations.Add(transaction.ID()); err != nil {
 			return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
 		}
@@ -112,6 +113,8 @@ func (s *StateDiff) Reset() error {
 	s.createdOutputs = shrinkingmap.New[mempool.StateID, mempool.StateMetadata]()
 	s.executedTransactions = orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata]()
 	s.stateUsageCounters = shrinkingmap.New[mempool.StateID, int]()
+
+	fmt.Println(">> begin StateDiff.Reset()", s.slot, "s.mutations.Size()", s.mutations.Size())
 
 	transactionIDs := make([]iotago.TransactionID, 0)
 	if err := s.mutations.Stream(func(transactionID iotago.TransactionID) error {
