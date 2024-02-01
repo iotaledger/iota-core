@@ -10,7 +10,7 @@ import (
 //nolint:unparam // we have no error case right now
 func validatorsSummary() (*ValidatorsSummaryResponse, error) {
 	seatManager := deps.Protocol.Engines.Main.Get().SybilProtection.SeatManager()
-	latestSlotIndex := deps.Protocol.Engines.Main.Get().Storage.Settings().LatestCommitment().Slot()
+	latestSlotIndex := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
 	latestCommittee, exists := seatManager.CommitteeInSlot(latestSlotIndex)
 	if !exists {
 		return nil, ierrors.Errorf("committee for slot %d was not selected", latestSlotIndex)

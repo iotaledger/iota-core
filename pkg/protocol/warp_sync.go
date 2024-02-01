@@ -234,7 +234,10 @@ func (w *WarpSync) ProcessResponse(commitmentID iotago.CommitmentID, blockIDsByS
 			commitment.IsSynced.OnUpdateOnce(func(_ bool, _ bool) {
 				// update the flag in a worker since it can potentially cause a commit
 				w.workerPool.Submit(func() {
-					if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - targetEngine.LatestAPI().ProtocolParameters().MinCommittableAge()); exists {
+					// we add +1 here to enable syncing of chains of empty commitments since we can assume that there is
+					// at least 1 additional slot building on top of the synced commitment as it would have otherwise
+					// not turned into a commitment in the first place.
+					if committableCommitment, exists := chain.Commitment(commitmentID.Slot() - targetEngine.LatestAPI().ProtocolParameters().MinCommittableAge() + 1); exists {
 						committableCommitment.IsCommittable.Set(true)
 					}
 				})

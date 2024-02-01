@@ -1,4 +1,4 @@
-name: Run Docker Network and Check Health
+name: Docker Network Health Check
 
 on:
   workflow_dispatch:
@@ -9,6 +9,9 @@ on:
       - '!scripts/**'
       - '!tools/**'
       - 'tools/genesis-snapshot/**'
+  push:
+    branches:
+      - develop
 
 concurrency: 
   group: run-and-check-group
@@ -20,7 +23,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Run network, wait and check health
       run: |

@@ -1,8 +1,8 @@
-package metrics
+package prometheus
 
 import (
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/iota-core/components/metrics/collector"
+	"github.com/iotaledger/iota-core/components/prometheus/collector"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 

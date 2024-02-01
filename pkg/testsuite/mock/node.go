@@ -227,15 +227,9 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 	events := instance.Events
 
 	events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
-		instance.LogTrace("BlockDAG.BlockAttached", "block", block.ID())
-
 		n.mutex.Lock()
 		defer n.mutex.Unlock()
 		n.attachedBlocks = append(n.attachedBlocks, block)
-	})
-
-	events.BlockDAG.BlockSolid.Hook(func(block *blocks.Block) {
-		instance.LogTrace("BlockDAG.BlockSolid", "block", block.ID())
 	})
 
 	events.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
@@ -385,7 +379,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		instance.LogTrace("SybilProtection.OnlineCommitteeSeatRemoved", "seat", seat)
 	})
 
-	events.SybilProtection.CommitteeSelected.Hook(func(committee *account.Accounts, epoch iotago.EpochIndex) {
+	events.SybilProtection.CommitteeSelected.Hook(func(committee *account.SeatedAccounts, epoch iotago.EpochIndex) {
 		instance.LogTrace("SybilProtection.CommitteeSelected", "epoch", epoch, "committee", committee.IDs())
 	})
 

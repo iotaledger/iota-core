@@ -78,8 +78,11 @@ func (a *Attestations) initRequester() (shutdown func()) {
 	unsubscribeFromTicker := lo.Batch(
 		a.protocol.Commitments.WithElements(func(commitment *Commitment) (shutdown func()) {
 			return commitment.RequestAttestations.WithNonEmptyValue(func(_ bool) (teardown func()) {
-				if commitment.CumulativeWeight() == 0 {
-					commitment.IsAttested.Set(true)
+				if commitment.CumulativeWeight.Get() == 0 {
+					// execute in worker pool since it can have long-running effects (e.g. chain switching)
+					a.workerPool.Submit(func() {
+						commitment.IsAttested.Set(true)
+					})
 
 					return nil
 				}
@@ -161,7 +164,10 @@ func (a *Attestations) processResponse(commitment *model.Commitment, attestation
 			return
 		}
 
-		if publishedCommitment.AttestedWeight.Compute(func(currentWeight uint64) uint64 {
+		var wasAttested, attestationsUpdated bool
+		publishedCommitment.AttestedWeight.Compute(func(currentWeight uint64) uint64 {
+			wasAttested = currentWeight > 0
+
 			if !publishedCommitment.RequestAttestations.Get() {
 				a.LogTrace("received attestations for previously attested commitment", "commitment", publishedCommitment.LogName())
 
@@ -189,12 +195,14 @@ func (a *Attestations) processResponse(commitment *model.Commitment, attestation
 				return currentWeight
 			}
 
-			if actualWeight > currentWeight {
-				a.LogDebug("received response", "commitment", publishedCommitment.LogName(), "fromPeer", from)
+			if attestationsUpdated = actualWeight > currentWeight; attestationsUpdated {
+				a.LogDebug("received response", "commitment", publishedCommitment.LogName(), "weight", actualWeight, "fromPeer", from)
 			}
 
 			return actualWeight
-		}) > 0 {
+		})
+
+		if !wasAttested && attestationsUpdated {
 			publishedCommitment.IsAttested.Set(true)
 		}
 	})

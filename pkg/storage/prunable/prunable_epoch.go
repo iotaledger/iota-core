@@ -35,6 +35,6 @@ func (p *Prunable) DecidedUpgradeSignals() *epochstore.Store[model.VersionAndHas
 	return p.decidedUpgradeSignals
 }
 
-func (p *Prunable) Committee() *epochstore.Store[*account.Accounts] {
+func (p *Prunable) Committee() *epochstore.Store[*account.SeatedAccounts] {
 	return p.committee
 }

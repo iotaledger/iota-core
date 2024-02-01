@@ -1,12 +1,12 @@
 //nolint:gosec // false positive on constants
-package metrics
+package prometheus
 
 import (
 	"time"
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/runtime/event"
-	"github.com/iotaledger/iota-core/components/metrics/collector"
+	"github.com/iotaledger/iota-core/components/prometheus/collector"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 

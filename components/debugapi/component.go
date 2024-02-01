@@ -79,13 +79,13 @@ func configure() error {
 	blocksPerSlot = shrinkingmap.New[iotago.SlotIndex, []*blocks.Block]()
 	blocksPrunableStorage = prunable.NewBucketManager(database.Config{
 		Engine:    hivedb.EngineRocksDB,
-		Directory: ParamsDebugAPI.Path,
+		Directory: ParamsDebugAPI.Database.Path,
 
 		Version:      1,
 		PrefixHealth: []byte{debugPrefixHealth},
 	}, func(err error) {
 		Component.LogWarnf(">> DebugAPI Error: %s\n", err)
-	}, prunable.WithMaxOpenDBs(ParamsDebugAPI.MaxOpenDBs),
+	}, prunable.WithMaxOpenDBs(ParamsDebugAPI.Database.MaxOpenDBs),
 	)
 
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v2")
@@ -98,7 +98,7 @@ func configure() error {
 
 	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		epoch := deps.Protocol.APIForSlot(index).TimeProvider().EpochFromSlot(index)
-		if epoch < iotago.EpochIndex(ParamsDebugAPI.PruningThreshold) {
+		if epoch < iotago.EpochIndex(ParamsDebugAPI.Database.Pruning.Threshold) {
 			return
 		}
 
@@ -107,7 +107,7 @@ func configure() error {
 			lastPruned++
 		}
 
-		for i := lastPruned; i < epoch-iotago.EpochIndex(ParamsDebugAPI.PruningThreshold); i++ {
+		for i := lastPruned; i < epoch-iotago.EpochIndex(ParamsDebugAPI.Database.Pruning.Threshold); i++ {
 			if err := blocksPrunableStorage.Prune(i); err != nil {
 				Component.LogWarnf(">> DebugAPI Error: %s\n", err)
 			}

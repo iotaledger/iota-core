@@ -64,7 +64,9 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 
 		e.Constructed.OnTrigger(func() {
 			e.Events.Ledger.LinkTo(l.events)
-			l.spendDAG = spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](l.sybilProtection.SeatManager().OnlineCommittee().Size)
+			l.spendDAG = spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](func() int {
+				return l.sybilProtection.SeatManager().OnlineCommittee().Size()
+			})
 			e.Events.SpendDAG.LinkTo(l.spendDAG.Events())
 
 			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
@@ -111,7 +113,9 @@ func New(
 		commitmentLoader: commitmentLoader,
 		sybilProtection:  sybilProtection,
 		errorHandler:     errorHandler,
-		spendDAG:         spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](sybilProtection.SeatManager().OnlineCommittee().Size),
+		spendDAG: spenddagv1.New[iotago.TransactionID, mempool.StateID, ledger.BlockVoteRank](func() int {
+			return sybilProtection.SeatManager().OnlineCommittee().Size()
+		}),
 	}
 }
 

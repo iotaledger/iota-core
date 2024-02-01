@@ -4,17 +4,17 @@ on:
   pull_request:
     paths:
       - 'tools/genesis-snapshot/**'
-jobs:
 
+jobs:
   build:
     name: Import Check
     runs-on: self-hosted
     steps:
 
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
           cache: false
