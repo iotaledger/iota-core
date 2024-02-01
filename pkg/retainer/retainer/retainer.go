@@ -137,7 +137,7 @@ func (r *Retainer) Shutdown() {
 }
 
 func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
-	blockStatus, blockFailureReason, _ := r.blockStatus(blockID)
+	blockStatus, blockFailureReason, transactionID := r.blockStatus(blockID)
 	if blockStatus == api.BlockStateUnknown {
 		return nil, ierrors.Errorf("block %s not found", blockID.ToHex())
 	}
@@ -147,7 +147,7 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 		blockStatus = api.BlockStatePending
 	}
 
-	txID, txStatus, txFailureReason := r.transactionStatus(blockID)
+	txID, txStatus, txFailureReason := r.transactionStatus(transactionID)
 
 	return &retainer.BlockMetadata{
 		BlockID:                  blockID,
@@ -229,34 +229,28 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (api.BlockState, api.Bloc
 	return blockData.State, blockData.FailureReason, blockData.TransactionID
 }
 
-func (r *Retainer) transactionStatus(blockID iotago.BlockID) (iotago.TransactionID, api.TransactionState, api.TransactionFailureReason) {
-	blockData, err := r.store.getBlockData(blockID)
-	if err != nil {
-		r.errorHandler(ierrors.Wrapf(err, "could not get block data for slot %d", blockID.Slot()))
-		return iotago.EmptyTransactionID, api.TransactionStateNoTransaction, api.TxFailureNone
-	}
-	if blockData.TransactionID == iotago.EmptyTransactionID {
-		r.errorHandler(ierrors.Errorf("transaction %s not found for block %s", blockData.TransactionID.String(), blockID.String()))
+func (r *Retainer) transactionStatus(transactionID iotago.TransactionID) (iotago.TransactionID, api.TransactionState, api.TransactionFailureReason) {
+	if transactionID == iotago.EmptyTransactionID {
 		return iotago.EmptyTransactionID, api.TransactionStateNoTransaction, api.TxFailureNone
 	}
 
-	txData, err := r.store.getTransactionData(blockData.TransactionID)
+	txData, err := r.store.getTransactionData(transactionID)
 	if err != nil {
-		r.errorHandler(ierrors.Wrapf(err, "could not get transaction data for transaction %s", blockData.TransactionID.String()))
-		return blockData.TransactionID, api.TransactionStateNoTransaction, api.TxFailureNone
+		r.errorHandler(ierrors.Wrapf(err, "could not get transaction data for transaction %s", transactionID.String()))
+		return transactionID, api.TransactionStateNoTransaction, api.TxFailureNone
 	}
 
 	// check if any attachment is already confirmed
 	if txData.State == api.TransactionStateConfirmed {
 		// is attachmetn already finalized?
 		if txData.ConfirmedAttachmentSlot <= r.finalizedSlotFunc() {
-			return blockData.TransactionID, api.TransactionStateFinalized, api.TxFailureNone
+			return transactionID, api.TransactionStateFinalized, api.TxFailureNone
 		}
 
-		return blockData.TransactionID, api.TransactionStateConfirmed, api.TxFailureNone
+		return transactionID, api.TransactionStateConfirmed, api.TxFailureNone
 	}
 
-	return blockData.TransactionID, txData.State, txData.FailureReason
+	return transactionID, txData.State, txData.FailureReason
 }
 
 func (r *Retainer) onBlockAttached(block *blocks.Block) error {

@@ -90,11 +90,12 @@ func (m *metadataStore) moveTransactionMetadataToTheLatestAttachmentSlot(txID io
 
 	if currentSlot < latestAttachmentSlot {
 		moved, err := m.moveTransactionData(txID, currentSlot, latestAttachmentSlot)
-		if moved {
-			m.transactionLatestAttachmentSlot.Set(txID, latestAttachmentSlot)
-		}
 		if err != nil {
 			return err
+		}
+
+		if moved {
+			m.transactionLatestAttachmentSlot.Set(txID, latestAttachmentSlot)
 		}
 	}
 

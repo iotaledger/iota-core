@@ -4,6 +4,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/serializer/v2"
 	"github.com/iotaledger/hive.go/serializer/v2/stream"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
@@ -12,6 +13,9 @@ import (
 const (
 	blockStorePrefix byte = iota
 	transactionStorePrefix
+
+	transactionRetainerDataLength = serializer.OneByte + serializer.OneByte + serializer.UInt32ByteSize
+	blockRetainerDataLength       = serializer.OneByte + serializer.OneByte + iotago.TransactionIDLength
 )
 
 type BlockRetainerData struct {
@@ -21,7 +25,7 @@ type BlockRetainerData struct {
 }
 
 func (b *BlockRetainerData) Bytes() ([]byte, error) {
-	byteBuffer := stream.NewByteBuffer(2)
+	byteBuffer := stream.NewByteBuffer(blockRetainerDataLength)
 
 	if err := stream.Write(byteBuffer, b.State); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write block state")
@@ -66,7 +70,7 @@ type TransactionRetainerData struct {
 }
 
 func (t *TransactionRetainerData) Bytes() ([]byte, error) {
-	byteBuffer := stream.NewByteBuffer(2)
+	byteBuffer := stream.NewByteBuffer(transactionRetainerDataLength)
 
 	if err := stream.Write(byteBuffer, t.State); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write transaction state")
