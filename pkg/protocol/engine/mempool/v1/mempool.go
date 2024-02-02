@@ -2,6 +2,7 @@ package mempoolv1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds"
@@ -183,6 +184,7 @@ func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) (mempool.StateDiff,
 }
 
 func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error) {
+	fmt.Println("try to get state diff for slot", slot, m.lastEvictedSlot)
 	if m.lastEvictedSlot >= slot {
 		return nil, ierrors.Errorf("slot %d is older than last evicted slot %d", slot, m.lastEvictedSlot)
 	}
@@ -233,6 +235,8 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 		defer m.evictionMutex.Unlock()
 
 		m.lastEvictedSlot = slot
+
+		fmt.Println(">> update last evicted slot in the mempool to", slot)
 
 		m.stateDiffs.Delete(slot)
 
