@@ -2,6 +2,7 @@ package mempoolv1
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/iotaledger/hive.go/ds"
@@ -241,6 +242,8 @@ func (t *TransactionMetadata) AllInputsAccepted() bool {
 func (t *TransactionMetadata) setConflictAccepted() {
 	if t.conflictAccepted.Trigger() {
 		if t.invalid.Get() == nil && t.AllInputsAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
+			fmt.Println(">> accept a transaction because its conflict is accepted", t.EarliestIncludedAttachment().Slot(), t.ID(), t.EarliestIncludedAttachment())
+
 			t.accepted.Set(true)
 		}
 	}
@@ -257,6 +260,8 @@ func (t *TransactionMetadata) setupInput(input *StateMetadata) {
 		if atomic.AddUint64(&t.unacceptedInputsCount, ^uint64(0)) == 0 {
 			if wereAllInputsAccepted := t.allInputsAccepted.Set(true); !wereAllInputsAccepted {
 				if t.invalid.Get() == nil && t.IsConflictAccepted() && t.EarliestIncludedAttachment().Slot() != 0 {
+					fmt.Println(">> accept a transaction because its inputs are accepted", t.EarliestIncludedAttachment().Slot(), t.ID(), t.EarliestIncludedAttachment())
+
 					t.accepted.Set(true)
 				}
 			}
@@ -305,6 +310,8 @@ func (t *TransactionMetadata) setup() (self *TransactionMetadata) {
 			if t.invalid.Get() != nil || !t.IsConflictAccepted() || !t.AllInputsAccepted() {
 				return
 			}
+			fmt.Println(">> accept a transaction OnEarliestIncludedAttachmentUpdated", t.EarliestIncludedAttachment().Slot(), t.ID(), t.EarliestIncludedAttachment())
+
 			t.accepted.Set(true)
 		}
 	})

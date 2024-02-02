@@ -3,6 +3,7 @@ package mempoolv1
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds"
@@ -230,13 +231,16 @@ func (m *MemPool[VoteRank]) Reset() {
 
 // Evict evicts the slot with the given slot from the MemPool.
 func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
+	start := time.Now()
+	defer func() {
+		fmt.Println(">> eviction of mempool for slot ", slot, " took", time.Now().Sub(start))
+	}()
+
 	if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *SignedTransactionMetadata] {
 		m.evictionMutex.Lock()
 		defer m.evictionMutex.Unlock()
 
 		m.lastEvictedSlot = slot
-
-		fmt.Println(">> update last evicted slot in the mempool to", slot)
 
 		m.stateDiffs.Delete(slot)
 
@@ -454,6 +458,8 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 			return ierrors.Wrapf(err, "failed to get state diff for slot %d", newIndex)
 		}
 
+		fmt.Println(">> add transaction to the state diff OnEarliestIncludedAttachmentUpdated", transaction.EarliestIncludedAttachment().Slot(), transaction.ID(), transaction.EarliestIncludedAttachment())
+
 		if err = stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
 			return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
 		}
@@ -480,6 +486,8 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 
 				return
 			}
+
+			fmt.Println(">> add transaction to the state diff because it was accepted", slot, transaction.ID(), transaction.EarliestIncludedAttachment())
 
 			if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
 				m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))
