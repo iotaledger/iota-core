@@ -135,7 +135,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 
 			reward, _, _, rewardErr := v.ledger.sybilProtection.ValidatorReward(accountID, stakingFeature, claimingEpoch)
 			if rewardErr != nil {
-				return nil, ierrors.Wrapf(iotago.ErrStakingRewardCalculation, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d, claimingEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch, claimingEpoch)
+				return nil, ierrors.Wrapf(iotago.ErrStakingRewardCalculationFailure, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d, claimingEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch, claimingEpoch)
 			}
 
 			rewardInputSet[accountID] = reward
@@ -158,7 +158,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 
 			reward, _, _, rewardErr := v.ledger.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd, claimingEpoch)
 			if rewardErr != nil {
-				return nil, ierrors.Wrapf(iotago.ErrDelegationRewardCalculation, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
+				return nil, ierrors.Wrapf(iotago.ErrDelegationRewardCalculationFailure, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}
 
 			rewardInputSet[delegationID] = reward
