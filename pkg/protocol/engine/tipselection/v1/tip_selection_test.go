@@ -12,7 +12,7 @@ import (
 
 func TestTipSelection_DynamicLivenessThreshold_NoWitnesses(t *testing.T) {
 	tf := NewTestFramework(t)
-	tf.TipManager.CreateBlock("Block", map[iotago.ParentsType][]string{iotago.StrongParentType: {"Genesis"}})
+	tf.TipManager.CreateBasicBlock("Block", map[iotago.ParentsType][]string{iotago.StrongParentType: {"Genesis"}})
 	tf.TipManager.AddBlock("Block")
 
 	expectedLivenessThreshold := tf.ExpectedLivenessThreshold("Block")
@@ -43,7 +43,7 @@ func TestTipSelection_DynamicLivenessThreshold_NoWitnesses(t *testing.T) {
 
 func TestTipSelection_DynamicLivenessThreshold_WithSingleWitness(t *testing.T) {
 	tf := NewTestFramework(t)
-	tf.TipManager.CreateBlock("Block", map[iotago.ParentsType][]string{iotago.StrongParentType: {"Genesis"}})
+	tf.TipManager.CreateBasicBlock("Block", map[iotago.ParentsType][]string{iotago.StrongParentType: {"Genesis"}})
 	tf.TipManager.AddBlock("Block")
 
 	expectedLivenessThresholdWithoutWitnesses := tf.ExpectedLivenessThreshold("Block")
@@ -95,7 +95,7 @@ func TestTipSelection_DynamicLivenessThreshold_WithSingleWitness(t *testing.T) {
 
 func TestTipSelection_DynamicLivenessThreshold_WithMaxWitnesses(t *testing.T) {
 	tf := NewTestFramework(t)
-	tf.TipManager.CreateBlock("Block", map[iotago.ParentsType][]string{iotago.StrongParentType: {"Genesis"}})
+	tf.TipManager.CreateBasicBlock("Block", map[iotago.ParentsType][]string{iotago.StrongParentType: {"Genesis"}})
 	tf.TipManager.AddBlock("Block")
 
 	livenessThresholdZero := tf.ExpectedLivenessThreshold("Block")
@@ -178,7 +178,7 @@ func TestTipSelection_DynamicLivenessThreshold_WithMaxWitnesses(t *testing.T) {
 func TestDynamicLivenessThreshold(t *testing.T) {
 	const committeeSize = 10
 	tf := NewTestFramework(t, WithCommitteeSize(committeeSize))
-	tf.TipManager.CreateBlock("Block", map[iotago.ParentsType][]string{iotago.StrongParentType: {"Genesis"}})
+	tf.TipManager.CreateBasicBlock("Block", map[iotago.ParentsType][]string{iotago.StrongParentType: {"Genesis"}})
 	tf.TipManager.AddBlock("Block")
 
 	livenessThresholdLowerBound := tf.TipManager.API.ProtocolParameters().LivenessThresholdLowerBound()
