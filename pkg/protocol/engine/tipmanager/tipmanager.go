@@ -2,6 +2,7 @@ package tipmanager
 
 import (
 	"github.com/iotaledger/hive.go/runtime/module"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -26,6 +27,15 @@ type TipManager interface {
 
 	// OnBlockAdded registers a callback that is triggered whenever a new Block was added to the TipManager.
 	OnBlockAdded(handler func(block TipMetadata)) (unsubscribe func())
+
+	// AddSeat adds a validator seat to the tracking of the TipManager.
+	AddSeat(seat account.SeatIndex)
+
+	// RemoveSeat removes a validator seat from the tracking of the TipManager.
+	RemoveSeat(seat account.SeatIndex)
+
+	// ValidationTips returns the validation tips of the TipManager (with an optional limit).
+	ValidationTips(optAmount ...int) []TipMetadata
 
 	// StrongTips returns the strong tips of the TipManager (with an optional limit).
 	StrongTips(optAmount ...int) []TipMetadata
