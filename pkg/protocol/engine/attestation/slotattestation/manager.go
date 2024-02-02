@@ -5,6 +5,8 @@ import (
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -63,6 +65,8 @@ type Manager struct {
 	apiProvider iotago.APIProvider
 
 	module.Module
+
+	log.Logger
 }
 
 func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
@@ -70,6 +74,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 		latestCommitment := e.Storage.Settings().LatestCommitment()
 
 		return NewManager(
+			e.Logger.NewChildLogger("AttestationManager"),
 			latestCommitment.Slot(),
 			latestCommitment.CumulativeWeight(),
 			e.Storage.Attestations,
@@ -80,6 +85,7 @@ func NewProvider() module.Provider[*engine.Engine, attestation.Attestations] {
 }
 
 func NewManager(
+	logger log.Logger,
 	lastCommittedSlot iotago.SlotIndex,
 	lastCumulativeWeight uint64,
 	bucketedStorage func(slot iotago.SlotIndex) (kvstore.KVStore, error),
@@ -87,6 +93,7 @@ func NewManager(
 	apiProvider iotago.APIProvider,
 ) *Manager {
 	m := &Manager{
+		Logger:               logger,
 		lastCommittedSlot:    lastCommittedSlot,
 		lastCumulativeWeight: lastCumulativeWeight,
 		committeeFunc:        committeeFunc,
@@ -215,6 +222,7 @@ func (m *Manager) applyToPendingAttestations(attestation *iotago.Attestation, cu
 	}
 
 	for i := cutoffSlot; i <= updatedAttestation.Header.SlotCommitmentID.Slot(); i++ {
+		m.LogTrace("Applying attestation", "blockID", lo.PanicOnErr(updatedAttestation.BlockID()), "committing to", updatedAttestation.Header.SlotCommitmentID.Slot(), "pending attestations at slot", i)
 		m.pendingAttestations.Get(i, true).Set(attestation.Header.IssuerID, updatedAttestation)
 	}
 }
@@ -233,6 +241,8 @@ func (m *Manager) Commit(slot iotago.SlotIndex) (newCW uint64, attestationsRoot 
 	defer m.commitmentMutex.Unlock()
 
 	cutoffSlot, valid := m.computeAttestationCommitmentOffset(slot)
+
+	m.LogTrace("Committing", "slot", slot, "cutoffSlot", cutoffSlot)
 
 	// Remove all future attestations of slot and apply to pending attestations window.
 	futureAttestations := m.futureAttestations.Evict(slot)
@@ -297,6 +307,8 @@ func (m *Manager) Commit(slot iotago.SlotIndex) (newCW uint64, attestationsRoot 
 func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 	m.commitmentMutex.RLock()
 	defer m.commitmentMutex.RUnlock()
+
+	m.LogTrace("Rolling back to", targetSlot)
 
 	if targetSlot > m.lastCommittedSlot {
 		return ierrors.Errorf("slot %d is newer than last committed slot %d", targetSlot, m.lastCommittedSlot)
