@@ -833,7 +833,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 			initialParentsPrefix = "Genesis"
 		}
 
-		ts.IssueBlocksAtSlots(slotPrefix(partition, slots[0]), slots, 4, initialParentsPrefix, targetNodes, true, false)
+		ts.IssueBlocksAtSlots(slotPrefix(partition, slots[0]), slots, 4, initialParentsPrefix, targetNodes, true, true)
 
 		cumulativeAttestations := uint64(0)
 		for slot := genesisSlot + maxCommittableAge; slot <= lastCommittedSlot; slot++ {
@@ -845,7 +845,8 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 			}
 
 			for _, node := range otherNodes {
-				if slot <= lastCommonSlot+minCommittableAge {
+				// We force the commitments to be at minCommittableAge-1.
+				if slot <= lastCommonSlot+minCommittableAge-1 {
 					attestationBlocks.Add(ts, node, partition, min(slot, lastCommonSlot)) // carry forward last known attestations
 
 					cumulativeAttestations++
