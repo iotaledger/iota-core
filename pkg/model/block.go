@@ -137,15 +137,10 @@ func (blk *Block) String() string {
 }
 
 func (blk *Block) WorkScore() iotago.WorkScore {
-	if _, isBasic := blk.BasicBlock(); isBasic {
-		workScore, err := blk.ProtocolBlock().WorkScore()
-		if err != nil {
-			panic(err)
-		}
-
-		return workScore
+	workScore, err := blk.ProtocolBlock().WorkScore()
+	if err != nil {
+		panic(err)
 	}
 
-	// Otherwise this is a validation block and should have work score zero.
-	return iotago.WorkScore(0)
+	return workScore
 }

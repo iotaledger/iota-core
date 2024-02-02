@@ -44,12 +44,12 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		API:                tpkg.ZeroCostTestAPI,
 		time:               time.Now(),
 		manualPOA: *mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI),
-			epochstore.NewStore[*account.Accounts](
+			epochstore.NewStore[*account.SeatedAccounts](
 				nil,
 				mapdb.NewMapDB(),
 				func(index iotago.EpochIndex) iotago.EpochIndex { return index },
-				(*account.Accounts).Bytes,
-				account.AccountsFromBytes),
+				(*account.SeatedAccounts).Bytes,
+				account.SeatedAccountsFromBytes),
 		),
 	}
 

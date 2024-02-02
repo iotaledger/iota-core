@@ -6,12 +6,15 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
+	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
+
+// region Chains ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Chains is a subcomponent of the protocol that exposes the chains that are managed by the protocol and that implements
 // the chain switching logic.
@@ -23,13 +26,13 @@ type Chains struct {
 	Main reactive.Variable[*Chain]
 
 	// HeaviestClaimedCandidate contains the candidate chain with the heaviest claimed weight according to its latest commitment. The weight has neither been checked via attestations nor verified by downloading all data.
-	HeaviestClaimedCandidate reactive.Variable[*Chain]
+	HeaviestClaimedCandidate *ChainsCandidate
 
 	// HeaviestAttestedCandidate contains the candidate chain with the heaviest weight as checked by attestations. The chain has not been instantiated into an engine yet.
-	HeaviestAttestedCandidate reactive.Variable[*Chain]
+	HeaviestAttestedCandidate *ChainsCandidate
 
 	// HeaviestVerifiedCandidate contains the candidate chain with the heaviest verified weight, meaning the chain has been instantiated into an engine and the commitments have been produced by the engine itself.
-	HeaviestVerifiedCandidate reactive.Variable[*Chain]
+	HeaviestVerifiedCandidate *ChainsCandidate
 
 	// LatestSeenSlot contains the slot of the latest commitment of any received block.
 	LatestSeenSlot reactive.Variable[iotago.SlotIndex]
@@ -44,14 +47,15 @@ type Chains struct {
 // newChains creates a new chains instance for the given protocol.
 func newChains(protocol *Protocol) *Chains {
 	c := &Chains{
-		Set:                       reactive.NewSet[*Chain](),
-		Main:                      reactive.NewVariable[*Chain](),
-		HeaviestClaimedCandidate:  reactive.NewVariable[*Chain](),
-		HeaviestAttestedCandidate: reactive.NewVariable[*Chain](),
-		HeaviestVerifiedCandidate: reactive.NewVariable[*Chain](),
-		LatestSeenSlot:            reactive.NewVariable[iotago.SlotIndex](increasing[iotago.SlotIndex]),
-		protocol:                  protocol,
+		Set:            reactive.NewSet[*Chain](),
+		Main:           reactive.NewVariable[*Chain](),
+		LatestSeenSlot: reactive.NewVariable[iotago.SlotIndex](increasing[iotago.SlotIndex]),
+		protocol:       protocol,
 	}
+
+	c.HeaviestClaimedCandidate = newChainsCandidate(c, (*Commitment).cumulativeWeight)
+	c.HeaviestAttestedCandidate = newChainsCandidate(c, (*Commitment).cumulativeAttestedWeight)
+	c.HeaviestVerifiedCandidate = newChainsCandidate(c, (*Commitment).cumulativeVerifiedWeight)
 
 	shutdown := lo.Batch(
 		c.initLogger(protocol.NewChildLogger("Chains")),
@@ -98,68 +102,58 @@ func (c *Chains) initChainSwitching() (shutdown func()) {
 
 	c.Main.Set(mainChain)
 
-	// only switch to the heavier chain if the latest commitment is enough slots away from the forking point.
-	forkingPointBelowChainSwitchingThreshold := func(chain *Chain) func(_ *Commitment, latestCommitment *Commitment) bool {
-		return func(_ *Commitment, latestCommitment *Commitment) bool {
-			forkingPoint := chain.ForkingPoint.Get()
-			chainSwitchingThreshold := iotago.SlotIndex(c.protocol.APIForSlot(latestCommitment.Slot()).ProtocolParameters().ChainSwitchingThreshold())
-
-			return forkingPoint != nil && latestCommitment != nil && (latestCommitment.ID().Slot()-forkingPoint.ID().Slot()) > chainSwitchingThreshold
-		}
-	}
-
 	return lo.Batch(
 		c.HeaviestClaimedCandidate.WithNonEmptyValue(func(heaviestClaimedCandidate *Chain) (shutdown func()) {
 			return heaviestClaimedCandidate.RequestAttestations.ToggleValue(true)
 		}),
 
-		c.HeaviestAttestedCandidate.WithNonEmptyValue(func(heaviestAttestedCandidate *Chain) (shutdown func()) {
-			return heaviestAttestedCandidate.LatestAttestedCommitment.OnUpdateOnce(func(_ *Commitment, _ *Commitment) {
+		c.HeaviestAttestedCandidate.OnUpdate(func(_ *Chain, heaviestAttestedCandidate *Chain) {
+			if heaviestAttestedCandidate != nil {
 				heaviestAttestedCandidate.StartEngine.Set(true)
-			}, forkingPointBelowChainSwitchingThreshold(heaviestAttestedCandidate))
+			}
 		}),
 
-		c.HeaviestVerifiedCandidate.WithNonEmptyValue(func(heaviestVerifiedCandidate *Chain) (shutdown func()) {
-			return heaviestVerifiedCandidate.LatestProducedCommitment.OnUpdateOnce(func(_ *Commitment, latestProducedCommitment *Commitment) {
+		c.HeaviestVerifiedCandidate.OnUpdate(func(_ *Chain, heaviestVerifiedCandidate *Chain) {
+			if heaviestVerifiedCandidate != nil {
 				c.Main.Set(heaviestVerifiedCandidate)
-			}, forkingPointBelowChainSwitchingThreshold(heaviestVerifiedCandidate))
+			}
 		}),
 
-		c.WithElements(func(candidateChain *Chain) (shutdown func()) {
-			return lo.Batch(
-				c.initHeaviestCandidateTracking(c.HeaviestClaimedCandidate, (*Chain).claimedWeight, candidateChain),
-				c.initHeaviestCandidateTracking(c.HeaviestVerifiedCandidate, (*Chain).verifiedWeight, candidateChain),
-				c.initHeaviestCandidateTracking(c.HeaviestAttestedCandidate, (*Chain).attestedWeight, candidateChain),
-			)
-		}),
+		c.WithElements(c.trackHeaviestCandidates),
+		c.LatestSeenSlot.WithNonEmptyValue(c.updateMeasuredSlot),
 	)
 }
 
-// initHeaviestCandidateTracking initializes the tracking of the heaviest candidates according to the given parameters.
-func (c *Chains) initHeaviestCandidateTracking(candidateVar reactive.Variable[*Chain], weightVar func(*Chain) reactive.Variable[uint64], newCandidate *Chain) (unsubscribe func()) {
-	return weightVar(newCandidate).OnUpdate(func(_ uint64, newWeight uint64) {
-		// abort if the candidate is not heavier than the main chain.
-		if mainChain := c.Main.Get(); newCandidate == mainChain || newWeight <= mainChain.VerifiedWeight.Get() {
-			return
+func (c *Chains) trackHeaviestCandidates(chain *Chain) (teardown func()) {
+	return chain.LatestCommitment.OnUpdate(func(_ *Commitment, latestCommitment *Commitment) {
+		targetSlot := latestCommitment.ID().Index()
+
+		if evictionEvent := c.protocol.EvictionEvent(targetSlot); !evictionEvent.WasTriggered() {
+			c.HeaviestClaimedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+			c.HeaviestAttestedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
+			c.HeaviestVerifiedCandidate.registerCommitment(targetSlot, latestCommitment, evictionEvent)
 		}
+	})
+}
 
-		// atomically replace the existing candidate if the new one is heavier.
-		candidateVar.Compute(func(currentCandidate *Chain) *Chain {
-			if currentCandidate != nil && !currentCandidate.IsEvicted.WasTriggered() && newWeight <= weightVar(currentCandidate).Get() {
-				return currentCandidate
-			}
+func (c *Chains) updateMeasuredSlot(latestSeenSlot iotago.SlotIndex) (teardown func()) {
+	measuredSlot := latestSeenSlot - chainSwitchingMeasurementOffset
 
-			return newCandidate
-		})
-	}, true)
+	return lo.Batch(
+		c.HeaviestClaimedCandidate.measureAt(measuredSlot),
+		c.HeaviestAttestedCandidate.measureAt(measuredSlot),
+		c.HeaviestVerifiedCandidate.measureAt(measuredSlot),
+	)
 }
 
 // deriveLatestSeenSlot derives the latest seen slot from the protocol.
 func (c *Chains) deriveLatestSeenSlot(protocol *Protocol) func() {
 	return protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (shutdown func()) {
 		return lo.Batch(
-			mainEngine.Initialized.OnTrigger(func() {
-				c.LatestSeenSlot.Set(mainEngine.LatestCommitment.Get().Slot())
+			c.WithInitializedEngines(func(_ *Chain, engine *engine.Engine) (shutdown func()) {
+				return engine.LatestCommitment.OnUpdate(func(_ *model.Commitment, latestCommitment *model.Commitment) {
+					c.LatestSeenSlot.Set(latestCommitment.Slot())
+				})
 			}),
 
 			protocol.Network.OnBlockReceived(func(block *model.Block, src peer.ID) {
@@ -183,3 +177,101 @@ func (c *Chains) newChain() *Chain {
 func increasing[T cmp.Ordered](currentValue T, newValue T) T {
 	return max(currentValue, newValue)
 }
+
+const chainSwitchingMeasurementOffset iotago.SlotIndex = 1
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// region ChainsCandidate //////////////////////////////////////////////////////////////////////////////////////////////
+
+// ChainsCandidate implements a wrapper for the logic of tracking the heaviest candidate of all Chains in respect to
+// some monitored weight variable.
+type ChainsCandidate struct {
+	// Variable contains the heaviest chain candidate.
+	reactive.Variable[*Chain]
+
+	// chains contains a reference to the Chains instance that this candidate belongs to.
+	chains *Chains
+
+	// weightVariable contains the weight variable that is used to determine the heaviest chain candidate.
+	weightVariable func(element *Commitment) reactive.Variable[uint64]
+
+	// sortedCommitmentsBySlot contains the sorted commitments for each slot.
+	sortedCommitmentsBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, reactive.SortedSet[*Commitment]]
+}
+
+// newChainsCandidate creates a new heaviest chain candidate.
+func newChainsCandidate(chains *Chains, weightVariable func(element *Commitment) reactive.Variable[uint64]) *ChainsCandidate {
+	return &ChainsCandidate{
+		Variable:                reactive.NewVariable[*Chain](),
+		chains:                  chains,
+		sortedCommitmentsBySlot: shrinkingmap.New[iotago.SlotIndex, reactive.SortedSet[*Commitment]](),
+		weightVariable:          weightVariable,
+	}
+}
+
+// measureAt measures the heaviest chain candidate at the given slot and updates the variable as soon as the threshold
+// of chainSwitchingThreshold slots with the same heaviest chain in respect to the given slot is reached.
+func (c *ChainsCandidate) measureAt(slot iotago.SlotIndex) (teardown func()) {
+	// sanitize protocol parameters
+	chainSwitchingThreshold := c.chains.protocol.APIForSlot(slot).ProtocolParameters().ChainSwitchingThreshold()
+	if slot < iotago.SlotIndex(chainSwitchingThreshold) {
+		return
+	}
+
+	// abort if no commitment exists for this slot
+	sortedCommitments, sortedCommitmentsExist := c.sortedCommitmentsBySlot.Get(slot)
+	if !sortedCommitmentsExist {
+		return
+	}
+
+	// make sure the heaviest commitment was the heaviest for the last chainSwitchingThreshold slots before we update
+	return sortedCommitments.HeaviestElement().WithNonEmptyValue(func(heaviestCommitment *Commitment) (teardown func()) {
+		// abort if the heaviest commitment is the main chain
+		heaviestChain := heaviestCommitment.Chain.Get()
+		if heaviestChain == c.chains.Main.Get() {
+			return
+		}
+
+		// create counter for the number of slots with the same chain
+		slotsWithSameChain := reactive.NewCounter[*Commitment](func(commitment *Commitment) bool {
+			return commitment.Chain.Get() == heaviestChain
+		})
+
+		// reactively counts the number of slots with the same chain
+		var teardownMonitoringFunctions []func()
+		for i := uint8(1); i < chainSwitchingThreshold; i++ {
+			if earlierCommitments, earlierCommitmentsExist := c.sortedCommitmentsBySlot.Get(slot - iotago.SlotIndex(i)); earlierCommitmentsExist {
+				teardownMonitoringFunctions = append(teardownMonitoringFunctions, slotsWithSameChain.Monitor(earlierCommitments.HeaviestElement()))
+			}
+		}
+
+		// reactively update the value in respect to the reached threshold
+		teardownUpdates := slotsWithSameChain.OnUpdate(func(_ int, slotsWithSameChain int) {
+			if slotsWithSameChain >= int(chainSwitchingThreshold)-1 {
+				c.Set(heaviestChain)
+			} else {
+				c.Set(nil)
+			}
+		})
+
+		// return all teardown functions
+		return lo.Batch(append(teardownMonitoringFunctions, teardownUpdates)...)
+	})
+}
+
+// registerCommitment registers the given commitment for the given slot, which makes it become part of the weight
+// measurement process.
+func (c *ChainsCandidate) registerCommitment(slot iotago.SlotIndex, commitment *Commitment, evictionEvent reactive.Event) {
+	sortedCommitments, slotCreated := c.sortedCommitmentsBySlot.GetOrCreate(slot, func() reactive.SortedSet[*Commitment] {
+		return reactive.NewSortedSet(c.weightVariable)
+	})
+
+	if slotCreated {
+		evictionEvent.OnTrigger(func() { c.sortedCommitmentsBySlot.Delete(slot) })
+	}
+
+	sortedCommitments.Add(commitment)
+}
+
+// endregion ///////////////////////////////////////////////////////////////////////////////////////////////////////////

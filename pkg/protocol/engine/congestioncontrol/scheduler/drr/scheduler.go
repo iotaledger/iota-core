@@ -59,7 +59,7 @@ func NewProvider(opts ...options.Option[Scheduler]) module.Provider[*engine.Engi
 
 		e.Constructed.OnTrigger(func() {
 			s.latestCommittedSlot = func() iotago.SlotIndex {
-				return e.Storage.Settings().LatestCommitment().Slot()
+				return e.SyncManager.LatestCommitment().Slot()
 			}
 			s.blockCache = e.BlockCache
 			e.Events.Scheduler.LinkTo(s.events)

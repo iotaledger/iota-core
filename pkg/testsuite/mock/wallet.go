@@ -62,7 +62,7 @@ func (w *Wallet) BlockIssuerKey() iotago.BlockIssuerKey {
 	}
 	_, pub := w.keyManager.KeyPair()
 
-	return iotago.Ed25519PublicKeyBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(pub))
+	return iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(pub))
 }
 
 func (w *Wallet) SetDefaultNode(node *Node) {

@@ -140,7 +140,7 @@ func WithTaggedDataPayload(payload *iotago.TaggedData) options.Option[builder.Tr
 
 func WithAllotAllManaToAccount(slot iotago.SlotIndex, accountID iotago.AccountID) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
-		txBuilder.AllotAllMana(slot, accountID)
+		txBuilder.AllotAllMana(slot, accountID, 0)
 	}
 }
 
@@ -253,9 +253,9 @@ func WithAccountImmutableFeatures(features iotago.AccountOutputImmFeatures) opti
 			case iotago.FeatureMetadata:
 				//nolint:forcetypeassert
 				accountBuilder.ImmutableMetadata(feature.(*iotago.MetadataFeature).Entries)
-			case iotago.FeatureSender:
+			case iotago.FeatureIssuer:
 				//nolint:forcetypeassert
-				accountBuilder.ImmutableSender(feature.(*iotago.SenderFeature).Address)
+				accountBuilder.ImmutableIssuer(feature.(*iotago.IssuerFeature).Address)
 			}
 		}
 	}

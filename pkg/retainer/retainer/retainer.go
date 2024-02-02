@@ -55,8 +55,22 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	return module.Provide(func(e *engine.Engine) retainer.Retainer {
 		r := New(e.Workers.CreateGroup("Retainer"),
 			e.Storage.Retainer,
-			e.Storage.Settings().LatestCommitment().Slot,
-			e.Storage.Settings().LatestFinalizedSlot,
+			func() iotago.SlotIndex {
+				// use settings in case SyncManager is not constructed yet.
+				if e.SyncManager == nil {
+					return e.Storage.Settings().LatestCommitment().Slot()
+				}
+
+				return e.SyncManager.LatestCommitment().Slot()
+			},
+			func() iotago.SlotIndex {
+				// use settings in case SyncManager is not constructed yet.
+				if e.SyncManager == nil {
+					return e.Storage.Settings().LatestFinalizedSlot()
+				}
+
+				return e.SyncManager.LatestFinalizedSlot()
+			},
 			e.ErrorHandler("retainer"))
 
 		asyncOpt := event.WithWorkerPool(r.workerPool)

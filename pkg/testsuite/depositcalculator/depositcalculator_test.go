@@ -65,8 +65,8 @@ func TestCalculate(t *testing.T) {
 				Features: iotago.AccountOutputFeatures{
 					&iotago.BlockIssuerFeature{
 						BlockIssuerKeys: iotago.BlockIssuerKeys{
-							&iotago.Ed25519PublicKeyBlockIssuerKey{},
-							&iotago.Ed25519PublicKeyBlockIssuerKey{},
+							&iotago.Ed25519PublicKeyHashBlockIssuerKey{},
+							&iotago.Ed25519PublicKeyHashBlockIssuerKey{},
 						},
 						ExpirySlot: 0,
 					},

@@ -86,7 +86,7 @@ func (c *CommitmentAPI) Mutations() (acceptedBlocksBySlotCommitment map[iotago.C
 
 // Roots returns the roots of the slot.
 func (c *CommitmentAPI) Roots() (committedRoots *iotago.Roots, err error) {
-	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
+	if c.engine.SyncManager.LatestCommitment().Slot() < c.CommitmentID.Slot() {
 		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
 
@@ -107,7 +107,7 @@ func (c *CommitmentAPI) Roots() (committedRoots *iotago.Roots, err error) {
 
 // BlocksIDsBySlotCommitmentID returns the accepted block IDs of the slot grouped by their SlotCommitmentID.
 func (c *CommitmentAPI) BlocksIDsBySlotCommitmentID() (map[iotago.CommitmentID]iotago.BlockIDs, error) {
-	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
+	if c.engine.SyncManager.LatestCommitment().Slot() < c.CommitmentID.Slot() {
 		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
 
@@ -128,7 +128,7 @@ func (c *CommitmentAPI) BlocksIDsBySlotCommitmentID() (map[iotago.CommitmentID]i
 }
 
 func (c *CommitmentAPI) TransactionIDs() (iotago.TransactionIDs, error) {
-	if c.engine.Storage.Settings().LatestCommitment().Slot() < c.CommitmentID.Slot() {
+	if c.engine.SyncManager.LatestCommitment().Slot() < c.CommitmentID.Slot() {
 		return nil, ierrors.Errorf("slot %d is not committed yet", c.CommitmentID)
 	}
 

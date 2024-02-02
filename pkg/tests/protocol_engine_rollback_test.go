@@ -176,14 +176,14 @@ func TestProtocol_EngineRollbackFinalization(t *testing.T) {
 
 	// Assert state of the forked engine after rollback.
 	{
-		require.EqualValues(t, 13, newEngine.Storage.Settings().LatestCommitment().Slot())
-		require.EqualValues(t, 13, newEngine.Storage.Settings().LatestFinalizedSlot())
+		require.EqualValues(t, 13, newEngine.SyncManager.LatestCommitment().Slot())
+		require.EqualValues(t, 13, newEngine.SyncManager.LatestFinalizedSlot())
 		require.EqualValues(t, 13, newEngine.EvictionState.LastEvictedSlot())
 
 		for epoch := 0; epoch <= 2; epoch++ {
 			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
-			require.Len(t, committeeEpoch.IDs(), 4)
+			require.Equal(t, 4, committeeEpoch.SeatCount())
 		}
 
 		// Commmittee for the future epoch does not exist.
@@ -370,14 +370,14 @@ func TestProtocol_EngineRollbackNoFinalization(t *testing.T) {
 
 	// Assert state of the forked engine after rollback.
 	{
-		require.EqualValues(t, 13, newEngine.Storage.Settings().LatestCommitment().Slot())
-		require.EqualValues(t, 8, newEngine.Storage.Settings().LatestFinalizedSlot())
+		require.EqualValues(t, 13, newEngine.SyncManager.LatestCommitment().Slot())
+		require.EqualValues(t, 8, newEngine.SyncManager.LatestFinalizedSlot())
 		require.EqualValues(t, 13, newEngine.EvictionState.LastEvictedSlot())
 
 		for epoch := 0; epoch <= 2; epoch++ {
 			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
-			require.Len(t, committeeEpoch.IDs(), 4)
+			require.Equal(t, 4, committeeEpoch.SeatCount())
 		}
 
 		// Commmittee for the future epoch does not exist.
@@ -564,14 +564,14 @@ func TestProtocol_EngineRollbackNoFinalizationLastSlot(t *testing.T) {
 
 	// Assert state of the forked engine after rollback.
 	{
-		require.EqualValues(t, 15, newEngine.Storage.Settings().LatestCommitment().Slot())
-		require.EqualValues(t, 8, newEngine.Storage.Settings().LatestFinalizedSlot())
+		require.EqualValues(t, 15, newEngine.SyncManager.LatestCommitment().Slot())
+		require.EqualValues(t, 8, newEngine.SyncManager.LatestFinalizedSlot())
 		require.EqualValues(t, 15, newEngine.EvictionState.LastEvictedSlot())
 
 		for epoch := 0; epoch <= 2; epoch++ {
 			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
-			require.Len(t, committeeEpoch.IDs(), 4)
+			require.Equal(t, 4, committeeEpoch.SeatCount())
 		}
 
 		// Commmittee for the future epoch does not exist.
@@ -758,14 +758,14 @@ func TestProtocol_EngineRollbackNoFinalizationBeforePointOfNoReturn(t *testing.T
 
 	// Assert state of the forked engine after rollback.
 	{
-		require.EqualValues(t, 9, newEngine.Storage.Settings().LatestCommitment().Slot())
-		require.EqualValues(t, 8, newEngine.Storage.Settings().LatestFinalizedSlot())
+		require.EqualValues(t, 9, newEngine.SyncManager.LatestCommitment().Slot())
+		require.EqualValues(t, 8, newEngine.SyncManager.LatestFinalizedSlot())
 		require.EqualValues(t, 9, newEngine.EvictionState.LastEvictedSlot())
 
 		for epoch := 0; epoch <= 1; epoch++ {
 			committeeEpoch, err := newEngine.Storage.Committee().Load(iotago.EpochIndex(epoch))
 			require.NoError(t, err)
-			require.Len(t, committeeEpoch.IDs(), 4)
+			require.Equal(t, 4, committeeEpoch.SeatCount())
 		}
 
 		// Committee for the future epoch does not exist.

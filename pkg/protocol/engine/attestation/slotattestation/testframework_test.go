@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/kvstore"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
@@ -58,15 +59,13 @@ func NewTestFramework(test *testing.T) *TestFramework {
 
 	committeeFunc := func(index iotago.SlotIndex) (*account.SeatedAccounts, bool) {
 		accounts := account.NewAccounts()
-		var members []iotago.AccountID
 		t.issuerByAlias.ForEach(func(alias string, issuer *issuer) bool {
 			if err := accounts.Set(issuer.accountID, &account.Pool{}); err != nil { // we don't care about pools with PoA
 				test.Fatal(err)
 			}
-			members = append(members, issuer.accountID)
 			return true
 		})
-		return accounts.SeatedAccounts(members...), true
+		return accounts.SeatedAccounts(), true
 	}
 
 	t.testAPI = iotago.V3API(
@@ -78,6 +77,7 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t.apiProvider = iotago.SingleVersionProvider(t.testAPI)
 
 	t.Instance = slotattestation.NewManager(
+		log.NewLogger(),
 		0,
 		0,
 		bucketedStorage,
