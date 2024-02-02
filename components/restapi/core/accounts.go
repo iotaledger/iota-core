@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/core/account"
-	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -62,10 +61,10 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	var err error
 	pageSize := restapi.ParamsRestAPI.MaxPageSize
-	if len(c.QueryParam(restapipkg.QueryParameterPageSize)) > 0 {
-		pageSize, err = httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
+	if len(c.QueryParam(api.QueryParameterPageSize)) > 0 {
+		pageSize, err = httpserver.ParseUint32QueryParam(c, api.QueryParameterPageSize)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse page size %s", c.Param(restapipkg.QueryParameterPageSize))
+			return nil, ierrors.Wrapf(err, "failed to parse page size %s", c.Param(api.QueryParameterPageSize))
 		}
 		if pageSize > restapi.ParamsRestAPI.MaxPageSize {
 			pageSize = restapi.ParamsRestAPI.MaxPageSize
@@ -75,10 +74,10 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	// no cursor provided will be the first request
 	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
-	if len(c.QueryParam(restapipkg.QueryParameterCursor)) != 0 {
-		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
+	if len(c.QueryParam(api.QueryParameterCursor)) != 0 {
+		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, api.QueryParameterCursor)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse cursor %s", c.Param(restapipkg.QueryParameterCursor))
+			return nil, ierrors.Wrapf(err, "failed to parse cursor %s", c.Param(api.QueryParameterCursor))
 		}
 	}
 
