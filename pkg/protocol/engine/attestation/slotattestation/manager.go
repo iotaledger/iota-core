@@ -5,6 +5,7 @@ import (
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -221,6 +222,7 @@ func (m *Manager) applyToPendingAttestations(attestation *iotago.Attestation, cu
 	}
 
 	for i := cutoffSlot; i <= updatedAttestation.Header.SlotCommitmentID.Slot(); i++ {
+		m.LogTrace("Applying attestation", "blockID", lo.PanicOnErr(updatedAttestation.BlockID()), "committing to", updatedAttestation.Header.SlotCommitmentID.Slot(), "pending attestations at slot", i)
 		m.pendingAttestations.Get(i, true).Set(attestation.Header.IssuerID, updatedAttestation)
 	}
 }
@@ -240,7 +242,7 @@ func (m *Manager) Commit(slot iotago.SlotIndex) (newCW uint64, attestationsRoot 
 
 	cutoffSlot, valid := m.computeAttestationCommitmentOffset(slot)
 
-	m.LogTrace("Committing", slot, "cutoffSlot", cutoffSlot)
+	m.LogTrace("Committing", "slot", slot, "cutoffSlot", cutoffSlot)
 
 	// Remove all future attestations of slot and apply to pending attestations window.
 	futureAttestations := m.futureAttestations.Evict(slot)
