@@ -58,6 +58,39 @@ func (w *Wallet) CreateAccountFromInput(transactionName string, inputName string
 	return signedTransaction
 }
 
+func (w *Wallet) CreateAccountsFromInput(transactionName string, inputName string, outputCount int, opts ...options.Option[builder.AccountOutputBuilder]) *iotago.SignedTransaction {
+	input := w.Output(inputName)
+
+	outputBaseToken := input.BaseTokenAmount() / iotago.BaseToken(outputCount)
+	outputMana := input.StoredMana() / iotago.Mana(outputCount)
+	remainderBaseToken := input.BaseTokenAmount() - outputBaseToken*iotago.BaseToken(outputCount)
+	remainderMana := input.StoredMana() - outputMana*iotago.Mana(outputCount)
+
+	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
+	for i := 0; i < outputCount; i++ {
+		if i+1 == outputCount {
+			outputBaseToken += remainderBaseToken
+			outputMana += remainderMana
+		}
+		outputStates = append(outputStates, options.Apply(builder.NewAccountOutputBuilder(w.Address(), outputBaseToken), opts).MustBuild())
+	}
+
+	signedTransaction := w.createSignedTransactionWithOptions(
+		transactionName,
+		[]uint32{0},
+		WithCommitmentInput(&iotago.CommitmentInput{
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+		}),
+		WithInputs(utxoledger.Outputs{input}),
+		WithOutputs(outputStates),
+	)
+
+	// register the outputs in the wallet
+	w.registerOutputs(transactionName, signedTransaction.Transaction)
+
+	return signedTransaction
+}
+
 // CreateDelegationFromInput creates a new DelegationOutput with given options from an input. If the remainder Output
 // is not created, then StoredMana from the input is not passed and can potentially be burned.
 // In order not to burn it, it needs to be assigned manually in another output in the transaction.
@@ -200,6 +233,44 @@ func (w *Wallet) TransitionAccount(transactionName string, inputName string, opt
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
 		WithOutputs(iotago.Outputs[iotago.Output]{accountOutput}),
+	)
+
+	return signedTransaction
+}
+
+func (w *Wallet) TransitionAccounts(transactionName string, inputNames []string, opts ...options.Option[builder.AccountOutputBuilder]) *iotago.SignedTransaction {
+	inputs := make(utxoledger.Outputs, 0, len(inputNames))
+	outputs := make(iotago.Outputs[iotago.Output], 0, len(inputNames))
+	txOpts := []options.Option[builder.TransactionBuilder]{}
+	for _, inputName := range inputNames {
+		input := w.AccountOutput(inputName)
+		inputs = append(inputs, input)
+
+		accountInput, ok := input.Output().Clone().(*iotago.AccountOutput)
+		if !ok {
+			panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", inputName))
+		}
+
+		accountBuilder := builder.NewAccountOutputBuilderFromPrevious(accountInput)
+		accountOutput := options.Apply(accountBuilder, opts).MustBuild()
+		outputs = append(outputs, accountOutput)
+		txOpts = append(txOpts, WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
+			AccountID: accountOutput.AccountID,
+		}))
+	}
+
+	txOpts = append(txOpts,
+		WithInputs(inputs),
+		WithOutputs(outputs),
+		WithCommitmentInput(&iotago.CommitmentInput{
+			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
+		}),
+	)
+
+	signedTransaction := w.createSignedTransactionWithOptions(
+		transactionName,
+		[]uint32{0},
+		txOpts...,
 	)
 
 	return signedTransaction

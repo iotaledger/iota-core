@@ -6,11 +6,13 @@ import (
 	"testing"
 
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
 	iotago "github.com/iotaledger/iota.go/v4"
+	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
 	"github.com/sajari/regression"
 )
@@ -29,6 +31,15 @@ func Test_Regression(t *testing.T) {
 	r.SetVar(7, "SignatureEd25519")
 
 	r.Train(
+		regression.DataPoint(accountInAccountOut(t, 1)),
+		regression.DataPoint(accountInAccountOut(t, 20)),
+		regression.DataPoint(accountInAccountOut(t, iotago.MaxOutputsCount-2)),
+		regression.DataPoint(basicInAccountOut(t, 1, false)),
+		regression.DataPoint(basicInAccountOut(t, 20, false)),
+		regression.DataPoint(basicInAccountOut(t, iotago.MaxOutputsCount, false)),
+		regression.DataPoint(basicInAccountOut(t, 1, true)),
+		regression.DataPoint(basicInAccountOut(t, 20, true)),
+		regression.DataPoint(basicInAccountOut(t, iotago.MaxOutputsCount, true)),
 		regression.DataPoint(basicInNativeOut(t, 1)),
 		regression.DataPoint(basicInNativeOut(t, 20)),
 		regression.DataPoint(basicInNativeOut(t, iotago.MaxOutputsCount-1)),
@@ -42,12 +53,6 @@ func Test_Regression(t *testing.T) {
 		regression.DataPoint(basicInBasicOut(t, 20, 1, true)),
 		regression.DataPoint(basicInBasicOut(t, iotago.MaxInputsCount, 1, false)),
 		regression.DataPoint(basicInBasicOut(t, iotago.MaxInputsCount, 1, true)),
-		regression.DataPoint(accInAccOut(t)),
-		//regression.DataPoint(accInAccStakingOut(t)),
-		regression.DataPoint(oneInAccOut(t)),
-		regression.DataPoint(oneInAccStakingOut(t)),
-		regression.DataPoint(oneInAccRemOut(t)),
-		regression.DataPoint(oneInAccStakingRemOut(t)),
 
 		// regression.DataPoint(1951938, []float64{5, 0, 1, 0, 0, 0, 0, 1}),
 		// regression.DataPoint(2654715, []float64{20, 0, 1, 0, 0, 0, 0, 1}),
@@ -150,7 +155,7 @@ func basicInBasicOut(t *testing.T, numIn int, numOut int, signatures bool) (floa
 	return nsPerBlock, regressors
 }
 
-func oneInAccOut(t *testing.T) (float64, []float64) {
+func basicInAccountOut(t *testing.T, numAccounts int, staking bool) (float64, []float64) {
 	blockchan := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 
@@ -162,12 +167,17 @@ func oneInAccOut(t *testing.T) (float64, []float64) {
 			node := ts.AddValidatorNode("node1")
 			ts.AddDefaultWallet(node)
 			ts.Run(true)
-			tx1 := ts.DefaultWallet().CreateAccountFromInput(
+			opts := []options.Option[builder.AccountOutputBuilder]{
+				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
+			}
+			if staking {
+				opts = append(opts, mock.WithStakingFeature(10000, 421, 0, 10))
+			}
+			tx1 := ts.DefaultWallet().CreateAccountsFromInput(
 				"tx1",
 				"Genesis:0",
-				ts.DefaultWallet(),
+				numAccounts,
 				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
-				mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Node.Protocol.CommittedAPI().ProtocolParameters())),
 			)
 			// default block issuer issues a block containing the transaction in slot 1.
 			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
@@ -338,7 +348,10 @@ func oneInAccStakingRemOut(t *testing.T) (float64, []float64) {
 	return nsPerBlock, regressors
 }
 
-func accInAccOut(t *testing.T) (float64, []float64) {
+func accountInAccountOut(t *testing.T, numAccounts int) (float64, []float64) {
+	if numAccounts > iotago.MaxOutputsCount-2 {
+		panic("Can only create MaxOutputsCount - 2 account outputs because we two other outputs in genesis transaction to create inputs accounts)")
+	}
 	blockchan := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 
@@ -349,10 +362,15 @@ func accInAccOut(t *testing.T) (float64, []float64) {
 			ts := NewTestSuite(t)
 			node := ts.AddValidatorNode("node1")
 			ts.AddDefaultWallet(node)
+			inputNames := []string{"Genesis:2"}
+			for i := 0; i < numAccounts-1; i++ {
+				ts.AddGenesisWallet(fmt.Sprintf("wallet%d", i), node)
+				inputNames = append(inputNames, fmt.Sprintf("Genesis:%d", i+3))
+			}
 			ts.Run(true)
-			tx1 := ts.DefaultWallet().TransitionAccount(
+			tx1 := ts.DefaultWallet().TransitionAccounts(
 				"tx1",
-				"Genesis:2",
+				inputNames,
 				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
 			)
 			// default block issuer issues a block containing the transaction in slot 1.
