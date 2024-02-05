@@ -60,16 +60,7 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 
 func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	var err error
-	pageSize := restapi.ParamsRestAPI.MaxPageSize
-	if len(c.QueryParam(api.ParameterPageSize)) > 0 {
-		pageSize, err = httpserver.ParseUint32QueryParam(c, api.ParameterPageSize)
-		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse page size %s", c.Param(api.ParameterPageSize))
-		}
-		if pageSize > restapi.ParamsRestAPI.MaxPageSize {
-			pageSize = restapi.ParamsRestAPI.MaxPageSize
-		}
-	}
+	pageSize := httpserver.ParsePageSizeParam(c, api.ParameterPageSize, restapi.ParamsRestAPI.MaxPageSize)
 	latestCommittedSlot := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
 	// no cursor provided will be the first request
 	requestedSlot := latestCommittedSlot
