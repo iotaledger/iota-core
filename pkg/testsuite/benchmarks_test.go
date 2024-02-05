@@ -31,53 +31,74 @@ func Test_Regression(t *testing.T) {
 	r.SetVar(7, "SignatureEd25519")
 
 	r.Train(
-		regression.DataPoint(accountInAccountOut(t, 1)),
-		regression.DataPoint(accountInAccountOut(t, 20)),
-		regression.DataPoint(accountInAccountOut(t, iotago.MaxOutputsCount-2)),
-		regression.DataPoint(basicInAccountOut(t, 1, false)),
-		regression.DataPoint(basicInAccountOut(t, 20, false)),
-		regression.DataPoint(basicInAccountOut(t, iotago.MaxOutputsCount, false)),
-		regression.DataPoint(basicInAccountOut(t, 1, true)),
-		regression.DataPoint(basicInAccountOut(t, 20, true)),
-		regression.DataPoint(basicInAccountOut(t, iotago.MaxOutputsCount, true)),
-		regression.DataPoint(basicInNativeOut(t, 1)),
-		regression.DataPoint(basicInNativeOut(t, 20)),
-		regression.DataPoint(basicInNativeOut(t, iotago.MaxOutputsCount-1)),
+		// one basic output as input, one basic output
+		regression.DataPoint(basicInBasicOut(t, 1, 1, false)),
+		// one basic outputs as input, multiple basic outputs
+		regression.DataPoint(basicInBasicOut(t, 1, 20, false)),
+		regression.DataPoint(basicInBasicOut(t, 1, iotago.MaxOutputsCount, false)),
+		// multiple basic outputs as input, one basic output
+		regression.DataPoint(basicInBasicOut(t, 20, 1, false)),
+		regression.DataPoint(basicInBasicOut(t, iotago.MaxInputsCount, 1, false)),
+		// multiple basic outputs as input, each with difference signature unlocks, one basic output
+		regression.DataPoint(basicInBasicOut(t, 20, 1, true)),
+		regression.DataPoint(basicInBasicOut(t, iotago.MaxInputsCount, 1, true)),
+		// one basic output as input, one basic output and allotments
 		regression.DataPoint(allotments(t, 1)),
 		regression.DataPoint(allotments(t, 20)),
 		regression.DataPoint(allotments(t, iotago.MaxAllotmentCount)),
-		regression.DataPoint(basicInBasicOut(t, 1, 1, false)),
-		regression.DataPoint(basicInBasicOut(t, 1, 20, false)),
-		regression.DataPoint(basicInBasicOut(t, 1, iotago.MaxOutputsCount, false)),
-		regression.DataPoint(basicInBasicOut(t, 20, 1, false)),
-		regression.DataPoint(basicInBasicOut(t, 20, 1, true)),
-		regression.DataPoint(basicInBasicOut(t, iotago.MaxInputsCount, 1, false)),
-		regression.DataPoint(basicInBasicOut(t, iotago.MaxInputsCount, 1, true)),
-
-		// regression.DataPoint(1951938, []float64{5, 0, 1, 0, 0, 0, 0, 1}),
-		// regression.DataPoint(2654715, []float64{20, 0, 1, 0, 0, 0, 0, 1}),
-
-		// regression.DataPoint(3839477, []float64{20, 0, 1, 0, 0, 0, 0, 20}),
-		// regression.DataPoint(2892937, []float64{5, 0, 1, 0, 0, 0, 0, 5}),
-
-		// regression.DataPoint(2958266, []float64{1, 0, 1, 0, 0, 0, 2, 1}),
-		// regression.DataPoint(2943738, []float64{1, 0, 1, 0, 0, 0, 1, 1}),
-		// regression.DataPoint(81213422, []float64{2, 2, 128, 126, 0, 1, 0, 1}),
-		// regression.DataPoint(4482071, []float64{2, 2, 2, 1, 0, 1, 0, 1}),
-		// regression.DataPoint(2710304, []float64{1, 2, 1, 0, 0, 1, 0, 1}),
-		// regression.DataPoint(2574392, []float64{1, 1, 1, 0, 0, 1, 0, 1}),
-		// regression.DataPoint(2576957, []float64{1, 1, 1, 0, 1, 1, 0, 1}),
-		// regression.DataPoint(2659167, []float64{1, 1, 2, 0, 0, 1, 0, 1}),
-		// regression.DataPoint(2748479, []float64{1, 1, 2, 0, 1, 1, 0, 1}),
-		// regression.DataPoint(74449111, []float64{128, 0, 128, 0, 0, 0, 0, 128}),
-		// regression.DataPoint(12534771, []float64{128, 0, 1, 0, 0, 0, 0, 128}),
-		// regression.DataPoint(2387996, []float64{1, 0, 1, 0, 0, 0, 0, 1}),
-		// regression.DataPoint(47375253, []float64{1, 0, 128, 0, 0, 0, 0, 1}),
+		// one basic output as input, account outputs
+		regression.DataPoint(basicInAccountOut(t, 1, false)),
+		regression.DataPoint(basicInAccountOut(t, 20, false)),
+		regression.DataPoint(basicInAccountOut(t, iotago.MaxOutputsCount, false)),
+		// one basic output as input, account outputs with staking
+		regression.DataPoint(basicInAccountOut(t, 1, true)),
+		regression.DataPoint(basicInAccountOut(t, 20, true)),
+		regression.DataPoint(basicInAccountOut(t, iotago.MaxOutputsCount, true)),
+		// one account input, account outputs
+		regression.DataPoint(accountInAccountOut(t, 1)),
+		regression.DataPoint(accountInAccountOut(t, 20)),
+		regression.DataPoint(accountInAccountOut(t, iotago.MaxOutputsCount-2)),
+		// one basic output as input, native token outputs
+		regression.DataPoint(basicInNativeOut(t, 1)),
+		regression.DataPoint(basicInNativeOut(t, 20)),
+		regression.DataPoint(basicInNativeOut(t, iotago.MaxOutputsCount-1)),
 	)
 
 	r.Run()
-	printCoefficients(r.GetCoeffs())
-	fmt.Println(r.Formula)
+	coeffs := r.GetCoeffs()
+	printCoefficients(coeffs)
+
+	standardBlock := getStandardBlock(t)
+	// calculate the workScoreParameters from the coefficients based on a desired Mana cost of 500,000
+	// for a "standard block" creating an account from a basic output, and a ratio of 0.5 between the
+	// workScore due to the dataByte factor and that due to rest of the factors.
+	workScoreParams := workScoreParamsFromCoefficients(coeffs, standardBlock, 500_000, 0.5)
+	ts := NewTestSuite(t, WithProtocolParametersOptions(iotago.WithWorkScoreOptions(
+		workScoreParams.DataByte, workScoreParams.Block, workScoreParams.Input, workScoreParams.ContextInput,
+		workScoreParams.Output, workScoreParams.NativeToken, workScoreParams.Staking, workScoreParams.BlockIssuer,
+		workScoreParams.Allotment, workScoreParams.SignatureEd25519,
+	)))
+	standardBlock.API = ts.API
+	// verify that the new workScore coefficients yield the desired cost for a standard block
+	fmt.Printf("Standard block cost when RMC = 1: %d\n", lo.PanicOnErr(standardBlock.WorkScore()))
+}
+
+func getStandardBlock(t *testing.T) *iotago.Block {
+	ts := NewTestSuite(t)
+	node := ts.AddValidatorNode("node1")
+	ts.AddDefaultWallet(node)
+	ts.Run(true)
+	tx := ts.DefaultWallet().CreateAccountFromInput(
+		"tx",
+		"Genesis:0",
+		ts.DefaultWallet(),
+		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
+	)
+	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
+	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
+	block := ts.IssueBasicBlockWithOptions("block", ts.DefaultWallet(), tx, mock.WithSlotCommitment(genesisCommitment))
+
+	return block.ProtocolBlock()
 }
 
 func basicInBasicOut(t *testing.T, numIn int, numOut int, signatures bool) (float64, []float64) {
@@ -147,9 +168,13 @@ func basicInBasicOut(t *testing.T, numIn int, numOut int, signatures bool) (floa
 	}
 	// get the ns/op of processing the block
 	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
-	fmt.Printf("Max inputs one output: %f ns/op\n", nsPerBlock)
+	fmt.Printf("%d basic outputs as input, %d basic outputs", numIn, numOut)
+	if signatures {
+		fmt.Printf(", each with different signatures")
+	}
+	fmt.Printf(": %f ns/op\n", nsPerBlock)
 	// get the regressors
-	regressors := GetBlockWorkScoreRegressors(block)
+	regressors := getBlockWorkScoreRegressors(block)
 	printRegressors(regressors)
 
 	return nsPerBlock, regressors
@@ -177,7 +202,7 @@ func basicInAccountOut(t *testing.T, numAccounts int, staking bool) (float64, []
 				"tx1",
 				"Genesis:0",
 				numAccounts,
-				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
+				opts...,
 			)
 			// default block issuer issues a block containing the transaction in slot 1.
 			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
@@ -198,151 +223,15 @@ func basicInAccountOut(t *testing.T, numAccounts int, staking bool) (float64, []
 	}
 	// get the ns/op of processing the block
 	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
-	fmt.Printf("One input one account output and remainder: %f ns/op\n", nsPerBlock)
-	// get the regressors
-	regressors := GetBlockWorkScoreRegressors(block)
-	printRegressors(regressors)
-
-	return nsPerBlock, regressors
-}
-
-func oneInAccStakingOut(t *testing.T) (float64, []float64) {
-	blockchan := make(chan *blocks.Block, 1)
-	var block *iotago.Block
-
-	// basic block with one input, one account output with staking and a remainder
-	fn := func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			ts := NewTestSuite(t)
-			node := ts.AddValidatorNode("node1")
-			ts.AddDefaultWallet(node)
-			ts.Run(true)
-			tx1 := ts.DefaultWallet().CreateAccountFromInput(
-				"tx1",
-				"Genesis:0",
-				ts.DefaultWallet(),
-				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
-				mock.WithStakingFeature(10000, 421, 0, 10),
-				mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Node.Protocol.CommittedAPI().ProtocolParameters())),
-			)
-			// default block issuer issues a block containing the transaction in slot 1.
-			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
-			block = block1.ProtocolBlock()
-			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
-			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
-			b.StartTimer()
-			// time from issuance of the block to when it is scheduled
-			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
-			b.StopTimer()
-			ts.Shutdown()
-		}
+	fmt.Printf("One basic output as input, %d account outputs", numAccounts)
+	if staking {
+		fmt.Printf(" with ")
+	} else {
+		fmt.Printf(" without ")
 	}
-	// get the ns/op of processing the block
-	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
-	fmt.Printf("One input one account with staking output and remainder: %f ns/op\n", nsPerBlock)
+	fmt.Printf("staking feature: %f ns/op\n", nsPerBlock)
 	// get the regressors
-	regressors := GetBlockWorkScoreRegressors(block)
-	printRegressors(regressors)
-
-	return nsPerBlock, regressors
-}
-
-func oneInAccRemOut(t *testing.T) (float64, []float64) {
-	blockchan := make(chan *blocks.Block, 1)
-	var block *iotago.Block
-
-	// basic block with one input, one account output with staking and a remainder
-	fn := func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			ts := NewTestSuite(t)
-			node := ts.AddValidatorNode("node1")
-			ts.AddDefaultWallet(node)
-			ts.Run(true)
-			tx1 := ts.DefaultWallet().CreateAccountFromInput(
-				"tx1",
-				"Genesis:0",
-				ts.DefaultWallet(),
-				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
-				mock.WithAccountAmount(100000),
-				mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Node.Protocol.CommittedAPI().ProtocolParameters())),
-			)
-			// default block issuer issues a block containing the transaction in slot 1.
-			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
-			block = block1.ProtocolBlock()
-			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
-			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
-			b.StartTimer()
-			// time from issuance of the block to when it is scheduled
-			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
-			b.StopTimer()
-			ts.Shutdown()
-		}
-	}
-	// get the ns/op of processing the block
-	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
-	fmt.Printf("One input one account output and remainder: %f ns/op\n", nsPerBlock)
-	// get the regressors
-	regressors := GetBlockWorkScoreRegressors(block)
-	printRegressors(regressors)
-
-	return nsPerBlock, regressors
-}
-
-func oneInAccStakingRemOut(t *testing.T) (float64, []float64) {
-	blockchan := make(chan *blocks.Block, 1)
-	var block *iotago.Block
-
-	// basic block with one input, one account output with staking and a remainder
-	fn := func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			ts := NewTestSuite(t)
-			node := ts.AddValidatorNode("node1")
-			ts.AddDefaultWallet(node)
-			ts.Run(true)
-			tx1 := ts.DefaultWallet().CreateAccountFromInput(
-				"tx1",
-				"Genesis:0",
-				ts.DefaultWallet(),
-				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
-				mock.WithStakingFeature(10000, 421, 0, 10),
-				mock.WithAccountAmount(100000),
-				mock.WithAccountMana(mock.MaxBlockManaCost(ts.DefaultWallet().Node.Protocol.CommittedAPI().ProtocolParameters())),
-			)
-			// default block issuer issues a block containing the transaction in slot 1.
-			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
-			block = block1.ProtocolBlock()
-			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
-			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
-			b.StartTimer()
-			// time from issuance of the block to when it is scheduled
-			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
-			b.StopTimer()
-			ts.Shutdown()
-		}
-	}
-	// get the ns/op of processing the block
-	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
-	fmt.Printf("One input one account with staking output and remainder: %f ns/op\n", nsPerBlock)
-	// get the regressors
-	regressors := GetBlockWorkScoreRegressors(block)
+	regressors := getBlockWorkScoreRegressors(block)
 	printRegressors(regressors)
 
 	return nsPerBlock, regressors
@@ -392,54 +281,9 @@ func accountInAccountOut(t *testing.T, numAccounts int) (float64, []float64) {
 	}
 	// get the ns/op of processing the block
 	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
-	fmt.Printf("One account input one account output: %f ns/op\n", nsPerBlock)
+	fmt.Printf("One account input %d account outputs: %f ns/op\n", numAccounts, nsPerBlock)
 	// get the regressors
-	regressors := GetBlockWorkScoreRegressors(block)
-	printRegressors(regressors)
-
-	return nsPerBlock, regressors
-}
-
-func accInAccStakingOut(t *testing.T) (float64, []float64) {
-	blockchan := make(chan *blocks.Block, 1)
-	var block *iotago.Block
-
-	// basic block with one input, one account output with staking and a remainder
-	fn := func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			ts := NewTestSuite(t)
-			node := ts.AddValidatorNode("node1")
-			ts.AddDefaultWallet(node)
-			ts.Run(true)
-			tx1 := ts.DefaultWallet().TransitionAccount(
-				"tx1",
-				"Genesis:2",
-				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
-				mock.WithStakingFeature(10000, 421, 0, 10),
-			)
-			// default block issuer issues a block containing the transaction in slot 1.
-			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
-			block = block1.ProtocolBlock()
-			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
-			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
-			b.StartTimer()
-			// time from issuance of the block to when it is scheduled
-			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
-			b.StopTimer()
-			ts.Shutdown()
-		}
-	}
-	// get the ns/op of processing the block
-	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
-	fmt.Printf("One account input one account output with staking: %f ns/op\n", nsPerBlock)
-	// get the regressors
-	regressors := GetBlockWorkScoreRegressors(block)
+	regressors := getBlockWorkScoreRegressors(block)
 	printRegressors(regressors)
 
 	return nsPerBlock, regressors
@@ -493,10 +337,10 @@ func basicInNativeOut(t *testing.T, nNative int) (float64, []float64) {
 	// get the ns/op of processing the block
 	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
 
-	fmt.Printf("One input max native token outputs: %f ns/op\n", nsPerBlock)
+	fmt.Printf("One input, %d native token outputs: %f ns/op\n", nNative, nsPerBlock)
 
 	// get the regressors
-	regressors := GetBlockWorkScoreRegressors(block)
+	regressors := getBlockWorkScoreRegressors(block)
 	printRegressors(regressors)
 	return nsPerBlock, regressors
 }
@@ -554,7 +398,7 @@ func nativeInNativeOut(t *testing.T) (float64, []float64) {
 	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
 	fmt.Printf("One native token in one native token output: %f ns/op\n", nsPerBlock)
 	// get the regressors
-	regressors := GetBlockWorkScoreRegressors(block)
+	regressors := getBlockWorkScoreRegressors(block)
 	printRegressors(regressors)
 
 	return nsPerBlock, regressors
@@ -612,9 +456,9 @@ func allotments(t *testing.T, numAllotments int) (float64, []float64) {
 	}
 	// get the ns/op of processing the block
 	nsPerBlock := float64(testing.Benchmark(fn).NsPerOp())
-	fmt.Printf("One input: %f ns/op\n", nsPerBlock)
+	fmt.Printf("One input, %d allotments: %f ns/op\n", numAllotments, nsPerBlock)
 	// get the regressors
-	regressors := GetBlockWorkScoreRegressors(block)
+	regressors := getBlockWorkScoreRegressors(block)
 	printRegressors(regressors)
 
 	return nsPerBlock, regressors
@@ -638,24 +482,24 @@ func printCoefficients(coefficients []float64) {
 			minCoeff = coeff
 		}
 	}
-	normalisedCoeffs := make([]float64, len(coefficients))
+	normalisedCoeffs := make([]int, len(coefficients))
 	for i, coeff := range coefficients {
-		normalisedCoeffs[i] = coeff / minCoeff
+		normalisedCoeffs[i] = int(coeff / minCoeff)
 	}
 
 	fmt.Println("Calculated coefficients from regression:")
-	fmt.Printf("Block: %f\n", normalisedCoeffs[0])
-	fmt.Printf("Input: %f\n", normalisedCoeffs[1])
-	fmt.Printf("ContextInput: %f\n", normalisedCoeffs[2])
-	fmt.Printf("Output: %f\n", normalisedCoeffs[3])
-	fmt.Printf("NativeToken: %f\n", normalisedCoeffs[4])
-	fmt.Printf("Staking: %f\n", normalisedCoeffs[5])
-	fmt.Printf("BlockIssuer: %f\n", normalisedCoeffs[6])
-	fmt.Printf("Allotment: %f\n", normalisedCoeffs[7])
-	fmt.Printf("SignatureEd25519: %f\n", normalisedCoeffs[8])
+	fmt.Printf("Block: %d\n", normalisedCoeffs[0])
+	fmt.Printf("Input: %d\n", normalisedCoeffs[1])
+	fmt.Printf("ContextInput: %d\n", normalisedCoeffs[2])
+	fmt.Printf("Output: %d\n", normalisedCoeffs[3])
+	fmt.Printf("NativeToken: %d\n", normalisedCoeffs[4])
+	fmt.Printf("Staking: %d\n", normalisedCoeffs[5])
+	fmt.Printf("BlockIssuer: %d\n", normalisedCoeffs[6])
+	fmt.Printf("Allotment: %d\n", normalisedCoeffs[7])
+	fmt.Printf("SignatureEd25519: %d\n", normalisedCoeffs[8])
 }
 
-func GetBlockWorkScoreRegressors(block *iotago.Block) []float64 {
+func getBlockWorkScoreRegressors(block *iotago.Block) []float64 {
 	regressors := make([]float64, 8)
 
 	basicBlockBody, isBasic := block.Body.(*iotago.BasicBlockBody)
@@ -697,4 +541,33 @@ func GetBlockWorkScoreRegressors(block *iotago.Block) []float64 {
 	}
 
 	return regressors
+}
+
+// workScoreParamsFromCoefficients creates a WorkScoreParameters from the coefficients provided by the regression model.
+// The parameters are scaled such that the the standardBlock has workScore of standardBlockMinCost. This represents the Mana cost
+// of the "standard block" when the reference Mana cost (RMC) is at its minimum value of 1.
+// The dataByteRatio is the ratio of the part of the WorkScore due to the DataBytes factor to that due to the rest of the factors.
+func workScoreParamsFromCoefficients(coeffs []float64, standardBlock *iotago.Block, standardBlockMinCost iotago.Mana, dataByteRatio float64) iotago.WorkScoreParameters {
+	standarBlockRegressors := getBlockWorkScoreRegressors(standardBlock)
+	fmt.Printf("Standard block regressors: %+v\n", standarBlockRegressors)
+	standardBlockWorkScore := coeffs[0]
+	for i, regressor := range standarBlockRegressors {
+		standardBlockWorkScore += regressor * coeffs[i+1]
+	}
+	scalingFactor := float64(standardBlockMinCost) / (standardBlockWorkScore * (1 + dataByteRatio))
+	payloadSize := standardBlock.Body.(*iotago.BasicBlockBody).Payload.Size()
+	dataByteFactor := (standardBlockWorkScore * (dataByteRatio * scalingFactor) / float64(payloadSize))
+
+	return iotago.WorkScoreParameters{
+		DataByte:         iotago.WorkScore(dataByteFactor),
+		Block:            iotago.WorkScore(coeffs[0] * scalingFactor),
+		Input:            iotago.WorkScore(coeffs[1] * scalingFactor),
+		ContextInput:     iotago.WorkScore(coeffs[2] * scalingFactor),
+		Output:           iotago.WorkScore(coeffs[3] * scalingFactor),
+		NativeToken:      iotago.WorkScore(coeffs[4] * scalingFactor),
+		Staking:          iotago.WorkScore(coeffs[5] * scalingFactor),
+		BlockIssuer:      iotago.WorkScore(coeffs[6] * scalingFactor),
+		Allotment:        iotago.WorkScore(coeffs[7] * scalingFactor),
+		SignatureEd25519: iotago.WorkScore(coeffs[8] * scalingFactor),
+	}
 }
