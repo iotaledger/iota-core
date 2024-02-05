@@ -19,6 +19,7 @@ import (
 
 // Test_Regression runs benchmarks for many block types and find the best fit regression model.
 func Test_Regression(t *testing.T) {
+	t.Skip("This test is only intended to be run locally to determine new WorkScoreParameters")
 	r := new(regression.Regression)
 	r.SetObserved("ns/op")
 	r.SetVar(0, "Input")
@@ -68,11 +69,15 @@ func Test_Regression(t *testing.T) {
 	coeffs := r.GetCoeffs()
 	printCoefficients(coeffs)
 
+	// standardBlock is a block creating an account from a basic input.
 	standardBlock := getStandardBlock(t)
-	// calculate the workScoreParameters from the coefficients based on a desired Mana cost of 500,000
-	// for a "standard block" creating an account from a basic output, and a ratio of 0.5 between the
-	// workScore due to the dataByte factor and that due to rest of the factors.
-	workScoreParams := workScoreParamsFromCoefficients(coeffs, standardBlock, 500_000, 0.5)
+	// standardBlockCost is the desired cost of the "standard block".
+	// i.e. we want to set the workScore coefficients such that the standard block costs this much.
+	standardBlockCost := iotago.Mana(500_000)
+	// dataByteRatio is the ratio of the workScore due to the dataByte factor to that due to the rest of the factors.
+	dataByteRatio := 0.5
+	// calculate the workScoreParameters from the coefficients based on a standardBlockCost of 500,000 Mana and dataByteRatio of 0.5
+	workScoreParams := workScoreParamsFromCoefficients(coeffs, standardBlock, standardBlockCost, dataByteRatio)
 	ts := NewTestSuite(t, WithProtocolParametersOptions(iotago.WithWorkScoreOptions(
 		workScoreParams.DataByte, workScoreParams.Block, workScoreParams.Input, workScoreParams.ContextInput,
 		workScoreParams.Output, workScoreParams.NativeToken, workScoreParams.Staking, workScoreParams.BlockIssuer,
@@ -417,7 +422,7 @@ func allotments(t *testing.T, numAllotments int) (float64, []float64) {
 			for i := 0; i < numAllotments; i++ {
 				ts.AddGenesisAccount(snapshotcreator.AccountDetails{
 					Address:              nil,
-					Amount:               mock.MinIssuerAccountAmount(ts.API.ProtocolParameters()) * 10,
+					Amount:               mock.MinIssuerAccountAmount(ts.API.ProtocolParameters()),
 					Mana:                 0,
 					IssuerKey:            tpkg.RandBlockIssuerKey(),
 					ExpirySlot:           iotago.MaxSlotIndex,

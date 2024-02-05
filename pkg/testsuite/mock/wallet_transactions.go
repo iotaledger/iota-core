@@ -999,6 +999,9 @@ func (w *Wallet) createSignedTransactionWithOptions(transactionName string, addr
 }
 
 func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Transaction, indexes ...uint32) {
+	if indexes == nil {
+		indexes = []uint32{0}
+	}
 	currentAPI := w.Node.Protocol.CommittedAPI()
 	(lo.PanicOnErr(transaction.ID())).RegisterAlias(transactionName)
 	w.transactions[transactionName] = transaction
