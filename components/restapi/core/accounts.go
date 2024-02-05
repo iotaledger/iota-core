@@ -61,10 +61,10 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	var err error
 	pageSize := restapi.ParamsRestAPI.MaxPageSize
-	if len(c.QueryParam(api.QueryParameterPageSize)) > 0 {
-		pageSize, err = httpserver.ParseUint32QueryParam(c, api.QueryParameterPageSize)
+	if len(c.QueryParam(api.ParameterPageSize)) > 0 {
+		pageSize, err = httpserver.ParseUint32QueryParam(c, api.ParameterPageSize)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse page size %s", c.Param(api.QueryParameterPageSize))
+			return nil, ierrors.Wrapf(err, "failed to parse page size %s", c.Param(api.ParameterPageSize))
 		}
 		if pageSize > restapi.ParamsRestAPI.MaxPageSize {
 			pageSize = restapi.ParamsRestAPI.MaxPageSize
@@ -74,10 +74,10 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	// no cursor provided will be the first request
 	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
-	if len(c.QueryParam(api.QueryParameterCursor)) != 0 {
-		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, api.QueryParameterCursor)
+	if len(c.QueryParam(api.ParameterCursor)) != 0 {
+		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, api.ParameterCursor)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse cursor %s", c.Param(api.QueryParameterCursor))
+			return nil, ierrors.Wrapf(err, "failed to parse cursor %s", c.Param(api.ParameterCursor))
 		}
 	}
 
