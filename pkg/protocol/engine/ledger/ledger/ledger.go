@@ -741,7 +741,7 @@ func (l *Ledger) resolveState(stateRef mempool.StateReference) *promise.Promise[
 		commitment := stateRef.(mempool.CommitmentInputStateRef).Input
 		loadedCommitment, err := l.loadCommitment(commitment.CommitmentID)
 		if err != nil {
-			return p.Reject(ierrors.Join(iotago.ErrCommitmentInputInvalid, ierrors.Wrapf(err, "failed to load commitment %s", commitment.CommitmentID)))
+			return p.Reject(ierrors.Join(iotago.ErrCommitmentInputReferenceInvalid, ierrors.Wrapf(err, "failed to load commitment %s", commitment.CommitmentID)))
 		}
 
 		return p.Resolve(mempool.CommitmentInputStateFromCommitment(loadedCommitment))
