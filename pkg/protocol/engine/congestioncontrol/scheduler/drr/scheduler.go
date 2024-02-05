@@ -219,17 +219,15 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, workScores ..
 	if s.basicBuffer.Size() == 0 {
 		return true
 	}
-	work := iotago.WorkScore(0)
-	for _, workScore := range workScores {
-		work += workScore
-	}
 
-	// if no specific work score is provided, assume max block work score.
-	if work == 0 {
-		currentAPI := s.apiProvider.CommittedAPI()
-		if len(workScores) == 0 {
-			work = currentAPI.MaxBlockWork()
+	var work iotago.WorkScore
+	if len(workScores) > 0 {
+		for _, workScore := range workScores {
+			work += workScore
 		}
+	} else {
+		// if no specific work score is provided, assume max block work score.
+		work = s.apiProvider.CommittedAPI().MaxBlockWork()
 	}
 
 	deficit, exists := s.deficits.Get(accountID)

@@ -22,7 +22,7 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 		return nil, err
 	}
 
-	workScore, err := httpserver.ParseWorkScoreParam(c, api.ParameterWorkScore)
+	workScore, err := httpserver.ParseWorkScoreQueryParam(c, api.ParameterWorkScore)
 	if err != nil {
 		return nil, err
 	}

@@ -23,10 +23,10 @@ require (
 	github.com/iotaledger/hive.go/runtime v0.0.0-20240126143305-9caf79103e85
 	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240126143305-9caf79103e85
 	github.com/iotaledger/hive.go/stringify v0.0.0-20240126143305-9caf79103e85
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240125161730-faf053c90f7b
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240205143850-53158342305c
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240125161426-1846f6320506
 	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240205131109-72af13887479
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240205135859-2e6b70b484d6
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/labstack/gommon v0.4.2
 	github.com/libp2p/go-libp2p v0.32.2
