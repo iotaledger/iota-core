@@ -227,7 +227,7 @@ services:
       - iota-core
     command: >
       --inx.address=node-1-validator:9029
-      --restAPI.bindAddress=inx-indexer:9011
+      --restAPI.bindAddress=inx-indexer:9091
 
   inx-mqtt:
     image: iotaledger/inx-mqtt:2.0-alpha
@@ -250,7 +250,7 @@ services:
       node-1-validator:
         condition: service_healthy
       inx-indexer:
-        condition: service_started
+        condition: service_healthy
     networks:
       - iota-core
     environment:
@@ -269,7 +269,7 @@ services:
       node-1-validator:
         condition: service_healthy
       inx-indexer:
-        condition: service_started
+        condition: service_healthy
       inx-blockissuer:
         condition: service_started
     networks:
