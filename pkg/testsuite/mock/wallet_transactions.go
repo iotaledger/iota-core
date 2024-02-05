@@ -389,8 +389,14 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, i
 
 	inputState := w.Output(inputName)
 	inputAccountState := w.AccountOutput(accountName)
-	inputAccount := inputAccountState.Output().(*iotago.AccountOutput)
-	accountAddr := inputAccount.AccountID.ToAddress().(*iotago.AccountAddress)
+	inputAccount, isAccount := inputAccountState.Output().(*iotago.AccountOutput)
+	if !isAccount {
+		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", accountName))
+	}
+	accountAddr, isAccountAddress := inputAccount.AccountID.ToAddress().(*iotago.AccountAddress)
+	if !isAccountAddress {
+		panic(fmt.Sprintf("account address of output with alias %s is not *iotago.AccountAddress", accountName))
+	}
 	serialNumber := inputAccount.FoundryCounter + 1
 
 	totalIn := inputState.BaseTokenAmount()
@@ -423,12 +429,17 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, i
 			Amount: baseTokenEach,
 			Mana:   0,
 			UnlockConditions: iotago.BasicOutputUnlockConditions{
-				&iotago.AddressUnlockCondition{Address: w.Address(uint32(index))},
+				&iotago.AddressUnlockCondition{Address: w.Address(index)},
 			},
 			Features: iotago.BasicOutputFeatures{
 				nativeTokenFeature,
 			},
 		})
+	}
+
+	accountOutput, isAccount := outputStates[1].(*iotago.AccountOutput)
+	if !isAccount {
+		panic("output with alias accountName is not *iotago.AccountOutput")
 	}
 
 	signedTransaction := w.createSignedTransactionWithOptions(
@@ -437,7 +448,7 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, i
 		WithInputs(utxoledger.Outputs{inputState, inputAccountState}),
 		WithOutputs(outputStates),
 		WithBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{
-			AccountID: outputStates[1].(*iotago.AccountOutput).AccountID,
+			AccountID: accountOutput.AccountID,
 		}),
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
@@ -449,10 +460,16 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, i
 
 func (w *Wallet) TransitionFoundry(transactionName string, inputName string, accountName string) *iotago.SignedTransaction {
 	input := w.Output(inputName)
-	inputFoundry := input.Output().(*iotago.FoundryOutput)
+	inputFoundry, isFoundry := input.Output().(*iotago.FoundryOutput)
+	if !isFoundry {
+		panic(fmt.Sprintf("output with alias %s is not *iotago.FoundryOutput", inputName))
+	}
 	inputAccount := w.AccountOutput(accountName)
 	nativeTokenAmount := inputFoundry.FeatureSet().NativeToken().Amount
-	previousTokenScheme := inputFoundry.TokenScheme.(*iotago.SimpleTokenScheme)
+	previousTokenScheme, isSimple := inputFoundry.TokenScheme.(*iotago.SimpleTokenScheme)
+	if !isSimple {
+		panic("only simple token schemes supported")
+	}
 	tokenScheme := &iotago.SimpleTokenScheme{
 		MaximumSupply: previousTokenScheme.MaximumSupply,
 		MeltedTokens:  previousTokenScheme.MeltedTokens,
@@ -467,7 +484,11 @@ func (w *Wallet) TransitionFoundry(transactionName string, inputName string, acc
 		TokenScheme(tokenScheme).
 		MustBuild()
 
-	outputAccount := builder.NewAccountOutputBuilderFromPrevious(inputAccount.Output().(*iotago.AccountOutput)).
+	inputAccountOutput, isAccountOutput := inputAccount.Output().(*iotago.AccountOutput)
+	if !isAccountOutput {
+		panic(fmt.Sprintf("output with alias %s is not *iotago.AccountOutput", accountName))
+	}
+	outputAccount := builder.NewAccountOutputBuilderFromPrevious(inputAccountOutput).
 		MustBuild()
 
 	signedTransaction := w.createSignedTransactionWithOptions(
@@ -597,7 +618,7 @@ func (w *Wallet) CreateBasicOutputsAtAddressesFromInput(transactionName string, 
 			Amount: tokenAmount,
 			Mana:   manaAmount,
 			UnlockConditions: iotago.BasicOutputUnlockConditions{
-				&iotago.AddressUnlockCondition{Address: w.Address(uint32(index))},
+				&iotago.AddressUnlockCondition{Address: w.Address(index)},
 			},
 			Features: iotago.BasicOutputFeatures{},
 		})
@@ -1024,6 +1045,7 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 					}
 				}
 				w.outputs[fmt.Sprintf("%s:%d", transactionName, outputID.Index())] = utxoledger.CreateOutput(w.Node.Protocol, actualOutputID, iotago.EmptyBlockID, currentAPI.TimeProvider().SlotFromTime(time.Now()), clonedOutput, lo.PanicOnErr(iotago.OutputIDProofFromTransaction(transaction, outputID.Index())))
+
 				break
 			}
 		}
