@@ -71,7 +71,7 @@ require (
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240125161730-faf053c90f7b // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240125161426-1846f6320506 // indirect
 	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240125151023-8623fbbce914 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240202111251-e3c83fac64c4 // indirect
 	github.com/ipfs/boxo v0.17.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
