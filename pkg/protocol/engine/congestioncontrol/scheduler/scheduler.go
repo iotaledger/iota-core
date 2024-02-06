@@ -10,7 +10,7 @@ type Scheduler interface {
 	// AddBlock adds a block to the scheduling buffer.
 	AddBlock(*blocks.Block)
 	// IsBlockIssuerReady returns true if the block issuer is ready to issuer a block, i.e., if the block issuer were to add a block to the scheduler, would it be scheduled.
-	IsBlockIssuerReady(iotago.AccountID, ...*blocks.Block) bool
+	IsBlockIssuerReady(iotago.AccountID, ...iotago.WorkScore) bool
 	// BasicBufferSize returns the current buffer size of the Scheduler as block count.
 	BasicBufferSize() int
 	// ValidatorBufferSize returns the current buffer size of the Scheduler as block count.
