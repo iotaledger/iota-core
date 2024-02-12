@@ -10,7 +10,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/congestioncontrol/scheduler"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/blockgadget"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/consensus/slotgadget"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/eviction"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/ledger"
@@ -29,7 +28,6 @@ type Events struct {
 	AcceptedBlockProcessed *event.Event1[*blocks.Block]
 	StoragePruned          *event.Event1[iotago.EpochIndex]
 
-	EvictionState   *eviction.Events
 	PreSolidFilter  *presolidfilter.Events
 	PostSolidFilter *postsolidfilter.Events
 	BlockRequester  *eventticker.Events[iotago.SlotIndex, iotago.BlockID]
@@ -56,7 +54,6 @@ var NewEvents = event.CreateGroupConstructor(func() (newEvents *Events) {
 		BlockProcessed:         event.New1[iotago.BlockID](),
 		AcceptedBlockProcessed: event.New1[*blocks.Block](),
 		StoragePruned:          event.New1[iotago.EpochIndex](),
-		EvictionState:          eviction.NewEvents(),
 		PreSolidFilter:         presolidfilter.NewEvents(),
 		PostSolidFilter:        postsolidfilter.NewEvents(),
 		BlockRequester:         eventticker.NewEvents[iotago.SlotIndex, iotago.BlockID](),

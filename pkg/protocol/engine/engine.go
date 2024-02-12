@@ -461,8 +461,6 @@ func (e *Engine) setupBlockStorage() {
 }
 
 func (e *Engine) setupEvictionState() {
-	e.Events.EvictionState.LinkTo(e.EvictionState.Events)
-
 	wp := e.Workers.CreatePool("EvictionState", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
 
 	e.Events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
@@ -471,17 +469,15 @@ func (e *Engine) setupEvictionState() {
 
 	e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		e.EvictionState.AdvanceActiveWindowToIndex(commitment.Slot())
-	}, event.WithWorkerPool(wp))
-
-	e.Events.EvictionState.SlotEvicted.Hook(e.BlockCache.EvictUntil)
+		e.BlockRequester.EvictUntil(commitment.Slot())
+		e.BlockCache.EvictUntil(commitment.Slot())
+	})
 
 	e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Slot())
 }
 
 func (e *Engine) setupBlockRequester() {
 	e.Events.BlockRequester.LinkTo(e.BlockRequester.Events)
-
-	e.Events.EvictionState.SlotEvicted.Hook(e.BlockRequester.EvictUntil)
 
 	// We need to hook to make sure that the request is created before the block arrives to avoid a race condition
 	// where we try to delete the request again before it is created. Thus, continuing to request forever.
