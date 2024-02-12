@@ -2,8 +2,6 @@ package mempoolv1
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	"github.com/iotaledger/hive.go/core/memstorage"
 	"github.com/iotaledger/hive.go/ds"
@@ -189,7 +187,6 @@ func (m *MemPool[VoteRank]) CommitStateDiff(slot iotago.SlotIndex) (mempool.Stat
 }
 
 func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error) {
-	fmt.Println("try to get state diff for slot", slot, m.lastEvictedSlot)
 	if m.lastCommittedSlot >= slot {
 		return nil, ierrors.Errorf("slot %d is older than last evicted slot %d", slot, m.lastCommittedSlot)
 	}
@@ -235,11 +232,6 @@ func (m *MemPool[VoteRank]) Reset() {
 
 // Evict evicts the slot with the given slot from the MemPool.
 func (m *MemPool[VoteRank]) evict(slot iotago.SlotIndex) *StateDiff {
-	start := time.Now()
-	defer func() {
-		fmt.Println(">> eviction of mempool for slot ", slot, " took", time.Now().Sub(start))
-	}()
-
 	m.lastCommittedSlot = slot
 
 	stateDiff, _ := m.stateDiffs.DeleteAndReturn(slot)
@@ -463,8 +455,6 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 			return ierrors.Wrapf(err, "failed to get state diff for slot %d", newIndex)
 		}
 
-		fmt.Println(">> add transaction to the state diff OnEarliestIncludedAttachmentUpdated", transaction.EarliestIncludedAttachment().Slot(), transaction.ID(), transaction.EarliestIncludedAttachment())
-
 		if err = stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
 			return ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID())
 		}
@@ -494,8 +484,6 @@ func (m *MemPool[VoteRank]) setupTransaction(transaction *TransactionMetadata) {
 
 				return
 			}
-
-			fmt.Println(">> add transaction to the state diff because it was accepted", slot, transaction.ID(), transaction.EarliestIncludedAttachment())
 
 			if err := stateDiff.AddTransaction(transaction, m.errorHandler); err != nil {
 				m.errorHandler(ierrors.Wrapf(err, "failed to add transaction to state diff, txID: %s", transaction.ID()))

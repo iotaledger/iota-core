@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"fmt"
 	"sync/atomic"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -303,8 +302,6 @@ func (w *WarpSync) ProcessRequest(commitmentID iotago.CommitmentID, from peer.ID
 		if err != nil {
 			return ierrors.Wrap(err, "failed to get mutations")
 		}
-
-		fmt.Println(">> send warp sync response ", commitmentID, "len(transactionIDs)", len(transactionIDs))
 
 		w.protocol.Network.SendWarpSyncResponse(commitmentID, blocks, blocksProof, transactionIDs, transactionIDsProof, from)
 
