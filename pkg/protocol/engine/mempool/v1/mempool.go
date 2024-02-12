@@ -183,7 +183,7 @@ func (m *MemPool[VoteRank]) CommitStateDiff(slot iotago.SlotIndex) (mempool.Stat
 		return nil, ierrors.Errorf("slot %d is older than last committed slot %d", slot, m.lastCommittedSlot)
 	}
 
-	return m.evict(slot), nil
+	return m.evict(slot)
 }
 
 func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error) {
@@ -231,10 +231,16 @@ func (m *MemPool[VoteRank]) Reset() {
 }
 
 // Evict evicts the slot with the given slot from the MemPool.
-func (m *MemPool[VoteRank]) evict(slot iotago.SlotIndex) *StateDiff {
+func (m *MemPool[VoteRank]) evict(slot iotago.SlotIndex) (stateDiff *StateDiff, err error) {
 	m.lastCommittedSlot = slot
 
-	stateDiff, _ := m.stateDiffs.DeleteAndReturn(slot)
+	stateDiff, deleted := m.stateDiffs.DeleteAndReturn(slot)
+	if !deleted {
+		stateDiff, err = m.stateDiff(slot)
+		if err != nil {
+			return nil, ierrors.Wrap(err, "failed to create empty StateDiff instance")
+		}
+	}
 
 	if evictedAttachments := m.attachments.Evict(slot); evictedAttachments != nil {
 		evictedAttachments.ForEach(func(blockID iotago.BlockID, signedTransactionMetadata *SignedTransactionMetadata) bool {
@@ -251,7 +257,7 @@ func (m *MemPool[VoteRank]) evict(slot iotago.SlotIndex) *StateDiff {
 	// No need to evict delayed eviction slot if the committed slot is below maxCommittableAge,
 	// as there is nothing to evict anyway at this point.
 	if slot <= genesisSlot+maxCommittableAge {
-		return stateDiff
+		return stateDiff, nil
 	}
 
 	delayedEvictionSlot := slot - maxCommittableAge
@@ -273,7 +279,7 @@ func (m *MemPool[VoteRank]) evict(slot iotago.SlotIndex) *StateDiff {
 		m.delayedOutputStateEviction.Delete(delayedEvictionSlot)
 	}
 
-	return stateDiff
+	return stateDiff, nil
 }
 
 func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTransaction, transaction mempool.Transaction, blockID iotago.BlockID) (storedSignedTransaction *SignedTransactionMetadata, isNewSignedTransaction bool, isNewTransaction bool, err error) {
