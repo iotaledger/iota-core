@@ -46,6 +46,7 @@ func NewBucketManager(dbConfig database.Config, errorHandler func(error), opts .
 	}, opts, func(m *BucketManager) {
 		// We use an LRU cache to try closing unnecessary databases.
 		m.openDBsCache = cache.New[iotago.EpochIndex, *database.DBInstance](m.optsMaxOpenDBs)
+		//nolint:revive
 		m.openDBsCache.SetEvictCallback(func(baseIndex iotago.EpochIndex, db *database.DBInstance) {
 			db.Close()
 		})
@@ -77,7 +78,7 @@ func (b *BucketManager) Lock() {
 	b.openDBsCacheMutex.Lock()
 
 	// Lock access to all KVStores so that they can't be reopened by components that store references to them (e.g., StateDiff)
-	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
+	b.openDBs.ForEach(func(_ iotago.EpochIndex, db *database.DBInstance) bool {
 		db.LockAccess()
 
 		return true
@@ -85,7 +86,7 @@ func (b *BucketManager) Lock() {
 }
 
 func (b *BucketManager) Unlock() {
-	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
+	b.openDBs.ForEach(func(_ iotago.EpochIndex, db *database.DBInstance) bool {
 		db.UnlockAccess()
 
 		return true
@@ -121,13 +122,13 @@ func (b *BucketManager) Shutdown() {
 func (b *BucketManager) TotalSize() int64 {
 	// Sum up all the evicted databases
 	var sum int64
-	b.dbSizes.ForEach(func(epoch iotago.EpochIndex, i int64) bool {
+	b.dbSizes.ForEach(func(_ iotago.EpochIndex, i int64) bool {
 		sum += i
 		return true
 	})
 
 	// Add up all the open databases
-	b.openDBs.ForEach(func(key iotago.EpochIndex, val *database.DBInstance) bool {
+	b.openDBs.ForEach(func(key iotago.EpochIndex, _ *database.DBInstance) bool {
 		size, err := dbPrunableDirectorySize(b.dbConfig.Directory, key)
 		if err != nil {
 			b.errorHandler(ierrors.Wrapf(err, "dbPrunableDirectorySize failed for key %s: %s", b.dbConfig.Directory, key))
@@ -301,7 +302,7 @@ func (b *BucketManager) PruneSlots(epoch iotago.EpochIndex, startPruneRange iota
 
 func (b *BucketManager) Flush() error {
 	var innerErr error
-	b.openDBs.ForEach(func(epoch iotago.EpochIndex, db *database.DBInstance) bool {
+	b.openDBs.ForEach(func(_ iotago.EpochIndex, db *database.DBInstance) bool {
 		if err := db.KVStore().Flush(); err != nil {
 			innerErr = err
 		}

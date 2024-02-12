@@ -36,6 +36,7 @@ func (s *SlotTracker) TrackVotes(slot iotago.SlotIndex, voterID iotago.AccountID
 	}
 
 	var previousSlot iotago.SlotIndex
+	//nolint:revive
 	updatedSlot := s.votesPerIdentity.Compute(voterID, func(currentSlot iotago.SlotIndex, exists bool) iotago.SlotIndex {
 		previousSlot = currentSlot
 		if slot > previousSlot {
