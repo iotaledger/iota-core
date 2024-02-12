@@ -470,8 +470,16 @@ func (e *Engine) setupEvictionState() {
 	e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
 		e.EvictionState.AdvanceActiveWindowToIndex(commitment.Slot())
 		e.BlockRequester.EvictUntil(commitment.Slot())
-		e.BlockCache.EvictUntil(commitment.Slot())
 	})
+
+	// We evict the block cache and trigger the eviction event in a separate worker pool.
+	// The block cache can be evicted asynchronously, as its internal state is defined via the EvictionState, and it will
+	// be updated accordingly on LatestCommitmentUpdated (atomically).
+	evictionWP := e.Workers.CreatePool("Eviction", workerpool.WithWorkerCount(1)) // Using just 1 worker to avoid contention
+	e.Events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+		e.BlockCache.Evict(commitment.Slot())
+		e.Events.Evict.Trigger(commitment.Slot())
+	}, event.WithWorkerPool(evictionWP))
 
 	e.EvictionState.Initialize(e.Storage.Settings().LatestCommitment().Slot())
 }

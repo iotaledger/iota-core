@@ -73,7 +73,8 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
 
 			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, e.Workers.CreateGroup("MemPool"), l.spendDAG, l.apiProvider, l.errorHandler)
-			e.BlockCache.Evict.Hook(l.memPool.Evict)
+			// TODO: remove this and make eviction atomic
+			e.Events.Evict.Hook(l.memPool.Evict)
 
 			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput, l.accountsLedger.Account)
 			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()

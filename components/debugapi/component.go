@@ -121,7 +121,7 @@ func configure() error {
 		}
 	})
 
-	deps.Protocol.Events.Engine.EvictionState.SlotEvicted.Hook(func(index iotago.SlotIndex) {
+	deps.Protocol.Events.Engine.Evict.Hook(func(index iotago.SlotIndex) {
 		blocksInSlot, exists := blocksPerSlot.Get(index)
 		if !exists {
 			return
