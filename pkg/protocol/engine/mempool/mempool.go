@@ -25,9 +25,7 @@ type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] interface {
 
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transaction TransactionMetadata, exists bool)
 
-	StateDiff(slot iotago.SlotIndex) (StateDiff, error)
-
-	Evict(slot iotago.SlotIndex)
+	CommitStateDiff(slot iotago.SlotIndex) (StateDiff, error)
 
 	// Reset resets the component to a clean state as if it was created at the last commitment.
 	Reset()
