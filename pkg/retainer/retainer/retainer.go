@@ -97,7 +97,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			}
 		}, asyncOpt)
 
-		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, err error) {
+		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, _ error) {
 			r.RetainBlockFailure(b.ID(), api.BlockFailureDroppedDueToCongestion)
 		})
 

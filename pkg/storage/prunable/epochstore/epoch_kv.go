@@ -55,6 +55,7 @@ func (e *EpochKVStore) LastPrunedEpoch() (iotago.EpochIndex, bool) {
 }
 
 func (e *EpochKVStore) GetEpoch(epoch iotago.EpochIndex) (kvstore.KVStore, error) {
+	//nolint:revive
 	_, _ = e.lastAccessedEpoch.Compute(func(lastAccessedEpoch iotago.EpochIndex, exists bool) (newValue iotago.EpochIndex, err error) {
 		if lastAccessedEpoch >= epoch {
 			return lastAccessedEpoch, kvstore.ErrTypedValueNotChanged
