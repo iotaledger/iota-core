@@ -27,6 +27,12 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 		return nil, err
 	}
 
+	// if work score is 0, we don't pass it to the scheduler
+	workScores := []iotago.WorkScore{}
+	if workScore != 0 {
+		workScores = append(workScores, workScore)
+	}
+
 	commitment := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
 	if commitmentID != iotago.EmptyCommitmentID {
 		// a commitment ID was provided, so we use the commitment for that ID
@@ -58,7 +64,7 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 
 	return &api.CongestionResponse{
 		Slot:                 commitment.Slot(),
-		Ready:                deps.Protocol.Engines.Main.Get().Scheduler.IsBlockIssuerReady(accountID, workScore),
+		Ready:                deps.Protocol.Engines.Main.Get().Scheduler.IsBlockIssuerReady(accountID, workScores...),
 		ReferenceManaCost:    commitment.ReferenceManaCost(),
 		BlockIssuanceCredits: acc.Credits.Value,
 	}, nil
