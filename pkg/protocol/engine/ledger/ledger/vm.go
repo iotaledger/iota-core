@@ -101,10 +101,10 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 	for _, inp := range bicInputs {
 		accountData, exists, accountErr := v.ledger.accountsLedger.Account(inp.AccountID, commitmentInput.Slot)
 		if accountErr != nil {
-			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, commitmentInput.Slot))
+			return nil, ierrors.Join(iotago.ErrBICInputReferenceInvalid, ierrors.Wrapf(accountErr, "could not get BIC input for account %s in slot %d", inp.AccountID, commitmentInput.Slot))
 		}
 		if !exists {
-			return nil, ierrors.Join(iotago.ErrBICInputInvalid, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, commitmentInput.Slot))
+			return nil, ierrors.Join(iotago.ErrBICInputReferenceInvalid, ierrors.Errorf("BIC input does not exist for account %s in slot %d", inp.AccountID, commitmentInput.Slot))
 		}
 
 		bicInputSet[inp.AccountID] = accountData.Credits.Value
@@ -114,7 +114,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 	for _, inp := range rewardInputs {
 		output, ok := resolvedInputStates[inp.Index].(*utxoledger.Output)
 		if !ok {
-			return nil, ierrors.Wrapf(iotago.ErrRewardInputInvalid, "input at index %d is not an UTXO output", inp.Index)
+			return nil, ierrors.Wrapf(iotago.ErrRewardInputReferenceInvalid, "input at index %d is not an UTXO output", inp.Index)
 		}
 		outputID := output.OutputID()
 
@@ -122,7 +122,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 		case *iotago.AccountOutput:
 			stakingFeature := castOutput.FeatureSet().Staking()
 			if stakingFeature == nil {
-				return nil, ierrors.Wrapf(iotago.ErrNoStakingFeature, "cannot claim rewards from an AccountOutput %s at index %d without staking feature", outputID, inp.Index)
+				return nil, ierrors.Wrapf(iotago.ErrRewardInputReferenceInvalid, "cannot claim rewards from an AccountOutput %s at index %d without staking feature", outputID, inp.Index)
 			}
 			accountID := castOutput.AccountID
 			if accountID.Empty() {
@@ -135,7 +135,7 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 
 			reward, _, _, rewardErr := v.ledger.sybilProtection.ValidatorReward(accountID, stakingFeature, claimingEpoch)
 			if rewardErr != nil {
-				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimStakingReward, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d, claimingEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch, claimingEpoch)
+				return nil, ierrors.Wrapf(iotago.ErrStakingRewardCalculationFailure, "failed to get Validator reward for AccountOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d, claimingEpoch: %d", outputID, inp.Index, stakingFeature.StakedAmount, stakingFeature.StartEpoch, stakingFeature.EndEpoch, claimingEpoch)
 			}
 
 			rewardInputSet[accountID] = reward
@@ -158,12 +158,12 @@ func (v *VM) ValidateSignatures(signedTransaction mempool.SignedTransaction, res
 
 			reward, _, _, rewardErr := v.ledger.sybilProtection.DelegatorReward(castOutput.ValidatorAddress.AccountID(), castOutput.DelegatedAmount, castOutput.StartEpoch, delegationEnd, claimingEpoch)
 			if rewardErr != nil {
-				return nil, ierrors.Wrapf(iotago.ErrFailedToClaimDelegationReward, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
+				return nil, ierrors.Wrapf(iotago.ErrDelegationRewardCalculationFailure, "failed to get Delegator reward for DelegationOutput %s at index %d (StakedAmount: %d, StartEpoch: %d, EndEpoch: %d", outputID, inp.Index, castOutput.DelegatedAmount, castOutput.StartEpoch, castOutput.EndEpoch)
 			}
 
 			rewardInputSet[delegationID] = reward
 		default:
-			return nil, ierrors.Wrapf(iotago.ErrRewardInputInvalid, "reward input cannot point to %s", output.Output().Type())
+			return nil, ierrors.Wrapf(iotago.ErrRewardInputReferenceInvalid, "reward input cannot point to %s", output.Output().Type())
 		}
 	}
 
