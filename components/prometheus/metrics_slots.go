@@ -57,7 +57,7 @@ var SlotMetrics = collector.NewCollection(slotNamespace,
 		collector.WithPruningDelay(10*time.Minute),
 		collector.WithHelp("Number of invalid blocks in a slot."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+			deps.Protocol.Events.Engine.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, _ error) {
 				eventSlot := int(block.ID().Slot())
 				deps.Collector.Increment(slotNamespace, invalidBlocks, strconv.Itoa(eventSlot))
 			}, event.WithWorkerPool(Component.WorkerPool))

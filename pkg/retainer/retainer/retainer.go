@@ -97,7 +97,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			}
 		}, asyncOpt)
 
-		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, err error) {
+		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, _ error) {
 			r.RetainBlockFailure(b.ID(), api.BlockFailureDroppedDueToCongestion)
 		})
 
@@ -123,7 +123,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 					})
 
 					transactionMetadata.OnRejected(func() {
-						r.RetainTransactionFailure(attachment, iotago.ErrTxConflicting)
+						r.RetainTransactionFailure(attachment, iotago.ErrTxConflictRejected)
 					})
 
 					transactionMetadata.OnAccepted(func() {

@@ -48,7 +48,7 @@ func init() {
 		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
 		Configure: configure,
 		Params:    params,
-		IsEnabled: func(c *dig.Container) bool {
+		IsEnabled: func(_ *dig.Container) bool {
 			return restapi.ParamsRestAPI.Enabled && ParamsDebugAPI.Enabled
 		},
 	}

@@ -22,6 +22,7 @@ func (o *Orchestrator) Import(reader io.ReadSeeker) error {
 	o.lastCommittedSlot = slot
 
 	upgradeSignalMap := make(map[account.SeatIndex]*model.SignaledBlock)
+	//nolint:revive
 	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint32, func(i int) error {
 		seat, err := stream.Read[account.SeatIndex](reader)
 		if err != nil {
@@ -56,6 +57,7 @@ func (o *Orchestrator) Import(reader io.ReadSeeker) error {
 		latestSignals.Set(seat, signaledBlock)
 	}
 
+	//nolint:revive
 	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsByte, func(i int) error {
 		epoch, err := stream.Read[iotago.EpochIndex](reader)
 		if err != nil {

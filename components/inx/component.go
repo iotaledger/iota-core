@@ -19,7 +19,7 @@ func init() {
 		Name:     "INX",
 		DepsFunc: func(cDeps dependencies) { deps = cDeps },
 		Params:   params,
-		IsEnabled: func(c *dig.Container) bool {
+		IsEnabled: func(_ *dig.Container) bool {
 			return ParamsINX.Enabled
 		},
 		Provide: provide,
