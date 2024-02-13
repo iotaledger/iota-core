@@ -556,7 +556,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 
 		block22 := ts.IssueBasicBlockWithOptions("block2.2", wallet2, &iotago.TaggedData{}, mock.WithStrongParents(ts.BlockID("block2.1")), mock.WithSlotCommitment(block2Commitment))
 
-		ts.AssertBlockFiltered([]*blocks.Block{block22}, iotago.ErrNegativeBIC, wallet2.Node)
+		ts.AssertBlockFiltered([]*blocks.Block{block22}, iotago.ErrAccountLocked, wallet2.Node)
 
 		latestParents = ts.CommitUntilSlot(ts.BlockID("block2.1").Slot(), block21.ID())
 
