@@ -13,6 +13,7 @@ import (
 	"github.com/iotaledger/hive.go/app"
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/daemon"
@@ -177,6 +178,8 @@ func provide(c *dig.Container) error {
 }
 
 func configure() error {
+	deps.Protocol.SetLogLevel(log.LevelTrace)
+
 	deps.Protocol.Network.OnBlockReceived(func(block *model.Block, _ peer.ID) {
 		Component.LogDebugf("BlockReceived: %s", block.ID())
 	})

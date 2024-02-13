@@ -206,7 +206,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, tx mempool.TransactionMetadata) bool {
 		tx.Commit()
 
-		//nolint:forcetypeassert we only handle a single type of transaction currently
+		//nolint:forcetypeassert // we only handle a single type of transaction currently
 		mutations = append(mutations, tx.Transaction().(*iotago.Transaction))
 
 		return true
