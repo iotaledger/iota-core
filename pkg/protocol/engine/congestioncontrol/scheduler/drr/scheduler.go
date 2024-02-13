@@ -1,6 +1,7 @@
 package drr
 
 import (
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -448,6 +449,9 @@ func (s *Scheduler) selectBasicBlockWithoutLocking() {
 		return
 	}
 
+	if rounds > 10000 {
+		fmt.Println(">>> rounds", rounds, "schedulingIssuer", schedulingIssuer.IssuerID(), slot)
+	}
 	if rounds > 0 {
 		// increment every issuer's deficit for the required number of rounds
 		for q := start; ; {
