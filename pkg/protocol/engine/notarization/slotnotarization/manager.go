@@ -199,7 +199,6 @@ func (m *Manager) isCommittable(slot iotago.SlotIndex, acceptedBlockSlot iotago.
 	return slot+m.apiProvider.APIForSlot(slot).ProtocolParameters().MinCommittableAge() <= acceptedBlockSlot
 }
 
-// TODO: if create commitment fails with an error then we need to rollback the state of every component
 func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, error) {
 	m.commitmentMutex.Lock()
 	defer m.commitmentMutex.Unlock()

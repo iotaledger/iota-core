@@ -90,13 +90,14 @@ func configure() error {
 
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v2")
 
+	debugAPIWorkerPool := workerpool.NewGroup("DebugAPI").CreatePool("DebugAPI", workerpool.WithWorkerCount(1))
+
 	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		blocksPerSlot.Set(block.ID().Slot(), append(lo.Return1(blocksPerSlot.GetOrCreate(block.ID().Slot(), func() []*blocks.Block {
 			return make([]*blocks.Block, 0)
 		})), block))
-	})
+	}, event.WithWorkerPool(debugAPIWorkerPool))
 
-	debugAPIWorkerPool := workerpool.NewGroup("DebugAPI")
 	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		epoch := deps.Protocol.APIForSlot(index).TimeProvider().EpochFromSlot(index)
 		if epoch < iotago.EpochIndex(ParamsDebugAPI.Database.Pruning.Threshold) {
@@ -114,13 +115,13 @@ func configure() error {
 			}
 		}
 
-	}, event.WithWorkerPool(debugAPIWorkerPool.CreatePool("PruneDebugAPI", workerpool.WithWorkerCount(1))))
+	}, event.WithWorkerPool(debugAPIWorkerPool))
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
 		if err := storeTransactionsPerSlot(scd); err != nil {
 			Component.LogWarnf(">> DebugAPI Error: %s\n", err)
 		}
-	})
+	}, event.WithWorkerPool(debugAPIWorkerPool))
 
 	deps.Protocol.Events.Engine.Evict.Hook(func(index iotago.SlotIndex) {
 		blocksInSlot, exists := blocksPerSlot.Get(index)
@@ -148,7 +149,7 @@ func configure() error {
 		}
 
 		blocksPerSlot.Delete(index)
-	}, event.WithWorkerPool(debugAPIWorkerPool.CreatePool("CommitDebugAPI", workerpool.WithWorkerCount(1))))
+	}, event.WithWorkerPool(debugAPIWorkerPool))
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
 		blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)

@@ -205,6 +205,8 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	// Mark each transaction as committed so the mempool can evict it
 	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, tx mempool.TransactionMetadata) bool {
 		tx.Commit()
+
+		//nolint:forcetypeassert we only handle a single type of transaction currently
 		mutations = append(mutations, tx.Transaction().(*iotago.Transaction))
 
 		return true

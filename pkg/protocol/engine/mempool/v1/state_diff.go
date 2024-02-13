@@ -124,9 +124,8 @@ func (s *StateDiff) Reset() error {
 			return ierrors.Wrapf(err, "failed to delete transaction with %s from state diff", transactionID)
 		}
 	}
-	// TODO: maybe s.mutations.Commit() is missing?
 
-	return nil
+	return s.mutations.Commit()
 }
 
 func (s *StateDiff) compactStateChanges(stateMetadata *StateMetadata, usageCounter int) {
