@@ -321,7 +321,7 @@ func CastVotesAcceptance(t *testing.T, tf *Framework) {
 
 func JoinSpendSetTwice(t *testing.T, tf *Framework) {
 	var conflictCreatedEventCount, resourceAddedEventCount int
-	tf.Instance.Events().SpenderCreated.Hook(func(id iotago.TransactionID) {
+	tf.Instance.Events().SpenderCreated.Hook(func(_ iotago.TransactionID) {
 		conflictCreatedEventCount++
 	})
 
@@ -414,7 +414,7 @@ func EvictAcceptedSpender(t *testing.T, tf *Framework) {
 
 func EvictRejectedSpender(t *testing.T, tf *Framework) {
 	conflictEvictedEventCount := 0
-	tf.Instance.Events().SpenderEvicted.Hook(func(id iotago.TransactionID) {
+	tf.Instance.Events().SpenderEvicted.Hook(func(_ iotago.TransactionID) {
 		conflictEvictedEventCount++
 	})
 

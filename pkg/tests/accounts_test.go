@@ -511,6 +511,9 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 	// MODIFY EXISTING GENESIS ACCOUNT
 	var block1Slot iotago.SlotIndex = 1
 	var latestParents []iotago.BlockID
+	// The cost of the block that will make the account go negative.
+	// We store it so we can allot that amount later to unlock it.
+	block12ManaCost := iotago.Mana(0)
 	// Issue one block from each of the two block-issuers - one will go negative and the other has enough BICs.
 	{
 		block1Commitment := iotago.NewEmptyCommitment(ts.API)
@@ -518,6 +521,10 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 		ts.SetCurrentSlot(block1Slot)
 		block11 := ts.IssueBasicBlockWithOptions("block1.1", wallet1, testPayload, mock.WithSlotCommitment(block1Commitment))
 		block12 := ts.IssueBasicBlockWithOptions("block1.2", wallet2, testPayload, mock.WithStrongParents(block11.ID()), mock.WithSlotCommitment(block1Commitment))
+
+		var err error
+		block12ManaCost, err = block12.ProtocolBlock().ManaCost(block1Commitment.ReferenceManaCost)
+		require.NoError(t, err)
 
 		// Commit BIC burns and check account states.
 		ts.CommitUntilSlot(ts.BlockID("block1.2").Slot(), block12.ID())
@@ -555,7 +562,7 @@ func Test_NegativeBIC_BlockIssuerLocked(t *testing.T) {
 
 		block22 := ts.IssueBasicBlockWithOptions("block2.2", wallet2, testPayload, mock.WithStrongParents(ts.BlockID("block2.1")), mock.WithSlotCommitment(block2Commitment))
 
-		ts.AssertBlockFiltered([]*blocks.Block{block22}, iotago.ErrNegativeBIC, wallet2.Node)
+		ts.AssertBlockFiltered([]*blocks.Block{block22}, iotago.ErrAccountLocked, wallet2.Node)
 
 		latestParents = ts.CommitUntilSlot(ts.BlockID("block2.1").Slot(), block21.ID())
 

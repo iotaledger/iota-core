@@ -114,12 +114,12 @@ func (b *Booker) Queue(block *blocks.Block) error {
 			b.setupBlock(block)
 		})
 
-		transactionMetadata.OnInvalid(func(err error) {
+		transactionMetadata.OnInvalid(func(_ error) {
 			b.setupBlock(block)
 		})
 	})
 
-	signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
+	signedTransactionMetadata.OnSignaturesInvalid(func(_ error) {
 		b.setupBlock(block)
 	})
 

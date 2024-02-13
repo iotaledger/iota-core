@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/iotaledger/hive.go/ads"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -28,6 +29,8 @@ type Attestations interface {
 	Reset()
 
 	RestoreFromDisk() (err error)
+
+	log.Logger
 
 	module.Interface
 }

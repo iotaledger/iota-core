@@ -7,11 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/ds"
+	"github.com/iotaledger/hive.go/kvstore/mapdb"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	tipmanagerv1 "github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager/v1"
+	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/seatmanager/mock"
+	"github.com/iotaledger/iota-core/pkg/storage/prunable/epochstore"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/tpkg"
@@ -24,6 +28,9 @@ type TestFramework struct {
 	tipMetadataByAlias map[string]tipmanager.TipMetadata
 	blocksByID         map[iotago.BlockID]*blocks.Block
 	test               *testing.T
+	time               time.Time
+
+	manualPOA mock.ManualPOA
 
 	API iotago.API
 }
@@ -35,6 +42,15 @@ func NewTestFramework(test *testing.T) *TestFramework {
 		blocksByID:         make(map[iotago.BlockID]*blocks.Block),
 		test:               test,
 		API:                tpkg.ZeroCostTestAPI,
+		time:               time.Now(),
+		manualPOA: *mock.NewManualPOA(iotago.SingleVersionProvider(tpkg.ZeroCostTestAPI),
+			epochstore.NewStore[*account.SeatedAccounts](
+				nil,
+				mapdb.NewMapDB(),
+				func(index iotago.EpochIndex) iotago.EpochIndex { return index },
+				(*account.SeatedAccounts).Bytes,
+				account.SeatedAccountsFromBytes),
+		),
 	}
 
 	t.blockIDsByAlias["Genesis"] = iotago.EmptyBlockID
@@ -42,20 +58,74 @@ func NewTestFramework(test *testing.T) *TestFramework {
 	t.Instance = tipmanagerv1.New(func(blockID iotago.BlockID) (block *blocks.Block, exists bool) {
 		block, exists = t.blocksByID[blockID]
 		return block, exists
-	})
+	}, t.manualPOA.CommitteeInSlot)
 
 	return t
 }
 
+func (t *TestFramework) Validator(alias string) iotago.AccountID {
+	return t.manualPOA.AccountID(alias)
+}
+
+func (t *TestFramework) AddValidators(aliases ...string) {
+	t.manualPOA.AddRandomAccounts(aliases...)
+
+	for _, alias := range aliases {
+		seat, exists := t.manualPOA.GetSeat(alias)
+		if !exists {
+			panic("seat does not exist")
+		}
+
+		t.Instance.AddSeat(seat)
+	}
+}
+
 func (t *TestFramework) AddBlock(alias string) tipmanager.TipMetadata {
 	t.tipMetadataByAlias[alias] = t.Instance.AddBlock(t.Block(alias))
+	t.tipMetadataByAlias[alias].ID().RegisterAlias(alias)
 
 	return t.tipMetadataByAlias[alias]
 }
 
-func (t *TestFramework) CreateBlock(alias string, parents map[iotago.ParentsType][]string, optBlockBuilder ...func(*builder.BasicBlockBuilder)) *blocks.Block {
+func (t *TestFramework) CreateBasicBlock(alias string, parents map[iotago.ParentsType][]string, optBlockBuilder ...func(*builder.BasicBlockBuilder)) *blocks.Block {
 	blockBuilder := builder.NewBasicBlockBuilder(t.API)
-	blockBuilder.IssuingTime(time.Now())
+
+	// Make sure that blocks don't have the same timestamp.
+	t.time = t.time.Add(1)
+	blockBuilder.IssuingTime(t.time)
+
+	if strongParents, strongParentsExist := parents[iotago.StrongParentType]; strongParentsExist {
+		blockBuilder.StrongParents(lo.Map(strongParents, t.BlockID))
+	}
+	if weakParents, weakParentsExist := parents[iotago.WeakParentType]; weakParentsExist {
+		blockBuilder.WeakParents(lo.Map(weakParents, t.BlockID))
+	}
+	if shallowLikeParents, shallowLikeParentsExist := parents[iotago.ShallowLikeParentType]; shallowLikeParentsExist {
+		blockBuilder.ShallowLikeParents(lo.Map(shallowLikeParents, t.BlockID))
+	}
+
+	if len(optBlockBuilder) > 0 {
+		optBlockBuilder[0](blockBuilder)
+	}
+
+	block, err := blockBuilder.Build()
+	require.NoError(t.test, err)
+
+	modelBlock, err := model.BlockFromBlock(block)
+	require.NoError(t.test, err)
+
+	t.blocksByID[modelBlock.ID()] = blocks.NewBlock(modelBlock)
+	t.blockIDsByAlias[alias] = modelBlock.ID()
+
+	return t.blocksByID[modelBlock.ID()]
+}
+
+func (t *TestFramework) CreateValidationBlock(alias string, parents map[iotago.ParentsType][]string, optBlockBuilder ...func(blockBuilder *builder.ValidationBlockBuilder)) *blocks.Block {
+	blockBuilder := builder.NewValidationBlockBuilder(t.API)
+
+	// Make sure that blocks don't have the same timestamp.
+	t.time = t.time.Add(1)
+	blockBuilder.IssuingTime(t.time)
 
 	if strongParents, strongParentsExist := parents[iotago.StrongParentType]; strongParentsExist {
 		blockBuilder.StrongParents(lo.Map(strongParents, t.BlockID))
@@ -113,6 +183,14 @@ func (t *TestFramework) RequireStrongTips(aliases ...string) {
 	}
 
 	require.Equal(t.test, len(aliases), len(t.Instance.StrongTips()), "strongTips size does not match")
+}
+
+func (t *TestFramework) RequireValidationTips(aliases ...string) {
+	for _, alias := range aliases {
+		require.True(t.test, ds.NewSet(lo.Map(t.Instance.ValidationTips(), tipmanager.TipMetadata.ID)...).Has(t.BlockID(alias)), "validationTips does not contain block '%s'", alias)
+	}
+
+	require.Equal(t.test, len(aliases), len(t.Instance.ValidationTips()), "validationTips size does not match")
 }
 
 func (t *TestFramework) RequireLivenessThresholdReached(alias string, expected bool) {

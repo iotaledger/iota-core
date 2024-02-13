@@ -53,6 +53,7 @@ func newBlocks(protocol *Protocol) *Blocks {
 			})
 		})
 
+		//nolint:revive
 		protocol.Chains.WithInitializedEngines(func(chain *Chain, engine *engine.Engine) (shutdown func()) {
 			return lo.Batch(
 				engine.Events.BlockRequester.Tick.Hook(b.SendRequest).Unhook,

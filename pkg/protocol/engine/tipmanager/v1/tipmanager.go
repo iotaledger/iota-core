@@ -4,11 +4,13 @@ import (
 	"fmt"
 
 	"github.com/iotaledger/hive.go/ds/randommap"
+	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/tipmanager"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -19,8 +21,17 @@ type TipManager struct {
 	// retrieveBlock is a function that retrieves a Block from the Tangle.
 	retrieveBlock func(blockID iotago.BlockID) (block *blocks.Block, exists bool)
 
+	// retrieveCommitteeInSlot is a function that retrieves the committee in a given slot.
+	retrieveCommitteeInSlot func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool)
+
 	// tipMetadataStorage contains the TipMetadata of all Blocks that are managed by the TipManager.
 	tipMetadataStorage *shrinkingmap.ShrinkingMap[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]]
+
+	// latestValidationBlocks contains a Variable for each validator that stores the latest validation block.
+	latestValidationBlocks *shrinkingmap.ShrinkingMap[account.SeatIndex, reactive.Variable[*TipMetadata]]
+
+	// validationTipSet contains the subset of blocks from the strong tip set that reference the latest validation block.
+	validationTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
 
 	// strongTipSet contains the blocks of the strong tip pool that have no referencing children.
 	strongTipSet *randommap.RandomMap[iotago.BlockID, *TipMetadata]
@@ -42,13 +53,19 @@ type TipManager struct {
 }
 
 // New creates a new TipManager.
-func New(blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool)) *TipManager {
+func New(
+	blockRetriever func(blockID iotago.BlockID) (block *blocks.Block, exists bool),
+	retrieveCommitteeInSlot func(slot iotago.SlotIndex) (*account.SeatedAccounts, bool),
+) *TipManager {
 	t := &TipManager{
-		retrieveBlock:      blockRetriever,
-		tipMetadataStorage: shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
-		strongTipSet:       randommap.New[iotago.BlockID, *TipMetadata](),
-		weakTipSet:         randommap.New[iotago.BlockID, *TipMetadata](),
-		blockAdded:         event.New1[tipmanager.TipMetadata](),
+		retrieveBlock:           blockRetriever,
+		retrieveCommitteeInSlot: retrieveCommitteeInSlot,
+		tipMetadataStorage:      shrinkingmap.New[iotago.SlotIndex, *shrinkingmap.ShrinkingMap[iotago.BlockID, *TipMetadata]](),
+		latestValidationBlocks:  shrinkingmap.New[account.SeatIndex, reactive.Variable[*TipMetadata]](),
+		validationTipSet:        randommap.New[iotago.BlockID, *TipMetadata](),
+		strongTipSet:            randommap.New[iotago.BlockID, *TipMetadata](),
+		weakTipSet:              randommap.New[iotago.BlockID, *TipMetadata](),
+		blockAdded:              event.New1[tipmanager.TipMetadata](),
 	}
 
 	t.TriggerConstructed()
@@ -78,6 +95,26 @@ func (t *TipManager) AddBlock(block *blocks.Block) tipmanager.TipMetadata {
 // OnBlockAdded registers a callback that is triggered whenever a new Block was added to the TipManager.
 func (t *TipManager) OnBlockAdded(handler func(block tipmanager.TipMetadata)) (unsubscribe func()) {
 	return t.blockAdded.Hook(handler).Unhook
+}
+
+// AddSeat adds a validator to the tracking of the TipManager.
+func (t *TipManager) AddSeat(seat account.SeatIndex) {
+	t.latestValidationBlocks.GetOrCreate(seat, func() reactive.Variable[*TipMetadata] {
+		return reactive.NewVariable[*TipMetadata]()
+	})
+}
+
+// RemoveSeat removes a validator from the tracking of the TipManager.
+func (t *TipManager) RemoveSeat(seat account.SeatIndex) {
+	latestValidationBlock, removed := t.latestValidationBlocks.DeleteAndReturn(seat)
+	if removed {
+		latestValidationBlock.Set(nil)
+	}
+
+}
+
+func (t *TipManager) ValidationTips(optAmount ...int) []tipmanager.TipMetadata {
+	return t.selectTips(t.validationTipSet, optAmount...)
 }
 
 // StrongTips returns the strong tips of the TipManager (with an optional limit).
@@ -123,6 +160,18 @@ func (t *TipManager) Shutdown() {
 
 // setupBlockMetadata sets up the behavior of the given Block.
 func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
+	tipMetadata.isStrongTipPoolMember.WithNonEmptyValue(func(_ bool) func() {
+		return t.trackLatestValidationBlock(tipMetadata)
+	})
+
+	tipMetadata.isValidationTip.OnUpdate(func(_ bool, isValidationTip bool) {
+		if isValidationTip {
+			t.validationTipSet.Set(tipMetadata.ID(), tipMetadata)
+		} else {
+			t.validationTipSet.Delete(tipMetadata.ID())
+		}
+	})
+
 	tipMetadata.isStrongTip.OnUpdate(func(_ bool, isStrongTip bool) {
 		if isStrongTip {
 			t.strongTipSet.Set(tipMetadata.ID(), tipMetadata)
@@ -148,6 +197,40 @@ func (t *TipManager) setupBlockMetadata(tipMetadata *TipMetadata) {
 	})
 
 	t.blockAdded.Trigger(tipMetadata)
+}
+
+// trackLatestValidationBlock tracks the latest validator block and takes care of marking the corresponding TipMetadata.
+func (t *TipManager) trackLatestValidationBlock(tipMetadata *TipMetadata) (teardown func()) {
+	if _, isValidationBlock := tipMetadata.Block().ValidationBlock(); !isValidationBlock {
+		return
+	}
+
+	committee, exists := t.retrieveCommitteeInSlot(tipMetadata.Block().ID().Slot())
+	if !exists {
+		return
+	}
+
+	seat, exists := committee.GetSeat(tipMetadata.Block().ProtocolBlock().Header.IssuerID)
+	if !exists {
+		return
+	}
+
+	// We only track the validation blocks of validators that are tracked by the TipManager (via AddSeat).
+	latestValidationBlock, exists := t.latestValidationBlocks.Get(seat)
+	if !exists {
+		return
+	}
+
+	if !tipMetadata.registerAsLatestValidationBlock(latestValidationBlock) {
+		return
+	}
+
+	// reset the latest validator block to nil if we are still the latest one during teardown
+	return func() {
+		latestValidationBlock.Compute(func(latestValidationBlock *TipMetadata) *TipMetadata {
+			return lo.Cond(latestValidationBlock == tipMetadata, nil, latestValidationBlock)
+		})
+	}
 }
 
 // forEachParentByType iterates through the parents of the given block and calls the consumer for each parent.

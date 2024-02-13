@@ -157,6 +157,7 @@ func (t *TestSuite) issueBlockRow(prefix string, row int, parentsPrefix string, 
 
 			b = t.IssueValidationBlockWithOptions(blockName, node, mock.WithValidationBlockHeaderOptions(blockHeaderOptions...), mock.WithHighestSupportedVersion(node.HighestSupportedVersion()), mock.WithProtocolParametersHash(node.ProtocolParametersHash()))
 		} else {
+			//nolint:revive
 			txCount := t.automaticTransactionIssuingCounters.Compute(node.Partition, func(currentValue int, exists bool) int {
 				return currentValue + 1
 			})

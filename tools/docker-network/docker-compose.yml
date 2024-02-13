@@ -282,6 +282,11 @@ services:
       --inx.address=node-1-validator:9029
       --faucet.bindAddress=inx-faucet:8091
       --faucet.rateLimit.enabled=false
+      --faucet.baseTokenAmount=1000000000
+      --faucet.baseTokenAmountSmall=100000000
+      --faucet.baseTokenAmountMaxTarget=5000000000
+      --faucet.manaAmount=10000000
+      --faucet.manaAmountMinFaucet=100000000
 
   inx-validator-1:
     image: iotaledger/inx-validator:1.0-alpha

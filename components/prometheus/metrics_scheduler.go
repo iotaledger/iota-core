@@ -140,22 +140,22 @@ var SchedulerMetrics = collector.NewCollection(schedulerNamespace,
 		collector.WithLabels("state"),
 		collector.WithHelp("Number of blocks processed by the scheduler."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockEnqueued.Hook(func(_ *blocks.Block) {
 				deps.Collector.Increment(schedulerNamespace, schedulerProcessedBlocks, enqueuedBlockLabel)
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(block *blocks.Block, _ error) {
+			deps.Protocol.Events.Engine.Scheduler.BlockDropped.Hook(func(_ *blocks.Block, _ error) {
 				deps.Collector.Increment(schedulerNamespace, schedulerProcessedBlocks, droppedBlockLabel)
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockSkipped.Hook(func(_ *blocks.Block) {
 				deps.Collector.Increment(schedulerNamespace, schedulerProcessedBlocks, skippedBlockLabel)
 
 			}, event.WithWorkerPool(Component.WorkerPool))
 
-			deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(_ *blocks.Block) {
 				deps.Collector.Increment(schedulerNamespace, schedulerProcessedBlocks, scheduledBlockLabel)
 
 			}, event.WithWorkerPool(Component.WorkerPool))

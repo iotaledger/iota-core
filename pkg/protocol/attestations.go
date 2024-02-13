@@ -67,6 +67,7 @@ func (a *Attestations) Get(commitmentID iotago.CommitmentID) (commitment *model.
 // initCommitmentVerifiers initializes the commitment verifiers for all chains (once they are required).
 func (a *Attestations) initCommitmentVerifiers() func() {
 	return a.protocol.Chains.WithElements(func(chain *Chain) (shutdown func()) {
+		//nolint:revive
 		return chain.RequestAttestations.WithNonEmptyValue(func(requestAttestations bool) (shutdown func()) {
 			return a.setupCommitmentVerifier(chain)
 		})

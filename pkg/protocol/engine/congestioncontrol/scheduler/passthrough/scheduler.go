@@ -40,7 +40,7 @@ func (s *Scheduler) Shutdown() {
 	s.TriggerStopped()
 }
 
-func (s *Scheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...*blocks.Block) bool {
+func (s *Scheduler) IsBlockIssuerReady(_ iotago.AccountID, _ ...iotago.WorkScore) bool {
 	return true
 }
 

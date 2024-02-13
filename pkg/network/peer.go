@@ -133,6 +133,7 @@ func peerFromBytes(bytes []byte) (*Peer, error) {
 
 	p.SetConnStatus(ConnStatusDisconnected)
 
+	//nolint:revive
 	if err = stream.ReadCollection(byteReader, serializer.SeriLengthPrefixTypeAsByte, func(i int) error {
 		addr, err := stream.ReadObjectWithSize(byteReader, serializer.SeriLengthPrefixTypeAsUint16, func(bytes []byte) (multiaddr.Multiaddr, int, error) {
 			m, err := multiaddr.NewMultiaddrBytes(bytes)

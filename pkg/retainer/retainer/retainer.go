@@ -82,7 +82,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 		}, asyncOpt)
 
 		e.Events.PostSolidFilter.BlockFiltered.Hook(func(e *postsolidfilter.BlockFilteredEvent) {
-			r.RetainBlockFailure(e.Block.ID(), determineBlockFailureReason(e.Reason))
+			r.RetainBlockFailure(e.Block.ID(), api.DetermineBlockFailureReason(e.Reason))
 		}, asyncOpt)
 
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
@@ -97,7 +97,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			}
 		}, asyncOpt)
 
-		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, err error) {
+		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, _ error) {
 			r.RetainBlockFailure(b.ID(), api.BlockFailureDroppedDueToCongestion)
 		})
 
@@ -123,7 +123,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 					})
 
 					transactionMetadata.OnRejected(func() {
-						r.RetainTransactionFailure(attachment, iotago.ErrTxConflicting)
+						r.RetainTransactionFailure(attachment, iotago.ErrTxConflictRejected)
 					})
 
 					transactionMetadata.OnAccepted(func() {
@@ -206,7 +206,7 @@ func (r *Retainer) RetainTransactionFailure(blockID iotago.BlockID, err error) {
 		return
 	}
 
-	if err := store.StoreTransactionFailure(blockID, determineTxFailureReason(err)); err != nil {
+	if err := store.StoreTransactionFailure(blockID, api.DetermineTransactionFailureReason(err)); err != nil {
 		r.errorHandler(ierrors.Wrap(err, "failed to store transaction failure in retainer"))
 	}
 }
