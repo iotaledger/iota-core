@@ -768,7 +768,7 @@ func Test_NegativeBIC_AccountOutput(t *testing.T) {
 	// Allot some mana to the locked account to unlock it.
 	// The locked wallet 1 is preparing and signs the transaction, but it's issued by wallet 2 whose account is not locked.
 	{
-		allottedBIC := iotago.BlockIssuanceCredits(10001)
+		allottedBIC := iotago.BlockIssuanceCredits(100_000_000)
 		tx2 := wallet1.AllotManaFromInputs("TX2",
 			iotago.Allotments{&iotago.Allotment{
 				AccountID: wallet1.BlockIssuer.AccountID,
