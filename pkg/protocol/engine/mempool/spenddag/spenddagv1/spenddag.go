@@ -63,6 +63,7 @@ func (c *SpendDAG[SpenderID, ResourceID, VoteRank]) Shutdown() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	//nolint:revive
 	c.spendersByID.ForEach(func(spenderID SpenderID, spender *Spender[SpenderID, ResourceID, VoteRank]) bool {
 		spender.Shutdown()
 

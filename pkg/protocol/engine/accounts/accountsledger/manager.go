@@ -274,6 +274,7 @@ func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 		slotDiff := lo.PanicOnErr(m.slotDiff(slot))
 		var internalErr error
 
+		//nolint:revive
 		if err := slotDiff.Stream(func(accountID iotago.AccountID, accountDiff *model.AccountDiff, destroyed bool) bool {
 			accountData, exists, err := m.accountsTree.Get(accountID)
 			if err != nil {

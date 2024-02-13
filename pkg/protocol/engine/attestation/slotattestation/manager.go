@@ -247,6 +247,7 @@ func (m *Manager) Commit(slot iotago.SlotIndex) (newCW uint64, attestationsRoot 
 	// Remove all future attestations of slot and apply to pending attestations window.
 	futureAttestations := m.futureAttestations.Evict(slot)
 	if futureAttestations != nil {
+		//nolint:revive
 		futureAttestations.ForEach(func(key iotago.AccountID, value *iotago.Attestation) bool {
 			m.applyToPendingAttestations(value, cutoffSlot)
 
@@ -326,6 +327,7 @@ func (m *Manager) Rollback(targetSlot iotago.SlotIndex) error {
 		return ierrors.Wrapf(err, "failed to get attestations of slot %d", targetSlot)
 	}
 
+	//nolint:revive
 	if err = attestationsStorage.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
 		m.applyToPendingAttestations(value, attestationSlot)
 

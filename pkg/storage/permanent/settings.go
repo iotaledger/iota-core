@@ -162,6 +162,7 @@ func (s *Settings) loadProtocolParameters() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	//nolint:revive
 	if err := s.storeProtocolParameters.Iterate(kvstore.EmptyPrefix, func(version iotago.Version, protocolParams iotago.ProtocolParameters) bool {
 		s.apiProvider.AddProtocolParameters(protocolParams)
 
@@ -514,6 +515,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 	}
 
 	// Read protocol version epoch mapping
+	//nolint:revive
 	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint16, func(i int) error {
 		version, err := stream.Read[iotago.Version](reader)
 		if err != nil {
@@ -536,6 +538,7 @@ func (s *Settings) Import(reader io.ReadSeeker) (err error) {
 	}
 
 	// Read future protocol parameters
+	//nolint:revive
 	if err := stream.ReadCollection(reader, serializer.SeriLengthPrefixTypeAsUint16, func(i int) error {
 		version, err := stream.Read[iotago.Version](reader)
 		if err != nil {

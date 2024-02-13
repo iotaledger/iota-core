@@ -69,6 +69,7 @@ func (s *Store[V]) Load(epoch iotago.EpochIndex) (V, error) {
 }
 
 func (s *Store[V]) Store(epoch iotago.EpochIndex, value V) error {
+	//nolint:revive
 	_, _ = s.lastAccessedEpoch.Compute(func(lastAccessedEpoch iotago.EpochIndex, exists bool) (newValue iotago.EpochIndex, err error) {
 		if lastAccessedEpoch >= epoch {
 			return lastAccessedEpoch, kvstore.ErrTypedValueNotChanged

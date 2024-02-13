@@ -68,6 +68,7 @@ func (m *Manager) Export(writer io.WriteSeeker, targetSlot iotago.SlotIndex) err
 	}
 
 	var attestations []*iotago.Attestation
+	//nolint:revive
 	if err = attestationsStorage.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
 		attestations = append(attestations, value)
 

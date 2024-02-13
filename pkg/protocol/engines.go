@@ -138,6 +138,7 @@ func (e *Engines) loadMainEngine(snapshotPath string) (*engine.Engine, error) {
 		return nil, ierrors.Errorf("unable to read engine info file: %w", err)
 	}
 
+	//nolint:revive
 	e.Main.Compute(func(mainEngine *engine.Engine) *engine.Engine {
 		// load previous engine as main engine if it exists.
 		if len(info.Name) > 0 {
