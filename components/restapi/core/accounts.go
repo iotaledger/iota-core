@@ -73,13 +73,14 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	var err error
 	pageSize := httpserver.ParsePageSizeQueryParam(c, api.ParameterPageSize, restapi.ParamsRestAPI.MaxPageSize)
 	latestCommittedSlot := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
+
 	// no cursor provided will be the first request
 	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
 	if len(c.QueryParam(api.ParameterCursor)) != 0 {
 		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, api.ParameterCursor)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse cursor %s", c.Param(api.ParameterCursor))
+			return nil, err
 		}
 	}
 
@@ -93,7 +94,8 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 	registeredValidators, exists := deps.Protocol.Engines.Main.Get().Retainer.RegisteredValidatorsCache(slotRange)
 	if !exists {
-		registeredValidators, err = deps.Protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(nextEpoch)
+		// HINT: the validators for an epoch are stored in the previous epoch
+		registeredValidators, err = deps.Protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(nextEpoch - 1)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get ordered registered validators list for epoch %d : %s", nextEpoch, err)
 		}

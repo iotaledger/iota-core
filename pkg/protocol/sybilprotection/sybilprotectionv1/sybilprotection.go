@@ -332,14 +332,18 @@ func (o *SybilProtection) EligibleValidators(epoch iotago.EpochIndex) (accounts.
 
 // OrderedRegisteredCandidateValidatorsList returns the currently known list of registered validator candidates for the given epoch.
 func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.EpochIndex) ([]*api.ValidatorResponse, error) {
-	// currently we have only active validators list, validators are stored under the epoch of registration, thus we use epoch-1
-	activeCandidates, err := o.performanceTracker.EligibleValidatorCandidates(epoch - 1)
+	candidates, err := o.performanceTracker.ValidatorCandidates(epoch)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to retrieve candidates")
+	}
+
+	activeCandidates, err := o.performanceTracker.EligibleValidatorCandidates(epoch)
 	if err != nil {
 		return nil, ierrors.Wrapf(err, "failed to retrieve eligible candidates")
 	}
 
-	validatorResp := make([]*api.ValidatorResponse, 0, activeCandidates.Size())
-	if err := activeCandidates.ForEach(func(candidate iotago.AccountID) error {
+	validatorResp := make([]*api.ValidatorResponse, 0, candidates.Size())
+	if err := candidates.ForEach(func(candidate iotago.AccountID) error {
 		accountData, exists, err := o.ledger.Account(candidate, o.lastCommittedSlot)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to get account %s", candidate)
@@ -351,13 +355,14 @@ func (o *SybilProtection) OrderedRegisteredCandidateValidatorsList(epoch iotago.
 		if accountData.StakeEndEpoch <= epoch {
 			return nil
 		}
+		active := activeCandidates.Has(candidate)
 		validatorResp = append(validatorResp, &api.ValidatorResponse{
 			AddressBech32:                  accountData.ID.ToAddress().Bech32(o.apiProvider.CommittedAPI().ProtocolParameters().Bech32HRP()),
 			StakingEndEpoch:                accountData.StakeEndEpoch,
 			PoolStake:                      accountData.ValidatorStake + accountData.DelegationStake,
 			ValidatorStake:                 accountData.ValidatorStake,
 			FixedCost:                      accountData.FixedCost,
-			Active:                         true,
+			Active:                         active,
 			LatestSupportedProtocolVersion: accountData.LatestSupportedProtocolVersionAndHash.Version,
 			LatestSupportedProtocolHash:    accountData.LatestSupportedProtocolVersionAndHash.Hash,
 		})
