@@ -81,7 +81,7 @@ func (b *AccountDiffs) Delete(accountID iotago.AccountID) (err error) {
 // Stream streams all accountIDs changes for a slot index.
 func (b *AccountDiffs) Stream(consumer func(accountID iotago.AccountID, accountDiff *model.AccountDiff, destroyed bool) bool) error {
 	// We firstly iterate over the destroyed accounts, as they won't have a corresponding accountDiff.
-	if storageErr := b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, empty types.Empty) bool {
+	if storageErr := b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, _ types.Empty) bool {
 		return consumer(accountID, nil, true)
 	}); storageErr != nil {
 		return ierrors.Wrapf(storageErr, "failed to iterate over account diffs for slot %s", b.slot)
@@ -99,7 +99,7 @@ func (b *AccountDiffs) Stream(consumer func(accountID iotago.AccountID, accountD
 
 // StreamDestroyed streams all destroyed accountIDs for a slot index.
 func (b *AccountDiffs) StreamDestroyed(consumer func(accountID iotago.AccountID) bool) error {
-	return b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, empty types.Empty) bool {
+	return b.destroyedAccounts.Iterate(kvstore.EmptyPrefix, func(accountID iotago.AccountID, _ types.Empty) bool {
 		return consumer(accountID)
 	})
 }

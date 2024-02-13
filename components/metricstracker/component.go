@@ -21,7 +21,7 @@ func init() {
 		Params:   params,
 		Provide:  provide,
 		Run:      run,
-		IsEnabled: func(c *dig.Container) bool {
+		IsEnabled: func(_ *dig.Container) bool {
 			return ParamsMetricsTracker.Enabled
 		},
 	}
@@ -63,13 +63,13 @@ func run() error {
 		Component.LogInfo("Starting Metrics Tracker ... done")
 
 		unhook := lo.Batch(
-			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
+			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
 				deps.MetricsTracker.metrics.Blocks.Inc()
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(_ *notarization.SlotCommittedDetails) {
 				deps.MetricsTracker.measure()
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(b *blocks.Block) {
+			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(_ *blocks.Block) {
 				deps.MetricsTracker.metrics.ConfirmedBlocks.Inc()
 			}, event.WithWorkerPool(Component.WorkerPool)).Unhook,
 		)

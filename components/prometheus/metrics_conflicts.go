@@ -37,6 +37,7 @@ var ConflictMetrics = collector.NewCollection(conflictNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Number of resolved (accepted) conflicts"),
 		collector.WithInitFunc(func() {
+			//nolint:revive
 			deps.Protocol.Events.Engine.SpendDAG.SpenderAccepted.Hook(func(spendID iotago.TransactionID) {
 				deps.Collector.Increment(conflictNamespace, resolvedConflictCount)
 			}, event.WithWorkerPool(Component.WorkerPool))
@@ -46,6 +47,7 @@ var ConflictMetrics = collector.NewCollection(conflictNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Number of created conflicts"),
 		collector.WithInitFunc(func() {
+			//nolint:revive
 			deps.Protocol.Events.Engine.SpendDAG.SpenderCreated.Hook(func(spendID iotago.TransactionID) {
 				deps.Collector.Increment(conflictNamespace, allConflictCounts)
 			}, event.WithWorkerPool(Component.WorkerPool))

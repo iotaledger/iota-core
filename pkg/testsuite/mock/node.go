@@ -166,12 +166,14 @@ func (n *Node) hookEvents() {
 		if heaviestAttestedCandidate != nil {
 			n.forkDetectedCount.Add(1)
 
+			//nolint:revive
 			heaviestAttestedCandidate.Engine.OnUpdate(func(prevEngine *engine.Engine, newEngine *engine.Engine) {
 				n.candidateEngineActivatedCount.Add(1)
 			})
 		}
 	})
 
+	//nolint:revive
 	n.Protocol.Chains.Main.OnUpdate(func(prevChain *protocol.Chain, newChain *protocol.Chain) {
 		if prevChain != nil {
 			n.mainEngineSwitchedCount.Add(1)
@@ -337,6 +339,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 		attestationBlockIDs := make([]iotago.BlockID, 0)
 		tree, err := instance.Attestations.GetMap(details.Commitment.Slot())
 		if err == nil {
+			//nolint:revive
 			err = tree.Stream(func(key iotago.AccountID, value *iotago.Attestation) error {
 				attestationBlockIDs = append(attestationBlockIDs, lo.PanicOnErr(value.BlockID()))
 				return nil

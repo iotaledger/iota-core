@@ -29,6 +29,7 @@ func (t *TestSuite) AssertAttestationsForSlot(slot iotago.SlotIndex, blocks []*b
 			}
 
 			storedAttestations := make([]iotago.BlockID, 0)
+			//nolint:revive
 			err = attestationTree.Stream(func(key iotago.AccountID, att *iotago.Attestation) error {
 				blockID, err := att.BlockID()
 				require.NoError(t.Testing, err)

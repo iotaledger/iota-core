@@ -19,6 +19,7 @@ func (m *Manager) RestoreFromDisk() error {
 			return ierrors.Wrapf(err, "failed to get storage for slot %d", i)
 		}
 
+		//nolint:revive
 		err = storage.Iterate(kvstore.EmptyPrefix, func(key iotago.AccountID, value *iotago.Attestation) bool {
 			m.applyToPendingAttestations(value, cutoffIndex)
 			return true

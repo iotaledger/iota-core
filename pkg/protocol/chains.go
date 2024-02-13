@@ -148,6 +148,7 @@ func (c *Chains) updateMeasuredSlot(latestSeenSlot iotago.SlotIndex) (teardown f
 
 // deriveLatestSeenSlot derives the latest seen slot from the protocol.
 func (c *Chains) deriveLatestSeenSlot(protocol *Protocol) func() {
+	//nolint:revive
 	return protocol.Engines.Main.WithNonEmptyValue(func(mainEngine *engine.Engine) (shutdown func()) {
 		return lo.Batch(
 			c.WithInitializedEngines(func(_ *Chain, engine *engine.Engine) (shutdown func()) {
@@ -156,7 +157,7 @@ func (c *Chains) deriveLatestSeenSlot(protocol *Protocol) func() {
 				})
 			}),
 
-			protocol.Network.OnBlockReceived(func(block *model.Block, src peer.ID) {
+			protocol.Network.OnBlockReceived(func(block *model.Block, _ peer.ID) {
 				c.LatestSeenSlot.Set(block.ProtocolBlock().Header.SlotCommitmentID.Slot())
 			}),
 		)
