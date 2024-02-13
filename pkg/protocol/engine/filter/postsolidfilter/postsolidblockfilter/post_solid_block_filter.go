@@ -136,7 +136,7 @@ func (c *PostSolidBlockFilter) ProcessSolidBlock(block *blocks.Block) {
 			if accountData.Credits.Value < 0 {
 				c.events.BlockFiltered.Trigger(&postsolidfilter.BlockFilteredEvent{
 					Block:  block,
-					Reason: ierrors.Wrapf(iotago.ErrNegativeBIC, "block issuer account %s is locked due to negative BIC", block.ProtocolBlock().Header.IssuerID),
+					Reason: ierrors.Wrapf(iotago.ErrAccountLocked, "block issuer account %s", block.ProtocolBlock().Header.IssuerID),
 				})
 
 				return

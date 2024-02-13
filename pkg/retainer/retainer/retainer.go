@@ -123,7 +123,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 					})
 
 					transactionMetadata.OnRejected(func() {
-						r.RetainTransactionFailure(attachment, iotago.ErrTxConflicting)
+						r.RetainTransactionFailure(attachment, iotago.ErrTxConflictRejected)
 					})
 
 					transactionMetadata.OnAccepted(func() {

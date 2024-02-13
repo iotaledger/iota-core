@@ -71,7 +71,7 @@ require (
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240212172835-f61c6d89d84d // indirect
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240125161426-1846f6320506 // indirect
 	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00 // indirect
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240205135859-2e6b70b484d6 // indirect
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240213081357-427dfc95a1b9 // indirect
 	github.com/ipfs/boxo v0.17.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
@@ -142,7 +142,6 @@ require (
 	github.com/quic-go/quic-go v0.41.0 // indirect
 	github.com/quic-go/webtransport-go v0.6.0 // indirect
 	github.com/raulk/go-watchdog v1.3.0 // indirect
-	github.com/samber/lo v1.39.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
