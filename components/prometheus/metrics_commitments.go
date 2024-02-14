@@ -59,7 +59,6 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithHelp("Number of accepted blocks by the node per slot."),
 		collector.WithLabels("slot"),
 		collector.WithPruningDelay(10*time.Minute),
-		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				deps.Collector.Update(commitmentsNamespace, acceptedBlocks, float64(details.AcceptedBlocks.Size()), strconv.Itoa(int(details.Commitment.Slot())))
@@ -71,7 +70,6 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithHelp("Number of accepted transactions by the node per slot."),
 		collector.WithLabels("slot"),
 		collector.WithPruningDelay(10*time.Minute),
-		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				deps.Collector.Update(commitmentsNamespace, transactions, float64(len(details.Mutations)), strconv.Itoa(int(details.Commitment.Slot())))
@@ -83,7 +81,6 @@ var CommitmentsMetrics = collector.NewCollection(commitmentsNamespace,
 		collector.WithHelp("Number of active validators per slot."),
 		collector.WithLabels("slot"),
 		collector.WithPruningDelay(10*time.Minute),
-		collector.WithResetBeforeCollecting(true),
 		collector.WithInitFunc(func() {
 			deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
 				deps.Collector.Update(commitmentsNamespace, validators, float64(details.ActiveValidatorsCount), strconv.Itoa(int(details.Commitment.Slot())))
