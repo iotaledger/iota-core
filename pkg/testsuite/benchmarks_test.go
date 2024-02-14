@@ -17,6 +17,17 @@ import (
 	"github.com/sajari/regression"
 )
 
+const (
+	inputRegressor = iota
+	contextInputRegressor
+	outputRegressor
+	nativeTokenRegressor
+	stakingRegressor
+	blockIssuerRegressor
+	allotmentRegressor
+	signatureEd25519Regressor
+)
+
 // Test_Regression runs benchmarks for many block types and find the best fit regression model.
 func Test_Regression(t *testing.T) {
 	t.Skip("This test is only intended to be run locally to determine new WorkScoreParameters")
@@ -79,9 +90,16 @@ func Test_Regression(t *testing.T) {
 	// calculate the workScoreParameters from the coefficients based on a standardBlockCost of 500,000 Mana and dataByteRatio of 0.5
 	workScoreParams := workScoreParamsFromCoefficients(coeffs, standardBlock, standardBlockCost, dataByteRatio)
 	ts := NewTestSuite(t, WithProtocolParametersOptions(iotago.WithWorkScoreOptions(
-		workScoreParams.DataByte, workScoreParams.Block, workScoreParams.Input, workScoreParams.ContextInput,
-		workScoreParams.Output, workScoreParams.NativeToken, workScoreParams.Staking, workScoreParams.BlockIssuer,
-		workScoreParams.Allotment, workScoreParams.SignatureEd25519,
+		workScoreParams.DataByte,
+		workScoreParams.Block,
+		workScoreParams.Input,
+		workScoreParams.ContextInput,
+		workScoreParams.Output,
+		workScoreParams.NativeToken,
+		workScoreParams.Staking,
+		workScoreParams.BlockIssuer,
+		workScoreParams.Allotment,
+		workScoreParams.SignatureEd25519,
 	)))
 	standardBlock.API = ts.API
 	// verify that the new workScore coefficients yield the desired cost for a standard block
@@ -99,30 +117,49 @@ func getStandardBlock(t *testing.T) *iotago.Block {
 		ts.DefaultWallet(),
 		mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
 	)
-	genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-	genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-	block := ts.IssueBasicBlockWithOptions("block", ts.DefaultWallet(), tx, mock.WithSlotCommitment(genesisCommitment))
+	commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+	block := ts.IssueBasicBlockWithOptions("block", ts.DefaultWallet(), tx, mock.WithSlotCommitment(commitment))
 
 	return block.ProtocolBlock()
 }
 
+// initializeTestSuite initializes a TestSuite with a single node and a default wallet and hooks the blockScheduled event as well as any additional setup functions.
+func initializeTestSuite(b *testing.B, t *testing.T, blockScheduled chan *blocks.Block, additionalSetupFuncs ...func(*TestSuite, *mock.Node)) (*TestSuite, *mock.Node) {
+	b.StopTimer()
+	ts := NewTestSuite(t)
+	node := ts.AddValidatorNode("node1")
+	ts.AddDefaultWallet(node)
+	for _, setupFunc := range additionalSetupFuncs {
+		setupFunc(ts, node)
+	}
+	ts.Run(true)
+	node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+		blockScheduled <- block
+	})
+
+	return ts, node
+}
+
+// issueBlockAndTimeProcessing runs the issueBlockAndTimeProcessing issues the block and measures the time it takes to schedule the block.
+func issueBlockAndTimeProcessing(b *testing.B, ts *TestSuite, modelBlock *model.Block, blockScheduled chan *blocks.Block) {
+	b.StartTimer()
+	ts.DefaultWallet().Node.Protocol.IssueBlock(modelBlock)
+	<-blockScheduled
+	b.StopTimer()
+	ts.Shutdown()
+}
+
 func basicInBasicOut(t *testing.T, numIn int, numOut int, signatures bool) (float64, []float64) {
-	blockchan := make(chan *blocks.Block, 1)
+	blockScheduled := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 
-	// basic block with one input and one output
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			ts := NewTestSuite(t)
-			node := ts.AddValidatorNode("node1")
-			ts.AddDefaultWallet(node)
-			ts.Run(true)
+			ts, node := initializeTestSuite(b, t, blockScheduled)
 			var addressIndexes []uint32
 			for i := 0; i < numIn; i++ {
 				addressIndexes = append(addressIndexes, uint32(i))
 			}
-			// First, create 128 outputs
 			var tx1 *iotago.SignedTransaction
 			if signatures {
 				tx1 = ts.DefaultWallet().CreateBasicOutputsAtAddressesFromInput(
@@ -137,38 +174,29 @@ func basicInBasicOut(t *testing.T, numIn int, numOut int, signatures bool) (floa
 					"Genesis:0",
 				)
 			}
-			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
+			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
-			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
 			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
+			<-blockScheduled
 
 			inputNames := make([]string, numIn)
 			for i := 0; i < numIn; i++ {
 				inputNames[i] = fmt.Sprintf("tx1:%d", i)
 			}
-			// Then, create a transaction with 128 inputs
 			tx2 := ts.DefaultWallet().CreateBasicOutputsEquallyFromInputs(
 				"tx2",
 				inputNames,
 				addressIndexes,
 				numOut,
 			)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithSlotCommitment(genesisCommitment))
+			commitment = node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+			block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithSlotCommitment(commitment))
 			block = block2.ProtocolBlock()
 			modelBlock = lo.PanicOnErr(model.BlockFromBlock(block))
-			b.StartTimer()
-			// time from issuance of the block to when it is scheduled
-			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
-			b.StopTimer()
-			ts.Shutdown()
+			// measure time from issuance of the block to when it is scheduled
+			issueBlockAndTimeProcessing(b, ts, modelBlock, blockScheduled)
 		}
 	}
 	// get the ns/op of processing the block
@@ -186,17 +214,13 @@ func basicInBasicOut(t *testing.T, numIn int, numOut int, signatures bool) (floa
 }
 
 func basicInAccountOut(t *testing.T, numAccounts int, staking bool) (float64, []float64) {
-	blockchan := make(chan *blocks.Block, 1)
+	blockScheduled := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 
 	// basic block with one input, one account output with staking and a remainder
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			ts := NewTestSuite(t)
-			node := ts.AddValidatorNode("node1")
-			ts.AddDefaultWallet(node)
-			ts.Run(true)
+			ts, node := initializeTestSuite(b, t, blockScheduled)
 			opts := []options.Option[builder.AccountOutputBuilder]{
 				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
 			}
@@ -209,21 +233,12 @@ func basicInAccountOut(t *testing.T, numAccounts int, staking bool) (float64, []
 				numAccounts,
 				opts...,
 			)
-			// default block issuer issues a block containing the transaction in slot 1.
-			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
+			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
-			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
-			b.StartTimer()
-			// time from issuance of the block to when it is scheduled
-			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
-			b.StopTimer()
-			ts.Shutdown()
+			// measure time from issuance of the block to when it is scheduled
+			issueBlockAndTimeProcessing(b, ts, modelBlock, blockScheduled)
 		}
 	}
 	// get the ns/op of processing the block
@@ -246,42 +261,32 @@ func accountInAccountOut(t *testing.T, numAccounts int) (float64, []float64) {
 	if numAccounts > iotago.MaxOutputsCount-2 {
 		panic("Can only create MaxOutputsCount - 2 account outputs because we two other outputs in genesis transaction to create inputs accounts)")
 	}
-	blockchan := make(chan *blocks.Block, 1)
+	blockScheduled := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 
 	// basic block with one input, one account output with staking and a remainder
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			ts := NewTestSuite(t)
-			node := ts.AddValidatorNode("node1")
-			ts.AddDefaultWallet(node)
+			ts, node := initializeTestSuite(b, t, blockScheduled, func(ts *TestSuite, node *mock.Node) {
+				for i := 0; i < numAccounts; i++ {
+					ts.AddGenesisWallet(fmt.Sprintf("wallet%d", i), node)
+				}
+			})
 			inputNames := []string{"Genesis:2"}
 			for i := 0; i < numAccounts-1; i++ {
-				ts.AddGenesisWallet(fmt.Sprintf("wallet%d", i), node)
 				inputNames = append(inputNames, fmt.Sprintf("Genesis:%d", i+3))
 			}
-			ts.Run(true)
 			tx1 := ts.DefaultWallet().TransitionAccounts(
 				"tx1",
 				inputNames,
 				mock.WithBlockIssuerFeature(iotago.BlockIssuerKeys{tpkg.RandBlockIssuerKey()}, iotago.MaxSlotIndex),
 			)
-			// default block issuer issues a block containing the transaction in slot 1.
-			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
+			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
-			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
-			b.StartTimer()
-			// time from issuance of the block to when it is scheduled
-			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
-			b.StopTimer()
-			ts.Shutdown()
+			// measure time from issuance of the block to when it is scheduled
+			issueBlockAndTimeProcessing(b, ts, modelBlock, blockScheduled)
 		}
 	}
 	// get the ns/op of processing the block
@@ -298,14 +303,11 @@ func basicInNativeOut(t *testing.T, nNative int) (float64, []float64) {
 	if nNative > iotago.MaxOutputsCount-1 {
 		panic("Can only create MaxOutputsCount - 1 native token outputs because we need an account output as well")
 	}
-	blockchan := make(chan *blocks.Block, 1)
+	blockScheduled := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			ts := NewTestSuite(t)
-			ts.AddDefaultWallet(ts.AddValidatorNode("node1"))
-			ts.Run(true)
+			ts, node := initializeTestSuite(b, t, blockScheduled)
 			var addressIndexes []uint32
 			for i := 0; i < nNative-1; i++ {
 				addressIndexes = append(addressIndexes, uint32(i))
@@ -316,27 +318,12 @@ func basicInNativeOut(t *testing.T, nNative int) (float64, []float64) {
 				"Genesis:2",
 				addressIndexes...,
 			)
-			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			// issue a block with the transaction
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
-			// get the protocol block
+			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
 			block = block1.ProtocolBlock()
-			// get the model block
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
-			// hook the block scheduled event
-			ts.DefaultWallet().Node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
-			// start the timer
-			b.StartTimer()
-			// time from issuance of the block to when it is scheduled
-			ts.DefaultWallet().Node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
-			// stop the timer
-			b.StopTimer()
-			// shutdown the test suite
-			ts.Shutdown()
+			// measure time from issuance of the block to when it is scheduled
+			issueBlockAndTimeProcessing(b, ts, modelBlock, blockScheduled)
 		}
 	}
 	// get the ns/op of processing the block
@@ -351,52 +338,35 @@ func basicInNativeOut(t *testing.T, nNative int) (float64, []float64) {
 }
 
 func nativeInNativeOut(t *testing.T) (float64, []float64) {
-	blockchan := make(chan *blocks.Block, 1)
+	blockScheduled := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 
-	// basic block with one input and one output
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			ts := NewTestSuite(t)
-			node := ts.AddValidatorNode("node1")
-			ts.AddDefaultWallet(node)
-			ts.Run(true)
-			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
+			ts, node := initializeTestSuite(b, t, blockScheduled)
 			tx1 := ts.DefaultWallet().CreateFoundryAndNativeTokensFromInput(
 				"tx1",
 				"Genesis:0",
 				"Genesis:2",
 			)
-			// default block issuer issues a block containing the transaction in slot 1.
-			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
+			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
-			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
 			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
+			<-blockScheduled
 
 			tx2 := ts.DefaultWallet().TransitionFoundry(
 				"tx2",
 				"tx1:0",
 				"tx1:1",
 			)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithSlotCommitment(genesisCommitment))
+			commitment = node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+			block2 := ts.IssueBasicBlockWithOptions("block2", ts.DefaultWallet(), tx2, mock.WithSlotCommitment(commitment))
 			block = block2.ProtocolBlock()
 			modelBlock = lo.PanicOnErr(model.BlockFromBlock(block))
-			b.StartTimer()
-			// time from issuance of the block to when it is scheduled
-			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
-			b.StopTimer()
-			ts.Shutdown()
+			// measure time from issuance of the block to when it is scheduled
+			issueBlockAndTimeProcessing(b, ts, modelBlock, blockScheduled)
 		}
 	}
 	// get the ns/op of processing the block
@@ -410,53 +380,40 @@ func nativeInNativeOut(t *testing.T) (float64, []float64) {
 }
 
 func allotments(t *testing.T, numAllotments int) (float64, []float64) {
-	blockchan := make(chan *blocks.Block, 1)
+	blockScheduled := make(chan *blocks.Block, 1)
 	var block *iotago.Block
 
-	// basic block with one input and one output
 	fn := func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			b.StopTimer()
-			ts := NewTestSuite(t)
-			// create genesis accounts to allot to.
-			for i := 0; i < numAllotments; i++ {
-				ts.AddGenesisAccount(snapshotcreator.AccountDetails{
-					Address:              nil,
-					Amount:               mock.MinIssuerAccountAmount(ts.API.ProtocolParameters()),
-					Mana:                 0,
-					IssuerKey:            tpkg.RandBlockIssuerKey(),
-					ExpirySlot:           iotago.MaxSlotIndex,
-					BlockIssuanceCredits: iotago.BlockIssuanceCredits(123),
-				})
-			}
-			node := ts.AddValidatorNode("node1")
-			ts.AddDefaultWallet(node)
-			ts.Run(true)
+			ts, node := initializeTestSuite(b, t, blockScheduled, func(ts *TestSuite, _ *mock.Node) {
+				// create genesis accounts to allot to.
+				for i := 0; i < numAllotments; i++ {
+					ts.AddGenesisAccount(snapshotcreator.AccountDetails{
+						Address:              nil,
+						Amount:               mock.MinIssuerAccountAmount(ts.API.ProtocolParameters()),
+						Mana:                 0,
+						IssuerKey:            tpkg.RandBlockIssuerKey(),
+						ExpirySlot:           iotago.MaxSlotIndex,
+						BlockIssuanceCredits: iotago.BlockIssuanceCredits(123),
+					})
+				}
+			})
 			var accountIDs []iotago.AccountID
 			for i := 0; i < numAllotments; i++ {
-				accountOutput := ts.AccountOutput(fmt.Sprintf("Genesis:%d", i+1)).Output().(*iotago.AccountOutput)
+				accountOutput := ts.AccountOutput(fmt.Sprintf("Genesis:%d", i+3)).Output().(*iotago.AccountOutput)
 				accountIDs = append(accountIDs, accountOutput.AccountID)
 			}
-			tx1 := ts.DefaultWallet().AllotManaFromInput(
+			tx1 := ts.DefaultWallet().AllotManaFromBasicOutput(
 				"tx1",
 				"Genesis:0",
 				accountIDs...,
 			)
-			// default block issuer issues a block containing the transaction in slot 1.
-			genesisCommitment := iotago.NewEmptyCommitment(ts.API)
-			genesisCommitment.ReferenceManaCost = ts.API.ProtocolParameters().CongestionControlParameters().MinReferenceManaCost
-			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(genesisCommitment))
+			commitment := node.Protocol.Chains.Main.Get().LatestCommitment.Get().Commitment.Commitment()
+			block1 := ts.IssueBasicBlockWithOptions("block1", ts.DefaultWallet(), tx1, mock.WithSlotCommitment(commitment))
 			block = block1.ProtocolBlock()
 			modelBlock := lo.PanicOnErr(model.BlockFromBlock(block))
-			node.Protocol.Events.Engine.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
-				blockchan <- block
-			})
-			b.StartTimer()
-			// time from issuance of the block to when it is scheduled
-			node.Protocol.IssueBlock(modelBlock)
-			<-blockchan
-			b.StopTimer()
-			ts.Shutdown()
+			// measure time from issuance of the block to when it is scheduled
+			issueBlockAndTimeProcessing(b, ts, modelBlock, blockScheduled)
 		}
 	}
 	// get the ns/op of processing the block
@@ -516,32 +473,32 @@ func getBlockWorkScoreRegressors(block *iotago.Block) []float64 {
 		panic("block payload is not a signed transaction")
 	}
 	// add one to the Input regressor for each input
-	regressors[0] += float64(len(signedTx.Transaction.TransactionEssence.Inputs))
+	regressors[inputRegressor] += float64(len(signedTx.Transaction.TransactionEssence.Inputs))
 	// add one to the ContextInput regressor for each context input
-	regressors[1] += float64(len(signedTx.Transaction.TransactionEssence.ContextInputs))
+	regressors[contextInputRegressor] += float64(len(signedTx.Transaction.TransactionEssence.ContextInputs))
 	for _, output := range signedTx.Transaction.Outputs {
 		// add one to the Output regressor for each output
-		regressors[2] += 1
+		regressors[outputRegressor] += 1
 		for _, feature := range output.FeatureSet() {
 			switch feature.Type() {
 			case iotago.FeatureNativeToken:
 				// add one to the NativeToken regressor for each output with the native token feature
-				regressors[3] += 1
+				regressors[nativeTokenRegressor] += 1
 			case iotago.FeatureStaking:
 				// add one to the Staking regressor for each output with the staking feature
-				regressors[4] += 1
+				regressors[stakingRegressor] += 1
 			case iotago.FeatureBlockIssuer:
 				// add one to the BlockIssuer regressor for each output with the block issuer feature
-				regressors[5] += 1
+				regressors[blockIssuerRegressor] += 1
 			}
 		}
 	}
 	// add one to Allotments regressor for each allotment
-	regressors[6] += float64(len(signedTx.Transaction.TransactionEssence.Allotments))
+	regressors[allotmentRegressor] += float64(len(signedTx.Transaction.TransactionEssence.Allotments))
 	for _, unlock := range signedTx.Unlocks {
 		if unlock.Type() == iotago.UnlockSignature {
 			// add one to the SignatureEd25519 regressor for each unlock block
-			regressors[7] += 1
+			regressors[signatureEd25519Regressor] += 1
 		}
 	}
 
@@ -556,6 +513,7 @@ func workScoreParamsFromCoefficients(coeffs []float64, standardBlock *iotago.Blo
 	standarBlockRegressors := getBlockWorkScoreRegressors(standardBlock)
 	fmt.Printf("Standard block regressors: %+v\n", standarBlockRegressors)
 	standardBlockWorkScore := coeffs[0]
+	// the coeffients contain the intercept (block factor) as the first element so we start from 1
 	for i, regressor := range standarBlockRegressors {
 		standardBlockWorkScore += regressor * coeffs[i+1]
 	}
@@ -563,16 +521,17 @@ func workScoreParamsFromCoefficients(coeffs []float64, standardBlock *iotago.Blo
 	payloadSize := standardBlock.Body.(*iotago.BasicBlockBody).Payload.Size()
 	dataByteFactor := (standardBlockWorkScore * (dataByteRatio * scalingFactor) / float64(payloadSize))
 
+	// the coeffients contain the intercept (block factor) as the first element so we start from 1
 	return iotago.WorkScoreParameters{
 		DataByte:         iotago.WorkScore(dataByteFactor),
 		Block:            iotago.WorkScore(coeffs[0] * scalingFactor),
-		Input:            iotago.WorkScore(coeffs[1] * scalingFactor),
-		ContextInput:     iotago.WorkScore(coeffs[2] * scalingFactor),
-		Output:           iotago.WorkScore(coeffs[3] * scalingFactor),
-		NativeToken:      iotago.WorkScore(coeffs[4] * scalingFactor),
-		Staking:          iotago.WorkScore(coeffs[5] * scalingFactor),
-		BlockIssuer:      iotago.WorkScore(coeffs[6] * scalingFactor),
-		Allotment:        iotago.WorkScore(coeffs[7] * scalingFactor),
-		SignatureEd25519: iotago.WorkScore(coeffs[8] * scalingFactor),
+		Input:            iotago.WorkScore(coeffs[inputRegressor+1] * scalingFactor),
+		ContextInput:     iotago.WorkScore(coeffs[contextInputRegressor+1] * scalingFactor),
+		Output:           iotago.WorkScore(coeffs[outputRegressor+1] * scalingFactor),
+		NativeToken:      iotago.WorkScore(coeffs[nativeTokenRegressor+1] * scalingFactor),
+		Staking:          iotago.WorkScore(coeffs[stakingRegressor+1] * scalingFactor),
+		BlockIssuer:      iotago.WorkScore(coeffs[blockIssuerRegressor+1] * scalingFactor),
+		Allotment:        iotago.WorkScore(coeffs[allotmentRegressor+1] * scalingFactor),
+		SignatureEd25519: iotago.WorkScore(coeffs[signatureEd25519Regressor+1] * scalingFactor),
 	}
 }

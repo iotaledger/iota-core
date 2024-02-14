@@ -400,8 +400,8 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, i
 	serialNumber := inputAccount.FoundryCounter + 1
 
 	totalIn := inputState.BaseTokenAmount()
-	baseTokenEach := totalIn / iotago.BaseToken(nNativeTokens+1)
-	remainder := totalIn - baseTokenEach*iotago.BaseToken(nNativeTokens+1)
+	outputAmount := totalIn / iotago.BaseToken(nNativeTokens+1)
+	remainder := totalIn - outputAmount*iotago.BaseToken(nNativeTokens+1)
 
 	tokenScheme := &iotago.SimpleTokenScheme{
 		MintedTokens:  big.NewInt(int64(nNativeTokens)),
@@ -414,19 +414,16 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, i
 	}
 
 	outputStates = append(outputStates,
-		builder.NewFoundryOutputBuilder(accountAddr, baseTokenEach+remainder, serialNumber, tokenScheme).
+		builder.NewFoundryOutputBuilder(accountAddr, outputAmount+remainder, serialNumber, tokenScheme).
 			MustBuild(),
 	)
 
-	outputStates = append(outputStates,
-		builder.NewAccountOutputBuilderFromPrevious(inputAccount).
-			FoundriesToGenerate(1).
-			MustBuild(),
-	)
+	accountOutput := builder.NewAccountOutputBuilderFromPrevious(inputAccount).FoundriesToGenerate(1).MustBuild()
+	outputStates = append(outputStates, accountOutput)
 
 	for _, index := range addressIndexes {
 		outputStates = append(outputStates, &iotago.BasicOutput{
-			Amount: baseTokenEach,
+			Amount: outputAmount,
 			Mana:   0,
 			UnlockConditions: iotago.BasicOutputUnlockConditions{
 				&iotago.AddressUnlockCondition{Address: w.Address(index)},
@@ -435,11 +432,6 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, i
 				nativeTokenFeature,
 			},
 		})
-	}
-
-	accountOutput, isAccount := outputStates[1].(*iotago.AccountOutput)
-	if !isAccount {
-		panic("output with alias accountName is not *iotago.AccountOutput")
 	}
 
 	signedTransaction := w.createSignedTransactionWithOptions(
@@ -458,6 +450,7 @@ func (w *Wallet) CreateFoundryAndNativeTokensFromInput(transactionName string, i
 	return signedTransaction
 }
 
+// TransitionFoundry transitions a FoundryOutput by increasing the native token amount on the output by one.
 func (w *Wallet) TransitionFoundry(transactionName string, inputName string, accountName string) *iotago.SignedTransaction {
 	input := w.Output(inputName)
 	inputFoundry, isFoundry := input.Output().(*iotago.FoundryOutput)
@@ -474,6 +467,10 @@ func (w *Wallet) TransitionFoundry(transactionName string, inputName string, acc
 		MaximumSupply: previousTokenScheme.MaximumSupply,
 		MeltedTokens:  previousTokenScheme.MeltedTokens,
 		MintedTokens:  previousTokenScheme.MintedTokens.Add(previousTokenScheme.MintedTokens, big.NewInt(1)),
+	}
+
+	if tokenScheme.MintedTokens.Cmp(tokenScheme.MaximumSupply) > 0 {
+		panic("Can't transition foundry, maximum native token supply reached")
 	}
 
 	outputFoundry := builder.NewFoundryOutputBuilderFromPrevious(inputFoundry).
@@ -507,8 +504,11 @@ func (w *Wallet) TransitionFoundry(transactionName string, inputName string, acc
 	return signedTransaction
 }
 
-func (w *Wallet) AllotManaFromInput(transactionName string, inputName string, accountIDs ...iotago.AccountID) *iotago.SignedTransaction {
+func (w *Wallet) AllotManaFromBasicOutput(transactionName string, inputName string, accountIDs ...iotago.AccountID) *iotago.SignedTransaction {
 	input := w.Output(inputName)
+	if _, isBasic := input.Output().(*iotago.BasicOutput); !isBasic {
+		panic(fmt.Sprintf("output with alias %s is not *iotago.BasicOutput", inputName))
+	}
 	output := &iotago.BasicOutput{
 		Amount: input.BaseTokenAmount(),
 		Mana:   0,
@@ -523,12 +523,17 @@ func (w *Wallet) AllotManaFromInput(transactionName string, inputName string, ac
 	storageScoreStructure := apiForSlot.StorageScoreStructure()
 
 	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{input.OutputID(): input.Output()}, vm.RewardsInputSet{}))
+	outputMana := totalInputMana / iotago.Mana(len(accountIDs))
+	remainderMana := totalInputMana - outputMana*iotago.Mana(len(accountIDs))
 
 	var allotments iotago.Allotments
-	for _, accountID := range accountIDs {
+	for i, accountID := range accountIDs {
+		if i+1 == len(accountIDs) {
+			outputMana += remainderMana
+		}
 		allotments = append(allotments, &iotago.Allotment{
 			AccountID: accountID,
-			Mana:      totalInputMana / iotago.Mana(len(accountIDs)),
+			Mana:      outputMana,
 		})
 	}
 
@@ -554,19 +559,17 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInput(transactionName string, outp
 	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{inputState.OutputID(): inputState.Output()}, vm.RewardsInputSet{}))
 
 	manaAmount := totalInputMana / iotago.Mana(outputCount)
-	remainderMana := totalInputMana
+	remainderMana := totalInputMana - manaAmount*iotago.Mana(outputCount)
 
 	tokenAmount := inputAmount / iotago.BaseToken(outputCount)
-	remainderFunds := inputAmount
+	remainderFunds := inputAmount - tokenAmount*iotago.BaseToken(outputCount)
 
 	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
 	for i := 0; i < outputCount; i++ {
 		if i+1 == outputCount {
-			tokenAmount = remainderFunds
-			manaAmount = remainderMana
+			tokenAmount += remainderFunds
+			manaAmount += remainderMana
 		}
-		remainderFunds -= tokenAmount
-		remainderMana -= manaAmount
 
 		outputStates = append(outputStates, &iotago.BasicOutput{
 			Amount: tokenAmount,
@@ -600,19 +603,17 @@ func (w *Wallet) CreateBasicOutputsAtAddressesFromInput(transactionName string, 
 	totalInputMana := lo.PanicOnErr(vm.TotalManaIn(manaDecayProvider, storageScoreStructure, w.currentSlot, vm.InputSet{inputState.OutputID(): inputState.Output()}, vm.RewardsInputSet{}))
 
 	manaAmount := totalInputMana / iotago.Mana(outputCount)
-	remainderMana := totalInputMana
+	remainderMana := totalInputMana - manaAmount*iotago.Mana(outputCount)
 
 	tokenAmount := inputAmount / iotago.BaseToken(outputCount)
-	remainderFunds := inputAmount
+	remainderFunds := inputAmount - tokenAmount*iotago.BaseToken(outputCount)
 
 	outputStates := make(iotago.Outputs[iotago.Output], 0, outputCount)
 	for i, index := range addressIndexes {
 		if i+1 == outputCount {
-			tokenAmount = remainderFunds
-			manaAmount = remainderMana
+			tokenAmount += remainderFunds
+			manaAmount += remainderMana
 		}
-		remainderFunds -= tokenAmount
-		remainderMana -= manaAmount
 
 		outputStates = append(outputStates, &iotago.BasicOutput{
 			Amount: tokenAmount,
@@ -653,14 +654,14 @@ func (w *Wallet) CreateBasicOutputsEquallyFromInputs(transactionName string, inp
 
 	outputStates := make(iotago.Outputs[iotago.Output], 0, outputsCount)
 	outputAmount := totalInputBaseToken / iotago.BaseToken(outputsCount)
-	remainderAmount := totalInputBaseToken % iotago.BaseToken(outputsCount)
+	remainderAmount := totalInputBaseToken - outputAmount*iotago.BaseToken(outputsCount)
 	outputMana := totalInputMana / iotago.Mana(outputsCount)
-	remainderMana := totalInputMana % iotago.Mana(outputsCount)
+	remainderMana := totalInputMana - outputMana*iotago.Mana(outputsCount)
 
 	for i := 0; i < outputsCount; i++ {
 		if i+1 == outputsCount {
-			outputAmount = outputAmount + remainderAmount
-			outputMana = outputMana + remainderMana
+			outputAmount += remainderAmount
+			outputMana += remainderMana
 		}
 		outputStates = append(outputStates, &iotago.BasicOutput{
 			Amount: outputAmount,
@@ -1019,9 +1020,9 @@ func (w *Wallet) createSignedTransactionWithOptions(transactionName string, addr
 	return signedTransaction
 }
 
-func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Transaction, indexes ...uint32) {
-	if indexes == nil {
-		indexes = []uint32{0}
+func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Transaction, addressIndexes ...uint32) {
+	if len(addressIndexes) == 0 {
+		addressIndexes = []uint32{0}
 	}
 	currentAPI := w.Node.Protocol.CommittedAPI()
 	(lo.PanicOnErr(transaction.ID())).RegisterAlias(transactionName)
@@ -1032,7 +1033,7 @@ func (w *Wallet) registerOutputs(transactionName string, transaction *iotago.Tra
 		addressUC := output.UnlockConditionSet().Address()
 		stateControllerUC := output.UnlockConditionSet().StateControllerAddress()
 		immutableAccountUC := output.UnlockConditionSet().ImmutableAccount()
-		for _, index := range indexes {
+		for _, index := range addressIndexes {
 			if addressUC != nil && (w.HasAddress(addressUC.Address, index) ||
 				addressUC.Address.Type() == iotago.AddressAccount && addressUC.Address.String() == w.BlockIssuer.AccountID.ToAddress().String()) ||
 				immutableAccountUC != nil && immutableAccountUC.Address.AccountID() == w.BlockIssuer.AccountID ||

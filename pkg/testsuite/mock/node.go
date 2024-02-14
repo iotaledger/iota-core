@@ -99,11 +99,9 @@ func NewNode(t *testing.T, parentLogger log.Logger, net *Network, partition stri
 	} else {
 		validationBlockIssuer = nil
 	}
-	logger := parentLogger.NewChildLogger(name)
-	//logger.SetLogLevel(log.LevelTrace)
 	return &Node{
 		Testing: t,
-		logger:  logger,
+		logger:  parentLogger.NewChildLogger(name),
 
 		Name: name,
 

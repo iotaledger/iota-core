@@ -133,8 +133,8 @@ func (w *Wallet) ImplicitAccountCreationAddress(index ...uint32) *iotago.Implici
 	return address.(*iotago.ImplicitAccountCreationAddress)
 }
 
-func (w *Wallet) HasAddress(address iotago.Address, index uint32) bool {
-	return address.Equal(w.Address(index)) || address.Equal(w.ImplicitAccountCreationAddress(index))
+func (w *Wallet) HasAddress(address iotago.Address, index ...uint32) bool {
+	return address.Equal(w.Address(index...)) || address.Equal(w.ImplicitAccountCreationAddress(index...))
 }
 
 func (w *Wallet) KeyPair() (ed25519.PrivateKey, ed25519.PublicKey) {
