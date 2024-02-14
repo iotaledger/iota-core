@@ -69,11 +69,16 @@ func prepareCommitmentGraph(g *graphviz.Graphviz, rootCommitment *protocol.Commi
 			return nil, parentErr
 		}
 
+		// TODO: this should be removed once eviction of commitments is properly implemented
 		if parentCommitment.Children.IsEmpty() {
 			if childCommitment, exists := parentCommitment.Chain.Get().Commitment(parentCommitment.Slot() + 1); exists {
 				if err = renderChild(childCommitment, graph, parentCommitment, parent); err != nil {
 					return nil, err
 				}
+
+				commitmentWalker.Push(childCommitment)
+
+				continue
 			}
 		}
 
