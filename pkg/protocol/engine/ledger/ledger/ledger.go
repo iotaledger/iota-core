@@ -282,7 +282,7 @@ func (l *Ledger) OutputOrSpent(outputID iotago.OutputID) (*utxoledger.Output, *u
 	stateRef := mempool.UTXOInputStateRefFromInput(outputID.UTXOInput())
 	stateWithMetadata, err := l.memPool.StateMetadata(stateRef)
 	if err != nil {
-		if ierrors.Is(iotago.ErrInputAlreadySpent, err) {
+		if ierrors.Is(err, iotago.ErrInputAlreadySpent) {
 			l.utxoLedger.ReadLockLedger()
 			defer l.utxoLedger.ReadUnlockLedger()
 
