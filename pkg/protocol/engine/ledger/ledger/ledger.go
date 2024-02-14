@@ -212,6 +212,9 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 		return true
 	})
 
+	// We evict the mempool before we return, after updating the last committed slot value.
+	// We need to evict after updating the last committed slot value because otherwise transactions would be orphaned first
+	// (due to removing the attachments) and then committed, which would result in a broken state of the transaction.
 	l.memPool.Evict(slot)
 
 	return l.utxoLedger.StateTreeRoot(), stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), outputs, spenders, mutations, nil
