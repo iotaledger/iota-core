@@ -89,7 +89,7 @@ func (b *Blocks) ProcessResponse(block *model.Block, from peer.ID) {
 	b.workerPool.Submit(func() {
 		// abort if the commitment belongs to an evicted slot
 		commitment, err := b.protocol.Commitments.Get(block.ProtocolBlock().Header.SlotCommitmentID, true)
-		if err != nil && ierrors.Is(ErrorSlotEvicted, err) {
+		if err != nil && ierrors.Is(err, ErrorSlotEvicted) {
 			b.LogError("dropped block referencing unsolidifiable commitment", "commitmentID", block.ProtocolBlock().Header.SlotCommitmentID, "blockID", block.ID(), "err", err)
 
 			return
