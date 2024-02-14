@@ -280,9 +280,14 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 // deriveChildren derives the children of this Commitment by adding the given child to the Children set.
 func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) {
 	c.MainChild.Compute(func(mainChild *Commitment) *Commitment {
+		c.LogInfo("adding child", "parent", c.LogName(), "child", child.LogName(), "childCount", c.Children.Size())
+
 		if !c.Children.Add(child) || mainChild != nil {
+			c.LogInfo("maybe added child?", "parent", c.LogName(), "child", child.LogName(), "childCount", c.Children.Size())
+
 			return mainChild
 		}
+		c.LogInfo("added child", "parent", c.LogName(), "child", child.LogName(), "childCount", c.Children.Size())
 
 		return child
 	})
