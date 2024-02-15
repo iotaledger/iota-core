@@ -14,8 +14,11 @@ const (
 	blockStorePrefix byte = iota
 	transactionStorePrefix
 
-	transactionRetainerDataLength = serializer.OneByte + serializer.OneByte + serializer.UInt32ByteSize
-	blockRetainerDataLength       = serializer.OneByte + serializer.OneByte + iotago.TransactionIDLength
+	// api.TransactionState + api.TransactionFailureReason + iotago.SlotIndex
+	transactionRetainerDataLength = serializer.OneByte + serializer.OneByte + iotago.SlotIndexLength
+
+	// api.BlockState + api.BlockFailureReason + iotago.TransactionID
+	blockRetainerDataLength = serializer.OneByte + serializer.OneByte + iotago.TransactionIDLength
 )
 
 type BlockRetainerData struct {
