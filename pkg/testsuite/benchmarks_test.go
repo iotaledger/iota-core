@@ -334,6 +334,7 @@ func basicInNativeOut(t *testing.T, nNative int) (float64, []float64) {
 	// get the regressors
 	regressors := getBlockWorkScoreRegressors(block)
 	printRegressors(regressors)
+
 	return nsPerBlock, regressors
 }
 
