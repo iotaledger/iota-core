@@ -29,6 +29,10 @@ const (
 )
 
 // Test_Regression runs benchmarks for many block types and find the best fit regression model.
+// In summary, the regression analysis works by benchmarking how long different types of blocks take to be processed by a mock node in our 
+// existing test suite, from issuance to scheduling. This is used as an indicator of how computationally expensive the block is to process. 
+// By varying the number and types of inputs and outputs in different transactions, we end up with a data set which we then use to train a linear model by regression,
+// i.e., we find the WorkScoreParameters that give the best fit to the data we generated.
 func Test_Regression(t *testing.T) {
 	t.Skip("This test is only intended to be run locally to determine new WorkScoreParameters")
 	r := new(regression.Regression)
