@@ -26,7 +26,7 @@ require (
 	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240214181534-9a393ea95057
 	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240214181217-a6dd0abaab8d
 	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240214180848-ff6a4bb7bc41
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240215154216-92b1c8ba1c57
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/labstack/gommon v0.4.2
 	github.com/libp2p/go-libp2p v0.32.2
