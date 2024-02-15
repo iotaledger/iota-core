@@ -132,7 +132,7 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (attachedTransaction mem
 		if err != nil {
 			transactionID, txIDErr := signedTransaction.Transaction.ID()
 			if txIDErr != nil {
-				l.errorHandler(err)
+				l.errorHandler(txIDErr)
 				return nil, true
 			}
 

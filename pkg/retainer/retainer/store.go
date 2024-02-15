@@ -74,12 +74,12 @@ func (m *metadataStore) setBlockConfirmed(blockID iotago.BlockID) error {
 }
 
 func (m *metadataStore) moveTransactionMetadataToTheLatestAttachmentSlot(txID iotago.TransactionID, latestAttachmentSlot iotago.SlotIndex) error {
-	m.attachmentSlotMutex.Lock()
-	defer m.attachmentSlotMutex.Unlock()
-
 	if txID == iotago.EmptyTransactionID {
 		return nil
 	}
+
+	m.attachmentSlotMutex.Lock()
+	defer m.attachmentSlotMutex.Unlock()
 
 	currentSlot, exists := m.transactionLatestAttachmentSlot.Get(txID)
 	if !exists {
@@ -146,7 +146,7 @@ func (m *metadataStore) getBlockData(blockID iotago.BlockID) (*slotstore.BlockRe
 	return data, nil
 }
 
-func (m *metadataStore) getTransactionStoreNoLock(txID iotago.TransactionID) (*slotstore.Retainer, error) {
+func (m *metadataStore) getTransactionStoreWithoutLocking(txID iotago.TransactionID) (*slotstore.Retainer, error) {
 	latestAttachmentSlot, exists := m.transactionLatestAttachmentSlot.Get(txID)
 	if !exists {
 		return nil, ierrors.Errorf("latest attachment slot for transaction %s not found", txID.String())
@@ -164,7 +164,7 @@ func (m *metadataStore) getTransactionData(txID iotago.TransactionID) (*slotstor
 	m.attachmentSlotMutex.Lock()
 	defer m.attachmentSlotMutex.Unlock()
 
-	store, err := m.getTransactionStoreNoLock(txID)
+	store, err := m.getTransactionStoreWithoutLocking(txID)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (m *metadataStore) setTransactionNoFailure(txID iotago.TransactionID, statu
 	m.attachmentSlotMutex.Lock()
 	defer m.attachmentSlotMutex.Unlock()
 
-	store, err := m.getTransactionStoreNoLock(txID)
+	store, err := m.getTransactionStoreWithoutLocking(txID)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (m *metadataStore) setTransactionFailure(txID iotago.TransactionID, failure
 	m.attachmentSlotMutex.Lock()
 	defer m.attachmentSlotMutex.Unlock()
 
-	store, err := m.getTransactionStoreNoLock(txID)
+	store, err := m.getTransactionStoreWithoutLocking(txID)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (m *metadataStore) updateConfirmedTransaction(txID iotago.TransactionID, at
 	m.attachmentSlotMutex.Lock()
 	defer m.attachmentSlotMutex.Unlock()
 
-	store, err := m.getTransactionStoreNoLock(txID)
+	store, err := m.getTransactionStoreWithoutLocking(txID)
 	if err != nil {
 		return err
 	}

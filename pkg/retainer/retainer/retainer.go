@@ -98,7 +98,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			}
 		}, asyncOpt)
 
-		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, err error) {
+		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, _ error) {
 			r.RetainBlockFailure(b.ModelBlock(), api.BlockFailureDroppedDueToCongestion)
 		})
 
@@ -112,13 +112,11 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 				signedTransactionMetadata.OnSignaturesValid(func() {
 					transactionMetadata := signedTransactionMetadata.TransactionMetadata()
 
-					// transaction is not included yet, thus EarliestIncludedAttachment is not set.
 					if err := r.onTransactionAttached(txID); err != nil {
 						r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAttached in retainer"))
 					}
 
 					transactionMetadata.OnInvalid(func(err error) {
-						// transaction is not included yet, thus EarliestIncludedAttachment is not set.
 						r.RetainTransactionFailure(txID, err)
 					})
 
@@ -209,14 +207,16 @@ func (r *Retainer) RetainRegisteredValidatorsCache(index uint32, resp []*api.Val
 }
 
 func (r *Retainer) transactionID(block *model.Block) iotago.TransactionID {
-	tx, exists := block.SignedTransaction()
-	if !exists {
+	tx, hasTx := block.SignedTransaction()
+	if !hasTx {
 		return iotago.EmptyTransactionID
 	}
 
 	txID, err := tx.Transaction.ID()
 	if err != nil {
 		r.errorHandler(ierrors.Wrap(err, "failed to get txID from attached block"))
+
+		return iotago.EmptyTransactionID
 	}
 
 	return txID
