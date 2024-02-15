@@ -18,11 +18,11 @@ func main() {
 	parsedOpts, configSelected := parseFlags()
 	opts := presets.Base
 	if strings.Contains(configSelected, ".yml") {
-		if yamlOpts, err := presets.GenerateFromYaml(configSelected); err != nil {
+		yamlOpts, err := presets.GenerateFromYaml(configSelected)
+		if err != nil {
 			panic(err)
-		} else {
-			opts = append(opts, yamlOpts...)
 		}
+		opts = append(opts, yamlOpts...)
 	} else {
 		switch configSelected {
 		case "docker":
