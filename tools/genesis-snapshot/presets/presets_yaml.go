@@ -2,13 +2,12 @@ package presets
 
 import (
 	"fmt"
-	"os"
 
 	"golang.org/x/crypto/blake2b"
-	"gopkg.in/yaml.v3"
 
 	"github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/ioutils"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	"github.com/iotaledger/iota-core/pkg/testsuite/snapshotcreator"
@@ -42,13 +41,8 @@ type ConfigYaml struct {
 }
 
 func GenerateFromYaml(hostsFile string) ([]options.Option[snapshotcreator.Options], error) {
-	yamlFile, err := os.ReadFile(hostsFile)
-	if err != nil {
-		return nil, err
-	}
 	var configYaml ConfigYaml
-	err = yaml.Unmarshal(yamlFile, &configYaml)
-	if err != nil {
+	if err := ioutils.ReadYAMLFromFile(hostsFile, &configYaml); err != nil {
 		return nil, err
 	}
 
