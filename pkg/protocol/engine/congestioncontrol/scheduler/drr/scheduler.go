@@ -146,7 +146,7 @@ func (s *Scheduler) Shutdown() {
 	s.TriggerShutdown()
 
 	// validator workers need to be shut down first, otherwise they will hang on the shutdown channel.
-	s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+	s.validatorBuffer.buffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 		s.shutdownValidatorQueue(validatorQueue)
 
 		return true
@@ -211,7 +211,7 @@ func (s *Scheduler) ReadyBlocksCount() int {
 	return s.basicBuffer.ReadyBlocksCount()
 }
 
-func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*blocks.Block) bool {
+func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, workScores ...iotago.WorkScore) bool {
 	s.bufferMutex.RLock()
 	defer s.bufferMutex.RUnlock()
 
@@ -219,15 +219,17 @@ func (s *Scheduler) IsBlockIssuerReady(accountID iotago.AccountID, blocks ...*bl
 	if s.basicBuffer.Size() == 0 {
 		return true
 	}
-	work := iotago.WorkScore(0)
-	// if no specific block(s) is provided, assume max block size
-	currentAPI := s.apiProvider.CommittedAPI()
-	if len(blocks) == 0 {
-		work = currentAPI.MaxBlockWork()
+
+	var work iotago.WorkScore
+	if len(workScores) > 0 {
+		for _, workScore := range workScores {
+			work += workScore
+		}
+	} else {
+		// if no specific work score is provided, assume max block work score.
+		work = s.apiProvider.CommittedAPI().MaxBlockWork()
 	}
-	for _, block := range blocks {
-		work += block.WorkScore()
-	}
+
 	deficit, exists := s.deficits.Get(accountID)
 	if !exists {
 		return false
@@ -401,7 +403,7 @@ func (s *Scheduler) selectBlockToScheduleWithLocking() {
 	s.bufferMutex.Lock()
 	defer s.bufferMutex.Unlock()
 
-	s.validatorBuffer.buffer.ForEach(func(accountID iotago.AccountID, validatorQueue *ValidatorQueue) bool {
+	s.validatorBuffer.buffer.ForEach(func(_ iotago.AccountID, validatorQueue *ValidatorQueue) bool {
 		if s.selectValidationBlockWithoutLocking(validatorQueue) {
 			s.validatorBuffer.size.Dec()
 		}
@@ -573,7 +575,7 @@ func (s *Scheduler) selectIssuer(start *IssuerQueue, slot iotago.SlotIndex) (Def
 
 func (s *Scheduler) removeIssuer(issuerID iotago.AccountID, err error) {
 	q := s.basicBuffer.IssuerQueue(issuerID)
-	q.submitted.ForEach(func(id iotago.BlockID, block *blocks.Block) bool {
+	q.submitted.ForEach(func(_ iotago.BlockID, block *blocks.Block) bool {
 		block.SetDropped()
 		s.events.BlockDropped.Trigger(block, err)
 

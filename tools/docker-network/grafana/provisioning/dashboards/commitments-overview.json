@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -65,7 +65,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 4.8,
+        "w": 4,
         "x": 0,
         "y": 1
       },
@@ -240,7 +240,7 @@
             "mode": "fixed"
           },
           "custom": {
-            "align": "auto",
+            "align": "left",
             "cellOptions": {
               "type": "auto"
             },
@@ -257,34 +257,25 @@
               }
             ]
           },
-          "unit": "SI"
+          "unit": "none"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "slot"
+              "options": "Slot"
             },
             "properties": [
               {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              },
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-green",
-                  "mode": "fixed"
-                }
+                "id": "custom.width",
+                "value": 40
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "commitment"
+              "options": "Slot"
             },
             "properties": [
               {
@@ -307,7 +298,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 4.8,
+        "w": 4,
         "x": 0,
         "y": 15
       },
@@ -382,11 +373,242 @@
               "instance": true,
               "job": true
             },
-            "indexByName": {},
+            "indexByName": {
+              "Time": 0,
+              "Value": 2,
+              "__name__": 1,
+              "commitment": 3,
+              "instance": 4,
+              "job": 5
+            },
             "renameByName": {
+              "Value": "Slot",
               "commitment": "Commitment",
               "slot": "Slot Index"
             }
+          }
+        }
+      ],
+      "transparent": true,
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 140,
+      "panels": [],
+      "title": "Slot Commitment - Details",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed"
+          },
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": false,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Slot"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#143003",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 52
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "# Blocks"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 50
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "# TX"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 40
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 0,
+        "y": 24
+      },
+      "id": 151,
+      "maxPerRow": 6,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": false,
+          "fields": "",
+          "reducer": [
+            "last"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "9.5.6",
+      "repeat": "instance",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "commitments_accepted_blocks{instance=~\"$instance\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "commitments_accepted_transactions{instance=~\"$instance\"}",
+          "format": "table",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "B"
+        }
+      ],
+      "title": "Details $instance",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "slot",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "slot"
+              }
+            ],
+            "fields": {}
+          }
+        },
+        {
+          "id": "limit",
+          "options": {
+            "limitField": 100
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": false,
+              "__name__": true,
+              "instance": true,
+              "job": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "Value": 3,
+              "__name__": 1,
+              "instance": 4,
+              "job": 5,
+              "slot": 2
+            },
+            "renameByName": {
+              "Value": "Blocks",
+              "Value #A": "# Blocks",
+              "Value #B": "# TX",
+              "commitment": "Commitment",
+              "slot": "Slot"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": true,
+                "field": "Slot"
+              }
+            ]
           }
         }
       ],
@@ -452,7 +674,7 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {
@@ -470,8 +692,8 @@
     ]
   },
   "timezone": "",
-  "title": "Global Nodes View",
+  "title": "Commitments Overview",
   "uid": "JKcc02v4d",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }

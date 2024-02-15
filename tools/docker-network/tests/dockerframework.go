@@ -373,7 +373,7 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
 
-	congestionResp, err := clt.Congestion(ctx, accountAddress, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	congestionResp, err := clt.Congestion(ctx, accountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
 	implicitAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForImplicitAccountCreationAddress(receiverAddr.(*iotago.ImplicitAccountCreationAddress), implicitPrivateKey))
@@ -427,7 +427,7 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
 
-	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
 	delegationOutput := builder.NewDelegationOutputBuilder(validatorAccountAddr.(*iotago.AccountAddress), fundsAddr, fundsUTXOOutput.BaseTokenAmount()).

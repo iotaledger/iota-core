@@ -24,4 +24,4 @@ jobs:
 
       - name: Build genesis-snapshot tool
         working-directory: tools/genesis-snapshot
-        run: go mod tidy && go build .
+        run: go build .

@@ -246,7 +246,7 @@ func Test_RewardInputCannotPointToNFTOutput(t *testing.T) {
 
 	ts.AssertTransactionsExist([]*iotago.Transaction{tx2.Transaction}, true, node1, node2)
 	signedTx2ID := lo.PanicOnErr(tx2.ID())
-	ts.AssertTransactionFailure(signedTx2ID, iotago.ErrRewardInputInvalid, node1, node2)
+	ts.AssertTransactionFailure(signedTx2ID, iotago.ErrRewardInputReferenceInvalid, node1, node2)
 }
 
 // Test that delegations in all forms are correctly reflected in the staked and delegated amounts.

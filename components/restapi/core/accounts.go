@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/components/restapi"
 	"github.com/iotaledger/iota-core/pkg/core/account"
-	restapipkg "github.com/iotaledger/iota-core/pkg/restapi"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -20,6 +19,17 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 	commitmentID, err := httpserver.ParseCommitmentIDQueryParam(c, api.ParameterCommitmentID)
 	if err != nil {
 		return nil, err
+	}
+
+	workScore, err := httpserver.ParseWorkScoreQueryParam(c, api.ParameterWorkScore)
+	if err != nil {
+		return nil, err
+	}
+
+	// if work score is 0, we don't pass it to the scheduler
+	workScores := []iotago.WorkScore{}
+	if workScore != 0 {
+		workScores = append(workScores, workScore)
 	}
 
 	commitment := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment()
@@ -53,7 +63,7 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 
 	return &api.CongestionResponse{
 		Slot:                 commitment.Slot(),
-		Ready:                deps.Protocol.Engines.Main.Get().Scheduler.IsBlockIssuerReady(accountID),
+		Ready:                deps.Protocol.Engines.Main.Get().Scheduler.IsBlockIssuerReady(accountID, workScores...),
 		ReferenceManaCost:    commitment.ReferenceManaCost(),
 		BlockIssuanceCredits: acc.Credits.Value,
 	}, nil
@@ -61,24 +71,16 @@ func congestionByAccountAddress(c echo.Context) (*api.CongestionResponse, error)
 
 func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	var err error
-	pageSize := restapi.ParamsRestAPI.MaxPageSize
-	if len(c.QueryParam(restapipkg.QueryParameterPageSize)) > 0 {
-		pageSize, err = httpserver.ParseUint32QueryParam(c, restapipkg.QueryParameterPageSize)
-		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse page size %s", c.Param(restapipkg.QueryParameterPageSize))
-		}
-		if pageSize > restapi.ParamsRestAPI.MaxPageSize {
-			pageSize = restapi.ParamsRestAPI.MaxPageSize
-		}
-	}
+	pageSize := httpserver.ParsePageSizeQueryParam(c, api.ParameterPageSize, restapi.ParamsRestAPI.MaxPageSize)
 	latestCommittedSlot := deps.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Slot()
+
 	// no cursor provided will be the first request
 	requestedSlot := latestCommittedSlot
 	var cursorIndex uint32
-	if len(c.QueryParam(restapipkg.QueryParameterCursor)) != 0 {
-		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, restapipkg.QueryParameterCursor)
+	if len(c.QueryParam(api.ParameterCursor)) != 0 {
+		requestedSlot, cursorIndex, err = httpserver.ParseCursorQueryParam(c, api.ParameterCursor)
 		if err != nil {
-			return nil, ierrors.Wrapf(err, "failed to parse cursor %s", c.Param(restapipkg.QueryParameterCursor))
+			return nil, err
 		}
 	}
 
@@ -92,7 +94,8 @@ func validators(c echo.Context) (*api.ValidatorsResponse, error) {
 	slotRange := uint32(requestedSlot) / restapi.ParamsRestAPI.RequestsMemoryCacheGranularity
 	registeredValidators, exists := deps.Protocol.Engines.Main.Get().Retainer.RegisteredValidatorsCache(slotRange)
 	if !exists {
-		registeredValidators, err = deps.Protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(nextEpoch)
+		// HINT: the validators for an epoch are stored in the previous epoch
+		registeredValidators, err = deps.Protocol.Engines.Main.Get().SybilProtection.OrderedRegisteredCandidateValidatorsList(nextEpoch - 1)
 		if err != nil {
 			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get ordered registered validators list for epoch %d : %s", nextEpoch, err)
 		}

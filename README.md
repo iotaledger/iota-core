@@ -8,6 +8,7 @@ IOTA-Core is the node software for the upcoming IOTA 2.0 protocol.
 ![GitHub License](https://img.shields.io/github/license/iotaledger/iota-core?branch=develop)
 ---
 [![unit-test](https://github.com/iotaledger/iota-core/actions/workflows/unit-test.yml/badge.svg?branch=develop)](https://github.com/iotaledger/iota-core/actions/workflows/unit-test.yml)
+[![unit-test-nightly](https://github.com/iotaledger/iota-core/actions/workflows/unit-test-nightly.yml/badge.svg?branch=develop)](https://github.com/iotaledger/iota-core/actions/workflows/unit-test-nightly.yml)
 [![build_docker](https://github.com/iotaledger/iota-core/actions/workflows/build_docker.yml/badge.svg?branch=develop)](https://github.com/iotaledger/iota-core/actions/workflows/build_docker.yml)
 [![docker-network-health](https://github.com/iotaledger/iota-core/actions/workflows/docker-network-health.yml/badge.svg?branch=develop)](https://github.com/iotaledger/iota-core/actions/workflows/docker-network-health.yml)
 [![docker-network-tests-nightly](https://github.com/iotaledger/iota-core/actions/workflows/docker-network-tests-nightly.yml/badge.svg?branch=develop)](https://github.com/iotaledger/iota-core/actions/workflows/docker-network-tests-nightly.yml)

@@ -31,7 +31,7 @@ func init() {
 		Provide:          provide,
 		Configure:        configure,
 		Run:              run,
-		IsEnabled: func(c *dig.Container) bool {
+		IsEnabled: func(_ *dig.Container) bool {
 			return ParamsRestAPI.Enabled
 		},
 	}

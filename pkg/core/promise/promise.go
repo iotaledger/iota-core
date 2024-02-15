@@ -58,11 +58,13 @@ func (p *Promise[T]) Resolve(result T) *Promise[T] {
 		return p
 	}
 
+	//nolint:revive
 	p.successCallbacks.ForEach(func(key types.UniqueID, callback func(T)) bool {
 		callback(result)
 		return true
 	})
 
+	//nolint:revive
 	p.completeCallbacks.ForEach(func(key types.UniqueID, callback func()) bool {
 		callback()
 		return true
@@ -86,11 +88,13 @@ func (p *Promise[T]) Reject(err error) *Promise[T] {
 		return p
 	}
 
+	//nolint:revive
 	p.errorCallbacks.ForEach(func(key types.UniqueID, callback func(error)) bool {
 		callback(err)
 		return true
 	})
 
+	//nolint:revive
 	p.completeCallbacks.ForEach(func(key types.UniqueID, callback func()) bool {
 		callback()
 		return true

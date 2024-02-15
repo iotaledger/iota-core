@@ -64,6 +64,25 @@ func durationFromEnvOrDefault(defaultDuration time.Duration, envKey string) time
 	return d
 }
 
+func loggerFromEnvOrDefault(noLogEnvKey string, logLevelEnvKey string) log.Logger {
+	noLog := os.Getenv(noLogEnvKey)
+	if noLog != "" {
+		return log.EmptyLogger
+	}
+
+	levelStr := os.Getenv(logLevelEnvKey)
+	if levelStr == "" {
+		return log.NewLogger()
+	}
+
+	level, err := log.LevelFromString(levelStr)
+	if err != nil {
+		panic(err)
+	}
+
+	return log.NewLogger(log.WithLevel(level))
+}
+
 var (
 	defaultProtocolParams              = iotago.NewV3SnapshotProtocolParameters()
 	DefaultSlotDurationInSeconds uint8 = defaultProtocolParams.SlotDurationInSeconds()
