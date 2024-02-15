@@ -84,7 +84,7 @@ func (t *TransactionRetainerData) Bytes() ([]byte, error) {
 	}
 
 	if err := stream.Write(byteBuffer, t.ConfirmedAttachmentSlot); err != nil {
-		return nil, ierrors.Wrap(err, "failed to write earliest confirmed slot")
+		return nil, ierrors.Wrap(err, "failed to write confirmed attachment slot")
 	}
 
 	return byteBuffer.Bytes()
@@ -105,7 +105,7 @@ func transactionRetainerDataFromBytes(bytes []byte) (*TransactionRetainerData, i
 	}
 
 	if t.ConfirmedAttachmentSlot, err = stream.Read[iotago.SlotIndex](byteReader); err != nil {
-		return nil, 0, ierrors.Wrap(err, "failed to read confirmed attachments slot")
+		return nil, 0, ierrors.Wrap(err, "failed to read confirmed attachment slot")
 	}
 
 	return t, byteReader.BytesRead(), nil
@@ -159,6 +159,7 @@ func (r *Retainer) StoreBlockAccepted(blockID iotago.BlockID) error {
 	}
 
 	data.State = api.BlockStateAccepted
+	data.FailureReason = api.BlockFailureNone
 
 	return r.blockStore.Set(blockID, data)
 }
@@ -170,6 +171,7 @@ func (r *Retainer) StoreBlockConfirmed(blockID iotago.BlockID) (iotago.Transacti
 	}
 
 	data.State = api.BlockStateConfirmed
+	data.FailureReason = api.BlockFailureNone
 
 	return data.TransactionID, r.blockStore.Set(blockID, data)
 }
