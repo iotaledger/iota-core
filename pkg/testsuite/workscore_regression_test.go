@@ -18,19 +18,19 @@ import (
 )
 
 const (
-	inputRegressor = iota
-	contextInputRegressor
-	outputRegressor
-	nativeTokenRegressor
-	stakingRegressor
-	blockIssuerRegressor
-	allotmentRegressor
-	signatureEd25519Regressor
+	regressorInput = iota
+	regressorContextInput
+	regressorOutput
+	regressorNativeToken
+	regressorStaking
+	regressorBlockIssuer
+	regressorAllotment
+	regressorSignatureEd25519
 )
 
 // Test_Regression runs benchmarks for many block types and find the best fit regression model.
-// In summary, the regression analysis works by benchmarking how long different types of blocks take to be processed by a mock node in our 
-// existing test suite, from issuance to scheduling. This is used as an indicator of how computationally expensive the block is to process. 
+// In summary, the regression analysis works by benchmarking how long different types of blocks take to be processed by a mock node in our
+// existing test suite, from issuance to scheduling. This is used as an indicator of how computationally expensive the block is to process.
 // By varying the number and types of inputs and outputs in different transactions, we end up with a data set which we then use to train a linear model by regression,
 // i.e., we find the WorkScoreParameters that give the best fit to the data we generated.
 func Test_Regression(t *testing.T) {
@@ -478,32 +478,32 @@ func getBlockWorkScoreRegressors(block *iotago.Block) []float64 {
 		panic("block payload is not a signed transaction")
 	}
 	// add one to the Input regressor for each input
-	regressors[inputRegressor] += float64(len(signedTx.Transaction.TransactionEssence.Inputs))
+	regressors[regressorInput] += float64(len(signedTx.Transaction.TransactionEssence.Inputs))
 	// add one to the ContextInput regressor for each context input
-	regressors[contextInputRegressor] += float64(len(signedTx.Transaction.TransactionEssence.ContextInputs))
+	regressors[regressorContextInput] += float64(len(signedTx.Transaction.TransactionEssence.ContextInputs))
 	for _, output := range signedTx.Transaction.Outputs {
 		// add one to the Output regressor for each output
-		regressors[outputRegressor] += 1
+		regressors[regressorOutput] += 1
 		for _, feature := range output.FeatureSet() {
 			switch feature.Type() {
 			case iotago.FeatureNativeToken:
 				// add one to the NativeToken regressor for each output with the native token feature
-				regressors[nativeTokenRegressor] += 1
+				regressors[regressorNativeToken] += 1
 			case iotago.FeatureStaking:
 				// add one to the Staking regressor for each output with the staking feature
-				regressors[stakingRegressor] += 1
+				regressors[regressorStaking] += 1
 			case iotago.FeatureBlockIssuer:
 				// add one to the BlockIssuer regressor for each output with the block issuer feature
-				regressors[blockIssuerRegressor] += 1
+				regressors[regressorBlockIssuer] += 1
 			}
 		}
 	}
 	// add one to Allotments regressor for each allotment
-	regressors[allotmentRegressor] += float64(len(signedTx.Transaction.TransactionEssence.Allotments))
+	regressors[regressorAllotment] += float64(len(signedTx.Transaction.TransactionEssence.Allotments))
 	for _, unlock := range signedTx.Unlocks {
 		if unlock.Type() == iotago.UnlockSignature {
 			// add one to the SignatureEd25519 regressor for each unlock block
-			regressors[signatureEd25519Regressor] += 1
+			regressors[regressorSignatureEd25519] += 1
 		}
 	}
 
@@ -530,13 +530,13 @@ func workScoreParamsFromCoefficients(coeffs []float64, standardBlock *iotago.Blo
 	return iotago.WorkScoreParameters{
 		DataByte:         iotago.WorkScore(dataByteFactor),
 		Block:            iotago.WorkScore(coeffs[0] * scalingFactor),
-		Input:            iotago.WorkScore(coeffs[inputRegressor+1] * scalingFactor),
-		ContextInput:     iotago.WorkScore(coeffs[contextInputRegressor+1] * scalingFactor),
-		Output:           iotago.WorkScore(coeffs[outputRegressor+1] * scalingFactor),
-		NativeToken:      iotago.WorkScore(coeffs[nativeTokenRegressor+1] * scalingFactor),
-		Staking:          iotago.WorkScore(coeffs[stakingRegressor+1] * scalingFactor),
-		BlockIssuer:      iotago.WorkScore(coeffs[blockIssuerRegressor+1] * scalingFactor),
-		Allotment:        iotago.WorkScore(coeffs[allotmentRegressor+1] * scalingFactor),
-		SignatureEd25519: iotago.WorkScore(coeffs[signatureEd25519Regressor+1] * scalingFactor),
+		Input:            iotago.WorkScore(coeffs[regressorInput+1] * scalingFactor),
+		ContextInput:     iotago.WorkScore(coeffs[regressorContextInput+1] * scalingFactor),
+		Output:           iotago.WorkScore(coeffs[regressorOutput+1] * scalingFactor),
+		NativeToken:      iotago.WorkScore(coeffs[regressorNativeToken+1] * scalingFactor),
+		Staking:          iotago.WorkScore(coeffs[regressorStaking+1] * scalingFactor),
+		BlockIssuer:      iotago.WorkScore(coeffs[regressorBlockIssuer+1] * scalingFactor),
+		Allotment:        iotago.WorkScore(coeffs[regressorAllotment+1] * scalingFactor),
+		SignatureEd25519: iotago.WorkScore(coeffs[regressorSignatureEd25519+1] * scalingFactor),
 	}
 }
