@@ -47,18 +47,18 @@ func (b *Blocks) Block(id iotago.BlockID) (block *Block, exists bool) {
 	return nil, false
 }
 
-func (b *Blocks) StoreOrUpdate(data *model.Block) (storedBlock *Block, evicted bool, updated bool) {
+func (b *Blocks) StoreOrUpdate(modelBlock *model.Block) (storedBlock *Block, evicted bool, updated bool) {
 	b.evictionMutex.RLock()
 	defer b.evictionMutex.RUnlock()
 
-	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= data.ID().Slot() {
+	if evictedIndex := b.evictionState.LastEvictedSlot(); evictedIndex >= modelBlock.ID().Slot() {
 		return nil, true, false
 	}
 
-	storage := b.blocks.Get(data.ID().Slot(), true)
-	createdBlock, created := storage.GetOrCreate(data.ID(), func() *Block { return NewBlock(data) })
+	storage := b.blocks.Get(modelBlock.ID().Slot(), true)
+	createdBlock, created := storage.GetOrCreate(modelBlock.ID(), func() *Block { return NewBlock(modelBlock) })
 	if !created {
-		return createdBlock, false, createdBlock.Update(data)
+		return createdBlock, false, createdBlock.Update(modelBlock)
 	}
 
 	return createdBlock, false, false

@@ -117,8 +117,8 @@ func New(logger log.Logger, workers *workerpool.Group, unsolidCommitmentBufferSi
 var _ blockdag.BlockDAG = new(BlockDAG)
 
 // Attach is used to attach new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
-func (b *BlockDAG) Attach(data *model.Block) (block *blocks.Block, wasAttached bool, err error) {
-	if block, wasAttached, err = b.attach(data); wasAttached {
+func (b *BlockDAG) Attach(modelBlock *model.Block) (block *blocks.Block, wasAttached bool, err error) {
+	if block, wasAttached, err = b.attach(modelBlock); wasAttached {
 		// We add blocks that commit to a commitment we haven't committed ourselves yet to this limited size buffer and
 		// only let them become solid once we committed said slot ourselves (to the same commitment).
 		// This is necessary in order to make sure that all necessary state is available after a block is solid (specifically
@@ -170,17 +170,17 @@ func (b *BlockDAG) setRetainBlockFailureFunc(retainBlockFailure func(block *mode
 }
 
 // attach tries to attach the given Block to the BlockDAG.
-func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached bool, err error) {
-	shouldAttach, err := b.shouldAttach(data)
+func (b *BlockDAG) attach(modelBlock *model.Block) (block *blocks.Block, wasAttached bool, err error) {
+	shouldAttach, err := b.shouldAttach(modelBlock)
 
 	if !shouldAttach {
 		return nil, false, err
 	}
 
-	block, evicted, updated := b.blockCache.StoreOrUpdate(data)
+	block, evicted, updated := b.blockCache.StoreOrUpdate(modelBlock)
 
 	if evicted {
-		b.retainBlockFailure(data, api.BlockFailureIsTooOld)
+		b.retainBlockFailure(modelBlock, api.BlockFailureIsTooOld)
 		return block, false, ierrors.New("cannot attach, block is too old, it was already evicted from the cache")
 	}
 
@@ -198,20 +198,20 @@ func (b *BlockDAG) attach(data *model.Block) (block *blocks.Block, wasAttached b
 }
 
 // canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
-func (b *BlockDAG) shouldAttach(data *model.Block) (shouldAttach bool, err error) {
-	if b.evictionState.InActiveRootBlockRange(data.ID()) && !b.evictionState.IsActiveRootBlock(data.ID()) {
-		b.retainBlockFailure(data, api.BlockFailureIsTooOld)
-		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", data.ID(), data.ProtocolBlock().Header.IssuingTime)
+func (b *BlockDAG) shouldAttach(modelBlock *model.Block) (shouldAttach bool, err error) {
+	if b.evictionState.InActiveRootBlockRange(modelBlock.ID()) && !b.evictionState.IsActiveRootBlock(modelBlock.ID()) {
+		b.retainBlockFailure(modelBlock, api.BlockFailureIsTooOld)
+		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", modelBlock.ID(), modelBlock.ProtocolBlock().Header.IssuingTime)
 	}
 
-	storedBlock, storedBlockExists := b.blockCache.Block(data.ID())
+	storedBlock, storedBlockExists := b.blockCache.Block(modelBlock.ID())
 	// We already attached it before
 	if storedBlockExists && !storedBlock.IsMissing() {
 		return false, nil
 	}
 
 	// We already attached it before, but the parents are invalid, then we set the block as invalid.
-	if parentsValid, err := b.canAttachToParents(data); !parentsValid {
+	if parentsValid, err := b.canAttachToParents(modelBlock); !parentsValid {
 		if storedBlock != nil {
 			storedBlock.SetInvalid()
 		}

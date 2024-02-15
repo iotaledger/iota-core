@@ -172,8 +172,8 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 }
 
 // RetainBlockFailure stores the block failure in the retainer and determines if the model block had a transaction attached.
-func (r *Retainer) RetainBlockFailure(block *model.Block, failureCode api.BlockFailureReason) {
-	if err := r.store.storeBlockData(block.ID(), failureCode, r.transactionID(block)); err != nil {
+func (r *Retainer) RetainBlockFailure(modelBlock *model.Block, failureCode api.BlockFailureReason) {
+	if err := r.store.storeBlockData(modelBlock.ID(), failureCode, r.transactionID(modelBlock)); err != nil {
 		r.errorHandler(ierrors.Wrap(err, "failed to store block failure in retainer"))
 	}
 }
