@@ -17,12 +17,12 @@ import (
 
 type ValidatorYaml struct {
 	Name      string `yaml:"name"`
-	PublicKey string `yaml:"public-key"`
+	PublicKey string `yaml:"publicKey"`
 }
 
 type BlockIssuerYaml struct {
 	Name      string `yaml:"name"`
-	PublicKey string `yaml:"public-key"`
+	PublicKey string `yaml:"publicKey"`
 }
 
 type BasicOutputYaml struct {
@@ -36,8 +36,8 @@ type ConfigYaml struct {
 	FilePath string `yaml:"filepath"`
 
 	Validators   []ValidatorYaml   `yaml:"validators"`
-	BlockIssuers []BlockIssuerYaml `yaml:"block-issuers"`
-	BasicOutputs []BasicOutputYaml `yaml:"basic-outputs"`
+	BlockIssuers []BlockIssuerYaml `yaml:"blockIssuers"`
+	BasicOutputs []BasicOutputYaml `yaml:"basicOutputs"`
 }
 
 func GenerateFromYaml(hostsFile string) ([]options.Option[snapshotcreator.Options], error) {
@@ -46,7 +46,7 @@ func GenerateFromYaml(hostsFile string) ([]options.Option[snapshotcreator.Option
 		return nil, err
 	}
 
-	var accounts []snapshotcreator.AccountDetails
+	accounts := make([]snapshotcreator.AccountDetails, 0, len(configYaml.Validators)+len(configYaml.BlockIssuers))
 	for _, validator := range configYaml.Validators {
 		pubkey := validator.PublicKey
 		fmt.Printf("adding validator %s with publicKey %s\n", validator.Name, pubkey)
@@ -80,7 +80,7 @@ func GenerateFromYaml(hostsFile string) ([]options.Option[snapshotcreator.Option
 		accounts = append(accounts, account)
 	}
 
-	var basicOutputs []snapshotcreator.BasicOutputDetails
+	basicOutputs := make([]snapshotcreator.BasicOutputDetails, 0, len(configYaml.BasicOutputs))
 	for _, basicOutput := range configYaml.BasicOutputs {
 		address := lo.Return2(iotago.ParseBech32(basicOutput.Address))
 		amount := basicOutput.Amount
