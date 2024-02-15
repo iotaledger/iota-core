@@ -250,7 +250,7 @@ services:
       node-1-validator:
         condition: service_healthy
       inx-indexer:
-        condition: service_healthy
+        condition: service_started
     networks:
       - iota-core
     environment:
@@ -269,7 +269,7 @@ services:
       node-1-validator:
         condition: service_healthy
       inx-indexer:
-        condition: service_healthy
+        condition: service_started
       inx-blockissuer:
         condition: service_started
     networks:
