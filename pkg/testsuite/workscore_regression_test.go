@@ -37,14 +37,14 @@ func Test_Regression(t *testing.T) {
 	t.Skip("This test is only intended to be run locally to determine new WorkScoreParameters")
 	r := new(regression.Regression)
 	r.SetObserved("ns/op")
-	r.SetVar(0, "Input")
-	r.SetVar(1, "ContextInput")
-	r.SetVar(2, "Output")
-	r.SetVar(3, "NativeToken")
-	r.SetVar(4, "Staking")
-	r.SetVar(5, "BlockIssuer")
-	r.SetVar(6, "Allotment")
-	r.SetVar(7, "SignatureEd25519")
+	r.SetVar(regressorInput, "Input")
+	r.SetVar(regressorContextInput, "ContextInput")
+	r.SetVar(regressorOutput, "Output")
+	r.SetVar(regressorNativeToken, "NativeToken")
+	r.SetVar(regressorStaking, "Staking")
+	r.SetVar(regressorBlockIssuer, "BlockIssuer")
+	r.SetVar(regressorAllotment, "Allotment")
+	r.SetVar(regressorSignatureEd25519, "SignatureEd25519")
 
 	r.Train(
 		// one basic output as input, one basic output
