@@ -21,7 +21,7 @@ func NewProvider() module.Provider[*engine.Engine, tipmanager.TipManager] {
 
 			e.Events.Scheduler.BlockScheduled.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(tipWorker))
 			e.Events.Scheduler.BlockSkipped.Hook(lo.Void(t.AddBlock), event.WithWorkerPool(tipWorker))
-			e.BlockCache.Evict.Hook(t.Evict)
+			e.Events.Evict.Hook(t.Evict)
 
 			e.Events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(index account.SeatIndex, _ iotago.AccountID) {
 				t.AddSeat(index)

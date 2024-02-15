@@ -6,6 +6,7 @@ scrape_configs:
           - node-1-validator:9311
           - node-2-validator:9311
           - node-3-validator:9311
+          - node-4-validator:9311
           - node-4:9311
           - node-5:9311
     dns_sd_configs:

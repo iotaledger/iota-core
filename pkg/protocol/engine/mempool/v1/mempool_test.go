@@ -60,7 +60,6 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 			prevStateAlias = fmt.Sprintf("tx%d:0", index)
 
 			tf.CommitSlot(iotago.SlotIndex(index))
-			tf.Instance.Evict(iotago.SlotIndex(index))
 
 			require.Nil(t, memPoolInstance.attachments.Get(iotago.SlotIndex(index), false))
 
@@ -111,7 +110,6 @@ func TestMempoolV1_ResourceCleanup(t *testing.T) {
 
 	for index := txIndex; index <= txIndex+20; index++ {
 		tf.CommitSlot(iotago.SlotIndex(index))
-		tf.Instance.Evict(iotago.SlotIndex(index))
 	}
 
 	// Genesis output is also finally evicted thanks to the fact that all its spenders got evicted.

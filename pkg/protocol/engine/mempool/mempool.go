@@ -25,7 +25,7 @@ type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] interface {
 
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transaction TransactionMetadata, exists bool)
 
-	StateDiff(slot iotago.SlotIndex) (StateDiff, error)
+	CommitStateDiff(slot iotago.SlotIndex) (StateDiff, error)
 
 	Evict(slot iotago.SlotIndex)
 
@@ -33,7 +33,7 @@ type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] interface {
 	Reset()
 }
 
-// Denotes the type of state.
+// StateType denotes the type of state.
 type StateType byte
 
 const (

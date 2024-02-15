@@ -122,6 +122,8 @@ func (m *Manager) tryCommitUntil(commitUntilSlot iotago.SlotIndex) {
 }
 
 func (m *Manager) ForceCommit(slot iotago.SlotIndex) (*model.Commitment, error) {
+	m.LogInfof("Force commit slot %d", slot)
+
 	if m.WasStopped() {
 		return nil, ierrors.New("notarization manager was stopped")
 	}
@@ -144,6 +146,8 @@ func (m *Manager) ForceCommit(slot iotago.SlotIndex) (*model.Commitment, error) 
 }
 
 func (m *Manager) ForceCommitUntil(commitUntilSlot iotago.SlotIndex) error {
+	m.LogInfof("Force commit until slot %d", commitUntilSlot)
+
 	for i := m.storage.Settings().LatestCommitment().Slot() + 1; i <= commitUntilSlot; i++ {
 		if _, err := m.ForceCommit(i); err != nil {
 			return ierrors.Wrapf(err, "failed to force commit slot %d", i)
@@ -208,10 +212,9 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 		return nil, ierrors.Errorf("cannot create commitment for slot %d, latest commitment is for slot %d", slot, latestCommitment.Slot())
 	}
 
-	// Set createIfMissing to true to make sure that this is never nil. Will get evicted later on anyway.
-	acceptedBlocks := m.slotMutations.AcceptedBlocks(slot, true)
-	if err := acceptedBlocks.Commit(); err != nil {
-		return nil, ierrors.Wrap(err, "failed to commit accepted blocks")
+	acceptedBlocksSet, err := m.slotMutations.Commit(slot)
+	if err != nil {
+		return nil, ierrors.Wrap(err, "failed to commit acceptedBlocksSet")
 	}
 
 	cumulativeWeight, attestationsRoot, err := m.attestation.Commit(slot)
@@ -219,7 +222,7 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 		return nil, ierrors.Wrap(err, "failed to commit attestations")
 	}
 
-	stateRoot, mutationRoot, accountRoot, created, consumed, err := m.ledger.CommitSlot(slot)
+	stateRoot, mutationRoot, accountRoot, created, consumed, mutations, err := m.ledger.CommitSlot(slot)
 	if err != nil {
 		return nil, ierrors.Wrap(err, "failed to commit ledger")
 	}
@@ -236,7 +239,7 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 	}
 
 	roots := iotago.NewRoots(
-		acceptedBlocks.Root(),
+		acceptedBlocksSet.Root(),
 		mutationRoot,
 		attestationsRoot,
 		stateRoot,
@@ -282,10 +285,11 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 
 	m.events.SlotCommitted.Trigger(&notarization.SlotCommittedDetails{
 		Commitment:            newModelCommitment,
-		AcceptedBlocks:        acceptedBlocks,
+		AcceptedBlocks:        acceptedBlocksSet,
 		ActiveValidatorsCount: 0,
 		OutputsCreated:        created,
 		OutputsConsumed:       consumed,
+		Mutations:             mutations,
 	})
 
 	if err = m.storage.Settings().SetLatestCommitment(newModelCommitment); err != nil {
@@ -293,10 +297,6 @@ func (m *Manager) createCommitment(slot iotago.SlotIndex) (*model.Commitment, er
 	}
 
 	m.events.LatestCommitmentUpdated.Trigger(newModelCommitment)
-
-	if err = m.slotMutations.Evict(slot); err != nil {
-		m.errorHandler(ierrors.Wrapf(err, "failed to evict slotMutations at slot: %d", slot))
-	}
 
 	return newModelCommitment, nil
 }
