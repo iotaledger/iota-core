@@ -48,7 +48,7 @@ func init() {
 		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
 		Configure: configure,
 		Params:    params,
-		IsEnabled: func(c *dig.Container) bool {
+		IsEnabled: func(_ *dig.Container) bool {
 			return restapi.ParamsRestAPI.Enabled && ParamsDebugAPI.Enabled
 		},
 	}
@@ -90,11 +90,13 @@ func configure() error {
 
 	routeGroup := deps.RestRouteManager.AddRoute("debug/v2")
 
+	debugAPIWorkerPool := workerpool.NewGroup("DebugAPI").CreatePool("DebugAPI", workerpool.WithWorkerCount(1))
+
 	deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
 		blocksPerSlot.Set(block.ID().Slot(), append(lo.Return1(blocksPerSlot.GetOrCreate(block.ID().Slot(), func() []*blocks.Block {
 			return make([]*blocks.Block, 0)
 		})), block))
-	})
+	}, event.WithWorkerPool(debugAPIWorkerPool))
 
 	deps.Protocol.Events.Engine.SlotGadget.SlotFinalized.Hook(func(index iotago.SlotIndex) {
 		epoch := deps.Protocol.APIForSlot(index).TimeProvider().EpochFromSlot(index)
@@ -113,15 +115,15 @@ func configure() error {
 			}
 		}
 
-	}, event.WithWorkerPool(workerpool.NewGroup("DebugAPI").CreatePool("PruneDebugAPI", workerpool.WithWorkerCount(1))))
+	}, event.WithWorkerPool(debugAPIWorkerPool))
 
 	deps.Protocol.Events.Engine.Notarization.SlotCommitted.Hook(func(scd *notarization.SlotCommittedDetails) {
 		if err := storeTransactionsPerSlot(scd); err != nil {
 			Component.LogWarnf(">> DebugAPI Error: %s\n", err)
 		}
-	})
+	}, event.WithWorkerPool(debugAPIWorkerPool))
 
-	deps.Protocol.Events.Engine.EvictionState.SlotEvicted.Hook(func(index iotago.SlotIndex) {
+	deps.Protocol.Events.Engine.Evict.Hook(func(index iotago.SlotIndex) {
 		blocksInSlot, exists := blocksPerSlot.Get(index)
 		if !exists {
 			return
@@ -129,7 +131,8 @@ func configure() error {
 
 		for _, block := range blocksInSlot {
 			if block.ProtocolBlock() == nil {
-				Component.LogInfof("block is a root block", block.ID())
+				Component.LogInfof("block is a root block %s", block.ID())
+
 				continue
 			}
 
@@ -146,7 +149,7 @@ func configure() error {
 		}
 
 		blocksPerSlot.Delete(index)
-	})
+	}, event.WithWorkerPool(debugAPIWorkerPool))
 
 	routeGroup.GET(RouteBlockMetadata, func(c echo.Context) error {
 		blockID, err := httpserver.ParseBlockIDParam(c, api.ParameterBlockID)

@@ -16,18 +16,19 @@ import (
 )
 
 var (
-	// use defaults from iota.go
+	// use defaults from iota.go.
 	protocolParamsBase = iotago.NewV3SnapshotProtocolParameters(
 		iotago.WithNetworkOptions("default", iotago.PrefixTestnet),
 	)
 
-	// use defaults from iota.go
+	// use defaults from iota.go.
 	protocolParamsDocker = iotago.NewV3SnapshotProtocolParameters(
 		iotago.WithNetworkOptions("docker", iotago.PrefixTestnet),
-		iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 13),
+		iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 7),
+		iotago.WithLivenessOptions(10, 15, 3, 6, 8),
 	)
 
-	// use defaults from iota.go
+	// use defaults from iota.go.
 	protocolParamsFeature = iotago.NewV3SnapshotProtocolParameters(
 		iotago.WithNetworkOptions("feature", iotago.PrefixTestnet),
 		iotago.WithTimeProviderOptions(666666, time.Now().Unix()-100_000, 10, 13),
@@ -158,7 +159,7 @@ var (
 			snapshotcreator.BasicOutputDetails{
 				Address: lo.Return2(iotago.ParseBech32("rms1xqqz7e8e69uej86s2s4srcp5lgzrkx25qwr4hpnha7h3j66pezyq85qpqg55v3ur")),
 				Amount:  1_000_000_000_000_000,
-				Mana:    10_000_000,
+				Mana:    1_000_000_000_000_000,
 			},
 		),
 	}
@@ -278,7 +279,7 @@ var (
 			snapshotcreator.BasicOutputDetails{
 				Address: lo.Return2(iotago.ParseBech32("rms1xqqy3txhvnmzv53kgm2ueu30splfd5ct02cqvnehpdn04qgeskv9a3qpqgrhlhv3")),
 				Amount:  1_000_000_000_000_000,
-				Mana:    10_000_000,
+				Mana:    1_000_000_000_000_000,
 			},
 		),
 	}

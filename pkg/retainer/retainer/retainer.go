@@ -123,7 +123,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 					})
 
 					transactionMetadata.OnRejected(func() {
-						r.RetainTransactionFailure(txID, iotago.ErrTxConflicting)
+						r.RetainTransactionFailure(txID, iotago.ErrTxConflictRejected)
 					})
 
 					transactionMetadata.OnAccepted(func() {
@@ -182,7 +182,7 @@ func (r *Retainer) RetainBlockFailure(block *model.Block, failureCode api.BlockF
 
 // RetainTransactionFailure stores the transaction failure in the retainer.
 func (r *Retainer) RetainTransactionFailure(txID iotago.TransactionID, reason error) {
-	err := r.store.setTransactionFailure(txID, determineTxFailureReason(reason))
+	err := r.store.setTransactionFailure(txID, api.DetermineTransactionFailureReason(reason))
 	if err != nil {
 		r.errorHandler(ierrors.Wrap(err, "failed to store transaction failure in retainer"))
 	}
@@ -272,7 +272,7 @@ func (r *Retainer) onBlockAttached(block *blocks.Block) error {
 }
 
 func (r *Retainer) onBlockFilter(block *blocks.Block, reason error) {
-	r.RetainBlockFailure(block.ModelBlock(), determineBlockFailureReason(reason))
+	r.RetainBlockFailure(block.ModelBlock(), api.DetermineBlockFailureReason(reason))
 }
 
 func (r *Retainer) onBlockAccepted(blockID iotago.BlockID) error {

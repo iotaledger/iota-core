@@ -7,8 +7,4 @@ pushd tools/gendoc
 go mod tidy
 popd
 
-pushd tools/genesis-snapshot
-go mod tidy
-popd
-
 popd

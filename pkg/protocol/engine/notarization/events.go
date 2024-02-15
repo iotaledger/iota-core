@@ -31,4 +31,5 @@ type SlotCommittedDetails struct {
 	ActiveValidatorsCount int
 	OutputsCreated        utxoledger.Outputs
 	OutputsConsumed       utxoledger.Spents
+	Mutations             []*iotago.Transaction
 }

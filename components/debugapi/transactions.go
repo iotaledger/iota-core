@@ -4,7 +4,6 @@ import (
 	"github.com/iotaledger/hive.go/ads"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore/mapdb"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -17,10 +16,7 @@ func init() {
 
 func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) error {
 	slot := scd.Commitment.Slot()
-	stateDiff, err := deps.Protocol.Engines.Main.Get().Ledger.MemPool().StateDiff(slot)
-	if err != nil {
-		return ierrors.Wrapf(err, "failed to retrieve state diff for slot %d", slot)
-	}
+
 	mutationsTree := ads.NewSet[iotago.Identifier](
 		mapdb.NewMapDB(),
 		iotago.Identifier.Bytes,
@@ -33,23 +29,24 @@ func storeTransactionsPerSlot(scd *notarization.SlotCommittedDetails) error {
 		IncludedTransactions: make([]string, 0),
 	}
 
-	var innerErr error
-	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, txMeta mempool.TransactionMetadata) bool {
-		tcs.IncludedTransactions = append(tcs.IncludedTransactions, txMeta.ID().String())
-		if err := mutationsTree.Add(txMeta.ID()); err != nil {
-			innerErr = ierrors.Wrapf(err, "failed to add transaction to mutations tree, txID: %s", txMeta.ID())
-
-			return false
+	for _, transaction := range scd.Mutations {
+		txID, err := transaction.ID()
+		if err != nil {
+			return ierrors.Wrapf(err, "failed to calculate transactionID")
 		}
 
-		return true
-	})
+		tcs.IncludedTransactions = append(tcs.IncludedTransactions, txID.String())
+		if err = mutationsTree.Add(txID); err != nil {
+			return ierrors.Wrapf(err, "failed to add transaction to mutations tree, txID: %s", txID)
+		}
+
+	}
 
 	tcs.MutationsRoot = mutationsTree.Root().String()
 
 	transactionsPerSlot[slot] = tcs
 
-	return innerErr
+	return nil
 }
 
 func getSlotTransactionIDs(slot iotago.SlotIndex) (*TransactionsChangesResponse, error) {

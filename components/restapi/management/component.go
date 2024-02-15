@@ -19,7 +19,7 @@ func init() {
 		Name:      "ManagementAPIV1",
 		DepsFunc:  func(cDeps dependencies) { deps = cDeps },
 		Configure: configure,
-		IsEnabled: func(c *dig.Container) bool {
+		IsEnabled: func(_ *dig.Container) bool {
 			return restapi.ParamsRestAPI.Enabled
 		},
 	}

@@ -18,8 +18,6 @@ import (
 
 // State represents the state of the eviction and keeps track of the root blocks.
 type State struct {
-	Events *Events
-
 	settings             *permanent.Settings
 	rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error)
 	lastCommittedSlot    iotago.SlotIndex
@@ -30,7 +28,6 @@ type State struct {
 func NewState(settings *permanent.Settings, rootBlockStorageFunc func(iotago.SlotIndex) (*slotstore.Store[iotago.BlockID, iotago.CommitmentID], error)) (state *State) {
 	return &State{
 		settings:             settings,
-		Events:               NewEvents(),
 		rootBlockStorageFunc: rootBlockStorageFunc,
 	}
 }
@@ -42,18 +39,13 @@ func (s *State) Initialize(lastCommittedSlot iotago.SlotIndex) {
 
 func (s *State) AdvanceActiveWindowToIndex(slot iotago.SlotIndex) {
 	s.evictionMutex.Lock()
+	defer s.evictionMutex.Unlock()
 
 	if slot <= s.lastCommittedSlot {
-		s.evictionMutex.Unlock()
 		return
 	}
 
 	s.lastCommittedSlot = slot
-
-	s.evictionMutex.Unlock()
-
-	// We only delay eviction in the Eviction State, but components evict on commitment, which in this context is slot.
-	s.Events.SlotEvicted.Trigger(slot)
 }
 
 func (s *State) LastEvictedSlot() iotago.SlotIndex {

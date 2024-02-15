@@ -469,6 +469,7 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 			ts.IssueCandidacyAnnouncementInSlot("P0:node2-candidacy:1", 3, "P0:node1-candidacy:1", ts.Wallet("node2"))
 		}
 
+		// Important note: We need to issue with `useMinCommittableAge` set to true, to make sure that the blocks do commit to a deterministic slot, so that we can assert the attestations and how they are carried forward later.
 		ts.IssueBlocksAtSlots("P0:", []iotago.SlotIndex{3, 4, 5, 6, 7}, 4, "P0:node2-candidacy:1", ts.Nodes(), true, true)
 
 		ts.AssertNodeState(ts.Nodes(),
@@ -496,13 +497,16 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 
 	// Issue blocks in partition 1.
 	{
-		ts.IssueBlocksAtSlots("P1:", []iotago.SlotIndex{8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}, 4, "P0:7.3", nodesP1, true, false)
+		ts.IssueBlocksAtSlots("P1:", []iotago.SlotIndex{8, 9, 10, 11, 12, 13, 14, 15}, 4, "P0:7.3", nodesP1, true, true)
+		// Slot 16 is the new epoch, where node0 is not part of the (online) committee. Therefore, we can't issue blocks with commitments at minCommittableAge anymore.
+		// This is fine, as we keep issuing with the committee members and therefore within each slot there is a newer attestation that replaces the previous one.
+		// However, it is important that Block(P1:15.3-node0) commits to Slot12, as this decides how far we carry the attestation forward.
+		ts.IssueBlocksAtSlots("P1:", []iotago.SlotIndex{16, 17, 18, 19, 20}, 4, "P1:15.3", nodesP1, true, false)
 
 		ts.AssertNodeState(nodesP1,
 			testsuite.WithLatestFinalizedSlot(17),
 			testsuite.WithLatestCommitmentSlotIndex(18),
 			testsuite.WithEqualStoredCommitmentAtIndex(18),
-			testsuite.WithLatestCommitmentCumulativeWeight(47), // 4 + see attestation assertions below for how to compute
 			testsuite.WithSybilProtectionOnlineCommittee(ts.SeatOfNodes(18, "node1", "node2")...),
 			testsuite.WithEvictedSlot(18),
 		)
@@ -524,9 +528,10 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		ts.AssertAttestationsForSlot(13, ts.Blocks("P1:13.3-node0", "P1:13.3-node1", "P1:13.3-node2"), nodesP1...)             // Committee in epoch 1 is all nodes; node3 is in P2
 		ts.AssertAttestationsForSlot(14, ts.Blocks("P1:14.3-node0", "P1:14.3-node1", "P1:14.3-node2"), nodesP1...)             // Committee in epoch 1 is all nodes; node3 is in P2
 		ts.AssertAttestationsForSlot(15, ts.Blocks("P1:15.3-node0", "P1:15.3-node1", "P1:15.3-node2"), nodesP1...)             // Committee in epoch 1 is all nodes; node3 is in P2
-		ts.AssertAttestationsForSlot(16, ts.Blocks("P1:15.3-node0", "P1:16.3-node1", "P1:16.3-node2"), nodesP1...)             // We're in Epoch 2 (only node1, node2) but we carry attestations of others because of window
-		ts.AssertAttestationsForSlot(17, ts.Blocks("P1:15.3-node0", "P1:17.3-node1", "P1:17.3-node2"), nodesP1...)             // Committee in epoch 2 is only node1, node2
-		ts.AssertAttestationsForSlot(18, ts.Blocks("P1:15.3-node0", "P1:18.3-node1", "P1:18.3-node2"), nodesP1...)             // Committee in epoch 2 is only node1, node2
+		ts.AssertAttestationsForSlot(16, ts.Blocks("P1:15.3-node0", "P1:16.3-node1", "P1:16.3-node2"), nodesP1...)             // We're in Epoch 2 (only node1, node2) but we carry attestations of others because of window (=maxCommittableAge). Block(P1:15.3-node0) commits to Slot12.
+		ts.AssertAttestationsForSlot(17, ts.Blocks("P1:15.3-node0", "P1:17.3-node1", "P1:17.3-node2"), nodesP1...)             // Committee in epoch 2 is only node1, node2. Block(P1:15.3-node0) commits to Slot12.
+		ts.AssertAttestationsForSlot(18, ts.Blocks("P1:18.3-node1", "P1:18.3-node2"), nodesP1...)                              // Committee in epoch 2 is only node1, node2. Block(P1:15.3-node0) commits to Slot12, that's why it is not carried to 18.
+		ts.AssertLatestCommitmentCumulativeWeight(46, nodesP1...)                                                              // 4 + see attestation assertions above for how to compute
 
 		ts.AssertStrongTips(ts.Blocks("P1:20.3-node0", "P1:20.3-node1", "P1:20.3-node2"), nodesP1...)
 
@@ -537,12 +542,12 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	// Issue blocks in partition 2.
 	{
 		ts.IssueBlocksAtSlots("P2:", []iotago.SlotIndex{8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}, 4, "P0:7.3", nodesP2, true, false)
+		// Here we keep issuing with the only (online) validator in the partition. Since we issue in each slot, we don't need to set `useCommitmentAtMinCommittableAge` to true, as the newer blocks/attestations in each slot replace the previous ones.
 
 		ts.AssertNodeState(nodesP2,
 			testsuite.WithLatestFinalizedSlot(4),
 			testsuite.WithLatestCommitmentSlotIndex(18),
 			testsuite.WithEqualStoredCommitmentAtIndex(18),
-			// testsuite.WithLatestCommitmentCumulativeWeight(43), // 4 + see attestation assertions below for how to compute
 			testsuite.WithSybilProtectionOnlineCommittee(ts.SeatOfNodes(18, "node3")...),
 			testsuite.WithEvictedSlot(18),
 		)
@@ -566,6 +571,8 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		ts.AssertAttestationsForSlot(15, ts.Blocks("P2:15.3-node3"), nodesP2...)                                               // Committee in epoch 1 is all nodes; only node3 is in P2
 		ts.AssertAttestationsForSlot(16, ts.Blocks("P2:16.3-node3"), nodesP2...)                                               // Committee in epoch 2 (reused) is all nodes; only node3 is in P2
 		ts.AssertAttestationsForSlot(17, ts.Blocks("P2:17.3-node3"), nodesP2...)                                               // Committee in epoch 2 (reused) is all nodes; only node3 is in P2
+		ts.AssertAttestationsForSlot(18, ts.Blocks("P2:18.3-node3"), nodesP2...)                                               // Committee in epoch 2 (reused) is all nodes; only node3 is in P2
+		ts.AssertLatestCommitmentCumulativeWeight(29, nodesP2...)                                                              // 4 + see attestation assertions above for how to compute
 
 		ts.AssertStrongTips(ts.Blocks("P2:20.3-node3"), nodesP2...)
 
@@ -639,9 +646,9 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 	ts.AssertAttestationsForSlot(13, ts.Blocks("P1:13.3-node0", "P1:13.3-node1", "P1:13.3-node2"), ts.Nodes()...)             // Committee in epoch 1 is all nodes; node3 is in P2
 	ts.AssertAttestationsForSlot(14, ts.Blocks("P1:14.3-node0", "P1:14.3-node1", "P1:14.3-node2"), ts.Nodes()...)             // Committee in epoch 1 is all nodes; node3 is in P2
 	ts.AssertAttestationsForSlot(15, ts.Blocks("P1:15.3-node0", "P1:15.3-node1", "P1:15.3-node2"), ts.Nodes()...)             // Committee in epoch 1 is all nodes; node3 is in P2
-	ts.AssertAttestationsForSlot(16, ts.Blocks("P1:15.3-node0", "P1:16.3-node1", "P1:16.3-node2"), ts.Nodes()...)             // We're in Epoch 2 (only node1, node2) but we carry attestations of others because of window
-	ts.AssertAttestationsForSlot(17, ts.Blocks("P1:15.3-node0", "P1:17.3-node1", "P1:17.3-node2"), ts.Nodes()...)             // We're in Epoch 2 (only node1, node2) but we carry attestations of others because of window
-	ts.AssertAttestationsForSlot(18, ts.Blocks("P1:15.3-node0", "P1:18.3-node1", "P1:18.3-node2"), ts.Nodes()...)             // We're in Epoch 2 (only node1, node2) but we carry attestations of others because of window
+	ts.AssertAttestationsForSlot(16, ts.Blocks("P1:15.3-node0", "P1:16.3-node1", "P1:16.3-node2"), nodesP1...)                // We're in Epoch 2 (only node1, node2) but we carry attestations of others because of window (=maxCommittableAge). Block(P1:15.3-node0) commits to Slot12.
+	ts.AssertAttestationsForSlot(17, ts.Blocks("P1:15.3-node0", "P1:17.3-node1", "P1:17.3-node2"), nodesP1...)                // Committee in epoch 2 is only node1, node2. Block(P1:15.3-node0) commits to Slot12.
+	ts.AssertAttestationsForSlot(18, ts.Blocks("P1:18.3-node1", "P1:18.3-node2"), nodesP1...)                                 // Committee in epoch 2 is only node1, node2. Block(P1:15.3-node0) commits to Slot12, that's why it is not carried to 18.
 	ts.AssertAttestationsForSlot(19, ts.Blocks("P1:19.3-node1", "P1:19.3-node2"), ts.Nodes()...)                              // Committee in epoch 2 is only node1, node2
 }
 
@@ -826,7 +833,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 			initialParentsPrefix = "Genesis"
 		}
 
-		ts.IssueBlocksAtSlots(slotPrefix(partition, slots[0]), slots, 4, initialParentsPrefix, targetNodes, true, false)
+		ts.IssueBlocksAtSlots(slotPrefix(partition, slots[0]), slots, 4, initialParentsPrefix, targetNodes, true, true)
 
 		cumulativeAttestations := uint64(0)
 		for slot := genesisSlot + maxCommittableAge; slot <= lastCommittedSlot; slot++ {
@@ -838,7 +845,8 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 			}
 
 			for _, node := range otherNodes {
-				if slot <= lastCommonSlot+minCommittableAge {
+				// We force the commitments to be at minCommittableAge-1.
+				if slot <= lastCommonSlot+minCommittableAge-1 {
 					attestationBlocks.Add(ts, node, partition, min(slot, lastCommonSlot)) // carry forward last known attestations
 
 					cumulativeAttestations++

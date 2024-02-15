@@ -29,6 +29,7 @@ func (t *TestSuite) AssertAttestationsForSlot(slot iotago.SlotIndex, blocks []*b
 			}
 
 			storedAttestations := make([]iotago.BlockID, 0)
+			//nolint:revive
 			err = attestationTree.Stream(func(key iotago.AccountID, att *iotago.Attestation) error {
 				blockID, err := att.BlockID()
 				require.NoError(t.Testing, err)
@@ -37,15 +38,15 @@ func (t *TestSuite) AssertAttestationsForSlot(slot iotago.SlotIndex, blocks []*b
 				return nil
 			})
 			if err != nil {
-				return ierrors.Wrapf(err, "AssertAttestationsForSlot: %s: error iterating over attestation tree", node.Name)
+				return ierrors.Wrapf(err, "AssertAttestationsForSlot: %s: %s error iterating over attestation tree", node.Name, slot)
 			}
 
 			if !assert.ElementsMatch(t.fakeTesting, expectedAttestations, storedAttestations) {
-				return ierrors.Errorf("AssertAttestationsForSlot: %s: expected attestation(s) %s, got %s", node.Name, expectedAttestations, storedAttestations)
+				return ierrors.Errorf("AssertAttestationsForSlot: %s: %s expected attestation(s) %s, got %s", node.Name, slot, expectedAttestations, storedAttestations)
 			}
 
 			if len(expectedAttestations) != len(storedAttestations) {
-				return ierrors.Errorf("AssertAttestationsForSlot: %s: expected %d attestation(s), got %d", node.Name, len(expectedAttestations), len(storedAttestations))
+				return ierrors.Errorf("AssertAttestationsForSlot: %s: %s expected %d attestation(s), got %d", node.Name, slot, len(expectedAttestations), len(storedAttestations))
 			}
 
 			return nil

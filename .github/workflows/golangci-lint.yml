@@ -18,7 +18,7 @@ jobs:
       - name: Checkout custom linter
         uses: actions/checkout@v4
         with:
-          repository: karimodm/typegroupingcheck
+          repository: muxxer/typegroupingcheck
           path: typegroupingcheck 
 
       - name: Setup go

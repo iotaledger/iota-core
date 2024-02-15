@@ -143,7 +143,7 @@ func (t *TestFramework) AttachTransaction(signedTransactionAlias, transactionAli
 }
 
 func (t *TestFramework) CommitSlot(slot iotago.SlotIndex) {
-	stateDiff, err := t.Instance.StateDiff(slot)
+	stateDiff, err := t.Instance.CommitStateDiff(slot)
 	if err != nil {
 		panic(err)
 	}
@@ -165,6 +165,8 @@ func (t *TestFramework) CommitSlot(slot iotago.SlotIndex) {
 
 		return true
 	})
+
+	t.Instance.Evict(slot)
 }
 
 func (t *TestFramework) TransactionMetadata(alias string) (mempool.TransactionMetadata, bool) {
@@ -373,7 +375,7 @@ func (t *TestFramework) requireMarkedBooked(transactionAliases ...string) {
 }
 
 func (t *TestFramework) AssertStateDiff(slot iotago.SlotIndex, spentOutputAliases, createdOutputAliases, transactionAliases []string) {
-	stateDiff, err := t.Instance.StateDiff(slot)
+	stateDiff, err := t.Instance.CommitStateDiff(slot)
 	require.NoError(t.test, err)
 
 	require.Equal(t.test, len(spentOutputAliases), stateDiff.DestroyedStates().Size())

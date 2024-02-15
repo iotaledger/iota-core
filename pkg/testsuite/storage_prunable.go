@@ -130,7 +130,7 @@ func assertPrunableEpochStoragesPruned[V any](t *TestSuite, store *epochstore.St
 	}
 
 	seenEpochs = nil
-	err = store.StreamBytes(func(bytes []byte, bytes2 []byte) error {
+	err = store.StreamBytes(func(bytes []byte, _ []byte) error {
 		epochFromBytes, _, err := iotago.EpochIndexFromBytes(bytes)
 		if err != nil {
 			return ierrors.Wrapf(err, "failed to parse epoch from bytes")
