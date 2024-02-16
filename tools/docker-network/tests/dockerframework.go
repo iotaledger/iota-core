@@ -217,6 +217,7 @@ func (d *DockerTestFramework) waitForNodesAndGetClients() error {
 func (d *DockerTestFramework) WaitUntilNetworkReady() {
 	d.WaitUntilSync()
 
+	// inx-faucet is up only when the node and indexer are healthy, thus need to check the faucet even after nodes are synced.
 	d.WaitUntilFaucetHealthy()
 
 	d.DumpContainerLogsToFiles()
