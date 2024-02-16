@@ -36,6 +36,7 @@ require (
 	github.com/multiformats/go-varint v0.0.7
 	github.com/otiai10/copy v1.14.0
 	github.com/prometheus/client_golang v1.18.0
+	github.com/sajari/regression v1.0.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
 	github.com/zyedidia/generic v1.2.1

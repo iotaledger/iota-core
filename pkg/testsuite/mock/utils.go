@@ -46,7 +46,7 @@ func MaxBlockManaCost(protocolParameters iotago.ProtocolParameters) iotago.Mana 
 
 // TransactionBuilder options
 
-func WithInputs(inputs utxoledger.Outputs) options.Option[builder.TransactionBuilder] {
+func WithInputs(inputs ...*utxoledger.Output) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		for _, input := range inputs {
 			switch input.OutputType() {
@@ -124,7 +124,7 @@ func WithRewardInput(input *iotago.RewardInput, mana iotago.Mana) options.Option
 	}
 }
 
-func WithOutputs(outputs iotago.Outputs[iotago.Output]) options.Option[builder.TransactionBuilder] {
+func WithOutputs(outputs ...iotago.Output) options.Option[builder.TransactionBuilder] {
 	return func(txBuilder *builder.TransactionBuilder) {
 		for _, output := range outputs {
 			txBuilder.AddOutput(output)
