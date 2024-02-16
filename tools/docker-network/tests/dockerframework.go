@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"net/http"
 	"os"
 	"os/exec"
 	"sort"
@@ -213,7 +214,34 @@ func (d *DockerTestFramework) waitForNodesAndGetClients() error {
 	return nil
 }
 
-func (d *DockerTestFramework) WaitUntilSync() error {
+func (d *DockerTestFramework) WaitUntilNetworkReady() {
+	d.WaitUntilSync()
+
+	// inx-faucet is up only when the node and indexer are healthy, thus need to check the faucet even after nodes are synced.
+	d.WaitUntilFaucetHealthy()
+
+	d.DumpContainerLogsToFiles()
+}
+
+func (d *DockerTestFramework) WaitUntilFaucetHealthy() {
+	fmt.Println("Wait until the faucet is healthy...")
+	defer fmt.Println("Wait until the faucet is healthy......done")
+
+	d.Eventually(func() error {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, d.optsFaucetURL+"/health", nil)
+		require.NoError(d.Testing, err)
+
+		res, err := http.DefaultClient.Do(req)
+		require.NoError(d.Testing, err)
+		defer res.Body.Close()
+
+		require.Equal(d.Testing, http.StatusOK, res.StatusCode)
+
+		return nil
+	}, true)
+}
+
+func (d *DockerTestFramework) WaitUntilSync() {
 	fmt.Println("Wait until the nodes are synced...")
 	defer fmt.Println("Wait until the nodes are synced......done")
 
@@ -234,10 +262,6 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 
 		return nil
 	}, true)
-
-	d.DumpContainerLogsToFiles()
-
-	return nil
 }
 
 func (d *DockerTestFramework) AddValidatorNode(name string, containerName string, clientURL string, accAddrBech32 string, optIssueCandidacyPayload ...bool) {
