@@ -44,7 +44,7 @@ func NewTestSuite(t *testing.T) *TestSuite {
 			iotago.NewV3SnapshotProtocolParameters(
 				iotago.WithTimeProviderOptions(0, time.Now().Unix(), 10, 3),
 				iotago.WithLivenessOptions(5, 5, 1, 2, 3),
-				iotago.WithRewardsOptions(8, 8, 11, 2, 1, 5),
+				iotago.WithRewardsOptions(8, 11, 2, 5),
 			),
 		),
 	}

@@ -31,7 +31,7 @@ func setupValidatorTestsuite(t *testing.T, walletOpts ...options.Option[testsuit
 			iotago.WithStakingOptions(1, validationBlocksPerSlot, 1),
 			// Pick larger values for ManaShareCoefficient and DecayBalancingConstant for more precision in the calculations.
 			// Pick a small retention period so we can test rewards expiry.
-			iotago.WithRewardsOptions(8, 8, 11, 200, 200, 5),
+			iotago.WithRewardsOptions(8, 11, 200, 5),
 			// Pick Increase/Decrease threshold in accordance with sanity checks (necessary because we changed slot duration).
 			iotago.WithCongestionControlOptions(1, 0, 0, 400_000, 300_000, 100_000, 1000, 100),
 			iotago.WithTimeProviderOptions(
