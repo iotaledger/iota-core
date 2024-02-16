@@ -1,7 +1,8 @@
 # https://hub.docker.com/_/golang
-FROM golang:1.21-bookworm AS build
+FROM golang:1.22-bookworm AS build
 
 ARG BUILD_TAGS=rocksdb
+ARG BUILD_VERSION=v1.0.0-develop
 
 LABEL org.label-schema.description="IOTA core node"
 LABEL org.label-schema.name="iotaledger/iota-core"
@@ -28,7 +29,7 @@ RUN go mod download
 RUN go mod verify
 
 # Build the binary
-RUN go build -o /app/iota-core -tags="$BUILD_TAGS" -ldflags='-w -s'
+RUN go build -o /app/iota-core -tags="$BUILD_TAGS" -ldflags="-w -s -X=github.com/iotaledger/iota-core/components/app.Version=${BUILD_VERSION}"
 
 # Copy the assets
 RUN cp ./config_defaults.json /app/config.json
