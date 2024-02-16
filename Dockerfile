@@ -1,5 +1,5 @@
 # https://hub.docker.com/_/golang
-FROM golang:1.21-bookworm AS build
+FROM golang:1.22-bookworm AS build
 
 ARG BUILD_TAGS=rocksdb
 ARG BUILD_VERSION=v1.0.0-develop
