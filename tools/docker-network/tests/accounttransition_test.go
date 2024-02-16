@@ -36,8 +36,7 @@ func Test_AccountTransitions(t *testing.T) {
 	err := d.Run()
 	require.NoError(t, err)
 
-	err = d.WaitUntilSync()
-	require.NoError(t, err)
+	d.WaitUntilNetworkReady()
 
 	// create account1
 	fmt.Println("Creating account1")
