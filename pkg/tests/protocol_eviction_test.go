@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fjl/memsize"
 	"github.com/stretchr/testify/require"
 
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
-	"github.com/iotaledger/hive.go/runtime/memanalyzer"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/protocol"
@@ -159,27 +160,30 @@ func TestProtocol_Eviction(t *testing.T) {
 		ts.AssertStrongTips(tipBlocks, node)
 	}
 
-	// issue blocks until we evict the first slot
-	issueBlocks([]iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8})
+	lastIssuedSlot := iotago.SlotIndex(0)
 
-	memConsumptionStart := memConsumption(node)
-	fmt.Println(memConsumptionStart)
+	issueBlocksTill := func(slot iotago.SlotIndex) {
+		slotsToIssue := make([]iotago.SlotIndex, slot-lastIssuedSlot)
+		for currentSlot := lastIssuedSlot + 1; currentSlot <= slot; currentSlot++ {
+			slotsToIssue[currentSlot-lastIssuedSlot-1] = currentSlot
+		}
+
+		issueBlocks(slotsToIssue)
+
+		lastIssuedSlot = slot
+	}
+
+	// issue blocks until we evict the first slot
+	issueBlocksTill(8)
+
+	memConsumptionStart := memsize.Scan(node.Protocol).Total
+	fmt.Println(node.Protocol.Traverse())
 
 	// issue more blocks
-	issueBlocks([]iotago.SlotIndex{9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35})
+	issueBlocksTill(100)
 
-	memConsumptionEnd := memConsumption(node)
-	fmt.Println(memConsumptionEnd)
+	memConsumptionEnd := memsize.Scan(node.Protocol).Total
+	fmt.Println(node.Protocol.Traverse())
 
-	// make sure the memory does not grow by more than 5%
-	for key, memStart := range memConsumptionStart {
-		require.Less(t, float64(memConsumptionEnd[key]), 1.05*float64(memStart), key+" should not grow by more than 5%")
-	}
-}
-
-func memConsumption(node *mock.Node) map[string]uintptr {
-	return map[string]uintptr{
-		"Engine":   memanalyzer.MemSize(node.Protocol.Engines.Main.Get()),
-		"Protocol": memanalyzer.MemSize(node.Protocol),
-	}
+	require.Less(t, float64(lo.Return1(memConsumptionEnd)), 1.05*float64(memConsumptionStart), "memory consumption should not grow by more than 5%")
 }

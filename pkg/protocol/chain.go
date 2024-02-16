@@ -1,12 +1,15 @@
 package protocol
 
 import (
+	"fmt"
+
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/iota-core/pkg/core/traversed"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -165,6 +168,19 @@ func (c *Chain) LatestEngine() *engine.Engine {
 	return currentEngine
 }
 
+func (c *Chain) Traverse(seenObjects ...traversed.SeenElements) *traversed.Object {
+	return traversed.NewObject("Chain", c.LogName(), func(chain *traversed.Object) {
+		chain.AddTraversable("ForkingPoint", c.ForkingPoint.Get())
+		chain.AddTraversable("ParentChain", c.ParentChain.Get())
+
+		chain.AddNewObject("ChildChains", "Set", fmt.Sprintf("%p", c.ChildChains), func(childChains *traversed.Object) {
+			c.ChildChains.Range(func(childChain *Chain) {
+				childChains.AddTraversable(childChain.LogName(), childChain)
+			})
+		})
+	}, seenObjects...)
+}
+
 // initLogger initializes the Logger of this chain.
 func (c *Chain) initLogger() (shutdown func()) {
 	c.Logger = c.chains.NewChildLogger("", true)
@@ -261,6 +277,10 @@ func (c *Chain) addCommitment(newCommitment *Commitment) (shutdown func()) {
 		newCommitment.IsAttested.OnTrigger(func() { c.LatestAttestedCommitment.Set(newCommitment) }),
 		newCommitment.IsVerified.OnTrigger(func() { c.LatestProducedCommitment.Set(newCommitment) }),
 		newCommitment.IsSynced.OnTrigger(func() { c.LatestSyncedSlot.Set(newCommitment.Slot()) }),
+
+		func() {
+			c.commitments.Delete(newCommitment.Slot())
+		},
 	)
 }
 
