@@ -227,7 +227,7 @@ services:
       - iota-core
     command: >
       --inx.address=node-1-validator:9029
-      --restAPI.bindAddress=inx-indexer:9091
+      --restAPI.bindAddress=0.0.0.0:9091
 
   inx-mqtt:
     image: iotaledger/inx-mqtt:2.0-alpha
