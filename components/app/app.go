@@ -25,7 +25,7 @@ var (
 	Name = "iota-core"
 
 	// Version of the app.
-	Version = "1.0.0-alpha.6"
+	Version = "v1.0.0-develop"
 )
 
 func App() *app.App {
