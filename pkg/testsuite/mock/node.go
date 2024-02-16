@@ -140,9 +140,9 @@ func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[proto
 
 	n.hookEvents()
 
-	if n.enableEngineLogging {
-		n.hookLogging(failOnBlockFiltered)
-	}
+	// if n.enableEngineLogging {
+	// 	n.hookLogging(failOnBlockFiltered)
+	// }
 
 	n.ctx, n.ctxCancel = context.WithCancel(context.Background())
 

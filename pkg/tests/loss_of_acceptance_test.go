@@ -7,8 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -312,24 +313,18 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 
 	ts.Run(true, nil)
 
-	node0.Protocol.SetLogLevel(log.LevelTrace)
-	node1.Protocol.SetLogLevel(log.LevelTrace)
-
 	// Issue up to slot 10, committing slot 8.
 	{
-		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, false)
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, true)
 
 		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
 		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
 		ts.AssertLatestCommitmentSlotIndex(8, ts.Nodes()...)
 	}
 
-	// for _, node := range ts.Nodes("node0", "node1") {
-	// 	ts.RemoveNode(node.Name)
-	// 	node.Shutdown()
-	// }
-
-	// Revive chain on node0-restarted.
+	// Revive chain on node0 without restarting.
+	// There will be blocks and transactions in the slot 9 and 10 that are committed but don't have a future cone of
+	// blocks anymore because when reviving a chain, we pick a parent from the last committed slot.
 	{
 		ts.SetCurrentSlot(20)
 		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0)
@@ -348,12 +343,11 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 		ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)
 	}
 
-	return
 	// Continue issuing on all online nodes for a few slots.
 	{
-		// Since issued blocks in slot 9 and 10 are be orphaned, we need to make sure that the already issued transactions in the testsuite
-		// are not used again.
-		ts.SetAutomaticTransactionIssuingCounters(node2.Partition, 24)
+		// Since already issued, but not accepted blocks in slot 9 and 10 are be orphaned, we need to make sure that
+		// the already issued transactions in the testsuite  are not used again.
+		ts.SetAutomaticTransactionIssuingCounters(node2.Partition, 28)
 
 		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, false)
 
@@ -362,8 +356,33 @@ func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
 		ts.AssertLatestCommitmentSlotIndex(23, ts.Nodes()...)
 	}
 
-	// Check that commitments from 8-19 are empty -> all previously accepted blocks in 9,10 have been orphaned.
-	for _, slot := range []iotago.SlotIndex{9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19} {
+	// Check that accepted blocks and transactions in slot 9-10 are included in the commitment.
+	ts.AssertStorageCommitmentBlocks(9, map[iotago.CommitmentID]iotago.BlockIDs{
+		lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(6)).ID(): ts.BlockIDsWithPrefix("9"), // all blocks in slot 9 were accepted
+	}, ts.Nodes()...)
+	ts.AssertStorageCommitmentTransactions(9, expectedTransactions(ts.BlocksWithPrefix("9")), ts.Nodes()...)
+
+	ts.AssertStorageCommitmentBlocks(10, map[iotago.CommitmentID]iotago.BlockIDs{
+		lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(7)).ID(): ts.BlockIDsWithPrefix("10.0"), // only the first blocks row in slot 10 was accepted
+	}, ts.Nodes()...)
+	ts.AssertStorageCommitmentTransactions(10, expectedTransactions(ts.BlocksWithPrefix("10.0")), ts.Nodes()...)
+
+	// Check that commitments from 11-19 are empty.
+	for _, slot := range []iotago.SlotIndex{11, 12, 13, 14, 15, 16, 17, 18, 19} {
 		ts.AssertStorageCommitmentBlocks(slot, nil, ts.Nodes()...)
+		ts.AssertStorageCommitmentTransactions(slot, nil, ts.Nodes()...)
 	}
+}
+
+func expectedTransactions(allBLocks []*blocks.Block) iotago.TransactionIDs {
+	return lo.Filter(lo.Map(allBLocks, func(block *blocks.Block) iotago.TransactionID {
+		tx, hasTransaction := block.SignedTransaction()
+		if !hasTransaction {
+			return iotago.EmptyTransactionID
+		}
+
+		return lo.PanicOnErr(tx.Transaction.ID())
+	}), func(txID iotago.TransactionID) bool {
+		return txID != iotago.EmptyTransactionID
+	})
 }
