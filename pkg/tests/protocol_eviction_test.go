@@ -28,6 +28,10 @@ import (
 )
 
 func TestProtocol_Eviction(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in -race mode.")
+	}
+
 	var (
 		genesisSlot       iotago.SlotIndex = 0
 		minCommittableAge iotago.SlotIndex = 2
