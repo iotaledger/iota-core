@@ -130,6 +130,7 @@ func (n *Node) IsValidator() bool {
 	return n.Validator != nil
 }
 
+//nolint:revive
 func (n *Node) Initialize(failOnBlockFiltered bool, opts ...options.Option[protocol.Protocol]) {
 	n.Protocol = protocol.New(
 		n.logger,
@@ -215,6 +216,7 @@ func (n *Node) hookEvents() {
 		})
 }
 
+//nolint:unused
 func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	n.Protocol.Chains.WithElements(func(chain *protocol.Chain) (teardown func()) {
 		return chain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) {
@@ -225,6 +227,7 @@ func (n *Node) hookLogging(failOnBlockFiltered bool) {
 	})
 }
 
+//nolint:unused
 func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engine.Engine) {
 	events := instance.Events
 
@@ -455,6 +458,7 @@ func (n *Node) attachEngineLogsWithName(failOnBlockFiltered bool, instance *engi
 	})
 }
 
+//nolint:unused
 func (n *Node) attachEngineLogs(failOnBlockFiltered bool, instance *engine.Engine) {
 	n.attachEngineLogsWithName(failOnBlockFiltered, instance)
 }
