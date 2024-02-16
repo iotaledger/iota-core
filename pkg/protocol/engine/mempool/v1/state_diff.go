@@ -125,7 +125,7 @@ func (s *StateDiff) Reset() error {
 		}
 	}
 
-	return nil
+	return s.mutations.Commit()
 }
 
 func (s *StateDiff) compactStateChanges(stateMetadata *StateMetadata, usageCounter int) {

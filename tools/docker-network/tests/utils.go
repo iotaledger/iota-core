@@ -131,7 +131,6 @@ func (d *DockerTestFramework) AwaitAddressUnspentOutputAccepted(ctx context.Cont
 func (d *DockerTestFramework) SendFaucetRequest(ctx context.Context, receiveAddr iotago.Address) {
 	cltAPI := d.Node("V1").Client.CommittedAPI()
 	addrBech := receiveAddr.Bech32(cltAPI.ProtocolParameters().Bech32HRP())
-	fmt.Printf("Faucet request funds for Bech address: %s\n", addrBech)
 
 	type EnqueueRequest struct {
 		Address string `json:"address"`

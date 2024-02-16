@@ -69,18 +69,22 @@ func prepareCommitmentGraph(g *graphviz.Graphviz, rootCommitment *protocol.Commi
 			return nil, parentErr
 		}
 
+		// TODO: this should be removed once eviction of commitments is properly implemented
+		if parentCommitment.Children.IsEmpty() {
+			if childCommitment, exists := parentCommitment.Chain.Get().Commitment(parentCommitment.Slot() + 1); exists {
+				if err = renderChild(childCommitment, graph, parentCommitment, parent); err != nil {
+					return nil, err
+				}
+
+				commitmentWalker.Push(childCommitment)
+
+				continue
+			}
+		}
+
 		if err = parentCommitment.Children.ForEach(func(childCommitment *protocol.Commitment) error {
-			child, childErr := createNode(graph, childCommitment)
-			if childErr != nil {
-				return childErr
-			}
-
-			if childCommitment.Chain.Get() == deps.Protocol.Chains.Main.Get() {
-				child.SetColor("green")
-			}
-
-			if _, edgeErr := graph.CreateEdge(fmt.Sprintf("%s -> %s", parentCommitment.ID().String()[:8], childCommitment.ID().String()[:8]), parent, child); edgeErr != nil {
-				return ierrors.Wrapf(edgeErr, "could not create edge %s -> %s", parentCommitment.ID().String()[:8], childCommitment.ID().String()[:8])
+			if err = renderChild(childCommitment, graph, parentCommitment, parent); err != nil {
+				return err
 			}
 
 			commitmentWalker.Push(childCommitment)
@@ -92,6 +96,23 @@ func prepareCommitmentGraph(g *graphviz.Graphviz, rootCommitment *protocol.Commi
 	}
 
 	return graph, nil
+}
+
+func renderChild(childCommitment *protocol.Commitment, graph *cgraph.Graph, parentCommitment *protocol.Commitment, parent *cgraph.Node) error {
+	child, err := createNode(graph, childCommitment)
+	if err != nil {
+		return err
+	}
+
+	if childCommitment.Chain.Get() == deps.Protocol.Chains.Main.Get() {
+		child.SetColor("green")
+	}
+
+	if _, edgeErr := graph.CreateEdge(fmt.Sprintf("%s -> %s", parentCommitment.ID().String()[:8], childCommitment.ID().String()[:8]), parent, child); edgeErr != nil {
+		return ierrors.Wrapf(edgeErr, "could not create edge %s -> %s", parentCommitment.ID().String()[:8], childCommitment.ID().String()[:8])
+	}
+
+	return nil
 }
 
 func createNode(graph *cgraph.Graph, commitment *protocol.Commitment) (*cgraph.Node, error) {

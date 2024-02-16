@@ -72,7 +72,6 @@ func NewProvider() module.Provider[*engine.Engine, ledger.Ledger] {
 			l.setRetainTransactionFailureFunc(e.Retainer.RetainTransactionFailure)
 
 			l.memPool = mempoolv1.New(NewVM(l), l.resolveState, e.Storage.Mutations, e.Workers.CreateGroup("MemPool"), l.spendDAG, l.apiProvider, l.errorHandler)
-			e.EvictionState.Events.SlotEvicted.Hook(l.memPool.Evict)
 
 			l.manaManager = mana.NewManager(l.apiProvider, l.resolveAccountOutput, l.accountsLedger.Account)
 			latestCommittedSlot := e.Storage.Settings().LatestCommitment().Slot()
@@ -143,19 +142,19 @@ func (l *Ledger) AttachTransaction(block *blocks.Block) (attachedTransaction mem
 	return nil, false
 }
 
-func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, accountRoot iotago.Identifier, created utxoledger.Outputs, consumed utxoledger.Spents, err error) {
+func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier, mutationRoot iotago.Identifier, accountRoot iotago.Identifier, created utxoledger.Outputs, consumed utxoledger.Spents, mutations []*iotago.Transaction, err error) {
 	ledgerIndex, err := l.utxoLedger.ReadLedgerSlot()
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, err
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, nil, err
 	}
 
 	if slot != ledgerIndex+1 {
 		panic(ierrors.Errorf("there is a gap in the ledgerstate %d vs %d", ledgerIndex+1, slot))
 	}
 
-	stateDiff, err := l.memPool.StateDiff(slot)
+	stateDiff, err := l.memPool.CommitStateDiff(slot)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to retrieve state diff for slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, nil, ierrors.Errorf("failed to retrieve state diff for slot %d: %w", slot, err)
 	}
 
 	// collect outputs and allotments from the "uncompacted" stateDiff
@@ -163,7 +162,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	// and retrieve intermediate outputs to show to the user
 	spenders, outputs, accountDiffs, err := l.processStateDiffTransactions(stateDiff)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to process state diff transactions in slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, nil, ierrors.Errorf("failed to process state diff transactions in slot %d: %w", slot, err)
 	}
 
 	// Now we process the collected account changes, for that we consume the "compacted" state diff to get the overall
@@ -172,7 +171,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	// output side
 	createdAccounts, consumedAccounts, destroyedAccounts, err := l.processCreatedAndConsumedAccountOutputs(stateDiff, accountDiffs)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to process outputs consumed and created in slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, nil, ierrors.Errorf("failed to process outputs consumed and created in slot %d: %w", slot, err)
 	}
 
 	l.prepareAccountDiffs(accountDiffs, slot, consumedAccounts, createdAccounts)
@@ -180,7 +179,7 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	// Commit the changes
 	// Update the UTXO ledger
 	if err = l.utxoLedger.ApplyDiff(slot, outputs, spenders); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to apply diff to UTXO ledger for slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, nil, ierrors.Errorf("failed to apply diff to UTXO ledger for slot %d: %w", slot, err)
 	}
 
 	// Update the Accounts ledger
@@ -192,24 +191,33 @@ func (l *Ledger) CommitSlot(slot iotago.SlotIndex) (stateRoot iotago.Identifier,
 	}
 	rmcForSlot, err := l.rmcManager.RMC(rmcSlot)
 	if err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("ledger failed to get RMC for slot %d: %w", rmcSlot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, nil, ierrors.Errorf("ledger failed to get RMC for slot %d: %w", rmcSlot, err)
 	}
 	if err = l.accountsLedger.ApplyDiff(slot, rmcForSlot, accountDiffs, destroyedAccounts); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to apply diff to Accounts ledger for slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, nil, ierrors.Errorf("failed to apply diff to Accounts ledger for slot %d: %w", slot, err)
 	}
 
 	// Update the mana manager's cache
 	if err = l.manaManager.ApplyDiff(slot, destroyedAccounts, createdAccounts, accountDiffs); err != nil {
-		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, ierrors.Errorf("failed to apply diff to mana manager for slot %d: %w", slot, err)
+		return iotago.Identifier{}, iotago.Identifier{}, iotago.Identifier{}, nil, nil, nil, ierrors.Errorf("failed to apply diff to mana manager for slot %d: %w", slot, err)
 	}
 
 	// Mark each transaction as committed so the mempool can evict it
 	stateDiff.ExecutedTransactions().ForEach(func(_ iotago.TransactionID, tx mempool.TransactionMetadata) bool {
 		tx.Commit()
+
+		//nolint:forcetypeassert // we only handle a single type of transaction currently
+		mutations = append(mutations, tx.Transaction().(*iotago.Transaction))
+
 		return true
 	})
 
-	return l.utxoLedger.StateTreeRoot(), stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), outputs, spenders, nil
+	// We evict the mempool before we return, after updating the last committed slot value.
+	// We need to evict after updating the last committed slot value because otherwise transactions would be orphaned first
+	// (due to removing the attachments) and then committed, which would result in a broken state of the transaction.
+	l.memPool.Evict(slot)
+
+	return l.utxoLedger.StateTreeRoot(), stateDiff.Mutations().Root(), l.accountsLedger.AccountsTreeRoot(), outputs, spenders, mutations, nil
 }
 
 func (l *Ledger) AddAccount(output *utxoledger.Output, blockIssuanceCredits iotago.BlockIssuanceCredits) error {

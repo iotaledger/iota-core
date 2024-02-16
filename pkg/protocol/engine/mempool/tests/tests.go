@@ -232,7 +232,8 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 	require.False(t, tx2Metadata.IsAccepted())
 	require.False(t, tx3Metadata.IsAccepted())
 
-	tf.Instance.Evict(1)
+	tf.CommitSlot(1)
+
 	require.False(t, lo.Return2(tx1Metadata.OrphanedSlot()))
 	require.False(t, lo.Return2(tx2Metadata.OrphanedSlot()))
 	require.False(t, lo.Return2(tx3Metadata.OrphanedSlot()))
@@ -241,7 +242,7 @@ func TestSetTxOrphanageMultipleAttachments(t *testing.T, tf *TestFramework) {
 	require.True(t, lo.Return2(tf.SpendDAG.SpendSets(tf.TransactionID("tx2"))))
 	require.True(t, lo.Return2(tf.SpendDAG.SpendSets(tf.TransactionID("tx3"))))
 
-	tf.Instance.Evict(2)
+	tf.CommitSlot(2)
 
 	require.True(t, lo.Return2(tx1Metadata.OrphanedSlot()))
 	require.True(t, lo.Return2(tx2Metadata.OrphanedSlot()))
@@ -303,7 +304,7 @@ func TestStoreAttachmentInEvictedSlot(t *testing.T, tf *TestFramework) {
 	debug.SetEnabled(true)
 	defer debug.SetEnabled(false)
 
-	tf.Instance.Evict(iotago.SlotIndex(5))
+	tf.CommitSlot(5)
 
 	tf.CreateSignedTransaction("tx1", []string{"genesis"}, 1, true)
 	require.Error(t, tf.AttachTransaction("tx1-signed", "tx1", "block2", 1))

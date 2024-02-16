@@ -58,7 +58,7 @@ func (w *Wallet) SetBlockIssuer(accountID iotago.AccountID) {
 
 func (w *Wallet) BlockIssuerKey() iotago.BlockIssuerKey {
 	if w.BlockIssuer != nil {
-		return w.BlockIssuerKey()
+		return w.BlockIssuer.BlockIssuerKey()
 	}
 	_, pub := w.keyManager.KeyPair()
 
@@ -121,26 +121,26 @@ func (w *Wallet) TransactionID(alias string) iotago.TransactionID {
 	return lo.PanicOnErr(w.Transaction(alias).ID())
 }
 
-func (w *Wallet) Address() iotago.DirectUnlockableAddress {
-	address := w.keyManager.Address(iotago.AddressEd25519)
+func (w *Wallet) Address(index ...uint32) iotago.DirectUnlockableAddress {
+	address := w.keyManager.Address(iotago.AddressEd25519, index...)
 	//nolint:forcetypeassert
 	return address.(*iotago.Ed25519Address)
 }
 
-func (w *Wallet) ImplicitAccountCreationAddress() *iotago.ImplicitAccountCreationAddress {
-	address := w.keyManager.Address(iotago.AddressImplicitAccountCreation)
+func (w *Wallet) ImplicitAccountCreationAddress(index ...uint32) *iotago.ImplicitAccountCreationAddress {
+	address := w.keyManager.Address(iotago.AddressImplicitAccountCreation, index...)
 	//nolint:forcetypeassert
 	return address.(*iotago.ImplicitAccountCreationAddress)
 }
 
-func (w *Wallet) HasAddress(address iotago.Address) bool {
-	return address.Equal(w.Address()) || address.Equal(w.ImplicitAccountCreationAddress())
+func (w *Wallet) HasAddress(address iotago.Address, index ...uint32) bool {
+	return address.Equal(w.Address(index...)) || address.Equal(w.ImplicitAccountCreationAddress(index...))
 }
 
 func (w *Wallet) KeyPair() (ed25519.PrivateKey, ed25519.PublicKey) {
 	return w.keyManager.KeyPair()
 }
 
-func (w *Wallet) AddressSigner() iotago.AddressSigner {
-	return w.keyManager.AddressSigner()
+func (w *Wallet) AddressSigner(indexes ...uint32) iotago.AddressSigner {
+	return w.keyManager.AddressSigner(indexes...)
 }

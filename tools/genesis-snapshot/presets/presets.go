@@ -16,18 +16,19 @@ import (
 )
 
 var (
-	// use defaults from iota.go
+	// use defaults from iota.go.
 	protocolParamsBase = iotago.NewV3SnapshotProtocolParameters(
 		iotago.WithNetworkOptions("default", iotago.PrefixTestnet),
 	)
 
-	// use defaults from iota.go
+	// use defaults from iota.go.
 	protocolParamsDocker = iotago.NewV3SnapshotProtocolParameters(
 		iotago.WithNetworkOptions("docker", iotago.PrefixTestnet),
-		iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 13),
+		iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 7),
+		iotago.WithLivenessOptions(10, 15, 3, 6, 8),
 	)
 
-	// use defaults from iota.go
+	// use defaults from iota.go.
 	protocolParamsFeature = iotago.NewV3SnapshotProtocolParameters(
 		iotago.WithNetworkOptions("feature", iotago.PrefixTestnet),
 		iotago.WithTimeProviderOptions(666666, time.Now().Unix()-100_000, 10, 13),
