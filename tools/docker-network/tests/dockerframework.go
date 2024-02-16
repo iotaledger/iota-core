@@ -222,7 +222,7 @@ func (d *DockerTestFramework) WaitUntilNetworkReady() {
 	d.DumpContainerLogsToFiles()
 }
 
-func (d *DockerTestFramework) WaitUntilFaucetHealthy() error {
+func (d *DockerTestFramework) WaitUntilFaucetHealthy() {
 	fmt.Println("Wait until the faucet is healthy...")
 	defer fmt.Println("Wait until the faucet is healthy......done")
 
@@ -238,11 +238,9 @@ func (d *DockerTestFramework) WaitUntilFaucetHealthy() error {
 
 		return nil
 	}, true)
-
-	return nil
 }
 
-func (d *DockerTestFramework) WaitUntilSync() error {
+func (d *DockerTestFramework) WaitUntilSync() {
 	fmt.Println("Wait until the nodes are synced...")
 	defer fmt.Println("Wait until the nodes are synced......done")
 
@@ -263,8 +261,6 @@ func (d *DockerTestFramework) WaitUntilSync() error {
 
 		return nil
 	}, true)
-
-	return nil
 }
 
 func (d *DockerTestFramework) AddValidatorNode(name string, containerName string, clientURL string, accAddrBech32 string, optIssueCandidacyPayload ...bool) {
