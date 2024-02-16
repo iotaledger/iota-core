@@ -22,7 +22,7 @@ func Test_AccountTransitions(t *testing.T) {
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
+			iotago.WithRewardsOptions(8, 10, 2, 384),
 			iotago.WithTargetCommitteeSize(4),
 		))
 	defer d.Stop()
