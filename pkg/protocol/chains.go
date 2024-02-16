@@ -275,6 +275,10 @@ func attachEngineLogsWithName(instance *engine.Engine) {
 		transactionMetadata.OnPending(func() {
 			instance.LogTrace("MemPool.TransactionPending", "tx", transactionMetadata.ID())
 		})
+
+		transactionMetadata.OnEvicted(func() {
+			instance.LogTrace("MemPool.TransactionEvicted", "tx", transactionMetadata.ID())
+		})
 	})
 }
 
