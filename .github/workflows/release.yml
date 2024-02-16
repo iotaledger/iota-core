@@ -3,6 +3,7 @@ name: Release
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   docker:
@@ -43,4 +44,6 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            BUILD_VERSION=${{ github.ref }}
           tags: ${{ steps.meta.outputs.tags }}
