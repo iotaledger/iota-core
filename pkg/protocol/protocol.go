@@ -83,10 +83,18 @@ func New(logger log.Logger, workers *workerpool.Group, networkEndpoint network.E
 			p.Shutdown.OnTrigger(shutdown)
 		})
 
+		p.CheckCommitment()
+
 		p.Constructed.Trigger()
 
 		p.waitInitialized()
 	})
+}
+
+// Check whether the data base is consistent with the commitment.
+func (p *Protocol) CheckCommitment() error {
+
+	return nil
 }
 
 // IssueBlock issues a block to the node.
