@@ -506,7 +506,7 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
 
-	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
 	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
@@ -567,7 +567,7 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iota
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
 
-	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
 	signedTx, err := builder.NewTransactionBuilder(apiForSlot).

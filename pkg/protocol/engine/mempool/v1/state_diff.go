@@ -21,7 +21,8 @@ type StateDiff struct {
 
 	stateUsageCounters *shrinkingmap.ShrinkingMap[mempool.StateID, int]
 
-	mutations ads.Set[iotago.Identifier, iotago.TransactionID]
+	mutations   ads.Set[iotago.Identifier, iotago.TransactionID]
+	mutationsKV kvstore.KVStore
 }
 
 func NewStateDiff(slot iotago.SlotIndex, kv kvstore.KVStore) *StateDiff {
@@ -38,6 +39,7 @@ func NewStateDiff(slot iotago.SlotIndex, kv kvstore.KVStore) *StateDiff {
 			iotago.TransactionID.Bytes,
 			iotago.TransactionIDFromBytes,
 		),
+		mutationsKV: kv,
 	}
 }
 
@@ -111,21 +113,19 @@ func (s *StateDiff) Reset() error {
 	s.executedTransactions = orderedmap.New[iotago.TransactionID, mempool.TransactionMetadata]()
 	s.stateUsageCounters = shrinkingmap.New[mempool.StateID, int]()
 
-	transactionIDs := make([]iotago.TransactionID, 0)
-	if err := s.mutations.Stream(func(transactionID iotago.TransactionID) error {
-		transactionIDs = append(transactionIDs, transactionID)
-		return nil
-	}); err != nil {
-		return ierrors.Wrapf(err, "failed to stream mutations from state diff")
+	if err := s.mutationsKV.Clear(); err != nil {
+		return ierrors.Wrap(err, "failed to clear mutations")
 	}
 
-	for _, transactionID := range transactionIDs {
-		if _, err := s.mutations.Delete(transactionID); err != nil {
-			return ierrors.Wrapf(err, "failed to delete transaction with %s from state diff", transactionID)
-		}
-	}
+	s.mutations = ads.NewSet[iotago.Identifier](
+		s.mutationsKV,
+		iotago.Identifier.Bytes,
+		iotago.IdentifierFromBytes,
+		iotago.TransactionID.Bytes,
+		iotago.TransactionIDFromBytes,
+	)
 
-	return s.mutations.Commit()
+	return nil
 }
 
 func (s *StateDiff) compactStateChanges(stateMetadata *StateMetadata, usageCounter int) {

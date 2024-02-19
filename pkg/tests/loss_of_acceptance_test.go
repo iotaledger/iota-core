@@ -7,7 +7,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/iota-core/pkg/protocol"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/testsuite"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -235,7 +237,7 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 		node.Shutdown()
 	}
 
-	// Create snapshot and restart node0 from it.
+	// Restart node0.
 	var node0restarted *mock.Node
 	{
 		node0restarted = ts.AddNode("node0-restarted")
@@ -282,4 +284,105 @@ func TestLossOfAcceptanceWithRestartFromDisk(t *testing.T) {
 	for _, slot := range []iotago.SlotIndex{9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19} {
 		ts.AssertStorageCommitmentBlocks(slot, nil, ts.Nodes()...)
 	}
+}
+
+func TestLossOfAcceptanceWithoutRestart(t *testing.T) {
+	ts := testsuite.NewTestSuite(t,
+		testsuite.WithProtocolParametersOptions(
+			iotago.WithTimeProviderOptions(
+				0,
+				testsuite.GenesisTimeWithOffsetBySlots(100, testsuite.DefaultSlotDurationInSeconds),
+				testsuite.DefaultSlotDurationInSeconds,
+				3,
+			),
+			iotago.WithLivenessOptions(
+				10,
+				10,
+				2,
+				4,
+				5,
+			),
+		),
+	)
+	defer ts.Shutdown()
+
+	node0 := ts.AddValidatorNode("node0")
+	ts.AddDefaultWallet(node0)
+	node1 := ts.AddValidatorNode("node1")
+	node2 := ts.AddNode("node2")
+
+	ts.Run(true, nil)
+
+	// Issue up to slot 10, committing slot 8.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 3, "Genesis", ts.Nodes(), true, true)
+
+		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("10.0"), true, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(8, ts.Nodes()...)
+		ts.AssertLatestCommitmentSlotIndex(8, ts.Nodes()...)
+	}
+
+	// Revive chain on node0 without restarting.
+	// There will be blocks and transactions in the slot 9 and 10 that are committed but don't have a future cone of
+	// blocks anymore because when reviving a chain, we pick a parent from the last committed slot.
+	{
+		ts.SetCurrentSlot(20)
+		block0 := ts.IssueValidationBlockWithHeaderOptions("block0", node0)
+		require.EqualValues(t, 18, block0.SlotCommitmentID().Slot())
+		// Reviving the chain should select one parent from the last committed slot.
+		require.Len(t, block0.Parents(), 1)
+		require.EqualValues(t, block0.Parents()[0].Slot(), 8)
+		ts.AssertBlocksExist(ts.Blocks("block0"), true, ts.Nodes("node0")...)
+	}
+
+	// Need to issue to slot 22 so that all other nodes can warp sync up to slot 19 and then commit slot 20 themselves.
+	{
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{21, 22}, 2, "block0", ts.Nodes("node0"), true, false)
+
+		ts.AssertEqualStoredCommitmentAtIndex(20, ts.Nodes()...)
+		ts.AssertLatestCommitmentSlotIndex(20, ts.Nodes()...)
+	}
+
+	// Continue issuing on all online nodes for a few slots.
+	{
+		// Since already issued, but not accepted blocks in slot 9 and 10 are be orphaned, we need to make sure that
+		// the already issued transactions in the testsuite  are not used again.
+		ts.SetAutomaticTransactionIssuingCounters(node2.Partition, 28)
+
+		ts.IssueBlocksAtSlots("", []iotago.SlotIndex{23, 24, 25}, 3, "22.1", ts.Nodes(), true, false)
+
+		ts.AssertBlocksInCacheAccepted(ts.BlocksWithPrefix("25.0"), true, ts.Nodes()...)
+		ts.AssertEqualStoredCommitmentAtIndex(23, ts.Nodes()...)
+		ts.AssertLatestCommitmentSlotIndex(23, ts.Nodes()...)
+	}
+
+	// Check that accepted blocks and transactions in slot 9-10 are included in the commitment.
+	ts.AssertStorageCommitmentBlocks(9, map[iotago.CommitmentID]iotago.BlockIDs{
+		lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(6)).ID(): ts.BlockIDsWithPrefix("9"), // all blocks in slot 9 were accepted
+	}, ts.Nodes()...)
+	ts.AssertStorageCommitmentTransactions(9, expectedTransactions(ts.BlocksWithPrefix("9")), ts.Nodes()...)
+
+	ts.AssertStorageCommitmentBlocks(10, map[iotago.CommitmentID]iotago.BlockIDs{
+		lo.PanicOnErr(node1.Protocol.Engines.Main.Get().Storage.Commitments().Load(7)).ID(): ts.BlockIDsWithPrefix("10.0"), // only the first blocks row in slot 10 was accepted
+	}, ts.Nodes()...)
+	ts.AssertStorageCommitmentTransactions(10, expectedTransactions(ts.BlocksWithPrefix("10.0")), ts.Nodes()...)
+
+	// Check that commitments from 11-19 are empty.
+	for _, slot := range []iotago.SlotIndex{11, 12, 13, 14, 15, 16, 17, 18, 19} {
+		ts.AssertStorageCommitmentBlocks(slot, nil, ts.Nodes()...)
+		ts.AssertStorageCommitmentTransactions(slot, nil, ts.Nodes()...)
+	}
+}
+
+func expectedTransactions(allBLocks []*blocks.Block) iotago.TransactionIDs {
+	return lo.Filter(lo.Map(allBLocks, func(block *blocks.Block) iotago.TransactionID {
+		tx, hasTransaction := block.SignedTransaction()
+		if !hasTransaction {
+			return iotago.EmptyTransactionID
+		}
+
+		return lo.PanicOnErr(tx.Transaction.ID())
+	}), func(txID iotago.TransactionID) bool {
+		return txID != iotago.EmptyTransactionID
+	})
 }

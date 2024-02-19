@@ -17,8 +17,8 @@ import (
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
-// IOTA Mainnet Max Supply.
-const MAX_SUPPLY = iotago.BaseToken(4_600_000_000_000_000)
+// Supply for the test with faster slot duration and slots per epoch.
+const SUPPLY = iotago.BaseToken(1_813_620_509_061_365)
 
 func setupValidatorTestsuite(t *testing.T, walletOpts ...options.Option[testsuite.WalletOptions]) *testsuite.TestSuite {
 	var slotDuration uint8 = 5
@@ -27,11 +27,11 @@ func setupValidatorTestsuite(t *testing.T, walletOpts ...options.Option[testsuit
 
 	ts := testsuite.NewTestSuite(t,
 		testsuite.WithProtocolParametersOptions(
-			iotago.WithSupplyOptions(MAX_SUPPLY, 63, 1, 17, 32, 21, 70),
+			iotago.WithSupplyOptions(SUPPLY, 63, 1, 17, 32, 21, 70),
 			iotago.WithStakingOptions(1, validationBlocksPerSlot, 1),
 			// Pick larger values for ManaShareCoefficient and DecayBalancingConstant for more precision in the calculations.
 			// Pick a small retention period so we can test rewards expiry.
-			iotago.WithRewardsOptions(8, 8, 11, 200, 200, 5),
+			iotago.WithRewardsOptions(8, 11, 200, 5),
 			// Pick Increase/Decrease threshold in accordance with sanity checks (necessary because we changed slot duration).
 			iotago.WithCongestionControlOptions(1, 0, 0, 400_000, 300_000, 100_000, 1000, 100),
 			iotago.WithTimeProviderOptions(
@@ -138,7 +138,7 @@ func Test_Validator_PerfectIssuanceWithNonZeroFixedCost(t *testing.T) {
 func Test_Validator_PerfectIssuanceWithHugeStake(t *testing.T) {
 	// This gives both validators the max supply as stake, which is unrealistic,
 	// but is supposed to test if one validator with a huge stake causes an overflow in the rewards calculation.
-	ts := setupValidatorTestsuite(t, testsuite.WithWalletAmount(MAX_SUPPLY))
+	ts := setupValidatorTestsuite(t, testsuite.WithWalletAmount(SUPPLY))
 	defer ts.Shutdown()
 
 	validationBlocksPerSlot := ts.API.ProtocolParameters().ValidationBlocksPerSlot()
