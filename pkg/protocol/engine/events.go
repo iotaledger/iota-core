@@ -45,7 +45,6 @@ type Events struct {
 	Scheduler       *scheduler.Events
 	SeatManager     *seatmanager.Events
 	SyncManager     *syncmanager.Events
-
 	event.Group[Events, *Events]
 }
 

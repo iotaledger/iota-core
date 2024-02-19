@@ -7,7 +7,7 @@ import (
 
 // Events is a collection of Tangle related Events.
 type Events struct {
-	// BlockAttached is triggered when a previously unknown Block is attached.
+	// BlockAttached is triggered when a previously unknown Block is attached to the block DAG.
 	BlockAttached *event.Event1[*blocks.Block]
 
 	// BlockSolid is triggered when a Block becomes solid (its entire past cone is known and solid).

@@ -18,7 +18,7 @@ import (
 
 type (
 	//nolint:revive
-	RetainerFunc            func(iotago.SlotIndex) (*slotstore.Retainer, error)
+	SlotStoreFunc           func(iotago.SlotIndex) (*slotstore.SlotStore, error)
 	LatestCommittedSlotFunc func() iotago.SlotIndex
 	FinalizedSlotFunc       func() iotago.SlotIndex
 )
@@ -27,7 +27,8 @@ const MaxStakersResponsesCacheNum = 10
 
 // Retainer keeps and resolves all the information needed in the API and INX.
 type Retainer struct {
-	store                   RetainerFunc
+	events                  *retainer.Events
+	store                   SlotStoreFunc
 	latestCommittedSlotFunc LatestCommittedSlotFunc
 	finalizedSlotFunc       FinalizedSlotFunc
 	errorHandler            func(error)
@@ -39,10 +40,11 @@ type Retainer struct {
 	module.Module
 }
 
-func New(workersGroup *workerpool.Group, retainerFunc RetainerFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
+func New(workersGroup *workerpool.Group, slotStoreFunc SlotStoreFunc, latestCommittedSlotFunc LatestCommittedSlotFunc, finalizedSlotFunc FinalizedSlotFunc, errorHandler func(error)) *Retainer {
 	return &Retainer{
 		workerPool:              workersGroup.CreatePool("Retainer", workerpool.WithWorkerCount(1)),
-		store:                   retainerFunc,
+		events:                  retainer.NewEvents(),
+		store:                   slotStoreFunc,
 		stakersResponses:        shrinkingmap.New[uint32, []*api.ValidatorResponse](),
 		latestCommittedSlotFunc: latestCommittedSlotFunc,
 		finalizedSlotFunc:       finalizedSlotFunc,
@@ -54,7 +56,7 @@ func New(workersGroup *workerpool.Group, retainerFunc RetainerFunc, latestCommit
 func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	return module.Provide(func(e *engine.Engine) retainer.Retainer {
 		r := New(e.Workers.CreateGroup("Retainer"),
-			e.Storage.Retainer,
+			e.Storage.SlotStore,
 			func() iotago.SlotIndex {
 				// use settings in case SyncManager is not constructed yet.
 				if e.SyncManager == nil {
@@ -75,9 +77,9 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 
 		asyncOpt := event.WithWorkerPool(r.workerPool)
 
-		e.Events.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
-			if err := r.onBlockAttached(b.ID()); err != nil {
-				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAttached in retainer"))
+		e.Events.PostSolidFilter.BlockAllowed.Hook(func(b *blocks.Block) {
+			if err := r.onBlockAllowed(b); err != nil {
+				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAllowed in retainer"))
 			}
 		}, asyncOpt)
 
@@ -281,13 +283,19 @@ func (r *Retainer) transactionStatus(blockID iotago.BlockID) (iotago.Transaction
 	return txData.TransactionID, txData.State, txData.FailureReason
 }
 
-func (r *Retainer) onBlockAttached(blockID iotago.BlockID) error {
-	store, err := r.store(blockID.Slot())
+func (r *Retainer) onBlockAllowed(block *blocks.Block) error {
+	store, err := r.store(block.ID().Slot())
 	if err != nil {
-		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
+		return ierrors.Wrapf(err, "could not get retainer store for slot %d", block.ID().Slot())
 	}
 
-	return store.StoreBlockAttached(blockID)
+	if err := store.StoreBlockAllowed(block.ID()); err != nil {
+		return ierrors.Wrap(err, "failed to store on BlockAllowed in retainer")
+	}
+
+	r.events.BlockRetained.Trigger(block)
+
+	return nil
 }
 
 func (r *Retainer) onBlockAccepted(blockID iotago.BlockID) error {

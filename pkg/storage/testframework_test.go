@@ -307,7 +307,7 @@ func (t *TestFramework) assertPrunableSlotStoragesPruned(epoch iotago.EpochIndex
 	_, err = t.Instance.Roots(endSlot)
 	require.ErrorIsf(t.t, err, database.ErrEpochPruned, "expected epoch %d to be pruned", epoch)
 
-	_, err = t.Instance.Retainer(endSlot)
+	_, err = t.Instance.SlotStore(endSlot)
 	require.ErrorIsf(t.t, err, database.ErrEpochPruned, "expected epoch %d to be pruned", epoch)
 }
 

@@ -89,15 +89,15 @@ func TransactionRetainerDataFromBytes(bytes []byte) (*TransactionRetainerData, i
 	return t, byteReader.BytesRead(), nil
 }
 
-type Retainer struct {
+type SlotStore struct {
 	slot       iotago.SlotIndex
 	blockStore *kvstore.TypedStore[iotago.BlockID, *BlockRetainerData]
 	// we store transaction metadata per blockID as in API requests we always request by blockID
 	transactionStore *kvstore.TypedStore[iotago.BlockID, *TransactionRetainerData]
 }
 
-func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Retainer) {
-	return &Retainer{
+func NewSlotStore(slot iotago.SlotIndex, store kvstore.KVStore) (newSlotStore *SlotStore) {
+	return &SlotStore{
 		slot: slot,
 		blockStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockStorePrefix})),
 			iotago.BlockID.Bytes,
@@ -114,15 +114,15 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 	}
 }
 
-func (r *Retainer) StoreBlockAttached(blockID iotago.BlockID) error {
-	return r.blockStore.Set(blockID, &BlockRetainerData{
+func (s *SlotStore) StoreBlockAllowed(blockID iotago.BlockID) error {
+	return s.blockStore.Set(blockID, &BlockRetainerData{
 		State:         api.BlockStatePending,
 		FailureReason: api.BlockFailureNone,
 	})
 }
 
-func (r *Retainer) GetBlock(blockID iotago.BlockID) (*BlockRetainerData, bool) {
-	blockData, err := r.blockStore.Get(blockID)
+func (s *SlotStore) GetBlock(blockID iotago.BlockID) (*BlockRetainerData, bool) {
+	blockData, err := s.blockStore.Get(blockID)
 	if err != nil {
 		return nil, false
 	}
@@ -130,8 +130,8 @@ func (r *Retainer) GetBlock(blockID iotago.BlockID) (*BlockRetainerData, bool) {
 	return blockData, true
 }
 
-func (r *Retainer) GetTransaction(blockID iotago.BlockID) (*TransactionRetainerData, bool) {
-	txData, err := r.transactionStore.Get(blockID)
+func (s *SlotStore) GetTransaction(blockID iotago.BlockID) (*TransactionRetainerData, bool) {
+	txData, err := s.transactionStore.Get(blockID)
 	if err != nil {
 		return nil, false
 	}
@@ -139,51 +139,51 @@ func (r *Retainer) GetTransaction(blockID iotago.BlockID) (*TransactionRetainerD
 	return txData, true
 }
 
-func (r *Retainer) StoreBlockAccepted(blockID iotago.BlockID) error {
-	return r.blockStore.Set(blockID, &BlockRetainerData{
+func (s *SlotStore) StoreBlockAccepted(blockID iotago.BlockID) error {
+	return s.blockStore.Set(blockID, &BlockRetainerData{
 		State:         api.BlockStateAccepted,
 		FailureReason: api.BlockFailureNone,
 	})
 }
 
-func (r *Retainer) StoreBlockConfirmed(blockID iotago.BlockID) error {
-	return r.blockStore.Set(blockID, &BlockRetainerData{
+func (s *SlotStore) StoreBlockConfirmed(blockID iotago.BlockID) error {
+	return s.blockStore.Set(blockID, &BlockRetainerData{
 		State:         api.BlockStateConfirmed,
 		FailureReason: api.BlockFailureNone,
 	})
 }
 
-func (r *Retainer) StoreTransactionPending(blockID iotago.BlockID) error {
-	return r.transactionStore.Set(blockID, &TransactionRetainerData{
+func (s *SlotStore) StoreTransactionPending(blockID iotago.BlockID) error {
+	return s.transactionStore.Set(blockID, &TransactionRetainerData{
 		State:         api.TransactionStatePending,
 		FailureReason: api.TxFailureNone,
 	})
 }
 
-func (r *Retainer) StoreTransactionNoFailureStatus(blockID iotago.BlockID, status api.TransactionState) error {
+func (s *SlotStore) StoreTransactionNoFailureStatus(blockID iotago.BlockID, status api.TransactionState) error {
 	if status == api.TransactionStateFailed {
 		return ierrors.Errorf("failed to retain transaction status, status cannot be failed, blockID: %s", blockID.String())
 	}
 
-	return r.transactionStore.Set(blockID, &TransactionRetainerData{
+	return s.transactionStore.Set(blockID, &TransactionRetainerData{
 		State:         status,
 		FailureReason: api.TxFailureNone,
 	})
 }
 
-func (r *Retainer) DeleteTransactionData(prevID iotago.BlockID) error {
-	return r.transactionStore.Delete(prevID)
+func (s *SlotStore) DeleteTransactionData(prevID iotago.BlockID) error {
+	return s.transactionStore.Delete(prevID)
 }
 
-func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType api.BlockFailureReason) error {
-	return r.blockStore.Set(blockID, &BlockRetainerData{
+func (s *SlotStore) StoreBlockFailure(blockID iotago.BlockID, failureType api.BlockFailureReason) error {
+	return s.blockStore.Set(blockID, &BlockRetainerData{
 		State:         api.BlockStateFailed,
 		FailureReason: failureType,
 	})
 }
 
-func (r *Retainer) StoreTransactionFailure(blockID iotago.BlockID, failureType api.TransactionFailureReason) error {
-	return r.transactionStore.Set(blockID, &TransactionRetainerData{
+func (s *SlotStore) StoreTransactionFailure(blockID iotago.BlockID, failureType api.TransactionFailureReason) error {
+	return s.transactionStore.Set(blockID, &TransactionRetainerData{
 		State:         api.TransactionStateFailed,
 		FailureReason: failureType,
 	})
