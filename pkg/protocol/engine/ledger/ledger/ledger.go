@@ -122,8 +122,8 @@ func (l *Ledger) setRetainTransactionFailureFunc(retainTransactionFailure func(i
 	l.retainTransactionFailure = retainTransactionFailure
 }
 
-func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
-	l.memPool.OnTransactionAttached(handler, opts...)
+func (l *Ledger) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.TransactionMetadata)] {
+	return l.memPool.OnTransactionAttached(handler, opts...)
 }
 
 func (l *Ledger) AttachTransaction(block *blocks.Block) (attachedTransaction mempool.SignedTransactionMetadata, containsTransaction bool) {
