@@ -130,12 +130,12 @@ func (m *MemPool[VoteRank]) AttachSignedTransaction(signedTransaction mempool.Si
 	return storedSignedTransaction, nil
 }
 
-func (m *MemPool[VoteRank]) OnSignedTransactionAttached(handler func(signedTransactionMetadata mempool.SignedTransactionMetadata), opts ...event.Option) {
-	m.signedTransactionAttached.Hook(handler, opts...)
+func (m *MemPool[VoteRank]) OnSignedTransactionAttached(handler func(signedTransactionMetadata mempool.SignedTransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.SignedTransactionMetadata)] {
+	return m.signedTransactionAttached.Hook(handler, opts...)
 }
 
-func (m *MemPool[VoteRank]) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
-	m.transactionAttached.Hook(handler, opts...)
+func (m *MemPool[VoteRank]) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.TransactionMetadata)] {
+	return m.transactionAttached.Hook(handler, opts...)
 }
 
 // MarkAttachmentIncluded marks the attachment of the given block as included.
