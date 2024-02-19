@@ -316,13 +316,24 @@ func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) 
 // deriveChain derives the Chain of this Commitment which is either inherited from the parent if we are the main child
 // or a newly created chain.
 func (c *Commitment) deriveChain(parent *Commitment) func() {
-	return c.Chain.DeriveValueFrom(reactive.NewDerivedVariable3(func(currentChain *Chain, isRoot bool, mainChild *Commitment, parentChain *Chain) *Chain {
+	return c.Chain.DeriveValueFrom(reactive.NewDerivedVariable4(func(currentChain *Chain, isRoot bool, mainChild *Commitment, parentChain *Chain, isParentEvicted bool) *Chain {
 		// do not adjust the chain of the root commitment (it is set from the outside)
 		if isRoot {
 			return currentChain
 		}
 
-		// if we are not the main child of our parent, we spawn a new chain
+		// If the parent commitment is evicted and the current commitment is not the root,
+		// that means that the chain is an orphaned fork, and we should not spawn a new chain.
+		// Eventually, the commitments on the orphaned chain in a given slot will be evicted once the finalized slot advances.
+		if isParentEvicted {
+			if currentChain != nil {
+				currentChain.IsEvicted.Trigger()
+			}
+
+			return nil
+		}
+
+		// if we are not the main child of our parent, we spawn a new chain (new fork)
 		if c != mainChild {
 			if currentChain == nil {
 				currentChain = c.commitments.protocol.Chains.newChain()
@@ -337,10 +348,12 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 		// main child)
 		if currentChain != nil && currentChain != parentChain {
 			currentChain.IsEvicted.Trigger()
+
+			return nil
 		}
 
 		return parentChain
-	}, c.IsRoot, parent.MainChild, parent.Chain, c.Chain.Get()))
+	}, c.IsRoot, parent.MainChild, parent.Chain, parent.IsEvicted, c.Chain.Get()))
 }
 
 // deriveCumulativeAttestedWeight derives the CumulativeAttestedWeight of this Commitment which is the sum of the
