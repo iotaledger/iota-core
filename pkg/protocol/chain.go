@@ -207,7 +207,12 @@ func (c *Chain) initDerivedProperties() (shutdown func()) {
 	return lo.Batch(
 		c.deriveWarpSyncMode(),
 
-		c.ForkingPoint.WithValue(c.deriveParentChain),
+		c.ForkingPoint.WithValue(func(forkingPoint *Commitment) (teardown func()) {
+			return lo.Batch(
+				c.deriveParentChain(forkingPoint),
+				c.deriveIsEvicted(forkingPoint),
+			)
+		}),
 		c.ParentChain.WithNonEmptyValue(lo.Bind(c, (*Chain).deriveChildChains)),
 		c.Engine.WithNonEmptyValue(c.deriveOutOfSyncThreshold),
 	)
@@ -253,6 +258,16 @@ func (c *Chain) deriveParentChain(forkingPoint *Commitment) (shutdown func()) {
 	c.ParentChain.Set(nil)
 
 	return nil
+}
+
+func (c *Chain) deriveIsEvicted(forkingPoint *Commitment) (shutdown func()) {
+	if forkingPoint == nil {
+		return
+	}
+
+	return forkingPoint.IsEvicted.OnTrigger(func() {
+		c.IsEvicted.Trigger()
+	})
 }
 
 // deriveOutOfSyncThreshold defines how a chain determines its "out of sync" threshold (the latest seen slot minus 2
