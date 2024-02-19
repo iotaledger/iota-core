@@ -148,6 +148,11 @@ func (t *TipManager) Reset() {
 	defer t.evictionMutex.Unlock()
 
 	t.tipMetadataStorage.Clear()
+
+	t.latestValidationBlocks.Clear()
+
+	// TODO: introduce a method to clear the randommap
+	lo.ForEach(t.validationTipSet.Keys(), func(id iotago.BlockID) { t.validationTipSet.Delete(id) })
 	lo.ForEach(t.strongTipSet.Keys(), func(id iotago.BlockID) { t.strongTipSet.Delete(id) })
 	lo.ForEach(t.weakTipSet.Keys(), func(id iotago.BlockID) { t.weakTipSet.Delete(id) })
 }

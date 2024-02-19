@@ -16,8 +16,8 @@ type SlotMutations struct {
 	// acceptedBlocksBySlot stores the accepted blocks per slot.
 	acceptedBlocksBySlot *shrinkingmap.ShrinkingMap[iotago.SlotIndex, ads.Set[iotago.Identifier, iotago.BlockID]]
 
-	// latestCommittedIndex stores the index of the latest committed slot.
-	latestCommittedIndex iotago.SlotIndex
+	// latestCommittedSlot stores the index of the latest committed slot.
+	latestCommittedSlot iotago.SlotIndex
 
 	evictionMutex syncutils.RWMutex
 }
@@ -26,7 +26,7 @@ type SlotMutations struct {
 func NewSlotMutations(lastCommittedSlot iotago.SlotIndex) *SlotMutations {
 	return &SlotMutations{
 		acceptedBlocksBySlot: shrinkingmap.New[iotago.SlotIndex, ads.Set[iotago.Identifier, iotago.BlockID]](),
-		latestCommittedIndex: lastCommittedSlot,
+		latestCommittedSlot:  lastCommittedSlot,
 	}
 }
 
@@ -36,29 +36,15 @@ func (m *SlotMutations) AddAcceptedBlock(block *blocks.Block) (err error) {
 	defer m.evictionMutex.RUnlock()
 
 	blockID := block.ID()
-	if blockID.Slot() <= m.latestCommittedIndex {
+	if blockID.Slot() <= m.latestCommittedSlot {
 		return ierrors.Errorf("cannot add block %s: slot with %d is already committed", blockID, blockID.Slot())
 	}
 
-	if err := m.AcceptedBlocks(blockID.Slot(), true).Add(blockID); err != nil {
+	if err := m.acceptedBlocks(blockID.Slot(), true).Add(blockID); err != nil {
 		return ierrors.Wrapf(err, "failed to add block to accepted blocks, blockID: %s", blockID.ToHex())
 	}
 
 	return
-}
-
-// Evict evicts the given slot.
-func (m *SlotMutations) Evict(index iotago.SlotIndex) error {
-	m.evictionMutex.Lock()
-	defer m.evictionMutex.Unlock()
-
-	if index <= m.latestCommittedIndex {
-		return ierrors.Errorf("cannot commit slot %d: already committed", index)
-	}
-
-	m.evictUntil(index)
-
-	return nil
 }
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
@@ -66,10 +52,27 @@ func (m *SlotMutations) Reset() {
 	m.acceptedBlocksBySlot.Clear()
 }
 
-// AcceptedBlocks returns the set of accepted blocks for the given slot.
-func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing ...bool) ads.Set[iotago.Identifier, iotago.BlockID] {
+func (m *SlotMutations) Commit(slot iotago.SlotIndex) (ads.Set[iotago.Identifier, iotago.BlockID], error) {
+	m.evictionMutex.Lock()
+	defer m.evictionMutex.Unlock()
+
+	// If for whatever reason no blocks exist (empty slot), then we still want to create the ads.Set and get the root from it.
+	acceptedBlocksSet := m.acceptedBlocks(slot, true)
+
+	if err := acceptedBlocksSet.Commit(); err != nil {
+		return nil, ierrors.Wrap(err, "failed to commit accepted blocks")
+	}
+
+	m.acceptedBlocksBySlot.Delete(slot)
+	m.latestCommittedSlot = slot
+
+	return acceptedBlocksSet, nil
+}
+
+// acceptedBlocks returns the set of accepted blocks for the given slot.
+func (m *SlotMutations) acceptedBlocks(slot iotago.SlotIndex, createIfMissing ...bool) ads.Set[iotago.Identifier, iotago.BlockID] {
 	if len(createIfMissing) > 0 && createIfMissing[0] {
-		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(index, func() ads.Set[iotago.Identifier, iotago.BlockID] {
+		return lo.Return1(m.acceptedBlocksBySlot.GetOrCreate(slot, func() ads.Set[iotago.Identifier, iotago.BlockID] {
 			return ads.NewSet[iotago.Identifier](
 				mapdb.NewMapDB(),
 				iotago.Identifier.Bytes,
@@ -80,7 +83,7 @@ func (m *SlotMutations) AcceptedBlocks(index iotago.SlotIndex, createIfMissing .
 		}))
 	}
 
-	return lo.Return1(m.acceptedBlocksBySlot.Get(index))
+	return lo.Return1(m.acceptedBlocksBySlot.Get(slot))
 }
 
 func (m *SlotMutations) AcceptedBlocksCount(index iotago.SlotIndex) int {
@@ -90,13 +93,4 @@ func (m *SlotMutations) AcceptedBlocksCount(index iotago.SlotIndex) int {
 	}
 
 	return acceptedBlocks.Size()
-}
-
-// evictUntil removes all data for slots that are older than the given slot.
-func (m *SlotMutations) evictUntil(index iotago.SlotIndex) {
-	for i := m.latestCommittedIndex + 1; i <= index; i++ {
-		m.acceptedBlocksBySlot.Delete(i)
-	}
-
-	m.latestCommittedIndex = index
 }

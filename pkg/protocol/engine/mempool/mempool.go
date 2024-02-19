@@ -9,9 +9,9 @@ import (
 type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] interface {
 	AttachSignedTransaction(signedTransaction SignedTransaction, transaction Transaction, blockID iotago.BlockID) (signedTransactionMetadata SignedTransactionMetadata, err error)
 
-	OnSignedTransactionAttached(callback func(signedTransactionMetadata SignedTransactionMetadata), opts ...event.Option)
+	OnSignedTransactionAttached(callback func(signedTransactionMetadata SignedTransactionMetadata), opts ...event.Option) *event.Hook[func(metadata SignedTransactionMetadata)]
 
-	OnTransactionAttached(callback func(metadata TransactionMetadata), opts ...event.Option)
+	OnTransactionAttached(callback func(metadata TransactionMetadata), opts ...event.Option) *event.Hook[func(metadata TransactionMetadata)]
 
 	MarkAttachmentIncluded(blockID iotago.BlockID) bool
 
@@ -25,7 +25,7 @@ type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] interface {
 
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transaction TransactionMetadata, exists bool)
 
-	StateDiff(slot iotago.SlotIndex) (StateDiff, error)
+	CommitStateDiff(slot iotago.SlotIndex) (StateDiff, error)
 
 	Evict(slot iotago.SlotIndex)
 
@@ -33,7 +33,7 @@ type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] interface {
 	Reset()
 }
 
-// Denotes the type of state.
+// StateType denotes the type of state.
 type StateType byte
 
 const (

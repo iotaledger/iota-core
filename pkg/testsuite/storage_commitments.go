@@ -58,7 +58,7 @@ func (t *TestSuite) AssertEqualStoredCommitmentAtIndex(index iotago.SlotIndex, n
 	})
 }
 
-func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expectedBlocksBySlotCommitmentID map[iotago.CommitmentID]iotago.BlockIDs, nodes ...*mock.Node) {
+func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expectedBlocksBySlotCommitmentIDs map[iotago.CommitmentID]iotago.BlockIDs, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -73,21 +73,32 @@ func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expecte
 				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error getting committed slot for commitment: %s", node.Name, storedCommitment.ID())
 			}
 
-			committedBlocksBySlotCommitmentID, err := committedSlot.BlocksIDsBySlotCommitmentID()
+			committedBlocksBySlotCommitmentIDs, err := committedSlot.BlocksIDsBySlotCommitmentID()
 			if err != nil {
 				return ierrors.Wrapf(err, "AssertStorageCommitmentBlocks: %s: error getting committed blocks for slot: %d", node.Name, slot)
 			}
 
-			if len(committedBlocksBySlotCommitmentID) == 0 {
-				committedBlocksBySlotCommitmentID = nil
+			if len(committedBlocksBySlotCommitmentIDs) == 0 {
+				committedBlocksBySlotCommitmentIDs = nil
 			}
 
-			if len(expectedBlocksBySlotCommitmentID) == 0 {
-				expectedBlocksBySlotCommitmentID = nil
+			if len(expectedBlocksBySlotCommitmentIDs) == 0 {
+				expectedBlocksBySlotCommitmentIDs = nil
 			}
 
-			if !assert.Equal(t.fakeTesting, committedBlocksBySlotCommitmentID, expectedBlocksBySlotCommitmentID) {
-				return ierrors.Errorf("AssertStorageCommitmentBlocks: %s: expected %s, got %s", node.Name, expectedBlocksBySlotCommitmentID, committedBlocksBySlotCommitmentID)
+			if len(committedBlocksBySlotCommitmentIDs) != len(expectedBlocksBySlotCommitmentIDs) {
+				return ierrors.Errorf("AssertStorageCommitmentBlocks: %s: commitment count does not match - expected %s, got %s", node.Name, expectedBlocksBySlotCommitmentIDs, committedBlocksBySlotCommitmentIDs)
+			}
+
+			for expectedBlocksBySlotCommitmentID, expectedBlockIDs := range expectedBlocksBySlotCommitmentIDs {
+				committedBlockIDs, ok := committedBlocksBySlotCommitmentIDs[expectedBlocksBySlotCommitmentID]
+				if !ok {
+					return ierrors.Errorf("AssertStorageCommitmentBlocks: %s: %s not found in committedBlockIDs - expected %s, got %s", node.Name, expectedBlocksBySlotCommitmentID, expectedBlocksBySlotCommitmentIDs, committedBlocksBySlotCommitmentIDs)
+				}
+
+				if !assert.ElementsMatch(t.fakeTesting, expectedBlockIDs, committedBlockIDs) {
+					return ierrors.Errorf("AssertStorageCommitmentBlocks: %s: for commitment %s: expected %s, got %s", node.Name, expectedBlocksBySlotCommitmentID, expectedBlockIDs, committedBlockIDs)
+				}
 			}
 
 			return nil
@@ -95,7 +106,7 @@ func (t *TestSuite) AssertStorageCommitmentBlocks(slot iotago.SlotIndex, expecte
 	}
 }
 
-// Asserts that the given block ID has the expected containment status in the commitment identified by the given slot.
+// AssertStorageCommitmentBlockAccepted asserts that the given block ID has the expected containment status in the commitment identified by the given slot.
 func (t *TestSuite) AssertStorageCommitmentBlockAccepted(slot iotago.SlotIndex, blockID iotago.BlockID, expectedContains bool, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
@@ -136,7 +147,37 @@ func (t *TestSuite) AssertStorageCommitmentBlockAccepted(slot iotago.SlotIndex, 
 	}
 }
 
-// Asserts that the given transaction ID has the expected containment status in the commitment identified by the given slot.
+// AssertStorageCommitmentTransactions asserts that the given transactionIDs were included in the commitment identified by the given slot.
+func (t *TestSuite) AssertStorageCommitmentTransactions(slot iotago.SlotIndex, expectedTransactionIDs iotago.TransactionIDs, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			storedCommitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentTransactionAccepted: %s: error loading commitment for slot: %d", node.Name, slot)
+			}
+
+			committedSlot, err := node.Protocol.Engines.Main.Get().CommitmentAPI(storedCommitment.ID())
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentTransactionAccepted: %s: error getting committed slot for commitment: %s", node.Name, storedCommitment.ID())
+			}
+
+			acceptedTransactions, err := committedSlot.TransactionIDs()
+			if err != nil {
+				return ierrors.Wrapf(err, "AssertStorageCommitmentTransactionAccepted: %s: error getting BlocksIDsBySlotCommitmentID for commitment: %s", node.Name, storedCommitment.ID())
+			}
+
+			if !assert.ElementsMatch(t.fakeTesting, expectedTransactionIDs, acceptedTransactions) {
+				return ierrors.Errorf("AssertStorageCommitmentTransactionAccepted: %s: commitment %s's actual and expected transaction IDs do not match; actual: %s, expected: %s", node.Name, storedCommitment.ID(), acceptedTransactions, expectedTransactionIDs)
+			}
+
+			return nil
+		})
+	}
+}
+
+// AssertStorageCommitmentTransactionAccepted asserts that the given transaction ID has the expected containment status in the commitment identified by the given slot.
 func (t *TestSuite) AssertStorageCommitmentTransactionAccepted(slot iotago.SlotIndex, transactionID iotago.TransactionID, expectedContains bool, nodes ...*mock.Node) {
 	mustNodes(nodes)
 

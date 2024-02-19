@@ -1,6 +1,6 @@
 ARG WITH_GO_WORK=0
 # https://hub.docker.com/_/golang
-FROM golang:1.21-bookworm AS base
+FROM golang:1.22-bookworm AS base
 
 ARG BUILD_TAGS=rocksdb
 

@@ -157,7 +157,7 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 
 		parentBlock.Invalid().OnUpdateOnce(func(_ bool, _ bool) {
 			if block.SetInvalid() {
-				b.events.BlockInvalid.Trigger(block, ierrors.New("block marked as invalid in Booker"))
+				b.events.BlockInvalid.Trigger(block, ierrors.Errorf("block marked as invalid in Booker because parent block is invalid %s", parentBlock.ID()))
 			}
 		})
 	})

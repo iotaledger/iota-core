@@ -33,10 +33,10 @@ linters-settings:
                       desc: Should be replaced with "github.com/iotaledger/hive.go/ierrors" package
                     - pkg: "github.com/pkg/errors"
                       desc: Should be replaced with "github.com/iotaledger/hive.go/ierrors" package
-    custom:
-        typegroupingcheck:
-            path: ./typegroupingcheck/typegroupingcheck.so
-            description: Check for grouped types in functions' parameters
+    #custom:
+    #    typegroupingcheck:
+    #        path: ./typegroupingcheck/typegroupingcheck.so
+    #        description: Check for grouped types in functions' parameters
 
 linters:
     # Disable all linters.

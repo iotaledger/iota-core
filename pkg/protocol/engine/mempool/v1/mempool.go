@@ -63,11 +63,11 @@ type MemPool[VoteRank spenddag.VoteRankType[VoteRank]] struct {
 	// executionWorkers is the worker pool that is used to execute the state transitions of transactions.
 	executionWorkers *workerpool.WorkerPool
 
-	// lastEvictedSlot is the last slot that was evicted from the MemPool.
-	lastEvictedSlot iotago.SlotIndex
+	// lastCommittedSlot is the last slot that was committed in the MemPool.
+	lastCommittedSlot iotago.SlotIndex
 
-	// evictionMutex is used to synchronize the eviction of slots.
-	evictionMutex syncutils.RWMutex
+	// commitmentMutex is used to synchronize commitment of slots.
+	commitmentMutex syncutils.RWMutex
 
 	signedTransactionAttached *event.Event1[mempool.SignedTransactionMetadata]
 
@@ -130,12 +130,12 @@ func (m *MemPool[VoteRank]) AttachSignedTransaction(signedTransaction mempool.Si
 	return storedSignedTransaction, nil
 }
 
-func (m *MemPool[VoteRank]) OnSignedTransactionAttached(handler func(signedTransactionMetadata mempool.SignedTransactionMetadata), opts ...event.Option) {
-	m.signedTransactionAttached.Hook(handler, opts...)
+func (m *MemPool[VoteRank]) OnSignedTransactionAttached(handler func(signedTransactionMetadata mempool.SignedTransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.SignedTransactionMetadata)] {
+	return m.signedTransactionAttached.Hook(handler, opts...)
 }
 
-func (m *MemPool[VoteRank]) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
-	m.transactionAttached.Hook(handler, opts...)
+func (m *MemPool[VoteRank]) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.TransactionMetadata)] {
+	return m.transactionAttached.Hook(handler, opts...)
 }
 
 // MarkAttachmentIncluded marks the attachment of the given block as included.
@@ -174,17 +174,24 @@ func (m *MemPool[VoteRank]) TransactionMetadataByAttachment(blockID iotago.Block
 	return m.transactionByAttachment(blockID)
 }
 
-// StateDiff returns the state diff for the given slot.
-func (m *MemPool[VoteRank]) StateDiff(slot iotago.SlotIndex) (mempool.StateDiff, error) {
-	m.evictionMutex.RLock()
-	defer m.evictionMutex.RUnlock()
+// CommitStateDiff commits the state diff for the given slot so that it cannot be modified anymore and returns it.
+func (m *MemPool[VoteRank]) CommitStateDiff(slot iotago.SlotIndex) (mempool.StateDiff, error) {
+	m.commitmentMutex.Lock()
+	defer m.commitmentMutex.Unlock()
 
-	return m.stateDiff(slot)
+	stateDiff, err := m.stateDiff(slot)
+	if err != nil {
+		return nil, ierrors.Wrapf(err, "failed to retrieve StateDiff instance for slot %d", slot)
+	}
+
+	m.lastCommittedSlot = slot
+
+	return stateDiff, nil
 }
 
 func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error) {
-	if m.lastEvictedSlot >= slot {
-		return nil, ierrors.Errorf("slot %d is older than last evicted slot %d", slot, m.lastEvictedSlot)
+	if m.lastCommittedSlot >= slot {
+		return nil, ierrors.Errorf("slot %d is older than last evicted slot %d", slot, m.lastCommittedSlot)
 	}
 
 	kv, err := m.mutationsFunc(slot)
@@ -197,8 +204,11 @@ func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error)
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (m *MemPool[VoteRank]) Reset() {
+	m.commitmentMutex.Lock()
+	defer m.commitmentMutex.Unlock()
+
 	m.stateDiffs.ForEachKey(func(slot iotago.SlotIndex) bool {
-		if slot > m.lastEvictedSlot {
+		if slot > m.lastCommittedSlot {
 			if stateDiff, deleted := m.stateDiffs.DeleteAndReturn(slot); deleted {
 				if err := stateDiff.Reset(); err != nil {
 					m.errorHandler(ierrors.Wrapf(err, "failed to reset state diff for slot %d", slot))
@@ -211,7 +221,7 @@ func (m *MemPool[VoteRank]) Reset() {
 
 	attachmentsToDelete := make([]iotago.SlotIndex, 0)
 	m.attachments.ForEach(func(slot iotago.SlotIndex, _ *shrinkingmap.ShrinkingMap[iotago.BlockID, *SignedTransactionMetadata]) {
-		if slot > m.lastEvictedSlot {
+		if slot > m.lastCommittedSlot {
 			attachmentsToDelete = append(attachmentsToDelete, slot)
 		}
 	})
@@ -224,15 +234,66 @@ func (m *MemPool[VoteRank]) Reset() {
 			})
 		}
 	}
+
+	// We need to clean up all transactions and outputs that were issued beyond the last committed slot.
+	m.delayedTransactionEviction.ForEach(func(slot iotago.SlotIndex, delayedTransactions ds.Set[iotago.TransactionID]) bool {
+		if slot <= m.lastCommittedSlot {
+			return true
+		}
+
+		protocolParams := m.apiProvider.APIForSlot(slot).ProtocolParameters()
+		genesisSlot := protocolParams.GenesisSlot()
+		maxCommittableAge := protocolParams.MaxCommittableAge()
+
+		// No need to evict delayed eviction slot if the committed slot is below maxCommittableAge,
+		// as there is nothing to evict anyway at this point.
+		if slot <= genesisSlot+maxCommittableAge {
+			return true
+		}
+
+		delayedEvictionSlot := slot - maxCommittableAge
+		delayedTransactions.Range(func(txID iotago.TransactionID) {
+			if transaction, exists := m.cachedTransactions.Get(txID); exists {
+				transaction.setEvicted()
+			}
+		})
+		m.delayedTransactionEviction.Delete(delayedEvictionSlot)
+
+		return true
+	})
+
+	m.delayedOutputStateEviction.ForEach(func(slot iotago.SlotIndex, delayedOutputs *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata]) bool {
+		if slot <= m.lastCommittedSlot {
+			return true
+		}
+
+		protocolParams := m.apiProvider.APIForSlot(slot).ProtocolParameters()
+		genesisSlot := protocolParams.GenesisSlot()
+		maxCommittableAge := protocolParams.MaxCommittableAge()
+
+		// No need to evict delayed eviction slot if the committed slot is below maxCommittableAge,
+		// as there is nothing to evict anyway at this point.
+		if slot <= genesisSlot+maxCommittableAge {
+			return true
+		}
+
+		delayedEvictionSlot := slot - maxCommittableAge
+		delayedOutputs.ForEach(func(stateID iotago.Identifier, state *StateMetadata) bool {
+			m.cachedStateRequests.Delete(stateID, state.HasNoSpenders)
+
+			return true
+		})
+		m.delayedOutputStateEviction.Delete(delayedEvictionSlot)
+
+		return true
+	})
 }
 
 // Evict evicts the slot with the given slot from the MemPool.
 func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 	if evictedAttachments := func() *shrinkingmap.ShrinkingMap[iotago.BlockID, *SignedTransactionMetadata] {
-		m.evictionMutex.Lock()
-		defer m.evictionMutex.Unlock()
-
-		m.lastEvictedSlot = slot
+		m.commitmentMutex.Lock()
+		defer m.commitmentMutex.Unlock()
 
 		m.stateDiffs.Delete(slot)
 
@@ -247,10 +308,14 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 	protocolParams := m.apiProvider.APIForSlot(slot).ProtocolParameters()
 	genesisSlot := protocolParams.GenesisSlot()
 	maxCommittableAge := protocolParams.MaxCommittableAge()
+
+	// No need to evict delayed eviction slot if the committed slot is below maxCommittableAge,
+	// as there is nothing to evict anyway at this point.
 	if slot <= genesisSlot+maxCommittableAge {
 		return
 	}
 
+	// See PR #399 for the rationale behind this.
 	delayedEvictionSlot := slot - maxCommittableAge
 	if delayedTransactions, exists := m.delayedTransactionEviction.Get(delayedEvictionSlot); exists {
 		delayedTransactions.Range(func(txID iotago.TransactionID) {
@@ -272,12 +337,12 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 }
 
 func (m *MemPool[VoteRank]) storeTransaction(signedTransaction mempool.SignedTransaction, transaction mempool.Transaction, blockID iotago.BlockID) (storedSignedTransaction *SignedTransactionMetadata, isNewSignedTransaction bool, isNewTransaction bool, err error) {
-	m.evictionMutex.RLock()
-	defer m.evictionMutex.RUnlock()
+	m.commitmentMutex.RLock()
+	defer m.commitmentMutex.RUnlock()
 
-	if m.lastEvictedSlot >= blockID.Slot() {
+	if m.lastCommittedSlot >= blockID.Slot() {
 		// block will be retained as invalid, we do not store tx failure as it was block's fault
-		return nil, false, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastEvictedSlot)
+		return nil, false, false, ierrors.Errorf("blockID %d is older than last evicted slot %d", blockID.Slot(), m.lastCommittedSlot)
 	}
 
 	inputReferences, err := m.vm.Inputs(transaction)
@@ -409,10 +474,10 @@ func (m *MemPool[VoteRank]) requestState(stateRef mempool.StateReference, waitIf
 }
 
 func (m *MemPool[VoteRank]) updateAttachment(blockID iotago.BlockID, updateFunc func(transaction *TransactionMetadata, blockID iotago.BlockID) bool) bool {
-	m.evictionMutex.RLock()
-	defer m.evictionMutex.RUnlock()
+	m.commitmentMutex.RLock()
+	defer m.commitmentMutex.RUnlock()
 
-	if m.lastEvictedSlot < blockID.Slot() {
+	if m.lastCommittedSlot < blockID.Slot() {
 		if transaction, exists := m.transactionByAttachment(blockID); exists {
 			return updateFunc(transaction, blockID)
 		}
@@ -461,8 +526,8 @@ func (m *MemPool[VoteRank]) updateStateDiffs(transaction *TransactionMetadata, p
 func (m *MemPool[VoteRank]) setup() {
 	m.spendDAG.Events().SpenderAccepted.Hook(func(id iotago.TransactionID) {
 		if transaction, exists := m.cachedTransactions.Get(id); exists {
-			m.evictionMutex.RLock()
-			defer m.evictionMutex.RUnlock()
+			m.commitmentMutex.RLock()
+			defer m.commitmentMutex.RUnlock()
 
 			transaction.setConflictAccepted()
 		}

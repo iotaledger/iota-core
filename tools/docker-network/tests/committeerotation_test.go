@@ -25,7 +25,7 @@ func Test_SmallerCommittee(t *testing.T) {
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
+			iotago.WithRewardsOptions(8, 10, 2, 384),
 			iotago.WithTargetCommitteeSize(4),
 		))
 	defer d.Stop()
@@ -39,8 +39,7 @@ func Test_SmallerCommittee(t *testing.T) {
 	err := d.Run()
 	require.NoError(t, err)
 
-	err = d.WaitUntilSync()
-	require.NoError(t, err)
+	d.WaitUntilNetworkReady()
 
 	status := d.NodeStatus("V1")
 
@@ -71,7 +70,7 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
+			iotago.WithRewardsOptions(8, 10, 2, 384),
 			iotago.WithTargetCommitteeSize(4),
 		))
 	defer d.Stop()
@@ -85,8 +84,7 @@ func Test_ReuseDueToNoFinalization(t *testing.T) {
 	err := d.Run()
 	require.NoError(t, err)
 
-	err = d.WaitUntilSync()
-	require.NoError(t, err)
+	d.WaitUntilNetworkReady()
 
 	// stop 2 validators, finalization should stop
 	err = d.StopContainer(d.Node("V2").ContainerName, d.Node("V3").ContainerName)
@@ -141,7 +139,7 @@ func Test_NoCandidacyPayload(t *testing.T) {
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
+			iotago.WithRewardsOptions(8, 10, 2, 384),
 			iotago.WithTargetCommitteeSize(4),
 		))
 	defer d.Stop()
@@ -155,8 +153,7 @@ func Test_NoCandidacyPayload(t *testing.T) {
 	err := d.Run()
 	require.NoError(t, err)
 
-	err = d.WaitUntilSync()
-	require.NoError(t, err)
+	d.WaitUntilNetworkReady()
 
 	clt := d.Node("V1").Client
 	status := d.NodeStatus("V1")
@@ -192,7 +189,7 @@ func Test_Staking(t *testing.T) {
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
+			iotago.WithRewardsOptions(8, 10, 2, 384),
 			iotago.WithTargetCommitteeSize(3),
 		))
 	defer d.Stop()
@@ -206,8 +203,7 @@ func Test_Staking(t *testing.T) {
 	err := d.Run()
 	require.NoError(t, err)
 
-	err = d.WaitUntilSync()
-	require.NoError(t, err)
+	d.WaitUntilNetworkReady()
 
 	account := d.CreateAccount(WithStakingFeature(100, 1, 0))
 
@@ -225,7 +221,7 @@ func Test_Delegation(t *testing.T) {
 		WithProtocolParametersOptions(
 			iotago.WithTimeProviderOptions(5, time.Now().Unix(), 10, 4),
 			iotago.WithLivenessOptions(10, 10, 2, 4, 8),
-			iotago.WithRewardsOptions(8, 8, 10, 2, 1, 384),
+			iotago.WithRewardsOptions(8, 10, 2, 384),
 			iotago.WithTargetCommitteeSize(3),
 		))
 	defer d.Stop()
@@ -239,8 +235,7 @@ func Test_Delegation(t *testing.T) {
 	err := d.Run()
 	require.NoError(t, err)
 
-	err = d.WaitUntilSync()
-	require.NoError(t, err)
+	d.WaitUntilNetworkReady()
 
 	// create an account to perform delegation
 	account := d.CreateAccount()
