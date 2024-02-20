@@ -151,6 +151,8 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 			})
 		})
 
+		e.Events.Retainer.LinkTo(r.events)
+
 		r.TriggerInitialized()
 
 		return r
@@ -293,6 +295,8 @@ func (r *Retainer) onBlockAllowed(block *blocks.Block) error {
 		return ierrors.Wrap(err, "failed to store on BlockAllowed in retainer")
 	}
 
+	// this is always the first place where the block gets stored in the retainer.
+	// subsequent events where the block fails only update the status of the block.
 	r.events.BlockRetained.Trigger(block)
 
 	return nil

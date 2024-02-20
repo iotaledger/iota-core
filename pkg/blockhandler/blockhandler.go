@@ -117,7 +117,7 @@ func (i *BlockHandler) AttachBlock(ctx context.Context, iotaBlock *iotago.Block)
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error serializing block to model block")
 	}
 
-	if err = i.SubmitBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.PostSolidFilter.BlockAllowed); err != nil {
+	if err = i.SubmitBlockAndAwaitEvent(ctx, modelBlock, i.protocol.Events.Engine.Retainer.BlockRetained); err != nil {
 		return iotago.EmptyBlockID, ierrors.Wrap(err, "error issuing model block")
 	}
 
