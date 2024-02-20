@@ -335,18 +335,25 @@ func configure() error {
 func run() error {
 	if err := Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
 		deps.ManualPeeringMgr.Start()
-		if err := deps.AutoPeeringMgr.Start(ctx); err != nil {
-			Component.LogFatalf("Failed to start autopeering manager: %s", err)
-		}
 
 		defer func() {
 			if err := deps.ManualPeeringMgr.Stop(); err != nil {
 				Component.LogErrorf("Failed to stop the manager: %s", err)
 			}
-			if err := deps.AutoPeeringMgr.Stop(); err != nil {
-				Component.LogErrorf("Failed to stop autopeering manager: %s", err)
-			}
 		}()
+
+		if ParamsP2P.Autopeering.Enabled {
+			if err := deps.AutoPeeringMgr.Start(ctx); err != nil {
+				Component.LogFatalf("Failed to start autopeering manager: %s", err)
+			}
+
+			defer func() {
+				if err := deps.AutoPeeringMgr.Stop(); err != nil {
+					Component.LogErrorf("Failed to stop autopeering manager: %s", err)
+				}
+			}()
+		}
+
 		//nolint:contextcheck // false positive
 		connectConfigKnownPeers()
 		<-ctx.Done()

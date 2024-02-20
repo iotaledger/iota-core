@@ -28,6 +28,10 @@ type ParametersP2P struct {
 	// Defines the private key used to derive the node identity (optional).
 	IdentityPrivateKey string `default:"" usage:"private key used to derive the node identity (optional)"`
 
+	Autopeering struct {
+		Enabled bool `default:"true" usage:"enable or disable autopeering"`
+	}
+
 	Database struct {
 		// Defines the path to the p2p database.
 		Path string `default:"testnet/p2pstore" usage:"the path to the p2p database"`
