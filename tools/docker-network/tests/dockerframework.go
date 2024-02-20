@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"sort"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -613,39 +612,6 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iota
 	return updatedAccount
 }
 
-func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iotago.BlockID, txID iotago.TransactionID, creationOutputID iotago.OutputID, accountAddress *iotago.AccountAddress, checkIndexer ...bool) {
-	// request by blockID if provided, otherwise use txID
-	// we take the slot from the blockID in case the tx is created earlier than the block.
-	clt := d.Node("V1").Client
-	slot := blkID.Slot()
-
-	if blkID == iotago.EmptyBlockID {
-		blkMetadata, err := clt.TransactionIncludedBlockMetadata(ctx, txID)
-		require.NoError(d.Testing, err)
-
-		blkID = blkMetadata.BlockID
-		slot = blkMetadata.BlockID.Slot()
-	}
-
-	d.AwaitTransactionPayloadAccepted(ctx, blkID)
-
-	// wait for the account to be committed
-	d.AwaitCommitment(slot)
-
-	// Check the indexer
-	if len(checkIndexer) > 0 && checkIndexer[0] {
-		indexerClt, err := d.Node("V1").Client.Indexer(ctx)
-		require.NoError(d.Testing, err)
-
-		_, _, _, err = indexerClt.Account(ctx, accountAddress)
-		require.NoError(d.Testing, err)
-	}
-
-	// check if the creation output exists
-	_, err := clt.OutputByID(ctx, creationOutputID)
-	require.NoError(d.Testing, err)
-}
-
 func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, receiveAddr iotago.Address) (iotago.OutputID, iotago.Output) {
 	d.SendFaucetRequest(ctx, receiveAddr)
 
@@ -655,107 +621,6 @@ func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, receiveAdd
 	fmt.Println("Faucet funds received, txID:", outputID.TransactionID().ToHex())
 
 	return outputID, output
-}
-
-func (d *DockerTestFramework) AssertIndexerAccount(account *Account) {
-	d.Eventually(func() error {
-		ctx := context.TODO()
-		indexerClt, err := d.Node("V1").Client.Indexer(ctx)
-		if err != nil {
-			return err
-		}
-
-		outputID, output, _, err := indexerClt.Account(ctx, account.AccountAddress)
-		if err != nil {
-			return err
-		}
-
-		require.EqualValues(d.Testing, account.OutputID, *outputID)
-		require.EqualValues(d.Testing, account.AccountOutput, output)
-
-		return nil
-	})
-}
-
-func (d *DockerTestFramework) AssertIndexerFoundry(foundryID iotago.FoundryID) {
-	d.Eventually(func() error {
-		ctx := context.TODO()
-		indexerClt, err := d.Node("V1").Client.Indexer(ctx)
-		if err != nil {
-			return err
-		}
-
-		_, _, _, err = indexerClt.Foundry(ctx, foundryID)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-}
-
-func (d *DockerTestFramework) AssertValidatorExists(accountAddr *iotago.AccountAddress) {
-	d.Eventually(func() error {
-		for _, node := range d.Nodes() {
-			_, err := node.Client.StakingAccount(context.TODO(), accountAddr)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-}
-
-func (d *DockerTestFramework) AssertCommittee(expectedEpoch iotago.EpochIndex, expectedCommitteeMember []string) {
-	fmt.Println("Wait for committee selection..., expected epoch: ", expectedEpoch, ", expected committee size: ", len(expectedCommitteeMember))
-	defer fmt.Println("Wait for committee selection......done")
-
-	sort.Strings(expectedCommitteeMember)
-
-	status := d.NodeStatus("V1")
-	api := d.Node("V1").Client.CommittedAPI()
-	expectedSlotStart := api.TimeProvider().EpochStart(expectedEpoch)
-	require.Greater(d.Testing, expectedSlotStart, status.LatestAcceptedBlockSlot)
-
-	slotToWait := expectedSlotStart - status.LatestAcceptedBlockSlot
-	secToWait := time.Duration(slotToWait) * time.Duration(api.ProtocolParameters().SlotDurationInSeconds()) * time.Second
-	fmt.Println("Wait for ", secToWait, "until expected epoch: ", expectedEpoch)
-	time.Sleep(secToWait)
-
-	d.Eventually(func() error {
-		for _, node := range d.Nodes() {
-			resp, err := node.Client.Committee(context.TODO())
-			if err != nil {
-				return err
-			}
-
-			if resp.Epoch == expectedEpoch {
-				members := make([]string, len(resp.Committee))
-				for i, member := range resp.Committee {
-					members[i] = member.AddressBech32
-				}
-
-				sort.Strings(members)
-				if match := lo.Equal(expectedCommitteeMember, members); match {
-					return nil
-				}
-
-				return ierrors.Errorf("committee members does not match as expected, expected: %v, actual: %v", expectedCommitteeMember, members)
-			}
-		}
-
-		return nil
-	})
-}
-
-func (d *DockerTestFramework) AssertFinalizedSlot(condition func(iotago.SlotIndex) error) {
-	for _, node := range d.Nodes() {
-		status := d.NodeStatus(node.Name)
-
-		err := condition(status.LatestFinalizedSlot)
-		require.NoError(d.Testing, err)
-	}
 }
 
 func (d *DockerTestFramework) Stop() {
