@@ -85,6 +85,13 @@ type Commitment struct {
 	// IsEvicted contains a flag indicating if this Commitment was evicted from the Protocol.
 	IsEvicted reactive.Event
 
+	// IsOrphaned contains a flag indicating if this Commitment is part of an orphaned chain.
+	// An orphaned chain has its forking point below RootCommitment of the main chain.
+	// Orphaned commitments are eventually evicted just like other commitments.
+	// We don't dispatch blocks of orphaned commitments.
+	// We keep them around to not have to request them every time a block with such a commitment is received.
+	IsOrphaned reactive.Event
+
 	// commitments contains a reference to the Commitments instance that this Commitment belongs to.
 	commitments *Commitments
 
@@ -116,6 +123,7 @@ func newCommitment(commitments *Commitments, model *model.Commitment) *Commitmen
 		IsAboveLatestVerifiedCommitment: reactive.NewVariable[bool](),
 		ReplayDroppedBlocks:             reactive.NewVariable[bool](),
 		IsEvicted:                       reactive.NewEvent(),
+		IsOrphaned:                      reactive.NewEvent(),
 		commitments:                     commitments,
 	}
 
@@ -239,6 +247,7 @@ func (c *Commitment) initLogger() (shutdown func()) {
 		c.IsVerified.LogUpdates(c, log.LevelTrace, "IsVerified"),
 		c.ReplayDroppedBlocks.LogUpdates(c, log.LevelTrace, "ReplayDroppedBlocks"),
 		c.IsEvicted.LogUpdates(c, log.LevelTrace, "IsEvicted"),
+		c.IsOrphaned.LogUpdates(c, log.LevelDebug, "IsOrphaned"), // TODO: change the log level to trace
 
 		c.Logger.UnsubscribeFromParentLogger,
 	)
@@ -265,6 +274,7 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 			return lo.Batch(
 				parent.deriveChildren(c),
 
+				c.deriveOrphaned(parent),
 				c.deriveChain(parent),
 				c.deriveCumulativeAttestedWeight(parent),
 				c.deriveIsAboveLatestVerifiedCommitment(parent),
@@ -316,10 +326,17 @@ func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) 
 // deriveChain derives the Chain of this Commitment which is either inherited from the parent if we are the main child
 // or a newly created chain.
 func (c *Commitment) deriveChain(parent *Commitment) func() {
-	return c.Chain.DeriveValueFrom(reactive.NewDerivedVariable3(func(currentChain *Chain, isRoot bool, mainChild *Commitment, parentChain *Chain) *Chain {
+	return c.Chain.DeriveValueFrom(reactive.NewDerivedVariable4(func(currentChain *Chain, isRoot bool, mainChild *Commitment, parentChain *Chain, parentOrphaned bool) *Chain {
 		// do not adjust the chain of the root commitment (it is set from the outside)
 		if isRoot {
 			return currentChain
+		}
+
+		// If the parent commitment is orphaned,
+		// that means that the chain is an orphaned fork, and we should not spawn a new chain.
+		// Eventually, the orphaned commitments will be evicted once the finalized slot advances.
+		if parentOrphaned {
+			return nil
 		}
 
 		// if we are not the main child of our parent, we spawn a new chain
@@ -327,20 +344,45 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 			if currentChain == nil {
 				currentChain = c.commitments.protocol.Chains.newChain()
 				currentChain.ForkingPoint.Set(c)
+
+				return currentChain
+			}
+
+			if parentChain == currentChain {
+				return nil
 			}
 
 			return currentChain
+
 		}
 
 		// if we are the main child of our parent, and our chain is not the parent chain (that we are supposed to
 		// inherit), then we evict our current chain (we will spawn a new one if we ever change back to not being the
 		// main child)
-		if currentChain != nil && currentChain != parentChain {
-			currentChain.IsEvicted.Trigger()
-		}
+		//if currentChain != nil && currentChain != parentChain {
+		//	currentChain.IsEvicted.Trigger()
+		//}
 
 		return parentChain
-	}, c.IsRoot, parent.MainChild, parent.Chain, c.Chain.Get()))
+	}, c.IsRoot, parent.MainChild, parent.Chain, parent.IsOrphaned, c.Chain.Get()))
+}
+
+func (c *Commitment) deriveOrphaned(parent *Commitment) func() {
+	return c.IsOrphaned.DeriveValueFrom(reactive.NewDerivedVariable3(func(isOrphaned bool, isParentOrphaned bool, parentCommitment *Commitment, isRoot bool) bool {
+		c.LogDebug("derive orphaned", "isOrphaned", isOrphaned, "isParentOrphaned", isParentOrphaned, "parentCommitment", parentCommitment, "isRoot", isRoot)
+		// if the commitment is orphaned, we exit early
+		if isOrphaned {
+			return true
+		}
+
+		// If the parent was evicted and the current commitment is not root, it is marked as orphaned.
+		if parentCommitment == nil && !isRoot {
+			return true
+		}
+
+		// As a last resort, inherit the orphaned flag from the parent.
+		return isParentOrphaned
+	}, parent.IsOrphaned, c.Parent, c.IsRoot))
 }
 
 // deriveCumulativeAttestedWeight derives the CumulativeAttestedWeight of this Commitment which is the sum of the

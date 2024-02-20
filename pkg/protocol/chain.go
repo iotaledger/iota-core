@@ -299,6 +299,8 @@ func (c *Chain) addCommitment(newCommitment *Commitment) (shutdown func()) {
 		newCommitment.IsSynced.OnTrigger(func() { c.LatestSyncedSlot.Set(newCommitment.Slot()) }),
 
 		func() {
+			// TODO: this should not be done here, because it might cause problems upon chain switching.
+			//   A chain should manage this field by itself.
 			c.commitments.Delete(newCommitment.Slot())
 		},
 	)

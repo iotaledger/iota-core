@@ -12,6 +12,7 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
@@ -112,6 +113,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}
 
 	ts.Run(false, nodeOptions)
+
+	node6.Protocol.SetLogLevel(log.LevelTrace)
 
 	expectedCommittee := []iotago.AccountID{
 		node0.Validator.AccountID,
@@ -260,6 +263,12 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.AssertAttestationsForSlot(slot, attestationBlocks, nodesP1...)
 		}
 
+		ts.AssertLatestEngineCommitmentOnMainChain(nodesP1...)
+		ts.AssertUniqueCommitmentChain(nodesP1...)
+		//ts.AssertCommitmentsOnChain(commitments, chain, nodes...)
+
+		//ts.AssertCommitmentsOrphaned(commitments, bool, nodes...)
+
 		// Make sure the tips are properly set.
 		var tipBlocks []*blocks.Block
 		for _, node := range nodesP1[:len(nodesP1)-1] {
@@ -281,6 +290,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithSybilProtectionOnlineCommittee(expectedP2OnlineCommittee...),
 			testsuite.WithEvictedSlot(18),
 		)
+
+		ts.AssertLatestEngineCommitmentOnMainChain(nodesP2...)
+		ts.AssertUniqueCommitmentChain(nodesP2...)
 
 		for _, slot := range []iotago.SlotIndex{12, 13, 14, 15} {
 			var attestationBlocks []*blocks.Block
@@ -368,14 +380,15 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		wg.Wait()
 	}
 
+	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
+
 	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
 	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
 	// This is to make sure that the storage was copied correctly during engine switching.
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
-
-	// old blocks can exist (we route everything by default to the main chain) but are unsolid
-	//ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
+	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 }

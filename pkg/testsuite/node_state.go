@@ -57,7 +57,7 @@ func (t *TestSuite) AssertNodeState(nodes []*mock.Node, opts ...options.Option[N
 		t.AssertEvictedSlot(*state.evictedSlot, nodes...)
 	}
 	if state.chainManagerSolid != nil && *state.chainManagerSolid {
-		t.AssertChainManagerIsSolid(nodes...)
+		t.AssertLatestEngineCommitmentOnMainChain(nodes...)
 	}
 }
 
