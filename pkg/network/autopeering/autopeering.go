@@ -2,6 +2,7 @@ package autopeering
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,7 +20,7 @@ import (
 )
 
 type Manager struct {
-	networkID        string
+	namespace        string
 	p2pManager       *p2p.Manager
 	logger           log.Logger
 	host             host.Host
@@ -35,7 +36,7 @@ type Manager struct {
 // NewManager creates a new autopeering manager.
 func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *network.DB, logger log.Logger) *Manager {
 	return &Manager{
-		networkID:  networkID,
+		namespace:  fmt.Sprintf("/iota/%s/1.0.0", networkID),
 		p2pManager: p2pManager,
 		host:       host,
 		peerDB:     peerDB,
@@ -77,7 +78,7 @@ func (m *Manager) Start(ctx context.Context) (err error) {
 		}
 
 		m.routingDiscovery = routing.NewRoutingDiscovery(kademliaDHT)
-		util.Advertise(m.ctx, m.routingDiscovery, m.networkID, discovery.TTL(5*time.Minute))
+		util.Advertise(m.ctx, m.routingDiscovery, m.namespace, discovery.TTL(5*time.Minute))
 
 		go m.discoveryLoop()
 
@@ -119,8 +120,8 @@ func (m *Manager) discoverAndDialPeers() {
 	tctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
 	defer cancel()
 
-	m.logger.LogDebugf("Discovering peers for network ID %s", m.networkID)
-	peerChan, err := m.routingDiscovery.FindPeers(tctx, m.networkID)
+	m.logger.LogDebugf("Discovering peers for namespace %s", m.namespace)
+	peerChan, err := m.routingDiscovery.FindPeers(tctx, m.namespace)
 	if err != nil {
 		m.logger.LogWarnf("Failed to find peers: %s", err)
 	}
