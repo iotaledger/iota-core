@@ -652,7 +652,7 @@ func (d *DockerTestFramework) RequestFaucetFunds(ctx context.Context, receiveAdd
 	outputID, output, err := d.AwaitAddressUnspentOutputAccepted(ctx, receiveAddr)
 	require.NoError(d.Testing, err)
 
-	fmt.Println("Faucet funds received, txID:", outputID.TransactionID().ToHex())
+	fmt.Println("Faucet funds received, txID:", outputID.TransactionID().ToHex(), ", amount:", output.BaseTokenAmount(), ", mana:", output.StoredMana())
 
 	return outputID, output
 }
