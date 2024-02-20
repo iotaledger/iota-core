@@ -116,7 +116,7 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 		return ierrors.New("no protocol handler registered to dial peer")
 	}
 
-	if m.neighborExists(peer.ID) {
+	if m.NeighborExists(peer.ID) {
 		return ierrors.Wrapf(ErrDuplicateNeighbor, "peer %s already exists", peer.ID)
 	}
 
@@ -299,7 +299,7 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 	if m.isShutdown {
 		return ErrNotRunning
 	}
-	if m.neighborExists(peer.ID) {
+	if m.NeighborExists(peer.ID) {
 		return ierrors.WithStack(ErrDuplicateNeighbor)
 	}
 
@@ -334,7 +334,7 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 	return nil
 }
 
-func (m *Manager) neighborExists(id peer.ID) bool {
+func (m *Manager) NeighborExists(id peer.ID) bool {
 	return m.neighbors.Has(id)
 }
 
