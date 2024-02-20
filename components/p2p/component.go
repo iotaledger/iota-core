@@ -341,7 +341,10 @@ func run() error {
 
 		defer func() {
 			if err := deps.ManualPeeringMgr.Stop(); err != nil {
-				Component.LogErrorf("Failed to stop the manager", "err", err)
+				Component.LogErrorf("Failed to stop the manager: %s", err)
+			}
+			if err := deps.AutoPeeringMgr.Stop(); err != nil {
+				Component.LogErrorf("Failed to stop autopeering manager: %s", err)
 			}
 		}()
 		//nolint:contextcheck // false positive
