@@ -39,6 +39,9 @@ services:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
     restart: no
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -66,6 +69,9 @@ services:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
     restart: no
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -92,7 +98,10 @@ services:
   node-4-validator:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
-    restart: unless-stopped
+    restart: no
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -114,10 +123,13 @@ services:
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
 
-  node-4:
+  node-5:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
     restart: no
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -141,10 +153,13 @@ services:
       --prometheus.goMetrics=true
       --prometheus.processMetrics=true
 
-  node-5:
+  node-6:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
     restart: no
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
