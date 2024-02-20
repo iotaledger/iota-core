@@ -478,6 +478,47 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 	return delegationOutput.StartEpoch
 }
 
+// IncreaseBIC requests faucet funds then uses it to allots mana to an account.
+func (d *DockerTestFramework) IncreaseBIC(to *Account) {
+	// requesting faucet funds for allotment
+	ctx := context.TODO()
+	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
+	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
+	fundsAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), privateKey))
+
+	clt := d.Node("V1").Client
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	congestionResp, err := clt.Congestion(ctx, to.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
+
+	basicOutput, err := builder.NewBasicOutputBuilder(fundsAddr, fundsUTXOOutput.BaseTokenAmount()).Build()
+	require.NoError(d.Testing, err)
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: fundsAddr,
+			InputID:      fundsOutputID,
+			Input:        fundsUTXOOutput,
+		}).
+		AddOutput(basicOutput).
+		AllotAllMana(currentSlot, to.AccountID, 0).
+		Build(fundsAddrSigner)
+
+	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(to.AccountID, to.BlockIssuerKey), congestionResp, issuerResp)
+
+	fmt.Println("Allot mana transaction sent, blkID:", blkID.ToHex(), ", txID:", lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), ", slot:", blkID.Slot())
+
+	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+
+	// wait until BIC is updated
+	d.AwaitCommitment(blkID.Slot())
+}
+
 // AllotManaTo requests faucet funds then uses it to allots mana from one account to another.
 func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllot iotago.Mana) {
 	// requesting faucet funds for allotment
