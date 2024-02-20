@@ -117,13 +117,14 @@ func (m *Manager) discoveryLoop() {
 }
 
 func (m *Manager) discoverAndDialPeers() {
-	tctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+	findCtx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
 	defer cancel()
 
 	m.logger.LogDebugf("Discovering peers for namespace %s", m.namespace)
-	peerChan, err := m.routingDiscovery.FindPeers(tctx, m.namespace)
+	peerChan, err := m.routingDiscovery.FindPeers(findCtx, m.namespace)
 	if err != nil {
 		m.logger.LogWarnf("Failed to find peers: %s", err)
+		return
 	}
 
 	for peerAddrInfo := range peerChan {
@@ -137,10 +138,10 @@ func (m *Manager) discoverAndDialPeers() {
 		peer := network.NewPeerFromAddrInfo(&peerAddrInfo)
 		if err := m.p2pManager.DialPeer(m.ctx, peer); err != nil {
 			if ierrors.Is(err, p2p.ErrDuplicateNeighbor) {
-				m.logger.LogDebugf("Already connected to peer %s", peer)
+				m.logger.LogDebugf("Already connected to peer %s", peerAddrInfo)
 				continue
 			}
-			m.logger.LogWarnf("Failed to dial peer %s: %s", peer, err)
+			m.logger.LogWarnf("Failed to dial peer %s: %s", peerAddrInfo, err)
 		}
 	}
 }
