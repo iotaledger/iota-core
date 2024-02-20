@@ -176,8 +176,7 @@ func (c *Commitments) publishRootCommitment(mainChain *Chain, mainEngine *engine
 			publishedCommitment.Chain.Set(mainChain)
 		}
 
-		// TODO: USE SET HERE (debug eviction issues)
-		mainChain.ForkingPoint.DefaultTo(publishedCommitment)
+		mainChain.ForkingPoint.Set(publishedCommitment)
 
 		c.Root.Set(publishedCommitment)
 	})

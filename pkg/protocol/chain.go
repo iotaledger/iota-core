@@ -233,6 +233,10 @@ func (c *Chain) deriveWarpSyncMode() func() {
 
 // deriveChildChains defines how a chain determines its ChildChains (by adding each child to the set).
 func (c *Chain) deriveChildChains(child *Chain) func() {
+	if child == c {
+		return nil
+	}
+
 	c.ChildChains.Add(child)
 
 	return func() {
@@ -266,7 +270,8 @@ func (c *Chain) deriveIsEvicted(forkingPoint *Commitment) (shutdown func()) {
 	}
 
 	return forkingPoint.IsEvicted.OnTrigger(func() {
-		c.IsEvicted.Trigger()
+		// TODO: MOVE TO DEDICATED WORKER
+		go c.IsEvicted.Trigger()
 	})
 }
 

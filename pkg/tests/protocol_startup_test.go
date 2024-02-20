@@ -102,7 +102,8 @@ func Test_BookInCommittedSlot(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			// TODO: remove this? the forking gets updated now on eviction
+			//testsuite.WithChainID(genesisCommitment.MustID()),
 			testsuite.WithLatestCommitmentSlotIndex(5),
 			testsuite.WithEvictedSlot(5),
 			testsuite.WithActiveRootBlocks(expectedActiveRootBlocks),
@@ -270,7 +271,8 @@ func Test_StartNodeFromSnapshotAndDisk(t *testing.T) {
 		ts.AssertNodeState(ts.Nodes(),
 			testsuite.WithSnapshotImported(true),
 			testsuite.WithProtocolParameters(ts.API.ProtocolParameters()),
-			testsuite.WithChainID(genesisCommitment.MustID()),
+			// TODO: remove this? the forking gets updated now on eviction
+			//testsuite.WithChainID(genesisCommitment.MustID()),
 			testsuite.WithLatestFinalizedSlot(11),
 			testsuite.WithLatestCommitmentSlotIndex(11),
 			testsuite.WithEqualStoredCommitmentAtIndex(11),

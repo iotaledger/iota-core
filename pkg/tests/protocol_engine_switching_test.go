@@ -373,7 +373,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	// This is to make sure that the storage was copied correctly during engine switching.
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P0"), true, ts.Nodes()...)
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, ts.Nodes()...)
-	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
+
+	// old blocks can exist (we route everything by default to the main chain) but are unsolid
+	//ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 }
