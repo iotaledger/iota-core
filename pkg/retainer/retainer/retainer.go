@@ -8,7 +8,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage/prunable/slotstore"
@@ -77,14 +76,10 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 
 		asyncOpt := event.WithWorkerPool(r.workerPool)
 
-		e.Events.PostSolidFilter.BlockAllowed.Hook(func(b *blocks.Block) {
-			if err := r.onBlockAllowed(b); err != nil {
-				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAllowed in retainer"))
+		e.Events.Booker.BlockBooked.Hook(func(b *blocks.Block) {
+			if err := r.onBlockBooked(b); err != nil {
+				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockBooked in retainer"))
 			}
-		}, asyncOpt)
-
-		e.Events.PostSolidFilter.BlockFiltered.Hook(func(e *postsolidfilter.BlockFilteredEvent) {
-			r.RetainBlockFailure(e.Block.ID(), api.DetermineBlockFailureReason(e.Reason))
 		}, asyncOpt)
 
 		e.Events.BlockGadget.BlockAccepted.Hook(func(b *blocks.Block) {
@@ -100,7 +95,7 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 		}, asyncOpt)
 
 		e.Events.Scheduler.BlockDropped.Hook(func(b *blocks.Block, _ error) {
-			r.RetainBlockFailure(b.ID(), api.BlockFailureDroppedDueToCongestion)
+			r.RetainBlockDropped(b.ID())
 		})
 
 		e.Initialized.OnTrigger(func() {
@@ -169,21 +164,21 @@ func (r *Retainer) Shutdown() {
 }
 
 func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
-	blockStatus, blockFailureReason := r.blockStatus(blockID)
-	if blockStatus == api.BlockStateUnknown {
+	blockState, blockFailureReason := r.blockStatus(blockID)
+	if blockState == api.BlockStateUnknown {
 		return nil, ierrors.Errorf("block %s not found", blockID.ToHex())
 	}
 
 	// we do not expose accepted flag
-	if blockStatus == api.BlockStateAccepted {
-		blockStatus = api.BlockStatePending
+	if blockState == api.BlockStateAccepted {
+		blockState = api.BlockStatePending
 	}
 
 	txID, txStatus, txFailureReason := r.transactionStatus(blockID)
 
 	return &retainer.BlockMetadata{
 		BlockID:                  blockID,
-		BlockState:               blockStatus,
+		BlockState:               blockState,
 		BlockFailureReason:       blockFailureReason,
 		TransactionID:            txID,
 		TransactionState:         txStatus,
@@ -191,14 +186,14 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 	}, nil
 }
 
-func (r *Retainer) RetainBlockFailure(blockID iotago.BlockID, failureCode api.BlockFailureReason) {
+func (r *Retainer) RetainBlockDropped(blockID iotago.BlockID) {
 	store, err := r.store(blockID.Slot())
 	if err != nil {
 		r.errorHandler(ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot()))
 		return
 	}
 
-	if err := store.StoreBlockFailure(blockID, failureCode); err != nil {
+	if err := store.StoreBlockDropped(blockID); err != nil {
 		r.errorHandler(ierrors.Wrap(err, "failed to store block failure in retainer"))
 	}
 }
@@ -247,7 +242,7 @@ func (r *Retainer) blockStatus(blockID iotago.BlockID) (api.BlockState, api.Bloc
 	switch blockData.State {
 	case api.BlockStatePending:
 		if blockID.Slot() <= r.latestCommittedSlotFunc() {
-			return api.BlockStateRejected, blockData.FailureReason
+			return api.BlockStateOrphaned, blockData.FailureReason
 		}
 	case api.BlockStateAccepted, api.BlockStateConfirmed:
 		if blockID.Slot() <= r.finalizedSlotFunc() {
@@ -285,18 +280,16 @@ func (r *Retainer) transactionStatus(blockID iotago.BlockID) (iotago.Transaction
 	return txData.TransactionID, txData.State, txData.FailureReason
 }
 
-func (r *Retainer) onBlockAllowed(block *blocks.Block) error {
+func (r *Retainer) onBlockBooked(block *blocks.Block) error {
 	store, err := r.store(block.ID().Slot())
 	if err != nil {
 		return ierrors.Wrapf(err, "could not get retainer store for slot %d", block.ID().Slot())
 	}
 
-	if err := store.StoreBlockAllowed(block.ID()); err != nil {
-		return ierrors.Wrap(err, "failed to store on BlockAllowed in retainer")
+	if err := store.StoreBlockBooked(block.ID()); err != nil {
+		return ierrors.Wrap(err, "failed to store on BlockBooked in retainer")
 	}
 
-	// this is always the first place where the block gets stored in the retainer.
-	// subsequent events where the block fails only update the status of the block.
 	r.events.BlockRetained.Trigger(block)
 
 	return nil

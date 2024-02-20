@@ -178,7 +178,7 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 			t.Acceptance = true
 			t.Scheduled = true
 			t.Confirmation = true
-		case api.BlockStateFailed, api.BlockStateRejected:
+		case api.BlockStateFailed, api.BlockStateOrphaned:
 			t.ObjectivelyInvalid = true
 		}
 	}

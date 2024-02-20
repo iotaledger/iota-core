@@ -114,7 +114,7 @@ func NewSlotStore(slot iotago.SlotIndex, store kvstore.KVStore) (newSlotStore *S
 	}
 }
 
-func (s *SlotStore) StoreBlockAllowed(blockID iotago.BlockID) error {
+func (s *SlotStore) StoreBlockBooked(blockID iotago.BlockID) error {
 	return s.blockStore.Set(blockID, &BlockRetainerData{
 		State:         api.BlockStatePending,
 		FailureReason: api.BlockFailureNone,
@@ -175,10 +175,10 @@ func (s *SlotStore) DeleteTransactionData(prevID iotago.BlockID) error {
 	return s.transactionStore.Delete(prevID)
 }
 
-func (s *SlotStore) StoreBlockFailure(blockID iotago.BlockID, failureType api.BlockFailureReason) error {
+func (s *SlotStore) StoreBlockDropped(blockID iotago.BlockID) error {
 	return s.blockStore.Set(blockID, &BlockRetainerData{
 		State:         api.BlockStateFailed,
-		FailureReason: failureType,
+		FailureReason: api.BlockFailureDroppedDueToCongestion,
 	})
 }
 
