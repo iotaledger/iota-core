@@ -5,7 +5,7 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 )
 
-// Events is a collection of Tangle related Events.
+// Events is a collection of Retainer related Events.
 type Events struct {
 	// BlockRetained is triggered when a block is stored in the retainer.
 	BlockRetained *event.Event1[*blocks.Block]
