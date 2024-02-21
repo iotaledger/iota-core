@@ -52,8 +52,6 @@ type Manager struct {
 
 	autoPeering   *autopeering.Manager
 	manualPeering *manualpeering.Manager
-
-	allowPeerMutex syncutils.Mutex
 }
 
 var _ network.Manager = (*Manager)(nil)
@@ -117,9 +115,6 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer) error {
 	if m.NeighborExists(peer.ID) {
 		return ierrors.Wrapf(network.ErrDuplicatePeer, "peer %s already exists", peer.ID)
 	}
-
-	m.allowPeerMutex.Lock()
-	defer m.allowPeerMutex.Unlock()
 
 	if !m.allowPeer(peer.ID) {
 		return ierrors.Wrapf(network.ErrMaxAutopeeringPeersReached, "peer %s is not allowed", peer.ID)
@@ -285,8 +280,6 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 		return
 	}
 
-	m.allowPeerMutex.Lock()
-	defer m.allowPeerMutex.Unlock()
 	if m.ctx.Err() != nil {
 		m.logger.LogDebugf("aborting handling stream, context is done")
 		m.closeStream(stream)
@@ -362,7 +355,9 @@ func (m *Manager) addNeighbor(ctx context.Context, peer *network.Peer, ps *Packe
 	}
 
 	firstPacketReceivedCtx, firstPacketReceivedCancel := context.WithDeadline(ctx, time.Now().Add(5*time.Second))
-	// create and add the neighbor
+	defer firstPacketReceivedCancel()
+
+	var innerErr error
 	nbr := newNeighbor(m.logger, peer, ps, func(nbr *neighbor, packet proto.Message) {
 		m.protocolHandlerMutex.RLock()
 		defer m.protocolHandlerMutex.RUnlock()
@@ -402,7 +397,7 @@ func (m *Manager) addNeighbor(ctx context.Context, peer *network.Peer, ps *Packe
 		return ierrors.WithStack(network.ErrFirstPacketNotReceived)
 	}
 
-	return nil
+	return innerErr
 }
 
 func (m *Manager) NeighborExists(id peer.ID) bool {
@@ -440,8 +435,6 @@ func (m *Manager) dropAllNeighbors() {
 }
 
 func (m *Manager) allowPeer(id peer.ID) (allow bool) {
-	// This should always be called from within the allowPeerMutex lock
-
 	// Always allow manual peers
 	if m.manualPeering.IsPeerKnown(id) {
 		m.logger.LogDebugf("Allow manual peer %s", id)
