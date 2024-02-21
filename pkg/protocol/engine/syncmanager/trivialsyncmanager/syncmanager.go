@@ -89,7 +89,7 @@ func NewProvider(opts ...options.Option[SyncManager]) module.Provider[*engine.En
 			}
 		}, asyncOpt)
 
-		e.Events.StoragePruned.Hook(func(index iotago.EpochIndex) {
+		e.Storage.Pruned.Hook(func(index iotago.EpochIndex) {
 			if s.updatePrunedEpoch(index, true) {
 				s.triggerUpdate()
 			}

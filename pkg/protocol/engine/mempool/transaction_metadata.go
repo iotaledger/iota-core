@@ -45,6 +45,8 @@ type TransactionMetadata interface {
 
 	OnEarliestIncludedAttachmentUpdated(func(prevID, newID iotago.BlockID))
 
+	OnEvicted(func())
+
 	inclusionFlags
 }
 

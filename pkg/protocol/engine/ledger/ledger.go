@@ -17,7 +17,7 @@ import (
 
 type Ledger interface {
 	AttachTransaction(block *blocks.Block) (signedTransactionMetadata mempool.SignedTransactionMetadata, containsTransaction bool)
-	OnTransactionAttached(callback func(transactionMetadata mempool.TransactionMetadata), opts ...event.Option)
+	OnTransactionAttached(callback func(transactionMetadata mempool.TransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.TransactionMetadata)]
 	TransactionMetadata(id iotago.TransactionID) (transactionMetadata mempool.TransactionMetadata, exists bool)
 	TransactionMetadataByAttachment(blockID iotago.BlockID) (transactionMetadata mempool.TransactionMetadata, exists bool)
 

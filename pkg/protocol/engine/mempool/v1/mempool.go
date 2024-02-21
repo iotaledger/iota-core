@@ -130,12 +130,12 @@ func (m *MemPool[VoteRank]) AttachSignedTransaction(signedTransaction mempool.Si
 	return storedSignedTransaction, nil
 }
 
-func (m *MemPool[VoteRank]) OnSignedTransactionAttached(handler func(signedTransactionMetadata mempool.SignedTransactionMetadata), opts ...event.Option) {
-	m.signedTransactionAttached.Hook(handler, opts...)
+func (m *MemPool[VoteRank]) OnSignedTransactionAttached(handler func(signedTransactionMetadata mempool.SignedTransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.SignedTransactionMetadata)] {
+	return m.signedTransactionAttached.Hook(handler, opts...)
 }
 
-func (m *MemPool[VoteRank]) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) {
-	m.transactionAttached.Hook(handler, opts...)
+func (m *MemPool[VoteRank]) OnTransactionAttached(handler func(transaction mempool.TransactionMetadata), opts ...event.Option) *event.Hook[func(metadata mempool.TransactionMetadata)] {
+	return m.transactionAttached.Hook(handler, opts...)
 }
 
 // MarkAttachmentIncluded marks the attachment of the given block as included.
@@ -204,6 +204,9 @@ func (m *MemPool[VoteRank]) stateDiff(slot iotago.SlotIndex) (*StateDiff, error)
 
 // Reset resets the component to a clean state as if it was created at the last commitment.
 func (m *MemPool[VoteRank]) Reset() {
+	m.commitmentMutex.Lock()
+	defer m.commitmentMutex.Unlock()
+
 	m.stateDiffs.ForEachKey(func(slot iotago.SlotIndex) bool {
 		if slot > m.lastCommittedSlot {
 			if stateDiff, deleted := m.stateDiffs.DeleteAndReturn(slot); deleted {
@@ -231,6 +234,59 @@ func (m *MemPool[VoteRank]) Reset() {
 			})
 		}
 	}
+
+	// We need to clean up all transactions and outputs that were issued beyond the last committed slot.
+	m.delayedTransactionEviction.ForEach(func(slot iotago.SlotIndex, delayedTransactions ds.Set[iotago.TransactionID]) bool {
+		if slot <= m.lastCommittedSlot {
+			return true
+		}
+
+		protocolParams := m.apiProvider.APIForSlot(slot).ProtocolParameters()
+		genesisSlot := protocolParams.GenesisSlot()
+		maxCommittableAge := protocolParams.MaxCommittableAge()
+
+		// No need to evict delayed eviction slot if the committed slot is below maxCommittableAge,
+		// as there is nothing to evict anyway at this point.
+		if slot <= genesisSlot+maxCommittableAge {
+			return true
+		}
+
+		delayedEvictionSlot := slot - maxCommittableAge
+		delayedTransactions.Range(func(txID iotago.TransactionID) {
+			if transaction, exists := m.cachedTransactions.Get(txID); exists {
+				transaction.setEvicted()
+			}
+		})
+		m.delayedTransactionEviction.Delete(delayedEvictionSlot)
+
+		return true
+	})
+
+	m.delayedOutputStateEviction.ForEach(func(slot iotago.SlotIndex, delayedOutputs *shrinkingmap.ShrinkingMap[iotago.Identifier, *StateMetadata]) bool {
+		if slot <= m.lastCommittedSlot {
+			return true
+		}
+
+		protocolParams := m.apiProvider.APIForSlot(slot).ProtocolParameters()
+		genesisSlot := protocolParams.GenesisSlot()
+		maxCommittableAge := protocolParams.MaxCommittableAge()
+
+		// No need to evict delayed eviction slot if the committed slot is below maxCommittableAge,
+		// as there is nothing to evict anyway at this point.
+		if slot <= genesisSlot+maxCommittableAge {
+			return true
+		}
+
+		delayedEvictionSlot := slot - maxCommittableAge
+		delayedOutputs.ForEach(func(stateID iotago.Identifier, state *StateMetadata) bool {
+			m.cachedStateRequests.Delete(stateID, state.HasNoSpenders)
+
+			return true
+		})
+		m.delayedOutputStateEviction.Delete(delayedEvictionSlot)
+
+		return true
+	})
 }
 
 // Evict evicts the slot with the given slot from the MemPool.
@@ -259,6 +315,7 @@ func (m *MemPool[VoteRank]) Evict(slot iotago.SlotIndex) {
 		return
 	}
 
+	// See PR #399 for the rationale behind this.
 	delayedEvictionSlot := slot - maxCommittableAge
 	if delayedTransactions, exists := m.delayedTransactionEviction.Get(delayedEvictionSlot); exists {
 		delayedTransactions.Range(func(txID iotago.TransactionID) {
