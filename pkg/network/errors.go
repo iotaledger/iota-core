@@ -11,4 +11,6 @@ var (
 	ErrLoopbackPeer = ierrors.New("loopback connection not allowed")
 	// ErrDuplicatePeer is returned when the same peer is added more than once.
 	ErrDuplicatePeer = ierrors.New("already connected")
+	// ErrMaxAutopeeringPeersReached is returned when the maximum number of autopeering peers is reached.
+	ErrMaxAutopeeringPeersReached = ierrors.New("max autopeering peers reached")
 )

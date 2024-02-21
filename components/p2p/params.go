@@ -29,7 +29,7 @@ type ParametersP2P struct {
 	IdentityPrivateKey string `default:"" usage:"private key used to derive the node identity (optional)"`
 
 	Autopeering struct {
-		MaxPeers int `default:"2" usage:"the max number of autopeer connections. Set to 0 to disable autopeering."`
+		MaxPeers int `default:"5" usage:"the max number of autopeer connections. Set to 0 to disable autopeering."`
 	}
 
 	Database struct {

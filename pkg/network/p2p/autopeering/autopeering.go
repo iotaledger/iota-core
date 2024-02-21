@@ -122,11 +122,11 @@ func (m *Manager) discoveryLoop() {
 }
 
 func (m *Manager) discoverAndDialPeers() {
-	//peersToFind := m.maxPeers - len(m.p2pManager.AutopeeredNeighbors())
-	//if peersToFind <= 0 {
-	//	m.logger.LogDebugf("Enough autopeering peers connected, not discovering new ones")
-	//	return
-	//}
+	peersToFind := m.maxPeers - m.networkManager.AutopeeringNeighborsCount()
+	if peersToFind <= 0 {
+		m.logger.LogDebug("Enough autopeering peers connected, not discovering new ones")
+		return
+	}
 
 	findCtx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
 	defer cancel()
@@ -139,10 +139,10 @@ func (m *Manager) discoverAndDialPeers() {
 	}
 
 	for peerAddrInfo := range peerChan {
-		//if peersToFind <= 0 {
-		//	m.logger.LogDebugf("Enough new autopeering peers connected")
-		//	return
-		//}
+		if peersToFind <= 0 {
+			m.logger.LogDebug("Enough new autopeering peers connected")
+			return
+		}
 
 		// Do not self-dial.
 		if peerAddrInfo.ID == m.host.ID() {
@@ -160,6 +160,6 @@ func (m *Manager) discoverAndDialPeers() {
 		if err := m.networkManager.DialPeer(m.ctx, peer); err != nil {
 			m.logger.LogWarnf("Failed to dial peer %s: %s", peerAddrInfo, err)
 		}
-		//peersToFind--
+		peersToFind--
 	}
 }

@@ -185,6 +185,7 @@ func (m *Manager) IsPeerKnown(id peer.ID) bool {
 	defer m.knownPeersMutex.RUnlock()
 
 	_, exists := m.knownPeers[id]
+
 	return exists
 }
 
@@ -264,15 +265,15 @@ func (m *Manager) keepPeerConnected(peer *network.Peer) {
 }
 
 func (m *Manager) onGossipNeighborRemoved(neighbor network.Neighbor) {
-	m.changeNeighborStatus(neighbor, network.ConnStatusDisconnected)
+	m.changeNeighborStatus(neighbor)
 }
 
 func (m *Manager) onGossipNeighborAdded(neighbor network.Neighbor) {
-	m.changeNeighborStatus(neighbor, network.ConnStatusConnected)
+	m.changeNeighborStatus(neighbor)
 	m.logger.LogInfof("Gossip layer successfully connected with the peer %s", neighbor.Peer())
 }
 
-func (m *Manager) changeNeighborStatus(neighbor network.Neighbor, connStatus network.ConnectionStatus) {
+func (m *Manager) changeNeighborStatus(neighbor network.Neighbor) {
 	m.knownPeersMutex.RLock()
 	defer m.knownPeersMutex.RUnlock()
 
@@ -280,6 +281,6 @@ func (m *Manager) changeNeighborStatus(neighbor network.Neighbor, connStatus net
 	if !exists {
 		return
 	}
-	kp.SetConnStatus(connStatus)
+	kp.SetConnStatus(neighbor.Peer().GetConnStatus())
 	m.networkManager.P2PHost().ConnManager().Protect(neighbor.Peer().ID, manualPeerProtectionTag)
 }

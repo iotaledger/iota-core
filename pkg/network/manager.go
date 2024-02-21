@@ -19,6 +19,7 @@ type Manager interface {
 	OnNeighborRemoved(func(Neighbor)) *event.Hook[func(Neighbor)]
 
 	AllNeighbors() []Neighbor
+	AutopeeringNeighborsCount() int
 
 	DropNeighbor(peer.ID) error
 	NeighborExists(peer.ID) bool

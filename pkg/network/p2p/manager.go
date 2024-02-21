@@ -12,6 +12,7 @@ import (
 
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
@@ -52,6 +53,8 @@ type Manager struct {
 
 	autoPeering   *autopeering.Manager
 	manualPeering *manualpeering.Manager
+
+	allowPeerMutex syncutils.Mutex
 }
 
 var _ network.Manager = (*Manager)(nil)
@@ -114,6 +117,13 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer) error {
 
 	if m.NeighborExists(peer.ID) {
 		return ierrors.Wrapf(network.ErrDuplicatePeer, "peer %s already exists", peer.ID)
+	}
+
+	m.allowPeerMutex.Lock()
+	defer m.allowPeerMutex.Unlock()
+
+	if !m.allowPeer(peer.ID) {
+		return ierrors.Wrapf(network.ErrMaxAutopeeringPeersReached, "peer %s is not allowed", peer.ID)
 	}
 
 	// Adds the peer's multiaddresses to the peerstore, so that they can be used for dialing.
@@ -273,6 +283,18 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 		return
 	}
 
+	m.allowPeerMutex.Lock()
+	defer m.allowPeerMutex.Unlock()
+
+	peerID := stream.Conn().RemotePeer()
+
+	if !m.allowPeer(peerID) {
+		m.logger.LogDebugf("peer %s is not allowed", peerID)
+		m.closeStream(stream)
+
+		return
+	}
+
 	ps := NewPacketsStream(stream, m.protocolHandler.PacketFactory)
 	if err := ps.receiveNegotiation(); err != nil {
 		m.logger.LogError("failed to receive negotiation message")
@@ -282,20 +304,20 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 	}
 
 	peerAddrInfo := &peer.AddrInfo{
-		ID:    stream.Conn().RemotePeer(),
+		ID:    peerID,
 		Addrs: []multiaddr.Multiaddr{stream.Conn().RemoteMultiaddr()},
 	}
 
 	networkPeer := network.NewPeerFromAddrInfo(peerAddrInfo)
 	if err := m.peerDB.UpdatePeer(networkPeer); err != nil {
-		m.logger.LogErrorf("failed to update peer in peer database, peerID: %s, error: %s", networkPeer.ID, err)
+		m.logger.LogErrorf("failed to update peer in peer database, peerID: %s, error: %s", peerID, err)
 		m.closeStream(stream)
 
 		return
 	}
 
 	if err := m.addNeighbor(networkPeer, ps); err != nil {
-		m.logger.LogErrorf("failed to add neighbor, peerID: %s, error: %s", networkPeer.ID, err)
+		m.logger.LogErrorf("failed to add neighbor, peerID: %s, error: %s", peerID, err)
 		m.closeStream(stream)
 
 		return
@@ -357,6 +379,7 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 	nbr.readLoop()
 	nbr.writeLoop()
 	nbr.logger.LogInfof("Connection established to %s", nbr.Peer().ID)
+	nbr.Peer().SetConnStatus(network.ConnStatusConnected)
 	m.neighborAdded.Trigger(nbr)
 
 	return nil
@@ -371,6 +394,8 @@ func (m *Manager) deleteNeighbor(nbr *neighbor) {
 	_ = m.libp2pHost.Network().ClosePeer(nbr.Peer().ID)
 
 	m.neighbors.Delete(nbr.Peer().ID)
+
+	nbr.Peer().SetConnStatus(network.ConnStatusDisconnected)
 }
 
 func (m *Manager) setNeighbor(nbr *neighbor) error {
@@ -392,4 +417,32 @@ func (m *Manager) dropAllNeighbors() {
 	for _, nbr := range neighborsList {
 		nbr.Close()
 	}
+}
+
+func (m *Manager) AutopeeringNeighborsCount() int {
+	return len(lo.Filter(m.allNeighborsIDs(), func(p peer.ID) bool {
+		return !m.manualPeering.IsPeerKnown(p)
+	}))
+}
+
+func (m *Manager) allowPeer(id peer.ID) (allow bool) {
+	// This should always be called from within the allowPeerMutex lock
+
+	// Always allow manual peers
+	if m.manualPeering.IsPeerKnown(id) {
+		m.logger.LogDebugf("Allow peer %s because it is a manual peer", id)
+		return true
+	}
+
+	// Only allow up to the maximum number of autopeered neighbors
+	autopeeredNeighbors := m.AutopeeringNeighborsCount()
+	if autopeeredNeighbors < m.autoPeering.MaxNeighbors() {
+		m.logger.LogDebugf("Allow peer %s because it is an autopeered peer and the maximum number of autopeered neighbors has not been reached: %d vs %d", id, autopeeredNeighbors, m.autoPeering.MaxNeighbors())
+		return true
+	}
+
+	// Don't allow new peers
+	m.logger.LogDebugf("Disallow peer %s because it is an autopeered peer and the maximum number of autopeered neighbors has been reached: max %d", id, m.autoPeering.MaxNeighbors())
+
+	return false
 }
