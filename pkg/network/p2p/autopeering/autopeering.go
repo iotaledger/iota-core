@@ -187,7 +187,7 @@ func (m *Manager) discoverAndDialPeers() {
 	autopeeringNeighbors := m.networkManager.AutopeeringNeighbors()
 	peersToFind := m.maxPeers - len(autopeeringNeighbors)
 	if peersToFind == 0 {
-		m.logger.LogDebugf("%d autopeering peers connected, not discovering new ones", len(autopeeringNeighbors))
+		m.logger.LogDebugf("%d autopeering peers connected, not discovering new ones. (max %d)", len(autopeeringNeighbors), m.maxPeers)
 		return
 	}
 
