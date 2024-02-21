@@ -213,6 +213,11 @@ func (m *Manager) discoverAndDialPeers() {
 	}
 
 	for peerAddrInfo := range peerChan {
+		if m.ctx.Err() != nil {
+			m.logger.LogDebug("Context is done, stopping dialing new peers")
+			return
+		}
+
 		if peersToFind <= 0 {
 			m.logger.LogDebug("Enough new autopeering peers connected")
 			return
