@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"cmp"
+	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 
@@ -9,8 +10,14 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/iota-core/pkg/core/account"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/postsolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
+	"github.com/iotaledger/iota-core/pkg/protocol/engine/notarization"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
 
@@ -57,6 +64,16 @@ func newChains(protocol *Protocol) *Chains {
 	c.HeaviestAttestedCandidate = newChainsCandidate(c, (*Commitment).cumulativeAttestedWeight)
 	c.HeaviestVerifiedCandidate = newChainsCandidate(c, (*Commitment).cumulativeVerifiedWeight)
 
+	c.WithElements(func(chain *Chain) (teardown func()) {
+		return chain.Engine.OnUpdate(func(_ *engine.Engine, newEngine *engine.Engine) {
+			if newEngine != nil {
+				newEngine.Logger.OnLogLevelActive(log.LevelTrace, func() (shutdown func()) {
+					return attachEngineLogs(newEngine)
+				})
+			}
+		})
+	})
+
 	shutdown := lo.Batch(
 		c.initLogger(protocol.NewChildLogger("Chains")),
 		c.initChainSwitching(),
@@ -69,6 +86,204 @@ func newChains(protocol *Protocol) *Chains {
 	protocol.Shutdown.OnTrigger(shutdown)
 
 	return c
+}
+
+func attachEngineLogs(instance *engine.Engine) func() {
+	events := instance.Events
+
+	return lo.Batch(
+		events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockDAG.BlockAttached", "block", block.ID())
+		}).Unhook,
+
+		events.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+			instance.LogTrace("BlockDAG.BlockInvalid", "block", block.ID(), "err", err)
+		}).Unhook,
+
+		events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockDAG.BlockMissing", "block", block.ID())
+		}).Unhook,
+
+		events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockDAG.MissingBlockAttached", "block", block.ID())
+		}).Unhook,
+
+		events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {
+			instance.LogTrace("SeatManager.BlockProcessed", "block", block.ID())
+		}).Unhook,
+
+		events.Booker.BlockBooked.Hook(func(block *blocks.Block) {
+			instance.LogTrace("Booker.BlockBooked", "block", block.ID())
+		}).Unhook,
+
+		events.Booker.BlockInvalid.Hook(func(block *blocks.Block, err error) {
+			instance.LogTrace("Booker.BlockInvalid", "block", block.ID(), "err", err)
+		}).Unhook,
+
+		events.Booker.TransactionInvalid.Hook(func(metadata mempool.TransactionMetadata, err error) {
+			instance.LogTrace("Booker.TransactionInvalid", "tx", metadata.ID(), "err", err)
+		}).Unhook,
+
+		events.Scheduler.BlockScheduled.Hook(func(block *blocks.Block) {
+			instance.LogTrace("Scheduler.BlockScheduled", "block", block.ID())
+		}).Unhook,
+
+		events.Scheduler.BlockEnqueued.Hook(func(block *blocks.Block) {
+			instance.LogTrace("Scheduler.BlockEnqueued", "block", block.ID())
+		}).Unhook,
+
+		events.Scheduler.BlockSkipped.Hook(func(block *blocks.Block) {
+			instance.LogTrace("Scheduler.BlockSkipped", "block", block.ID())
+		}).Unhook,
+
+		events.Scheduler.BlockDropped.Hook(func(block *blocks.Block, err error) {
+			instance.LogTrace("Scheduler.BlockDropped", "block", block.ID(), "err", err)
+		}).Unhook,
+
+		events.Clock.AcceptedTimeUpdated.Hook(func(newTime time.Time) {
+			instance.LogTrace("Clock.AcceptedTimeUpdated", "time", newTime, "slot", instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
+		}).Unhook,
+
+		events.Clock.ConfirmedTimeUpdated.Hook(func(newTime time.Time) {
+			instance.LogTrace("Clock.ConfirmedTimeUpdated", "time", newTime, "slot", instance.LatestAPI().TimeProvider().SlotFromTime(newTime))
+		}).Unhook,
+
+		events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
+			instance.LogTrace("PreSolidFilter.BlockPreAllowed", "block", block.ID())
+		}).Unhook,
+
+		events.PreSolidFilter.BlockPreFiltered.Hook(func(event *presolidfilter.BlockPreFilteredEvent) {
+			instance.LogTrace("PreSolidFilter.BlockPreFiltered", "block", event.Block.ID(), "err", event.Reason)
+		}).Unhook,
+
+		events.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
+			instance.LogTrace("PostSolidFilter.BlockAllowed", "block", block.ID())
+		}).Unhook,
+
+		events.PostSolidFilter.BlockFiltered.Hook(func(event *postsolidfilter.BlockFilteredEvent) {
+			instance.LogTrace("PostSolidFilter.BlockFiltered", "block", event.Block.ID(), "err", event.Reason)
+		}).Unhook,
+
+		events.BlockRequester.Tick.Hook(func(blockID iotago.BlockID) {
+			instance.LogTrace("BlockRequester.Tick", "block", blockID)
+		}).Unhook,
+
+		events.BlockProcessed.Hook(func(blockID iotago.BlockID) {
+			instance.LogTrace("BlockProcessed", "block", blockID)
+		}).Unhook,
+
+		events.Notarization.SlotCommitted.Hook(func(details *notarization.SlotCommittedDetails) {
+			instance.LogTrace("NotarizationManager.SlotCommitted", "commitment", details.Commitment.ID(), "acceptedBlocks count", details.AcceptedBlocks.Size(), "accepted transactions", len(details.Mutations))
+		}).Unhook,
+
+		events.Notarization.LatestCommitmentUpdated.Hook(func(commitment *model.Commitment) {
+			instance.LogTrace("NotarizationManager.LatestCommitmentUpdated", "commitment", commitment.ID())
+		}).Unhook,
+
+		events.BlockGadget.BlockPreAccepted.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockGadget.BlockPreAccepted", "block", block.ID(), "slotCommitmentID", block.ProtocolBlock().Header.SlotCommitmentID)
+		}).Unhook,
+
+		events.BlockGadget.BlockAccepted.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockGadget.BlockAccepted", "block", block.ID(), "slotCommitmentID", block.ProtocolBlock().Header.SlotCommitmentID)
+		}).Unhook,
+
+		events.BlockGadget.BlockPreConfirmed.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockGadget.BlockPreConfirmed", "block", block.ID(), "slotCommitmentID", block.ProtocolBlock().Header.SlotCommitmentID)
+		}).Unhook,
+
+		events.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockGadget.BlockConfirmed", "block", block.ID(), "slotCommitmentID", block.ProtocolBlock().Header.SlotCommitmentID)
+		}).Unhook,
+
+		events.SlotGadget.SlotFinalized.Hook(func(slot iotago.SlotIndex) {
+			instance.LogTrace("SlotGadget.SlotFinalized", "slot", slot)
+		}).Unhook,
+
+		events.SeatManager.OnlineCommitteeSeatAdded.Hook(func(seat account.SeatIndex, accountID iotago.AccountID) {
+			instance.LogTrace("SybilProtection.OnlineCommitteeSeatAdded", "seat", seat, "accountID", accountID)
+		}).Unhook,
+
+		events.SeatManager.OnlineCommitteeSeatRemoved.Hook(func(seat account.SeatIndex) {
+			instance.LogTrace("SybilProtection.OnlineCommitteeSeatRemoved", "seat", seat)
+		}).Unhook,
+
+		events.SybilProtection.CommitteeSelected.Hook(func(committee *account.SeatedAccounts, epoch iotago.EpochIndex) {
+			instance.LogTrace("SybilProtection.CommitteeSelected", "epoch", epoch, "committee", committee.IDs())
+		}).Unhook,
+
+		events.SpendDAG.SpenderCreated.Hook(func(conflictID iotago.TransactionID) {
+			instance.LogTrace("SpendDAG.SpenderCreated", "conflictID", conflictID)
+		}).Unhook,
+
+		events.SpendDAG.SpenderEvicted.Hook(func(conflictID iotago.TransactionID) {
+			instance.LogTrace("SpendDAG.SpenderEvicted", "conflictID", conflictID)
+		}).Unhook,
+
+		events.SpendDAG.SpenderRejected.Hook(func(conflictID iotago.TransactionID) {
+			instance.LogTrace("SpendDAG.SpenderRejected", "conflictID", conflictID)
+		}).Unhook,
+
+		events.SpendDAG.SpenderAccepted.Hook(func(conflictID iotago.TransactionID) {
+			instance.LogTrace("SpendDAG.SpenderAccepted", "conflictID", conflictID)
+		}).Unhook,
+
+		instance.Ledger.OnTransactionAttached(func(transactionMetadata mempool.TransactionMetadata) {
+			instance.LogTrace("Ledger.TransactionAttached", "tx", transactionMetadata.ID())
+
+			transactionMetadata.OnSolid(func() {
+				instance.LogTrace("MemPool.TransactionSolid", "tx", transactionMetadata.ID())
+			})
+
+			transactionMetadata.OnExecuted(func() {
+				instance.LogTrace("MemPool.TransactionExecuted", "tx", transactionMetadata.ID())
+			})
+
+			transactionMetadata.OnBooked(func() {
+				instance.LogTrace("MemPool.TransactionBooked", "tx", transactionMetadata.ID())
+			})
+
+			transactionMetadata.OnConflicting(func() {
+				instance.LogTrace("MemPool.TransactionConflicting", "tx", transactionMetadata.ID())
+			})
+
+			transactionMetadata.OnAccepted(func() {
+				instance.LogTrace("MemPool.TransactionAccepted", "tx", transactionMetadata.ID())
+			})
+
+			transactionMetadata.OnRejected(func() {
+				instance.LogTrace("MemPool.TransactionRejected", "tx", transactionMetadata.ID())
+			})
+
+			transactionMetadata.OnInvalid(func(err error) {
+				instance.LogTrace("MemPool.TransactionInvalid", "tx", transactionMetadata.ID(), "err", err)
+			})
+
+			transactionMetadata.OnOrphanedSlotUpdated(func(slot iotago.SlotIndex) {
+				instance.LogTrace("MemPool.TransactionOrphanedSlotUpdated", "tx", transactionMetadata.ID(), "slot", slot)
+			})
+
+			transactionMetadata.OnCommittedSlotUpdated(func(slot iotago.SlotIndex) {
+				instance.LogTrace("MemPool.TransactionCommittedSlotUpdated", "tx", transactionMetadata.ID(), "slot", slot)
+			})
+
+			transactionMetadata.OnPending(func() {
+				instance.LogTrace("MemPool.TransactionPending", "tx", transactionMetadata.ID())
+			})
+
+			transactionMetadata.OnEvicted(func() {
+				instance.LogTrace("MemPool.TransactionEvicted", "tx", transactionMetadata.ID())
+			})
+		}).Unhook,
+
+		instance.Ledger.MemPool().OnSignedTransactionAttached(
+			func(signedTransactionMetadata mempool.SignedTransactionMetadata) {
+				signedTransactionMetadata.OnSignaturesInvalid(func(err error) {
+					instance.LogTrace("MemPool.SignedTransactionSignaturesInvalid", "signedTx", signedTransactionMetadata.ID(), "tx", signedTransactionMetadata.TransactionMetadata().ID(), "err", err)
+				})
+			},
+		).Unhook,
+	)
 }
 
 // WithInitializedEngines is a reactive selector that executes the given callback for each managed chain that

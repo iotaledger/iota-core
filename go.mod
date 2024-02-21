@@ -1,6 +1,6 @@
 module github.com/iotaledger/iota-core
 
-go 1.21
+go 1.22
 
 replace github.com/goccy/go-graphviz => github.com/alexsporn/go-graphviz v0.0.0-20231011102718-04f10f0a9b59
 
@@ -10,23 +10,23 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/iotaledger/hive.go/ads v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/app v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/constraints v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/crypto v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/ds v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/ierrors v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/kvstore v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/lo v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/log v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/runtime v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240214175801-9ca9f93790f5
-	github.com/iotaledger/hive.go/stringify v0.0.0-20240214175801-9ca9f93790f5
-	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240214181534-9a393ea95057
-	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240214181217-a6dd0abaab8d
-	github.com/iotaledger/iota-crypto-demo v0.0.0-20231208171603-786bb32fdb00
-	github.com/iotaledger/iota.go/v4 v4.0.0-20240214180848-ff6a4bb7bc41
+	github.com/iotaledger/hive.go/ads v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/app v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/constraints v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/core v1.0.0-rc.3.0.20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/crypto v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/ds v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/ierrors v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/kvstore v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/lo v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/log v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/runtime v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/serializer/v2 v2.0.0-rc.1.0.20240216135101-261e99d9d84a
+	github.com/iotaledger/hive.go/stringify v0.0.0-20240216135101-261e99d9d84a
+	github.com/iotaledger/inx-app v1.0.0-rc.3.0.20240216141618-d7dfe94bdc1e
+	github.com/iotaledger/inx/go v1.0.0-rc.2.0.20240216141023-6d5f4ef12ac5
+	github.com/iotaledger/iota-crypto-demo v0.0.0-20240216103559-27ca8dffd1e7
+	github.com/iotaledger/iota.go/v4 v4.0.0-20240216140514-c867d6524642
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/labstack/gommon v0.4.2
 	github.com/libp2p/go-libp2p v0.32.2
@@ -144,8 +144,8 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pokt-network/smt v0.9.2 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
-	github.com/prometheus/client_model v0.5.0 // indirect
-	github.com/prometheus/common v0.46.0 // indirect
+	github.com/prometheus/client_model v0.6.0 // indirect
+	github.com/prometheus/common v0.47.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/quic-go v0.41.0 // indirect

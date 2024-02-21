@@ -148,11 +148,11 @@ func (t *TestSuite) AssertAccountDiff(accountID iotago.AccountID, index iotago.S
 				return ierrors.Errorf("AssertAccountDiff: %s: expected previous output ID %s but actual %s for account %s at slot %d", node.Name, accountDiff.PreviousOutputID, actualAccountDiff.PreviousOutputID, accountID, index)
 			}
 
-			if !assert.Equal(t.fakeTesting, accountDiff.BlockIssuerKeysAdded, actualAccountDiff.BlockIssuerKeysAdded) {
+			if !assert.True(t.fakeTesting, accountDiff.BlockIssuerKeysAdded.Equal(actualAccountDiff.BlockIssuerKeysAdded)) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys added %s but actual %s for account %s at slot %d", node.Name, accountDiff.BlockIssuerKeysAdded, actualAccountDiff.BlockIssuerKeysAdded, accountID, index)
 			}
 
-			if !assert.Equal(t.fakeTesting, accountDiff.BlockIssuerKeysRemoved, actualAccountDiff.BlockIssuerKeysRemoved) {
+			if !assert.True(t.fakeTesting, accountDiff.BlockIssuerKeysRemoved.Equal(actualAccountDiff.BlockIssuerKeysRemoved)) {
 				return ierrors.Errorf("AssertAccountDiff: %s: expected pub keys removed %s but actual %s for account %s at slot %d", node.Name, accountDiff.BlockIssuerKeysRemoved, actualAccountDiff.BlockIssuerKeysRemoved, accountID, index)
 			}
 

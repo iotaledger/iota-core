@@ -17,7 +17,7 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/iota-core/components/metricstracker"
 	"github.com/iotaledger/iota-core/pkg/daemon"
-	"github.com/iotaledger/iota-core/pkg/network/p2p"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 )
 
@@ -49,7 +49,7 @@ type dependencies struct {
 	Host           host.Host
 	Protocol       *protocol.Protocol
 	AppInfo        *app.Info
-	P2PManager     *p2p.Manager
+	NetworkManager network.Manager
 	MetricsTracker *metricstracker.MetricsTracker
 }
 
@@ -171,28 +171,20 @@ func currentNodeStatus() *nodestatus {
 
 func neighborMetrics() []neighbormetric {
 	var stats []neighbormetric
-	if deps.P2PManager == nil {
+	if deps.NetworkManager == nil {
 		return stats
 	}
 
 	// gossip plugin might be disabled
-	neighbors := deps.P2PManager.AllNeighbors()
+	neighbors := deps.NetworkManager.AllNeighbors()
 	if neighbors == nil {
 		return stats
 	}
 
 	for _, neighbor := range neighbors {
-		// origin := "Inbound"
-		// for _, p := range deps.P2PManager.AllNeighbors() {
-		//	if neighbor.Peer == peer {
-		//		origin = "Outbound"
-		//		break
-		//	}
-		// }
-
 		stats = append(stats, neighbormetric{
-			ID:             neighbor.Peer.ID.String(),
-			Addresses:      fmt.Sprintf("%s", neighbor.Peer.PeerAddresses),
+			ID:             neighbor.Peer().ID.String(),
+			Addresses:      fmt.Sprintf("%s", neighbor.Peer().PeerAddresses),
 			PacketsRead:    neighbor.PacketsRead(),
 			PacketsWritten: neighbor.PacketsWritten(),
 		})

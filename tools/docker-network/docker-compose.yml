@@ -29,7 +29,6 @@ services:
       - ./config.json:/app/config.json:ro
     command: >
       ${COMMON_CONFIG}
-      ${MANUALPEERING_CONFIG}
       --p2p.identityPrivateKey=08735375679f3d8031353e94282ed1d65119e5c288fe56d6639d9184a3f978fee8febfedff11cc376daea0f59c395ae2e9a870a25ac4e36093000fbf4d0e8f18
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
@@ -40,6 +39,9 @@ services:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
     restart: no
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -56,7 +58,7 @@ services:
       - ./config.json:/app/config.json:ro
     command: >
       ${COMMON_CONFIG}
-      ${MANUALPEERING_CONFIG}
+      ${AUTOPEERING_CONFIG}
       --p2p.identityPrivateKey=ba771419c52132a0dfb2521ed18667813f398da159010a55a0a482af939affb92d3338789ad4a07a7631b91791deb11f82ed5dc612822f24275e9f7a313b691f
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
@@ -67,6 +69,9 @@ services:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
     restart: no
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -83,7 +88,7 @@ services:
       - ./config.json:/app/config.json:ro
     command: >
       ${COMMON_CONFIG}
-      ${MANUALPEERING_CONFIG}
+      ${AUTOPEERING_CONFIG}
       --p2p.identityPrivateKey=a6261ac049755675ff1437654ca9f83b305055f01ff08c4f039209ef5a4a7d96d06fb61df77a8815209a8f4d204226dee593e50d0ec897ec440a2c1fbde77656
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
@@ -93,7 +98,10 @@ services:
   node-4-validator:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
-    restart: unless-stopped
+    restart: no
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -110,15 +118,18 @@ services:
       - ./config.json:/app/config.json:ro
     command: >
       ${COMMON_CONFIG}
-      ${MANUALPEERING_CONFIG}
+      ${AUTOPEERING_CONFIG}
       --p2p.identityPrivateKey=f205f6c4525069f71f9c7e987d72421a16c7900056b494a2b85fdf7942cf906aefbdc580f5d1ce4ae3f86ccfe109c6cd76df9b0e710a437b2aa964358c7b9449
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
 
-  node-4:
+  node-5:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
     restart: no
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -135,17 +146,20 @@ services:
       - ./config.json:/app/config.json:ro
     command: >
       ${COMMON_CONFIG}
-      ${MANUALPEERING_CONFIG}
+      ${AUTOPEERING_CONFIG}
       --p2p.identityPrivateKey=03feb3bcd25e57f75697bb329e6e0100680431e4c45c85bc013da2aea9e9d0345e08a0c37407dc62369deebc64cb0fb3ea26127d19d141ee7fb8eaa6b92019d7
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
       --prometheus.goMetrics=true
       --prometheus.processMetrics=true
 
-  node-5:
+  node-6:
     image: docker-network-node-1-validator:latest
     stop_grace_period: 1m
     restart: no
+    depends_on:
+      node-1-validator:
+        condition: service_healthy
     ulimits:
       nofile:
         soft: 16384
@@ -162,7 +176,7 @@ services:
       - ./config.json:/app/config.json:ro
     command: >
       ${COMMON_CONFIG}
-      ${MANUALPEERING_CONFIG}
+      ${AUTOPEERING_CONFIG}
       --p2p.identityPrivateKey=7d1491df3ef334dee988d6cdfc4b430b996d520bd63375a01d6754f8cee979b855b200fbea8c936ea1937a27e6ad72a7c9a21c1b17c2bd3c11f1f6994d813446
       --inx.enabled=true
       --inx.bindAddress=0.0.0.0:9029
@@ -227,7 +241,8 @@ services:
       - iota-core
     command: >
       --inx.address=node-1-validator:9029
-      --restAPI.bindAddress=inx-indexer:9091
+      --restAPI.bindAddress=0.0.0.0:9091
+      --restAPI.advertiseAddress=inx-indexer:9091
 
   inx-mqtt:
     image: iotaledger/inx-mqtt:2.0-alpha
@@ -250,7 +265,7 @@ services:
       node-1-validator:
         condition: service_healthy
       inx-indexer:
-        condition: service_started
+        condition: service_healthy
     networks:
       - iota-core
     environment:
@@ -269,7 +284,7 @@ services:
       node-1-validator:
         condition: service_healthy
       inx-indexer:
-        condition: service_started
+        condition: service_healthy
       inx-blockissuer:
         condition: service_started
     networks:
@@ -285,8 +300,8 @@ services:
       --faucet.baseTokenAmount=1000000000
       --faucet.baseTokenAmountSmall=100000000
       --faucet.baseTokenAmountMaxTarget=5000000000
-      --faucet.manaAmount=10000000
-      --faucet.manaAmountMinFaucet=100000000
+      --faucet.manaAmount=100000000
+      --faucet.manaAmountMinFaucet=1000000000
 
   inx-validator-1:
     image: iotaledger/inx-validator:1.0-alpha
