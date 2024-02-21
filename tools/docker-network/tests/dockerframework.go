@@ -471,9 +471,10 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 		Build(fundsAddrSigner)
 	require.NoError(d.Testing, err)
 
-	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
+	_ = d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
 
-	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+	txID := lo.PanicOnErr(signedTx.Transaction.ID())
+	d.AwaitTransactionPayloadAccepted(ctx, txID)
 
 	return delegationOutput.StartEpoch
 }
@@ -513,7 +514,8 @@ func (d *DockerTestFramework) IncreaseBIC(to *Account) {
 
 	fmt.Println("Allot mana transaction sent, blkID:", blkID.ToHex(), ", txID:", lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), ", slot:", blkID.Slot())
 
-	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+	txID := lo.PanicOnErr(signedTx.Transaction.ID())
+	d.AwaitTransactionPayloadAccepted(ctx, txID)
 
 	// wait until BIC is updated
 	d.AwaitCommitment(blkID.Slot())
@@ -567,7 +569,8 @@ func (d *DockerTestFramework) AllotManaTo(from *Account, to *Account, manaToAllo
 
 	fmt.Println("Allot mana transaction sent, blkID:", blkID.ToHex(), ", txID:", lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), ", slot:", blkID.Slot())
 
-	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+	txID := lo.PanicOnErr(signedTx.Transaction.ID())
+	d.AwaitTransactionPayloadAccepted(ctx, txID)
 }
 
 // CreateNativeToken request faucet funds then use it to create native token for the account, and returns the updated Account.
@@ -641,7 +644,8 @@ func (d *DockerTestFramework) CreateNativeToken(from *Account, mintedAmount iota
 		OutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
 	}
 
-	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+	txID := lo.PanicOnErr(signedTx.Transaction.ID())
+	d.AwaitTransactionPayloadAccepted(ctx, txID)
 
 	fmt.Println("Create native tokens transaction sent, blkID:", blkID.ToHex(), ", txID:", lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), ", slot:", blkID.Slot())
 
@@ -660,6 +664,8 @@ func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iota
 	clt := d.Node("V1").Client
 	slot := blkID.Slot()
 
+	// TODO: maybe we should return the slot in which the transaction was included in the metadata response
+	// so we can get rid of the blockID here.
 	if blkID == iotago.EmptyBlockID {
 		blkMetadata, err := clt.TransactionIncludedBlockMetadata(ctx, txID)
 		require.NoError(d.Testing, err)
@@ -668,7 +674,7 @@ func (d *DockerTestFramework) CheckAccountStatus(ctx context.Context, blkID iota
 		slot = blkMetadata.BlockID.Slot()
 	}
 
-	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+	d.AwaitTransactionPayloadAccepted(ctx, txID)
 
 	// wait for the account to be committed
 	d.AwaitCommitment(slot)

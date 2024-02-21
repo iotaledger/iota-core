@@ -130,13 +130,13 @@ func (r *BlockRetainer) storeBlockData(modelBlock *model.Block, failureCode api.
 	}
 
 	if failureCode == api.BlockFailureNone {
-		return store.StoreBlockAttached(modelBlock.ID(), r.transactionID(modelBlock))
+		return store.StoreBlockBooked(modelBlock.ID())
 	}
 
-	return store.StoreBlockFailure(modelBlock.ID(), failureCode, r.transactionID(modelBlock))
+	return store.StoreBlockFailure(modelBlock.ID(), failureCode)
 }
 
-func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
+func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
 	blockStatus, blockFailureReason := r.blockStatus(blockID)
 	if blockStatus == api.BlockStateUnknown {
 		return nil, ierrors.Errorf("block %s not found", blockID.ToHex())
@@ -147,7 +147,7 @@ func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMe
 		blockStatus = api.BlockStatePending
 	}
 
-	return &retainer.BlockMetadata{
+	return &api.BlockMetadataResponse{
 		BlockID:            blockID,
 		BlockState:         blockStatus,
 		BlockFailureReason: blockFailureReason,
@@ -164,7 +164,7 @@ func (r *BlockRetainer) blockStatus(blockID iotago.BlockID) (api.BlockState, api
 	switch blockData.State {
 	case api.BlockStatePending:
 		if blockID.Slot() <= r.latestCommittedSlotFunc() {
-			return api.BlockStateRejected, blockData.FailureReason
+			return api.BlockStateOrphaned, blockData.FailureReason
 		}
 	case api.BlockStateAccepted, api.BlockStateConfirmed:
 		if blockID.Slot() <= r.finalizedSlotFunc() {
@@ -209,27 +209,9 @@ func (r *BlockRetainer) OnBlockConfirmed(blockID iotago.BlockID) error {
 		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
 	}
 
-	// TODO remove txID returned from StoreBlockConfirmed after merging Andrew's changes
-	_, err = store.StoreBlockConfirmed(blockID)
-	if err != nil {
+	if err := store.StoreBlockConfirmed(blockID); err != nil {
 		return ierrors.Wrapf(err, "")
 	}
 
 	return nil
-}
-
-func (r *BlockRetainer) transactionID(block *model.Block) iotago.TransactionID {
-	tx, hasTx := block.SignedTransaction()
-	if !hasTx {
-		return iotago.EmptyTransactionID
-	}
-
-	txID, err := tx.Transaction.ID()
-	if err != nil {
-		r.errorHandler(ierrors.Wrap(err, "failed to get txID from attached block"))
-
-		return iotago.EmptyTransactionID
-	}
-
-	return txID
 }

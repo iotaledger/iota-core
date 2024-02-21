@@ -31,21 +31,7 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse,
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
 	}
 
-	return blockMetadata.BlockMetadataResponse(), nil
-}
-
-func transactionMetadataByBlockID(blockID iotago.BlockID) (*api.TransactionMetadataResponse, error) {
-	blockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
-	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
-	}
-
-	metadata := blockMetadata.TransactionMetadataResponse()
-	if metadata == nil {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "transaction not found")
-	}
-
-	return metadata, nil
+	return blockMetadata, nil
 }
 
 func blockMetadataByID(c echo.Context) (*api.BlockMetadataResponse, error) {

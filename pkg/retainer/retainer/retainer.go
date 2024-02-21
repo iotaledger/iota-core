@@ -6,7 +6,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
@@ -111,9 +110,9 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 				signedTransactionMetadata.OnSignaturesValid(func() {
 					transactionMetadata := signedTransactionMetadata.TransactionMetadata()
 
-					if err := r.onTransactionAttached(txID); err != nil {
-						r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAttached in retainer"))
-					}
+					//if err := r.onTransactionAttached(txID); err != nil {
+					//	r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAttached in retainer"))
+					//}
 
 					transactionMetadata.OnInvalid(func(err error) {
 						r.RetainTransactionFailure(txID, err)
@@ -124,9 +123,9 @@ func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 					})
 
 					transactionMetadata.OnAccepted(func() {
-						if err := r.onTransactionAccepted(txID); err != nil {
-							r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAccepted in retainer"))
-						}
+						//if err := r.onTransactionAccepted(txID); err != nil {
+						//	r.errorHandler(ierrors.Wrap(err, "failed to store on TransactionAccepted in retainer"))
+						//}
 					})
 				})
 			})
@@ -149,8 +148,8 @@ func (r *Retainer) Shutdown() {
 	r.workerPool.Shutdown()
 }
 
-func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadata, error) {
-	blockState, blockFailureReason, transactionID := r.blockStatus(blockID)
+func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
+	blockState, blockFailureReason := r.blockStatus(blockID)
 	if blockState == api.BlockStateUnknown {
 		return nil, ierrors.Errorf("block %s not found", blockID.ToHex())
 	}
@@ -160,24 +159,16 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*retainer.BlockMetadat
 		blockState = api.BlockStatePending
 	}
 
-	txID, txStatus, txFailureReason := r.transactionStatus(transactionID)
-
-	return &retainer.BlockMetadata{
-		BlockID:                  blockID,
-		BlockState:               blockState,
-		BlockFailureReason:       blockFailureReason,
-		TransactionID:            txID,
-		TransactionState:         txStatus,
-		TransactionFailureReason: txFailureReason,
+	return &api.BlockMetadataResponse{
+		BlockID:            blockID,
+		BlockState:         blockState,
+		BlockFailureReason: blockFailureReason,
 	}, nil
 }
 
 // RetainTransactionFailure stores the transaction failure in the retainer.
-func (r *Retainer) RetainTransactionFailure(txID iotago.TransactionID, reason error) {
-	err := r.store.setTransactionFailure(txID, api.DetermineTransactionFailureReason(reason))
-	if err != nil {
-		r.errorHandler(ierrors.Wrap(err, "failed to store transaction failure in retainer"))
-	}
+func (r *Retainer) RetainTransactionFailure(_ iotago.TransactionID, _ error) {
+	// TODO: remove this method after merging the TX retainer PR
 }
 
 // RegisteredValidatorsCache returns the cached registered validators for the given index.
@@ -200,69 +191,29 @@ func (r *Retainer) RetainRegisteredValidatorsCache(index uint32, resp []*api.Val
 	}
 }
 
-func (r *Retainer) transactionID(block *model.Block) iotago.TransactionID {
-	tx, hasTx := block.SignedTransaction()
-	if !hasTx {
-		return iotago.EmptyTransactionID
-	}
-
-	txID, err := tx.Transaction.ID()
-	if err != nil {
-		r.errorHandler(ierrors.Wrap(err, "failed to get txID from attached block"))
-
-		return iotago.EmptyTransactionID
-	}
-
-	return txID
-}
-
-func (r *Retainer) blockStatus(blockID iotago.BlockID) (api.BlockState, api.BlockFailureReason, iotago.TransactionID) {
+func (r *Retainer) blockStatus(blockID iotago.BlockID) (api.BlockState, api.BlockFailureReason) {
 	blockData, err := r.store.getBlockData(blockID)
 	if err != nil {
 		r.errorHandler(ierrors.Wrapf(err, "could not get block data for slot %d", blockID.Slot()))
-		return api.BlockStateUnknown, api.BlockFailureNone, iotago.EmptyTransactionID
+		return api.BlockStateUnknown, api.BlockFailureNone
 	}
 
 	switch blockData.State {
 	case api.BlockStatePending:
 		if blockID.Slot() <= r.latestCommittedSlotFunc() {
-			return api.BlockStateOrphaned, blockData.FailureReason, blockData.TransactionID
+			return api.BlockStateOrphaned, blockData.FailureReason
 		}
 	case api.BlockStateAccepted, api.BlockStateConfirmed:
 		if blockID.Slot() <= r.finalizedSlotFunc() {
-			return api.BlockStateFinalized, api.BlockFailureNone, blockData.TransactionID
+			return api.BlockStateFinalized, api.BlockFailureNone
 		}
 	}
 
-	return blockData.State, blockData.FailureReason, blockData.TransactionID
-}
-
-func (r *Retainer) transactionStatus(transactionID iotago.TransactionID) (iotago.TransactionID, api.TransactionState, api.TransactionFailureReason) {
-	if transactionID == iotago.EmptyTransactionID {
-		return iotago.EmptyTransactionID, api.TransactionStateNoTransaction, api.TxFailureNone
-	}
-
-	txData, err := r.store.getTransactionData(transactionID)
-	if err != nil {
-		r.errorHandler(ierrors.Wrapf(err, "could not get transaction data for transaction %s", transactionID.String()))
-		return transactionID, api.TransactionStateNoTransaction, api.TxFailureNone
-	}
-
-	// check if any attachment is already confirmed
-	if txData.State == api.TransactionStateConfirmed {
-		// is attachmetn already finalized?
-		if txData.ConfirmedAttachmentSlot <= r.finalizedSlotFunc() {
-			return transactionID, api.TransactionStateFinalized, api.TxFailureNone
-		}
-
-		return transactionID, api.TransactionStateConfirmed, api.TxFailureNone
-	}
-
-	return transactionID, txData.State, txData.FailureReason
+	return blockData.State, blockData.FailureReason
 }
 
 func (r *Retainer) onBlockBooked(block *blocks.Block) error {
-	if err := r.store.setBlockBooked(block.ID(), r.transactionID(block.ModelBlock())); err != nil {
+	if err := r.store.setBlockBooked(block.ID()); err != nil {
 		return err
 	}
 
@@ -281,12 +232,4 @@ func (r *Retainer) onBlockConfirmed(blockID iotago.BlockID) error {
 
 func (r *Retainer) onBlockDropped(blockID iotago.BlockID) error {
 	return r.store.setBlockDropped(blockID)
-}
-
-func (r *Retainer) onTransactionAttached(txID iotago.TransactionID) error {
-	return r.store.setTransactionNoFailure(txID, api.TransactionStatePending)
-}
-
-func (r *Retainer) onTransactionAccepted(txID iotago.TransactionID) error {
-	return r.store.setTransactionNoFailure(txID, api.TransactionStateAccepted)
 }

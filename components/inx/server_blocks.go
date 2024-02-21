@@ -14,7 +14,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 func (s *Server) ReadActiveRootBlocks(_ context.Context, _ *inx.NoParams) (*inx.RootBlocksResponse, error) {
@@ -196,21 +195,9 @@ func (s *Server) attachBlock(ctx context.Context, block *iotago.Block) (*inx.Blo
 }
 
 func getINXBlockMetadata(blockID iotago.BlockID) (*inx.BlockMetadata, error) {
-	retainerBlockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
+	blockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
 	if err != nil {
 		return nil, ierrors.Errorf("failed to get BlockMetadata: %v", err)
-	}
-
-	// TODO: the retainer should store the blockMetadataResponse directly
-	blockMetadata := &api.BlockMetadataResponse{
-		BlockID:            retainerBlockMetadata.BlockID,
-		BlockState:         retainerBlockMetadata.BlockState,
-		BlockFailureReason: retainerBlockMetadata.BlockFailureReason,
-		TransactionMetadata: &api.TransactionMetadataResponse{
-			TransactionID:            iotago.EmptyTransactionID, // TODO: change the retainer to store the transaction ID
-			TransactionState:         retainerBlockMetadata.TransactionState,
-			TransactionFailureReason: retainerBlockMetadata.TransactionFailureReason,
-		},
 	}
 
 	return inx.WrapBlockMetadata(blockMetadata)
