@@ -109,7 +109,7 @@ func (s *Storage) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.Commitme
 	return s.prunable.Roots(slot)
 }
 
-func (s *Storage) SlotStore(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
+func (s *Storage) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
 	if err := s.permanent.Settings().AdvanceLatestStoredSlot(slot); err != nil {
 		return nil, ierrors.Wrap(err, "failed to advance latest stored slot when accessing retainer")
 	}

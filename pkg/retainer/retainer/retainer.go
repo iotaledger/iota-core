@@ -56,7 +56,7 @@ func New(workersGroup *workerpool.Group, slotStoreFunc SlotStoreFunc, latestComm
 func NewProvider() module.Provider[*engine.Engine, retainer.Retainer] {
 	return module.Provide(func(e *engine.Engine) retainer.Retainer {
 		r := New(e.Workers.CreateGroup("Retainer"),
-			e.Storage.SlotStore,
+			e.Storage.Retainer,
 			func() iotago.SlotIndex {
 				// use settings in case SyncManager is not constructed yet.
 				if e.SyncManager == nil {
