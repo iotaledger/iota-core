@@ -45,7 +45,7 @@ func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []*model.Commit
 				return nil
 			})
 
-			if selectedChain == nil {
+			if chainID != iotago.EmptyCommitmentID && selectedChain == nil {
 				return ierrors.Errorf("AssertCommitmentsOnChain: %s: chain with forking point %s not found", node.Name, chainID)
 			}
 
@@ -63,7 +63,7 @@ func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []*model.Commit
 				}
 
 				// Check that the chain has correct commitments assigned in its metadata.
-				{
+				if selectedChain != nil {
 					commitment, exists := selectedChain.Commitment(expectedCommitment.Slot())
 					if !exists {
 						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment for slot %d does not exist on the selected chain %s", node.Name, expectedCommitment.Slot(), chainID)

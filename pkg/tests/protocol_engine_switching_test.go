@@ -12,10 +12,10 @@ import (
 	"github.com/iotaledger/hive.go/core/eventticker"
 	"github.com/iotaledger/hive.go/ds"
 	"github.com/iotaledger/hive.go/lo"
-	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/core/account"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
@@ -113,8 +113,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}
 
 	ts.Run(false, nodeOptions)
-
-	node6.Protocol.SetLogLevel(log.LevelTrace)
 
 	expectedCommittee := []iotago.AccountID{
 		node0.Validator.AccountID,
@@ -265,9 +263,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP1...)
 		ts.AssertUniqueCommitmentChain(nodesP1...)
-		//ts.AssertCommitmentsOnChain(commitments, chain, nodes...)
-
-		//ts.AssertCommitmentsOrphaned(commitments, bool, nodes...)
+		ts.AssertCommitmentsOnChain(ts.CommitmentsOfMainEngine(node0, 13, 18), ts.CommitmentOfMainEngine(node0, 13).ID(), nodesP1...)
+		ts.AssertCommitmentsOrphaned(ts.CommitmentsOfMainEngine(node0, 13, 18), false, nodesP1...)
 
 		// Make sure the tips are properly set.
 		var tipBlocks []*blocks.Block
@@ -276,6 +273,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		}
 		ts.AssertStrongTips(tipBlocks, nodesP1...)
 	}
+
+	var engineCommitmentsP2 []*model.Commitment
 
 	// Issue blocks in partition 2.
 	{
@@ -291,8 +290,11 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithEvictedSlot(18),
 		)
 
+		engineCommitmentsP2 = ts.CommitmentsOfMainEngine(node6, 6, 18)
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP2...)
 		ts.AssertUniqueCommitmentChain(nodesP2...)
+		ts.AssertCommitmentsOnChain(engineCommitmentsP2, ts.CommitmentOfMainEngine(node0, 6).ID(), nodesP2...)
+		ts.AssertCommitmentsOrphaned(engineCommitmentsP2, false, nodesP2...)
 
 		for _, slot := range []iotago.SlotIndex{12, 13, 14, 15} {
 			var attestationBlocks []*blocks.Block
@@ -380,8 +382,10 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		wg.Wait()
 	}
 
-	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
-	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
+	lastFinalizedSlot := node0.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - 4
+	ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
+		return commitment.Slot() >= lastFinalizedSlot
+	})
 
 	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
 	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
@@ -391,6 +395,19 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, ts.Nodes()...)
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
+
+	commitmentsMainChain := ts.CommitmentsOfMainEngine(node0, node0.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot()-4, expectedCommittedSlotAfterPartitionMerge)
+
+	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
+	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
+	ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+	ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(node0, lastFinalizedSlot).ID(), ts.Nodes()...)
+	// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
+
+	// TODO: assert chain count
+	// TODO: assert that Protocol only contains commitments from above the eviction point.
 }
 
 func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {

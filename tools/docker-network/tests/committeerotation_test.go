@@ -211,11 +211,11 @@ func Test_Staking(t *testing.T) {
 }
 
 // Test_Delegation tests if committee changed due to delegation.
-// initial stake: V1 > V2 > V3 > V4
-// 1. Run docker network, targetCommitteeSize=3, with 4 validators running. Committee members are: V1, V2, V3
+// initial settings are exact the same: V1 = V2 = V3 = V4, so committee is selected regarding the accountID order which is V4 > V1 > V3 > V2
+// 1. Run docker network, targetCommitteeSize=3, with 4 validators running. Committee members are: V1, V3, V4
 // 2. Create an account for delegation.
-// 3. Delegate requested faucet funds to V4, V4 should replace V3 as a committee member. (V4 > V1 > V2 > V3)
-// 4. Delegate requested faucet funds to V3, V3 should replace V2 as a committee member. (V3 > V4 > V1 > V2)
+// 3. Delegate requested faucet funds to V2, V2 should replace V3 as a committee member. (V2 > V4 > V1 > V3)
+// 4. Delegate requested faucet funds to V3, V3 should replace V1 as a committee member. (V3 > V2 > V4 > V1)
 func Test_Delegation(t *testing.T) {
 	d := NewDockerTestFramework(t,
 		WithProtocolParametersOptions(
@@ -226,9 +226,13 @@ func Test_Delegation(t *testing.T) {
 		))
 	defer d.Stop()
 
+	// V1 pubKey in hex: 0x293dc170d9a59474e6d81cfba7f7d924c09b25d7166bcfba606e53114d0a758b
 	d.AddValidatorNode("V1", "docker-network-inx-validator-1-1", "http://localhost:8050", "rms1pzg8cqhfxqhq7pt37y8cs4v5u4kcc48lquy2k73ehsdhf5ukhya3y5rx2w6")
+	// V2 pubKey in hex: 0x05c1de274451db8de8182d64c6ee0dca3ae0c9077e0b4330c976976171d79064
 	d.AddValidatorNode("V2", "docker-network-inx-validator-2-1", "http://localhost:8060", "rms1pqm4xk8e9ny5w5rxjkvtp249tfhlwvcshyr3pc0665jvp7g3hc875k538hl")
+	// V3 pubKey in hex: 0x1e4b21eb51dcddf65c20db1065e1f1514658b23a3ddbf48d30c0efc926a9a648
 	d.AddValidatorNode("V3", "docker-network-inx-validator-3-1", "http://localhost:8070", "rms1pp4wuuz0y42caz48vv876qfpmffswsvg40zz8v79sy8cp0jfxm4kunflcgt")
+	// V4 pubKey in hex: 0xc9ceac37d293155a578381aa313ee74edfa3ac73ee930d045564aae7771e8ffe
 	d.AddValidatorNode("V4", "docker-network-inx-validator-4-1", "http://localhost:8040", "rms1pr8cxs3dzu9xh4cduff4dd4cxdthpjkpwmz2244f75m0urslrsvtsshrrjw")
 	d.AddNode("node5", "docker-network-node-5-1", "http://localhost:8090")
 
@@ -240,11 +244,11 @@ func Test_Delegation(t *testing.T) {
 	// create an account to perform delegation
 	account := d.CreateAccount()
 
-	// delegate all faucet funds to V4, V4 should replace V3
-	delegationStartEpoch := d.DelegateToValidator(account, d.Node("V4"))
+	// delegate all faucet funds to V2, V2 should replace V3
+	delegationStartEpoch := d.DelegateToValidator(account, d.Node("V2"))
 	d.AssertCommittee(delegationStartEpoch+1, d.AccountsFromNodes(d.Nodes("V1", "V2", "V4")...))
 
-	// delegate all faucet funds to V3, V3 should replace V2
+	// delegate all faucet funds to V3, V3 should replace V1
 	delegationStartEpoch = d.DelegateToValidator(account, d.Node("V3"))
-	d.AssertCommittee(delegationStartEpoch+1, d.AccountsFromNodes(d.Nodes("V1", "V3", "V4")...))
+	d.AssertCommittee(delegationStartEpoch+1, d.AccountsFromNodes(d.Nodes("V2", "V3", "V4")...))
 }

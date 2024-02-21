@@ -99,6 +99,7 @@ Example:
 | [connectionManager](#p2p_connectionmanager) | Configuration for connectionManager                           | object |                                              |
 | externalMultiAddresses                      | External reacheable multi addresses advertised to the network | array  |                                              |
 | identityPrivateKey                          | Private key used to derive the node identity (optional)       | string | ""                                           |
+| [autopeering](#p2p_autopeering)             | Configuration for autopeering                                 | object |                                              |
 | [db](#p2p_db)                               | Configuration for db                                          | object |                                              |
 
 ### <a id="p2p_connectionmanager"></a> ConnectionManager
@@ -107,6 +108,12 @@ Example:
 | ------------- | ---------------------------------------------------------------------------- | ---- | ------------- |
 | highWatermark | The threshold up on which connections count truncates to the lower watermark | int  | 10            |
 | lowWatermark  | The minimum connections count to hold after the high watermark was reached   | int  | 5             |
+
+### <a id="p2p_autopeering"></a> Autopeering
+
+| Name     | Description                                                              | Type | Default value |
+| -------- | ------------------------------------------------------------------------ | ---- | ------------- |
+| maxPeers | The max number of autopeer connections. Set to 0 to disable autopeering. | int  | 5             |
 
 ### <a id="p2p_db"></a> Db
 
@@ -129,6 +136,9 @@ Example:
       },
       "externalMultiAddresses": [],
       "identityPrivateKey": "",
+      "autopeering": {
+        "maxPeers": 5
+      },
       "db": {
         "path": "testnet/p2pstore"
       }

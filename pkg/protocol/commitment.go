@@ -275,7 +275,9 @@ func (c *Commitment) initDerivedProperties() (shutdown func()) {
 				parent.deriveChildren(c),
 
 				c.deriveOrphaned(parent),
+
 				c.deriveChain(parent),
+
 				c.deriveCumulativeAttestedWeight(parent),
 				c.deriveIsAboveLatestVerifiedCommitment(parent),
 
@@ -349,7 +351,7 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 				return currentChain
 			}
 
-			if parentChain == currentChain {
+			if parentChain == currentChain || mainChild == nil {
 				return nil
 			}
 
@@ -369,20 +371,20 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 }
 
 func (c *Commitment) deriveOrphaned(parent *Commitment) func() {
-	return c.IsOrphaned.DeriveValueFrom(reactive.NewDerivedVariable3(func(isOrphaned bool, isParentOrphaned bool, isParentEvicted bool, isRoot bool) bool {
+	return c.IsOrphaned.DeriveValueFrom(reactive.NewDerivedVariable4(func(isOrphaned bool, isParentOrphaned bool, isParentEvicted bool, isRoot bool, rootCommitment *Commitment) bool {
 		// if the commitment is orphaned, we exit early
 		if isOrphaned {
 			return true
 		}
 
 		// If the parent was evicted and the current commitment is not root, it is marked as orphaned.
-		if isParentEvicted && !isRoot {
+		if isParentEvicted && !isRoot && rootCommitment.Slot() <= c.Slot() {
 			return true
 		}
 
 		// As a last resort, inherit the orphaned flag from the parent.
 		return isParentOrphaned
-	}, parent.IsOrphaned, parent.IsEvicted, c.IsRoot))
+	}, parent.IsOrphaned, parent.IsEvicted, c.IsRoot, c.commitments.Root))
 }
 
 // deriveCumulativeAttestedWeight derives the CumulativeAttestedWeight of this Commitment which is the sum of the
