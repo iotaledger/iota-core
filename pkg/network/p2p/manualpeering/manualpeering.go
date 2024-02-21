@@ -48,7 +48,7 @@ type Manager struct {
 func NewManager(networkManager network.Manager, logger log.Logger) *Manager {
 	m := &Manager{
 		networkManager:    networkManager,
-		logger:            logger,
+		logger:            logger.NewChildLogger("ManualPeering"),
 		reconnectInterval: network.DefaultReconnectInterval,
 		knownPeers:        make(map[peer.ID]*network.Peer),
 	}

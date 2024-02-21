@@ -10,6 +10,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/discovery"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/libp2p/go-libp2p/p2p/discovery/util"
 
@@ -31,6 +32,10 @@ type Manager struct {
 	ctx              context.Context
 	stopFunc         context.CancelFunc
 	routingDiscovery *routing.RoutingDiscovery
+
+	advertiseLock   sync.Mutex
+	advertiseCtx    context.Context
+	advertiseCancel context.CancelFunc
 }
 
 // NewManager creates a new autopeering manager.
@@ -40,7 +45,7 @@ func NewManager(maxPeers int, networkManager network.Manager, host host.Host, pe
 		networkManager: networkManager,
 		host:           host,
 		peerDB:         peerDB,
-		logger:         logger,
+		logger:         logger.NewChildLogger("Autopeering"),
 	}
 }
 
@@ -52,20 +57,30 @@ func (m *Manager) MaxNeighbors() int {
 func (m *Manager) Start(ctx context.Context, networkID string) (err error) {
 	//nolint:contextcheck
 	m.startOnce.Do(func() {
-		m.namespace = fmt.Sprintf("/iota/%s/1.0.0", networkID)
-		m.ctx, m.stopFunc = context.WithCancel(ctx)
-		kademliaDHT, innerErr := dht.New(m.ctx, m.host, dht.Mode(dht.ModeServer))
+		// We will use /iota/networkID/kad/1.0.0 for the DHT protocol.
+		// And /iota/networkID/iota-core/1.0.0 for the peer discovery.
+		prefix := protocol.ID("/iota")
+		extension := protocol.ID(fmt.Sprintf("/%s", networkID))
+		m.namespace = fmt.Sprintf("%s%s/%s", prefix, extension, network.CoreProtocolID)
+		dhtCtx, dhtCancel := context.WithCancel(ctx)
+		kademliaDHT, innerErr := dht.New(dhtCtx, m.host, dht.Mode(dht.ModeServer), dht.ProtocolPrefix(prefix), dht.ProtocolExtension(extension))
 		if innerErr != nil {
 			err = innerErr
+			dhtCancel()
+
 			return
 		}
 
 		// Bootstrap the DHT. In the default configuration, this spawns a Background worker that will keep the
 		// node connected to the bootstrap peers and will disconnect from peers that are not useful.
-		if innerErr = kademliaDHT.Bootstrap(m.ctx); innerErr != nil {
+		if innerErr = kademliaDHT.Bootstrap(dhtCtx); innerErr != nil {
 			err = innerErr
+			dhtCancel()
+
 			return
 		}
+
+		m.ctx = dhtCtx
 
 		for _, seedPeer := range m.peerDB.SeedPeers() {
 			addrInfo := seedPeer.ToAddrInfo()
@@ -83,9 +98,22 @@ func (m *Manager) Start(ctx context.Context, networkID string) (err error) {
 		}
 
 		m.routingDiscovery = routing.NewRoutingDiscovery(kademliaDHT)
-		util.Advertise(m.ctx, m.routingDiscovery, m.namespace, discovery.TTL(5*time.Minute))
-
+		m.startAdvertisingIfNeeded()
 		go m.discoveryLoop()
+
+		onGossipNeighborRemovedHook := m.networkManager.OnNeighborRemoved(func(_ network.Neighbor) {
+			m.startAdvertisingIfNeeded()
+		})
+		onGossipNeighborAddedHook := m.networkManager.OnNeighborAdded(func(_ network.Neighbor) {
+			m.stopAdvertisingItNotNeeded()
+		})
+
+		m.stopFunc = func() {
+			dhtCancel()
+			onGossipNeighborRemovedHook.Unhook()
+			onGossipNeighborAddedHook.Unhook()
+			m.stopAdvertising()
+		}
 
 		m.isStarted.Store(true)
 	})
@@ -100,9 +128,43 @@ func (m *Manager) Stop() error {
 	}
 	m.stopOnce.Do(func() {
 		m.stopFunc()
+		m.stopAdvertising()
 	})
 
 	return nil
+}
+
+func (m *Manager) startAdvertisingIfNeeded() {
+	m.advertiseLock.Lock()
+	defer m.advertiseLock.Unlock()
+
+	if len(m.networkManager.AutopeeringNeighbors()) >= m.maxPeers {
+		return
+	}
+
+	if m.advertiseCtx == nil && m.ctx.Err() == nil {
+		m.logger.LogInfof("Start advertising for namespace %s", m.namespace)
+		m.advertiseCtx, m.advertiseCancel = context.WithCancel(m.ctx)
+		util.Advertise(m.advertiseCtx, m.routingDiscovery, m.namespace, discovery.TTL(time.Minute))
+	}
+}
+
+func (m *Manager) stopAdvertisingItNotNeeded() {
+	if len(m.networkManager.AutopeeringNeighbors()) >= m.maxPeers {
+		m.stopAdvertising()
+	}
+}
+
+func (m *Manager) stopAdvertising() {
+	m.advertiseLock.Lock()
+	defer m.advertiseLock.Unlock()
+
+	if m.advertiseCancel != nil {
+		m.logger.LogInfof("Stop advertising for namespace %s", m.namespace)
+		m.advertiseCancel()
+		m.advertiseCtx = nil
+		m.advertiseCancel = nil
+	}
 }
 
 func (m *Manager) discoveryLoop() {
@@ -122,16 +184,28 @@ func (m *Manager) discoveryLoop() {
 }
 
 func (m *Manager) discoverAndDialPeers() {
-	peersToFind := m.maxPeers - m.networkManager.AutopeeringNeighborsCount()
-	if peersToFind <= 0 {
-		m.logger.LogDebug("Enough autopeering peers connected, not discovering new ones")
+	autopeeringNeighbors := m.networkManager.AutopeeringNeighbors()
+	peersToFind := m.maxPeers - len(autopeeringNeighbors)
+	if peersToFind == 0 {
+		m.logger.LogDebugf("%d autopeering peers connected, not discovering new ones", len(autopeeringNeighbors))
+		return
+	}
+
+	if peersToFind < 0 {
+		m.logger.LogDebugf("Too many autopeering peers connected %d, disconnecting some", -peersToFind)
+		for i := peersToFind; i < 0; i++ {
+			if err := m.networkManager.DropNeighbor(autopeeringNeighbors[i].Peer().ID); err != nil {
+				m.logger.LogDebugf("Failed to disconnect neighbor %s", autopeeringNeighbors[i].Peer().ID)
+			}
+		}
+
 		return
 	}
 
 	findCtx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
 	defer cancel()
 
-	m.logger.LogDebugf("Discovering new peers for namespace %s", m.namespace)
+	m.logger.LogDebugf("%d autopeering peers connected. Discovering new peers for namespace %s", len(autopeeringNeighbors), m.namespace)
 	peerChan, err := m.routingDiscovery.FindPeers(findCtx, m.namespace)
 	if err != nil {
 		m.logger.LogWarnf("Failed to find peers: %s", err)
@@ -159,7 +233,8 @@ func (m *Manager) discoverAndDialPeers() {
 		peer := network.NewPeerFromAddrInfo(&peerAddrInfo)
 		if err := m.networkManager.DialPeer(m.ctx, peer); err != nil {
 			m.logger.LogWarnf("Failed to dial peer %s: %s", peerAddrInfo, err)
+		} else {
+			peersToFind--
 		}
-		peersToFind--
 	}
 }

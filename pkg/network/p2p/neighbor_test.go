@@ -83,7 +83,7 @@ func newTestNeighbor(name string, stream p2pnetwork.Stream, packetReceivedFunc .
 		packetReceived = func(neighbor *neighbor, packet proto.Message) {}
 	}
 
-	return newNeighbor(lo.Return1(testLogger.NewChildLogger(name)), newTestPeer(name), NewPacketsStream(stream, packetFactory), packetReceived, func(neighbor *neighbor) {})
+	return newNeighbor(lo.Return1(testLogger.NewChildLogger(name)), newTestPeer(name), NewPacketsStream(stream, packetFactory), packetReceived, func(neighbor *neighbor) {}, func(neighbor *neighbor) {})
 }
 
 func packetFactory() proto.Message {

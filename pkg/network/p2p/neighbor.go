@@ -24,6 +24,7 @@ type queuedPacket struct {
 
 type (
 	PacketReceivedFunc       func(neighbor *neighbor, packet proto.Message)
+	NeighborConnectedFunc    func(neighbor *neighbor)
 	NeighborDisconnectedFunc func(neighbor *neighbor)
 )
 
@@ -34,8 +35,11 @@ type neighbor struct {
 	logger log.Logger
 
 	packetReceivedFunc PacketReceivedFunc
-	disconnectedFunc   NeighborDisconnectedFunc
 
+	connectedFunc    NeighborConnectedFunc
+	disconnectedFunc NeighborDisconnectedFunc
+
+	connectOnce    sync.Once
 	disconnectOnce sync.Once
 	wg             sync.WaitGroup
 
@@ -50,13 +54,14 @@ type neighbor struct {
 var _ network.Neighbor = (*neighbor)(nil)
 
 // newNeighbor creates a new neighbor from the provided peer and connection.
-func newNeighbor(parentLogger log.Logger, p *network.Peer, stream *PacketsStream, packetReceivedCallback PacketReceivedFunc, disconnectedCallback NeighborDisconnectedFunc) *neighbor {
+func newNeighbor(parentLogger log.Logger, p *network.Peer, stream *PacketsStream, packetReceivedCallback PacketReceivedFunc, connectedCallback NeighborConnectedFunc, disconnectedCallback NeighborDisconnectedFunc) *neighbor {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	n := &neighbor{
 		peer:               p,
 		logger:             parentLogger.NewChildLogger("peer", true),
 		packetReceivedFunc: packetReceivedCallback,
+		connectedFunc:      connectedCallback,
 		disconnectedFunc:   disconnectedCallback,
 		loopCtx:            ctx,
 		loopCtxCancel:      cancel,
@@ -122,6 +127,9 @@ func (n *neighbor) readLoop() {
 
 				return
 			}
+			n.connectOnce.Do(func() {
+				n.connectedFunc(n)
+			})
 			n.packetReceivedFunc(n, packet)
 		}
 	}(n.stream)
