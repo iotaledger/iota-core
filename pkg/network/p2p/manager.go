@@ -38,6 +38,8 @@ type Manager struct {
 	libp2pHost host.Host
 	peerDB     *network.DB
 
+	ctx context.Context
+
 	logger log.Logger
 
 	shutdownMutex syncutils.RWMutex
@@ -158,6 +160,8 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer) error {
 
 // Start starts the manager and initiates manual- and autopeering.
 func (m *Manager) Start(ctx context.Context, networkID string) error {
+	m.ctx = ctx
+
 	m.manualPeering.Start()
 
 	if m.autoPeering.MaxNeighbors() > 0 {
@@ -283,6 +287,12 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 
 	m.allowPeerMutex.Lock()
 	defer m.allowPeerMutex.Unlock()
+	if m.ctx.Err() != nil {
+		m.logger.LogDebugf("aborting handling stream, context is done")
+		m.closeStream(stream)
+
+		return
+	}
 
 	peerID := stream.Conn().RemotePeer()
 
@@ -314,7 +324,7 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 		return
 	}
 
-	if err := m.addNeighbor(context.Background(), networkPeer, ps); err != nil {
+	if err := m.addNeighbor(m.ctx, networkPeer, ps); err != nil {
 		m.logger.LogErrorf("failed to add neighbor, peerID: %s, error: %s", peerID, err)
 		m.closeStream(stream)
 
