@@ -16,7 +16,7 @@ import (
 
 func main() {
 	parsedOpts, configSelected := parseFlags()
-	opts := presets.Base
+	opts := presets.SnapshotOptionsBase
 	if strings.Contains(configSelected, ".yml") {
 		yamlOpts, err := presets.GenerateFromYaml(configSelected)
 		if err != nil {
@@ -26,9 +26,9 @@ func main() {
 	} else {
 		switch configSelected {
 		case "docker":
-			opts = append(opts, presets.Docker...)
+			opts = append(opts, presets.SnapshotOptionsDocker...)
 		case "feature":
-			opts = append(opts, presets.Feature...)
+			opts = append(opts, presets.SnapshotOptionsFeature...)
 		default:
 			configSelected = "default"
 		}

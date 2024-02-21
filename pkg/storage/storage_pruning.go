@@ -223,5 +223,7 @@ func (s *Storage) pruneUntilEpoch(startEpoch iotago.EpochIndex, targetEpoch iota
 
 	s.lastPrunedEpoch.MarkEvicted(targetEpoch)
 
+	s.Pruned.Trigger(targetEpoch)
+
 	return nil
 }

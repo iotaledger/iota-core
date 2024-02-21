@@ -5,12 +5,8 @@ package daemon
 
 const (
 	PriorityCloseDatabase = iota // no dependencies
-	PriorityPeerDatabase
 	PriorityP2P
-	PriorityManualPeering
 	PriorityProtocol
-	PriorityBlockIssuer
-	PriorityActivity // depends on BlockIssuer
 	PriorityRestAPI
 	PriorityINX
 	PriorityDashboardMetrics
