@@ -158,7 +158,7 @@ func (a *Attestations) sendRequest(commitmentID iotago.CommitmentID) {
 // processResponse processes the given attestation response.
 func (a *Attestations) processResponse(commitment *model.Commitment, attestations []*iotago.Attestation, merkleProof *merklehasher.Proof[iotago.Identifier], from peer.ID) {
 	a.workerPool.Submit(func() {
-		publishedCommitment, _, err := a.protocol.Commitments.publishCommitment(commitment)
+		publishedCommitment, _, err := a.protocol.Commitments.publishCommitment(commitment, false)
 		if err != nil {
 			a.LogDebug("failed to publish commitment when processing attestations", "commitmentID", commitment.ID(), "peer", from, "error", err)
 
