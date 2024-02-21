@@ -51,7 +51,7 @@ func TestNeighborWrite(t *testing.T) {
 	defer teardown()
 
 	var countA uint32
-	neighborA := newTestNeighbor("A", a, func(neighbor *Neighbor, packet proto.Message) {
+	neighborA := newTestNeighbor("A", a, func(neighbor *neighbor, packet proto.Message) {
 		_ = packet.(*p2pproto.Negotiation)
 		atomic.AddUint32(&countA, 1)
 	})
@@ -59,7 +59,7 @@ func TestNeighborWrite(t *testing.T) {
 	neighborA.readLoop()
 
 	var countB uint32
-	neighborB := newTestNeighbor("B", b, func(neighbor *Neighbor, packet proto.Message) {
+	neighborB := newTestNeighbor("B", b, func(neighbor *neighbor, packet proto.Message) {
 		_ = packet.(*p2pproto.Negotiation)
 		atomic.AddUint32(&countB, 1)
 	})
@@ -75,15 +75,15 @@ func TestNeighborWrite(t *testing.T) {
 	assert.Eventually(t, func() bool { return atomic.LoadUint32(&countB) == 1 }, time.Second, 10*time.Millisecond)
 }
 
-func newTestNeighbor(name string, stream p2pnetwork.Stream, packetReceivedFunc ...PacketReceivedFunc) *Neighbor {
+func newTestNeighbor(name string, stream p2pnetwork.Stream, packetReceivedFunc ...PacketReceivedFunc) *neighbor {
 	var packetReceived PacketReceivedFunc
 	if len(packetReceivedFunc) > 0 {
 		packetReceived = packetReceivedFunc[0]
 	} else {
-		packetReceived = func(neighbor *Neighbor, packet proto.Message) {}
+		packetReceived = func(neighbor *neighbor, packet proto.Message) {}
 	}
 
-	return NewNeighbor(lo.Return1(testLogger.NewChildLogger(name)), newTestPeer(name), NewPacketsStream(stream, packetFactory), packetReceived, func(neighbor *Neighbor) {})
+	return newNeighbor(lo.Return1(testLogger.NewChildLogger(name)), newTestPeer(name), NewPacketsStream(stream, packetFactory), packetReceived, func(neighbor *neighbor) {})
 }
 
 func packetFactory() proto.Message {

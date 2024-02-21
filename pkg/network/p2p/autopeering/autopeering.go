@@ -16,12 +16,12 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/iota-core/pkg/network"
-	"github.com/iotaledger/iota-core/pkg/network/p2p"
 )
 
 type Manager struct {
 	namespace        string
-	p2pManager       *p2p.Manager
+	maxPeers         int
+	networkManager   network.Manager
 	logger           log.Logger
 	host             host.Host
 	peerDB           *network.DB
@@ -34,20 +34,25 @@ type Manager struct {
 }
 
 // NewManager creates a new autopeering manager.
-func NewManager(networkID string, p2pManager *p2p.Manager, host host.Host, peerDB *network.DB, logger log.Logger) *Manager {
+func NewManager(maxPeers int, networkManager network.Manager, host host.Host, peerDB *network.DB, logger log.Logger) *Manager {
 	return &Manager{
-		namespace:  fmt.Sprintf("/iota/%s/1.0.0", networkID),
-		p2pManager: p2pManager,
-		host:       host,
-		peerDB:     peerDB,
-		logger:     logger,
+		maxPeers:       maxPeers,
+		networkManager: networkManager,
+		host:           host,
+		peerDB:         peerDB,
+		logger:         logger,
 	}
 }
 
+func (m *Manager) MaxNeighbors() int {
+	return m.maxPeers
+}
+
 // Start starts the autopeering manager.
-func (m *Manager) Start(ctx context.Context) (err error) {
+func (m *Manager) Start(ctx context.Context, networkID string) (err error) {
 	//nolint:contextcheck
 	m.startOnce.Do(func() {
+		m.namespace = fmt.Sprintf("/iota/%s/1.0.0", networkID)
 		m.ctx, m.stopFunc = context.WithCancel(ctx)
 		kademliaDHT, innerErr := dht.New(m.ctx, m.host, dht.Mode(dht.ModeServer))
 		if innerErr != nil {
@@ -117,6 +122,12 @@ func (m *Manager) discoveryLoop() {
 }
 
 func (m *Manager) discoverAndDialPeers() {
+	//peersToFind := m.maxPeers - len(m.p2pManager.AutopeeredNeighbors())
+	//if peersToFind <= 0 {
+	//	m.logger.LogDebugf("Enough autopeering peers connected, not discovering new ones")
+	//	return
+	//}
+
 	findCtx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
 	defer cancel()
 
@@ -128,21 +139,27 @@ func (m *Manager) discoverAndDialPeers() {
 	}
 
 	for peerAddrInfo := range peerChan {
+		//if peersToFind <= 0 {
+		//	m.logger.LogDebugf("Enough new autopeering peers connected")
+		//	return
+		//}
+
 		// Do not self-dial.
 		if peerAddrInfo.ID == m.host.ID() {
 			continue
 		}
 
 		// Do not try to dial already connected peers.
-		if m.p2pManager.NeighborExists(peerAddrInfo.ID) {
+		if m.networkManager.NeighborExists(peerAddrInfo.ID) {
 			continue
 		}
 
 		m.logger.LogDebugf("Found peer: %s", peerAddrInfo)
 
 		peer := network.NewPeerFromAddrInfo(&peerAddrInfo)
-		if err := m.p2pManager.DialPeer(m.ctx, peer); err != nil {
+		if err := m.networkManager.DialPeer(m.ctx, peer); err != nil {
 			m.logger.LogWarnf("Failed to dial peer %s: %s", peerAddrInfo, err)
 		}
+		//peersToFind--
 	}
 }

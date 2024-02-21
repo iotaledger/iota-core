@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"time"
 
 	"github.com/libp2p/go-libp2p/core/host"
 	p2pnetwork "github.com/libp2p/go-libp2p/core/network"
@@ -14,21 +13,16 @@ import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/log"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
 	"github.com/iotaledger/iota-core/pkg/network"
+	"github.com/iotaledger/iota-core/pkg/network/p2p/autopeering"
+	"github.com/iotaledger/iota-core/pkg/network/p2p/manualpeering"
 )
 
 const (
-	protocolID               = "iota-core/1.0.0"
-	defaultConnectionTimeout = 5 * time.Second // timeout after which the connection must be established.
+	protocolID = "iota-core/1.0.0"
 )
-
-// ConnectPeerOption defines an option for the DialPeer and AcceptPeer methods.
-type ConnectPeerOption func(conf *connectPeerConfig)
-
-type connectPeerConfig struct {
-	useDefaultTimeout bool
-}
 
 // ProtocolHandler holds callbacks to handle a protocol.
 type ProtocolHandler struct {
@@ -36,27 +30,12 @@ type ProtocolHandler struct {
 	PacketHandler func(peer.ID, proto.Message) error
 }
 
-func buildConnectPeerConfig(opts []ConnectPeerOption) *connectPeerConfig {
-	conf := &connectPeerConfig{
-		useDefaultTimeout: true,
-	}
-	for _, o := range opts {
-		o(conf)
-	}
-
-	return conf
-}
-
-// WithNoDefaultTimeout returns a ConnectPeerOption that disables the default timeout for dial or accept.
-func WithNoDefaultTimeout() ConnectPeerOption {
-	return func(conf *connectPeerConfig) {
-		conf.useDefaultTimeout = false
-	}
-}
-
 // The Manager handles the connected neighbors.
 type Manager struct {
-	Events *NeighborEvents
+	// Fired when a neighbor connection has been established.
+	neighborAdded *event.Event1[network.Neighbor]
+	// Fired when a neighbor has been removed.
+	neighborRemoved *event.Event1[network.Neighbor]
 
 	libp2pHost host.Host
 	peerDB     *network.DB
@@ -66,21 +45,30 @@ type Manager struct {
 	shutdownMutex syncutils.RWMutex
 	isShutdown    bool
 
-	neighbors *shrinkingmap.ShrinkingMap[peer.ID, *Neighbor]
+	neighbors *shrinkingmap.ShrinkingMap[peer.ID, *neighbor]
 
 	protocolHandler      *ProtocolHandler
 	protocolHandlerMutex syncutils.RWMutex
+
+	autoPeering   *autopeering.Manager
+	manualPeering *manualpeering.Manager
 }
 
+var _ network.Manager = (*Manager)(nil)
+
 // NewManager creates a new Manager.
-func NewManager(libp2pHost host.Host, peerDB *network.DB, logger log.Logger) *Manager {
+func NewManager(libp2pHost host.Host, peerDB *network.DB, maxAutopeeringPeers int, logger log.Logger) *Manager {
 	m := &Manager{
-		libp2pHost: libp2pHost,
-		peerDB:     peerDB,
-		logger:     logger,
-		Events:     NewNeighborEvents(),
-		neighbors:  shrinkingmap.New[peer.ID, *Neighbor](),
+		libp2pHost:      libp2pHost,
+		peerDB:          peerDB,
+		logger:          logger,
+		neighborAdded:   event.New1[network.Neighbor](),
+		neighborRemoved: event.New1[network.Neighbor](),
+		neighbors:       shrinkingmap.New[peer.ID, *neighbor](),
 	}
+
+	m.autoPeering = autopeering.NewManager(maxAutopeeringPeers, m, libp2pHost, peerDB, logger)
+	m.manualPeering = manualpeering.NewManager(m, logger)
 
 	return m
 }
@@ -107,8 +95,16 @@ func (m *Manager) UnregisterProtocol() {
 	m.protocolHandler = nil
 }
 
+func (m *Manager) OnNeighborAdded(handler func(network.Neighbor)) *event.Hook[func(network.Neighbor)] {
+	return m.neighborAdded.Hook(handler)
+}
+
+func (m *Manager) OnNeighborRemoved(handler func(network.Neighbor)) *event.Hook[func(network.Neighbor)] {
+	return m.neighborRemoved.Hook(handler)
+}
+
 // DialPeer connects to a peer.
-func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...ConnectPeerOption) error {
+func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer) error {
 	m.protocolHandlerMutex.RLock()
 	defer m.protocolHandlerMutex.RUnlock()
 
@@ -117,19 +113,12 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 	}
 
 	if m.NeighborExists(peer.ID) {
-		return ierrors.Wrapf(ErrDuplicateNeighbor, "peer %s already exists", peer.ID)
+		return ierrors.Wrapf(network.ErrDuplicatePeer, "peer %s already exists", peer.ID)
 	}
-
-	conf := buildConnectPeerConfig(opts)
 
 	// Adds the peer's multiaddresses to the peerstore, so that they can be used for dialing.
 	m.libp2pHost.Peerstore().AddAddrs(peer.ID, peer.PeerAddresses, peerstore.ConnectedAddrTTL)
 	cancelCtx := ctx
-	if conf.useDefaultTimeout {
-		var cancel context.CancelFunc
-		cancelCtx, cancel = context.WithTimeout(ctx, defaultConnectionTimeout)
-		defer cancel()
-	}
 
 	stream, err := m.P2PHost().NewStream(cancelCtx, peer.ID, protocolID)
 	if err != nil {
@@ -160,6 +149,17 @@ func (m *Manager) DialPeer(ctx context.Context, peer *network.Peer, opts ...Conn
 	return nil
 }
 
+// Start starts the manager and initiates manual- and autopeering.
+func (m *Manager) Start(ctx context.Context, networkID string) error {
+	m.manualPeering.Start()
+
+	if m.autoPeering.MaxNeighbors() > 0 {
+		return m.autoPeering.Start(ctx, networkID)
+	}
+
+	return nil
+}
+
 // Shutdown stops the manager and closes all established connections.
 func (m *Manager) Shutdown() {
 	m.shutdownMutex.Lock()
@@ -169,9 +169,26 @@ func (m *Manager) Shutdown() {
 		return
 	}
 	m.isShutdown = true
+
+	if err := m.autoPeering.Stop(); err != nil {
+		m.logger.LogErrorf("failed to stop autopeering: %s", err)
+	}
+
+	if err := m.manualPeering.Stop(); err != nil {
+		m.logger.LogErrorf("failed to stop manualpeering: %s", err)
+	}
+
 	m.dropAllNeighbors()
 
 	m.UnregisterProtocol()
+
+	if err := m.libp2pHost.Close(); err != nil {
+		m.logger.LogErrorf("failed to close libp2p host: %s", err)
+	}
+}
+
+func (m *Manager) AddManualPeers(peers ...multiaddr.Multiaddr) error {
+	return m.manualPeering.AddPeers(peers...)
 }
 
 // LocalPeerID returns the local peer ID.
@@ -197,11 +214,11 @@ func (m *Manager) DropNeighbor(id peer.ID) error {
 
 // Send sends a message with the specific protocol to a set of neighbors.
 func (m *Manager) Send(packet proto.Message, to ...peer.ID) {
-	var neighbors []*Neighbor
+	var neighbors []*neighbor
 	if len(to) == 0 {
-		neighbors = m.AllNeighbors()
+		neighbors = m.allNeighbors()
 	} else {
-		neighbors = m.NeighborsByID(to)
+		neighbors = m.neighborsByID(to)
 	}
 
 	for _, nbr := range neighbors {
@@ -209,19 +226,29 @@ func (m *Manager) Send(packet proto.Message, to ...peer.ID) {
 	}
 }
 
-// AllNeighbors returns all the neighbors that are currently connected.
-func (m *Manager) AllNeighbors() []*Neighbor {
+func (m *Manager) AllNeighbors() []network.Neighbor {
+	neighbors := m.allNeighbors()
+	result := make([]network.Neighbor, len(neighbors))
+	for i, n := range neighbors {
+		result[i] = n
+	}
+
+	return result
+}
+
+// allNeighbors returns all the neighbors that are currently connected.
+func (m *Manager) allNeighbors() []*neighbor {
 	return m.neighbors.Values()
 }
 
-// AllNeighborsIDs returns all the ids of the neighbors that are currently connected.
-func (m *Manager) AllNeighborsIDs() []peer.ID {
+// allNeighborsIDs returns all the ids of the neighbors that are currently connected.
+func (m *Manager) allNeighborsIDs() []peer.ID {
 	return m.neighbors.Keys()
 }
 
-// NeighborsByID returns all the neighbors that are currently connected corresponding to the supplied ids.
-func (m *Manager) NeighborsByID(ids []peer.ID) []*Neighbor {
-	result := make([]*Neighbor, 0, len(ids))
+// neighborsByID returns all the neighbors that are currently connected corresponding to the supplied ids.
+func (m *Manager) neighborsByID(ids []peer.ID) []*neighbor {
+	result := make([]*neighbor, 0, len(ids))
 	if len(ids) == 0 {
 		return result
 	}
@@ -258,6 +285,7 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 		ID:    stream.Conn().RemotePeer(),
 		Addrs: []multiaddr.Multiaddr{stream.Conn().RemoteMultiaddr()},
 	}
+
 	networkPeer := network.NewPeerFromAddrInfo(peerAddrInfo)
 	if err := m.peerDB.UpdatePeer(networkPeer); err != nil {
 		m.logger.LogErrorf("failed to update peer in peer database, peerID: %s, error: %s", networkPeer.ID, err)
@@ -275,16 +303,16 @@ func (m *Manager) handleStream(stream p2pnetwork.Stream) {
 }
 
 func (m *Manager) closeStream(s p2pnetwork.Stream) {
-	if err := s.Close(); err != nil {
+	if err := s.Reset(); err != nil {
 		m.logger.LogWarnf("close error, error: %s", err)
 	}
 }
 
 // neighborWithGroup returns neighbor by ID and group.
-func (m *Manager) neighbor(id peer.ID) (*Neighbor, error) {
+func (m *Manager) neighbor(id peer.ID) (*neighbor, error) {
 	nbr, ok := m.neighbors.Get(id)
 	if !ok {
-		return nil, ErrUnknownNeighbor
+		return nil, network.ErrUnknownPeer
 	}
 
 	return nbr, nil
@@ -292,19 +320,19 @@ func (m *Manager) neighbor(id peer.ID) (*Neighbor, error) {
 
 func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 	if peer.ID == m.libp2pHost.ID() {
-		return ierrors.WithStack(ErrLoopbackNeighbor)
+		return ierrors.WithStack(network.ErrLoopbackPeer)
 	}
 	m.shutdownMutex.RLock()
 	defer m.shutdownMutex.RUnlock()
 	if m.isShutdown {
-		return ErrNotRunning
+		return network.ErrNotRunning
 	}
 	if m.NeighborExists(peer.ID) {
-		return ierrors.WithStack(ErrDuplicateNeighbor)
+		return ierrors.WithStack(network.ErrDuplicatePeer)
 	}
 
 	// create and add the neighbor
-	nbr := NewNeighbor(m.logger, peer, ps, func(nbr *Neighbor, packet proto.Message) {
+	nbr := newNeighbor(m.logger, peer, ps, func(nbr *neighbor, packet proto.Message) {
 		m.protocolHandlerMutex.RLock()
 		defer m.protocolHandlerMutex.RUnlock()
 
@@ -312,15 +340,15 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 			nbr.logger.LogError("Can't handle packet as no protocol is registered")
 			return
 		}
-		if err := m.protocolHandler.PacketHandler(nbr.ID, packet); err != nil {
+		if err := m.protocolHandler.PacketHandler(nbr.Peer().ID, packet); err != nil {
 			nbr.logger.LogDebugf("Can't handle packet, error: %s", err)
 		}
-	}, func(nbr *Neighbor) {
+	}, func(nbr *neighbor) {
 		m.deleteNeighbor(nbr)
-		m.Events.NeighborRemoved.Trigger(nbr)
+		m.neighborRemoved.Trigger(nbr)
 	})
 	if err := m.setNeighbor(nbr); err != nil {
-		if resetErr := ps.Close(); resetErr != nil {
+		if resetErr := ps.Reset(); resetErr != nil {
 			nbr.logger.LogErrorf("error closing stream, error: %s", resetErr)
 		}
 
@@ -328,8 +356,8 @@ func (m *Manager) addNeighbor(peer *network.Peer, ps *PacketsStream) error {
 	}
 	nbr.readLoop()
 	nbr.writeLoop()
-	nbr.logger.LogInfof("Connection established to %s", nbr.ID)
-	m.Events.NeighborAdded.Trigger(nbr)
+	nbr.logger.LogInfof("Connection established to %s", nbr.Peer().ID)
+	m.neighborAdded.Trigger(nbr)
 
 	return nil
 }
@@ -338,15 +366,18 @@ func (m *Manager) NeighborExists(id peer.ID) bool {
 	return m.neighbors.Has(id)
 }
 
-func (m *Manager) deleteNeighbor(nbr *Neighbor) {
-	m.neighbors.Delete(nbr.ID)
+func (m *Manager) deleteNeighbor(nbr *neighbor) {
+	// Close the connection to the peer.
+	_ = m.libp2pHost.Network().ClosePeer(nbr.Peer().ID)
+
+	m.neighbors.Delete(nbr.Peer().ID)
 }
 
-func (m *Manager) setNeighbor(nbr *Neighbor) error {
+func (m *Manager) setNeighbor(nbr *neighbor) error {
 	var err error
-	m.neighbors.Compute(nbr.ID, func(currentValue *Neighbor, exists bool) *Neighbor {
+	m.neighbors.Compute(nbr.Peer().ID, func(currentValue *neighbor, exists bool) *neighbor {
 		if exists {
-			err = ierrors.WithStack(ErrDuplicateNeighbor)
+			err = ierrors.WithStack(network.ErrDuplicatePeer)
 			return currentValue
 		}
 
@@ -357,7 +388,7 @@ func (m *Manager) setNeighbor(nbr *Neighbor) error {
 }
 
 func (m *Manager) dropAllNeighbors() {
-	neighborsList := m.AllNeighbors()
+	neighborsList := m.allNeighbors()
 	for _, nbr := range neighborsList {
 		nbr.Close()
 	}
