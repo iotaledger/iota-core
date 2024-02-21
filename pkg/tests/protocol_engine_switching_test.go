@@ -121,6 +121,10 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	ts.Run(false, nodeOptions)
 
+	node0.Protocol.SetLogLevel(log.LevelDebug)
+	node0.Protocol.Chains.SetLogLevel(log.LevelTrace)
+	node0.Protocol.Commitments.SetLogLevel(log.LevelTrace)
+
 	expectedCommittee := []iotago.AccountID{
 		node0.Validator.AccountID,
 		node1.Validator.AccountID,
@@ -272,6 +276,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertUniqueCommitmentChain(nodesP1...)
 		ts.AssertCommitmentsOnChain(ts.CommitmentsOfMainEngine(nodesP1[0], 13, 18), ts.CommitmentOfMainEngine(nodesP1[0], 13).ID(), nodesP1...)
 		ts.AssertCommitmentsOrphaned(ts.CommitmentsOfMainEngine(nodesP1[0], 13, 18), false, nodesP1...)
+		ts.AssertCommitmentsEvicted(12, nodesP1...)
 
 		// Make sure the tips are properly set.
 		var tipBlocks []*blocks.Block
@@ -302,6 +307,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		ts.AssertUniqueCommitmentChain(nodesP2...)
 		ts.AssertCommitmentsOnChain(engineCommitmentsP2, ts.CommitmentOfMainEngine(nodesP1[0], 6).ID(), nodesP2...)
 		ts.AssertCommitmentsOrphaned(engineCommitmentsP2, false, nodesP2...)
+		ts.AssertCommitmentsEvicted(5, nodesP2...)
 
 		for _, slot := range []iotago.SlotIndex{12, 13, 14, 15} {
 			var attestationBlocks []*blocks.Block
@@ -412,7 +418,7 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
 	// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
 	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
-
+	ts.AssertCommitmentsEvicted(oldestNonEvictedCommitment-1, ts.Nodes()...)
 	// TODO: assert chain count
 	// TODO: assert that Protocol only contains commitments from above the eviction point.
 }
