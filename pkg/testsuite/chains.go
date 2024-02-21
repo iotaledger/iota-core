@@ -3,6 +3,7 @@ package testsuite
 import (
 	"github.com/iotaledger/hive.go/ds/shrinkingmap"
 	"github.com/iotaledger/hive.go/ierrors"
+	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/testsuite/mock"
 	iotago "github.com/iotaledger/iota.go/v4"
@@ -30,7 +31,7 @@ func (t *TestSuite) AssertLatestEngineCommitmentOnMainChain(nodes ...*mock.Node)
 	}
 }
 
-func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []iotago.CommitmentID, chainID iotago.CommitmentID, nodes ...*mock.Node) {
+func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []*model.Commitment, chainID iotago.CommitmentID, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -48,28 +49,28 @@ func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []iotago.Commit
 				return ierrors.Errorf("AssertCommitmentsOnChain: %s: chain with forking point %s not found", node.Name, chainID)
 			}
 
-			for _, expectedCommitmentID := range expectedCommitments {
+			for _, expectedCommitment := range expectedCommitments {
 				// Check that passed commitments have the correct chain assigned.
 				{
-					expectedCommitment, err := node.Protocol.Commitments.Get(expectedCommitmentID, false)
+					expectedCommitment, err := node.Protocol.Commitments.Get(expectedCommitment.ID(), false)
 					if err != nil {
-						return ierrors.Wrapf(err, "AssertCommitmentsOnChain: %s: expected commitment %s on chain %s not found", node.Name, expectedCommitmentID, chainID)
+						return ierrors.Wrapf(err, "AssertCommitmentsOnChain: %s: expected commitment %s on chain %s not found", node.Name, expectedCommitment, chainID)
 					}
 
 					if expectedCommitment.Chain.Get() != selectedChain {
-						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment %s not on correct chain, expected %s, got %s", node.Name, expectedCommitmentID, chainID, expectedCommitment.Chain.Get().ForkingPoint.Get().ID())
+						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment %s not on correct chain, expected %s, got %s", node.Name, expectedCommitment, chainID, expectedCommitment.Chain.Get().ForkingPoint.Get().ID())
 					}
 				}
 
 				// Check that the chain has correct commitments assigned in its metadata.
 				{
-					commitment, exists := selectedChain.Commitment(expectedCommitmentID.Slot())
+					commitment, exists := selectedChain.Commitment(expectedCommitment.Slot())
 					if !exists {
-						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment for slot %d does not exist on the selected chain %s", node.Name, expectedCommitmentID.Slot(), chainID)
+						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment for slot %d does not exist on the selected chain %s", node.Name, expectedCommitment.Slot(), chainID)
 					}
 
-					if expectedCommitmentID != commitment.ID() {
-						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment on chain does not match, expected %s, got %s", node.Name, expectedCommitmentID, commitment.ID())
+					if expectedCommitment.ID() != commitment.ID() {
+						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment on chain does not match, expected %s, got %s", node.Name, expectedCommitment, commitment.ID())
 					}
 				}
 			}
@@ -117,13 +118,23 @@ func (t *TestSuite) AssertUniqueCommitmentChain(nodes ...*mock.Node) {
 	}
 }
 
-//func (t *TestSuite) AssertCommitmentsOrphaned(commitments []iotago.CommitmentID, expectedOrphaned bool, nodes ...*mock.Node) {
-//	mustNodes(nodes)
-//
-//	for _, node := range nodes {
-//		t.Eventually(func() error {
-//
-//			return nil
-//		})
-//	}
-//}
+func (t *TestSuite) AssertCommitmentsOrphaned(expectedCommitments []*model.Commitment, expectedOrphaned bool, nodes ...*mock.Node) {
+	mustNodes(nodes)
+
+	for _, node := range nodes {
+		t.Eventually(func() error {
+			for _, expectedCommitment := range expectedCommitments {
+				commitment, err := node.Protocol.Commitments.Get(expectedCommitment.ID(), false)
+				if err != nil {
+					return ierrors.Wrapf(err, "AssertCommitmentsOrphaned: %s: expected commitment %s not found", node.Name, expectedCommitment.ID())
+				}
+
+				if expectedOrphaned != commitment.IsOrphaned.Get() {
+					return ierrors.Errorf("AssertCommitmentsOrphaned: %s: expected commitment %s to be orphaned %t, got %t", node.Name, expectedCommitment.ID(), expectedOrphaned, commitment.IsOrphaned.Get())
+				}
+			}
+
+			return nil
+		})
+	}
+}
