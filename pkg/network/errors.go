@@ -12,7 +12,7 @@ var (
 	// ErrDuplicatePeer is returned when the same peer is added more than once.
 	ErrDuplicatePeer = ierrors.New("already connected")
 	// ErrFirstPacketNotReceived is returned when the first packet from a peer is not received.
-	ErrFistPacketNotReceived = ierrors.New("first packet not received")
+	ErrFirstPacketNotReceived = ierrors.New("first packet not received")
 	// ErrMaxAutopeeringPeersReached is returned when the maximum number of autopeering peers is reached.
 	ErrMaxAutopeeringPeersReached = ierrors.New("max autopeering peers reached")
 )

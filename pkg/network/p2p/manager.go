@@ -389,7 +389,7 @@ func (m *Manager) addNeighbor(ctx context.Context, peer *network.Peer, ps *Packe
 		nbr.logger.LogErrorf("First packet not received within deadline")
 		nbr.Close()
 
-		return ierrors.WithStack(network.ErrFistPacketNotReceived)
+		return ierrors.WithStack(network.ErrFirstPacketNotReceived)
 	}
 
 	return nil
