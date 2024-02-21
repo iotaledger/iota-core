@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
@@ -318,6 +319,26 @@ func createLogDirectory(testName string) string {
 	}
 
 	return dir
+}
+
+func AwaitEventAPITopics(t *testing.T, duration time.Duration, cancleFunc context.CancelFunc, receiveChan chan struct{}, numOfTopics int) error {
+	counter := 0
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			cancleFunc()
+			return ierrors.New("Timeout, did not receive signals from all  topics")
+		case <-receiveChan:
+			counter++
+			if counter == numOfTopics {
+				fmt.Println("Received all signals from topics")
+				return nil
+			}
+		}
+	}
 }
 
 func BIP32PathForIndex(index uint32) string {
