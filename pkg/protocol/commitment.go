@@ -318,7 +318,8 @@ func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) 
 				return mainChild
 			}
 
-			return lo.Return1(c.Children.Any())
+			// When removing the commitment, we need to set the main child back to nil when cleaning up children to avoid inconsistent state with MainChild being set to a random value, which then triggers other reactive events.
+			return nil
 		})
 	}
 }
@@ -368,21 +369,20 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 }
 
 func (c *Commitment) deriveOrphaned(parent *Commitment) func() {
-	return c.IsOrphaned.DeriveValueFrom(reactive.NewDerivedVariable3(func(isOrphaned bool, isParentOrphaned bool, parentCommitment *Commitment, isRoot bool) bool {
-		c.LogDebug("derive orphaned", "isOrphaned", isOrphaned, "isParentOrphaned", isParentOrphaned, "parentCommitment", parentCommitment, "isRoot", isRoot)
+	return c.IsOrphaned.DeriveValueFrom(reactive.NewDerivedVariable3(func(isOrphaned bool, isParentOrphaned bool, isParentEvicted bool, isRoot bool) bool {
 		// if the commitment is orphaned, we exit early
 		if isOrphaned {
 			return true
 		}
 
 		// If the parent was evicted and the current commitment is not root, it is marked as orphaned.
-		if parentCommitment == nil && !isRoot {
+		if isParentEvicted && !isRoot {
 			return true
 		}
 
 		// As a last resort, inherit the orphaned flag from the parent.
 		return isParentOrphaned
-	}, parent.IsOrphaned, c.Parent, c.IsRoot))
+	}, parent.IsOrphaned, parent.IsEvicted, c.IsRoot))
 }
 
 // deriveCumulativeAttestedWeight derives the CumulativeAttestedWeight of this Commitment which is the sum of the

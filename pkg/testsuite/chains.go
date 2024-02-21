@@ -87,6 +87,11 @@ func (t *TestSuite) AssertUniqueCommitmentChain(nodes ...*mock.Node) {
 		t.Eventually(func() error {
 			commitmentCountPerChain := shrinkingmap.New[*protocol.Chain, *shrinkingmap.ShrinkingMap[iotago.SlotIndex, []iotago.CommitmentID]]()
 			_ = node.Protocol.Commitments.ForEach(func(commitment *protocol.Commitment) error {
+				// Orphaned commitments have chain set to nil, we want to ignore them in this check.
+				if commitment.Chain.Get() == nil {
+					return nil
+				}
+
 				commitmentCountForChain, _ := commitmentCountPerChain.GetOrCreate(commitment.Chain.Get(), func() *shrinkingmap.ShrinkingMap[iotago.SlotIndex, []iotago.CommitmentID] {
 					return shrinkingmap.New[iotago.SlotIndex, []iotago.CommitmentID]()
 				})
