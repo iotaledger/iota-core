@@ -11,36 +11,27 @@ import (
 )
 
 type metadataStore struct {
-	store StoreFunc
+	store SlotStoreFunc
 
 	// transaction metadata is kept in one place and stored under the latest attachment slot to align block and transaction pruning
 	transactionLatestAttachmentSlot *shrinkingmap.ShrinkingMap[iotago.TransactionID, iotago.SlotIndex]
 	attachmentSlotMutex             sync.Mutex
 }
 
-func newMetadataStore(store StoreFunc) *metadataStore {
+func newMetadataStore(store SlotStoreFunc) *metadataStore {
 	return &metadataStore{
 		store:                           store,
 		transactionLatestAttachmentSlot: shrinkingmap.New[iotago.TransactionID, iotago.SlotIndex](),
 	}
 }
 
-func (m *metadataStore) storeBlockData(blockID iotago.BlockID, failureReason api.BlockFailureReason, transactionID iotago.TransactionID) error {
+func (m *metadataStore) setBlockBooked(blockID iotago.BlockID, transactionID iotago.TransactionID) error {
 	store, err := m.store(blockID.Slot())
 	if err != nil {
 		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
 	}
 
-	err = m.moveTransactionMetadataToTheLatestAttachmentSlot(transactionID, blockID.Slot())
-	if err != nil {
-		return err
-	}
-
-	if failureReason == api.BlockFailureNone {
-		return store.StoreBlockAttached(blockID, transactionID)
-	}
-
-	return store.StoreBlockFailure(blockID, failureReason, transactionID)
+	return store.StoreBlockBooked(blockID, transactionID)
 }
 
 func (m *metadataStore) setBlockAccepted(blockID iotago.BlockID) error {
@@ -50,6 +41,15 @@ func (m *metadataStore) setBlockAccepted(blockID iotago.BlockID) error {
 	}
 
 	return store.StoreBlockAccepted(blockID)
+}
+
+func (m *metadataStore) setBlockDropped(blockID iotago.BlockID) error {
+	store, err := m.store(blockID.Slot())
+	if err != nil {
+		return ierrors.Wrapf(err, "could not get retainer store for slot %d", blockID.Slot())
+	}
+
+	return store.StoreBlockDropped(blockID)
 }
 
 func (m *metadataStore) setBlockConfirmed(blockID iotago.BlockID) error {
@@ -73,65 +73,6 @@ func (m *metadataStore) setBlockConfirmed(blockID iotago.BlockID) error {
 	return nil
 }
 
-func (m *metadataStore) moveTransactionMetadataToTheLatestAttachmentSlot(txID iotago.TransactionID, latestAttachmentSlot iotago.SlotIndex) error {
-	if txID == iotago.EmptyTransactionID {
-		return nil
-	}
-
-	m.attachmentSlotMutex.Lock()
-	defer m.attachmentSlotMutex.Unlock()
-
-	currentSlot, exists := m.transactionLatestAttachmentSlot.Get(txID)
-	if !exists {
-		m.transactionLatestAttachmentSlot.Set(txID, latestAttachmentSlot)
-
-		return nil
-	}
-
-	if currentSlot < latestAttachmentSlot {
-		moved, err := m.moveTransactionData(txID, currentSlot, latestAttachmentSlot)
-		if err != nil {
-			return err
-		}
-
-		if moved {
-			m.transactionLatestAttachmentSlot.Set(txID, latestAttachmentSlot)
-		}
-	}
-
-	return nil
-}
-
-func (m *metadataStore) moveTransactionData(txID iotago.TransactionID, prevSlot iotago.SlotIndex, newSlot iotago.SlotIndex) (bool, error) {
-	store, err := m.store(prevSlot)
-	if err != nil {
-		return false, ierrors.Wrapf(err, "could not get retainer store for slot %d", prevSlot)
-	}
-
-	txData, exist := store.GetTransaction(txID)
-	if !exist {
-		// nothing to move
-		return false, nil
-	}
-
-	newStore, err := m.store(newSlot)
-	if err != nil {
-		return false, ierrors.Wrapf(err, "could not get retainer store for slot %d", newSlot)
-	}
-
-	err = newStore.StoreTransactionData(txID, txData)
-	if err != nil {
-		return false, err
-	}
-
-	err = store.DeleteTransactionData(txID)
-	if err != nil {
-		return true, err
-	}
-
-	return true, nil
-}
-
 func (m *metadataStore) getBlockData(blockID iotago.BlockID) (*slotstore.BlockRetainerData, error) {
 	store, err := m.store(blockID.Slot())
 	if err != nil {
@@ -146,7 +87,7 @@ func (m *metadataStore) getBlockData(blockID iotago.BlockID) (*slotstore.BlockRe
 	return data, nil
 }
 
-func (m *metadataStore) getTransactionStoreWithoutLocking(txID iotago.TransactionID) (*slotstore.Retainer, error) {
+func (m *metadataStore) getTransactionStoreWithoutLocking(txID iotago.TransactionID) (*slotstore.SlotStore, error) {
 	latestAttachmentSlot, exists := m.transactionLatestAttachmentSlot.Get(txID)
 	if !exists {
 		return nil, ierrors.Errorf("latest attachment slot for transaction %s not found", txID.String())
