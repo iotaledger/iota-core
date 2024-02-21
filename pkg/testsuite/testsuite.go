@@ -398,13 +398,17 @@ func (t *TestSuite) CommitmentsOfMainEngine(node *mock.Node, start, end iotago.S
 	var commitments []*model.Commitment
 
 	for i := start; i <= end; i++ {
-		commitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(i)
-		require.NoErrorf(t.Testing, err, "node %s: commitment for slot %d not found", node.Name, i)
-
-		commitments = append(commitments, commitment)
+		commitments = append(commitments, t.CommitmentOfMainEngine(node, i))
 	}
 
 	return commitments
+}
+
+func (t *TestSuite) CommitmentOfMainEngine(node *mock.Node, slot iotago.SlotIndex) *model.Commitment {
+	commitment, err := node.Protocol.Engines.Main.Get().Storage.Commitments().Load(slot)
+	require.NoErrorf(t.Testing, err, "node %s: commitment for slot %d not found", node.Name, slot)
+
+	return commitment
 }
 
 // AddGenesisWallet adds a wallet to the test suite with a block issuer in the genesis snapshot and access to the genesis seed.
