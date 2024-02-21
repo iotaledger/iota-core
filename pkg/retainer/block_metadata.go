@@ -9,7 +9,7 @@ type BlockMetadata struct {
 	BlockID            iotago.BlockID
 	BlockState         api.BlockState
 	BlockFailureReason api.BlockFailureReason
-
+	// TODO remove after merging Andrews PR
 	TransactionID            iotago.TransactionID
 	TransactionState         api.TransactionState
 	TransactionFailureReason api.TransactionFailureReason
@@ -17,14 +17,19 @@ type BlockMetadata struct {
 
 func (m *BlockMetadata) BlockMetadataResponse() *api.BlockMetadataResponse {
 	return &api.BlockMetadataResponse{
-		BlockID:             m.BlockID,
-		BlockState:          m.BlockState,
-		BlockFailureReason:  m.BlockFailureReason,
-		TransactionMetadata: m.TransactionMetadataResponse(),
+		BlockID:            m.BlockID,
+		BlockState:         m.BlockState,
+		BlockFailureReason: m.BlockFailureReason,
 	}
 }
 
-func (m *BlockMetadata) TransactionMetadataResponse() *api.TransactionMetadataResponse {
+type TransactionMetadata struct {
+	TransactionID            iotago.TransactionID
+	TransactionState         api.TransactionState
+	TransactionFailureReason api.TransactionFailureReason
+}
+
+func (m *TransactionMetadata) TransactionMetadataResponse() *api.TransactionMetadataResponse {
 	if m.TransactionState == api.TransactionStateNoTransaction {
 		return nil
 	}
