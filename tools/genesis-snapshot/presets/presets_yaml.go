@@ -53,14 +53,14 @@ func GenerateFromYaml(hostsFile string) ([]options.Option[snapshotcreator.Option
 		account := snapshotcreator.AccountDetails{
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex(pubkey))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex(pubkey))),
-			Amount:               mock.MinValidatorAccountAmount(protocolParamsDocker),
+			Amount:               mock.MinValidatorAccountAmount(ProtocolParamsDocker),
 			IssuerKey:            iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex(pubkey)))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
 			StakingEndEpoch:      iotago.MaxEpochIndex,
 			FixedCost:            1,
-			StakedAmount:         mock.MinValidatorAccountAmount(protocolParamsDocker),
-			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount(protocolParamsDocker)),
+			StakedAmount:         mock.MinValidatorAccountAmount(ProtocolParamsDocker),
+			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount(ProtocolParamsDocker)),
 		}
 		accounts = append(accounts, account)
 	}
@@ -71,11 +71,11 @@ func GenerateFromYaml(hostsFile string) ([]options.Option[snapshotcreator.Option
 		account := snapshotcreator.AccountDetails{
 			AccountID:            blake2b.Sum256(lo.PanicOnErr(hexutil.DecodeHex(pubkey))),
 			Address:              iotago.Ed25519AddressFromPubKey(lo.PanicOnErr(hexutil.DecodeHex(pubkey))),
-			Amount:               mock.MinValidatorAccountAmount(protocolParamsDocker),
+			Amount:               mock.MinValidatorAccountAmount(ProtocolParamsDocker),
 			IssuerKey:            iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(ed25519.PublicKey(lo.PanicOnErr(hexutil.DecodeHex(pubkey)))),
 			ExpirySlot:           iotago.MaxSlotIndex,
 			BlockIssuanceCredits: iotago.MaxBlockIssuanceCredits / 4,
-			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount(protocolParamsDocker)),
+			Mana:                 iotago.Mana(mock.MinValidatorAccountAmount(ProtocolParamsDocker)),
 		}
 		accounts = append(accounts, account)
 	}
@@ -95,7 +95,7 @@ func GenerateFromYaml(hostsFile string) ([]options.Option[snapshotcreator.Option
 
 	return []options.Option[snapshotcreator.Options]{
 		snapshotcreator.WithFilePath(configYaml.FilePath),
-		snapshotcreator.WithProtocolParameters(protocolParamsDocker),
+		snapshotcreator.WithProtocolParameters(ProtocolParamsDocker),
 		snapshotcreator.WithAccounts(accounts...),
 		snapshotcreator.WithBasicOutputs(basicOutputs...),
 	}, nil

@@ -7,6 +7,7 @@ import (
 	"github.com/iotaledger/hive.go/ds/reactive"
 	"github.com/iotaledger/hive.go/ierrors"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
+	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/options"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/storage/database"
@@ -25,6 +26,8 @@ const (
 
 // Storage is an abstraction around the storage layer of the node.
 type Storage struct {
+	Pruned *event.Event1[iotago.EpochIndex]
+
 	dir *utils.Directory
 
 	// Permanent is the section of the storage that is maintained forever (holds the current ledger state).
@@ -57,6 +60,7 @@ type Storage struct {
 // New creates a new storage instance with the named database version in the given directory.
 func New(directory string, errorHandler func(error), opts ...options.Option[Storage]) *Storage {
 	return options.Apply(&Storage{
+		Pruned:                             event.New1[iotago.EpochIndex](),
 		dir:                                utils.NewDirectory(directory, true),
 		errorHandler:                       errorHandler,
 		lastPrunedEpoch:                    model.NewEvictionIndex[iotago.EpochIndex](),
