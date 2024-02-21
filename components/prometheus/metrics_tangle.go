@@ -39,7 +39,7 @@ var TangleMetrics = collector.NewCollection(tangleNamespace,
 		collector.WithType(collector.Counter),
 		collector.WithHelp("Total number of blocks attached."),
 		collector.WithInitFunc(func() {
-			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(_ *blocks.Block) {
+			deps.Protocol.Events.Engine.PostSolidFilter.BlockAllowed.Hook(func(_ *blocks.Block) {
 				deps.Collector.Increment(tangleNamespace, blocksTotal)
 			}, event.WithWorkerPool(Component.WorkerPool))
 		}),

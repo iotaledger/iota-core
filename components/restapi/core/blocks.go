@@ -7,7 +7,6 @@ import (
 
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/inx-app/pkg/httpserver"
-	"github.com/iotaledger/iota-core/pkg/blockhandler"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 )
@@ -32,21 +31,7 @@ func blockMetadataByBlockID(blockID iotago.BlockID) (*api.BlockMetadataResponse,
 		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
 	}
 
-	return blockMetadata.BlockMetadataResponse(), nil
-}
-
-func transactionMetadataByBlockID(blockID iotago.BlockID) (*api.TransactionMetadataResponse, error) {
-	blockMetadata, err := deps.Protocol.Engines.Main.Get().Retainer.BlockMetadata(blockID)
-	if err != nil {
-		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to get block metadata %s: %s", blockID.ToHex(), err)
-	}
-
-	metadata := blockMetadata.TransactionMetadataResponse()
-	if metadata == nil {
-		return nil, ierrors.Wrapf(echo.ErrNotFound, "transaction not found")
-	}
-
-	return metadata, nil
+	return blockMetadata, nil
 }
 
 func blockMetadataByID(c echo.Context) (*api.BlockMetadataResponse, error) {
@@ -121,16 +106,7 @@ func sendBlock(c echo.Context) (*api.BlockCreatedResponse, error) {
 
 	blockID, err := deps.BlockHandler.AttachBlock(c.Request().Context(), iotaBlock)
 	if err != nil {
-		switch {
-		case ierrors.Is(err, blockhandler.ErrBlockAttacherInvalidBlock):
-			return nil, ierrors.Wrapf(httpserver.ErrInvalidParameter, "failed to attach block: %w", err)
-
-		case ierrors.Is(err, blockhandler.ErrBlockAttacherAttachingNotPossible):
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to attach block: %w", err)
-
-		default:
-			return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to attach block: %w", err)
-		}
+		return nil, ierrors.Wrapf(echo.ErrInternalServerError, "failed to attach block: %w", err)
 	}
 
 	return &api.BlockCreatedResponse{

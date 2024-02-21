@@ -10,12 +10,11 @@ import (
 // TODO Remove old general interface after merging Andrews PR and connect new block retainer
 // Retainer keeps and resolves all the information needed in the API and INX.
 type Retainer interface {
-	BlockMetadata(blockID iotago.BlockID) (*BlockMetadata, error)
+	BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error)
 
 	RegisteredValidatorsCache(uint32) ([]*api.ValidatorResponse, bool)
 	RetainRegisteredValidatorsCache(uint32, []*api.ValidatorResponse)
 
-	RetainBlockFailure(*model.Block, api.BlockFailureReason)
 	RetainTransactionFailure(iotago.TransactionID, error)
 
 	// Reset resets the component to a clean state as if it was created at the last commitment.
@@ -27,8 +26,11 @@ type Retainer interface {
 
 // BlockRetainer keeps and resolves all the information needed in the API and INX.
 type BlockRetainer interface {
-	BlockMetadata(blockID iotago.BlockID) (*BlockMetadata, error)
+	BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error)
 	RetainBlockFailure(*model.Block, api.BlockFailureReason)
+
+	// Reset resets the component to a clean state as if it was created at the last commitment.
+	Reset()
 
 	// Interface embeds the required methods of the module.Interface.
 	module.Interface
@@ -36,8 +38,11 @@ type BlockRetainer interface {
 
 // TransactionRetainer keeps and resolves all the information needed in the API and INX.
 type TransactionRetainer interface {
-	TransactionMetadata(txID iotago.TransactionID) (*TransactionMetadata, error)
+	TransactionMetadata(txID iotago.TransactionID) (*api.TransactionMetadataResponse, error)
 	RetainTransactionFailure(iotago.TransactionID, error)
+
+	// Reset resets the component to a clean state as if it was created at the last commitment.
+	Reset()
 
 	module.Interface
 }

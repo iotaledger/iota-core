@@ -11,7 +11,6 @@ import (
 	"github.com/iotaledger/inx-app/pkg/httpserver"
 	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
-	"github.com/iotaledger/iota-core/pkg/retainer"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/hexutil"
@@ -89,7 +88,7 @@ func findBlock(blockID iotago.BlockID) (explorerBlk *ExplorerBlock, err error) {
 	return createExplorerBlock(block, cachedBlock, blockMetadata), nil
 }
 
-func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata *retainer.BlockMetadata) *ExplorerBlock {
+func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, blockMetadata *api.BlockMetadataResponse) *ExplorerBlock {
 	iotaBlk := block.ProtocolBlock()
 
 	sigBytes, err := iotaBlk.Signature.Encode()
@@ -171,14 +170,14 @@ func createExplorerBlock(block *model.Block, cachedBlock *blocks.Block, metadata
 			return spendID.ToHex()
 		})
 	} else {
-		switch metadata.BlockState {
+		switch blockMetadata.BlockState {
 		case api.BlockStateConfirmed, api.BlockStateFinalized:
 			t.Solid = true
 			t.Booked = true
 			t.Acceptance = true
 			t.Scheduled = true
 			t.Confirmation = true
-		case api.BlockStateFailed, api.BlockStateRejected:
+		case api.BlockStateFailed, api.BlockStateOrphaned:
 			t.ObjectivelyInvalid = true
 		}
 	}

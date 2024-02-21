@@ -12,8 +12,6 @@ const (
 	Issued
 	// Allowed denotes blocks that passed the filter checks.
 	Allowed
-	// Attached denotes blocks stored by the block store.
-	Attached
 	// Solidified denotes blocks solidified by the solidifier.
 	Solidified
 	// Scheduled denotes blocks scheduled by the scheduler.
@@ -53,8 +51,6 @@ func (c ComponentType) String() string {
 		return "Issued"
 	case Allowed:
 		return "Allowed"
-	case Attached:
-		return "Attached"
 	case Solidified:
 		return "Solidified"
 	case Scheduled:

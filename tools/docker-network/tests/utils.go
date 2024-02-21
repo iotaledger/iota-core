@@ -59,28 +59,24 @@ func (d *DockerTestFramework) Eventually(condition func() error, waitForSync ...
 	}
 }
 
-func (d *DockerTestFramework) AwaitTransactionPayloadAccepted(ctx context.Context, blkID iotago.BlockID) {
+func (d *DockerTestFramework) AwaitTransactionPayloadAccepted(ctx context.Context, txID iotago.TransactionID) {
 	clt := d.Node("V1").Client
 
 	d.Eventually(func() error {
-		resp, err := clt.BlockMetadataByBlockID(ctx, blkID)
+		resp, err := clt.TransactionMetadata(ctx, txID)
 		if err != nil {
 			return err
 		}
 
-		if resp.TransactionMetadata == nil {
-			return ierrors.Errorf("transaction is not included in block: %s", blkID.ToHex())
-		}
-
-		if resp.TransactionMetadata.TransactionState == api.TransactionStateAccepted ||
-			resp.TransactionMetadata.TransactionState == api.TransactionStateConfirmed ||
-			resp.TransactionMetadata.TransactionState == api.TransactionStateFinalized {
-			if resp.TransactionMetadata.TransactionFailureReason == api.TxFailureNone {
+		if resp.TransactionState == api.TransactionStateAccepted ||
+			resp.TransactionState == api.TransactionStateConfirmed ||
+			resp.TransactionState == api.TransactionStateFinalized {
+			if resp.TransactionFailureReason == api.TxFailureNone {
 				return nil
 			}
 		}
 
-		return ierrors.Errorf("transaction in block %s is pending or having errors, state: %s, failure reason: %d", blkID.ToHex(), resp.TransactionMetadata.TransactionState.String(), resp.TransactionMetadata.TransactionFailureReason)
+		return ierrors.Errorf("transaction %s is pending or having errors, state: %s, failure reason: %d", txID.ToHex(), resp.TransactionState.String(), resp.TransactionFailureReason)
 	})
 }
 

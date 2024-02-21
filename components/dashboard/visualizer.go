@@ -88,7 +88,7 @@ func runVisualizer(component *app.Component) {
 				attachmentID := transactionMetadata.EarliestIncludedAttachment()
 				sendTxAccepted(attachmentID, true)
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
-			deps.Protocol.Events.Engine.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
+			deps.Protocol.Events.Engine.PostSolidFilter.BlockAllowed.Hook(func(block *blocks.Block) {
 				sendVertex(block, false)
 			}, event.WithWorkerPool(component.WorkerPool)).Unhook,
 			deps.Protocol.Events.Engine.BlockGadget.BlockConfirmed.Hook(func(block *blocks.Block) {
