@@ -367,6 +367,25 @@ func (d *DockerTestFramework) StopIssueCandidacyPayload(nodes ...*Node) {
 	d.DockerComposeUp(true)
 }
 
+func (d *DockerTestFramework) CreateTaggedDataBlock(issuer *Account, tag []byte) *iotago.Block {
+	ctx := context.TODO()
+	clt := d.Node("V1").Client
+
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	congestionResp, err := clt.Congestion(ctx, issuer.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
+
+	if congestionResp.BlockIssuanceCredits <= 0 {
+		// request faucet funds to gain BIC
+	}
+
+	return d.CreateBlock(ctx, &iotago.TaggedData{
+		Tag: tag,
+	}, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
+}
+
 func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *Account {
 	// create an implicit account by requesting faucet funds
 	ctx := context.TODO()
@@ -744,7 +763,7 @@ func (d *DockerTestFramework) GetContainersConfigs() {
 	}
 }
 
-func (d *DockerTestFramework) SubmitPayload(ctx context.Context, payload iotago.Payload, issuer wallet.Account, congestionResp *api.CongestionResponse, issuerResp *api.IssuanceBlockHeaderResponse) iotago.BlockID {
+func (d *DockerTestFramework) CreateBlock(ctx context.Context, payload iotago.Payload, issuer wallet.Account, congestionResp *api.CongestionResponse, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.Block {
 	clt := d.Node("V1").Client
 	issuingTime := time.Now()
 	apiForSlot := clt.APIForSlot(clt.LatestAPI().TimeProvider().SlotFromTime(issuingTime))
@@ -766,6 +785,21 @@ func (d *DockerTestFramework) SubmitPayload(ctx context.Context, payload iotago.
 
 	blk, err := blockBuilder.Build()
 	require.NoError(d.Testing, err)
+
+	return blk
+}
+
+func (d *DockerTestFramework) SubmitBlock(ctx context.Context, blk *iotago.Block) {
+	clt := d.Node("V1").Client
+
+	_, err := clt.SubmitBlock(ctx, blk)
+	require.NoError(d.Testing, err)
+}
+
+func (d *DockerTestFramework) SubmitPayload(ctx context.Context, payload iotago.Payload, issuer wallet.Account, congestionResp *api.CongestionResponse, issuerResp *api.IssuanceBlockHeaderResponse) iotago.BlockID {
+	clt := d.Node("V1").Client
+
+	blk := d.CreateBlock(ctx, payload, issuer, congestionResp, issuerResp)
 
 	blkID, err := clt.SubmitBlock(ctx, blk)
 	require.NoError(d.Testing, err)
