@@ -14,7 +14,7 @@ import (
 	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/model"
-	"github.com/iotaledger/iota-core/pkg/network/p2p"
+	"github.com/iotaledger/iota-core/pkg/network"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/attestation/slotattestation"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/filter/presolidfilter/presolidblockfilter"
@@ -115,7 +115,7 @@ func provide(c *dig.Container) error {
 
 		DatabaseEngine     hivedb.Engine `name:"databaseEngine"`
 		ProtocolParameters []iotago.ProtocolParameters
-		P2PManager         *p2p.Manager
+		NetworkManager     network.Manager
 	}
 
 	return c.Provide(func(deps protocolDeps) *protocol.Protocol {
@@ -132,7 +132,7 @@ func provide(c *dig.Container) error {
 		return protocol.New(
 			Component.Logger,
 			workerpool.NewGroup("Protocol"),
-			deps.P2PManager,
+			deps.NetworkManager,
 			protocol.WithBaseDirectory(ParamsDatabase.Path),
 			protocol.WithStorageOptions(
 				storage.WithDBEngine(deps.DatabaseEngine),

@@ -2,9 +2,7 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
-	"time"
 
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -21,11 +19,8 @@ import (
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/kvstore"
 	hivedb "github.com/iotaledger/hive.go/kvstore/database"
-	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/iota-core/pkg/daemon"
 	"github.com/iotaledger/iota-core/pkg/network"
-	"github.com/iotaledger/iota-core/pkg/network/autopeering"
-	"github.com/iotaledger/iota-core/pkg/network/manualpeering"
 	"github.com/iotaledger/iota-core/pkg/network/p2p"
 	"github.com/iotaledger/iota-core/pkg/protocol"
 )
@@ -51,9 +46,7 @@ type dependencies struct {
 	dig.In
 	PeeringConfig        *configuration.Configuration `name:"peeringConfig"`
 	PeeringConfigManager *p2p.ConfigManager
-	ManualPeeringMgr     *manualpeering.Manager
-	AutoPeeringMgr       *autopeering.Manager
-	P2PManager           *p2p.Manager
+	NetworkManager       network.Manager
 	PeerDB               *network.DB
 	Protocol             *protocol.Protocol
 	PeerDBKVSTore        kvstore.KVStore `name:"peerDBKVStore"`
@@ -79,49 +72,6 @@ func initConfigParams(c *dig.Container) error {
 }
 
 func provide(c *dig.Container) error {
-	type manualPeeringDeps struct {
-		dig.In
-
-		P2PManager *p2p.Manager
-	}
-
-	if err := c.Provide(func(deps manualPeeringDeps) *manualpeering.Manager {
-		return manualpeering.NewManager(deps.P2PManager, Component.WorkerPool, Component.Logger)
-	}); err != nil {
-		return err
-	}
-
-	type autoPeeringDeps struct {
-		dig.In
-
-		Protocol   *protocol.Protocol
-		P2PManager *p2p.Manager
-		Host       host.Host
-		PeerDB     *network.DB
-	}
-
-	if err := c.Provide(func(deps autoPeeringDeps) *autopeering.Manager {
-		peersMultiAddresses, err := getMultiAddrsFromString(ParamsPeers.BootstrapPeers)
-		if err != nil {
-			Component.LogFatalf("Failed to parse bootstrapPeers param: %s", err)
-		}
-
-		for _, multiAddr := range peersMultiAddresses {
-			bootstrapPeer, err := network.NewPeerFromMultiAddr(multiAddr)
-			if err != nil {
-				Component.LogFatalf("Failed to parse bootstrap peer multiaddress: %s", err)
-			}
-
-			if err := deps.PeerDB.UpdatePeer(bootstrapPeer); err != nil {
-				Component.LogErrorf("Failed to update bootstrap peer: %s", err)
-			}
-		}
-
-		return autopeering.NewManager(deps.Protocol.LatestAPI().ProtocolParameters().NetworkName(), deps.P2PManager, deps.Host, deps.PeerDB, Component.Logger)
-	}); err != nil {
-		return err
-	}
-
 	type peerDatabaseResult struct {
 		dig.Out
 
@@ -251,7 +201,7 @@ func provide(c *dig.Container) error {
 		connManager, err := connmgr.NewConnManager(
 			ParamsP2P.ConnectionManager.LowWatermark,
 			ParamsP2P.ConnectionManager.HighWatermark,
-			connmgr.WithGracePeriod(time.Minute),
+			connmgr.WithEmergencyTrim(true),
 		)
 		if err != nil {
 			Component.LogPanicf("unable to initialize connection manager: %s", err)
@@ -263,6 +213,7 @@ func provide(c *dig.Container) error {
 			libp2p.Transport(tcp.NewTCPTransport),
 			libp2p.ConnectionManager(connManager),
 			libp2p.NATPortMap(),
+			libp2p.DisableRelay(),
 			// Define a custom address factory to inject external addresses to the DHT advertisements.
 			libp2p.AddrsFactory(func() func(addrs []multiaddr.Multiaddr) []multiaddr.Multiaddr {
 				var externalMultiAddrs []multiaddr.Multiaddr
@@ -294,8 +245,31 @@ func provide(c *dig.Container) error {
 		Component.LogPanic(err.Error())
 	}
 
-	return c.Provide(func(host host.Host, peerDB *network.DB) *p2p.Manager {
-		return p2p.NewManager(host, peerDB, Component.Logger)
+	type p2pManagerDeps struct {
+		dig.In
+		Host   host.Host
+		PeerDB *network.DB
+	}
+
+	return c.Provide(func(inDeps p2pManagerDeps) network.Manager {
+
+		peersMultiAddresses, err := getMultiAddrsFromString(ParamsPeers.BootstrapPeers)
+		if err != nil {
+			Component.LogFatalf("Failed to parse bootstrapPeers param: %s", err)
+		}
+
+		for _, multiAddr := range peersMultiAddresses {
+			bootstrapPeer, err := network.NewPeerFromMultiAddr(multiAddr)
+			if err != nil {
+				Component.LogFatalf("Failed to parse bootstrap peer multiaddress: %s", err)
+			}
+
+			if err := inDeps.PeerDB.UpdatePeer(bootstrapPeer); err != nil {
+				Component.LogErrorf("Failed to update bootstrap peer: %s", err)
+			}
+		}
+
+		return p2p.NewManager(inDeps.Host, inDeps.PeerDB, ParamsP2P.Autopeering.MaxPeers, Component.Logger)
 	})
 }
 
@@ -321,43 +295,27 @@ func configure() error {
 	}
 
 	// log the p2p events
-	deps.P2PManager.Events.NeighborAdded.Hook(func(neighbor *p2p.Neighbor) {
-		Component.LogInfof("Neighbor added: %s / %s", neighbor.PeerAddresses, neighbor.ID)
-	}, event.WithWorkerPool(Component.WorkerPool))
+	deps.NetworkManager.OnNeighborAdded(func(neighbor network.Neighbor) {
+		Component.LogInfof("neighbor added: %s / %s", neighbor.Peer().PeerAddresses, neighbor.Peer().ID)
+	})
 
-	deps.P2PManager.Events.NeighborRemoved.Hook(func(neighbor *p2p.Neighbor) {
-		Component.LogInfof("Neighbor removed: %s / %s", neighbor.PeerAddresses, neighbor.ID)
-	}, event.WithWorkerPool(Component.WorkerPool))
+	deps.NetworkManager.OnNeighborRemoved(func(neighbor network.Neighbor) {
+		Component.LogInfof("neighbor removed: %s / %s", neighbor.Peer().PeerAddresses, neighbor.Peer().ID)
+	})
 
 	return nil
 }
 
 func run() error {
 	if err := Component.Daemon().BackgroundWorker(Component.Name, func(ctx context.Context) {
-		deps.ManualPeeringMgr.Start()
-		if err := deps.AutoPeeringMgr.Start(ctx); err != nil {
-			Component.LogFatalf("Failed to start autopeering manager: %s", err)
+		defer deps.NetworkManager.Shutdown()
+
+		if err := deps.NetworkManager.Start(ctx, deps.Protocol.LatestAPI().ProtocolParameters().NetworkName()); err != nil {
+			Component.LogFatalf("Failed to start p2p manager: %s", err)
 		}
 
-		defer func() {
-			if err := deps.ManualPeeringMgr.Stop(); err != nil {
-				Component.LogErrorf("Failed to stop the manager", "err", err)
-			}
-		}()
 		//nolint:contextcheck // false positive
 		connectConfigKnownPeers()
-		<-ctx.Done()
-	}, daemon.PriorityManualPeering); err != nil {
-		Component.LogFatalf("Failed to start as daemon: %s", err)
-	}
-
-	if err := Component.Daemon().BackgroundWorker(fmt.Sprintf("%s-P2PManager", Component.Name), func(ctx context.Context) {
-		defer deps.P2PManager.Shutdown()
-		defer func() {
-			if err := deps.P2PManager.P2PHost().Close(); err != nil {
-				Component.LogWarnf("Failed to close libp2p host: %+v", err)
-			}
-		}()
 
 		<-ctx.Done()
 	}, daemon.PriorityP2P); err != nil {
@@ -395,7 +353,7 @@ func connectConfigKnownPeers() {
 			Component.LogPanicf("invalid peer address info: %s", err)
 		}
 
-		if err := deps.ManualPeeringMgr.AddPeers(multiAddr); err != nil {
+		if err := deps.NetworkManager.AddManualPeers(multiAddr); err != nil {
 			Component.LogInfof("failed to add peer: %s, error: %s", multiAddr.String(), err)
 		}
 	}

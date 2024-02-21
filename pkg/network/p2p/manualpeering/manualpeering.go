@@ -13,9 +13,11 @@ import (
 	"github.com/iotaledger/hive.go/log"
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/syncutils"
-	"github.com/iotaledger/hive.go/runtime/workerpool"
 	"github.com/iotaledger/iota-core/pkg/network"
-	"github.com/iotaledger/iota-core/pkg/network/p2p"
+)
+
+const (
+	manualPeerProtectionTag = "manual-peering"
 )
 
 // Manager is the core entity in the manual peering package.
@@ -27,7 +29,7 @@ import (
 // manager will make sure gossip drops that connection.
 // Manager also subscribes to the gossip events and in case the connection with a manual peer fails it will reconnect.
 type Manager struct {
-	p2pm              *p2p.Manager
+	networkManager    network.Manager
 	logger            log.Logger
 	startOnce         sync.Once
 	isStarted         atomic.Bool
@@ -37,20 +39,18 @@ type Manager struct {
 	reconnectInterval time.Duration
 	knownPeersMutex   syncutils.RWMutex
 	knownPeers        map[peer.ID]*network.Peer
-	workerPool        *workerpool.WorkerPool
 
-	onGossipNeighborRemovedHook *event.Hook[func(*p2p.Neighbor)]
-	onGossipNeighborAddedHook   *event.Hook[func(*p2p.Neighbor)]
+	onGossipNeighborRemovedHook *event.Hook[func(network.Neighbor)]
+	onGossipNeighborAddedHook   *event.Hook[func(network.Neighbor)]
 }
 
 // NewManager initializes a new Manager instance.
-func NewManager(p2pm *p2p.Manager, workerPool *workerpool.WorkerPool, logger log.Logger) *Manager {
+func NewManager(networkManager network.Manager, logger log.Logger) *Manager {
 	m := &Manager{
-		p2pm:              p2pm,
-		logger:            logger,
+		networkManager:    networkManager,
+		logger:            logger.NewChildLogger("ManualPeering"),
 		reconnectInterval: network.DefaultReconnectInterval,
 		knownPeers:        make(map[peer.ID]*network.Peer),
-		workerPool:        workerPool,
 	}
 
 	return m
@@ -84,7 +84,10 @@ func (m *Manager) RemovePeer(peerID peer.ID) error {
 	m.knownPeersMutex.Unlock()
 
 	<-kp.DoneCh
-	if err := m.p2pm.DropNeighbor(peerID); err != nil && !ierrors.Is(err, p2p.ErrUnknownNeighbor) {
+
+	m.networkManager.P2PHost().ConnManager().Unprotect(peerID, manualPeerProtectionTag)
+
+	if err := m.networkManager.DropNeighbor(peerID); err != nil && !ierrors.Is(err, network.ErrUnknownPeer) {
 		return ierrors.Wrapf(err, "failed to drop known peer %s in the gossip layer", peerID)
 	}
 
@@ -149,13 +152,12 @@ func (m *Manager) GetPeers(opts ...GetPeersOption) []*network.PeerDescriptor {
 // Calling multiple times has no effect.
 func (m *Manager) Start() {
 	m.startOnce.Do(func() {
-		m.workerPool.Start()
-		m.onGossipNeighborRemovedHook = m.p2pm.Events.NeighborRemoved.Hook(func(neighbor *p2p.Neighbor) {
+		m.onGossipNeighborRemovedHook = m.networkManager.OnNeighborRemoved(func(neighbor network.Neighbor) {
 			m.onGossipNeighborRemoved(neighbor)
-		}, event.WithWorkerPool(m.workerPool))
-		m.onGossipNeighborAddedHook = m.p2pm.Events.NeighborAdded.Hook(func(neighbor *p2p.Neighbor) {
+		})
+		m.onGossipNeighborAddedHook = m.networkManager.OnNeighborAdded(func(neighbor network.Neighbor) {
 			m.onGossipNeighborAdded(neighbor)
-		}, event.WithWorkerPool(m.workerPool))
+		})
 		m.isStarted.Store(true)
 	})
 }
@@ -178,6 +180,15 @@ func (m *Manager) Stop() (err error) {
 	return err
 }
 
+func (m *Manager) IsPeerKnown(id peer.ID) bool {
+	m.knownPeersMutex.RLock()
+	defer m.knownPeersMutex.RUnlock()
+
+	_, exists := m.knownPeers[id]
+
+	return exists
+}
+
 func (m *Manager) addPeer(peerAddr multiaddr.Multiaddr) error {
 	if !m.isStarted.Load() {
 		return ierrors.New("manual peering manager hasn't been started yet")
@@ -196,7 +207,7 @@ func (m *Manager) addPeer(peerAddr multiaddr.Multiaddr) error {
 	}
 
 	// Do not add self
-	if p.ID == m.p2pm.P2PHost().ID() {
+	if p.ID == m.networkManager.P2PHost().ID() {
 		return ierrors.New("not adding self to the list of known peers")
 	}
 
@@ -240,7 +251,7 @@ func (m *Manager) keepPeerConnected(peer *network.Peer) {
 			m.logger.LogInfof("Peer is disconnected, calling gossip layer to establish the connection, peerID: %s", peer.ID)
 
 			var err error
-			if err = m.p2pm.DialPeer(ctx, peer); err != nil && !ierrors.Is(err, p2p.ErrDuplicateNeighbor) && !ierrors.Is(err, context.Canceled) {
+			if err = m.networkManager.DialPeer(ctx, peer); err != nil && !ierrors.Is(err, network.ErrDuplicatePeer) && !ierrors.Is(err, context.Canceled) {
 				m.logger.LogErrorf("Failed to connect a neighbor in the gossip layer, peerID: %s, error: %s", peer.ID, err)
 			}
 		}
@@ -253,22 +264,23 @@ func (m *Manager) keepPeerConnected(peer *network.Peer) {
 	}
 }
 
-func (m *Manager) onGossipNeighborRemoved(neighbor *p2p.Neighbor) {
-	m.changeNeighborStatus(neighbor, network.ConnStatusDisconnected)
+func (m *Manager) onGossipNeighborRemoved(neighbor network.Neighbor) {
+	m.changeNeighborStatus(neighbor)
 }
 
-func (m *Manager) onGossipNeighborAdded(neighbor *p2p.Neighbor) {
-	m.changeNeighborStatus(neighbor, network.ConnStatusConnected)
-	m.logger.LogInfof("Gossip layer successfully connected with the peer %s", neighbor.Peer)
+func (m *Manager) onGossipNeighborAdded(neighbor network.Neighbor) {
+	m.changeNeighborStatus(neighbor)
+	m.logger.LogInfof("Gossip layer successfully connected with the peer %s", neighbor.Peer())
 }
 
-func (m *Manager) changeNeighborStatus(neighbor *p2p.Neighbor, connStatus network.ConnectionStatus) {
+func (m *Manager) changeNeighborStatus(neighbor network.Neighbor) {
 	m.knownPeersMutex.RLock()
 	defer m.knownPeersMutex.RUnlock()
 
-	kp, exists := m.knownPeers[neighbor.ID]
+	kp, exists := m.knownPeers[neighbor.Peer().ID]
 	if !exists {
 		return
 	}
-	kp.SetConnStatus(connStatus)
+	kp.SetConnStatus(neighbor.Peer().GetConnStatus())
+	m.networkManager.P2PHost().ConnManager().Protect(neighbor.Peer().ID, manualPeerProtectionTag)
 }
