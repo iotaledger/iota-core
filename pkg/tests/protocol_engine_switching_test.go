@@ -263,8 +263,8 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP1...)
 		ts.AssertUniqueCommitmentChain(nodesP1...)
-		ts.AssertCommitmentsOnChain(ts.CommitmentsOfMainEngine(node0, 13, 18), ts.CommitmentOfMainEngine(node0, 13).ID(), nodesP1...)
-		ts.AssertCommitmentsOrphaned(ts.CommitmentsOfMainEngine(node0, 13, 18), false, nodesP1...)
+		ts.AssertCommitmentsOnChain(ts.CommitmentsOfMainEngine(nodesP1[0], 13, 18), ts.CommitmentOfMainEngine(nodesP1[0], 13).ID(), nodesP1...)
+		ts.AssertCommitmentsOrphaned(ts.CommitmentsOfMainEngine(nodesP1[0], 13, 18), false, nodesP1...)
 
 		// Make sure the tips are properly set.
 		var tipBlocks []*blocks.Block
@@ -290,10 +290,10 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithEvictedSlot(18),
 		)
 
-		engineCommitmentsP2 = ts.CommitmentsOfMainEngine(node6, 6, 18)
+		engineCommitmentsP2 = ts.CommitmentsOfMainEngine(nodesP2[0], 6, 18)
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP2...)
 		ts.AssertUniqueCommitmentChain(nodesP2...)
-		ts.AssertCommitmentsOnChain(engineCommitmentsP2, ts.CommitmentOfMainEngine(node0, 6).ID(), nodesP2...)
+		ts.AssertCommitmentsOnChain(engineCommitmentsP2, ts.CommitmentOfMainEngine(nodesP1[0], 6).ID(), nodesP2...)
 		ts.AssertCommitmentsOrphaned(engineCommitmentsP2, false, nodesP2...)
 
 		for _, slot := range []iotago.SlotIndex{12, 13, 14, 15} {
@@ -382,11 +382,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 		wg.Wait()
 	}
 
-	lastFinalizedSlot := node0.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - 4
-	ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
-		return commitment.Slot() >= lastFinalizedSlot
-	})
-
 	// Make sure that nodes that switched their engine still have blocks with prefix P0 from before the fork.
 	// Those nodes should also have all the blocks from the target fork P1 and should not have blocks from P2.
 	// This is to make sure that the storage was copied correctly during engine switching.
@@ -396,13 +391,18 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 
-	commitmentsMainChain := ts.CommitmentsOfMainEngine(node0, node0.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot()-4, expectedCommittedSlotAfterPartitionMerge)
+	lastFinalizedSlot := node0.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - 4
+	ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
+		return commitment.Slot() >= lastFinalizedSlot
+	})
+
+	commitmentsMainChain := ts.CommitmentsOfMainEngine(nodesP1[0], lastFinalizedSlot-4, expectedCommittedSlotAfterPartitionMerge)
 
 	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
 	ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
-	ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(node0, lastFinalizedSlot).ID(), ts.Nodes()...)
+	ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(nodesP1[0], lastFinalizedSlot).ID(), ts.Nodes()...)
 	// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
 	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
 
@@ -571,6 +571,8 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, nodesP2...)
 	}
 
+	var engineCommitmentsP2 []*model.Commitment
+
 	// Issue blocks in partition 2.
 	{
 		ts.IssueBlocksAtSlots("P2:", []iotago.SlotIndex{8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}, 4, "P0:7.3", nodesP2, true, false)
@@ -610,6 +612,26 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, nodesP2...)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, nodesP1...)
+
+		lastFinalizedSlot := node0.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - 4
+		commitmentsMainChain := ts.CommitmentsOfMainEngine(node0, lastFinalizedSlot-4, expectedCommittedSlotAfterPartitionMerge)
+		ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
+			return commitment.Slot() >= lastFinalizedSlot
+		})
+
+		ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
+		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
+		ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(node0, lastFinalizedSlot).ID(), ts.Nodes()...)
+		// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
+		ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
+
+		engineCommitmentsP2 = ts.CommitmentsOfMainEngine(nodesP2[0], 6, 18)
+		ts.AssertLatestEngineCommitmentOnMainChain(nodesP2...)
+		ts.AssertUniqueCommitmentChain(nodesP2...)
+		ts.AssertCommitmentsOnChain(engineCommitmentsP2, ts.CommitmentOfMainEngine(node0, 6).ID(), nodesP2...)
+		ts.AssertCommitmentsOrphaned(engineCommitmentsP2, false, nodesP2...)
 	}
 
 	// Merge the partitions
@@ -993,6 +1015,27 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	wg.Wait()
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
+
+	lastFinalizedSlot := mainPartition[0].Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - 4
+	commitmentsMainChain := ts.CommitmentsOfMainEngine(ts.Node("node0"), lastFinalizedSlot-4, expectedCommittedSlotAfterPartitionMerge)
+	ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
+		return commitment.Slot() >= lastFinalizedSlot
+	})
+	ultimateCommitmentsP3 := lo.Filter(engineCommitmentsP3, func(commitment *model.Commitment) bool {
+		return commitment.Slot() >= lastFinalizedSlot
+	})
+
+	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
+	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
+	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP3, true, ts.Nodes()...)
+
+	ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+	ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(mainPartition[0], lastFinalizedSlot).ID(), ts.Nodes()...)
+	// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
+
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, iotago.EmptyCommitmentID, ts.Nodes()...)
 }
 
 type Blocks []*blocks.Block
