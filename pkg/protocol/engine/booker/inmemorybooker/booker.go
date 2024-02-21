@@ -16,7 +16,6 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/mempool/spenddag"
 	iotago "github.com/iotaledger/iota.go/v4"
-	"github.com/iotaledger/iota.go/v4/api"
 )
 
 type Booker struct {
@@ -29,7 +28,6 @@ type Booker struct {
 	ledger ledger.Ledger
 
 	loadBlockFromStorage func(id iotago.BlockID) (*model.Block, bool)
-	retainBlockFailure   func(block *model.Block, reason api.BlockFailureReason)
 
 	errorHandler func(error)
 	apiProvider  iotago.APIProvider
@@ -60,8 +58,6 @@ func NewProvider(opts ...options.Option[Booker]) module.Provider[*engine.Engine,
 					b.errorHandler(err)
 				}
 			})
-
-			b.setRetainBlockFailureFunc(e.Retainer.RetainBlockFailure)
 
 			e.Events.Booker.LinkTo(b.events)
 
@@ -94,8 +90,6 @@ func (b *Booker) Queue(block *blocks.Block) error {
 	}
 
 	if signedTransactionMetadata == nil {
-		b.retainBlockFailure(block.ModelBlock(), api.BlockFailurePayloadInvalid)
-
 		return ierrors.Errorf("transaction in %s was not attached", block.ID())
 	}
 
@@ -163,10 +157,6 @@ func (b *Booker) setupBlock(block *blocks.Block) {
 	})
 }
 
-func (b *Booker) setRetainBlockFailureFunc(retainBlockFailure func(*model.Block, api.BlockFailureReason)) {
-	b.retainBlockFailure = retainBlockFailure
-}
-
 func (b *Booker) book(block *blocks.Block) error {
 	spendersToInherit, err := b.inheritSpenders(block)
 	if err != nil {
@@ -202,8 +192,6 @@ func (b *Booker) inheritSpenders(block *blocks.Block) (spenderIDs ds.Set[iotago.
 	for _, parent := range block.ParentsWithType() {
 		parentBlock, exists := b.blockCache.Block(parent.ID)
 		if !exists {
-			b.retainBlockFailure(block.ModelBlock(), api.BlockFailureParentNotFound)
-
 			return nil, ierrors.Errorf("parent %s does not exist", parent.ID)
 		}
 

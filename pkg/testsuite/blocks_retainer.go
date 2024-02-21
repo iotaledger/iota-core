@@ -13,7 +13,7 @@ func (t *TestSuite) AssertRetainerBlocksState(expectedBlocks []*blocks.Block, ex
 	for _, node := range nodes {
 		for _, block := range expectedBlocks {
 			t.Eventually(func() error {
-				blockFromRetainer, err := node.Protocol.Engines.Main.Get().Retainer.BlockMetadata(block.ID())
+				blockFromRetainer, err := node.Protocol.Engines.Main.Get().BlockRetainer.BlockMetadata(block.ID())
 				if err != nil {
 					return ierrors.Errorf("AssertRetainerBlocksState: %s: block %s: error when loading %s", node.Name, block.ID(), err.Error())
 				}

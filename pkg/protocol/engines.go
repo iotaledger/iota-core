@@ -214,6 +214,7 @@ func (e *Engines) loadEngineInstanceWithStorage(engineAlias string, storage *sto
 		e.protocol.Options.TipManagerProvider,
 		e.protocol.Options.TipSelectionProvider,
 		e.protocol.Options.RetainerProvider,
+		e.protocol.Options.BlockRetainerProvider,
 		e.protocol.Options.UpgradeOrchestratorProvider,
 		e.protocol.Options.SyncManagerProvider,
 		append(e.protocol.Options.EngineOptions, engineOptions...)...,

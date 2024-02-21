@@ -38,7 +38,8 @@ import (
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection"
 	"github.com/iotaledger/iota-core/pkg/protocol/sybilprotection/sybilprotectionv1"
 	"github.com/iotaledger/iota-core/pkg/retainer"
-	retainer1 "github.com/iotaledger/iota-core/pkg/retainer/retainer"
+	"github.com/iotaledger/iota-core/pkg/retainer/blockretainer"
+	oldretainer "github.com/iotaledger/iota-core/pkg/retainer/retainer"
 	"github.com/iotaledger/iota-core/pkg/storage"
 	iotago "github.com/iotaledger/iota.go/v4"
 )
@@ -106,6 +107,9 @@ type Options struct {
 	// RetainerProvider contains the provider for the Retainer engine modules.
 	RetainerProvider module.Provider[*engine.Engine, retainer.Retainer]
 
+	// BlockRetainerProvider contains the provider for the BlockRetainer engine modules.
+	BlockRetainerProvider module.Provider[*engine.Engine, retainer.BlockRetainer]
+
 	// SchedulerProvider contains the provider for the Scheduler engine modules.
 	SchedulerProvider module.Provider[*engine.Engine, scheduler.Scheduler]
 
@@ -132,7 +136,8 @@ func NewDefaultOptions() *Options {
 		AttestationProvider:         slotattestation.NewProvider(),
 		SyncManagerProvider:         trivialsyncmanager.NewProvider(),
 		LedgerProvider:              ledger1.NewProvider(),
-		RetainerProvider:            retainer1.NewProvider(),
+		RetainerProvider:            oldretainer.NewProvider(),
+		BlockRetainerProvider:       blockretainer.NewProvider(),
 		SchedulerProvider:           drr.NewProvider(),
 		UpgradeOrchestratorProvider: signalingupgradeorchestrator.NewProvider(),
 	}

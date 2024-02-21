@@ -64,6 +64,7 @@ type Engine struct {
 	Scheduler           scheduler.Scheduler
 	TipManager          tipmanager.TipManager
 	TipSelection        tipselection.TipSelection
+	BlockRetainer       retainer.BlockRetainer
 	Retainer            retainer.Retainer
 	SyncManager         syncmanager.SyncManager
 	UpgradeOrchestrator upgrade.Orchestrator
@@ -110,6 +111,7 @@ func New(
 	tipManagerProvider module.Provider[*Engine, tipmanager.TipManager],
 	tipSelectionProvider module.Provider[*Engine, tipselection.TipSelection],
 	retainerProvider module.Provider[*Engine, retainer.Retainer],
+	blockRetainerProvider module.Provider[*Engine, retainer.BlockRetainer],
 	upgradeOrchestratorProvider module.Provider[*Engine, upgrade.Orchestrator],
 	syncManagerProvider module.Provider[*Engine, syncmanager.SyncManager],
 	opts ...options.Option[Engine],
@@ -171,6 +173,7 @@ func New(
 			e.Scheduler = schedulerProvider(e)
 			e.TipSelection = tipSelectionProvider(e)
 			e.Retainer = retainerProvider(e)
+			e.BlockRetainer = blockRetainerProvider(e)
 			e.UpgradeOrchestrator = upgradeOrchestratorProvider(e)
 			e.SyncManager = syncManagerProvider(e)
 		},
@@ -261,6 +264,7 @@ func (e *Engine) Reset() {
 	e.BlockDAG.Reset()
 	e.PreSolidFilter.Reset()
 	e.Retainer.Reset()
+	e.BlockRetainer.Reset()
 	e.EvictionState.Reset()
 	e.BlockCache.Reset()
 	e.Storage.Reset()
@@ -595,6 +599,7 @@ func (e *Engine) initReactiveModule(parentLogger log.Logger) (reactiveModule *mo
 		e.BlockDAG.Shutdown()
 		e.PreSolidFilter.Shutdown()
 		e.Retainer.Shutdown()
+		e.BlockRetainer.Shutdown()
 		e.Workers.Shutdown()
 		e.Storage.Shutdown()
 
