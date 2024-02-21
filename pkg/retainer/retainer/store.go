@@ -87,7 +87,7 @@ func (m *metadataStore) getBlockData(blockID iotago.BlockID) (*slotstore.BlockRe
 	return data, nil
 }
 
-func (m *metadataStore) getTransactionStoreWithoutLocking(txID iotago.TransactionID) (*slotstore.SlotStore, error) {
+func (m *metadataStore) getTransactionStoreWithoutLocking(txID iotago.TransactionID) (*slotstore.Retainer, error) {
 	latestAttachmentSlot, exists := m.transactionLatestAttachmentSlot.Get(txID)
 	if !exists {
 		return nil, ierrors.Errorf("latest attachment slot for transaction %s not found", txID.String())

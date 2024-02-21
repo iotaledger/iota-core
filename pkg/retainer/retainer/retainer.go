@@ -18,7 +18,7 @@ import (
 
 type (
 	//nolint:revive
-	SlotStoreFunc           func(iotago.SlotIndex) (*slotstore.SlotStore, error)
+	SlotStoreFunc           func(iotago.SlotIndex) (*slotstore.Retainer, error)
 	LatestCommittedSlotFunc func() iotago.SlotIndex
 	FinalizedSlotFunc       func() iotago.SlotIndex
 )

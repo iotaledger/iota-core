@@ -146,11 +146,11 @@ func (p *Prunable) Roots(slot iotago.SlotIndex) (*slotstore.Store[iotago.Commitm
 	), nil
 }
 
-func (p *Prunable) SlotStore(slot iotago.SlotIndex) (*slotstore.SlotStore, error) {
+func (p *Prunable) Retainer(slot iotago.SlotIndex) (*slotstore.Retainer, error) {
 	kv, err := p.getKVStoreFromSlot(slot, kvstore.Realm{slotPrefixRetainer})
 	if err != nil {
 		return nil, ierrors.Wrapf(database.ErrEpochPruned, "could not get retainer with slot %d", slot)
 	}
 
-	return slotstore.NewSlotStore(slot, kv), nil
+	return slotstore.NewRetainer(slot, kv), nil
 }

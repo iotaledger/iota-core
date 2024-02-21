@@ -111,15 +111,15 @@ func transactionRetainerDataFromBytes(bytes []byte) (*TransactionRetainerData, i
 	return t, byteReader.BytesRead(), nil
 }
 
-type SlotStore struct {
+type Retainer struct {
 	slot       iotago.SlotIndex
 	blockStore *kvstore.TypedStore[iotago.BlockID, *BlockRetainerData]
 	// we store transaction metadata per blockID as in API requests we always request by blockID
 	transactionStore *kvstore.TypedStore[iotago.TransactionID, *TransactionRetainerData]
 }
 
-func NewSlotStore(slot iotago.SlotIndex, store kvstore.KVStore) (newSlotStore *SlotStore) {
-	return &SlotStore{
+func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Retainer) {
+	return &Retainer{
 		slot: slot,
 		blockStore: kvstore.NewTypedStore(lo.PanicOnErr(store.WithExtendedRealm(kvstore.Realm{blockStorePrefix})),
 			iotago.BlockID.Bytes,
@@ -136,24 +136,24 @@ func NewSlotStore(slot iotago.SlotIndex, store kvstore.KVStore) (newSlotStore *S
 	}
 }
 
-func (s *SlotStore) StoreBlockBooked(blockID iotago.BlockID, transactionID iotago.TransactionID) error {
-	return s.blockStore.Set(blockID, &BlockRetainerData{
+func (r *Retainer) StoreBlockBooked(blockID iotago.BlockID, transactionID iotago.TransactionID) error {
+	return r.blockStore.Set(blockID, &BlockRetainerData{
 		State:         api.BlockStatePending,
 		FailureReason: api.BlockFailureNone,
 		TransactionID: transactionID,
 	})
 }
 
-func (s *SlotStore) StoreBlockFailure(blockID iotago.BlockID, failureType api.BlockFailureReason, transactionID iotago.TransactionID) error {
-	return s.blockStore.Set(blockID, &BlockRetainerData{
+func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType api.BlockFailureReason, transactionID iotago.TransactionID) error {
+	return r.blockStore.Set(blockID, &BlockRetainerData{
 		State:         api.BlockStateFailed,
 		FailureReason: failureType,
 		TransactionID: transactionID,
 	})
 }
 
-func (s *SlotStore) StoreBlockAccepted(blockID iotago.BlockID) error {
-	data, err := s.blockStore.Get(blockID)
+func (r *Retainer) StoreBlockAccepted(blockID iotago.BlockID) error {
+	data, err := r.blockStore.Get(blockID)
 	if err != nil {
 		return err
 	}
@@ -161,11 +161,11 @@ func (s *SlotStore) StoreBlockAccepted(blockID iotago.BlockID) error {
 	data.State = api.BlockStateAccepted
 	data.FailureReason = api.BlockFailureNone
 
-	return s.blockStore.Set(blockID, data)
+	return r.blockStore.Set(blockID, data)
 }
 
-func (s *SlotStore) StoreBlockConfirmed(blockID iotago.BlockID) (iotago.TransactionID, error) {
-	data, err := s.blockStore.Get(blockID)
+func (r *Retainer) StoreBlockConfirmed(blockID iotago.BlockID) (iotago.TransactionID, error) {
+	data, err := r.blockStore.Get(blockID)
 	if err != nil {
 		return iotago.EmptyTransactionID, err
 	}
@@ -173,11 +173,11 @@ func (s *SlotStore) StoreBlockConfirmed(blockID iotago.BlockID) (iotago.Transact
 	data.State = api.BlockStateConfirmed
 	data.FailureReason = api.BlockFailureNone
 
-	return data.TransactionID, s.blockStore.Set(blockID, data)
+	return data.TransactionID, r.blockStore.Set(blockID, data)
 }
 
-func (s *SlotStore) StoreBlockDropped(blockID iotago.BlockID) error {
-	data, err := s.blockStore.Get(blockID)
+func (r *Retainer) StoreBlockDropped(blockID iotago.BlockID) error {
+	data, err := r.blockStore.Get(blockID)
 	if err != nil {
 		return err
 	}
@@ -185,11 +185,11 @@ func (s *SlotStore) StoreBlockDropped(blockID iotago.BlockID) error {
 	data.State = api.BlockStateFailed
 	data.FailureReason = api.BlockFailureDroppedDueToCongestion
 
-	return s.blockStore.Set(blockID, data)
+	return r.blockStore.Set(blockID, data)
 }
 
-func (s *SlotStore) GetBlock(blockID iotago.BlockID) (*BlockRetainerData, bool) {
-	blockData, err := s.blockStore.Get(blockID)
+func (r *Retainer) GetBlock(blockID iotago.BlockID) (*BlockRetainerData, bool) {
+	blockData, err := r.blockStore.Get(blockID)
 	if err != nil {
 		return nil, false
 	}
@@ -197,34 +197,34 @@ func (s *SlotStore) GetBlock(blockID iotago.BlockID) (*BlockRetainerData, bool) 
 	return blockData, true
 }
 
-func (s *SlotStore) StoreTransactionData(transactionID iotago.TransactionID, data *TransactionRetainerData) error {
-	return s.transactionStore.Set(transactionID, data)
+func (r *Retainer) StoreTransactionData(transactionID iotago.TransactionID, data *TransactionRetainerData) error {
+	return r.transactionStore.Set(transactionID, data)
 }
 
-func (s *SlotStore) StoreTransactionNoFailure(transactionID iotago.TransactionID, status api.TransactionState) error {
+func (r *Retainer) StoreTransactionNoFailure(transactionID iotago.TransactionID, status api.TransactionState) error {
 	if status == api.TransactionStateFailed {
 		return ierrors.Errorf("failed to retain transaction status, status cannot be failed, transactionID: %s", transactionID.String())
 	}
 
-	return s.transactionStore.Set(transactionID, &TransactionRetainerData{
+	return r.transactionStore.Set(transactionID, &TransactionRetainerData{
 		State:         status,
 		FailureReason: api.TxFailureNone,
 	})
 }
 
-func (s *SlotStore) StoreTransactionFailure(transactionID iotago.TransactionID, failureType api.TransactionFailureReason) error {
-	return s.transactionStore.Set(transactionID, &TransactionRetainerData{
+func (r *Retainer) StoreTransactionFailure(transactionID iotago.TransactionID, failureType api.TransactionFailureReason) error {
+	return r.transactionStore.Set(transactionID, &TransactionRetainerData{
 		State:         api.TransactionStateFailed,
 		FailureReason: failureType,
 	})
 }
 
-func (s *SlotStore) DeleteTransactionData(prevID iotago.TransactionID) error {
-	return s.transactionStore.Delete(prevID)
+func (r *Retainer) DeleteTransactionData(prevID iotago.TransactionID) error {
+	return r.transactionStore.Delete(prevID)
 }
 
-func (s *SlotStore) GetTransaction(txID iotago.TransactionID) (*TransactionRetainerData, bool) {
-	txData, err := s.transactionStore.Get(txID)
+func (r *Retainer) GetTransaction(txID iotago.TransactionID) (*TransactionRetainerData, bool) {
+	txData, err := r.transactionStore.Get(txID)
 	if err != nil {
 		return nil, false
 	}
