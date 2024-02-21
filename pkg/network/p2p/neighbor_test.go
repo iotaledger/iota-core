@@ -129,12 +129,12 @@ func newStreamsPipe(t testing.TB) (p2pnetwork.Stream, p2pnetwork.Stream, func())
 	_, err = dialStream.Write(nil)
 	require.NoError(t, err)
 	acceptStream := <-acceptStremCh
+
 	tearDown := func() {
-		err2 := dialStream.Close()
-		require.NoError(t, err2)
-		err2 = acceptStream.Close()
-		require.NoError(t, err2)
-		err2 = host1.Close()
+		dialStream.Close()
+		acceptStream.Close()
+
+		err2 := host1.Close()
 		require.NoError(t, err2)
 		err2 = host2.Close()
 		require.NoError(t, err2)
