@@ -120,7 +120,9 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 	}
 
 	ts.Run(false, nodeOptions)
-
+	ts.Node("node6").Protocol.SetLogLevel(log.LevelTrace)
+	ts.Node("node6").Protocol.Engines.Main.Get().SetLogLevel(log.LevelDebug)
+	ts.Node("node6").Protocol.Blocks.SetLogLevel(log.LevelDebug)
 	expectedCommittee := []iotago.AccountID{
 		node0.Validator.AccountID,
 		node1.Validator.AccountID,
@@ -786,6 +788,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	ts.AddDefaultWallet(nodes[0])
 
 	const expectedCommittedSlotAfterPartitionMerge = 18
+	const forkingSlot = 14
 
 	nodeOptions := []options.Option[protocol.Protocol]{
 		protocol.WithSybilProtectionProvider(
@@ -965,12 +968,17 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		}
 
 		ts.AssertStrongTips(tipBlocks, targetNodes...)
-
-		// Assert Protocol.Chains and Protocol.Commitments state.
-		// TODO: assert here
 	}
 
 	issueBlocks(0, []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13})
+
+	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
+
+	commitmentsMainChain := ts.CommitmentsOfMainEngine(nodes[0], 6, 11)
+	ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+	ts.AssertCommitmentsOnChain(commitmentsMainChain, commitmentsMainChain[0].ID(), ts.Nodes()...)
+	ts.AssertCommitmentsAndChainsEvicted(5, ts.Nodes()...)
 
 	// Split into partitions P1, P2 and P3.
 	ts.SplitIntoPartitions(map[string][]*mock.Node{
@@ -1001,6 +1009,9 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	issueBlocks(1, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
 	issueBlocks(2, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
 	issueBlocks(3, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
+
+	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 
 	commitment140 := ts.CommitmentOfMainEngine(nodes[0], 14)
 	commitment141 := ts.CommitmentOfMainEngine(nodes[1], 14)
@@ -1062,40 +1073,48 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 
 	oldestNonEvictedCommitment := mainPartition[0].Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - maxCommittableAge
-	fmt.Println("Oldest non-evicted commitment: ", oldestNonEvictedCommitment)
-	commitmentsMainChain := ts.CommitmentsOfMainEngine(mainPartition[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
+
+	commitmentsMainChain = ts.CommitmentsOfMainEngine(mainPartition[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
 	ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
-		return commitment.Slot() >= oldestNonEvictedCommitment
+		return commitment.Slot() >= forkingSlot
 	})
 	ultimateCommitmentsP3 := lo.Filter(engineCommitmentsP3, func(commitment *model.Commitment) bool {
-		return commitment.Slot() >= oldestNonEvictedCommitment
+		return commitment.Slot() >= forkingSlot
 	})
-
-	// TODO: remove prints
-	fmt.Println("Commitments on main chain: ", lo.Map(commitmentsMainChain, func(c *model.Commitment) iotago.CommitmentID {
-		return c.ID()
-	}))
-	fmt.Println("Ultimate commitments P2: ", lo.Map(ultimateCommitmentsP2, func(c *model.Commitment) iotago.CommitmentID {
-		return c.ID()
-	}))
-	fmt.Println("Ultimate commitments P3: ", lo.Map(ultimateCommitmentsP3, func(c *model.Commitment) iotago.CommitmentID {
-		return c.ID()
-	}))
 
 	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
 
 	// We have not evicted the slot below the forking point, so chains are not yet orphaned.
-	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, false, ts.Nodes()...)
-	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, ultimateCommitmentsP2[0].ID(), ts.Nodes()...)
-
-	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP3, false, ts.Nodes()...)
-	ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, iotago.EmptyCommitmentID, ts.Nodes()...)
-
 	ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
-	ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(mainPartition[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
+	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, false, ts.Nodes()...)
+	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP3, false, ts.Nodes()...)
 
-	// TODO: ts.AssertCommitmentsAndChainsEvicted(11, ts.Nodes()...)
+	// The Main partition should have all commitments on the old chain, because it did not switch chains.
+	ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(mainPartition[0], oldestNonEvictedCommitment).ID(), mainPartition...)
+	// Pre-fork commitments should be on the old chains on other partitions.
+	ts.AssertCommitmentsOnChain(commitmentsMainChain[:8], ts.CommitmentOfMainEngine(otherPartitions[0], oldestNonEvictedCommitment).ID(), otherPartitions...)
+	// Post-fork winning commitments should be on the new chains on other partitions. This chain is the new main one.
+	ts.AssertCommitmentsOnChain(commitmentsMainChain[8:], ts.CommitmentOfMainEngine(otherPartitions[0], forkingSlot).ID(), otherPartitions...)
+
+	// P2 commitments on the main partition should be on its own chain.
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, ultimateCommitmentsP2[0].ID(), mainPartition...)
+
+	// P2 commitments on P2 node should be on the old chain, that is not the main chain anymore.
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, ts.CommitmentOfMainEngine(otherPartitions[0], oldestNonEvictedCommitment).ID(), otherPartitions[0])
+	// P2 commitments on P3 node should be on separate chain.
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, ultimateCommitmentsP2[0].ID(), otherPartitions[1])
+
+	// P3 commitments on the main partition should be on its own chain.
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, ultimateCommitmentsP3[0].ID(), mainPartition...)
+	// P3 commitments on P3 node should be on the old chain, that is not the main chain anymore.
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, ts.CommitmentOfMainEngine(otherPartitions[1], oldestNonEvictedCommitment).ID(), otherPartitions[1])
+	// P3 commitments on P2 node should be on separate chain.
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, ultimateCommitmentsP3[0].ID(), otherPartitions[0])
+
+	// TODO:
+	//  Extend the test and make sure that after eviction everything is intact.
+	//  ts.AssertCommitmentsAndChainsEvicted(11, ts.Nodes()...)
 }
 
 type Blocks []*blocks.Block
