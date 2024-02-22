@@ -14,6 +14,26 @@ import (
 	"github.com/iotaledger/iota.go/v4/nodeclient"
 )
 
+func (d *DockerTestFramework) AssertLatestCommitments(ctx context.Context, eventClt *nodeclient.EventAPIClient, expectedSlots []iotago.SlotIndex, finishChan chan struct{}) {
+	commitmentChan, subInfo := eventClt.CommitmentsLatest()
+	require.Nil(d.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+		d.assertCommitmentsTopics(ctx, commitmentChan, expectedSlots, finishChan)
+	}()
+}
+
+func (d *DockerTestFramework) AssertFinalizedCommitments(ctx context.Context, eventClt *nodeclient.EventAPIClient, expectedSlots []iotago.SlotIndex, finishChan chan struct{}) {
+	commitmentChan, subInfo := eventClt.CommitmentsFinalized()
+	require.Nil(d.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+		d.assertCommitmentsTopics(ctx, commitmentChan, expectedSlots, finishChan)
+	}()
+}
+
 func (d *DockerTestFramework) AssertBlocks(ctx context.Context, eventClt *nodeclient.EventAPIClient, expectedBlockIDs map[string]*iotago.Block, finishChan chan struct{}) {
 	blksChan, subInfo := eventClt.Blocks()
 	require.Nil(d.Testing, subInfo.Error())
@@ -207,6 +227,31 @@ func (d *DockerTestFramework) AssertNFTOutput(ctx context.Context, eventClt *nod
 			return false
 		}, finishChan)
 	}()
+}
+
+func (d *DockerTestFramework) assertCommitmentsTopics(ctx context.Context, receivedChan <-chan *iotago.Commitment, expectedSlots []iotago.SlotIndex, finishChan chan struct{}) {
+	maxSlot := lo.Max(expectedSlots...)
+	slots := make([]iotago.SlotIndex, 0)
+
+	for {
+		select {
+		case commitment := <-receivedChan:
+			slots = append(slots, commitment.Slot)
+			if commitment.Slot == maxSlot {
+				// make sure the commitment is in increasing order.
+				require.IsIncreasing(d.Testing, slots)
+				// we will receive more slots than expected, so we need to trim the slice
+				slots = slots[len(slots)-len(expectedSlots):]
+
+				require.ElementsMatch(d.Testing, expectedSlots, slots)
+				finishChan <- struct{}{}
+				return
+			}
+		case <-ctx.Done():
+			fmt.Println("Received slots:", slots)
+			return
+		}
+	}
 }
 
 func (d *DockerTestFramework) assertBlocksTopics(ctx context.Context, receivedChan <-chan *iotago.Block, expectedBlocks map[string]*iotago.Block, finishChan chan struct{}) {
