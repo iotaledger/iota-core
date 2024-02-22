@@ -12,14 +12,12 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
 
-	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
 	"github.com/iotaledger/hive.go/runtime/options"
@@ -78,8 +76,7 @@ type DockerTestFramework struct {
 	snapshotPath     string
 	logDirectoryPath string
 
-	latestUsedIndex atomic.Uint32
-	defaultWallet   *Wallet
+	defaultWallet *Wallet
 
 	optsProtocolParameterOptions []options.Option[iotago.V3ProtocolParameters]
 	optsSnapshotOptions          []options.Option[snapshotcreator.Options]
@@ -424,67 +421,81 @@ func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuer *Account, va
 		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
 }
 
-func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *Account {
-	// create an implicit account by requesting faucet funds
+// CreateAccountBlockFromInput consumes the given output, which should be either an basic output with implicit address or an account output, then build block with the given account output options.
+func (d *DockerTestFramework) CreateAccountBlockFromInput(inputId iotago.OutputID, opts ...options.Option[builder.AccountOutputBuilder]) (*Account, iotago.OutputID, *iotago.Block) {
 	ctx := context.TODO()
-	receiverAddr, implicitPrivateKey := d.getAddress(iotago.AddressImplicitAccountCreation)
-	implicitOutputID, implicitAccountOutput := d.RequestFaucetFunds(ctx, receiverAddr)
-
-	accountID := iotago.AccountIDFromOutputID(implicitOutputID)
-	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
-	require.True(d.Testing, ok)
-
-	// make sure an implicit account is committed
-	d.CheckAccountStatus(ctx, iotago.EmptyBlockID, implicitOutputID.TransactionID(), implicitOutputID, accountAddress)
-
-	// transition to a full account with new Ed25519 address and staking feature
-	accEd25519Addr, accPrivateKey := d.getAddress(iotago.AddressEd25519)
-	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(accPrivateKey.Public().(ed25519.PublicKey)))
-	accountOutput := options.Apply(builder.NewAccountOutputBuilder(accEd25519Addr, implicitAccountOutput.BaseTokenAmount()),
-		opts, func(b *builder.AccountOutputBuilder) {
-			b.AccountID(accountID).
-				BlockIssuer(iotago.NewBlockIssuerKeys(accBlockIssuerKey), iotago.MaxSlotIndex)
-		}).MustBuild()
-
 	clt := d.Node("V1").Client
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
+	input := d.defaultWallet.Output(inputId)
 
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
 
-	congestionResp, err := clt.Congestion(ctx, accountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
-	require.NoError(d.Testing, err)
-	implicitAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForImplicitAccountCreationAddress(receiverAddr.(*iotago.ImplicitAccountCreationAddress), implicitPrivateKey))
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
-		AddInput(&builder.TxInput{
-			UnlockTarget: receiverAddr,
-			InputID:      implicitOutputID,
-			Input:        implicitAccountOutput,
-		}).
-		AddOutput(accountOutput).
-		SetCreationSlot(currentSlot).
-		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
-		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: accountID}).
-		AllotAllMana(currentSlot, accountID, 0).
-		Build(implicitAddrSigner)
+	congestionResp, err := clt.Congestion(ctx, input.Address.(*iotago.AccountAddress), 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(accountID, implicitPrivateKey), congestionResp, issuerResp)
+	account, signedTx := d.defaultWallet.TransitionImplicitAccountToAccountOutput(clt, input.ID, issuerResp)
+	txId, err := signedTx.Transaction.ID()
+	require.NoError(d.Testing, err)
 
-	// check if the account is committed
-	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
-	d.CheckAccountStatus(ctx, blkID, lo.PanicOnErr(signedTx.Transaction.ID()), accOutputID, accountAddress, true)
+	return account,
+		iotago.OutputIDFromTransactionIDAndIndex(txId, 0),
+		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(account.AccountID, account.BlockIssuerKey), congestionResp, issuerResp)
+}
 
-	fmt.Printf("Account created, Bech addr: %s, in txID: %s, slot: %d\n", accountAddress.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), blkID.Slot())
+// CreateImplicitAccount requests faucet funds and creates an implicit account. It already wait until the transaction is committed and the created account is useable.
+func (d *DockerTestFramework) CreateImplicitAccount(ctx context.Context) *Account {
+	fundsAddr, privateKey := d.getAddress(iotago.AddressImplicitAccountCreation)
+	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
+	d.defaultWallet.AddOutput(fundsOutputID, &Output{
+		ID:         fundsOutputID,
+		Output:     fundsUTXOOutput,
+		PrivateKey: privateKey,
+		Address:    fundsAddr,
+	})
 
+	accountID := iotago.AccountIDFromOutputID(fundsOutputID)
+	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
+	require.True(d.Testing, ok)
+
+	// make sure an implicit account is committed
+	d.CheckAccountStatus(ctx, iotago.EmptyBlockID, fundsOutputID.TransactionID(), fundsOutputID, accountAddress)
+
+	// Note: the implicit account output is not an AccountOutput, thus we ignore it here.
 	return &Account{
 		AccountID:      accountID,
 		AccountAddress: accountAddress,
-		BlockIssuerKey: accPrivateKey,
-		AccountOutput:  accountOutput,
-		OutputID:       accOutputID,
+		BlockIssuerKey: privateKey,
+		OutputID:       fundsOutputID,
 	}
+}
+
+// CreateAccount creates an new account from implicit one to full one, it already wait until the transaction is committed and the created account is useable.
+func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *Account {
+	// create an implicit account by requesting faucet funds
+	ctx := context.TODO()
+	implicitAccount := d.CreateImplicitAccount(ctx)
+
+	// transition to a full account with new Ed25519 address and staking feature
+	clt := d.Node("V1").Client
+
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	congestionResp, err := clt.Congestion(ctx, implicitAccount.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
+
+	fullAccount, signedTx := d.defaultWallet.TransitionImplicitAccountToAccountOutput(clt, implicitAccount.OutputID, issuerResp, opts...)
+
+	// The account transition block should be issued by the implicit account block issuer key.
+	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(implicitAccount.AccountID, implicitAccount.BlockIssuerKey), congestionResp, issuerResp)
+
+	// check if the account is committed
+	accOutputID := iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0)
+	d.CheckAccountStatus(ctx, blkID, lo.PanicOnErr(signedTx.Transaction.ID()), accOutputID, implicitAccount.AccountAddress, true)
+
+	fmt.Printf("Account created, Bech addr: %s, in txID: %s, slot: %d\n", implicitAccount.AccountAddress.Bech32(clt.CommittedAPI().ProtocolParameters().Bech32HRP()), lo.PanicOnErr(signedTx.Transaction.ID()).ToHex(), blkID.Slot())
+
+	return fullAccount
 }
 
 // DelegateToValidator requests faucet funds and delegate the UTXO output to the validator.

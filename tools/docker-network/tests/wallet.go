@@ -7,8 +7,10 @@ import (
 	"testing"
 	"time"
 
+	hiveEd25519 "github.com/iotaledger/hive.go/crypto/ed25519"
 	"github.com/iotaledger/hive.go/ierrors"
 	"github.com/iotaledger/hive.go/lo"
+	"github.com/iotaledger/hive.go/runtime/options"
 	iotago "github.com/iotaledger/iota.go/v4"
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
@@ -99,6 +101,53 @@ func (w *Wallet) KeyPair(indexes ...uint32) (ed25519.PrivateKey, ed25519.PublicK
 
 func (w *Wallet) AddressSigner(indexes ...uint32) iotago.AddressSigner {
 	return w.keyManager.AddressSigner(indexes...)
+}
+
+func (w *Wallet) TransitionImplicitAccountToAccountOutput(clt *nodeclient.Client, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse, opts ...options.Option[builder.AccountOutputBuilder]) (*Account, *iotago.SignedTransaction) {
+	input := w.Output(inputId)
+	implicitAddr := input.Address
+	implicitOutput := input.Output
+	implicitOutputID := input.ID
+	implicitAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForImplicitAccountCreationAddress(implicitAddr.(*iotago.ImplicitAccountCreationAddress), input.PrivateKey))
+
+	accountID := iotago.AccountIDFromOutputID(implicitOutputID)
+	accountAddress, ok := accountID.ToAddress().(*iotago.AccountAddress)
+	require.True(w.Testing, ok)
+
+	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
+	apiForSlot := clt.APIForSlot(currentSlot)
+
+	// transition to a full account with new Ed25519 address and staking feature
+	accEd25519Addr := w.Address()
+	accPrivateKey, _ := w.KeyPair()
+	accBlockIssuerKey := iotago.Ed25519PublicKeyHashBlockIssuerKeyFromPublicKey(hiveEd25519.PublicKey(accPrivateKey.Public().(ed25519.PublicKey)))
+	accountOutput := options.Apply(builder.NewAccountOutputBuilder(accEd25519Addr, implicitOutput.BaseTokenAmount()),
+		opts, func(b *builder.AccountOutputBuilder) {
+			b.AccountID(accountID).
+				BlockIssuer(iotago.NewBlockIssuerKeys(accBlockIssuerKey), iotago.MaxSlotIndex)
+		}).MustBuild()
+
+	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
+		AddInput(&builder.TxInput{
+			UnlockTarget: implicitAddr,
+			InputID:      implicitOutputID,
+			Input:        implicitOutput,
+		}).
+		AddOutput(accountOutput).
+		SetCreationSlot(currentSlot).
+		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
+		AddBlockIssuanceCreditInput(&iotago.BlockIssuanceCreditInput{AccountID: accountID}).
+		AllotAllMana(currentSlot, accountID, 0).
+		Build(implicitAddrSigner)
+	require.NoError(w.Testing, err)
+
+	return &Account{
+		AccountID:      accountID,
+		AccountAddress: accountAddress,
+		BlockIssuerKey: accPrivateKey,
+		AccountOutput:  accountOutput,
+		OutputID:       iotago.OutputIDFromTransactionIDAndIndex(lo.PanicOnErr(signedTx.Transaction.ID()), 0),
+	}, signedTx
 }
 
 func (w *Wallet) CreateDelegationFromInput(clt *nodeclient.Client, from *Account, validator *Node, inputId iotago.OutputID, issuerResp *api.IssuanceBlockHeaderResponse) *iotago.SignedTransaction {
