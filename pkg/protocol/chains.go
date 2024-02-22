@@ -92,8 +92,8 @@ func attachEngineLogs(instance *engine.Engine) func() {
 	events := instance.Events
 
 	return lo.Batch(
-		events.BlockDAG.BlockAttached.Hook(func(block *blocks.Block) {
-			instance.LogTrace("BlockDAG.BlockAttached", "block", block.ID())
+		events.BlockDAG.BlockAppended.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockDAG.BlockAppended", "block", block.ID())
 		}).Unhook,
 
 		events.BlockDAG.BlockInvalid.Hook(func(block *blocks.Block, err error) {
@@ -104,8 +104,8 @@ func attachEngineLogs(instance *engine.Engine) func() {
 			instance.LogTrace("BlockDAG.BlockMissing", "block", block.ID())
 		}).Unhook,
 
-		events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
-			instance.LogTrace("BlockDAG.MissingBlockAttached", "block", block.ID())
+		events.BlockDAG.MissingBlockAppended.Hook(func(block *blocks.Block) {
+			instance.LogTrace("BlockDAG.MissingBlockAppended", "block", block.ID())
 		}).Unhook,
 
 		events.SeatManager.BlockProcessed.Hook(func(block *blocks.Block) {

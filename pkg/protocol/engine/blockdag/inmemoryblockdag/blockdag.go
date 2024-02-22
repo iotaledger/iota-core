@@ -44,11 +44,11 @@ func NewProvider(opts ...options.Option[BlockDAG]) module.Provider[*engine.Engin
 		b := New(e.Logger.NewChildLogger("BlockDAG"), e.Workers.CreateGroup("BlockDAG"), int(e.Storage.Settings().APIProvider().CommittedAPI().ProtocolParameters().MaxCommittableAge())*2, e.EvictionState, e.BlockCache, e.ErrorHandler("blockdag"), opts...)
 
 		e.Constructed.OnTrigger(func() {
-			wp := b.workers.CreatePool("BlockDAG.Attach", workerpool.WithWorkerCount(2))
+			wp := b.workers.CreatePool("BlockDAG.Append", workerpool.WithWorkerCount(2))
 
 			e.Events.PreSolidFilter.BlockPreAllowed.Hook(func(block *model.Block) {
-				if _, _, err := b.Attach(block); err != nil {
-					b.LogError("failed to attach block", "blockID", block.ID(), "issuer", block.ProtocolBlock().Header.IssuerID, "err", err)
+				if _, _, err := b.Append(block); err != nil {
+					b.LogError("failed to append block", "blockID", block.ID(), "issuer", block.ProtocolBlock().Header.IssuerID, "err", err)
 				}
 			}, event.WithWorkerPool(wp))
 
@@ -112,14 +112,14 @@ func New(logger log.Logger, workers *workerpool.Group, unsolidCommitmentBufferSi
 
 var _ blockdag.BlockDAG = new(BlockDAG)
 
-// Attach is used to attach new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
-func (b *BlockDAG) Attach(modelBlock *model.Block) (block *blocks.Block, wasAttached bool, err error) {
-	if block, wasAttached, err = b.attach(modelBlock); wasAttached {
+// Append is used to append new Blocks to the BlockDAG. It is the main function of the BlockDAG that triggers Events.
+func (b *BlockDAG) Append(modelBlock *model.Block) (block *blocks.Block, wasAppended bool, err error) {
+	if block, wasAppended, err = b.append(modelBlock); wasAppended {
 		// We add blocks that commit to a commitment we haven't committed ourselves yet to this limited size buffer and
 		// only let them become solid once we committed said slot ourselves (to the same commitment).
 		// This is necessary in order to make sure that all necessary state is available after a block is solid (specifically
 		// the state of the referenced commitment for the commitment filter). All the while, we need to make sure that
-		// the requesting of missing blocks (done in b.attach) continues so that we can advance our state and eventually
+		// the requesting of missing blocks (done in b.append) continues so that we can advance our state and eventually
 		// commit the slot.
 		// This limited size buffer has a nice side effect: In normal behavior (e.g. no attack of a neighbor that sends you
 		// unsolidifiable blocks in your committed slots) it will prevent the node from storing too many blocks in memory.
@@ -129,9 +129,9 @@ func (b *BlockDAG) Attach(modelBlock *model.Block) (block *blocks.Block, wasAtta
 			return
 		}
 
-		b.LogTrace("block attached", "block", block.ID())
+		b.LogTrace("block appended", "block", block.ID())
 
-		b.events.BlockAttached.Trigger(block)
+		b.events.BlockAppended.Trigger(block)
 
 		b.setupBlock(block)
 	}
@@ -161,24 +161,24 @@ func (b *BlockDAG) Shutdown() {
 	b.workers.Shutdown()
 }
 
-// attach tries to attach the given Block to the BlockDAG.
-func (b *BlockDAG) attach(modelBlock *model.Block) (block *blocks.Block, wasAttached bool, err error) {
-	shouldAttach, err := b.shouldAttach(modelBlock)
+// append tries to append the given Block to the BlockDAG.
+func (b *BlockDAG) append(modelBlock *model.Block) (block *blocks.Block, wasAppended bool, err error) {
+	shouldAppend, err := b.shouldAppend(modelBlock)
 
-	if !shouldAttach {
+	if !shouldAppend {
 		return nil, false, err
 	}
 
 	block, evicted, updated := b.blockCache.StoreOrUpdate(modelBlock)
 
 	if evicted {
-		return block, false, ierrors.New("cannot attach, block is too old, it was already evicted from the cache")
+		return block, false, ierrors.New("cannot append, block is too old, it was already evicted from the cache")
 	}
 
 	if updated {
-		b.LogTrace("missing block attached", "block", block.ID())
+		b.LogTrace("missing block appended", "block", block.ID())
 
-		b.events.MissingBlockAttached.Trigger(block)
+		b.events.MissingBlockAppended.Trigger(block)
 	}
 
 	block.ForEachParent(func(parent iotago.Parent) {
@@ -188,20 +188,20 @@ func (b *BlockDAG) attach(modelBlock *model.Block) (block *blocks.Block, wasAtta
 	return block, true, nil
 }
 
-// canAttach determines if the Block can be attached (does not exist and addresses a recent slot).
-func (b *BlockDAG) shouldAttach(modelBlock *model.Block) (shouldAttach bool, err error) {
+// shouldAppend determines if the Block can be appended (does not exist and addresses a recent slot).
+func (b *BlockDAG) shouldAppend(modelBlock *model.Block) (shouldAppend bool, err error) {
 	if b.evictionState.InActiveRootBlockRange(modelBlock.ID()) && !b.evictionState.IsActiveRootBlock(modelBlock.ID()) {
 		return false, ierrors.Errorf("block data with %s is too old (issued at: %s)", modelBlock.ID(), modelBlock.ProtocolBlock().Header.IssuingTime)
 	}
 
 	storedBlock, storedBlockExists := b.blockCache.Block(modelBlock.ID())
-	// We already attached it before
+	// We already appended it before
 	if storedBlockExists && !storedBlock.IsMissing() {
 		return false, nil
 	}
 
-	// We already attached it before, but the parents are invalid, then we set the block as invalid.
-	if parentsValid, err := b.canAttachToParents(modelBlock); !parentsValid {
+	// We already appended it before, but the parents are invalid, then we set the block as invalid.
+	if parentsValid, err := b.canAppendToParents(modelBlock); !parentsValid {
 		if storedBlock != nil {
 			storedBlock.SetInvalid()
 		}
@@ -212,9 +212,9 @@ func (b *BlockDAG) shouldAttach(modelBlock *model.Block) (shouldAttach bool, err
 	return true, nil
 }
 
-// canAttachToParents determines if the Block references parents in a non-pruned slot. If a Block is found to violate
+// canAppendToParents determines if the Block references parents in a non-pruned slot. If a Block is found to violate
 // this condition but exists as a missing entry, we mark it as invalid.
-func (b *BlockDAG) canAttachToParents(modelBlock *model.Block) (parentsValid bool, err error) {
+func (b *BlockDAG) canAppendToParents(modelBlock *model.Block) (parentsValid bool, err error) {
 	for _, parentID := range modelBlock.ProtocolBlock().Parents() {
 		if b.evictionState.InActiveRootBlockRange(parentID) && !b.evictionState.IsActiveRootBlock(parentID) {
 			return false, ierrors.Errorf("parent %s of block %s is too old", parentID, modelBlock.ID())

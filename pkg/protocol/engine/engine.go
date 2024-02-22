@@ -496,7 +496,7 @@ func (e *Engine) setupBlockRequester() {
 	e.Events.BlockDAG.BlockMissing.Hook(func(block *blocks.Block) {
 		e.BlockRequester.StartTicker(block.ID())
 	})
-	e.Events.BlockDAG.MissingBlockAttached.Hook(func(block *blocks.Block) {
+	e.Events.BlockDAG.MissingBlockAppended.Hook(func(block *blocks.Block) {
 		e.BlockRequester.StopTicker(block.ID())
 	}, event.WithWorkerPool(e.Workers.CreatePool("BlockRequester", workerpool.WithWorkerCount(1)))) // Using just 1 worker to avoid contention
 }
