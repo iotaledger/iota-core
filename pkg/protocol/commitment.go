@@ -329,16 +329,16 @@ func (c *Commitment) deriveChildren(child *Commitment) (unregisterChild func()) 
 // deriveChain derives the Chain of this Commitment which is either inherited from the parent if we are the main child
 // or a newly created chain.
 func (c *Commitment) deriveChain(parent *Commitment) func() {
-	return c.Chain.DeriveValueFrom(reactive.NewDerivedVariable4(func(currentChain *Chain, isRoot bool, mainChild *Commitment, parentChain *Chain, parentOrphaned bool) *Chain {
+	return c.Chain.DeriveValueFrom(reactive.NewDerivedVariable4(func(currentChain *Chain, isRoot bool, isOrphaned bool, mainChild *Commitment, parentChain *Chain) *Chain {
 		// do not adjust the chain of the root commitment (it is set from the outside)
 		if isRoot {
 			return currentChain
 		}
 
-		// If the parent commitment is orphaned,
+		// If the commitment is orphaned,
 		// that means that the chain is an orphaned fork, and we should not spawn a new chain.
 		// Eventually, the orphaned commitments will be evicted once the finalized slot advances.
-		if parentOrphaned {
+		if isOrphaned {
 			return nil
 		}
 
@@ -362,12 +362,12 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 		// if we are the main child of our parent, and our chain is not the parent chain (that we are supposed to
 		// inherit), then we evict our current chain (we will spawn a new one if we ever change back to not being the
 		// main child)
-		//if currentChain != nil && currentChain != parentChain {
+		// if currentChain != nil && currentChain != parentChain {
 		//	currentChain.IsEvicted.Trigger()
-		//}
+		// }
 
 		return parentChain
-	}, c.IsRoot, parent.MainChild, parent.Chain, parent.IsOrphaned, c.Chain.Get()))
+	}, c.IsRoot, c.IsOrphaned, parent.MainChild, parent.Chain, c.Chain.Get()))
 }
 
 func (c *Commitment) deriveOrphaned(parent *Commitment) func() {
