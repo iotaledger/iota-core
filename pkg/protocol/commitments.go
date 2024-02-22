@@ -258,7 +258,7 @@ func (c *Commitments) publishCommitment(commitment *model.Commitment, solidify b
 func (c *Commitments) cachedRequest(commitmentID iotago.CommitmentID, solidify bool, requestIfMissing ...bool) *promise.Promise[*Commitment] {
 	// handle evicted slots
 	slotEvicted := c.protocol.EvictionEvent(commitmentID.Index())
-	if slotEvicted.WasTriggered() && c.protocol.LastEvictedSlot().Get() != 0 {
+	if slotEvicted.WasTriggered() {
 		return promise.New[*Commitment]().Reject(ErrorSlotEvicted)
 	}
 
