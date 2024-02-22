@@ -104,22 +104,11 @@ func Test_EventAPI_BasicTaggedDataBlocks(t *testing.T) {
 	finish := make(chan struct{})
 	totalTopics := 6
 
-	// register to `blocks` topic
 	d.AssertBlocks(ctx, eventClt, expectedBlocks, finish)
-
-	// register to `blocks/basic` topic
 	d.AssertBasicBlocks(ctx, eventClt, expectedBlocks, finish)
-
-	// register to `blocks/basic/tagged-data` topic
 	d.AssertTaggedDataBlocks(ctx, eventClt, expectedBlocks, finish)
-
-	// register to `blocks/basic/transaction/tagged-data/{tag}` topic
 	d.AssertTaggedDataBlocksByTag(ctx, eventClt, expectedBlocks, []byte("tag"), finish)
-
-	// register to `block-metadata/accepted` topic
 	d.AssertBlockMetadataAcceptedBlocks(ctx, eventClt, expectedBlocks, finish)
-
-	// register to `block-metadata/confirmed` topic
 	d.AssertBlockMetadataConfirmedBlocks(ctx, eventClt, expectedBlocks, finish)
 
 	// wait until all topics starts listening
