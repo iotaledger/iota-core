@@ -73,7 +73,7 @@ func newCommitments(protocol *Protocol) *Commitments {
 func (c *Commitments) Get(commitmentID iotago.CommitmentID, requestIfMissing ...bool) (commitment *Commitment, err error) {
 	cachedRequest, exists := c.cachedRequests.Get(commitmentID)
 	if !exists && lo.First(requestIfMissing) {
-		if cachedRequest = c.cachedRequest(commitmentID, true); cachedRequest.WasRejected() {
+		if cachedRequest = c.cachedRequest(commitmentID, true, true); cachedRequest.WasRejected() {
 			return nil, ierrors.Wrapf(cachedRequest.Err(), "failed to request commitment %s", commitmentID)
 		}
 	}
@@ -294,7 +294,7 @@ func (c *Commitments) initCommitment(commitment *Commitment, solidify bool, slot
 
 	// solidify the parent of the commitment
 	if solidify {
-		c.cachedRequest(commitment.PreviousCommitmentID(), true).OnSuccess(func(parent *Commitment) {
+		c.cachedRequest(commitment.PreviousCommitmentID(), true, true).OnSuccess(func(parent *Commitment) {
 			commitment.Parent.Set(parent)
 
 			parent.IsEvicted.OnTrigger(func() {
