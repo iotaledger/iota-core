@@ -30,7 +30,6 @@ import (
 	"github.com/iotaledger/iota.go/v4/api"
 	"github.com/iotaledger/iota.go/v4/builder"
 	"github.com/iotaledger/iota.go/v4/nodeclient"
-	"github.com/iotaledger/iota.go/v4/tpkg"
 	"github.com/iotaledger/iota.go/v4/wallet"
 )
 
@@ -78,8 +77,9 @@ type DockerTestFramework struct {
 
 	snapshotPath     string
 	logDirectoryPath string
-	seed             [32]byte
-	latestUsedIndex  atomic.Uint32
+
+	latestUsedIndex atomic.Uint32
+	defaultWallet   *Wallet
 
 	optsProtocolParameterOptions []options.Option[iotago.V3ProtocolParameters]
 	optsSnapshotOptions          []options.Option[snapshotcreator.Options]
@@ -93,7 +93,7 @@ func NewDockerTestFramework(t *testing.T, opts ...options.Option[DockerTestFrame
 	return options.Apply(&DockerTestFramework{
 		Testing:         t,
 		nodes:           make(map[string]*Node),
-		seed:            tpkg.RandEd25519Seed(),
+		defaultWallet:   NewWallet(t, "default"),
 		optsWaitForSync: 5 * time.Minute,
 		optsWaitFor:     2 * time.Minute,
 		optsTick:        5 * time.Second,
@@ -377,13 +377,51 @@ func (d *DockerTestFramework) CreateTaggedDataBlock(issuer *Account, tag []byte)
 	congestionResp, err := clt.Congestion(ctx, issuer.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	if congestionResp.BlockIssuanceCredits <= 0 {
-		// request faucet funds to gain BIC
+	if congestionResp.BlockIssuanceCredits <= 500 {
+		d.IncreaseBIC(issuer)
+
+		// need to renew BlockIssuance and Congestion response
+		issuerResp, err = clt.BlockIssuance(ctx)
+		require.NoError(d.Testing, err)
+
+		congestionResp, err = clt.Congestion(ctx, issuer.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+		require.NoError(d.Testing, err)
 	}
 
 	return d.CreateBlock(ctx, &iotago.TaggedData{
 		Tag: tag,
 	}, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
+}
+
+func (d *DockerTestFramework) CreateDelegationBlockFromInput(issuer *Account, validator *Node, inputId iotago.OutputID) (iotago.DelegationID, iotago.OutputID, *iotago.Block) {
+	ctx := context.TODO()
+	clt := d.Node("V1").Client
+
+	issuerResp, err := clt.BlockIssuance(ctx)
+	require.NoError(d.Testing, err)
+
+	congestionResp, err := clt.Congestion(ctx, issuer.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+	require.NoError(d.Testing, err)
+
+	if congestionResp.BlockIssuanceCredits <= 500 {
+		d.IncreaseBIC(issuer)
+
+		// need to renew BlockIssuance and Congestion response
+		issuerResp, err = clt.BlockIssuance(ctx)
+		require.NoError(d.Testing, err)
+
+		congestionResp, err = clt.Congestion(ctx, issuer.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
+		require.NoError(d.Testing, err)
+	}
+
+	signedTx := d.defaultWallet.CreateDelegationFromInput(clt, issuer, validator, inputId, issuerResp)
+	delegationOutput := signedTx.Transaction.Outputs[0].(*iotago.DelegationOutput)
+	txId, err := signedTx.Transaction.ID()
+	require.NoError(d.Testing, err)
+
+	return delegationOutput.DelegationID,
+		iotago.OutputIDFromTransactionIDAndIndex(txId, 0),
+		d.CreateBlock(ctx, signedTx, wallet.NewEd25519Account(issuer.AccountID, issuer.BlockIssuerKey), congestionResp, issuerResp)
 }
 
 func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.AccountOutputBuilder]) *Account {
@@ -417,7 +455,6 @@ func (d *DockerTestFramework) CreateAccount(opts ...options.Option[builder.Accou
 
 	congestionResp, err := clt.Congestion(ctx, accountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
-
 	implicitAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForImplicitAccountCreationAddress(receiverAddr.(*iotago.ImplicitAccountCreationAddress), implicitPrivateKey))
 	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
 		AddInput(&builder.TxInput{
@@ -456,42 +493,28 @@ func (d *DockerTestFramework) DelegateToValidator(from *Account, validator *Node
 	ctx := context.TODO()
 	fundsAddr, privateKey := d.getAddress(iotago.AddressEd25519)
 	fundsOutputID, fundsUTXOOutput := d.RequestFaucetFunds(ctx, fundsAddr)
-	fundsAddrSigner := iotago.NewInMemoryAddressSigner(iotago.NewAddressKeysForEd25519Address(fundsAddr.(*iotago.Ed25519Address), privateKey))
-
-	_, validatorAccountAddr, err := iotago.ParseBech32(validator.AccountAddressBech32)
-	require.NoError(d.Testing, err)
+	d.defaultWallet.AddOutput(fundsOutputID, &Output{
+		ID:         fundsOutputID,
+		Address:    fundsAddr,
+		PrivateKey: privateKey,
+		Output:     fundsUTXOOutput,
+	})
 
 	clt := validator.Client
-	currentSlot := clt.LatestAPI().TimeProvider().SlotFromTime(time.Now())
-	apiForSlot := clt.APIForSlot(currentSlot)
 
-	// construct delegation transaction
 	issuerResp, err := clt.BlockIssuance(ctx)
 	require.NoError(d.Testing, err)
 
 	congestionResp, err := clt.Congestion(ctx, from.AccountAddress, 0, lo.PanicOnErr(issuerResp.LatestCommitment.ID()))
 	require.NoError(d.Testing, err)
 
-	delegationOutput := builder.NewDelegationOutputBuilder(validatorAccountAddr.(*iotago.AccountAddress), fundsAddr, fundsUTXOOutput.BaseTokenAmount()).
-		StartEpoch(getDelegationStartEpoch(apiForSlot, issuerResp.LatestCommitment.Slot)).
-		DelegatedAmount(fundsUTXOOutput.BaseTokenAmount()).MustBuild()
-
-	signedTx, err := builder.NewTransactionBuilder(apiForSlot).
-		AddInput(&builder.TxInput{
-			UnlockTarget: fundsAddr,
-			InputID:      fundsOutputID,
-			Input:        fundsUTXOOutput,
-		}).
-		AddOutput(delegationOutput).
-		SetCreationSlot(currentSlot).
-		AddCommitmentInput(&iotago.CommitmentInput{CommitmentID: lo.Return1(issuerResp.LatestCommitment.ID())}).
-		AllotAllMana(currentSlot, from.AccountID, 0).
-		Build(fundsAddrSigner)
-	require.NoError(d.Testing, err)
+	signedTx := d.defaultWallet.CreateDelegationFromInput(clt, from, validator, fundsOutputID, issuerResp)
 
 	blkID := d.SubmitPayload(ctx, signedTx, wallet.NewEd25519Account(from.AccountID, from.BlockIssuerKey), congestionResp, issuerResp)
 
 	d.AwaitTransactionPayloadAccepted(ctx, blkID)
+
+	delegationOutput := signedTx.Transaction.Outputs[0].(*iotago.DelegationOutput)
 
 	return delegationOutput.StartEpoch
 }

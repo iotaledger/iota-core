@@ -292,11 +292,12 @@ func (d *DockerTestFramework) SendFaucetRequest(ctx context.Context, receiveAddr
 
 func (d *DockerTestFramework) getAddress(addressType iotago.AddressType) (iotago.DirectUnlockableAddress, ed25519.PrivateKey) {
 	newIndex := d.latestUsedIndex.Add(1)
-	keyManager := lo.PanicOnErr(wallet.NewKeyManager(d.seed[:], BIP32PathForIndex(newIndex)))
-	privateKey, _ := keyManager.KeyPair()
-	receiverAddr := keyManager.Address(addressType)
+	privateKey, _ := d.defaultWallet.KeyPair(newIndex)
+	if addressType == iotago.AddressEd25519 {
+		return d.defaultWallet.Address(newIndex), privateKey
+	}
 
-	return receiverAddr, privateKey
+	return d.defaultWallet.ImplicitAccountCreationAddress(newIndex), privateKey
 }
 
 func createLogDirectory(testName string) string {
