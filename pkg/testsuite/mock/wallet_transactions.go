@@ -347,20 +347,66 @@ func (w *Wallet) CreateImplicitAccountFromInput(transactionName string, inputNam
 	return signedTransaction
 }
 
-func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string, inputName string, opts ...options.Option[builder.AccountOutputBuilder]) *iotago.SignedTransaction {
+// CreateImplicitAccountFromInput creates an implicit account output.
+func (w *Wallet) CreateImplicitAccountAndBasicOutputFromInput(transactionName string, inputName string, recipientWallet *Wallet) *iotago.SignedTransaction {
 	input := w.Output(inputName)
-	implicitAccountID := iotago.AccountIDFromOutputID(input.OutputID())
 
-	basicOutput, isBasic := input.Output().(*iotago.BasicOutput)
-	if !isBasic {
-		panic(fmt.Sprintf("output with alias %s is not *iotago.BasicOutput", inputName))
+	implicitAccountOutput := &iotago.BasicOutput{
+		Amount: MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
+		Mana:   AccountConversionManaCost(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: recipientWallet.ImplicitAccountCreationAddress()},
+		},
+		Features: iotago.BasicOutputFeatures{},
 	}
-	if basicOutput.UnlockConditionSet().Address().Address.Type() != iotago.AddressImplicitAccountCreation {
-		panic(fmt.Sprintf("output with alias %s is not an implicit account", inputName))
+
+	remainderBasicOutput := &iotago.BasicOutput{
+		Amount: input.BaseTokenAmount() - MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
+		Mana:   input.StoredMana() - AccountConversionManaCost(w.Node.Protocol.CommittedAPI().ProtocolParameters()),
+		UnlockConditions: iotago.BasicOutputUnlockConditions{
+			&iotago.AddressUnlockCondition{Address: recipientWallet.Address()},
+		},
+		Features: iotago.BasicOutputFeatures{},
 	}
+
+	signedTransaction := w.createSignedTransactionWithOptions(
+		transactionName,
+		[]uint32{0},
+		WithInputs(input),
+		WithOutputs(implicitAccountOutput, remainderBasicOutput),
+	)
+
+	// register the outputs in the recipient wallet (so wallet doesn't have to scan for outputs on its addresses)
+	recipientWallet.registerOutputs(transactionName, signedTransaction.Transaction)
+
+	// register the implicit account as a block issuer in the wallet
+	implicitAccountID := iotago.AccountIDFromOutputID(recipientWallet.Output(fmt.Sprintf("%s:0", transactionName)).OutputID())
+	recipientWallet.SetBlockIssuer(implicitAccountID)
+
+	return signedTransaction
+}
+
+func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string, inputNames []string, opts ...options.Option[builder.AccountOutputBuilder]) *iotago.SignedTransaction {
+	var implicitAccountOutput *utxoledger.Output
+	inputs := make(utxoledger.Outputs, 0, len(inputNames))
+	for _, inputName := range inputNames {
+		input := w.Output(inputName)
+		basicOutput, isBasic := input.Output().(*iotago.BasicOutput)
+		if !isBasic {
+			panic(fmt.Sprintf("output with alias %s is not *iotago.BasicOutput", inputName))
+		}
+		if basicOutput.UnlockConditionSet().Address().Address.Type() == iotago.AddressImplicitAccountCreation {
+			implicitAccountOutput = input
+		}
+		inputs = append(inputs, input)
+	}
+	if implicitAccountOutput == nil {
+		panic("no implicit account output found")
+	}
+	implicitAccountID := iotago.AccountIDFromOutputID(implicitAccountOutput.OutputID())
 
 	accountOutput := options.Apply(builder.NewAccountOutputBuilder(w.Address(), MinIssuerAccountAmount(w.Node.Protocol.CommittedAPI().ProtocolParameters())).
-		AccountID(iotago.AccountIDFromOutputID(input.OutputID())),
+		AccountID(implicitAccountID),
 		opts).MustBuild()
 
 	signedTransaction := w.createSignedTransactionWithOptions(
@@ -372,7 +418,7 @@ func (w *Wallet) TransitionImplicitAccountToAccountOutput(transactionName string
 		WithCommitmentInput(&iotago.CommitmentInput{
 			CommitmentID: w.Node.Protocol.Engines.Main.Get().SyncManager.LatestCommitment().Commitment().MustID(),
 		}),
-		WithInputs(input),
+		WithInputs(inputs...),
 		WithOutputs(accountOutput),
 		WithAllotAllManaToAccount(w.currentSlot, implicitAccountID),
 	)
