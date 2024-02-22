@@ -269,10 +269,24 @@ func (c *Chain) deriveIsEvicted(forkingPoint *Commitment) (shutdown func()) {
 		return
 	}
 
-	return forkingPoint.IsEvicted.OnTrigger(func() {
-		// TODO: MOVE TO DEDICATED WORKER
-		go c.IsEvicted.Trigger()
-	})
+	// TODO: this might be cleaner but deadlocks
+	// return c.IsEvicted.DeriveValueFrom(reactive.NewDerivedVariable2(func(currentValue bool, forkingPointIsOrphaned bool, forkingPointIsEvicted bool) bool {
+	// 	if currentValue {
+	// 		return true
+	// 	}
+	//
+	// 	return forkingPointIsOrphaned || forkingPointIsEvicted
+	// }, forkingPoint.IsOrphaned, forkingPoint.IsEvicted))
+
+	return lo.Batch(
+		forkingPoint.IsEvicted.OnTrigger(func() {
+			// TODO: MOVE TO DEDICATED WORKER
+			go c.IsEvicted.Trigger()
+		}),
+		forkingPoint.IsOrphaned.OnTrigger(func() {
+			go c.IsEvicted.Trigger()
+		}),
+	)
 }
 
 // deriveOutOfSyncThreshold defines how a chain determines its "out of sync" threshold (the latest seen slot minus 2
