@@ -342,6 +342,11 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 			return nil
 		}
 
+		// if mainChild is nil that means that the parent has been evicted, so we should stay on the currentChain
+		if mainChild == nil {
+			return currentChain
+		}
+
 		// if we are not the main child of our parent, we spawn a new chain
 		if c != mainChild {
 			if currentChain == nil {
@@ -356,7 +361,6 @@ func (c *Commitment) deriveChain(parent *Commitment) func() {
 			}
 
 			return currentChain
-
 		}
 
 		// if we are the main child of our parent, and our chain is not the parent chain (that we are supposed to
