@@ -67,9 +67,9 @@ func NewProvider() module.Provider[*engine.Engine, retainer.BlockRetainer] {
 
 		asyncOpt := event.WithWorkerPool(r.workerPool)
 
-		e.Events.BlockDAG.BlockAttached.Hook(func(b *blocks.Block) {
-			if err := r.OnBlockAttached(b.ModelBlock()); err != nil {
-				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAttached in retainer"))
+		e.Events.BlockDAG.BlockAppended.Hook(func(b *blocks.Block) {
+			if err := r.OnBlockAppended(b.ModelBlock()); err != nil {
+				r.errorHandler(ierrors.Wrap(err, "failed to store on BlockAppended in retainer"))
 			}
 		}, asyncOpt)
 
@@ -182,7 +182,7 @@ func (r *BlockRetainer) RetainBlockFailure(modelBlock *model.Block, failureCode 
 	}
 }
 
-func (r *BlockRetainer) OnBlockAttached(modelBlock *model.Block) error {
+func (r *BlockRetainer) OnBlockAppended(modelBlock *model.Block) error {
 	if err := r.storeBlockData(modelBlock, api.BlockFailureNone); err != nil {
 		return ierrors.Wrap(err, "failed to store block failure in retainer")
 	}
