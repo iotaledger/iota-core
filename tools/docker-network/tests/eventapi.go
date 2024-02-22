@@ -114,6 +114,101 @@ func (d *DockerTestFramework) AssertBlockMetadataConfirmedBlocks(ctx context.Con
 	}()
 }
 
+func (d *DockerTestFramework) AssertOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, outputId iotago.OutputID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputWithMetadataByOutputID(outputId)
+	require.Nil(d.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+			if outputId.Compare(resp.Metadata.OutputID) == 0 {
+				return true
+			}
+			return false
+		}, finishChan)
+	}()
+}
+
+func (d *DockerTestFramework) AssertDelegationOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, delegationId iotago.DelegationID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByDelegationID(delegationId)
+	require.Nil(d.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+			if resp.Output.Type() == iotago.OutputDelegation {
+				o := resp.Output.(*iotago.DelegationOutput)
+				return delegationId.Matches(o.DelegationID)
+			}
+			return false
+		}, finishChan)
+	}()
+}
+
+func (d *DockerTestFramework) AssertFoundryOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, foundryId iotago.FoundryID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByFoundryID(foundryId)
+	require.Nil(d.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+			if resp.Output.Type() == iotago.OutputFoundry {
+				o := resp.Output.(*iotago.FoundryOutput)
+				return foundryId.Matches(o.MustFoundryID())
+			}
+			return false
+		}, finishChan)
+	}()
+}
+
+func (d *DockerTestFramework) AssertAccountOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, accountId iotago.AccountID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByAccountID(accountId)
+	require.Nil(d.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+			if resp.Output.Type() == iotago.OutputAccount {
+				o := resp.Output.(*iotago.AccountOutput)
+				return accountId.Matches(o.AccountID)
+			}
+			return false
+		}, finishChan)
+	}()
+}
+
+func (d *DockerTestFramework) AssertAnchorOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, anchorId iotago.AnchorID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByAnchorID(anchorId)
+	require.Nil(d.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+			if resp.Output.Type() == iotago.OutputAnchor {
+				o := resp.Output.(*iotago.AnchorOutput)
+				return anchorId.Matches(o.AnchorID)
+			}
+			return false
+		}, finishChan)
+	}()
+}
+
+func (d *DockerTestFramework) AssertNFTOutput(ctx context.Context, eventClt *nodeclient.EventAPIClient, nftId iotago.NFTID, finishChan chan struct{}) {
+	outputMetadataChan, subInfo := eventClt.OutputsWithMetadataByNFTID(nftId)
+	require.Nil(d.Testing, subInfo.Error())
+
+	go func() {
+		defer subInfo.Close()
+		d.assertOutputMetadataTopics(ctx, outputMetadataChan, func(resp *api.OutputWithMetadataResponse) bool {
+			if resp.Output.Type() == iotago.OutputNFT {
+				o := resp.Output.(*iotago.NFTOutput)
+				return nftId.Matches(o.NFTID)
+			}
+			return false
+		}, finishChan)
+	}()
+}
+
 func (d *DockerTestFramework) assertBlocksTopics(ctx context.Context, receivedChan <-chan *iotago.Block, expectedBlocks map[string]*iotago.Block, finishChan chan struct{}) {
 	expectedBlockIDsSlice := lo.Keys(expectedBlocks)
 	blkIDs := make([]string, 0)
@@ -164,6 +259,24 @@ func (d *DockerTestFramework) assertBlockMetadataTopics(ctx context.Context, rec
 			}
 		case <-ctx.Done():
 			fmt.Println("Received blocks:", blkIDs)
+			return
+		}
+	}
+}
+
+func (d *DockerTestFramework) assertOutputMetadataTopics(ctx context.Context, receivedChan <-chan *api.OutputWithMetadataResponse, matchFunc func(*api.OutputWithMetadataResponse) bool, finishChan chan struct{}) {
+	// in order to inform that the channel is listened
+	finishChan <- struct{}{}
+
+	for {
+		select {
+		case outputMetadata := <-receivedChan:
+			if matchFunc(outputMetadata) {
+				finishChan <- struct{}{}
+				return
+			}
+		case <-ctx.Done():
+			fmt.Println("Output Metadata related topics does not get expected contents")
 			return
 		}
 	}
