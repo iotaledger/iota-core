@@ -149,7 +149,7 @@ func (r *Retainer) Shutdown() {
 }
 
 func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
-	blockState, blockFailureReason := r.blockStatus(blockID)
+	blockState := r.blockStatus(blockID)
 	if blockState == api.BlockStateUnknown {
 		return nil, ierrors.Errorf("block %s not found", blockID.ToHex())
 	}
@@ -160,9 +160,8 @@ func (r *Retainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResp
 	}
 
 	return &api.BlockMetadataResponse{
-		BlockID:            blockID,
-		BlockState:         blockState,
-		BlockFailureReason: blockFailureReason,
+		BlockID:    blockID,
+		BlockState: blockState,
 	}, nil
 }
 
@@ -191,25 +190,25 @@ func (r *Retainer) RetainRegisteredValidatorsCache(index uint32, resp []*api.Val
 	}
 }
 
-func (r *Retainer) blockStatus(blockID iotago.BlockID) (api.BlockState, api.BlockFailureReason) {
+func (r *Retainer) blockStatus(blockID iotago.BlockID) api.BlockState {
 	blockData, err := r.store.getBlockData(blockID)
 	if err != nil {
 		r.errorHandler(ierrors.Wrapf(err, "could not get block data for slot %d", blockID.Slot()))
-		return api.BlockStateUnknown, api.BlockFailureNone
+		return api.BlockStateUnknown
 	}
 
 	switch blockData.State {
 	case api.BlockStatePending:
 		if blockID.Slot() <= r.latestCommittedSlotFunc() {
-			return api.BlockStateOrphaned, blockData.FailureReason
+			return api.BlockStateOrphaned
 		}
 	case api.BlockStateAccepted, api.BlockStateConfirmed:
 		if blockID.Slot() <= r.finalizedSlotFunc() {
-			return api.BlockStateFinalized, api.BlockFailureNone
+			return api.BlockStateFinalized
 		}
 	}
 
-	return blockData.State, blockData.FailureReason
+	return blockData.State
 }
 
 func (r *Retainer) onBlockBooked(block *blocks.Block) error {

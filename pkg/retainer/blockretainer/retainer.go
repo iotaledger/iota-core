@@ -5,7 +5,6 @@ import (
 	"github.com/iotaledger/hive.go/runtime/event"
 	"github.com/iotaledger/hive.go/runtime/module"
 	"github.com/iotaledger/hive.go/runtime/workerpool"
-	"github.com/iotaledger/iota-core/pkg/model"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine"
 	"github.com/iotaledger/iota-core/pkg/protocol/engine/blocks"
 	"github.com/iotaledger/iota-core/pkg/retainer"
@@ -122,21 +121,8 @@ func (r *BlockRetainer) getBlockData(blockID iotago.BlockID) (*slotstore.BlockRe
 	return data, nil
 }
 
-func (r *BlockRetainer) storeBlockData(modelBlock *model.Block, failureCode api.BlockFailureReason) error {
-	store, err := r.store(modelBlock.ID().Slot())
-	if err != nil {
-		return err
-	}
-
-	if failureCode == api.BlockFailureNone {
-		return store.StoreBlockBooked(modelBlock.ID())
-	}
-
-	return store.StoreBlockFailure(modelBlock.ID(), failureCode)
-}
-
 func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadataResponse, error) {
-	blockStatus, blockFailureReason := r.blockStatus(blockID)
+	blockStatus := r.blockStatus(blockID)
 	if blockStatus == api.BlockStateUnknown {
 		return nil, ierrors.Errorf("block %s not found", blockID.ToHex())
 	}
@@ -147,31 +133,30 @@ func (r *BlockRetainer) BlockMetadata(blockID iotago.BlockID) (*api.BlockMetadat
 	}
 
 	return &api.BlockMetadataResponse{
-		BlockID:            blockID,
-		BlockState:         blockStatus,
-		BlockFailureReason: blockFailureReason,
+		BlockID:    blockID,
+		BlockState: blockStatus,
 	}, nil
 }
 
-func (r *BlockRetainer) blockStatus(blockID iotago.BlockID) (api.BlockState, api.BlockFailureReason) {
+func (r *BlockRetainer) blockStatus(blockID iotago.BlockID) api.BlockState {
 	blockData, err := r.getBlockData(blockID)
 	if err != nil {
 		r.errorHandler(ierrors.Wrapf(err, "could not get block data for slot %d", blockID.Slot()))
-		return api.BlockStateUnknown, api.BlockFailureNone
+		return api.BlockStateUnknown
 	}
 
 	switch blockData.State {
 	case api.BlockStatePending:
 		if blockID.Slot() <= r.latestCommittedSlotFunc() {
-			return api.BlockStateOrphaned, blockData.FailureReason
+			return api.BlockStateOrphaned
 		}
 	case api.BlockStateAccepted, api.BlockStateConfirmed:
 		if blockID.Slot() <= r.finalizedSlotFunc() {
-			return api.BlockStateFinalized, api.BlockFailureNone
+			return api.BlockStateFinalized
 		}
 	}
 
-	return blockData.State, blockData.FailureReason
+	return blockData.State
 }
 
 // OnBlockBooked triggers storing block in the retainer on block booked event.

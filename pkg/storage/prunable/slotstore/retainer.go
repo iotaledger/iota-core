@@ -17,13 +17,12 @@ const (
 	// api.TransactionState + api.TransactionFailureReason + iotago.SlotIndex.
 	transactionRetainerDataLength = serializer.OneByte + serializer.OneByte + iotago.SlotIndexLength
 
-	// api.BlockState + api.BlockFailureReason.
-	blockRetainerDataLength = serializer.OneByte + serializer.OneByte
+	// api.BlockState
+	blockRetainerDataLength = serializer.OneByte
 )
 
 type BlockRetainerData struct {
-	State         api.BlockState
-	FailureReason api.BlockFailureReason
+	State api.BlockState
 }
 
 func (b *BlockRetainerData) Bytes() ([]byte, error) {
@@ -31,9 +30,6 @@ func (b *BlockRetainerData) Bytes() ([]byte, error) {
 
 	if err := stream.Write(byteBuffer, b.State); err != nil {
 		return nil, ierrors.Wrap(err, "failed to write block state")
-	}
-	if err := stream.Write(byteBuffer, b.FailureReason); err != nil {
-		return nil, ierrors.Wrap(err, "failed to write block failure reason")
 	}
 
 	return byteBuffer.Bytes()
@@ -47,10 +43,6 @@ func blockRetainerDataFromBytes(bytes []byte) (*BlockRetainerData, int, error) {
 
 	if b.State, err = stream.Read[api.BlockState](byteReader); err != nil {
 		return nil, 0, ierrors.Wrap(err, "failed to read block state")
-	}
-
-	if b.FailureReason, err = stream.Read[api.BlockFailureReason](byteReader); err != nil {
-		return nil, 0, ierrors.Wrap(err, "failed to read block failure reason")
 	}
 
 	return b, byteReader.BytesRead(), nil
@@ -129,15 +121,7 @@ func NewRetainer(slot iotago.SlotIndex, store kvstore.KVStore) (newRetainer *Ret
 
 func (r *Retainer) StoreBlockBooked(blockID iotago.BlockID) error {
 	return r.blockStore.Set(blockID, &BlockRetainerData{
-		State:         api.BlockStatePending,
-		FailureReason: api.BlockFailureNone,
-	})
-}
-
-func (r *Retainer) StoreBlockFailure(blockID iotago.BlockID, failureType api.BlockFailureReason) error {
-	return r.blockStore.Set(blockID, &BlockRetainerData{
-		State:         api.BlockStateFailed,
-		FailureReason: failureType,
+		State: api.BlockStatePending,
 	})
 }
 
@@ -148,7 +132,6 @@ func (r *Retainer) StoreBlockAccepted(blockID iotago.BlockID) error {
 	}
 
 	data.State = api.BlockStateAccepted
-	data.FailureReason = api.BlockFailureNone
 
 	return r.blockStore.Set(blockID, data)
 }
@@ -160,7 +143,6 @@ func (r *Retainer) StoreBlockConfirmed(blockID iotago.BlockID) error {
 	}
 
 	data.State = api.BlockStateConfirmed
-	data.FailureReason = api.BlockFailureNone
 
 	return r.blockStore.Set(blockID, data)
 }
@@ -171,8 +153,7 @@ func (r *Retainer) StoreBlockDropped(blockID iotago.BlockID) error {
 		return err
 	}
 
-	data.State = api.BlockStateFailed
-	data.FailureReason = api.BlockFailureDroppedDueToCongestion
+	data.State = api.BlockStateDropped
 
 	return r.blockStore.Set(blockID, data)
 }
