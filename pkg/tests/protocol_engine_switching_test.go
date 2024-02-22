@@ -121,10 +121,6 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	ts.Run(false, nodeOptions)
 
-	node0.Protocol.SetLogLevel(log.LevelDebug)
-	node0.Protocol.Chains.SetLogLevel(log.LevelTrace)
-	node0.Protocol.Commitments.SetLogLevel(log.LevelTrace)
-
 	expectedCommittee := []iotago.AccountID{
 		node0.Validator.AccountID,
 		node1.Validator.AccountID,
@@ -272,11 +268,12 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			ts.AssertAttestationsForSlot(slot, attestationBlocks, nodesP1...)
 		}
 
+		// Assert Protocol.Chains and Protocol.Commitments state.
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP1...)
 		ts.AssertUniqueCommitmentChain(nodesP1...)
 		ts.AssertCommitmentsOnChain(ts.CommitmentsOfMainEngine(nodesP1[0], 13, 18), ts.CommitmentOfMainEngine(nodesP1[0], 13).ID(), nodesP1...)
 		ts.AssertCommitmentsOrphaned(ts.CommitmentsOfMainEngine(nodesP1[0], 13, 18), false, nodesP1...)
-		ts.AssertCommitmentsEvicted(12, nodesP1...)
+		ts.AssertCommitmentsAndChainsEvicted(12, nodesP1...)
 
 		// Make sure the tips are properly set.
 		var tipBlocks []*blocks.Block
@@ -302,12 +299,13 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 			testsuite.WithEvictedSlot(18),
 		)
 
+		// Assert Protocol.Chains and Protocol.Commitments state.
 		engineCommitmentsP2 = ts.CommitmentsOfMainEngine(nodesP2[0], 6, 18)
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP2...)
 		ts.AssertUniqueCommitmentChain(nodesP2...)
 		ts.AssertCommitmentsOnChain(engineCommitmentsP2, ts.CommitmentOfMainEngine(nodesP1[0], 6).ID(), nodesP2...)
 		ts.AssertCommitmentsOrphaned(engineCommitmentsP2, false, nodesP2...)
-		ts.AssertCommitmentsEvicted(5, nodesP2...)
+		ts.AssertCommitmentsAndChainsEvicted(5, nodesP2...)
 
 		for _, slot := range []iotago.SlotIndex{12, 13, 14, 15} {
 			var attestationBlocks []*blocks.Block
@@ -404,23 +402,24 @@ func TestProtocol_EngineSwitching(t *testing.T) {
 
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 
-	oldestNonEvictedCommitment := node0.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - maxCommittableAge
-	ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
-		return commitment.Slot() >= oldestNonEvictedCommitment
-	})
+	// Assert Protocol.Chains and Protocol.Commitments state.
+	{
+		oldestNonEvictedCommitment := node0.Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - maxCommittableAge
+		ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
+			return commitment.Slot() >= oldestNonEvictedCommitment
+		})
 
-	commitmentsMainChain := ts.CommitmentsOfMainEngine(nodesP1[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
+		commitmentsMainChain := ts.CommitmentsOfMainEngine(nodesP1[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
 
-	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
-	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
-	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
-	ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
-	ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
-	// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
-	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
-	ts.AssertCommitmentsEvicted(oldestNonEvictedCommitment-1, ts.Nodes()...)
-	// TODO: assert chain count
-	// TODO: assert that Protocol only contains commitments from above the eviction point.
+		ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
+		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
+		ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
+		// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
+		ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
+		ts.AssertCommitmentsAndChainsEvicted(oldestNonEvictedCommitment-1, ts.Nodes()...)
+	}
 }
 
 func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
@@ -592,6 +591,14 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), true, nodesP1...)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P1"), false, nodesP2...)
+
+		// Assert Protocol.Chains and Protocol.Commitments state.
+		engineCommitmentsP1 := ts.CommitmentsOfMainEngine(nodesP1[0], 12, 18)
+		ts.AssertLatestEngineCommitmentOnMainChain(nodesP1...)
+		ts.AssertUniqueCommitmentChain(nodesP1...)
+		ts.AssertCommitmentsOnChain(engineCommitmentsP1, ts.CommitmentOfMainEngine(node0, 12).ID(), nodesP1...)
+		ts.AssertCommitmentsOrphaned(engineCommitmentsP1, false, nodesP1...)
+		ts.AssertCommitmentsAndChainsEvicted(11, nodesP1...)
 	}
 
 	var engineCommitmentsP2 []*model.Commitment
@@ -636,11 +643,13 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), true, nodesP2...)
 		ts.AssertBlocksExist(ts.BlocksWithPrefix("P2"), false, nodesP1...)
 
+		// Assert Protocol.Chains and Protocol.Commitments state.
 		engineCommitmentsP2 = ts.CommitmentsOfMainEngine(nodesP2[0], 0, 18)
 		ts.AssertLatestEngineCommitmentOnMainChain(nodesP2...)
 		ts.AssertUniqueCommitmentChain(nodesP2...)
 		ts.AssertCommitmentsOnChain(engineCommitmentsP2, ts.CommitmentOfMainEngine(node0, 0).ID(), nodesP2...)
 		ts.AssertCommitmentsOrphaned(engineCommitmentsP2, false, nodesP2...)
+		// We only finalized until slot 4, and maxCommittableAge=5. Thus, we don't expect any evictions on chains/commmitments yet.
 	}
 
 	// Merge the partitions
@@ -720,15 +729,18 @@ func TestProtocol_EngineSwitching_CommitteeRotation(t *testing.T) {
 		return commitment.Slot() >= oldestNonEvictedCommitment
 	})
 
-	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
-	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
-	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
-	ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
-	ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
-	// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
-	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
-	// TODO: assert chain count
-	// TODO: assert that Protocol only contains commitments from above the eviction point.
+	// Assert Protocol.Chains and Protocol.Commitments state.
+	{
+		ts.AssertUniqueCommitmentChain(ts.Nodes()...)
+		ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
+		ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
+		ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
+		ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(nodesP1[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
+		// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
+		ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
+
+		ts.AssertCommitmentsAndChainsEvicted(oldestNonEvictedCommitment-1, ts.Nodes()...)
+	}
 }
 
 func TestProtocol_EngineSwitching_Tie(t *testing.T) {
@@ -826,6 +838,8 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	}
 
 	ts.Run(false, nodesOptions)
+
+	nodes[0].Protocol.SetLogLevel(log.LevelTrace)
 
 	expectedCommittee := []iotago.AccountID{nodes[0].Validator.AccountID, nodes[1].Validator.AccountID, nodes[2].Validator.AccountID}
 
@@ -951,6 +965,9 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		}
 
 		ts.AssertStrongTips(tipBlocks, targetNodes...)
+
+		// Assert Protocol.Chains and Protocol.Commitments state.
+		// TODO: assert here
 	}
 
 	issueBlocks(0, []iotago.SlotIndex{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13})
@@ -985,9 +1002,9 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	issueBlocks(2, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
 	issueBlocks(3, []iotago.SlotIndex{14, 15, 16, 17, 18, 19, 20})
 
-	commitment140, _ := nodes[0].Protocol.Chains.Main.Get().Commitment(14)
-	commitment141, _ := nodes[1].Protocol.Chains.Main.Get().Commitment(14)
-	commitment142, _ := nodes[2].Protocol.Chains.Main.Get().Commitment(14)
+	commitment140 := ts.CommitmentOfMainEngine(nodes[0], 14)
+	commitment141 := ts.CommitmentOfMainEngine(nodes[1], 14)
+	commitment142 := ts.CommitmentOfMainEngine(nodes[2], 14)
 
 	var mainPartition []*mock.Node
 	var otherPartitions []*mock.Node
@@ -1003,10 +1020,8 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		otherPartitions = []*mock.Node{nodes[0], nodes[1]}
 	}
 
-	oldestNonEvictedCommitmentBeforeMerge := mainPartition[0].Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - maxCommittableAge
-
-	engineCommitmentsP2 := ts.CommitmentsOfMainEngine(otherPartitions[0], oldestNonEvictedCommitmentBeforeMerge, 18)
-	engineCommitmentsP3 := ts.CommitmentsOfMainEngine(otherPartitions[0], oldestNonEvictedCommitmentBeforeMerge, 18)
+	engineCommitmentsP2 := ts.CommitmentsOfMainEngine(otherPartitions[0], lastCommonSlot+1, 18)
+	engineCommitmentsP3 := ts.CommitmentsOfMainEngine(otherPartitions[1], lastCommonSlot+1, 18)
 
 	// Merge the partitions
 	{
@@ -1047,6 +1062,7 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 	ts.AssertEqualStoredCommitmentAtIndex(expectedCommittedSlotAfterPartitionMerge, ts.Nodes()...)
 
 	oldestNonEvictedCommitment := mainPartition[0].Protocol.Engines.Main.Get().SyncManager.LatestFinalizedSlot() - maxCommittableAge
+	fmt.Println("Oldest non-evicted commitment: ", oldestNonEvictedCommitment)
 	commitmentsMainChain := ts.CommitmentsOfMainEngine(mainPartition[0], oldestNonEvictedCommitment, expectedCommittedSlotAfterPartitionMerge)
 	ultimateCommitmentsP2 := lo.Filter(engineCommitmentsP2, func(commitment *model.Commitment) bool {
 		return commitment.Slot() >= oldestNonEvictedCommitment
@@ -1055,18 +1071,31 @@ func TestProtocol_EngineSwitching_Tie(t *testing.T) {
 		return commitment.Slot() >= oldestNonEvictedCommitment
 	})
 
+	// TODO: remove prints
+	fmt.Println("Commitments on main chain: ", lo.Map(commitmentsMainChain, func(c *model.Commitment) iotago.CommitmentID {
+		return c.ID()
+	}))
+	fmt.Println("Ultimate commitments P2: ", lo.Map(ultimateCommitmentsP2, func(c *model.Commitment) iotago.CommitmentID {
+		return c.ID()
+	}))
+	fmt.Println("Ultimate commitments P3: ", lo.Map(ultimateCommitmentsP3, func(c *model.Commitment) iotago.CommitmentID {
+		return c.ID()
+	}))
+
 	ts.AssertUniqueCommitmentChain(ts.Nodes()...)
 	ts.AssertLatestEngineCommitmentOnMainChain(ts.Nodes()...)
-	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, true, ts.Nodes()...)
-	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP3, true, ts.Nodes()...)
+
+	// We have not evicted the slot below the forking point, so chains are not yet orphaned.
+	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP2, false, ts.Nodes()...)
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, ultimateCommitmentsP2[0].ID(), ts.Nodes()...)
+
+	ts.AssertCommitmentsOrphaned(ultimateCommitmentsP3, false, ts.Nodes()...)
+	ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, iotago.EmptyCommitmentID, ts.Nodes()...)
 
 	ts.AssertCommitmentsOrphaned(commitmentsMainChain, false, ts.Nodes()...)
 	ts.AssertCommitmentsOnChain(commitmentsMainChain, ts.CommitmentOfMainEngine(mainPartition[0], oldestNonEvictedCommitment).ID(), ts.Nodes()...)
-	// EmptyCommitmentID as ChainID means that the chain on those commitments should be set to nil.
 
-	ts.AssertCommitmentsOnChain(ultimateCommitmentsP2, iotago.EmptyCommitmentID, ts.Nodes()...)
-	ts.AssertCommitmentsOnChain(ultimateCommitmentsP3, iotago.EmptyCommitmentID, ts.Nodes()...)
-
+	// TODO: ts.AssertCommitmentsAndChainsEvicted(11, ts.Nodes()...)
 }
 
 type Blocks []*blocks.Block
@@ -1083,8 +1112,8 @@ func slotPrefix(partition int, slot iotago.SlotIndex) string {
 	return "P" + strconv.Itoa(partition) + ":"
 }
 
-func commitmentWithLargestID(commitments ...*protocol.Commitment) *protocol.Commitment {
-	var largestCommitment *protocol.Commitment
+func commitmentWithLargestID(commitments ...*model.Commitment) *model.Commitment {
+	var largestCommitment *model.Commitment
 	for _, commitment := range commitments {
 		if largestCommitment == nil || bytes.Compare(lo.PanicOnErr(commitment.ID().Bytes()), lo.PanicOnErr(largestCommitment.ID().Bytes())) > 0 {
 			largestCommitment = commitment

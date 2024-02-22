@@ -54,11 +54,15 @@ func (t *TestSuite) AssertCommitmentsOnChain(expectedCommitments []*model.Commit
 				{
 					protocolCommitment, err := node.Protocol.Commitments.Get(expectedCommitment.ID(), false)
 					if err != nil {
-						return ierrors.Wrapf(err, "AssertCommitmentsOnChain: %s: expected commitment %s on chain %s not found", node.Name, protocolCommitment, chainID)
+						return ierrors.Wrapf(err, "AssertCommitmentsOnChain: %s: expected commitment %s on chain %s not found", node.Name, expectedCommitment.ID(), chainID)
 					}
 
 					if protocolCommitment.Chain.Get() != selectedChain {
-						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment %s not on correct chain, expected %s, got %s", node.Name, protocolCommitment, chainID, protocolCommitment.Chain.Get().ForkingPoint.Get().ID())
+						if selectedChain == nil {
+							return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment %s not on correct chain, expected nil, got %s (pointer: %p, name: %s)", node.Name, expectedCommitment.ID(), protocolCommitment.Chain.Get().ForkingPoint.Get().ID(), protocolCommitment.Chain.Get(), protocolCommitment.Chain.Get().LogName())
+						}
+
+						return ierrors.Errorf("AssertCommitmentsOnChain: %s: commitment %s not on correct chain, expected %s (pointer: %p, name: %s), got %s (pointer: %p, name: %s)", node.Name, expectedCommitment.ID(), chainID, selectedChain, selectedChain.LogName(), protocolCommitment.Chain.Get().ForkingPoint.Get().ID(), protocolCommitment.Chain.Get(), protocolCommitment.Chain.Get().LogName())
 					}
 				}
 
@@ -123,7 +127,7 @@ func (t *TestSuite) AssertUniqueCommitmentChain(nodes ...*mock.Node) {
 	}
 }
 
-func (t *TestSuite) AssertCommitmentsEvicted(expectedEvictedSlot iotago.SlotIndex, nodes ...*mock.Node) {
+func (t *TestSuite) AssertCommitmentsAndChainsEvicted(expectedEvictedSlot iotago.SlotIndex, nodes ...*mock.Node) {
 	mustNodes(nodes)
 
 	for _, node := range nodes {
@@ -136,7 +140,7 @@ func (t *TestSuite) AssertCommitmentsEvicted(expectedEvictedSlot iotago.SlotInde
 				}
 
 				if expectedEvictedSlot >= commitment.Slot() {
-					return ierrors.Errorf("AssertCommitmentsEvicted: %s: commitment %s not evicted", node.Name, commitment.ID())
+					return ierrors.Errorf("AssertCommitmentsAndChainsEvicted: %s: commitment %s not evicted", node.Name, commitment.ID())
 				}
 
 				return nil
@@ -148,7 +152,7 @@ func (t *TestSuite) AssertCommitmentsEvicted(expectedEvictedSlot iotago.SlotInde
 				for i := iotago.SlotIndex(0); i <= expectedEvictedSlot; i++ {
 					commitment, exists := chain.Commitment(expectedEvictedSlot)
 					if exists {
-						return ierrors.Errorf("AssertCommitmentsEvicted: %s: commitment %s on chain %s not evicted", node.Name, commitment.ID(), chain.ForkingPoint.Get().ID())
+						return ierrors.Errorf("AssertCommitmentsAndChainsEvicted: %s: commitment %s on chain %s not evicted", node.Name, commitment.ID(), chain.ForkingPoint.Get().ID())
 					}
 				}
 
@@ -160,7 +164,7 @@ func (t *TestSuite) AssertCommitmentsEvicted(expectedEvictedSlot iotago.SlotInde
 			// Make sure that we don't have dangling chains.
 			if err := node.Protocol.Chains.Set.ForEach(func(chain *protocol.Chain) error {
 				if _, exists := seenChains[chain]; !exists {
-					return ierrors.Errorf("AssertCommitmentsEvicted: %s: chain %s not evicted", node.Name, chain.ForkingPoint.Get().ID())
+					return ierrors.Errorf("AssertCommitmentsAndChainsEvicted: %s: chain %s not evicted, total count of chains (from commitments)=%d, actual (in Protocol.Chains)=%d", node.Name, chain.ForkingPoint.Get().ID(), len(seenChains), node.Protocol.Chains.Set.Size())
 				}
 
 				return nil
