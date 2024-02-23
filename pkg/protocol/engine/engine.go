@@ -133,7 +133,8 @@ func New(
 			e.ReactiveModule = e.initReactiveModule(logger)
 
 			e.errorHandler = func(err error) {
-				e.LogTrace("engine error", "err", err)
+				// TODO: should switch to some level that doesn't panic before release.
+				e.LogPanic("engine error", "err", err)
 			}
 
 			// Import the settings from the snapshot file if needed.
